@@ -9,6 +9,8 @@
  * else in an entry is stepped over rather than modelled.
  */
 
+import type { Translator } from "@polaris/core";
+import { gameCatalogs, type GameKey } from "../../../messages";
 import { dataReplyValue, readFirstAccepted, readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
 
 /**
@@ -55,11 +57,26 @@ export const MAIN_SLOT_ROWS: readonly (readonly number[])[] = [range(9, 9), rang
 
 /** Where a slot number puts the item, in the words the game uses for it. */
 export function slotLabel(slot: number): string {
-    if (slot === OFFHAND_SLOT) return "Offhand";
-    if (slot >= 100 && slot <= 103) return ["Boots", "Leggings", "Chestplate", "Helmet"][slot - 100] ?? "Armour";
-    if (slot >= 0 && slot <= 8) return `Hotbar ${slot + 1}`;
-    return `Slot ${slot}`;
+    return slotLabelIn(ENGLISH, slot);
 }
+
+/** The same name, in the language of the translator given. */
+export function slotLabelIn(t: Translator<GameKey<"minecraft">>, slot: number): string {
+    if (slot === OFFHAND_SLOT) return t("inventory.slots.offhand");
+    if (slot >= 100 && slot <= 103) return t(ARMOUR_KEYS[slot - 100]!);
+    if (slot >= 0 && slot <= 8) return t("inventory.slots.hotbar", { number: slot + 1 });
+    return t("inventory.slots.slot", { number: slot });
+}
+
+const ENGLISH = gameCatalogs.translator("en-US", "minecraft");
+
+/** Slots 100 to 103, feet up. */
+const ARMOUR_KEYS: readonly GameKey<"minecraft">[] = [
+    "inventory.slots.boots",
+    "inventory.slots.leggings",
+    "inventory.slots.chestplate",
+    "inventory.slots.helmet"
+];
 
 /**
  * The stacks the drawn slots do not account for.

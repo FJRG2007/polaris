@@ -226,5 +226,55 @@
     },
     "timeout": {
         "left": "{unit, select, now {lifting now} m {{count}m left} h {{count}h left} other {{count}d left}}"
+    },
+    "vocab": {
+        "filters": {
+            "all": "Everyone",
+            "online": "Online",
+            "allowed": "Allowed in",
+            "operators": "Operators",
+            "banned": "Banned"
+        },
+        "action": {
+            "add": "Add player",
+            "edit": "Edit {name}",
+            "allow": "Allow {name} in",
+            "remove": "Remove {name} from the player list",
+            "kick": "Kick {name}",
+            "ban": "Ban {name}",
+            "pardon": "Lift the ban on {name}",
+            "timeout": "Time {name} out",
+            "message": "Message {name}",
+            "more": "More for {name}"
+        },
+        "menu": {
+            "edit": "Edit player",
+            "timeout": "Time out",
+            "pardon": "Lift the ban",
+            "message": "Message them",
+            "history": "Joins and leaves"
+        },
+        "standing": {
+            "allowed": "allowed",
+            "notAllowed": "not on the list",
+            "waiting": "waiting",
+            "banned": "banned",
+            "operator": "operator"
+        },
+        "presence": {
+            "playing": "Playing",
+            "afk": "AFK",
+            "connecting": "Connecting",
+            "offline": "Offline",
+            "never": "Never joined"
+        },
+        "confirm": {
+            "kickTitle": "Kick {name}?",
+            "kickBody": "They are disconnected and can join again straight away.",
+            "banTitle": "Ban {name}?",
+            "banBody": "They are disconnected and cannot rejoin until the ban is lifted.",
+            "removeTitle": "Remove {name} from the player list?",
+            "removeBody": "The running server is told at once. While the server only lets in players on the list, they cannot join again until they are added back."
+        }
     }
 }

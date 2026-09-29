@@ -19,7 +19,8 @@
  */
 
 import Link from "next/link";
-import { timeoutText, useGameText } from "../game-text";
+import type { GameKey } from "../../../messages";
+import { timeoutText, useGameText, usePlayerWords } from "../game-text";
 import { ArkMods } from "./ark-mods";
 import { ArkRules } from "./ark-rules";
 import * as actions from "./ark-actions";
@@ -53,14 +54,6 @@ import {
     ArkMessageDialog,
     ArkPlayerDialog
 } from "./ark-player-dialogs";
-import {
-    playerAction,
-    playerConfirm,
-    playerFilters,
-    playerMenuItem,
-    playerPresence,
-    playerStanding
-} from "../../lib/player-vocabulary";
 import {
     Badge,
     Button,
@@ -176,7 +169,7 @@ export function ArkPanel({
      *  be opened for players outside this network. */
     game: GameContext | null;
     held: readonly Permission[];
-    onStatus?: (label: string | null) => void;
+    onStatus?: (label: string | null, tone?: "danger") => void;
 }) {
     const t = useGameText("ark");
     const router = useRouter();
@@ -239,7 +232,7 @@ export function ArkPanel({
                 error?: string;
             };
             if (!response.ok || !data.status) {
-                setError(data.error ?? "Could not read the server");
+                setError(data.error ?? t("panel.readFailed"));
                 return;
             }
             setError(null);
@@ -309,8 +302,9 @@ export function ArkPanel({
     const isRunning = status?.running ?? running;
 
     useEffect(() => {
-        onStatus?.(statusLabel(reading.status, isRunning));
-    }, [onStatus, reading.status, isRunning]);
+        const state = statusState(reading.status, isRunning);
+        onStatus?.(state === null ? null : t(STATE_LABEL[state]), state === "notRunning" ? "danger" : undefined);
+    }, [onStatus, reading.status, isRunning, t]);
 
     const reloadSettings = useCallback(() => {
         router.refresh();
@@ -519,7 +513,7 @@ function ConnectCard({
         setSaving(true);
         const result = await actions.saveArkWorldAction(installedAppId);
         setSaving(false);
-        setSaved(result.error ?? "World saved");
+        setSaved(result.error ?? t("panel.worldSaved"));
     }
 
     return (
@@ -544,12 +538,12 @@ function ConnectCard({
                             <JoinAddress
                                 title={t("panel.addInSteamOrThe")}
                                 value={withPort(address, status?.queryPort ?? ports.query)}
-                                detail="Steam, View, Servers, Favorites, +. It appears in ARK under Favorites."
+                                detail={t("panel.steamPath")}
                             />
                             <JoinAddress
                                 title={t("panel.orConnectStraightToIt")}
                                 value={`open ${withPort(address, status?.gamePort ?? ports.game)}`}
-                                detail="In a loaded single-player world, press Tab and type this. ARK has no console on its menu."
+                                detail={t("panel.consoleHint")}
                             />
                         </>
                     )}
@@ -723,30 +717,41 @@ function withPresence(
     };
 }
 
-/** What the server is doing, in one word. "Meant to be running" and "running" are
- *  different things, and the header is told which. */
-function statusLabel(status: ArkStatus | null, running: boolean): string | null {
+type ServerState = "crashLoop" | "stopped" | "notRunning" | "online" | "starting";
+
+/** Each state in one word, for the page header. */
+const STATE_LABEL: Readonly<Record<ServerState, GameKey<"ark">>> = {
+    crashLoop: "panel.crashLoop",
+    stopped: "panel.stopped",
+    notRunning: "panel.notRunning",
+    online: "panel.online",
+    starting: "panel.starting"
+};
+
+/** What the server is doing. "Meant to be running" and "running" are different
+ *  things, and the header is told which. */
+function statusState(status: ArkStatus | null, running: boolean): ServerState | null {
     if (status === null) return null;
-    // Before either of the two words below, both of which a looping container is
+    // Before either of the two states below, both of which a looping container is
     // momentarily entitled to and neither of which is the useful one.
-    if (status.crashLoop) return "Crash loop";
-    if (!running || !status.running) return "Stopped";
-    if (status.containerRunning === false) return "Not running";
-    return status.answering ? "Online" : "Starting";
+    if (status.crashLoop) return "crashLoop";
+    if (!running || !status.running) return "stopped";
+    if (status.containerRunning === false) return "notRunning";
+    return status.answering ? "online" : "starting";
 }
 
 function StatusBadge({ status, running }: { status: ArkStatus | null; running: boolean }) {
     const t = useGameText("ark");
-    const label = statusLabel(status, running);
-    if (label === null) return <Skeleton className="h-6 w-20" />;
-    if (label === "Crash loop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
-    if (label === "Not running") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
-    if (label === "Starting")
+    const state = statusState(status, running);
+    if (state === null) return <Skeleton className="h-6 w-20" />;
+    if (state === "crashLoop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
+    if (state === "notRunning") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
+    if (state === "starting")
         return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
-    if (label === "Stopped") return <Badge>{t("panel.stopped")}</Badge>;
+    if (state === "stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return (
         <Badge className="border-success-edge text-success">
-            {status?.players.length} / {status?.max ?? "?"} online
+            {t("panel.playersOnline", { count: status?.players.length ?? 0, max: status?.max ?? "?" })}
         </Badge>
     );
 }
@@ -926,6 +931,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: ArkAccessView) => void;
 }) {
+    const { playerFilters, playerAction, playerConfirm } = usePlayerWords();
     const t = useGameText("ark");
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
@@ -1126,7 +1132,7 @@ function PlayersTab({
                 ]}
                 search={query}
                 onSearch={setQuery}
-                searchPlaceholder="Search by name or Steam id"
+                searchPlaceholder={t("panel.searchPlaceholder")}
                 filter={filter}
                 onFilter={setFilter}
                 // Named once for every game - see `player-vocabulary`. Operators
@@ -1144,7 +1150,7 @@ function PlayersTab({
                             and not be. */}
                         {canManage && (
                             <ToolbarSwitch
-                                label={{ on: "List enforced", off: "Anyone may join" }}
+                                label={{ on: t("panel.listOn"), off: t("panel.listOff") }}
                                 checked={access?.closed ?? false}
                                 disabled={pending || access === null}
                                 onChange={onSetClosed}
@@ -1160,8 +1166,8 @@ function PlayersTab({
                 isEmpty={shown.length === 0}
                 empty={
                     players.length === 0
-                        ? (status?.message ?? "Nobody is on the list and nobody is playing.")
-                        : "Nobody matches that."
+                        ? (status?.message ?? t("panel.nobodyAtAll"))
+                        : t("panel.nobodyMatches")
                 }
                 rows={shown.map((entry) => (
                     <ArkPlayerRow
@@ -1186,8 +1192,8 @@ function PlayersTab({
                                 () =>
                                     actions.setArkAdminAction(installedAppId, entry.steamId, next),
                                 next
-                                    ? `${entry.name} administers this server from its next start.`
-                                    : `${entry.name} stops administering it at its next start.`
+                                    ? t("panel.adminOn", { name: entry.name })
+                                    : t("panel.adminOff", { name: entry.name })
                             )
                         }
                         timeout={timeoutFor(timeouts, entry.steamId)}
@@ -1234,8 +1240,8 @@ function PlayersTab({
                                                 entry.steamId,
                                                 "kill"
                                             ),
-                                        "Sent to the server. ARK does not answer a kill, so watch the game.",
-                                        (reason) => `${entry.name} was not killed: ${reason}`
+                                        t("panel.killSent"),
+                                        (reason) => t("panel.notKilled", { name: entry.name, reason })
                                     );
                                 }
                             })
@@ -1256,9 +1262,8 @@ function PlayersTab({
                                                 entry.steamId,
                                                 "strip"
                                             ),
-                                        "Sent to the server.",
-                                        (reason) =>
-                                            `${entry.name}'s inventory was left alone: ${reason}`
+                                        t("panel.sentToServer"),
+                                        (reason) => t("panel.notStripped", { name: entry.name, reason })
                                     );
                                 }
                             })
@@ -1277,7 +1282,7 @@ function PlayersTab({
                                                 entry.steamId,
                                                 "kick"
                                             ),
-                                        `${entry.name} was kicked.`
+                                        t("panel.kicked", { name: entry.name })
                                     );
                                 }
                             })
@@ -1296,7 +1301,7 @@ function PlayersTab({
                                                 entry.steamId,
                                                 "ban"
                                             ),
-                                        `${entry.name} is banned.`
+                                        t("panel.banned", { name: entry.name })
                                     );
                                 }
                             })
@@ -1308,7 +1313,7 @@ function PlayersTab({
                             // and unban a person nobody had banned since.
                             run(
                                 () => actions.liftArkTimeoutAction(installedAppId, entry.steamId),
-                                `The ban on ${entry.name} is lifted.`
+                                t("panel.unbanned", { name: entry.name })
                             )
                         }
                     />
@@ -1374,7 +1379,7 @@ function PlayersTab({
                                     input.label,
                                     input.userId
                                 ),
-                            target ? undefined : "Added. The server is told as soon as it answers."
+                            target ? undefined : t("panel.added")
                         )
                     }
                 />
@@ -1393,7 +1398,7 @@ function PlayersTab({
                                     target.steamId,
                                     message
                                 ),
-                            `Sent to ${target.name}.`
+                            t("panel.sentTo", { name: target.name })
                         )
                     }
                 />
@@ -1420,14 +1425,16 @@ function PlayersTab({
                             // Said rather than claimed: the server takes the
                             // command and answers nothing either way, so the note
                             // is about what was sent.
-                            `Sent ${lines.length === 1 ? `${lines[0]?.quantity ?? 1}` : `${lines.length} things`} to ${target.name}. ARK does not confirm a give - ask them to look.`,
+                            lines.length === 1
+                                ? t("panel.gaveOne", { quantity: lines[0]?.quantity ?? 1, name: target.name })
+                                : t("panel.gaveMany", { count: lines.length, name: target.name }),
                             // Part of a list can land before something stops the
                             // rest, and the refusal says how far it got - so this
                             // may not claim they were given nothing.
                             (reason) =>
                                 lines.length === 1
-                                    ? `${target.name} was not given anything: ${reason}`
-                                    : `${target.name} was not given everything: ${reason}`
+                                    ? t("panel.gaveNothing", { name: target.name, reason })
+                                    : t("panel.gavePart", { name: target.name, reason })
                         );
                     }}
                 />
@@ -1446,8 +1453,8 @@ function PlayersTab({
                                     target.steamId,
                                     amount
                                 ),
-                            `Sent ${amount} experience to ${target.name}.`,
-                            (reason) => `${target.name} was given no experience: ${reason}`
+                            t("panel.experienceSent", { amount, name: target.name }),
+                            (reason) => t("panel.experienceRefused", { name: target.name, reason })
                         )
                     }
                 />
@@ -1467,7 +1474,7 @@ function PlayersTab({
                                     minutes,
                                     reason
                                 }),
-                            `${target.name} is out for a while.`
+                            t("panel.timedOut", { name: target.name })
                         )
                     }
                 />
@@ -1503,7 +1510,7 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
                 return;
             }
             setMessage("");
-            setNote("Sent to everyone playing.");
+            setNote(t("panel.sentToEveryone"));
         });
     }
 
@@ -1617,6 +1624,7 @@ function ArkPlayerRow({
     onUnban: () => void;
     onTimeout: () => void;
 }) {
+    const { playerAction, playerMenuItem, playerStanding, playerPresence } = usePlayerWords();
     const tGames = useGameText("games");
     const t = useGameText("ark");
     // Every verb that reaches the game needs a server that is answering. Editing
@@ -1700,8 +1708,8 @@ function ArkPlayerRow({
                         {
                             kind: "item",
                             text: admin
-                                ? "Stop them administering it"
-                                : "Let them administer it",
+                                ? t("panel.menu.adminOff")
+                                : t("panel.menu.adminOn"),
                             icon: admin ? (
                                 <ShieldMinus className="size-4" />
                             ) : (
@@ -1717,7 +1725,7 @@ function ArkPlayerRow({
               // difference between a moderator deciding and guessing.
               {
                   kind: "link",
-                  text: "Open their Steam profile",
+                  text: t("panel.menu.steamProfile"),
                   icon: <Eye className="size-4" />,
                   href: `https://steamcommunity.com/profiles/${entry.steamId}`
               },
@@ -1725,7 +1733,7 @@ function ArkPlayerRow({
               // exactly the question asked about a name that is not there.
               {
                   kind: "item",
-                  text: "Their history",
+                  text: t("panel.menu.history"),
                   icon: <Clock className="size-4" />,
                   onSelect: onHistory
               },
@@ -1742,14 +1750,14 @@ function ArkPlayerRow({
               // an offline give would be a command the server takes and drops.
               {
                   kind: "item",
-                  text: "Give them something",
+                  text: t("panel.menu.give"),
                   icon: <PackagePlus className="size-4" />,
                   disabled: !live || !entry.online,
                   onSelect: onGive
               },
               {
                   kind: "item",
-                  text: "Give them experience",
+                  text: t("panel.menu.experience"),
                   icon: <Sparkles className="size-4" />,
                   disabled: !live || !entry.online,
                   onSelect: onExperience
@@ -1761,7 +1769,7 @@ function ArkPlayerRow({
               // never played here.
               {
                   kind: "item",
-                  text: "Kill their survivor",
+                  text: t("panel.menu.kill"),
                   icon: <Skull className="size-4" />,
                   danger: true,
                   disabled: !live || !entry.online,
@@ -1769,7 +1777,7 @@ function ArkPlayerRow({
               },
               {
                   kind: "item",
-                  text: "Empty their inventory",
+                  text: t("panel.menu.strip"),
                   icon: <PackageMinus className="size-4" />,
                   danger: true,
                   disabled: !live || !entry.online,
@@ -2113,7 +2121,7 @@ function PasswordCard({
                     <>
                         <ChangePassword
                             label={t("panel.newJoinPassword")}
-                            help="Players type this. Applied the next time the server starts."
+                            help={t("panel.joinPasswordHelp")}
                             save={(value) =>
                                 actions.setArkJoinPasswordAction(installedAppId, value)
                             }
@@ -2121,7 +2129,7 @@ function PasswordCard({
                         />
                         <ChangePassword
                             label={t("panel.newAdminPassword")}
-                            help="Typed after enablecheats in game. Applied the next time the server starts."
+                            help={t("panel.adminPasswordHelp")}
                             save={(value) =>
                                 actions.setArkAdminPasswordAction(installedAppId, value)
                             }
@@ -2167,7 +2175,7 @@ function ChangePassword({
             }
             setValue("");
             onSaved();
-            setMessage("Saved. It takes effect the next time the server starts.");
+            setMessage(t("panel.savedNextStart"));
         });
     }
 

@@ -65,6 +65,12 @@
         "lastOn": "Last on <time></time>",
         "messageNamed": "Message {name}",
         "listCounts": "{listed} on the list, {banned} banned.",
-        "keyHelp": "The free key from <link>keymaster</link>. A key is tied to the address it was issued for, so a server that has moved needs a new one. It is never shown back."
+        "keyHelp": "The free key from <link>keymaster</link>. A key is tied to the address it was issued for, so a server that has moved needs a new one. It is never shown back.",
+        "readFailed": "Could not read the server",
+        "searchPlaceholder": "Search by name or identifier",
+        "reading": "Reading the server...",
+        "nobodyAtAll": "Nobody is playing, and nobody has been added yet.",
+        "notAnswering": "The server is not answering.",
+        "savedRestart": "Saved. Restart the server to run on it."
     }
 }

@@ -24,6 +24,7 @@
  */
 
 import { X } from "lucide-react";
+import { useGameText } from "../game-text";
 import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "../../lib/minecraft/items";
@@ -35,7 +36,7 @@ import {
     OFFHAND_SLOT,
     bySlot,
     extraSlots,
-    slotLabel,
+    slotLabelIn,
     type InventoryItem
 } from "../../lib/minecraft/inventory";
 
@@ -107,6 +108,7 @@ export function InventoryGrid({
     /** Called with a waiting stack's queued id to call it back off the slot. */
     onCancelPending?: (id: string) => void;
 }) {
+    const t = useGameText("minecraft");
     const slots = bySlot(items);
     const extra = extraSlots(items);
     const total = items.reduce((sum, item) => sum + item.count, 0);
@@ -121,28 +123,25 @@ export function InventoryGrid({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-6">
-                <Section label="Worn" slots={ARMOUR_SLOTS} columns={4} {...shared} />
-                <Section label="Offhand" slots={[OFFHAND_SLOT]} columns={1} {...shared} />
+                <Section label={t("inventory.worn")} slots={ARMOUR_SLOTS} columns={4} {...shared} />
+                <Section label={t("inventory.offhand")} slots={[OFFHAND_SLOT]} columns={1} {...shared} />
             </div>
 
-            <Section label="Bag" slots={MAIN_SLOT_ROWS.flat()} columns={9} grow {...shared} />
-            <Section label="Hotbar" slots={HOTBAR_SLOTS} columns={9} grow {...shared} />
+            <Section label={t("inventory.bag")} slots={MAIN_SLOT_ROWS.flat()} columns={9} grow {...shared} />
+            <Section label={t("inventory.hotbar")} slots={HOTBAR_SLOTS} columns={9} grow {...shared} />
 
             {/* Vanilla has nowhere else to put an item, so anything here came from
                 a mod - worth showing rather than quietly dropping. Never editable:
                 `/item replace` has no name for a slot only a mod knows about. */}
             {extra.length > 0 && (
-                <Section label="Elsewhere" slots={extra.map((item) => item.slot)} at={slots} columns={9} grow />
+                <Section label={t("inventory.elsewhere")} slots={extra.map((item) => item.slot)} at={slots} columns={9} grow />
             )}
 
             <p className="text-xs text-muted-foreground">
                 {items.length === 0
-                    ? "Nothing in it."
-                    : `${total} ${total === 1 ? "item" : "items"} in ${items.length} ${
-                          items.length === 1 ? "stack" : "stacks"
-                      }.`}
-                {waiting.size > 0 &&
-                    ` ${waiting.size} ${waiting.size === 1 ? "stack is" : "stacks are"} waiting for them to join.`}
+                    ? t("inventory.nothingInIt")
+                    : t("inventory.summary", { total, stacks: items.length })}
+                {waiting.size > 0 && ` ${t("inventory.waiting", { count: waiting.size })}`}
             </p>
         </div>
     );
@@ -216,7 +215,8 @@ function Slot({
     handlers?: SlotHandlers;
     onCancelPending?: (id: string) => void;
 }) {
-    const where = slotLabel(slot);
+    const t = useGameText("minecraft");
+    const where = slotLabelIn(t, slot);
     // A stack whose data cannot be written back exactly is not draggable at all,
     // rather than draggable and refused on drop. The check is the same one the
     // action runs, so the two can never disagree about which stacks those are.
@@ -241,8 +241,8 @@ function Slot({
         const what = `${pending.count} x ${name}`;
         return (
             <li
-                title={`${what} - ${where}, when they next join`}
-                aria-label={`${where}: ${what} waiting for them to join`}
+                title={t("inventory.pendingTitle", { what, where })}
+                aria-label={t("inventory.pendingLabel", { what, where })}
                 {...dropProps}
                 className="relative aspect-square rounded border border-dashed border-primary/60 bg-primary/5 p-0.5"
             >
@@ -261,8 +261,8 @@ function Slot({
                 {onCancelPending && (
                     <button
                         type="button"
-                        title={`Call back ${what}`}
-                        aria-label={`Call back ${what} from ${where}`}
+                        title={t("inventory.callBack", { what })}
+                        aria-label={t("inventory.callBackFrom", { what, where })}
                         onClick={() => onCancelPending(pending.id)}
                         className="absolute -right-1 -top-1 rounded-full border border-border bg-surface p-0.5 text-muted-foreground transition-colors hover:text-danger"
                     >

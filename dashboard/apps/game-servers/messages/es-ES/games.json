@@ -226,5 +226,55 @@
     },
     "timeout": {
         "left": "{unit, select, now {termina ya} m {quedan {count} min} h {quedan {count} h} other {quedan {count} d}}"
+    },
+    "vocab": {
+        "filters": {
+            "all": "Todos",
+            "online": "En línea",
+            "allowed": "Admitidos",
+            "operators": "Operadores",
+            "banned": "Vetados"
+        },
+        "action": {
+            "add": "Nuevo jugador",
+            "edit": "Editar a {name}",
+            "allow": "Dejar entrar a {name}",
+            "remove": "Quitar a {name} de la lista de jugadores",
+            "kick": "Expulsar a {name}",
+            "ban": "Vetar a {name}",
+            "pardon": "Levantar el veto a {name}",
+            "timeout": "Aislar a {name}",
+            "message": "Escribir a {name}",
+            "more": "Más para {name}"
+        },
+        "menu": {
+            "edit": "Editar jugador",
+            "timeout": "Aislar",
+            "pardon": "Levantar veto",
+            "message": "Escribirle",
+            "history": "Entradas y salidas"
+        },
+        "standing": {
+            "allowed": "admitido",
+            "notAllowed": "fuera de lista",
+            "waiting": "pendiente",
+            "banned": "vetado",
+            "operator": "operador"
+        },
+        "presence": {
+            "playing": "Jugando",
+            "afk": "AFK",
+            "connecting": "Conectando",
+            "offline": "Fuera",
+            "never": "Nunca entró"
+        },
+        "confirm": {
+            "kickTitle": "¿Expulsar a {name}?",
+            "kickBody": "Se le desconecta y puede volver a entrar enseguida.",
+            "banTitle": "¿Vetar a {name}?",
+            "banBody": "Se le desconecta y no puede volver hasta que se levante el veto.",
+            "removeTitle": "¿Quitar a {name} de la lista de jugadores?",
+            "removeBody": "Se avisa al servidor en marcha al momento. Mientras el servidor solo deje entrar a los de la lista, no podrá volver hasta que se le añada de nuevo."
+        }
     }
 }

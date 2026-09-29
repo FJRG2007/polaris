@@ -65,6 +65,12 @@
         "lastOn": "Visto <time></time>",
         "messageNamed": "Escribir a {name}",
         "listCounts": "{listed} en la lista, {banned} vetados.",
-        "keyHelp": "La clave gratuita de <link>keymaster</link>. Una clave va ligada a la dirección para la que se emitió, así que un servidor que se ha movido necesita otra. Nunca se vuelve a mostrar."
+        "keyHelp": "La clave gratuita de <link>keymaster</link>. Una clave va ligada a la dirección para la que se emitió, así que un servidor que se ha movido necesita otra. Nunca se vuelve a mostrar.",
+        "readFailed": "No se pudo leer el servidor",
+        "searchPlaceholder": "Buscar por nombre o identificador",
+        "reading": "Leyendo el servidor...",
+        "nobodyAtAll": "No hay nadie jugando, y aún no se ha añadido a nadie.",
+        "notAnswering": "El servidor no responde.",
+        "savedRestart": "Guardado. Reinicia el servidor para que lo use."
     }
 }

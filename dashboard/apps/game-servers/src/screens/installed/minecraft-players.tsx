@@ -18,7 +18,8 @@
  */
 
 import * as actions from "./minecraft-actions";
-import { timeoutText, useGameText } from "../game-text";
+import { timeoutText, useGameText, usePlayerWords, type GameText } from "../game-text";
+import type { PlayerWords } from "../../lib/player-vocabulary";
 import { forgetLoginAction } from "./minecraft-login-actions";
 import type { PlayerSeen } from "../../lib/games-activity";
 import type { MinecraftModeration } from "./minecraft-actions";
@@ -38,14 +39,6 @@ import type {
     MinecraftRoster,
     MinecraftStatus
 } from "../../lib/minecraft/service";
-import {
-    playerAction,
-    playerConfirm,
-    playerFilters,
-    playerMenuItem,
-    playerPresence,
-    playerStanding
-} from "../../lib/player-vocabulary";
 import {
     ExperienceDialog,
     HistoryDialog,
@@ -86,11 +79,6 @@ const { relativeTime } = hostUi.relativeTime;
 const { useConfirm } = hostUi.confirmDialog;
 const { ToolbarSwitch } = hostUi.toolbarSwitch;
 const { useDisplayFormat } = hostUi.displayFormat;
-
-/** The cuts an operator reaches for; anything finer is what search is for. Named
- *  once for every game - see `player-vocabulary`. Minecraft has operators, so it
- *  asks for that one. */
-const FILTERS = playerFilters({ operators: true });
 
 /** Nobody known to be idle: the screen before the first answer about it. */
 const NOBODY_IDLE: Readonly<Record<string, number>> = {};
@@ -157,6 +145,7 @@ export function MinecraftPlayers({
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
+    const { playerAction, playerConfirm, playerFilters } = usePlayerWords();
     const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -477,7 +466,7 @@ export function MinecraftPlayers({
                                                         installedAppId,
                                                         username: refusal.player,
                                                         address: from,
-                                                        note: "Added from a refused join"
+                                                        note: t("playersTab.addedFromRefusal")
                                                     })
                                                 )
                                             }
@@ -605,10 +594,12 @@ export function MinecraftPlayers({
                 ]}
                 search={query}
                 onSearch={setQuery}
-                searchPlaceholder="Search by name, address or note"
+                searchPlaceholder={t("playersTab.searchPlaceholder")}
                 filter={filter}
                 onFilter={(value) => setFilter(value as Filter)}
-                filters={FILTERS}
+                // The cuts an operator reaches for, named once for every game - see
+                // `player-vocabulary`. Minecraft has operators, so it asks for that one.
+                filters={playerFilters({ operators: true })}
                 toolbar={
                     <>
                         {!bedrock && (
@@ -653,10 +644,10 @@ export function MinecraftPlayers({
                 isEmpty={shown.length === 0}
                 empty={
                     !answering && players.length === 0
-                        ? (status?.message ?? "Connecting to the server...")
+                        ? (status?.message ?? t("playersTab.connecting"))
                         : players.length === 0
-                          ? "Nobody is registered and nobody is playing."
-                          : "Nobody matches that."
+                          ? t("playersTab.nobodyAtAll")
+                          : t("playersTab.nobodyMatches")
                 }
                 rows={shown.map((player) => (
                     <PlayerRow
@@ -916,6 +907,7 @@ function PlayerRow({
     onResetPassword?: () => void;
     onRevoke: () => void;
 }) {
+    const { playerAction, playerStanding } = usePlayerWords();
     const t = useGameText("minecraft");
     const tGames = useGameText("games");
     const { name } = player;
@@ -927,7 +919,10 @@ function PlayerRow({
     // Everything this row can do, in one list: the icons at its end, and the
     // longer set behind the `...`. The right button gets both, which is what
     // anybody who has used a file manager tries first on a table of names.
+    const words = usePlayerWords();
     const quick = quickEntries({
+        t,
+        words,
         player,
         bedrock,
         live,
@@ -937,6 +932,8 @@ function PlayerRow({
         onRevoke
     });
     const more = moreEntries({
+        t,
+        words,
         player,
         bedrock,
         live,
@@ -1025,7 +1022,7 @@ function PlayerRow({
                             <Badge variant="primary">{playerStanding.allowed}</Badge>
                         )}
                         {player.operator && <Badge>{playerStanding.operator}</Badge>}
-                        {player.whitelisted && <Badge>whitelisted</Badge>}
+                        {player.whitelisted && <Badge>{t("playersTab.whitelisted")}</Badge>}
                         {/* Whether they can get past Polaris login, on the servers that
                         ask for it. Somebody without one sets it on their next join. */}
                         {passwords &&
@@ -1081,7 +1078,7 @@ function PlayerRow({
                         {waiting > 0 && (
                             <Badge title={t("playersTab.waitingToReachThem")}>
                                 <Clock className="size-3" />
-                                {waiting} waiting
+                                {t("playersTab.waitingCount", { count: waiting })}
                             </Badge>
                         )}
                     </div>
@@ -1145,6 +1142,7 @@ function StatusCell({
     now: number;
     onOpen: (dialog: PlayerDialog) => void;
 }) {
+    const { playerPresence } = usePlayerWords();
     const t = useGameText("minecraft");
     const format = useDisplayFormat();
     const away = player.presence === "playing" && idleSince !== null;
@@ -1203,8 +1201,12 @@ function quickEntries({
     pending,
     onModerate,
     onModerateWithConfirm,
-    onRevoke
+    onRevoke,
+    t,
+    words
 }: {
+    t: GameText<"minecraft">;
+    words: PlayerWords;
     player: PlayerEntry;
     bedrock: boolean;
     live: boolean;
@@ -1217,13 +1219,14 @@ function quickEntries({
     ) => Promise<void>;
     onRevoke: () => void;
 }): RowMenuEntry[] {
+    const { playerAction, playerConfirm } = words;
     const { name } = player;
     const entries: RowMenuEntry[] = [];
 
     if (!bedrock) {
         entries.push({
             kind: "item",
-            text: player.operator ? `Remove ${name} as operator` : `Make ${name} an operator`,
+            text: player.operator ? t("playersTab.deop", { name }) : t("playersTab.op", { name }),
             icon: player.operator ? (
                 <ShieldMinus className="size-4" />
             ) : (
@@ -1235,8 +1238,8 @@ function quickEntries({
         entries.push({
             kind: "item",
             text: player.whitelisted
-                ? `Take ${name} off the whitelist`
-                : `Put ${name} on the whitelist`,
+                ? t("playersTab.unwhitelist", { name })
+                : t("playersTab.whitelist", { name }),
             icon: player.whitelisted ? (
                 <UserMinus className="size-4" />
             ) : (
@@ -1315,8 +1318,12 @@ function moreEntries({
     onOpen,
     onModerateWithConfirm,
     onGamemode,
-    onResetPassword
+    onResetPassword,
+    t,
+    words
 }: {
+    t: GameText<"minecraft">;
+    words: PlayerWords;
     player: PlayerEntry;
     bedrock: boolean;
     live: boolean;
@@ -1329,6 +1336,7 @@ function moreEntries({
     onGamemode: (players: readonly string[], mode: string) => Promise<void>;
     onResetPassword?: () => void;
 }): RowMenuEntry[] {
+    const { playerMenuItem } = words;
     return [
         { kind: "label", text: player.name },
         { kind: "separator" },
@@ -1351,21 +1359,21 @@ function moreEntries({
         // happens when they next join.
         {
             kind: "item",
-            text: "Inventory and items",
+            text: t("playersTab.menu.inventory"),
             icon: <Backpack className="size-4" />,
             disabled: !live || bedrock,
             onSelect: () => onOpen("inventory")
         },
         {
             kind: "item",
-            text: "Where they are",
+            text: t("playersTab.menu.location"),
             icon: <LocateFixed className="size-4" />,
             disabled: !live || bedrock || !player.online,
             onSelect: () => onOpen("location")
         },
         {
             kind: "item",
-            text: "Teleport",
+            text: t("playersTab.menu.teleport"),
             icon: <MapPin className="size-4" />,
             disabled: !live || bedrock || !player.online,
             onSelect: () => onOpen("teleport")
@@ -1375,7 +1383,7 @@ function moreEntries({
         // not.
         {
             kind: "item",
-            text: "Experience",
+            text: t("playersTab.menu.experience"),
             icon: <Sparkles className="size-4" />,
             disabled: !live || bedrock || !player.online,
             onSelect: () => onOpen("experience")
@@ -1396,7 +1404,7 @@ function moreEntries({
             ? ([
                   {
                       kind: "item",
-                      text: "Reset password",
+                      text: t("playersTab.menu.resetPassword"),
                       icon: <RotateCcw className="size-4" />,
                       onSelect: onResetPassword
                   }
@@ -1405,11 +1413,11 @@ function moreEntries({
         { kind: "separator" },
         // Flat rather than a submenu. Four items is not enough to be worth a
         // second layer somebody has to hover exactly onto.
-        { kind: "label", text: "Game mode", muted: true },
+        { kind: "label", text: t("playersTab.menu.gameMode"), muted: true },
         ...GAME_MODES.map(
             (mode): RowMenuEntry => ({
                 kind: "item",
-                text: mode.charAt(0).toUpperCase() + mode.slice(1),
+                text: t(`playersTab.modes.${mode}`),
                 icon: <Gamepad2 className="size-4" />,
                 disabled: !live || !player.online,
                 onSelect: () => void onGamemode([player.name], mode)
@@ -1418,15 +1426,15 @@ function moreEntries({
         { kind: "separator" },
         {
             kind: "item",
-            text: "Kill",
+            text: t("playersTab.menu.kill"),
             icon: <Skull className="size-4" />,
             danger: true,
             disabled: !live || bedrock || !player.online,
             onSelect: () =>
                 void onModerateWithConfirm(
                     { action: "kill", player: player.name },
-                    `Kill ${player.name}?`,
-                    "They die where they stand and drop what they were carrying. Nothing stops them respawning."
+                    t("playersTab.killTitle", { name: player.name }),
+                    t("playersTab.killBody")
                 )
         },
         {
@@ -1455,11 +1463,12 @@ function WhitelistSwitch({
     onError: (message: string | null) => void;
     onChanged: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
 
     return (
         <ToolbarSwitch
-            label={{ on: "Whitelist enforced", off: "Whitelist off" }}
+            label={{ on: t("playersTab.whitelistOn"), off: t("playersTab.whitelistOff") }}
             checked={enforced}
             disabled={disabled || pending}
             onChange={(next) => {
@@ -1514,8 +1523,8 @@ export function FirewallSection({
             }
             setApplied(
                 result.banned === 0
-                    ? "Every blocked address was already banned here"
-                    : `Banned ${result.banned} ${result.banned === 1 ? "address" : "addresses"}`
+                    ? t("playersTab.allBanned")
+                    : t("playersTab.bannedCount", { count: result.banned })
             );
             onChanged();
         });

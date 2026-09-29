@@ -21,6 +21,7 @@
  */
 
 import { updateServerSettingsAction } from "./minecraft-actions";
+import { useGameText } from "../game-text";
 import { memoryChangeSentence } from "../../lib/minecraft/memory-plan";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
@@ -88,6 +89,7 @@ export function MinecraftMods({
     packCommands?: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const projectsSetting = settings.find((setting) => setting.key === PROJECTS_KEY);
     const dependenciesSetting = settings.find((setting) => setting.key === DEPENDENCIES_KEY);
     const serverType = settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? "";
@@ -182,7 +184,7 @@ export function MinecraftMods({
                 if (!response.ok) {
                     setResults([]);
                     setSearchFailed(true);
-                    setError(data.error ?? "Could not search Modrinth");
+                    setError(data.error ?? t("mods.searchFailed"));
                     return;
                 }
                 setResults(data.projects ?? []);
@@ -197,7 +199,7 @@ export function MinecraftMods({
                 // ever says nothing about what to do.
                 setResults([]);
                 setSearchFailed(true);
-                setError("Could not reach Modrinth");
+                setError(t("mods.unreachable"));
             } finally {
                 if (!signal?.aborted) setSearching(false);
             }
@@ -279,10 +281,9 @@ export function MinecraftMods({
     async function removeProject(entry: string, title: string): Promise<void> {
         if (
             !(await confirm({
-                title: `Remove ${title}?`,
-                description:
-                    "It comes off the list now. The server uninstalls it when you save and restart.",
-                confirmLabel: "Remove",
+                title: t("mods.removeTitle", { name: title }),
+                description: t("mods.itComesOffTheList"),
+                confirmLabel: t("mods.remove"),
                 danger: true
             }))
         ) {
@@ -296,13 +297,13 @@ export function MinecraftMods({
         setMemoryNote(null);
         const warning =
             playersOnline > 0
-                ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-                : "The server restarts to install and remove what changed.";
+                ? t("mods.playersWillDrop", { count: playersOnline })
+                : t("mods.restartsToInstall");
         if (
             !(await confirm({
-                title: "Restart to apply the changes?",
+                title: t("mods.restartToApplyTheChanges"),
                 description: warning,
-                confirmLabel: "Save and restart"
+                confirmLabel: t("mods.saveAndRestart")
             }))
         ) {
             return;
@@ -327,13 +328,12 @@ export function MinecraftMods({
                 <CardBody className="flex flex-col gap-2 py-8 text-center">
                     <p className="text-sm">
                         {serverType
-                            ? `This server runs ${serverType.toLowerCase()}, which cannot load mods.`
-                            : "Bedrock servers do not load mods or plugins."}
+                            ? t("mods.cannotLoad", { software: serverType.toLowerCase() })
+                            : t("mods.bedrockServersDoNotLoad")}
                     </p>
                     {serverType && (
                         <p className="text-sm text-muted-foreground">
-                            Change the server software under Settings to Paper for plugins, or
-                            Fabric, Forge or NeoForge for mods.
+                            {t("mods.changeTheServerSoftwareUnder")}
                         </p>
                     )}
                 </CardBody>
@@ -368,7 +368,9 @@ export function MinecraftMods({
                 version={version}
                 dependencies={dependencies}
                 dependencyOptions={
-                    dependenciesSetting?.options ?? [{ value: "required", label: "Required only" }]
+                    dependenciesSetting?.options ?? [
+                        { value: "required", label: t("mods.requiredOnly") }
+                    ]
                 }
                 onDependencies={setDependencies}
                 onRemove={(entry, title) => void removeProject(entry, title)}
@@ -399,8 +401,8 @@ export function MinecraftMods({
                                 className="pl-9"
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder={`Search ${loader} mods and plugins`}
-                                aria-label="Search Modrinth"
+                                placeholder={t("mods.searchPlaceholder", { loader })}
+                                aria-label={t("mods.searchModrinth")}
                             />
                         </div>
                         {searching && (
@@ -431,8 +433,8 @@ export function MinecraftMods({
 
                     <p className="text-xs text-muted-foreground">
                         {version
-                            ? `Only what runs on ${loader} and has a build for ${version}.`
-                            : `Only what runs on ${loader}. This server is on LATEST, so nothing can be filtered by release - check a project supports the version it ends up on.`}
+                            ? t("mods.onlyFor", { loader, version })
+                            : t("mods.onlyForLatest", { loader })}
                     </p>
 
                     {results === null ? (
@@ -444,7 +446,7 @@ export function MinecraftMods({
                     ) : searchFailed ? (
                         <div className="flex flex-col items-center gap-2 py-6 text-center">
                             <p className="text-sm text-muted-foreground">
-                                This is not what Modrinth has - the search did not go through.
+                                {t("mods.thisIsNotWhatModrinth")}
                             </p>
                             <Button
                                 size="sm"
@@ -452,7 +454,7 @@ export function MinecraftMods({
                                 onClick={() => void browse(query, category)}
                             >
                                 <RotateCw className="size-4" />
-                                Try again
+                                {t("mods.tryAgain")}
                             </Button>
                         </div>
                     ) : results.length === 0 ? (
@@ -462,10 +464,11 @@ export function MinecraftMods({
                         // shader was never going to be in these results anyway.
                         <p className="py-6 text-center text-sm text-muted-foreground">
                             {query.trim()
-                                ? `Nothing here matches "${query.trim()}".`
-                                : `Nothing on Modrinth runs on ${loader}${version ? ` with a build for ${version}` : ""}.`}
-                            {!modrinth.isPluginLoader(loader) &&
-                                " Only mods that run on a server are listed, so a client-only one - a HUD, a minimap, a shader - is missing because it is installed in your own game rather than on this server."}
+                                ? t("mods.noMatch", { query: query.trim() })
+                                : version
+                                  ? t("mods.nothingForVersion", { loader, version })
+                                  : t("mods.nothingFor", { loader })}
+                            {!modrinth.isPluginLoader(loader) && ` ${t("mods.serverSideOnly")}`}
                         </p>
                     ) : (
                         <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
@@ -505,13 +508,14 @@ export function MinecraftMods({
                     stops the other from happening at all. */}
                 {blocking.length > 0 ? (
                     <p className="text-xs text-danger">
-                        {blocking[0]?.slug} needs {blocking[0]?.needsTitle}, which has no build for
-                        this server. Take it off the list, or the server will restart until it is
-                        stopped.
+                        {t("mods.blocking", {
+                            name: blocking[0]?.slug ?? "",
+                            needs: blocking[0]?.needsTitle ?? ""
+                        })}
                     </p>
                 ) : (
                     <p className="text-xs text-muted-foreground">
-                        {changed ? "Changes apply on the next restart." : "Nothing to apply."}
+                        {changed ? t("mods.changesApplyOnTheNext") : t("mods.nothingToApply")}
                     </p>
                 )}
                 <Button
@@ -519,7 +523,7 @@ export function MinecraftMods({
                     disabled={pending || !changed || blocking.length > 0}
                     title={
                         blocking.length > 0
-                            ? `${blocking[0]?.needsTitle} cannot be installed on this server`
+                            ? t("mods.cannotInstall", { name: blocking[0]?.needsTitle ?? "" })
                             : undefined
                     }
                 >
@@ -528,7 +532,7 @@ export function MinecraftMods({
                     ) : (
                         <RotateCw className="size-4" />
                     )}
-                    Save and restart
+                    {t("mods.saveAndRestart")}
                 </Button>
             </div>
 
@@ -548,6 +552,7 @@ function ProjectCard({
     added: boolean;
     onAdd: () => void;
 }) {
+    const t = useGameText("minecraft");
     return (
         <li className="flex items-start gap-3 rounded-md border border-border p-3">
             <ProjectIcon installedAppId={installedAppId} project={project} />
@@ -561,7 +566,11 @@ function ProjectCard({
                         <Download className="size-3" />
                         {project.downloads.toLocaleString()}
                     </span>
-                    {project.author && <span className="truncate">by {project.author}</span>}
+                    {project.author && (
+                        <span className="truncate">
+                            {t("mods.byAuthor", { name: project.author })}
+                        </span>
+                    )}
                     {/* The page it came from, for the description, the screenshots
                         and the changelog - none of which belong in a row here, and
                         all of which are what somebody checks before installing. */}
@@ -570,7 +579,7 @@ function ProjectCard({
                         target="_blank"
                         rel="noreferrer noopener"
                         className="ml-auto flex items-center gap-1 hover:text-foreground"
-                        title={`Open ${project.title} on Modrinth`}
+                        title={t("mods.openOnModrinth", { name: project.title })}
                     >
                         <ExternalLink className="size-3" />
                     </a>
@@ -583,7 +592,7 @@ function ProjectCard({
                 onClick={onAdd}
             >
                 <Plus className="size-4" />
-                {added ? "Added" : "Add"}
+                {added ? t("mods.added") : t("mods.add")}
             </Button>
         </li>
     );
@@ -664,6 +673,7 @@ function InstalledList({
     onDependencies: (value: string) => void;
     onRemove: (entry: string, title: string) => void;
 }) {
+    const t = useGameText("minecraft");
     const conflictsFor = (slug: string): string[] =>
         conflicts
             .filter((entry) => entry.slug === slug || entry.withSlug === slug)
@@ -675,12 +685,11 @@ function InstalledList({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <p className="text-sm font-medium">
-                            Installed{" "}
+                            {t("mods.installed")}{" "}
                             <span className="text-muted-foreground">{entries.length || ""}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
-                            The server installs these when it boots and removes whatever is taken
-                            off.
+                            {t("mods.theServerInstallsTheseWhen")}
                         </p>
                         {/* Where a mod's own settings live. Every one of these
                             writes a file into `config/` the first time the server
@@ -694,18 +703,18 @@ function InstalledList({
                                 className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                             >
                                 <FolderCog className="size-3.5" />
-                                Mod settings files
+                                {t("mods.modSettingsFiles")}
                             </Link>
                         ) : null}
                     </div>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                        Dependencies
+                        {t("mods.dependencies")}
                         <div className="w-44">
                             <Select
                                 value={dependencies}
                                 onValueChange={onDependencies}
                                 options={[...dependencyOptions]}
-                                aria-label="Which dependencies to install with a mod"
+                                aria-label={t("mods.whichDependenciesToInstallWith")}
                             />
                         </div>
                     </label>
@@ -719,30 +728,27 @@ function InstalledList({
                 {refused.length > 0 && (
                     <div className="flex flex-col gap-1 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <p className="text-sm font-medium">
-                            The server would not load{" "}
-                            {refused.length === 1 ? "one of these" : `${refused.length} of these`}{" "}
-                            when it last started
+                            {t("mods.refused", { count: refused.length })}
                         </p>
                         {refused.map((one) => (
                             <p key={one.jar} className="text-xs text-muted-foreground">
                                 <span className="font-medium text-foreground">{one.name}</span>
                                 {one.needs.length > 0
-                                    ? ` needs ${one.needs.join(", ")}, which is not installed.`
+                                    ? ` ${t("mods.needsMissing", { names: one.needs.join(", ") })}`
                                     : one.why
                                       ? ` - ${one.why}`
-                                      : " - the server did not say why."}
+                                      : ` - ${t("mods.noReason")}`}
                             </p>
                         ))}
                         <p className="text-xs text-muted-foreground">
-                            It is installed and it is not running. Whatever it was installed for is
-                            not in the game until this is fixed.
+                            {t("mods.itIsInstalledAndIt")}
                         </p>
                     </div>
                 )}
 
                 {entries.length === 0 ? (
                     <p className="py-2 text-sm text-muted-foreground">
-                        Nothing installed yet. Browse below to add a mod or plugin.
+                        {t("mods.nothingInstalledYetBrowseBelow")}
                     </p>
                 ) : projects === null ? (
                     // The names are a round trip away; the rows themselves are not.
@@ -784,20 +790,22 @@ function InstalledList({
                                             {!project.known && (
                                                 <Badge
                                                     variant="warning"
-                                                    title="Modrinth has no project by this name"
+                                                    title={t("mods.modrinthHasNoProjectBy")}
                                                 >
-                                                    <TriangleAlert className="size-3" /> not on
-                                                    Modrinth
+                                                    <TriangleAlert className="size-3" />{" "}
+                                                    {t("mods.notOnModrinth")}
                                                 </Badge>
                                             )}
                                             {project.known && !project.fitsLoader && (
                                                 <Badge variant="warning">
-                                                    no build for this software
+                                                    {t("mods.noBuildForThisSoftware")}
                                                 </Badge>
                                             )}
                                             {project.known && project.fitsVersion === false && (
                                                 <Badge variant="warning">
-                                                    no build for {version}
+                                                    {t("mods.noBuildFor", {
+                                                        version: version ?? ""
+                                                    })}
                                                 </Badge>
                                             )}
                                             {/* Only ever on an entry nailed to a
@@ -813,21 +821,30 @@ function InstalledList({
                                                             project.newest as string
                                                         )
                                                     }
-                                                    title={`Pinned to ${project.pinned}. Move it to ${project.newest}.`}
+                                                    title={t("mods.pinned", {
+                                                        pinned: project.pinned ?? "",
+                                                        newest: project.newest
+                                                    })}
                                                 >
                                                     <Badge variant="primary">
                                                         <ArrowUpCircle className="size-3" />{" "}
-                                                        {project.newest} available
+                                                        {t("mods.available", {
+                                                            version: project.newest
+                                                        })}
                                                     </Badge>
                                                 </button>
                                             )}
                                             {clashes.length > 0 && (
                                                 <Badge
                                                     variant="danger"
-                                                    title={`Its publisher says it cannot run alongside ${clashes.join(", ")}`}
+                                                    title={t("mods.clashTitle", {
+                                                        names: clashes.join(", ")
+                                                    })}
                                                 >
-                                                    <TriangleAlert className="size-3" /> clashes
-                                                    with {clashes.join(", ")}
+                                                    <TriangleAlert className="size-3" />{" "}
+                                                    {t("mods.clashesWith", {
+                                                        names: clashes.join(", ")
+                                                    })}
                                                 </Badge>
                                             )}
                                             {/* Why this row is here, when it is here
@@ -838,9 +855,13 @@ function InstalledList({
                                             {neededFor.length > 0 && (
                                                 <Badge
                                                     variant="neutral"
-                                                    title={`${neededFor.join(", ")} cannot run without it`}
+                                                    title={t("mods.neededForTitle", {
+                                                        names: neededFor.join(", ")
+                                                    })}
                                                 >
-                                                    needed by {neededFor.join(", ")}
+                                                    {t("mods.neededBy", {
+                                                        names: neededFor.join(", ")
+                                                    })}
                                                 </Badge>
                                             )}
                                             {/* What it needs and has not got. The
@@ -855,21 +876,31 @@ function InstalledList({
                                                         key={need.needs}
                                                         type="button"
                                                         onClick={() => onAddNeeded([need.needs])}
-                                                        title={`${project.title} needs ${need.needsTitle}. Add it to the list.`}
+                                                        title={t("mods.needsAdd", {
+                                                            name: project.title,
+                                                            needs: need.needsTitle
+                                                        })}
                                                     >
                                                         <Badge variant="primary">
-                                                            <Plus className="size-3" /> needs{" "}
-                                                            {need.needsTitle}
+                                                            <Plus className="size-3" />{" "}
+                                                            {t("mods.needs", {
+                                                                name: need.needsTitle
+                                                            })}
                                                         </Badge>
                                                     </button>
                                                 ) : (
                                                     <Badge
                                                         key={need.needs}
                                                         variant="danger"
-                                                        title={`${need.needsTitle} has no build for this server, and ${project.title} will not start without it`}
+                                                        title={t("mods.needsNoBuildTitle", {
+                                                            needs: need.needsTitle,
+                                                            name: project.title
+                                                        })}
                                                     >
-                                                        <TriangleAlert className="size-3" /> needs{" "}
-                                                        {need.needsTitle}, which has no build here
+                                                        <TriangleAlert className="size-3" />{" "}
+                                                        {t("mods.needsNoBuild", {
+                                                            name: need.needsTitle
+                                                        })}
                                                     </Badge>
                                                 )
                                             )}
@@ -878,8 +909,8 @@ function InstalledList({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={`Remove ${project.title}`}
-                                        title={`Remove ${project.title}`}
+                                        aria-label={t("mods.removeNamed", { name: project.title })}
+                                        title={t("mods.removeNamed", { name: project.title })}
                                         className="text-danger hover:text-danger"
                                         onClick={() => onRemove(project.entry, project.title)}
                                     >

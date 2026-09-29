@@ -11,6 +11,7 @@ import type { Translator } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { gameCatalogs, type GameKey, type GameNamespace } from "../../messages";
 import { timeoutLeft } from "../lib/player-timeout";
+import { playerWords, type PlayerWords } from "../lib/player-vocabulary";
 
 export type GameText<N extends GameNamespace> = Translator<GameKey<N>>;
 
@@ -22,4 +23,9 @@ export function useGameText<N extends GameNamespace>(namespace: N): GameText<N> 
 /** How long a timeout has left, in the reader's words: "40m left". */
 export function timeoutText(t: GameText<"games">, iso: string): string {
     return t("timeout.left", timeoutLeft(iso));
+}
+
+/** The players screens' shared words, in the reader's language. */
+export function usePlayerWords(): PlayerWords {
+    return playerWords(useGameText("games"));
 }

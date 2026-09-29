@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { useGameText } from "../game-text";
+import { useGameText, usePlayerWords } from "../game-text";
 import * as actions from "./fivem-actions";
 import { FivemRules } from "./fivem-rules";
 import { GameConsole } from "./game-console";
@@ -53,14 +53,6 @@ import {
     sameRoster,
     type FivemPlayerEntry
 } from "../../lib/fivem/roster";
-import {
-    playerAction,
-    playerConfirm,
-    playerFilters,
-    playerMenuItem,
-    playerPresence,
-    playerStanding
-} from "../../lib/player-vocabulary";
 import {
     generateConsolePassword,
     isBanReason,
@@ -158,7 +150,7 @@ export function FivemPanel({
      *  holds, and the port it was published on. */
     game: GameContext | null;
     held: readonly Permission[];
-    onStatus?: (label: string | null) => void;
+    onStatus?: (label: string | null, tone?: "danger") => void;
 }) {
     const t = useGameText("fivem");
     const router = useRouter();
@@ -211,7 +203,7 @@ export function FivemPanel({
                 error?: string;
             };
             if (!response.ok || !data.status) {
-                setError(data.error ?? "Could not read the server");
+                setError(data.error ?? t("panel.readFailed"));
                 return;
             }
             setError(null);
@@ -267,8 +259,9 @@ export function FivemPanel({
     const isRunning = status?.running ?? running;
 
     useEffect(() => {
-        onStatus?.(statusLabel(status, isRunning));
-    }, [onStatus, status, isRunning]);
+        const state = statusState(status, isRunning);
+        onStatus?.(state === null ? null : t(STATE_LABEL[state]), state === "notRunning" ? "danger" : undefined);
+    }, [onStatus, status, isRunning, t]);
 
     return (
         <div className="flex flex-col gap-4">
@@ -468,24 +461,35 @@ function withPresence(
     };
 }
 
-function statusLabel(status: FivemStatus | null, running: boolean): string | null {
+type ServerState = "crashLoop" | "stopped" | "notRunning" | "online" | "starting";
+
+/** Each state in one word, for the page header. */
+const STATE_LABEL: Readonly<Record<ServerState, GameKey<"fivem">>> = {
+    crashLoop: "panel.crashLoop",
+    stopped: "panel.stopped",
+    notRunning: "panel.notRunning",
+    online: "panel.online",
+    starting: "panel.starting"
+};
+
+function statusState(status: FivemStatus | null, running: boolean): ServerState | null {
     if (status === null) return null;
-    // Before either of the two words below, both of which a looping container is
+    // Before either of the two states below, both of which a looping container is
     // momentarily entitled to and neither of which is the useful one.
-    if (status.crashLoop) return "Crash loop";
-    if (!running || !status.running) return "Stopped";
-    if (status.containerRunning === false) return "Not running";
-    return status.answering ? "Online" : "Starting";
+    if (status.crashLoop) return "crashLoop";
+    if (!running || !status.running) return "stopped";
+    if (status.containerRunning === false) return "notRunning";
+    return status.answering ? "online" : "starting";
 }
 
 function StatusBadge({ status, running }: { status: FivemStatus | null; running: boolean }) {
     const t = useGameText("fivem");
-    const label = statusLabel(status, running);
-    if (label === null) return <Skeleton className="h-6 w-20" />;
-    if (label === "Crash loop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
-    if (label === "Not running") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
-    if (label === "Starting") return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
-    if (label === "Stopped") return <Badge>{t("panel.stopped")}</Badge>;
+    const state = statusState(status, running);
+    if (state === null) return <Skeleton className="h-6 w-20" />;
+    if (state === "crashLoop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
+    if (state === "notRunning") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
+    if (state === "starting") return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
+    if (state === "stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return <Badge className="border-success-edge text-success">{t("panel.online")}</Badge>;
 }
 
@@ -537,6 +541,7 @@ function ConnectCard({
                             </span>
                             <span className="flex min-w-0 items-center gap-1">
                                 <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
+                                    {/* i18n-ignore: the console command, typed as it is */}
                                     connect {joined}
                                 </code>
                                 <CopyButton value={`connect ${joined}`} label={t("panel.theConnectCommand")} />
@@ -635,6 +640,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: FivemAccessView) => void;
 }) {
+    const { playerFilters, playerAction, playerConfirm } = usePlayerWords();
     const t = useGameText("fivem");
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
@@ -675,7 +681,7 @@ function PlayersTab({
                 minWidth="46rem"
                 search={query}
                 onSearch={setQuery}
-                searchPlaceholder="Search by name or identifier"
+                searchPlaceholder={t("panel.searchPlaceholder")}
                 filter={filter}
                 filters={playerFilters({ operators: true })}
                 onFilter={setFilter}
@@ -694,10 +700,10 @@ function PlayersTab({
                 isEmpty={rows.length === 0}
                 empty={
                     status === null
-                        ? "Reading the server..."
+                        ? t("panel.reading")
                         : status.answering
-                          ? "Nobody is playing, and nobody has been added yet."
-                          : (status.message ?? "The server is not answering.")
+                          ? t("panel.nobodyAtAll")
+                          : (status.message ?? t("panel.notAnswering"))
                 }
                 rows={rows.map((entry) => (
                     <PlayerRow
@@ -729,6 +735,7 @@ function PlayersTab({
                                 actions.kickFivemPlayerAction(
                                     installedAppId,
                                     entry.playerId!,
+                                    // i18n-ignore: shown in the game, to a player whose language Polaris does not know
                                     "You were removed from this server."
                                 )
                             );
@@ -856,6 +863,7 @@ function PlayerRow({
     onMessage: () => void;
     onAdmin: (isAdmin: boolean) => void;
 }) {
+    const { playerAction, playerMenuItem, playerStanding, playerPresence } = usePlayerWords();
     const t = useGameText("fivem");
     // What the line under the name says - see `presenceLine`.
     const line = presenceLine({ online: entry.online, seen, addedAt: entry.addedAt });
@@ -1021,6 +1029,7 @@ function AddPlayerDialog({
     onClose: () => void;
     onAdd: (identifier: string, label: string) => void;
 }) {
+    const { playerAction } = usePlayerWords();
     const t = useGameText("fivem");
     const [identifier, setIdentifier] = useState("");
     const [label, setLabel] = useState("");
@@ -1342,7 +1351,7 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                                         return;
                                     }
                                     setDraft("");
-                                    setNote("Saved. Restart the server to run on it.");
+                                    setNote(t("panel.savedRestart"));
                                 })
                             }
                         >

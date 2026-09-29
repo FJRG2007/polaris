@@ -110,7 +110,9 @@ export const xraySettingsSchema = z.object({
     warning: z
         .string()
         .max(400)
-        .refine((value) => !/[\0\r\n]/.test(value), "One line"),
+        // The catalog key, in the `namespace:key` form the screen and the
+        // server's `issueText` both put into the reader's language.
+        .refine((value) => !/[\0\r\n]/.test(value), "minecraft:xray.oneLine"),
     /** Whether the Nether gets honeypots too. */
     nether: z.boolean(),
     /**

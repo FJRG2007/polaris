@@ -13,8 +13,13 @@
  * the others do not - a Steam profile, a whitelist - still writes its own label;
  * what is shared is only what is genuinely the same act.
  *
- * Pure and client-safe: both players tables are browser components.
+ * Pure and client-safe: both players tables are browser components. The words
+ * themselves are in the `games` catalog under `vocab`, so `playerWords` takes
+ * the reader's translator.
  */
+
+import type { Translator } from "@polaris/core";
+import type { GameKey } from "../../messages";
 
 /** The cuts an operator reaches for. Anything finer is what the search box is
  *  for, and a filter nobody uses is a list nobody reads to the end of. */
@@ -23,86 +28,92 @@ export interface PlayerFilterOption {
     readonly label: string;
 }
 
-const ALL: PlayerFilterOption = { value: "all", label: "Everyone" };
-const ONLINE: PlayerFilterOption = { value: "online", label: "Online" };
-const ALLOWED: PlayerFilterOption = { value: "allowed", label: "Allowed in" };
-const OPERATORS: PlayerFilterOption = { value: "operators", label: "Operators" };
-const BANNED: PlayerFilterOption = { value: "banned", label: "Banned" };
-
-/**
- * The filters a game offers, in one order.
- *
- * `operators` only where the game has them. Minecraft ops by name; ARK has no
- * operator command at all, but it does read a file of the Steam ids allowed to run
- * admin commands without the password - which is the same idea and is what the
- * filter cuts on there.
- */
-export function playerFilters(has: { operators?: boolean } = {}): PlayerFilterOption[] {
-    return [ALL, ONLINE, ALLOWED, ...(has.operators ? [OPERATORS] : []), BANNED];
+/** Every shared word, in the language of the translator given. */
+export function playerWords(t: Translator<GameKey<"games">>) {
+    return {
+        /**
+         * The filters a game offers, in one order.
+         *
+         * `operators` only where the game has them. Minecraft ops by name; ARK has
+         * no operator command at all, but it does read a file of the Steam ids
+         * allowed to run admin commands without the password - which is the same
+         * idea and is what the filter cuts on there.
+         */
+        playerFilters(has: { operators?: boolean } = {}): PlayerFilterOption[] {
+            return [
+                { value: "all", label: t("vocab.filters.all") },
+                { value: "online", label: t("vocab.filters.online") },
+                { value: "allowed", label: t("vocab.filters.allowed") },
+                ...(has.operators
+                    ? [{ value: "operators", label: t("vocab.filters.operators") }]
+                    : []),
+                { value: "banned", label: t("vocab.filters.banned") }
+            ];
+        },
+        /** What each verb is called, wherever it is offered. The name is in the
+         *  label because these are icon buttons and menu items: the label is the
+         *  only thing a screen reader reads out, and "Ban" alone does not say who. */
+        playerAction: {
+            add: t("vocab.action.add"),
+            edit: (name: string) => t("vocab.action.edit", { name }),
+            allow: (name: string) => t("vocab.action.allow", { name }),
+            remove: (name: string) => t("vocab.action.remove", { name }),
+            kick: (name: string) => t("vocab.action.kick", { name }),
+            ban: (name: string) => t("vocab.action.ban", { name }),
+            pardon: (name: string) => t("vocab.action.pardon", { name }),
+            timeout: (name: string) => t("vocab.action.timeout", { name }),
+            message: (name: string) => t("vocab.action.message", { name }),
+            more: (name: string) => t("vocab.action.more", { name })
+        },
+        /** The same verbs as they read inside the row's menu, where the name is
+         *  already the heading above them and repeating it in every item is noise. */
+        playerMenuItem: {
+            edit: t("vocab.menu.edit"),
+            timeout: t("vocab.menu.timeout"),
+            pardon: t("vocab.menu.pardon"),
+            message: t("vocab.menu.message"),
+            history: t("vocab.menu.history")
+        },
+        /** What a badge on a row says. Shared because the states themselves are
+         *  shared, whatever each game's list is called underneath. */
+        playerStanding: {
+            allowed: t("vocab.standing.allowed"),
+            notAllowed: t("vocab.standing.notAllowed"),
+            /** On Polaris' list, and the server has not been told yet - it was
+             *  down, or still installing. */
+            waiting: t("vocab.standing.waiting"),
+            banned: t("vocab.standing.banned"),
+            operator: t("vocab.standing.operator")
+        },
+        /** What a presence badge says. "Never joined" is not "offline": one is
+         *  somebody who has been added and has not turned up, the other is
+         *  somebody who has. */
+        playerPresence: {
+            playing: t("vocab.presence.playing"),
+            afk: t("vocab.presence.afk"),
+            connecting: t("vocab.presence.connecting"),
+            offline: t("vocab.presence.offline"),
+            never: t("vocab.presence.never")
+        },
+        /** What a destructive verb asks before it happens. One wording, so the
+         *  same question is not answered differently depending on which game
+         *  asked it. */
+        playerConfirm: {
+            kick: (name: string) => ({
+                title: t("vocab.confirm.kickTitle", { name }),
+                description: t("vocab.confirm.kickBody")
+            }),
+            ban: (name: string) => ({
+                title: t("vocab.confirm.banTitle", { name }),
+                description: t("vocab.confirm.banBody")
+            }),
+            remove: (name: string) => ({
+                title: t("vocab.confirm.removeTitle", { name }),
+                description: t("vocab.confirm.removeBody")
+            })
+        }
+    };
 }
 
-/** What each verb is called, wherever it is offered. The name is in the label
- *  because these are icon buttons and menu items: the label is the only thing a
- *  screen reader reads out, and "Ban" alone does not say who. */
-export const playerAction = {
-    add: "Add player",
-    edit: (name: string) => `Edit ${name}`,
-    allow: (name: string) => `Allow ${name} in`,
-    remove: (name: string) => `Remove ${name} from the player list`,
-    kick: (name: string) => `Kick ${name}`,
-    ban: (name: string) => `Ban ${name}`,
-    pardon: (name: string) => `Lift the ban on ${name}`,
-    timeout: (name: string) => `Time ${name} out`,
-    message: (name: string) => `Message ${name}`,
-    more: (name: string) => `More for ${name}`
-} as const;
-
-/** The same verbs as they read inside the row's menu, where the name is already
- *  the heading above them and repeating it in every item is noise. */
-export const playerMenuItem = {
-    edit: "Edit player",
-    timeout: "Time out",
-    pardon: "Lift the ban",
-    message: "Message them",
-    history: "Joins and leaves"
-} as const;
-
-/** What a badge on a row says. Shared because the states themselves are shared,
- *  whatever each game's list is called underneath. */
-export const playerStanding = {
-    allowed: "allowed",
-    notAllowed: "not on the list",
-    /** On Polaris' list, and the server has not been told yet - it was down, or
-     *  still installing. */
-    waiting: "waiting",
-    banned: "banned",
-    operator: "operator"
-} as const;
-
-/** What a presence badge says. "Never joined" is not "offline": one is somebody
- *  who has been added and has not turned up, the other is somebody who has. */
-export const playerPresence = {
-    playing: "Playing",
-    afk: "AFK",
-    connecting: "Connecting",
-    offline: "Offline",
-    never: "Never joined"
-} as const;
-
-/** What a destructive verb asks before it happens. One wording, so the same
- *  question is not answered differently depending on which game asked it. */
-export const playerConfirm = {
-    kick: (name: string) => ({
-        title: `Kick ${name}?`,
-        description: "They are disconnected and can join again straight away."
-    }),
-    ban: (name: string) => ({
-        title: `Ban ${name}?`,
-        description: "They are disconnected and cannot rejoin until the ban is lifted."
-    }),
-    remove: (name: string) => ({
-        title: `Remove ${name} from the player list?`,
-        description:
-            "The running server is told at once. While the server only lets in players on the list, they cannot join again until they are added back."
-    })
-} as const;
+/** The shared words in one language. */
+export type PlayerWords = ReturnType<typeof playerWords>;

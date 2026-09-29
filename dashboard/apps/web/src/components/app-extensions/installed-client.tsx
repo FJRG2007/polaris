@@ -20,8 +20,10 @@ export interface InstalledSlotHost {
     readonly running: boolean;
     /** What the viewer holds on this install. */
     readonly held: readonly Permission[];
-    /** For a panel that polls, so what it learns reaches the page header. */
-    readonly onStatus: (label: string | null) => void;
+    /** For a panel that polls, so what it learns reaches the page header: the
+     *  word in the reader's language, and "danger" when it is bad news - the
+     *  header cannot tell that from a word it does not know. */
+    readonly onStatus: (label: string | null, tone?: "danger") => void;
 }
 
 export function AppSlotView({ slot, host }: { slot: AppSlot; host?: InstalledSlotHost }) {

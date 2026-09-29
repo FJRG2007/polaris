@@ -2,6 +2,7 @@
     "$comment": "Files whose every user-facing string comes from a catalog. test/i18n/scan.test.ts holds each to zero findings of scripts/i18n-scan.mjs, so a migrated screen cannot drift back to English. Add a file here in the same change that migrates it. Paths are relative to dashboard/apps.",
     "files": [
         "game-servers/src/lib/minecraft/suspicion.ts",
+        "game-servers/src/lib/player-vocabulary.ts",
         "game-servers/src/routes/api/apps/games/live/route.ts",
         "game-servers/src/routes/api/apps/games/route.ts",
         "game-servers/src/routes/api/apps/games/stream/route.ts",
@@ -32,7 +33,10 @@
         "game-servers/src/screens/installed/minecraft-announce.tsx",
         "game-servers/src/screens/installed/minecraft-challenges-parts.tsx",
         "game-servers/src/screens/installed/minecraft-challenges.tsx",
+        "game-servers/src/screens/installed/minecraft-inventory-editor.tsx",
+        "game-servers/src/screens/installed/minecraft-inventory.tsx",
         "game-servers/src/screens/installed/minecraft-login-actions.ts",
+        "game-servers/src/screens/installed/minecraft-mods.tsx",
         "game-servers/src/screens/installed/minecraft-player-dialogs.tsx",
         "game-servers/src/screens/installed/minecraft-players.tsx",
         "game-servers/src/screens/installed/minecraft-schedule.tsx",

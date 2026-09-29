@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import type { Permission } from "@polaris/core";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { useRuntimeLog } from "./use-runtime-log";
@@ -58,7 +58,7 @@ function adaptedPanelFor(
      *  would accept. */
     held: readonly Permission[],
     /** Handed to a panel that polls, so what it learns reaches the header. */
-    onStatus: (label: string | null) => void
+    onStatus: (label: string | null, tone?: "danger") => void
 ) {
     switch (app.catalogId) {
         case "messaging-bridge":
@@ -103,11 +103,19 @@ export function InstalledAppDashboard({
     // header knows only what Polaris intends, which is not the same thing and
     // read as a contradiction when the container had gone down underneath it.
     const [liveStatus, setLiveStatus] = useState<string | null>(null);
+    // Said by the panel rather than read off the word, which is in the reader's
+    // language. "Not running" is still recognised from a panel built before the
+    // tone was passed.
+    const [liveDanger, setLiveDanger] = useState(false);
+    const reportStatus = useCallback((label: string | null, tone?: "danger") => {
+        setLiveStatus(label);
+        setLiveDanger(tone === "danger" || label === "Not running");
+    }, []);
 
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
     // Apps with an adapted panel lead with it and fold the raw log away by default.
-    const adaptedPanel = adaptedPanelFor(app, settings, running, slot, held, setLiveStatus);
+    const adaptedPanel = adaptedPanelFor(app, settings, running, slot, held, reportStatus);
     const [showLogs, setShowLogs] = useState(adaptedPanel === null);
     const { log, refresh: loadLog } = useRuntimeLog(applicationId, running && showLogs);
     // Back goes where this app is listed, which for anything belonging to a game -
@@ -145,12 +153,9 @@ export function InstalledAppDashboard({
                     <div className="flex items-center gap-2">
                         <Badge
                             className={cn(
-                                (app.applicationStatus === "failed" ||
-                                    liveStatus === "Not running") &&
+                                (app.applicationStatus === "failed" || liveDanger) &&
                                     "border-danger-edge text-danger",
-                                running &&
-                                    liveStatus !== "Not running" &&
-                                    "border-success-edge text-success"
+                                running && !liveDanger && "border-success-edge text-success"
                             )}
                         >
                             {liveStatus ??

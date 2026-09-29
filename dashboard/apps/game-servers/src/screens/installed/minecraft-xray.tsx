@@ -196,7 +196,7 @@ export function MinecraftXray({
         void readXrayAction(installedAppId).then((answer) => {
             const fresh = answer.view;
             if (!fresh) {
-                setError(answer.error ?? "Anti-cheat could not be read");
+                setError(answer.error ?? t("xray.readFailed"));
                 if (!answered.current) {
                     setView(null);
                     setDraft(DEFAULT_XRAY_SETTINGS);
@@ -216,8 +216,14 @@ export function MinecraftXray({
 
     const problem = useMemo(() => {
         const parsed = xraySettingsSchema.safeParse(draft);
-        return parsed.success ? null : (parsed.error.issues[0]?.message ?? "Check the settings");
-    }, [draft]);
+        if (parsed.success) return null;
+        const message = parsed.error.issues[0]?.message;
+        // The schema names its own words as `minecraft:<key>`, being shared with
+        // the server, which has no reader when it loads.
+        return message?.startsWith("minecraft:")
+            ? t(message.slice("minecraft:".length) as GameKey<"minecraft">)
+            : (message ?? t("xray.checkSettings"));
+    }, [draft, t]);
     const dirty = view !== null && JSON.stringify(draft) !== JSON.stringify(view.settings);
 
     const { suspects, incidents } = useMemo(
@@ -268,15 +274,21 @@ export function MinecraftXray({
         startTransition(async () => {
             const result = await saveXraySettingsAction({ installedAppId, settings: draft });
             if (!result.view) {
-                setError(result.error ?? "That could not be saved");
+                setError(result.error ?? t("xray.saveFailed"));
                 return;
             }
             keepView(result.view);
             const { enabled, movement } = result.view.settings;
             setNote(
                 enabled || movement
-                    ? `Saved. ${enabled ? "Honeypots are placed around the players within a minute" : "Honeypots are being turned back into rock"}${movement ? ", and players are watched from the next few seconds" : ""}. No restart needed.`
-                    : "Off. The honeypots are being turned back into rock. No restart needed."
+                    ? t(
+                          enabled
+                              ? movement
+                                  ? "xray.savedPlacedWatched"
+                                  : "xray.savedPlaced"
+                              : "xray.savedRemovedWatched"
+                      )
+                    : t("xray.savedOff")
             );
         });
     }
@@ -291,7 +303,7 @@ export function MinecraftXray({
         startTransition(async () => {
             const result = await clearXrayPlayerAction({ installedAppId, player });
             if (result.view) keepView(result.view);
-            else setError(result.error ?? "That could not be cleared");
+            else setError(result.error ?? t("xray.clearFailed"));
         });
     }
 
@@ -526,10 +538,10 @@ export function MinecraftXray({
                             reading === "reading"
                                 ? TABLE_LOADING
                                 : !loaded
-                                  ? "The players could not be read."
+                                  ? t("xray.playersFailed")
                                   : suspects.length === 0
-                                    ? "Nothing recorded against anybody yet, and no mining figures to show."
-                                    : "No player matches."
+                                    ? t("xray.nothingRecorded")
+                                    : t("xray.noPlayerMatches")
                         }
                         rows={shown.map((suspect) => (
                             <tr
@@ -611,8 +623,8 @@ export function MinecraftXray({
                             reading === "reading"
                                 ? TABLE_LOADING
                                 : loaded
-                                  ? "Nothing has happened in the last 14 days."
-                                  : "The incidents could not be read."
+                                  ? t("xray.noIncidents")
+                                  : t("xray.incidentsFailed")
                         }
                         rows={incidents.slice(0, 100).map((incident) => (
                             <tr

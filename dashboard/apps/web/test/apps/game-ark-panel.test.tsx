@@ -16,7 +16,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameContext } from "@polaris-app/game-servers/src/screens/installed/game-context";
-import { playerAction, playerFilters, playerStanding } from "@polaris-app/game-servers/src/lib/player-vocabulary";
+import { playerWords } from "@polaris-app/game-servers/src/lib/player-vocabulary";
+import { gameCatalogs } from "@polaris-app/game-servers/messages";
+
+const { playerAction, playerFilters, playerStanding } = playerWords(gameCatalogs.translator("en-US", "games"));
 // The dashboard's pieces the screen takes, as the layout provides them.
 import "@/components/app-host/client";
 

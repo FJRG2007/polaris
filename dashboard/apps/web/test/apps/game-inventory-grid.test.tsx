@@ -8,8 +8,12 @@
  * lose.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+}));
 import {
     DRAG_EFFECT_ALLOWED,
     InventoryGrid,

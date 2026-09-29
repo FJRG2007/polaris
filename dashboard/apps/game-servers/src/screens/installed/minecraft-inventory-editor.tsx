@@ -24,13 +24,15 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { useGameText, type GameText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
 import { bySlot } from "../../lib/minecraft/inventory";
 import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
 import { maxStackFor, stacksFor } from "../../lib/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "../../lib/minecraft/item-argument";
-import { describeQueued, type QueuedAction } from "../../lib/minecraft/queue";
+import type { QueuedAction } from "../../lib/minecraft/queue";
+import { describeQueuedText } from "./queue-text";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
     Eraser,
@@ -80,6 +82,7 @@ export function InventoryEditor({
      *  what is waiting agrees with this one. */
     onChanged: () => void;
 }) {
+    const t = useGameText("minecraft");
     const display = useDisplayFormat();
     const [reading, setReading] = useState<actions.InventoryReading | null>(null);
     const [waiting, setWaiting] = useState<QueuedAction[]>([]);
@@ -258,7 +261,7 @@ export function InventoryEditor({
         if (!source || source.count < 2 || source.data !== null) return;
         const free = writableSlots().find((candidate) => !slots.has(candidate));
         if (free === undefined) {
-            setError("There is no free slot to split it into.");
+            setError(t("inventoryEditor.noFreeSlot"));
             return;
         }
         run(() =>
@@ -279,11 +282,11 @@ export function InventoryEditor({
 
     async function emptyAll(): Promise<void> {
         const agreed = await confirm({
-            title: `Empty ${player}'s inventory?`,
+            title: t("inventoryEditor.emptyTitle", { name: player }),
             description: live
-                ? "Everything they carry goes, armour and offhand included. This cannot be undone."
-                : "Everything they carry goes when they next join, armour and offhand included. This cannot be undone.",
-            confirmLabel: "Empty inventory",
+                ? t("inventoryEditor.everythingTheyCarryGoesArmour")
+                : t("inventoryEditor.everythingTheyCarryGoesWhen"),
+            confirmLabel: t("inventoryEditor.emptyInventory"),
             danger: true
         });
         if (agreed) run(() => actions.clearPlayerInventoryAction({ installedAppId, player }));
@@ -291,9 +294,9 @@ export function InventoryEditor({
 
     async function sendAll(to: string): Promise<void> {
         const agreed = await confirm({
-            title: `Send everything to ${to}?`,
-            description: `Every stack ${player} carries moves to ${to}, a stack at a time. What does not fit in ${to}'s bag lands at their feet.`,
-            confirmLabel: "Send everything"
+            title: t("inventoryEditor.sendAllTitle", { name: to }),
+            description: t("inventoryEditor.sendAllBody", { from: player, to }),
+            confirmLabel: t("inventoryEditor.sendEverything")
         });
         if (!agreed) return;
         run(async () => {
@@ -307,8 +310,10 @@ export function InventoryEditor({
             const kept = result.kept ?? 0;
             return {
                 note:
-                    `Sent ${moved} ${moved === 1 ? "stack" : "stacks"} to ${to}.` +
-                    (kept > 0 ? ` ${kept} stayed with ${player}.` : "")
+                    t("inventoryEditor.sent", { count: moved, to }) +
+                    (kept > 0
+                        ? ` ${t("inventoryEditor.stayed", { count: kept, from: player })}`
+                        : "")
             };
         });
     }
@@ -319,19 +324,20 @@ export function InventoryEditor({
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={live ? "success" : undefined}>
-                        {live ? "Live" : "From a copy"}
+                        {live ? t("inventoryEditor.live") : t("inventoryEditor.fromACopy")}
                     </Badge>
                     {!live && reading?.takenAt && (
                         <span
                             className="text-xs text-muted-foreground"
                             title={display.dateTime(reading.takenAt)}
                         >
-                            kept {ago(reading.takenAt)}
+                            {t("inventoryEditor.kept", { when: ago(t, reading.takenAt) })}
                         </span>
                     )}
                     {loading && (
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Loader2 className="size-3 animate-spin" /> Reading their bag...
+                            <Loader2 className="size-3 animate-spin" />{" "}
+                            {t("inventoryEditor.readingTheirBag")}
                         </span>
                     )}
                     <Button
@@ -339,8 +345,8 @@ export function InventoryEditor({
                         variant="ghost"
                         className="ml-auto"
                         disabled={loading || pending}
-                        aria-label="Read the bag again"
-                        title="Read the bag again"
+                        aria-label={t("inventoryEditor.readTheBagAgain")}
+                        title={t("inventoryEditor.readTheBagAgain")}
                         onClick={() => {
                             setLoading(true);
                             void reload();
@@ -353,17 +359,12 @@ export function InventoryEditor({
 
                 {!live && !loading && (
                     <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
-                        <span className="font-medium">{player} is not on the server.</span>{" "}
-                        {reading?.takenAt ? (
-                            <>This is the last copy Polaris kept. Nothing in it can be moved,</>
-                        ) : (
-                            <>
-                                Polaris has no copy of their bag yet - one is kept every ten minutes
-                                while they play - so it is drawn empty. Nothing can be moved out of
-                                it,
-                            </>
-                        )}{" "}
-                        but an item dropped onto a slot is saved and given to them when they join.
+                        <span className="font-medium">
+                            {t("inventoryEditor.notOnServer", { name: player })}
+                        </span>{" "}
+                        {reading?.takenAt
+                            ? t("inventoryEditor.lastCopyNote")
+                            : t("inventoryEditor.noCopyNote")}
                     </p>
                 )}
 
@@ -395,8 +396,8 @@ export function InventoryEditor({
                 {editable && (
                     <p className="text-xs text-muted-foreground">
                         {live
-                            ? "Drag a stack anywhere: bag, hotbar, worn or offhand. Onto the same item it stacks up. Hold Ctrl to move one of it, and right-click to split it in half."
-                            : "Drag an item from the palette onto the slot it should land in."}
+                            ? t("inventoryEditor.dragAStackAnywhereBag")
+                            : t("inventoryEditor.dragAnItemFromThe")}
                     </p>
                 )}
                 {(reading?.unreadable ?? 0) > 0 && (
@@ -404,26 +405,22 @@ export function InventoryEditor({
                     // looks exactly like a complete one, and somebody checking what
                     // a player is carrying would believe it.
                     <p className="text-xs text-warning">
-                        {reading?.unreadable}{" "}
-                        {reading?.unreadable === 1 ? "stack was" : "stacks were"} too large for the
-                        server to hand over in one reply, so{" "}
-                        {reading?.unreadable === 1 ? "it is" : "they are"} not drawn here.
+                        {t("inventoryEditor.unreadable", { count: reading?.unreadable ?? 0 })}
                     </p>
                 )}
                 {stuck.length > 0 && (
                     // Named rather than left as slots that silently refuse to be
                     // picked up, which reads as the page being broken.
                     <p className="text-xs text-muted-foreground">
-                        {stuck.length} {stuck.length === 1 ? "stack carries" : "stacks carry"} data
-                        Polaris cannot write back exactly, so{" "}
-                        {stuck.length === 1 ? "it cannot" : "they cannot"} be moved without losing
-                        it.
+                        {t("inventoryEditor.stuck", { count: stuck.length })}
                     </p>
                 )}
 
                 {queuedElsewhere.length > 0 && (
                     <div className="flex flex-col gap-1 rounded-md border border-border bg-surface/40 px-3 py-2">
-                        <p className="text-xs font-medium">Also waiting for {player}</p>
+                        <p className="text-xs font-medium">
+                            {t("inventoryEditor.alsoWaiting", { name: player })}
+                        </p>
                         <ul className="flex flex-col gap-0.5">
                             {queuedElsewhere.map((entry) => (
                                 <li
@@ -431,13 +428,18 @@ export function InventoryEditor({
                                     className="flex items-center justify-between gap-2 text-xs"
                                 >
                                     <span className="truncate text-muted-foreground">
-                                        {describeQueued(entry)}
+                                        {describeQueuedText(t, entry)}
                                     </span>
                                     <button
                                         type="button"
                                         disabled={pending}
-                                        title={`Cancel ${describeQueued(entry)}`}
-                                        aria-label={`Cancel ${describeQueued(entry)} for ${player}`}
+                                        title={t("inventoryEditor.cancelWhat", {
+                                            what: describeQueuedText(t, entry)
+                                        })}
+                                        aria-label={t("playersTab.cancelFor", {
+                                            what: describeQueuedText(t, entry),
+                                            name: player
+                                        })}
                                         className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
                                         onClick={() =>
                                             run(() =>
@@ -463,7 +465,7 @@ export function InventoryEditor({
 
             <div className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
                 <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                    Items
+                    {t("inventoryEditor.items")}
                 </span>
                 {/* Dragged onto a slot rather than clicked into one: the whole
                     point of the grid is that the operator picks where it lands.
@@ -491,7 +493,7 @@ export function InventoryEditor({
                         min={1}
                         max={MOST_THAT_FITS}
                         value={amount}
-                        aria-label="How many"
+                        aria-label={t("inventoryEditor.howMany")}
                         className="w-20"
                         onChange={(event) =>
                             setAmount(
@@ -502,12 +504,15 @@ export function InventoryEditor({
                             )
                         }
                     />
-                    <span className="text-xs text-muted-foreground">at a time</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("inventoryEditor.atATime")}
+                    </span>
                 </div>
                 {picked && amount > maxStackFor(picked) && (
                     <p className="text-xs text-muted-foreground">
-                        {stacksFor(picked, amount).length} stacks. One lands where you drop it and
-                        the rest go into the bag.
+                        {t("inventoryEditor.manyStacks", {
+                            count: stacksFor(picked, amount).length
+                        })}
                     </p>
                 )}
 
@@ -529,7 +534,9 @@ export function InventoryEditor({
                         }
                     >
                         <PackagePlus className="size-4" />
-                        {live ? "Give it to them" : "Save it for their next join"}
+                        {live
+                            ? t("inventoryEditor.giveItToThem")
+                            : t("inventoryEditor.saveItForTheirNext")}
                     </Button>
                     <Button
                         size="sm"
@@ -549,12 +556,14 @@ export function InventoryEditor({
                         }
                     >
                         <PackageMinus className="size-4" />
-                        {live ? "Take it off them" : "Take it when they join"}
+                        {live
+                            ? t("inventoryEditor.takeItOffThem")
+                            : t("inventoryEditor.takeItWhenTheyJoin")}
                     </Button>
                 </div>
                 {picked && editable && (
                     <p className="text-xs text-muted-foreground">
-                        Or drag it onto a slot{live ? "" : " to save it for their next join"}.
+                        {live ? t("inventoryEditor.orDrag") : t("inventoryEditor.orDragToSave")}
                     </p>
                 )}
 
@@ -582,24 +591,24 @@ export function InventoryEditor({
                         )}
                     >
                         <Trash2 className="size-4" />
-                        Drop a stack here to take it away
+                        {t("inventoryEditor.dropAStackHereTo")}
                     </div>
                 )}
 
                 {editable && live && (
                     <div className="flex flex-col gap-1.5 border-t border-border pt-3">
                         <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                            Send to another player
+                            {t("inventoryEditor.sendToAnotherPlayer")}
                         </span>
                         {others.length === 0 ? (
                             <p className="text-xs text-muted-foreground">
-                                Nobody else is on the server to send to.
+                                {t("inventoryEditor.nobodyElseIsOnThe")}
                             </p>
                         ) : (
                             <>
                                 <Select
-                                    aria-label="Player to send to"
-                                    placeholder="Choose a player"
+                                    aria-label={t("inventoryEditor.playerToSendTo")}
+                                    placeholder={t("inventoryEditor.chooseAPlayer")}
                                     value={sendTo ?? ""}
                                     onValueChange={(value) => setRecipient(value || null)}
                                     options={others.map((name) => ({ value: name, label: name }))}
@@ -631,8 +640,8 @@ export function InventoryEditor({
                                 >
                                     <Send className="size-4" />
                                     {sendTo
-                                        ? `Drop a stack here to send it to ${sendTo}`
-                                        : "Choose a player, then drop a stack here"}
+                                        ? t("inventoryEditor.dropToSend", { name: sendTo })
+                                        : t("inventoryEditor.chooseAPlayerThenDrop")}
                                 </div>
                                 <Button
                                     size="sm"
@@ -641,7 +650,9 @@ export function InventoryEditor({
                                     onClick={() => sendTo && void sendAll(sendTo)}
                                 >
                                     <Send className="size-4" />
-                                    {sendTo ? `Send everything to ${sendTo}` : "Send everything"}
+                                    {sendTo
+                                        ? t("inventoryEditor.sendAllTo", { name: sendTo })
+                                        : t("inventoryEditor.sendEverything")}
                                 </Button>
                             </>
                         )}
@@ -656,7 +667,9 @@ export function InventoryEditor({
                     onClick={() => void emptyAll()}
                 >
                     <Eraser className="size-4" />
-                    {live ? "Empty inventory" : "Empty it when they join"}
+                    {live
+                        ? t("inventoryEditor.emptyInventory")
+                        : t("inventoryEditor.emptyItWhenTheyJoin")}
                 </Button>
                 {pending && <Skeleton className="h-1 w-full" />}
             </div>
@@ -665,13 +678,12 @@ export function InventoryEditor({
 }
 
 /** "6 minutes ago", in the words somebody reads a staleness warning in. */
-function ago(iso: string): string {
+function ago(t: GameText<"minecraft">, iso: string): string {
     const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-    if (seconds < 90) return "a moment ago";
+    if (seconds < 90) return t("inventoryEditor.ago.moment");
     const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes} minutes ago`;
+    if (minutes < 60) return t("inventoryEditor.ago.minutes", { count: minutes });
     const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-    const days = Math.round(hours / 24);
-    return `${days} ${days === 1 ? "day" : "days"} ago`;
+    if (hours < 24) return t("inventoryEditor.ago.hours", { count: hours });
+    return t("inventoryEditor.ago.days", { count: Math.round(hours / 24) });
 }
