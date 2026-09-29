@@ -22,6 +22,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { chatText, type ChatText } from "@/lib/chat/text";
 import {
     chatPollCreateSchema,
     normalizePollOptions,
@@ -61,7 +62,12 @@ let votes: { optionId: string; userId: string }[] = [];
 let postable = true;
 let mayModerate = false;
 
-class FakeAccessError extends Error {}
+class FakeAccessError extends Error {
+    constructor(text?: string | ChatText) {
+        // The real one says its catalog words in English when nobody's language is asked for.
+        super(typeof text === "object" ? chatText("en-US", text) : text);
+    }
+}
 class FakeRuleError extends FakeAccessError {}
 
 vi.mock("@/lib/chat/access", () => ({

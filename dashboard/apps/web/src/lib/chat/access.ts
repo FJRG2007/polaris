@@ -34,7 +34,8 @@ import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
-import { translate } from "@/lib/i18n/translate";
+import { spokenWait } from "./durations";
+import { chatText, type ChatText } from "./text";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
@@ -46,15 +47,8 @@ export interface ChatActor {
 /** What somebody may do in a space. `owner` outranks both stored roles. */
 export type ChatSpaceAccess = "member" | "admin" | "owner";
 
-/** A refusal in words from the `chat` catalog: the key under `errors`, and the
- *  values its sentence takes. */
-export interface ChatErrorText {
-    readonly key: ChatErrorKey;
-    readonly params?: core.MessageParams;
-}
-
-/** The keys a refusal may be written with. */
-export type ChatErrorKey = Extract<NamespaceKey<"chat">, `errors.${string}`>;
+/** A refusal: a message under `errors` in the `chat` catalog, and its values. */
+export type ChatErrorText = ChatText<Extract<NamespaceKey<"chat">, `errors.${string}`>>;
 
 /**
  * A refusal the person who asked is shown.
@@ -66,18 +60,17 @@ export type ChatErrorKey = Extract<NamespaceKey<"chat">, `errors.${string}`>;
  * caller that has no reader to ask.
  */
 export class ChatAccessError extends Error {
-    /** The catalog words, or null for a sentence thrown as it is. */
-    readonly text: ChatErrorText | null;
+    readonly text: ChatErrorText;
 
-    constructor(text: ChatErrorText | string = { key: "errors.notInConversation" }) {
-        super(typeof text === "string" ? text : translate(core.DEFAULT_LOCALE, `chat.${text.key}`, text.params));
-        this.text = typeof text === "string" ? null : text;
+    constructor(text: ChatErrorText = { key: "errors.notInConversation" }) {
+        super(chatText(core.DEFAULT_LOCALE, text));
+        this.text = text;
         this.name = "ChatAccessError";
     }
 
     /** The refusal in one reader's language. */
     textIn(locale: core.Locale): string {
-        return this.text ? translate(locale, `chat.${this.text.key}`, this.text.params) : this.message;
+        return chatText(locale, this.text);
     }
 }
 
@@ -91,7 +84,7 @@ export class ChatAccessError extends Error {
  * name is what tells the two apart in a log.
  */
 export class ChatRuleError extends ChatAccessError {
-    constructor(text: ChatErrorText | string) {
+    constructor(text: ChatErrorText) {
         super(text);
         this.name = "ChatRuleError";
     }
@@ -141,9 +134,9 @@ export async function requireSpace(
     minimum: ChatSpaceAccess = "member"
 ): Promise<ChatSpaceAccess> {
     const access = await spaceAccess(actor, spaceId);
-    if (!access) throw new ChatAccessError("You are not in that space");
+    if (!access) throw new ChatAccessError({ key: "errors.notInSpace" });
     if (minimum === "admin" && access === "member") {
-        throw new ChatAccessError("Only an admin of this space can do that");
+        throw new ChatAccessError({ key: "errors.spaceAdminOnly" });
     }
     return access;
 }
@@ -316,11 +309,9 @@ export async function requirePostable(actor: ChatActor, channelId: string): Prom
         // stopped mid-sentence needs to know how long for, and a moment in ISO
         // is a thing to be decoded rather than read.
         const left = Math.max(1, Math.ceil((access.mutedUntil.getTime() - Date.now()) / 1000));
-        throw new ChatAccessError(
-            `You have been timed out here. It ends in ${core.slowmodeSpoken(left)}.`
-        );
+        throw new ChatAccessError({ key: "errors.timedOut", params: { wait: spokenWait(left) } });
     }
-    if (!access.mayPost) throw new ChatAccessError("That conversation is archived");
+    if (!access.mayPost) throw new ChatAccessError({ key: "errors.conversationArchived" });
     return access;
 }
 

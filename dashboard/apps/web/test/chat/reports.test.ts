@@ -18,6 +18,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { chatText, type ChatText } from "@/lib/chat/text";
 
 const MESSAGE = "018f2b7a-0000-7000-8000-0000000000a1";
 const CHANNEL = "018f2b7a-0000-7000-8000-0000000000c1";
@@ -72,7 +73,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/chat/link-preview", () => ({ knownPreviews: async () => new Map() }));
-class FakeAccessError extends Error {}
+class FakeAccessError extends Error {
+    constructor(text?: string | ChatText) {
+        // The real one says its catalog words in English when nobody's language is asked for.
+        super(typeof text === "object" ? chatText("en-US", text) : text);
+    }
+}
 vi.mock("@/lib/chat/access", () => ({
     requireChannel,
     ChatAccessError: FakeAccessError,

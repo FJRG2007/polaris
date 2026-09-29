@@ -440,14 +440,30 @@ export const chatScheduleSchema = z.object({
 
 export type ChatScheduleInput = z.infer<typeof chatScheduleSchema>;
 
-/** Whether a moment is one a message may be scheduled for, and why not. Pure, so
- *  the dialog can say it before the server does. */
-export function scheduleRefusal(sendAt: Date, now: Date = new Date()): string | null {
+/** Why a moment cannot be scheduled for: no moment at all, too soon, too far. */
+export type ScheduleProblem = "noDate" | "tooSoon" | "tooFar";
+
+/** Whether a moment is one a message may be scheduled for, and which problem it
+ *  has - for a caller that says it in the reader's language. */
+export function scheduleProblem(sendAt: Date, now: Date = new Date()): ScheduleProblem | null {
     const wait = sendAt.getTime() - now.getTime();
-    if (!Number.isFinite(wait)) return "Pick a date and a time";
-    if (wait < SCHEDULE_SOONEST_MS) return "Pick a time at least a minute from now";
-    if (wait > SCHEDULE_FURTHEST_MS) return "Pick a time within the next year";
+    if (!Number.isFinite(wait)) return "noDate";
+    if (wait < SCHEDULE_SOONEST_MS) return "tooSoon";
+    if (wait > SCHEDULE_FURTHEST_MS) return "tooFar";
     return null;
+}
+
+const SCHEDULE_PROBLEM_WORDS: Record<ScheduleProblem, string> = {
+    noDate: "Pick a date and a time",
+    tooSoon: "Pick a time at least a minute from now",
+    tooFar: "Pick a time within the next year"
+};
+
+/** Whether a moment is one a message may be scheduled for, and why not, in
+ *  English. Pure, so the dialog can say it before the server does. */
+export function scheduleRefusal(sendAt: Date, now: Date = new Date()): string | null {
+    const problem = scheduleProblem(sendAt, now);
+    return problem ? SCHEDULE_PROBLEM_WORDS[problem] : null;
 }
 
 /** Sending somebody else's message on to another conversation. */

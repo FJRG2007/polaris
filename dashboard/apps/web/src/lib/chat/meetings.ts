@@ -33,7 +33,7 @@ import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
-import { ChatAccessError, channelAccess, requireChannel, type ChatActor } from "./access";
+import { ChatAccessError, channelAccess, requireChannel, type ChatActor, type ChatErrorText } from "./access";
 
 /** How many browsers one call holds.
  *
@@ -243,13 +243,13 @@ export async function inviteToCall(
     openGroup: (userIds: readonly string[]) => Promise<string>
 ): Promise<{ meetingId: string; channelId: string; moved: boolean }> {
     const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
-    if (wanted.length === 0) throw new ChatAccessError("Pick somebody to bring in");
+    if (wanted.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToAdd" });
 
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
         select: { channelId: true, endedAt: true }
     });
-    if (!meeting?.channelId || meeting.endedAt) throw new ChatAccessError("That call has ended");
+    if (!meeting?.channelId || meeting.endedAt) throw new ChatAccessError({ key: "errors.callEnded" });
     const from = meeting.channelId;
     await requireChannel(actor, from);
 
@@ -257,7 +257,7 @@ export async function inviteToCall(
         where: { id: from },
         select: { kind: true, members: { select: { userId: true } } }
     });
-    if (!channel) throw new ChatAccessError("That call has ended");
+    if (!channel) throw new ChatAccessError({ key: "errors.callEnded" });
 
     if (channel.kind !== "dm") {
         // Only the people who are not in the conversation already. Everybody
@@ -365,8 +365,8 @@ export async function join(
         where: { id: meetingId },
         select: { channelId: true, endedAt: true }
     });
-    if (!meeting || meeting.endedAt) throw new ChatAccessError("That call has ended");
-    if (!meeting.channelId) throw new ChatAccessError("That call has ended");
+    if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.callEnded" });
+    if (!meeting.channelId) throw new ChatAccessError({ key: "errors.callEnded" });
     const access = await requireChannel(actor, meeting.channelId);
 
     const seat = await seatFor(meetingId, actor.id, actor.name, {
@@ -387,14 +387,14 @@ export async function join(
  */
 /** Said to somebody on a link into a meeting whose host asked for accounts. It
  *  is an instruction rather than a refusal: there is a way in, and this is it. */
-export const SIGN_IN_FIRST = "This meeting is only open to people signed in to Polaris";
+export const SIGN_IN_FIRST: ChatErrorText = { key: "errors.meetingSignInFirst" };
 
 export async function joinAsGuest(token: string, name: string): Promise<MeetingSeat> {
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
         select: { id: true, endedAt: true, approveGuests: true, requireAccount: true }
     });
-    if (!meeting || meeting.endedAt) throw new ChatAccessError("That call has ended");
+    if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.callEnded" });
     // The host asked for people to be signed in. The link still names the
     // meeting - it is how somebody knows what they are signing in for - and this
     // is the only way through it.
@@ -434,7 +434,7 @@ export async function decideAdmission(
 ): Promise<void> {
     const seated = await requireSeated(seat);
     if (seated.admission !== "admitted") {
-        throw new ChatAccessError("You are still waiting to be let in");
+        throw new ChatAccessError({ key: "errors.stillInLobby" });
     }
     if (admitted) await requireRoom(seat.meetingId);
 
@@ -632,7 +632,7 @@ export async function end(actor: ChatActor, meetingId: string): Promise<void> {
         select: { hostId: true }
     });
     if (!meeting || meeting.hostId !== actor.id) {
-        throw new ChatAccessError("Only whoever started the call can end it");
+        throw new ChatAccessError({ key: "errors.callEndStarterOnly" });
     }
     await closeMeeting(meetingId);
 }
@@ -655,7 +655,7 @@ export async function setGuestLink(
         select: { hostId: true, guestToken: true }
     });
     if (!meeting || meeting.hostId !== actor.id) {
-        throw new ChatAccessError("Only whoever started the call can share it");
+        throw new ChatAccessError({ key: "errors.callShareStarterOnly" });
     }
 
     const token = open ? (meeting.guestToken ?? randomBytes(24).toString("base64url")) : null;
@@ -1023,7 +1023,7 @@ async function requireRoom(meetingId: string, pastLimit = false): Promise<void> 
     await sweep(meetingId);
     const present = await admittedCount(meetingId);
     if (present >= MAX_IN_CALL) {
-        throw new ChatAccessError("That call is full");
+        throw new ChatAccessError({ key: "errors.callFull" });
     }
     if (pastLimit) return;
     const limit = await voiceLimitOf(meetingId);
@@ -1031,8 +1031,8 @@ async function requireRoom(meetingId: string, pastLimit = false): Promise<void> 
 }
 
 /** What somebody walking into a full voice channel is told. */
-function roomFull(limit: number): string {
-    return `This voice channel is full. It holds ${limit} ${limit === 1 ? "person" : "people"} at a time.`;
+function roomFull(limit: number): ChatErrorText {
+    return { key: "errors.voiceChannelFull", params: { count: limit } };
 }
 
 /** A call's voice channel limit, or zero when it has none - including every
@@ -1069,7 +1069,7 @@ export async function requireWithinLimit(seat: {
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         select: { userId: true, joinedAt: true, meeting: { select: { channelId: true } } }
     });
-    if (!mine) throw new ChatAccessError("You are not in that call");
+    if (!mine) throw new ChatAccessError({ key: "errors.notInCall" });
     const ahead = await prisma.meetingParticipant.count({
         where: {
             meetingId: seat.meetingId,
@@ -1156,7 +1156,7 @@ export async function requireSeated(seat: { meetingId: string; participantId: st
         where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
         select: { id: true, userId: true, name: true, admission: true, joinedAt: true }
     });
-    if (!participant) throw new ChatAccessError("You are not in that call");
+    if (!participant) throw new ChatAccessError({ key: "errors.notInCall" });
     return { ...participant, admission: participant.admission as MeetingSeat["admission"] };
 }
 
@@ -1533,10 +1533,10 @@ export async function createMeeting(
     input: NewMeeting
 ): Promise<{ meetingId: string; guestToken: string }> {
     const title = input.title.trim().slice(0, MAX_MEETING_TITLE);
-    if (!title) throw new ChatAccessError("Give the meeting a name");
+    if (!title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
     if (input.scheduledAt) {
         const ahead = input.scheduledAt.getTime() - Date.now();
-        if (ahead > MAX_SCHEDULE_AHEAD_MS) throw new ChatAccessError("That is too far ahead");
+        if (ahead > MAX_SCHEDULE_AHEAD_MS) throw new ChatAccessError({ key: "errors.scheduleTooFar" });
     }
 
     const guestToken = randomBytes(24).toString("base64url");
@@ -1582,7 +1582,7 @@ export async function joinMeeting(
             invites: { where: { userId: actor.id }, select: { id: true } }
         }
     });
-    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
     // A conversation's call is reached through the conversation, which is what
     // decides who may be in it. Sending one through here would be a way past it.
     if (meeting.channelId) return join(actor, meetingId);
@@ -1591,7 +1591,7 @@ export async function joinMeeting(
         where: { meetingId, userId: actor.id, admission: "denied" },
         select: { id: true }
     });
-    if (shown) throw new ChatAccessError("You were removed from this meeting");
+    if (shown) throw new ChatAccessError({ key: "errors.removedFromMeeting" });
 
     const known = meeting.hostId === actor.id || meeting.invites.length > 0;
     return seatFor(meetingId, actor.id, actor.name, {
@@ -1621,7 +1621,7 @@ export async function joinOnLink(
         where: { guestToken: token },
         select: { id: true, endedAt: true }
     });
-    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
     return joinMeeting(actor, meeting.id);
 }
 
@@ -1713,7 +1713,7 @@ export async function inviteToMeeting(
 ): Promise<{ title: string; invited: readonly string[] }> {
     const meeting = await requireHost(actor, meetingId);
     const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
-    if (wanted.length === 0) throw new ChatAccessError("Pick somebody to invite");
+    if (wanted.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToInvite" });
 
     // Only people who exist, so a bad id is a name that is not added rather than
     // an invitation to nobody sitting on the meeting forever.
@@ -1721,7 +1721,7 @@ export async function inviteToMeeting(
         where: { id: { in: wanted } },
         select: { id: true }
     });
-    if (real.length === 0) throw new ChatAccessError("Pick somebody to invite");
+    if (real.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToInvite" });
 
     await prisma.meetingInvite.createMany({
         data: real.map((person) => ({ meetingId, userId: person.id, invitedById: actor.id })),
@@ -1759,9 +1759,9 @@ export async function transferHost(
         where: { id: participantId, meetingId, leftAt: null, admission: "admitted" },
         select: { userId: true }
     });
-    if (!target) throw new ChatAccessError("They are not in this meeting");
+    if (!target) throw new ChatAccessError({ key: "errors.notInMeeting" });
     if (!target.userId) {
-        throw new ChatAccessError("Only somebody with a Polaris account can host a meeting");
+        throw new ChatAccessError({ key: "errors.meetingHostNeedsAccount" });
     }
 
     await prisma.meeting.update({ where: { id: meetingId }, data: { hostId: target.userId } });
@@ -1791,9 +1791,9 @@ export async function removeFromMeeting(
         where: { id: participantId, meetingId, leftAt: null },
         select: { id: true, userId: true }
     });
-    if (!target) throw new ChatAccessError("They are not in this meeting");
+    if (!target) throw new ChatAccessError({ key: "errors.notInMeeting" });
     if (target.userId && target.userId === meeting.hostId) {
-        throw new ChatAccessError("You cannot remove yourself from your own meeting");
+        throw new ChatAccessError({ key: "errors.meetingRemoveSelf" });
     }
 
     await prisma.meetingParticipant.update({
@@ -1818,7 +1818,7 @@ export async function setMeetingOptions(
 ): Promise<void> {
     await requireHost(actor, meetingId);
     const title = options.title?.trim().slice(0, MAX_MEETING_TITLE);
-    if (options.title !== undefined && !title) throw new ChatAccessError("Give the meeting a name");
+    if (options.title !== undefined && !title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
 
     await prisma.meeting.update({
         where: { id: meetingId },
@@ -1852,9 +1852,9 @@ async function requireHost(
         where: { id: meetingId },
         select: { hostId: true, title: true, endedAt: true }
     });
-    if (!meeting || meeting.endedAt) throw new ChatAccessError("That meeting has ended");
+    if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
     if (meeting.hostId !== actor.id) {
-        throw new ChatAccessError("Only whoever is hosting the meeting can do that");
+        throw new ChatAccessError({ key: "errors.meetingHostOnly" });
     }
     return { title: meeting.title, hostId: meeting.hostId };
 }

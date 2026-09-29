@@ -52,9 +52,7 @@ export async function requireNotSpam(input: {
         rules.maxMentionsPerMessage !== core.CHAT_NO_LIMIT &&
         people.length > rules.maxMentionsPerMessage
     ) {
-        throw new ChatRuleError(
-            `One message can mention up to ${rules.maxMentionsPerMessage} people here. Split it up, or use @everyone.`
-        );
+        throw new ChatRuleError({ key: "errors.tooManyMentions", params: { count: rules.maxMentionsPerMessage } });
     }
     if (input.editing) return;
 
@@ -69,9 +67,7 @@ export async function requireNotSpam(input: {
             }
         });
         if (same >= rules.maxRepeatedMessages) {
-            throw new ChatRuleError(
-                "You have just sent that same message several times. Give it a moment."
-            );
+            throw new ChatRuleError({ key: "errors.repeatedMessage" });
         }
     }
 
@@ -100,9 +96,7 @@ export async function requireNotSpam(input: {
         if (
             mentioned.some((person) => (times.get(person.id) ?? 0) >= rules.maxSamePersonMentions)
         ) {
-            throw new ChatRuleError(
-                "You have mentioned the same person a lot in the last few minutes. They have been told - give them a moment."
-            );
+            throw new ChatRuleError({ key: "errors.repeatedMention" });
         }
     }
 }
@@ -141,8 +135,6 @@ export async function requireRoomMentionAllowed(input: {
     });
     const used = candidates.filter((message) => channelMentions(message.body).size > 0).length;
     if (used >= rules.maxRoomMentionsPerHour) {
-        throw new ChatRuleError(
-            `@everyone and @here can be used ${rules.maxRoomMentionsPerHour} ${rules.maxRoomMentionsPerHour === 1 ? "time" : "times"} an hour per person here. Send it without, or try again later.`
-        );
+        throw new ChatRuleError({ key: "errors.roomMentionsPerHour", params: { count: rules.maxRoomMentionsPerHour } });
     }
 }

@@ -45,8 +45,10 @@ import {
     requireChannel,
     requirePostable,
     type ChannelAccess,
-    type ChatActor
+    type ChatActor,
+    type ChatErrorText
 } from "./access";
+import { spokenEditWindow, spokenWait } from "./durations";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -205,7 +207,7 @@ const QUOTE_LENGTH = 160;
 
 /** Said when somebody answers a message that has been taken back. One sentence
  *  for the reply, the thread and the forward, because it is one situation. */
-const GONE = "That message was deleted";
+const GONE: ChatErrorText = { key: "errors.messageDeleted" };
 
 /** One emoji on a message, already counted. */
 export interface ChatReactionView {
@@ -392,7 +394,7 @@ export async function send(
     // is the content, the note on top is optional and says so on the dialog -
     // and this refused every forward somebody sent without typing one.
     if (attachments.length === 0 && !quote?.forwarded && isBlankMarkdown(input.body)) {
-        throw new ChatRuleError("Write something first");
+        throw new ChatRuleError({ key: "errors.bodyRequired" });
     }
 
     if (input.parentId) {
@@ -401,7 +403,7 @@ export async function send(
             select: { channelId: true, parentId: true, deletedAt: true }
         });
         if (!parent || parent.channelId !== input.channelId) {
-            throw new ChatAccessError("That message is not in this conversation");
+            throw new ChatAccessError({ key: "errors.messageNotInConversation" });
         }
         if (parent.deletedAt) throw new ChatRuleError(GONE);
         // Threads are one level. A reply to a reply joins the same thread rather
@@ -558,8 +560,10 @@ async function refuseIfBlocked(actor: ChatActor, access: ChannelAccess): Promise
     );
     if (blocked.size === 0) return;
 
-    const name = others.find((row) => blocked.has(row.userId))?.user.name || "them";
-    throw new ChatRuleError(`You blocked ${name}. Unblock them to send a message.`);
+    const name = others.find((row) => blocked.has(row.userId))?.user.name;
+    throw new ChatRuleError(
+        name ? { key: "errors.blockedRecipient", params: { name } } : { key: "errors.blockedRecipientUnnamed" }
+    );
 }
 
 /**
@@ -583,9 +587,7 @@ async function requireSendable(
     // Code points rather than UTF-16 units: a limit that counted the latter
     // would refuse a message of emoji at half its stated length.
     if ([...body].length > rules.maxMessageLength) {
-        throw new ChatRuleError(
-            `Messages here are limited to ${rules.maxMessageLength} characters`
-        );
+        throw new ChatRuleError({ key: "errors.messageTooLong", params: { count: rules.maxMessageLength } });
     }
 
     if (rules.maxPerMinute !== core.CHAT_NO_LIMIT && options.wait !== false) {
@@ -597,7 +599,7 @@ async function requireSendable(
             }
         });
         if (recent >= rules.maxPerMinute) {
-            throw new ChatRuleError("You are sending messages too quickly. Wait a moment.");
+            throw new ChatRuleError({ key: "errors.tooFast" });
         }
     }
 
@@ -644,9 +646,7 @@ async function requireSendable(
         now: new Date()
     });
     if (wait > 0) {
-        throw new ChatRuleError(
-            `Slow mode is on here. You can send again in ${core.slowmodeSpoken(wait)}.`
-        );
+        throw new ChatRuleError({ key: "errors.slowMode", params: { wait: spokenWait(wait) } });
     }
 }
 
@@ -674,16 +674,16 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
             createdAt: true
         }
     });
-    if (!message) throw new ChatAccessError("That message is gone");
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     const editable = await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id)
-        throw new ChatAccessError("You can only edit your own messages");
-    if (message.deletedAt) throw new ChatAccessError("That message was deleted");
+        throw new ChatAccessError({ key: "errors.editOwnOnly" });
+    if (message.deletedAt) throw new ChatAccessError({ key: "errors.messageDeleted" });
     // A poll's body is the question people answered. Changing it after the fact
     // would leave every vote already cast standing behind something nobody
     // agreed to - so it is taken back and asked again instead.
     if (message.kind === "poll") {
-        throw new ChatRuleError("A poll cannot be rewritten. Delete it and ask again.");
+        throw new ChatRuleError({ key: "errors.pollNotEditable" });
     }
     // The length and the instance's own limit, but never the wait: slow mode is
     // about how often somebody speaks, and rewriting what you already said is
@@ -706,13 +706,14 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
         }
     }
     // Emptying a message is deleting it, and there is a delete for that.
-    if (isBlankMarkdown(input.body)) throw new ChatRuleError("Write something first");
+    if (isBlankMarkdown(input.body)) throw new ChatRuleError({ key: "errors.bodyRequired" });
 
     const rules = await rulesForChannel(message.channelId);
     if (!core.withinEditWindow(rules, message.createdAt)) {
-        throw new ChatRuleError(
-            `Messages here can be edited for ${core.editWindowLabel(rules.editWindowMinutes)} after they are sent`
-        );
+        throw new ChatRuleError({
+            key: "errors.editWindowPassed",
+            params: { window: spokenEditWindow(rules.editWindowMinutes) }
+        });
     }
 
     const editedAt = new Date();
@@ -834,7 +835,7 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
         where: { id: messageId },
         select: { channelId: true }
     });
-    if (!found) throw new ChatAccessError("That message is gone");
+    if (!found) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, found.channelId);
 
     const [row, channel] = await Promise.all([
@@ -844,9 +845,9 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
             select: { name: true, spaceId: true, kind: true }
         })
     ]);
-    if (!row) throw new ChatAccessError("That message is gone");
+    if (!row) throw new ChatAccessError({ key: "errors.messageGone" });
     const [message] = await decorateMessages(actor, [row]);
-    if (!message) throw new ChatAccessError("That message is gone");
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     return {
         message,
         // A direct message is named after whoever is in it, which from here is
@@ -862,7 +863,7 @@ export async function editHistory(actor: ChatActor, messageId: string): Promise<
         where: { id: messageId },
         select: { channelId: true, deletedAt: true }
     });
-    if (!message) throw new ChatAccessError("That message is gone");
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
 
     const rules = await rulesForChannel(message.channelId);
@@ -929,7 +930,7 @@ export async function remove(
         : (await requireChannel(actor, message.channelId)).mayModerate;
     const mine = message.authorId === actor.id;
     if (!mine && !mayAdminister) {
-        throw new ChatAccessError("You cannot delete that message");
+        throw new ChatAccessError({ key: "errors.messageDeleteNotAllowed" });
     }
 
     const rules = await rulesForChannel(message.channelId);
@@ -937,9 +938,10 @@ export async function remove(
     // from a room they run is not taking back their own words, and a rule that
     // stopped them would turn moderation into a race against a clock.
     if (mine && !mayAdminister && !core.withinEditWindow(rules, message.createdAt)) {
-        throw new ChatRuleError(
-            `Messages here can be deleted for ${core.editWindowLabel(rules.editWindowMinutes)} after they are sent`
-        );
+        throw new ChatRuleError({
+            key: "errors.deleteWindowPassed",
+            params: { window: spokenEditWindow(rules.editWindowMinutes) }
+        });
     }
 
     // A thread root is the one message that cannot leave without trace: the
@@ -990,7 +992,7 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
         where: { id: input.messageId },
         select: { channelId: true }
     });
-    if (!message) throw new ChatAccessError("That message is gone");
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requirePostable(actor, message.channelId);
 
     const existing = await prisma.chatReaction.findUnique({
@@ -1391,12 +1393,12 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
         where: { id: input.messageId },
         select: { id: true, authorId: true, deletedAt: true }
     });
-    if (!original || original.deletedAt) throw new ChatAccessError("That message is gone");
+    if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
     if (
         original.authorId &&
         !(await maySee(original.authorId, "forwarding", { id: actor.id, isAdmin: false }))
     ) {
-        throw new ChatAccessError("They do not allow their messages to be passed on");
+        throw new ChatAccessError({ key: "errors.forwardingRefused" });
     }
 
     // The note as written, empty included: a space was here to get past the
@@ -1419,7 +1421,7 @@ export async function star(actor: ChatActor, messageId: string): Promise<boolean
         where: { id: messageId },
         select: { channelId: true }
     });
-    if (!message) throw new ChatAccessError("That message is gone");
+    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
 
     const existing = await prisma.chatStar.findUnique({

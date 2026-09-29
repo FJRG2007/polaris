@@ -41,10 +41,16 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
 import { chatAlertShelf } from "./isolation";
 import { recipientShelf } from "@/lib/workspace-scope";
-import { ChatAccessError, roomMentionsAllowed, type ChannelAccess, type ChatActor } from "./access";
+import {
+    ChatAccessError,
+    roomMentionsAllowed,
+    type ChannelAccess,
+    type ChatActor,
+    type ChatErrorText
+} from "./access";
 
 /** What somebody is told when the owner of a group has kept these to themselves. */
-const ROOM_MENTION_REFUSED = "Only the owner of this group can use @everyone and @here";
+const ROOM_MENTION_REFUSED: ChatErrorText = { key: "errors.roomMentionOwnerOnly" };
 
 /**
  * Refuse a message that names the room from somebody the room does not let.

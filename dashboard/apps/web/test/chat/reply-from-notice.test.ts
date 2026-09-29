@@ -17,7 +17,7 @@ const ANNOUNCED = "33333333-3333-4333-8333-333333333333";
 
 const fake = vi.hoisted(() => ({
     calls: [] as string[],
-    refuse: null as string | null,
+    refuse: null as import("@/lib/chat/access").ChatErrorText | null,
     readFails: false
 }));
 
@@ -66,10 +66,10 @@ describe("answering from a notice", () => {
     });
 
     it("says why an answer was refused", async () => {
-        fake.refuse = "You cannot post in this conversation";
+        fake.refuse = { key: "errors.notInConversation" };
         expect(
             await replyFromNoticeAction({ channelId: CHANNEL, messageId: ANNOUNCED, body: "hi" })
-        ).toEqual({ error: "You cannot post in this conversation" });
+        ).toEqual({ error: "You are not in that conversation" });
     });
 
     it("still sends the answer when reading failed", async () => {

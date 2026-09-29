@@ -61,7 +61,7 @@ export async function saveMedia(
     });
     if (existing) return view(existing);
     if (kept >= MAX_SAVED_MEDIA) {
-        throw new ChatAccessError(`You can keep ${MAX_SAVED_MEDIA} pictures. Remove one first.`);
+        throw new ChatAccessError({ key: "errors.savedPicturesFull", params: { count: MAX_SAVED_MEDIA } });
     }
 
     const row = await prisma.chatSavedMedia.create({
@@ -127,14 +127,14 @@ export async function sendSavedMedia(
         where: { id: savedId, userId: actor.id },
         select: { source: true, name: true }
     });
-    if (!saved) throw new ChatAccessError("That is not one of yours");
+    if (!saved) throw new ChatAccessError({ key: "errors.notYours" });
     // A remote address is handed back rather than fetched here, so it goes
     // through the same guard every remote picture goes through - checked at the
     // moment it is used rather than trusted because it was once in a message.
     if (!saved.source.startsWith(ATTACHMENT)) return { remote: saved.source };
 
     const bytes = await readAttachment(saved.source.slice(ATTACHMENT.length));
-    if (!bytes) throw new ChatAccessError("That picture is no longer stored here");
+    if (!bytes) throw new ChatAccessError({ key: "errors.pictureNotStored" });
 
     const stored: StoredAttachment = await storeAttachment(channelId, {
         name: bytes.name,
@@ -171,7 +171,7 @@ export function remoteSource(source: string): string | null {
  */
 async function validate(actor: ChatActor, source: string): Promise<string> {
     const cleaned = source.trim();
-    if (!cleaned || cleaned.length > 2048) throw new ChatAccessError("That cannot be kept");
+    if (!cleaned || cleaned.length > 2048) throw new ChatAccessError({ key: "errors.pictureNotKeepable" });
 
     if (cleaned.startsWith(ATTACHMENT)) {
         const attachmentId = cleaned.slice(ATTACHMENT.length);
@@ -179,7 +179,7 @@ async function validate(actor: ChatActor, source: string): Promise<string> {
             where: { id: attachmentId },
             select: { message: { select: { channelId: true } } }
         });
-        if (!attachment) throw new ChatAccessError("That picture is gone");
+        if (!attachment) throw new ChatAccessError({ key: "errors.pictureGone" });
         // Read access, not post access: keeping something is reading it again.
         await requireChannel(actor, attachment.message.channelId);
         return cleaned;
@@ -190,10 +190,10 @@ async function validate(actor: ChatActor, source: string): Promise<string> {
     try {
         url = new URL(cleaned);
     } catch {
-        throw new ChatAccessError("That is not an address");
+        throw new ChatAccessError({ key: "errors.addressInvalid" });
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-        throw new ChatAccessError("That is not an address");
+        throw new ChatAccessError({ key: "errors.addressInvalid" });
     }
     return url.href;
 }

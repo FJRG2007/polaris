@@ -15,14 +15,21 @@ import {
     MEDIA_SOURCE,
     UNRESTRICTED,
     callModerationSchema,
-    heldBack,
+    heldBack as heldBackKey,
     mediaPermissions,
     microphoneAllowed,
-    moderationNotice,
-    moderationRefusal,
+    moderationNotice as moderationNoticeKey,
+    moderationRefusal as moderationRefusalKey,
     restrictionAfter,
     subscriptionRules
 } from "@/lib/chat/voice-moderation";
+import { translate } from "@/lib/i18n/translate";
+
+/** The words a key of the chat catalog says in English, which is what these read. */
+const said = (key: string | null): string | null => (key ? translate("en-US", `chat.${key}` as never) : null);
+const moderationRefusal = (input: Parameters<typeof moderationRefusalKey>[0]) => said(moderationRefusalKey(input));
+const moderationNotice = (action: Parameters<typeof moderationNoticeKey>[0]) => said(moderationNoticeKey(action));
+const heldBack = (restriction: Parameters<typeof heldBackKey>[0]) => said(heldBackKey(restriction));
 
 const base = {
     mayModerate: true,

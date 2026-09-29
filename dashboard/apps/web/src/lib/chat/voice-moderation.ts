@@ -20,6 +20,15 @@ export const CALL_MODERATIONS = ["mute", "unmute", "deafen", "undeafen", "discon
 
 export type CallModeration = (typeof CALL_MODERATIONS)[number];
 
+/** Why a moderator's press is refused: a key under `errors.moderation` in the
+ *  `chat` catalog, said in the reader's language where it is answered. */
+export type ModerationRefusal =
+    | "errors.moderation.groupOnly"
+    | "errors.moderation.moderatorOnly"
+    | "errors.moderation.self"
+    | "errors.moderation.groupOwner"
+    | "errors.moderation.serverOwner";
+
 /** The request, as the action layer accepts it. */
 export const callModerationSchema = z.object({
     participantId: z.string().uuid(),
@@ -54,23 +63,19 @@ export function moderationRefusal(input: {
     readonly ownerId: string | null;
     readonly targetUserId: string | null;
     readonly group: boolean;
-}): string | null {
+}): ModerationRefusal | null {
     if (!input.mayModerate) {
-        return input.group
-            ? "Only whoever runs this group can do that"
-            : "Only a moderator of this server can do that";
+        return input.group ? "errors.moderation.groupOnly" : "errors.moderation.moderatorOnly";
     }
     if (input.targetUserId !== null && input.targetUserId === input.actorId) {
-        return "That is you. Your own controls do that";
+        return "errors.moderation.self";
     }
     if (
         input.targetUserId !== null &&
         input.ownerId !== null &&
         input.targetUserId === input.ownerId
     ) {
-        return input.group
-            ? "Whoever runs the group cannot be moderated"
-            : "The owner of this server cannot be moderated";
+        return input.group ? "errors.moderation.groupOwner" : "errors.moderation.serverOwner";
     }
     return null;
 }
@@ -167,24 +172,14 @@ export function microphoneAllowed(
     return sources.length === 0 || sources.includes(MEDIA_SOURCE.MICROPHONE);
 }
 
-/** What the person it was done to is told, in a note on their screen. */
-export function moderationNotice(action: CallModeration): string {
-    switch (action) {
-        case "mute":
-            return "A moderator muted you. Only a moderator can unmute you.";
-        case "unmute":
-            return "A moderator unmuted you.";
-        case "deafen":
-            return "A moderator deafened you. You cannot hear the call until a moderator undoes it.";
-        case "undeafen":
-            return "A moderator undeafened you.";
-        case "disconnect":
-            return "A moderator disconnected you from the call.";
-    }
+/** What the person it was done to is told, in a note on their screen: a key of
+ *  the `chat` catalog, translated where it is shown. */
+export function moderationNotice(action: CallModeration): `moderation.notice.${CallModeration}` {
+    return `moderation.notice.${action}`;
 }
 
 /** What a press of mute or deafen says while a moderator's restriction is on. */
-export function heldBack(restriction: SeatRestriction): string | null {
+export function heldBack(restriction: SeatRestriction): `moderation.notice.${CallModeration}` | null {
     if (restriction.serverDeafened) return moderationNotice("deafen");
     if (restriction.serverMuted) return moderationNotice("mute");
     return null;

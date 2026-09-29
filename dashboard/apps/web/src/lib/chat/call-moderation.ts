@@ -69,12 +69,12 @@ export async function moderateSeat(
             }
         }
     });
-    if (!seat) throw new ChatAccessError("They are not in this call any more");
+    if (!seat) throw new ChatAccessError({ key: "errors.seatGone" });
     const { meeting } = seat;
     if (meeting.endedAt || !meeting.channelId || !meeting.channel) {
         // A meeting of its own has a host, and the host has their own way to
         // show somebody out - `removeFromMeeting`.
-        throw new ChatAccessError("That call has ended");
+        throw new ChatAccessError({ key: "errors.callEnded" });
     }
 
     const access = await requireChannel(actor, meeting.channelId);
@@ -86,7 +86,7 @@ export async function moderateSeat(
         targetUserId: seat.userId,
         group
     });
-    if (refusal) throw new ChatAccessError(refusal);
+    if (refusal) throw new ChatAccessError({ key: refusal });
 
     if (action === "disconnect") {
         // Told first: once the connection is closed the browser is no longer

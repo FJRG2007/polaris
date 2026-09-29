@@ -73,17 +73,17 @@ export async function createInvite(
         where: { id: input.spaceId },
         select: { id: true, visibility: true, archived: true }
     });
-    if (!space || space.archived) throw new ChatAccessError("That space is not open");
+    if (!space || space.archived) throw new ChatAccessError({ key: "errors.spaceNotOpen" });
 
     const membership = await prisma.chatSpaceMember.findUnique({
         where: { spaceId_userId: { spaceId: input.spaceId, userId: actor.id } },
         select: { role: true }
     });
-    if (!membership) throw new ChatAccessError("You are not in that space");
+    if (!membership) throw new ChatAccessError({ key: "errors.notInSpace" });
     // A private space is one whose roster was chosen. A member who could hand
     // out a link would be choosing it instead of the administrator.
     if (space.visibility === "private" && membership.role !== "admin") {
-        throw new ChatAccessError("Only an administrator of this space can invite people to it");
+        throw new ChatAccessError({ key: "errors.spaceInviteAdminOnly" });
     }
 
     const invite = await prisma.chatSpaceInvite.create({
@@ -109,7 +109,7 @@ export async function listInvites(
         where: { spaceId_userId: { spaceId, userId: actor.id } },
         select: { role: true }
     });
-    if (!membership) throw new ChatAccessError("You are not in that space");
+    if (!membership) throw new ChatAccessError({ key: "errors.notInSpace" });
 
     const rows = await prisma.chatSpaceInvite.findMany({
         where: {
@@ -130,7 +130,7 @@ export async function revokeInvite(actor: ChatActor, inviteId: string): Promise<
         where: { id: inviteId },
         select: { id: true, spaceId: true, createdById: true }
     });
-    if (!invite) throw new ChatAccessError("That invitation is gone");
+    if (!invite) throw new ChatAccessError({ key: "errors.invitationGone" });
 
     if (invite.createdById !== actor.id) {
         const membership = await prisma.chatSpaceMember.findUnique({
@@ -138,7 +138,7 @@ export async function revokeInvite(actor: ChatActor, inviteId: string): Promise<
             select: { role: true }
         });
         if (membership?.role !== "admin") {
-            throw new ChatAccessError("That invitation is not yours to withdraw");
+            throw new ChatAccessError({ key: "errors.invitationNotYours" });
         }
     }
 
@@ -205,8 +205,8 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
             space: { select: { archived: true } }
         }
     });
-    if (!invite || invite.space.archived) throw new ChatAccessError("That invitation is gone");
-    if (!core.inviteUsable(invite)) throw new ChatAccessError("That invitation is no longer good");
+    if (!invite || invite.space.archived) throw new ChatAccessError({ key: "errors.invitationGone" });
+    if (!core.inviteUsable(invite)) throw new ChatAccessError({ key: "errors.invitationExpired" });
 
     const already = await prisma.chatSpaceMember.findUnique({
         where: { spaceId_userId: { spaceId: invite.spaceId, userId: actor.id } },
@@ -224,7 +224,7 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
         where: { spaceId_userId: { spaceId: invite.spaceId, userId: actor.id } },
         select: { id: true }
     });
-    if (barred) throw new ChatAccessError("You cannot join that space");
+    if (barred) throw new ChatAccessError({ key: "errors.spaceJoinNotAllowed" });
 
     const claimed = await prisma.chatSpaceInvite.updateMany({
         where: {
@@ -234,7 +234,7 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
         },
         data: { uses: { increment: 1 } }
     });
-    if (claimed.count === 0) throw new ChatAccessError("That invitation is no longer good");
+    if (claimed.count === 0) throw new ChatAccessError({ key: "errors.invitationExpired" });
 
     await prisma.chatSpaceMember.create({
         data: { spaceId: invite.spaceId, userId: actor.id, role: "member" }

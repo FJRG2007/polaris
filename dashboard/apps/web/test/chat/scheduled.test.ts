@@ -19,6 +19,7 @@
 
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { chatText, type ChatText } from "@/lib/chat/text";
 
 interface Row {
     id: string;
@@ -55,7 +56,12 @@ let postable = true;
 /** Files handed to the storage sweep. */
 let removed: string[] = [];
 
-class FakeAccessError extends Error {}
+class FakeAccessError extends Error {
+    constructor(text?: string | ChatText) {
+        // The real one says its catalog words in English when nobody's language is asked for.
+        super(typeof text === "object" ? chatText("en-US", text) : text);
+    }
+}
 
 vi.mock("@/lib/chat/access", () => ({
     ChatAccessError: FakeAccessError,

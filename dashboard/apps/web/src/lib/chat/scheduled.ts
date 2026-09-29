@@ -85,10 +85,10 @@ export async function scheduleMessage(
     await refuseRoomMention(actor, access, input.body);
 
     const sendAt = new Date(input.sendAt);
-    const refusal = core.scheduleRefusal(sendAt);
-    if (refusal) throw new ChatAccessError(refusal);
+    const problem = core.scheduleProblem(sendAt);
+    if (problem) throw new ChatAccessError({ key: `errors.schedule.${problem}` });
     if (attachments.length === 0 && !input.body.trim()) {
-        throw new ChatAccessError("Write something first");
+        throw new ChatAccessError({ key: "errors.bodyRequired" });
     }
 
     const row = await prisma.chatScheduledMessage.create({
@@ -210,7 +210,7 @@ export async function sendScheduledNow(actor: ChatActor, id: string): Promise<vo
         where: { id, authorId: actor.id },
         select: rowForSending
     });
-    if (!row) throw new ChatAccessError("There is nothing waiting under that id");
+    if (!row) throw new ChatAccessError({ key: "errors.scheduledMissing" });
 
     await deliver(row);
 }

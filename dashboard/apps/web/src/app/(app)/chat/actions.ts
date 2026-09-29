@@ -1218,7 +1218,7 @@ export async function inviteToDirectAction(input: {
 
     const result = await guard(async () => {
         const offer = await invites.readInvite(me, code.data);
-        if (!offer) throw new ChatAccessError("That invitation is gone");
+        if (!offer) throw new ChatAccessError({ key: "errors.invitationGone" });
         const channelId = await chat.openDirect(me, [userId.data]);
         // Built on the address Polaris hands out rather than on the sender's
         // tab, which may be a name that resolves on their network alone.

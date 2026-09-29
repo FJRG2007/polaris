@@ -35,7 +35,8 @@ import {
     requireChannel,
     requireSpace,
     spaceAccess,
-    type ChatActor
+    type ChatActor,
+    type ChatErrorText
 } from "./access";
 
 /** A space as the rail draws it. */
@@ -158,7 +159,7 @@ const UNREAD_CAP = 99;
 
 /** Said the same way wherever it is refused, because it is one situation and the
  *  next step is the same: an administrator switches the chat on for them. */
-const NO_CHAT = "Somebody there does not have the chat turned on";
+const NO_CHAT: ChatErrorText = { key: "errors.chatOff" };
 
 /**
  * Said wherever a block is what refuses, and deliberately vague.
@@ -169,7 +170,7 @@ const NO_CHAT = "Somebody there does not have the chat turned on";
  * it was set against, and one that names who in a group of five is the same
  * leak with an extra step.
  */
-const NO_REACH = "You cannot start that conversation";
+const NO_REACH: ChatErrorText = { key: "errors.cannotStartConversation" };
 
 // ---------------------------------------------------------------------------
 // Spaces
@@ -253,7 +254,7 @@ export async function createSpace(
             where: { id: input.orgId, ...readsOrgWhere(actor.id) },
             select: { id: true }
         });
-        if (!reads) throw new ChatAccessError("You are not in that organization");
+        if (!reads) throw new ChatAccessError({ key: "errors.notInYourOrganization" });
     }
 
     return prisma.$transaction(async (tx) => {
@@ -298,7 +299,7 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
         select: { ownerId: true }
     });
     if (!space || space.ownerId !== actor.id) {
-        throw new ChatAccessError("Only the owner can delete a space");
+        throw new ChatAccessError({ key: "errors.spaceDeleteOwnerOnly" });
     }
     // Every channel's files, before the rows that say where they are cascade
     // away with the space.
@@ -445,7 +446,7 @@ async function refuseSpaceOwner(spaceId: string, userId: string): Promise<void> 
         where: { id: spaceId },
         select: { ownerId: true }
     });
-    if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
+    if (space?.ownerId === userId) throw new ChatRuleError({ key: "errors.spaceOwnerProtected" });
 }
 
 /** A ban, as the list that lifts them draws it. */
@@ -482,14 +483,14 @@ export async function banFromSpace(
     reason = ""
 ): Promise<void> {
     await requireSpace(actor, spaceId, "admin");
-    if (userId === actor.id) throw new ChatRuleError("You cannot ban yourself");
+    if (userId === actor.id) throw new ChatRuleError({ key: "errors.banSelf" });
     const space = await prisma.chatSpace.findUnique({
         where: { id: spaceId },
         select: { ownerId: true }
     });
     // The owner is not somebody an administrator gets to decide about. Without
     // this, any admin could take the space from whoever made it.
-    if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
+    if (space?.ownerId === userId) throw new ChatRuleError({ key: "errors.spaceOwnerProtected" });
 
     await prisma.$transaction(async (tx) => {
         await tx.chatSpaceBan.upsert({
@@ -584,7 +585,7 @@ export async function timeOutMember(
     userId: string,
     minutes: number
 ): Promise<void> {
-    if (userId === actor.id) throw new ChatRuleError("You cannot time yourself out");
+    if (userId === actor.id) throw new ChatRuleError({ key: "errors.timeoutSelf" });
     const until = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
 
     if (where.spaceId) {
@@ -593,7 +594,7 @@ export async function timeOutMember(
             where: { id: where.spaceId },
             select: { ownerId: true }
         });
-        if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
+        if (space?.ownerId === userId) throw new ChatRuleError({ key: "errors.spaceOwnerProtected" });
         await prisma.chatSpaceMember.updateMany({
             where: { spaceId: where.spaceId, userId },
             data: { timeoutUntil: until }
@@ -606,9 +607,9 @@ export async function timeOutMember(
     }
 
     const channelId = where.channelId;
-    if (!channelId) throw new ChatRuleError("There is nowhere to do that");
+    if (!channelId) throw new ChatRuleError({ key: "errors.nowhereToDoThat" });
     const access = await requireChannel(actor, channelId);
-    if (!access.mayModerate) throw new ChatAccessError("You cannot do that here");
+    if (!access.mayModerate) throw new ChatAccessError({ key: "errors.notAllowedHere" });
     await prisma.chatChannelMember.updateMany({
         where: { channelId, userId },
         data: { timeoutUntil: until }
@@ -893,7 +894,7 @@ export async function renameCategory(
         where: { id: input.categoryId },
         select: { spaceId: true }
     });
-    if (!category) throw new ChatAccessError("That category is gone");
+    if (!category) throw new ChatAccessError({ key: "errors.categoryGone" });
     await requireSpace(actor, category.spaceId, "admin");
 
     await prisma.chatCategory.update({
@@ -937,7 +938,7 @@ export async function createChannel(
         where: { spaceId: input.spaceId, name: input.name },
         select: { id: true }
     });
-    if (clash) throw new ChatAccessError("A channel with that name is already here");
+    if (clash) throw new ChatAccessError({ key: "errors.channelNameTaken" });
 
     // A heading from another space would put the channel somewhere nobody in
     // this one can see it.
@@ -946,7 +947,7 @@ export async function createChannel(
             where: { id: input.categoryId, spaceId: input.spaceId },
             select: { id: true }
         });
-        if (!category) throw new ChatAccessError("That category is not in this space");
+        if (!category) throw new ChatAccessError({ key: "errors.categoryNotInSpace" });
     }
 
     const channel = await prisma.chatChannel.create({
@@ -1090,7 +1091,7 @@ export async function reorderChannels(
             where: { id: input.categoryId, spaceId: input.spaceId },
             select: { id: true }
         });
-        if (!category) throw new ChatAccessError("That category is not in this space");
+        if (!category) throw new ChatAccessError({ key: "errors.categoryNotInSpace" });
     }
 
     // Every id is checked against the space rather than trusted from the client:
@@ -1146,10 +1147,10 @@ export async function updateChannel(
     input: core.ChatChannelUpdateInput
 ): Promise<void> {
     const access = await requireChannel(actor, input.channelId);
-    if (!access.mayAdminister) throw new ChatAccessError("You cannot change that channel");
-    if (!access.spaceId) throw new ChatAccessError("A direct message has no name to change");
+    if (!access.mayAdminister) throw new ChatAccessError({ key: "errors.channelChangeNotAllowed" });
+    if (!access.spaceId) throw new ChatAccessError({ key: "errors.directHasNoName" });
     if (input.userLimit !== undefined && access.kind !== "voice") {
-        throw new ChatAccessError("Only a voice channel holds a number of people");
+        throw new ChatAccessError({ key: "errors.limitVoiceOnly" });
     }
 
     await prisma.chatChannel.update({
@@ -1186,13 +1187,13 @@ export async function renameGroup(
     name: string
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
-    if (access.kind !== "group") throw new ChatAccessError("That conversation has no name to set");
+    if (access.kind !== "group") throw new ChatAccessError({ key: "errors.conversationHasNoName" });
     const group = await prisma.chatChannel.findUnique({
         where: { id: channelId },
         select: { kind: true, ownerId: true, createdById: true, membersMayEdit: true }
     });
     if (!group || !picturesAllowed({ ...group, mayAdminister: access.mayAdminister }, actor.id)) {
-        throw new ChatAccessError("Only the owner of this group can rename it");
+        throw new ChatAccessError({ key: "errors.groupRenameOwnerOnly" });
     }
 
     await prisma.chatChannel.update({ where: { id: channelId }, data: { name } });
@@ -1258,7 +1259,7 @@ export async function transferGroup(
         where: { channelId_userId: { channelId, userId: toUserId } },
         select: { id: true }
     });
-    if (!member) throw new ChatAccessError("That person is not in this group");
+    if (!member) throw new ChatAccessError({ key: "errors.personNotInGroup" });
 
     await prisma.chatChannel.update({ where: { id: channelId }, data: { ownerId: toUserId } });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
@@ -1272,15 +1273,15 @@ async function requireGroupOwner(actor: ChatActor, channelId: string): Promise<v
         where: { id: channelId },
         select: { kind: true, ownerId: true, createdById: true }
     });
-    if (!group || group.kind !== "group") throw new ChatAccessError("That is not a group");
+    if (!group || group.kind !== "group") throw new ChatAccessError({ key: "errors.notAGroup" });
     if (groupOwnerId(group) !== actor.id) {
-        throw new ChatAccessError("Only the owner of this group can do that");
+        throw new ChatAccessError({ key: "errors.groupOwnerOnly" });
     }
 }
 
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
     const access = await requireChannel(actor, channelId);
-    if (!access.mayAdminister) throw new ChatAccessError("You cannot delete that channel");
+    if (!access.mayAdminister) throw new ChatAccessError({ key: "errors.channelDeleteNotAllowed" });
     await discardChannel(channelId);
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }
@@ -1346,7 +1347,7 @@ export async function addChannelMembers(
     const access = await requireChannel(actor, channelId);
     const group = access.kind === "group";
     if (!access.mayAdminister && !group) {
-        throw new ChatAccessError("You cannot add people to that channel");
+        throw new ChatAccessError({ key: "errors.channelAddNotAllowed" });
     }
     if (group) {
         // Asked of the row, not of the screen: a button hidden from somebody is
@@ -1362,7 +1363,7 @@ export async function addChannelMembers(
             }
         });
         if (!room || !invitesAllowed({ ...room, mayAdminister: access.mayAdminister }, actor.id)) {
-            throw new ChatAccessError("Only the owner of this group can add people to it");
+            throw new ChatAccessError({ key: "errors.groupAddOwnerOnly" });
         }
     }
 
@@ -1377,9 +1378,7 @@ export async function addChannelMembers(
             where: { channelId, userId: { in: wanted } }
         });
         if (already + wanted.length - newcomers > core.MAX_GROUP_MEMBERS) {
-            throw new ChatAccessError(
-                `A group holds ${core.MAX_GROUP_MEMBERS} people. Make a channel instead.`
-            );
+            throw new ChatAccessError({ key: "errors.groupFull", params: { count: core.MAX_GROUP_MEMBERS } });
         }
     }
     // Somebody without the chat has no screen this channel could appear on, so
@@ -1446,12 +1445,12 @@ export async function removeChannelMember(
 ): Promise<void> {
     const access = await requireChannel(actor, channelId);
     const group = access.kind === "group";
-    if (!access.spaceId && !group) throw new ChatAccessError("A direct message cannot be left");
+    if (!access.spaceId && !group) throw new ChatAccessError({ key: "errors.directCannotBeLeft" });
     if (group && userId !== actor.id) {
-        throw new ChatAccessError("Only the person leaving can leave a group");
+        throw new ChatAccessError({ key: "errors.groupLeaveSelfOnly" });
     }
     if (userId !== actor.id && !access.mayAdminister) {
-        throw new ChatAccessError("You cannot remove people from that channel");
+        throw new ChatAccessError({ key: "errors.channelRemoveNotAllowed" });
     }
     if (userId !== actor.id && access.spaceId) await refuseSpaceOwner(access.spaceId, userId);
     const removed = await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
@@ -1515,7 +1514,7 @@ export async function setMuted(
 ): Promise<void> {
     await requireChannel(actor, channelId);
     const parsed = core.muteSchema.safeParse({ channelId, minutes });
-    if (!parsed.success) throw new ChatAccessError("That is not a length this can be muted for");
+    if (!parsed.success) throw new ChatAccessError({ key: "errors.muteLengthInvalid" });
 
     const muted = parsed.data.minutes !== null;
     const mutedUntil = muted ? core.muteEndsAt(parsed.data.minutes!) : null;
@@ -1552,7 +1551,7 @@ export async function setChannelNotify(
 ): Promise<void> {
     await requireChannel(actor, channelId);
     const parsed = core.chatChannelNotifySchema.safeParse({ channelId, level });
-    if (!parsed.success) throw new ChatAccessError("That is not a notification setting");
+    if (!parsed.success) throw new ChatAccessError({ key: "errors.notifySettingInvalid" });
 
     const notifyLevel = parsed.data.level;
     await prisma.chatChannelMember.upsert({
@@ -1578,7 +1577,7 @@ export async function setSpaceNotify(
 ): Promise<void> {
     await requireSpace(actor, spaceId);
     const parsed = core.chatSpaceNotifySchema.safeParse({ spaceId, level });
-    if (!parsed.success) throw new ChatAccessError("That is not a notification setting");
+    if (!parsed.success) throw new ChatAccessError({ key: "errors.notifySettingInvalid" });
 
     const notifyLevel = parsed.data.level;
     await prisma.chatSpacePreference.upsert({
@@ -1649,14 +1648,14 @@ async function directAllowed(
     userIds: readonly string[]
 ): Promise<{ others: string[]; orgId: string | null }> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
-    if (others.length === 0) throw new ChatAccessError("Pick somebody to message");
+    if (others.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToMessage" });
 
     const present = await prisma.user.findMany({
         where: { id: { in: others } },
         select: { id: true, name: true }
     });
     if (present.length !== others.length)
-        throw new ChatAccessError("Somebody there no longer has an account");
+        throw new ChatAccessError({ key: "errors.memberAccountGone" });
 
     // The same rule the picker applies, applied again here: a picker is a
     // convenience and this is the check.
@@ -1675,7 +1674,7 @@ async function directAllowed(
     // group is also made on the way out of a call taking a third person - and a
     // rule with two implementations is a rule with one hole in it.
     if (others.length > 1 && !(await can(actor.id, "chat.groups"))) {
-        throw new ChatAccessError("You are not allowed to start group conversations");
+        throw new ChatAccessError({ key: "errors.groupStartNotAllowed" });
     }
 
     // The chat this is being started in, which is also what it is filed under.
@@ -1683,7 +1682,7 @@ async function directAllowed(
     if (orgId) {
         const roster = await orgChatPeople(orgId);
         if (others.some((id) => !roster.has(id)))
-            throw new ChatAccessError("They are not in this organization");
+            throw new ChatAccessError({ key: "errors.notInOrganization" });
     }
 
     return { others, orgId };

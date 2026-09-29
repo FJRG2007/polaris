@@ -74,11 +74,11 @@ vi.mock("@/lib/chat/access", async () => {
     return {
         ChatAccessError,
         requireChannel: async (_actor: unknown, channelId: string) => {
-            if (!reachable.has(channelId)) throw new ChatAccessError("Not yours");
+            if (!reachable.has(channelId)) throw new ChatAccessError({ key: "errors.notYours" });
             return { spaceId: null, mayAdminister: false };
         },
         requirePostable: async (_actor: unknown, channelId: string) => {
-            if (!reachable.has(channelId)) throw new ChatAccessError("Not yours");
+            if (!reachable.has(channelId)) throw new ChatAccessError({ key: "errors.notYours" });
         }
     };
 });
@@ -127,7 +127,7 @@ describe("keeping one", () => {
     it("refuses one from a conversation they are not in", async () => {
         // The whole reason this is checked: an attachment id in a request is a
         // guess until the channel behind it says otherwise.
-        await expect(saved.saveMedia(ada, "attachment:theirs")).rejects.toThrow(/not yours/i);
+        await expect(saved.saveMedia(ada, "attachment:theirs")).rejects.toThrow(/not one of yours/i);
     });
 
     it("refuses one that is gone", async () => {

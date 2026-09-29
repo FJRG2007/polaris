@@ -221,22 +221,22 @@ export async function vote(
             }
         }
     });
-    if (!message?.poll) throw new ChatAccessError("That poll is gone");
-    if (message.deletedAt) throw new ChatRuleError("That poll was deleted");
+    if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
+    if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
     await requirePostable(actor, message.channelId);
 
-    if (core.pollIsClosed(message.poll, now)) throw new ChatRuleError("That poll has closed");
+    if (core.pollIsClosed(message.poll, now)) throw new ChatRuleError({ key: "errors.pollClosed" });
 
     const wanted = [...new Set(input.optionIds)];
     if (!message.poll.multiple && wanted.length > 1) {
-        throw new ChatRuleError("This poll takes one answer");
+        throw new ChatRuleError({ key: "errors.pollSingleAnswer" });
     }
     // An answer from another poll, or one that has since gone. Refused rather
     // than dropped: a vote that silently counted for less than was pressed is
     // the one failure a poll must not have.
     const belongs = new Set(message.poll.options.map((option) => option.id));
     if (wanted.some((id) => !belongs.has(id))) {
-        throw new ChatAccessError("That is not an answer on this poll");
+        throw new ChatAccessError({ key: "errors.pollAnswerInvalid" });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -278,12 +278,12 @@ export async function endPoll(
             poll: { select: { closesAt: true, closedAt: true } }
         }
     });
-    if (!message?.poll) throw new ChatAccessError("That poll is gone");
-    if (message.deletedAt) throw new ChatRuleError("That poll was deleted");
+    if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
+    if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
 
     const access = await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id && !access.mayModerate) {
-        throw new ChatAccessError("That is not your poll to close");
+        throw new ChatAccessError({ key: "errors.pollCloseNotYours" });
     }
 
     if (core.pollIsClosed(message.poll, now)) return;

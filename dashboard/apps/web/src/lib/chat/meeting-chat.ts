@@ -89,7 +89,7 @@ export interface MeetingLine {
 async function admitted(seat: { meetingId: string; participantId: string }): Promise<void> {
     const seated = await requireSeated(seat);
     if (seated.admission !== "admitted") {
-        throw new ChatAccessError("You are still waiting to be let in");
+        throw new ChatAccessError({ key: "errors.stillInLobby" });
     }
 }
 
@@ -109,7 +109,7 @@ export async function sayInMeeting(
     const said = body.trim().slice(0, MAX_MEETING_LINE);
     // A line that is only a picture is a line. Insisting on words first is a tax
     // on the commonest thing anybody does with a call's chat.
-    if (!said && files.length === 0) throw new ChatAccessError("Write something first");
+    if (!said && files.length === 0) throw new ChatAccessError({ key: "errors.bodyRequired" });
 
     await prisma.meetingMessage.create({
         data: {
@@ -149,13 +149,13 @@ export async function pollInMeeting(
     await admitted(seat);
 
     const question = draft.question.trim().slice(0, MAX_MEETING_LINE);
-    if (!question) throw new ChatAccessError("Ask something first");
+    if (!question) throw new ChatAccessError({ key: "errors.pollQuestionRequired" });
 
     const options = draft.options
         .map((option) => option.trim().slice(0, MAX_POLL_OPTION))
         .filter((option) => option.length > 0)
         .slice(0, MAX_POLL_OPTIONS);
-    if (options.length < MIN_POLL_OPTIONS) throw new ChatAccessError("Give it at least two answers");
+    if (options.length < MIN_POLL_OPTIONS) throw new ChatAccessError({ key: "errors.pollAnswersRequired" });
 
     await prisma.meetingMessage.create({
         data: {
@@ -204,9 +204,9 @@ export async function voteInMeeting(
     // said: an option id is a guess anybody can make, and this is the line that
     // stops one call voting in another.
     if (!option || option.poll.message.meetingId !== seat.meetingId) {
-        throw new ChatAccessError("That question is not in this call");
+        throw new ChatAccessError({ key: "errors.questionNotInCall" });
     }
-    if (option.poll.closedAt) throw new ChatAccessError("That question is closed");
+    if (option.poll.closedAt) throw new ChatAccessError({ key: "errors.questionClosed" });
 
     const held = await prisma.meetingPollVote.findUnique({
         where: { optionId_participantId: { optionId, participantId: seat.participantId } },
@@ -258,14 +258,14 @@ export async function closePollInMeeting(
         }
     });
     if (!poll || poll.message.meetingId !== seat.meetingId) {
-        throw new ChatAccessError("That question is not in this call");
+        throw new ChatAccessError({ key: "errors.questionNotInCall" });
     }
     if (poll.closedAt) return;
 
     const seated = await requireSeated(seat);
     const asked = poll.message.participantId === seat.participantId;
     const hosting = seated.userId !== null && seated.userId === poll.message.meeting.hostId;
-    if (!asked && !hosting) throw new ChatAccessError("Only whoever asked it can close it");
+    if (!asked && !hosting) throw new ChatAccessError({ key: "errors.questionCloseAskerOnly" });
 
     await prisma.meetingPoll.update({ where: { messageId }, data: { closedAt: new Date() } });
     publishMeetingEvent({ meetingId: seat.meetingId, kind: "said" });

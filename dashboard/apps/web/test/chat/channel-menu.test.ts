@@ -46,7 +46,7 @@ vi.mock("@/lib/chat/access", async (importOriginal) => {
         channelAccess: async (_actor: unknown, channelId: string) =>
             reachable.has(channelId) ? access(channelId) : null,
         requireSpace: async () => {
-            if (!administers) throw new real.ChatAccessError("Only an admin of this space can do that");
+            if (!administers) throw new real.ChatAccessError({ key: "errors.spaceAdminOnly" });
             return "admin";
         }
     };

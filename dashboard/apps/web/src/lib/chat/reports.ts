@@ -121,7 +121,7 @@ export async function reportMessage(
             _count: { select: { attachments: true } }
         }
     });
-    if (!message || message.deletedAt) throw new ChatAccessError("That message is not there");
+    if (!message || message.deletedAt) throw new ChatAccessError({ key: "errors.messageMissing" });
 
     // A report of "hola" is a row a moderator can only dismiss, and a queue with
     // enough of them in it is a queue nobody reads. Refused here rather than
@@ -135,7 +135,7 @@ export async function reportMessage(
         !message.replyToId &&
         core.isPleasantry(plainExcerpt(message.body, 200))
     ) {
-        throw new ChatRuleError(core.PLEASANTRY_REFUSAL);
+        throw new ChatRuleError({ key: "errors.reportPleasantry" });
     }
     // The same check that let them read it. Without this, an id somebody
     // guessed would be answered with "reported" or "not there", which is a way
@@ -329,7 +329,7 @@ export async function settleReport(
         where: { id: reportId },
         select: { id: true, messageId: true, status: true }
     });
-    if (!report) throw new ChatAccessError("That report is not there");
+    if (!report) throw new ChatAccessError({ key: "errors.reportMissing" });
 
     if (decision === "removed" && report.messageId) {
         // As the instance rather than as a member: `remove` takes the author or
