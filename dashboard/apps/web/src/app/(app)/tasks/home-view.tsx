@@ -19,6 +19,8 @@ import { useStableOrder } from "./stable-order";
 import { Fragment, useMemo, useState, useTransition } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { Button, Card, CardBody, ConfirmDeleteDialog, EmptyState, cn } from "@polaris/ui";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
@@ -71,6 +73,7 @@ export function HomeView({
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
+    const t = useTranslations("tasks");
     const [openTaskId, setOpenTaskId] = useState<string | null>(null);
     const [starting, startTransition] = useTransition();
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
@@ -207,14 +210,14 @@ export function HomeView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">My work</h1>
-                <p className="text-sm text-muted-foreground">Everything assigned to you, soonest first.</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("home.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("home.subtitle")}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Stat label="Assigned to you" value={counts.assigned} icon={ListChecks} />
-                <Stat label="Due today" value={counts.dueToday} icon={Clock} tone="text-warning" />
-                <Stat label="Overdue" value={counts.overdue} icon={CircleAlert} tone="text-danger" />
+                <Stat label={t("home.assigned")} value={counts.assigned} icon={ListChecks} />
+                <Stat label={t("home.dueToday")} value={counts.dueToday} icon={Clock} tone="text-warning" />
+                <Stat label={t("home.overdue")} value={counts.overdue} icon={CircleAlert} tone="text-danger" />
             </div>
 
             {timer && (
@@ -224,7 +227,10 @@ export function HomeView({
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{timer.taskName}</p>
                             <p className="text-xs text-muted-foreground">
-                                Running since {format.time(timer.startedAt)} - {core.formatTimer(timer.elapsed)} so far
+                                {t("home.runningSince", {
+                                    time: format.time(timer.startedAt),
+                                    elapsed: core.formatTimer(timer.elapsed)
+                                })}
                             </p>
                         </div>
                         <button
@@ -235,7 +241,7 @@ export function HomeView({
                             }}
                             className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted"
                         >
-                            <Square className="size-3.5" /> Stop
+                            <Square className="size-3.5" /> {t("timesheet.stop")}
                         </button>
                     </CardBody>
                 </Card>
@@ -249,7 +255,7 @@ export function HomeView({
 
             {groups.length === 0 &&
                 (hasSpaces ? (
-                    <EmptyState title="Nothing is assigned to you." description="Open a list and put your name on something." />
+                    <EmptyState title={t("home.emptyTitle")} description={t("home.emptyDescription")} />
                 ) : (
                     /* A first visit. "Open a list and put your name on
                        something" is advice about a list that does not exist -
@@ -257,8 +263,8 @@ export function HomeView({
                        one of each and opaque before that, so the way out is a
                        press rather than an explanation. */
                     <EmptyState
-                        title="Nothing here yet."
-                        description="Work lives in a space, a space holds lists, and a list holds tasks. Polaris can set the first one up for you."
+                        title={t("home.firstTitle")}
+                        description={t("home.firstDescription")}
                         action={
                             <>
                                 <Button size="sm" disabled={starting} onClick={() => void start()}>
@@ -267,10 +273,10 @@ export function HomeView({
                                     ) : (
                                         <Plus className="size-4" />
                                     )}
-                                    Set up my first space
+                                    {t("home.setUp")}
                                 </Button>
                                 <Button size="sm" variant="ghost" asChild>
-                                    <Link href="/tasks/spaces">Do it myself</Link>
+                                    <Link href="/tasks/spaces">{t("home.doItMyself")}</Link>
                                 </Button>
                             </>
                         }
@@ -286,7 +292,7 @@ export function HomeView({
                             group.bucket === "today" && "text-warning"
                         )}
                     >
-                        {core.DUE_BUCKET_LABELS[group.bucket]}
+                        {optionLabel(t, "dueBucket", group.bucket)}
                         <span className="ml-2 text-xs font-normal text-muted-foreground">{group.tasks.length}</span>
                     </h2>
                     <ul className="divide-y divide-border rounded-lg border border-border">
@@ -365,8 +371,13 @@ export function HomeView({
                 name={deleting?.name ?? ""}
                 kind="task"
                 requireTyping={false}
-                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
-                confirmLabel="Delete task"
+                title={t("deleteTask.title")}
+                question={t.rich("deleteTask.question", {
+                    name: deleting?.name ?? "",
+                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                })}
+                description={t("deleteTask.description")}
+                confirmLabel={t("deleteTask.title")}
                 onConfirm={async () => {
                     if (!deleting) return;
                     const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);

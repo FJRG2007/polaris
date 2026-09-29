@@ -18,6 +18,7 @@
 import { useRouter } from "next/navigation";
 import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
 import { agentHandoffChoicesAction, handTaskToAgentAction } from "./actions";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
@@ -48,18 +49,19 @@ interface Props {
 
 export function HandToAgent({ taskId, reference, name, description }: Props) {
     const [open, setOpen] = useState(false);
+    const t = useTranslations("tasksDetail");
 
     return (
         <>
             <Button
                 size="sm"
                 variant="ghost"
-                title="Give this to an agent"
-                aria-label="Give this to an agent"
+                title={t("agent.giveThis")}
+                aria-label={t("agent.giveThis")}
                 onClick={() => setOpen(true)}
             >
                 <Bot className="size-4" />
-                <span className="hidden sm:inline">Give to an agent</span>
+                <span className="hidden sm:inline">{t("agent.give")}</span>
             </Button>
             {open ? (
                 <HandOffDialog
@@ -81,6 +83,8 @@ function HandOffDialog({
     description,
     onClose
 }: Props & { onClose: () => void }) {
+    const t = useTranslations("tasksDetail");
+    const tc = useTranslations("common");
     const [repos, setRepos] = useState<{ id: string; name: string }[] | null>(null);
     const [agents, setAgents] = useState<AgentOption[]>([]);
     const [repoId, setRepoId] = useState("");
@@ -89,7 +93,7 @@ function HandOffDialog({
     // right brief and occasionally needs a sentence of context that would have
     // been noise on the board.
     const [prompt, setPrompt] = useState(
-        [`${reference}: ${name}`, description, "", "Update the task in Polaris as you go."]
+        [`${reference}: ${name}`, description, "", t("agent.promptTail")]
             .filter((line) => line !== "")
             .join("\n\n")
     );
@@ -141,18 +145,17 @@ function HandOffDialog({
         <Dialog open onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Give {reference} to an agent</DialogTitle>
+                    <DialogTitle>{t("agent.title", { reference })}</DialogTitle>
                 </DialogHeader>
 
                 {noRepos ? (
                     <p className="text-sm text-muted-foreground">
-                        An agent works in a repository the Agents app already reaches, and none is
-                        connected yet.
+                        {t("agent.noRepos")}
                     </p>
                 ) : (
                     <div className="space-y-3">
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Repository</span>
+                            <span className="text-xs text-muted-foreground">{t("agent.repository")}</span>
                             <Select
                                 value={repoId}
                                 onValueChange={setRepoId}
@@ -160,11 +163,11 @@ function HandOffDialog({
                                     value: repo.id,
                                     label: repo.name
                                 }))}
-                                placeholder="Pick a repository"
+                                placeholder={t("agent.pickRepository")}
                             />
                         </label>
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Agent</span>
+                            <span className="text-xs text-muted-foreground">{t("agent.agent")}</span>
                             <AgentSelect
                                 options={agents}
                                 value={cli}
@@ -174,9 +177,7 @@ function HandOffDialog({
                         </label>
                         {unlinked ? <SignInNotice agent={unlinked} /> : null}
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">
-                                What it is being asked
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("agent.prompt")}</span>
                             <Textarea
                                 value={prompt}
                                 onChange={(event) => setPrompt(event.target.value)}
@@ -189,14 +190,14 @@ function HandOffDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         onClick={submit}
                         disabled={busy || noRepos || !repoId || !prompt.trim() || unlinked !== null}
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        Start
+                        {t("agent.start")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -29,6 +29,9 @@ import { listAttachments, type AttachmentView } from "./attachment-service";
 import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
 import { pushTaskStatus } from "./trackers/push";
 import { taskShelf } from "./shelf";
+import { translate } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { TaskRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -585,7 +588,7 @@ async function statusInSpace(
         where: { id: statusId },
         select: { id: true, name: true, type: true, spaceId: true }
     });
-    if (!given) throw new Error("That status no longer exists");
+    if (!given) throw new TaskRefusal("refusals.statusGone");
     if (given.spaceId === spaceId) return { id: given.id, type: given.type };
 
     // Matched in memory rather than in the query: a space holds a handful of
@@ -597,7 +600,7 @@ async function statusInSpace(
     });
     const needle = given.name.trim().toLowerCase();
     const sameName = owned.find((status) => status.name.trim().toLowerCase() === needle);
-    if (!sameName) throw new Error(`This task's space has no status called "${given.name}"`);
+    if (!sameName) throw new TaskRefusal("refusals.noStatusCalled", { name: given.name });
     return { id: sameName.id, type: sameName.type };
 }
 
@@ -704,7 +707,7 @@ async function announceAssignment(
             userId,
             event: "tasks.assigned",
             title: taskName,
-            body: "You were assigned this task.",
+            body: translate(await getUserLocale(userId), "tasks.notify.assigned"),
             href: `/tasks/t/${taskId}`,
             shelf
         });
@@ -747,7 +750,7 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
             tags: { select: { tagId: true } }
         }
     });
-    if (!before) throw new Error("That task no longer exists");
+    if (!before) throw new TaskRefusal("refusals.taskGone");
 
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
@@ -985,7 +988,7 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
         where: { id: input.taskId },
         select: { listId: true, statusId: true, spaceId: true }
     });
-    if (!current) throw new Error("That task no longer exists");
+    if (!current) throw new TaskRefusal("refusals.taskGone");
 
     const data: Record<string, unknown> = {
         order: core.orderBetween(before?.order ?? null, after?.order ?? null)
@@ -996,7 +999,7 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
             select: { spaceId: true }
         });
         if (!target || target.spaceId !== current.spaceId) {
-            throw new Error("A task can only move between lists in the same space");
+            throw new TaskRefusal("refusals.moveSameSpace");
         }
         data.listId = input.listId;
     }
@@ -1142,9 +1145,9 @@ export async function bulkUpdate(
             where: { id: input.listId },
             select: { spaceId: true }
         });
-        if (!target) throw new Error("That list no longer exists");
+        if (!target) throw new TaskRefusal("refusals.listGone");
         if (spacesTouched.size > 1 || !spacesTouched.has(target.spaceId)) {
-            throw new Error("Tasks can only be moved between lists in their own space");
+            throw new TaskRefusal("refusals.moveOwnSpace");
         }
         data.listId = input.listId;
     }
@@ -1406,7 +1409,8 @@ async function announceHandover(
     for (const [userId, taskIds] of perPerson) {
         const first = taskIds[0] as string;
         if (taskIds.length === 1) {
-            await announceAssignment(first, names.get(first) ?? "A task", [userId], actorId);
+            const name = names.get(first) ?? translate(await getUserLocale(userId), "tasks.notify.aTask");
+            await announceAssignment(first, name, [userId], actorId);
             continue;
         }
         // One shelf when every task is on it, which is every selection a
@@ -1415,11 +1419,12 @@ async function announceHandover(
         const shelves = await Promise.all(taskIds.map((taskId) => taskShelf(taskId)));
         const lead = shelves[0];
         const shared = shelves.every((one) => one && lead && one.orgId === lead.orgId);
+        const locale = await getUserLocale(userId);
         await notify({
             userId,
             event: "tasks.assigned",
-            title: `${taskIds.length} tasks assigned to you`,
-            body: "You were put on them in one change.",
+            title: translate(locale, "tasks.notify.manyAssigned", { count: taskIds.length }),
+            body: translate(locale, "tasks.notify.manyAssignedBody"),
             href: "/tasks",
             shelf: shared ? lead : undefined
         });
@@ -1603,7 +1608,7 @@ export async function copyTasks(
         where: { id: listId },
         select: { id: true, spaceId: true }
     });
-    if (!list) throw new Error("That list no longer exists");
+    if (!list) throw new TaskRefusal("refusals.listGone");
 
     const sources = await prisma.task.findMany({
         where: { id: { in: [...taskIds] } },

@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { TaskRefusal } from "./refusal";
 import { githubTokenForUser } from "@/lib/github-access";
 import { listConnections } from "@/lib/connections/store";
 // The same parser the repository field uses, so what counts as a GitHub
@@ -113,7 +114,7 @@ async function describeCommit(
     }
 }
 
-export class CommitLinkError extends Error {}
+export class CommitLinkError extends TaskRefusal {}
 
 /**
  * Attach a commit to a task.
@@ -126,12 +127,12 @@ export class CommitLinkError extends Error {}
 export async function linkCommit(taskId: string, userId: string, raw: string): Promise<CommitLink> {
     const [linkedAccount] = await listConnections(userId, "github");
     if (!linkedAccount) {
-        throw new CommitLinkError("Connect your GitHub account under Connected accounts first");
+        throw new CommitLinkError("refusals.connectGithub");
     }
 
     const reference = parseGithubCommit(raw);
     if (!reference) {
-        throw new CommitLinkError("Paste a commit link, or write it as owner/repo@sha");
+        throw new CommitLinkError("refusals.commitReference");
     }
 
     const details = await describeCommit(reference, userId);

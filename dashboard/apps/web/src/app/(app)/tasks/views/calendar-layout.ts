@@ -15,8 +15,6 @@ import type { GoogleEvent } from "@/lib/google-calendar/events-client";
 export const CALENDAR_SCOPES = ["day", "week", "month"] as const;
 export type CalendarScope = (typeof CALENDAR_SCOPES)[number];
 
-export const SCOPE_LABELS: Record<CalendarScope, string> = { day: "Day", week: "Week", month: "Month" };
-
 /** Google's own blue, so an event is never read as one of the space's statuses. */
 export const GOOGLE_COLOR = "#4285f4";
 
@@ -40,21 +38,6 @@ export interface CalendarEntry {
     readonly url?: string;
 }
 
-const MONTH_NAMES = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-] as const;
-
 export interface CalendarRange {
     readonly days: Date[];
     readonly label: string;
@@ -75,13 +58,15 @@ export function buildRange(
     offset: number,
     weekStartsOn: number,
     format: core.DisplayFormat,
-    now: Date = new Date()
+    now: Date = new Date(),
+    /** The reader's language, for the day and month names in the heading. */
+    locale: string = "en-US"
 ): CalendarRange {
     if (scope === "day") {
         const day = core.addDays(core.startOfDay(now), offset);
         return {
             days: [day],
-            label: `${core.WEEKDAY_NAMES[day.getDay()]}, ${format.date(day)}`,
+            label: `${core.weekdayNames(locale, "long")[day.getDay()]}, ${format.date(day)}`,
             monthShown: day.getMonth()
         };
     }
@@ -102,7 +87,7 @@ export function buildRange(
     for (let cursor = first; cursor <= last; cursor = core.addDays(cursor, 1)) days.push(cursor);
     return {
         days,
-        label: `${MONTH_NAMES[anchor.getMonth()]} ${anchor.getFullYear()}`,
+        label: new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(anchor),
         monthShown: anchor.getMonth()
     };
 }

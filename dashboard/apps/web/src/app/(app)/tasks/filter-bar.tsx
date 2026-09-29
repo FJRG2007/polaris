@@ -20,6 +20,9 @@ import { Button, Select, cn } from "@polaris/ui";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { PersonName } from "@/components/person-name";
 import { Avatar, preloadAvatars } from "@/components/avatar";
+import { optionLabel } from "./option-label";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CustomFieldView, StatusView, TagView } from "@/lib/tasks/space-service";
 
 /** Which operators make sense for a field. */
@@ -46,6 +49,7 @@ function operatorsFor(field: core.TaskFilterField): core.TaskFilterOperator[] {
 
 /** The values a field can be compared against, when they come from a list. */
 function choicesFor(
+    t: NamespaceTranslator<"tasks">,
     condition: core.TaskFilterCondition,
     context: {
         statuses: readonly StatusView[];
@@ -61,12 +65,12 @@ function choicesFor(
         case "statusType":
             return core.TASK_STATUS_TYPES.map((type) => ({
                 value: type,
-                label: core.TASK_STATUS_TYPE_LABELS[type]
+                label: optionLabel(t, "statusType", type)
             }));
         case "priority":
             return core.TASK_PRIORITIES.map((priority) => ({
                 value: priority,
-                label: core.TASK_PRIORITY_LABELS[priority]
+                label: optionLabel(t, "priority", priority)
             }));
         case "tag":
             return context.tags.map((tag) => ({ value: tag.id, label: tag.name }));
@@ -81,15 +85,15 @@ function choicesFor(
         case "archived":
         case "blocked":
             return [
-                { value: "true", label: "Yes" },
-                { value: "false", label: "No" }
+                { value: "true", label: t("fields.yes") },
+                { value: "false", label: t("fields.no") }
             ];
         case "dueDate":
         case "startDate":
         case "createdAt":
             return core.RELATIVE_DATES.map((token) => ({
                 value: token,
-                label: core.RELATIVE_DATE_LABELS[token]
+                label: optionLabel(t, "relativeDate", token)
             }));
         case "customField": {
             const field = context.fields.find((entry) => entry.id === condition.fieldId);
@@ -117,6 +121,8 @@ export function FilterBar({
     };
     className?: string;
 }) {
+    const t = useTranslations("tasksViews");
+    const tt = useTranslations("tasks");
     const [open, setOpen] = useState(false);
     const count = filter.conditions.length;
 
@@ -145,28 +151,28 @@ export function FilterBar({
                 )}
             >
                 <Filter className="size-3.5" />
-                {count === 0 ? "Filter" : `${count} ${count === 1 ? "filter" : "filters"}`}
+                {count === 0 ? t("filter.button") : t("filter.count", { count })}
             </button>
 
             {open && (
                 <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>Show tasks matching</span>
+                        <span>{t("filter.showMatching")}</span>
                         <Select
                             value={filter.match}
                             onValueChange={(match) => onChange({ ...filter, match: match as "all" | "any" })}
                             options={[
-                                { value: "all", label: "all" },
-                                { value: "any", label: "any" }
+                                { value: "all", label: t("filter.all") },
+                                { value: "any", label: t("filter.any") }
                             ]}
-                            aria-label="Match all or any"
+                            aria-label={t("filter.matchLabel")}
                             className="h-7 w-24 text-xs"
                         />
-                        <span>of these</span>
+                        <span>{t("filter.ofThese")}</span>
                     </div>
 
                     {filter.conditions.map((condition, index) => {
-                        const choices = choicesFor(condition, context);
+                        const choices = choicesFor(tt, condition, context);
                         const operators = operatorsFor(condition.field);
                         const valueless = condition.operator === "isSet" || condition.operator === "isNotSet";
 
@@ -183,9 +189,9 @@ export function FilterBar({
                                     }
                                     options={core.TASK_FILTER_FIELDS.map((field) => ({
                                         value: field,
-                                        label: core.TASK_FILTER_LABELS[field]
+                                        label: optionLabel(tt, "filter", field)
                                     }))}
-                                    aria-label="Field"
+                                    aria-label={t("filter.field")}
                                     className="h-7 w-36 text-xs"
                                 />
 
@@ -197,8 +203,8 @@ export function FilterBar({
                                             value: field.id,
                                             label: field.name
                                         }))}
-                                        placeholder="Pick a field"
-                                        aria-label="Custom field"
+                                        placeholder={t("filter.pickField")}
+                                        aria-label={t("filter.customField")}
                                         className="h-7 w-36 text-xs"
                                     />
                                 )}
@@ -210,9 +216,9 @@ export function FilterBar({
                                     }
                                     options={operators.map((operator) => ({
                                         value: operator,
-                                        label: core.TASK_FILTER_OPERATOR_LABELS[operator]
+                                        label: optionLabel(tt, "filterOperator", operator)
                                     }))}
-                                    aria-label="Operator"
+                                    aria-label={t("filter.operator")}
                                     className="h-7 w-36 text-xs"
                                 />
 
@@ -268,16 +274,16 @@ export function FilterBar({
                                         <input
                                             value={condition.values[0] ?? ""}
                                             onChange={(event) => update(index, { values: [event.target.value] })}
-                                            placeholder="Value"
-                                            aria-label="Value"
+                                            placeholder={t("filter.value")}
+                                            aria-label={t("filter.value")}
                                             className="h-7 w-40 rounded-md border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                                         />
                                     ))}
 
                                 <button
                                     type="button"
-                                    aria-label="Remove this condition"
-                                    title="Remove condition"
+                                    aria-label={t("filter.removeThis")}
+                                    title={t("filter.remove")}
                                     onClick={() =>
                                         onChange({
                                             ...filter,
@@ -306,11 +312,11 @@ export function FilterBar({
                                 })
                             }
                         >
-                            <Plus className="size-3.5" /> Condition
+                            <Plus className="size-3.5" /> {t("filter.condition")}
                         </Button>
                         {count > 0 && (
                             <Button size="sm" variant="ghost" onClick={() => onChange(core.EMPTY_FILTER)}>
-                                Clear all
+                                {t("filter.clearAll")}
                             </Button>
                         )}
                     </div>

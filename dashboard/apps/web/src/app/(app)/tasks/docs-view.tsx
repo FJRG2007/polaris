@@ -15,6 +15,7 @@ import { cn, Button, EmptyState } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DocNode, DocView } from "@/lib/tasks/doc-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { ChevronRight, FileText, Plus, Search, Trash2 } from "lucide-react";
@@ -79,6 +80,8 @@ export function DocsView({
     canEdit: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [title, setTitle] = useState(doc?.title ?? "");
     const [body, setBody] = useState(doc?.body ?? "");
     const [query, setQuery] = useState("");
@@ -96,7 +99,7 @@ export function DocsView({
         const result = await runAction(
             () =>
                 actions.updateDocAction(doc.id, {
-                    title: title.trim() || "Untitled",
+                    title: title.trim() || t("docs.untitled"),
                     body,
                     spaceId: doc.spaceId,
                     // Sent back as it was: a save is an edit to the text, and
@@ -122,18 +125,18 @@ export function DocsView({
             <aside className="flex w-full flex-col gap-2 md:w-60 md:shrink-0">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Pages
+                        {t("docs.pages")}
                     </h2>
                     {canEdit && (
                         <button
                             type="button"
-                            aria-label="New page"
-                            title="New page"
+                            aria-label={t("docs.newPage")}
+                            title={t("docs.newPage")}
                             onClick={async () => {
                                 const result = await runAction(
                                     () =>
                                         actions.createDocAction({
-                                            title: "Untitled",
+                                            title: t("docs.untitled"),
                                             spaceId: spaces[0]?.id ?? null
                                         }),
                                     setError
@@ -153,14 +156,14 @@ export function DocsView({
                     <input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Find a page"
-                        aria-label="Find a page"
+                        placeholder={t("docs.find")}
+                        aria-label={t("docs.find")}
                         className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
 
                 {matches.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No pages yet.</p>
+                    <p className="text-xs text-muted-foreground">{t("docs.noPages")}</p>
                 ) : (
                     <TreeBranch
                         nodes={matches}
@@ -174,8 +177,8 @@ export function DocsView({
             <div className="flex min-w-0 flex-1 flex-col gap-3">
                 {!doc && (
                     <EmptyState
-                        title="Pick a page, or write a new one."
-                        description="Docs live beside the work rather than in another tool."
+                        title={t("docs.emptyTitle")}
+                        description={t("docs.emptyDescription")}
                     />
                 )}
 
@@ -201,15 +204,21 @@ export function DocsView({
                         <input
                             value={title}
                             disabled={!canEdit}
-                            aria-label="Page title"
+                            aria-label={t("docs.pageTitle")}
                             onChange={(event) => setTitle(event.target.value)}
                             className="w-full bg-transparent text-2xl font-semibold outline-none"
                         />
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                             <span>
-                                Updated <RelativeTime iso={doc.updatedAt} />
-                                {doc.updatedByName ? ` by ${doc.updatedByName}` : ""}
+                                {doc.updatedByName
+                                    ? t.rich("docs.updatedBy", {
+                                          name: doc.updatedByName,
+                                          time: () => <RelativeTime key="time" iso={doc.updatedAt} />
+                                      })
+                                    : t.rich("docs.updated", {
+                                          time: () => <RelativeTime key="time" iso={doc.updatedAt} />
+                                      })}
                             </span>
                             <span className="flex-1" />
                             {canEdit && (
@@ -219,12 +228,12 @@ export function DocsView({
                                         disabled={!dirty || saving}
                                         onClick={() => void save()}
                                     >
-                                        {saving ? "Saving" : dirty ? "Save" : "Saved"}
+                                        {saving ? t("docs.saving") : dirty ? tc("actions.save") : t("docs.saved")}
                                     </Button>
                                     <button
                                         type="button"
-                                        aria-label="Delete this page"
-                                        title="Delete page"
+                                        aria-label={t("docs.deleteThis")}
+                                        title={t("docs.delete")}
                                         onClick={async () => {
                                             await runAction(
                                                 () => actions.deleteDocAction(doc.id),
@@ -256,7 +265,7 @@ export function DocsView({
                             key={doc.id}
                             value={body}
                             disabled={!canEdit}
-                            placeholder="Type / for a block, @ for somebody, # for a task. Markdown works as you write it."
+                            placeholder={t("docs.placeholder")}
                             onChange={setBody}
                             // A page earns a taller ceiling than a form field,
                             // but still a ceiling: a surface that grows past the

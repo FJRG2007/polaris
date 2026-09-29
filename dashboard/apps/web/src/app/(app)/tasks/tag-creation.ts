@@ -22,6 +22,7 @@
 
 import * as actions from "./actions";
 import { useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import type { TagView } from "@/lib/tasks/space-service";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
@@ -175,6 +176,7 @@ export interface TagCreation {
 
 export function useTagCreation(spaceId: string, tags: readonly TagView[]): TagCreation {
     const toast = useToast();
+    const t = useTranslations("tasks");
     const created = useSyncExternalStore(subscribe, read, read);
 
     const create = useCallback(
@@ -194,14 +196,14 @@ export function useTagCreation(spaceId: string, tags: readonly TagView[]): TagCr
                 made.delete(id);
                 publish();
                 answer(null);
-                toast.show({ key: `tag-create:${name}`, title: `Could not create "${name}"`, body: message });
+                toast.show({ key: `tag-create:${name}`, title: t("tags.createFailed", { name }), body: message });
             };
 
             void (async () => {
                 const result = await runAction(() => actions.createTagAction(spaceId, name, color), refuse);
                 // A rejected call has already been refused by the handler above.
                 if (!result) return;
-                if (!result.tag) refuse(result.error ?? "The tag was not added.");
+                if (!result.tag) refuse(result.error ?? t("tags.notAdded"));
                 else {
                     const entry = made.get(id);
                     if (entry) entry.real = result.tag.id;
@@ -211,7 +213,7 @@ export function useTagCreation(spaceId: string, tags: readonly TagView[]): TagCr
 
             return id;
         },
-        [spaceId, toast]
+        [spaceId, toast, t]
     );
 
     return { tags: useMemo(() => fold({ spaceId, tags }, created, false), [spaceId, tags, created]), create };

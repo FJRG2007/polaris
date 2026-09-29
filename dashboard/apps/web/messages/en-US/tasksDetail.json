@@ -1,1 +1,74 @@
-{}
+{
+    "agent": {
+        "giveThis": "Give this to an agent",
+        "give": "Give to an agent",
+        "promptTail": "Update the task in Polaris as you go.",
+        "title": "Give {reference} to an agent",
+        "noRepos": "An agent works in a repository the Agents app already reaches, and none is connected yet.",
+        "repository": "Repository",
+        "pickRepository": "Pick a repository",
+        "agent": "Agent",
+        "prompt": "What it is being asked",
+        "start": "Start"
+    },
+    "files": {
+        "uploadFailed": "Could not upload that file",
+        "title": "Files",
+        "attach": "Attach",
+        "attachTitle": "Attach to this task",
+        "drop": "Drop a screenshot, a recording or a document here",
+        "removeNamed": "Remove {name}",
+        "remove": "Remove",
+        "nothing": "Nothing attached."
+    },
+    "commits": {
+        "title": "Commits",
+        "linkLabel": "the commit link",
+        "unlinkNamed": "Unlink {sha}",
+        "unlink": "Unlink",
+        "placeholder": "Paste a commit link, or owner/repo@sha",
+        "link": "Link"
+    },
+    "create": {
+        "title": "New task",
+        "in": "in",
+        "list": "List",
+        "name": "Task name",
+        "namePlaceholder": "What needs doing?",
+        "description": "Description",
+        "descriptionPlaceholder": "What does done look like? Type / for a block, @ for somebody, # for a task.",
+        "restored": "Picked up where you left off.",
+        "startAgain": "Start again",
+        "creating": "Creating",
+        "submit": "Create task",
+        "keepTitle": "Keep this draft?",
+        "keepDescription": "It stays in this browser and is offered back the next time you write a task in this list.",
+        "discard": "Discard it",
+        "keepWriting": "Keep writing",
+        "saveDraft": "Save draft"
+    },
+    "props": {
+        "status": "Status",
+        "assignees": "Assignees",
+        "nobody": "Nobody yet",
+        "dates": "Dates",
+        "startDate": "Start date",
+        "dueDate": "Due date",
+        "timeOfDay": "Time of day",
+        "priority": "Priority",
+        "blocked": "Blocked",
+        "blockedUntil": "Blocked until",
+        "blockedWhy": "Why this is blocked",
+        "blockedWhyPlaceholder": "Why, if it is not a task or a date",
+        "waitingOn": "Waiting on {count} unfinished {count, plural, one {task} other {tasks}}",
+        "points": "Points",
+        "storyPoints": "Story points",
+        "empty": "Empty",
+        "estimate": "Estimate",
+        "trackTime": "Track time",
+        "tags": "Tags",
+        "fields": "Fields",
+        "hideEmpty": "Hide {count} empty {count, plural, one {field} other {fields}}",
+        "showEmpty": "Show {count} empty {count, plural, one {field} other {fields}}"
+    }
+}

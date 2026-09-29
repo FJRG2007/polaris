@@ -11,7 +11,9 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { createTask } from "./task-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { generateToken } from "@polaris/core/tokens";
+import { TaskRefusal } from "./refusal";
 
 export interface FormView {
     readonly id: string;
@@ -73,7 +75,7 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
  *  the form's own space - never a list somebody else's space keeps. */
 async function requireListInSpace(spaceId: string, listId: string): Promise<void> {
     if ((await prisma.taskList.count({ where: { id: listId, spaceId } })) === 0) {
-        throw new Error("That list is not in this space");
+        throw new TaskRefusal("refusals.listNotInSpace");
     }
 }
 
@@ -121,12 +123,12 @@ export async function updateForm(
             enabled: input.enabled
         }
     });
-    if (count === 0) throw new Error("That form is not in this space");
+    if (count === 0) throw new TaskRefusal("refusals.formNotInSpace");
 }
 
 export async function deleteForm(spaceId: string, formId: string): Promise<void> {
     const { count } = await prisma.taskForm.deleteMany({ where: { id: formId, spaceId } });
-    if (count === 0) throw new Error("That form is not in this space");
+    if (count === 0) throw new TaskRefusal("refusals.formNotInSpace");
 }
 
 /** What the public page renders. Never includes the list, the space, or
@@ -187,16 +189,17 @@ export async function submitForm(
             createdById: true
         }
     });
-    if (!form || !form.enabled)
-        return { ok: false, error: "This form is no longer accepting responses" };
-    if (form.requireLogin && !submittedById)
-        return { ok: false, error: "Sign in to send this form" };
+    // Read by whoever is filling the form in, in their language: the only
+    // caller is the public form's own action.
+    const t = await getTranslations("tasks");
+    if (!form || !form.enabled) return { ok: false, error: t("forms.closed") };
+    if (form.requireLogin && !submittedById) return { ok: false, error: t("forms.signIn") };
 
     const fields = parseFields(form.fields);
     const clean: Record<string, string> = {};
     for (const field of fields) {
         const value = (answers[field.id] ?? "").toString().trim().slice(0, 5000);
-        if (field.required && !value) return { ok: false, error: `${field.label} is required` };
+        if (field.required && !value) return { ok: false, error: t("forms.required", { field: field.label }) };
         if (value) clean[field.id] = value;
     }
 

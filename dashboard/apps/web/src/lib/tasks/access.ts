@@ -28,6 +28,7 @@
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { TaskRefusal, type TaskRefusalKey } from "./refusal";
 import { canOn, grantedResourceIds } from "@polaris/auth";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
@@ -42,9 +43,12 @@ export interface TaskActor {
  *  operator is never locked out of the instance they run. */
 export type SpaceAccess = core.SpaceRole | "owner";
 
-export class TaskAccessError extends Error {
-    constructor(message = "You do not have access to that space") {
-        super(message);
+/** A refusal about who may do what. Its words come from the `tasks` catalog
+ *  (see `TaskRefusal`), so the action that catches it answers in the reader's
+ *  language; `message` stays the English. */
+export class TaskAccessError extends TaskRefusal {
+    constructor(key: TaskRefusalKey = "refusals.noAccess") {
+        super(key);
         this.name = "TaskAccessError";
     }
 }
@@ -191,7 +195,7 @@ export async function requireSpace(
     const role = await resolveSpaceRole(actor, spaceId);
     if (!role) throw new TaskAccessError();
     if (!atLeast(role, minimum)) {
-        throw new TaskAccessError("You do not have permission to do that in this space");
+        throw new TaskAccessError("refusals.noPermissionSpace");
     }
     return role;
 }
@@ -282,11 +286,11 @@ export async function requireFolder(
         where: { id: folderId },
         select: { spaceId: true, parentId: true }
     });
-    if (!folder) throw new TaskAccessError("That folder no longer exists");
+    if (!folder) throw new TaskAccessError("refusals.folderGone");
     const role = await resolveFolderRole(actor, folder.spaceId, folderId);
     if (!role) throw new TaskAccessError();
     if (!atLeast(role, minimum)) {
-        throw new TaskAccessError("You do not have permission to do that in this folder");
+        throw new TaskAccessError("refusals.noPermissionFolder");
     }
     return { folderId, spaceId: folder.spaceId, parentId: folder.parentId, role };
 }
@@ -305,11 +309,11 @@ export async function requireList(
         where: { id: listId },
         select: { spaceId: true, folderId: true }
     });
-    if (!list) throw new TaskAccessError("That list no longer exists");
+    if (!list) throw new TaskAccessError("refusals.listGone");
     const role = await resolveFolderRole(actor, list.spaceId, list.folderId);
     if (!role) throw new TaskAccessError();
     if (!atLeast(role, minimum)) {
-        throw new TaskAccessError("You do not have permission to do that in this space");
+        throw new TaskAccessError("refusals.noPermissionSpace");
     }
     return { listId, spaceId: list.spaceId, folderId: list.folderId, role };
 }
@@ -323,7 +327,7 @@ export async function requireTask(
     minimum: core.SpaceRole
 ): Promise<{ taskId: string; listId: string; spaceId: string; role: SpaceAccess }> {
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { listId: true } });
-    if (!task) throw new TaskAccessError("That task no longer exists");
+    if (!task) throw new TaskAccessError("refusals.taskGone");
     const { spaceId, role } = await requireList(actor, task.listId, minimum);
     return { taskId, listId: task.listId, spaceId, role };
 }

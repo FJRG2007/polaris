@@ -1,1 +1,115 @@
-{}
+{
+    "everything": {
+        "title": "Todo",
+        "assignedTo": "Tareas asignadas a {name}",
+        "assignedToOne": "Tareas asignadas a una persona",
+        "subtitle": "Todas las tareas de todos los espacios que puedes ver"
+    },
+    "gantt": {
+        "task": "Tarea",
+        "barTitle": "{name}: del {start} al {end}",
+        "empty": "No hay nada programado. Dale a una tarea una fecha de inicio o límite y aparecerá aquí.",
+        "undated": "{count, plural, one {# tarea no tiene fecha y no está} other {# tareas no tienen fecha y no están}} en la línea de tiempo."
+    },
+    "filter": {
+        "button": "Filtrar",
+        "count": "{count, plural, one {# filtro} other {# filtros}}",
+        "showMatching": "Mostrar tareas que cumplan",
+        "all": "todas",
+        "any": "alguna",
+        "matchLabel": "Cumplir todas o alguna",
+        "ofThese": "de estas",
+        "field": "Campo",
+        "pickField": "Elige un campo",
+        "customField": "Campo personalizado",
+        "operator": "Operador",
+        "value": "Valor",
+        "removeThis": "Quitar esta condición",
+        "remove": "Quitar condición",
+        "condition": "Condición",
+        "clearAll": "Borrar todo"
+    },
+    "bulk": {
+        "shortfall": "{verb, select, deleted {Eliminadas} other {Cambiadas}} {count} de {asked}: {rest, plural, one {una tarea no es tuya para cambiarla} other {# tareas no son tuyas para cambiarlas}}.",
+        "tasks": "{count} tareas",
+        "copied": "Copiado: {label}",
+        "archive": "Archivar",
+        "delete": "Eliminar",
+        "clear": "Borrar selección",
+        "clearKey": "Borrar selección (Esc)",
+        "deleteTitle": "{count, plural, one {Eliminar tarea} other {Eliminar tareas}}",
+        "deleteQuestion": "¿Eliminar <strong>{name}</strong>?",
+        "deleteDescription": "Los comentarios, las listas de comprobación y el tiempo registrado se van con ellas. Archivarlas lo conserva todo y las quita del tablero.",
+        "deleteConfirm": "{count, plural, one {Eliminar tarea} other {Eliminar # tareas}}"
+    },
+    "paste": {
+        "aStatus": "un estado",
+        "aTag": "una etiqueta",
+        "tags": "etiquetas",
+        "people": "personas",
+        "joiner": ", ",
+        "pasted": "{count, plural, one {Pegada una tarea} other {Pegadas # tareas}}",
+        "leftOff": "Este espacio no tiene {items} que coincidan, así que se ha dejado fuera."
+    },
+    "views": {
+        "myOrder": "Mi orden"
+    },
+    "toolbar": {
+        "newTaskKey": "Nueva tarea (N)",
+        "newTask": "Nueva tarea",
+        "group": "Agrupar: {label}",
+        "groupBy": "Agrupar por",
+        "sort": "Ordenar: {label}",
+        "sortBy": "Ordenar por",
+        "ascending": "Ascendente",
+        "descending": "Descendente",
+        "showClosed": "Mostrar cerradas",
+        "search": "Buscar tareas"
+    },
+    "empty": {
+        "title": "Aquí no hay nada todavía.",
+        "description": "Añade la primera tarea y aparecerá en todas las vistas de esta lista.",
+        "add": "Añadir una tarea"
+    },
+    "hint": "Ctrl+clic (o Cmd+clic) selecciona una tarea sin abrirla, Mayús+clic coge todo lo que hay en medio, Esc borra la selección y N empieza una tarea nueva.",
+    "list": {
+        "expand": "Desplegar {name}",
+        "collapse": "Plegar {name}",
+        "addTo": "Añadir una tarea a {name}",
+        "quickPlaceholder": "Nombre de la tarea y pulsa Intro",
+        "noMatch": "Ninguna tarea coincide con esta vista.",
+        "noMatchDescription": "Cambia los filtros o añade la primera."
+    },
+    "table": {
+        "task": "Tarea",
+        "status": "Estado",
+        "assignees": "Responsables",
+        "priority": "Prioridad",
+        "due": "Vence",
+        "estimate": "Estimación",
+        "tracked": "Registrado"
+    },
+    "calendar": {
+        "previous": "{scope, select, day {Día anterior} week {Semana anterior} other {Mes anterior}}",
+        "next": "{scope, select, day {Día siguiente} week {Semana siguiente} other {Mes siguiente}}",
+        "today": "Hoy",
+        "scope": {
+            "day": "Día",
+            "week": "Semana",
+            "month": "Mes"
+        },
+        "undated": "{count} {count, plural, one {tarea no tiene fechas y no se muestra} other {tareas no tienen fechas y no se muestran}} aquí.",
+        "doubleClick": "Haz doble clic en {scope, select, month {un día} other {una hora}} para añadir ahí una tarea.",
+        "allDay": "Todo el día",
+        "googleEvent": "{title} (Google Calendar)",
+        "nothingToday": "No hay nada este día.",
+        "reconnectGoogle": "Volver a conectar Google Calendar",
+        "connectGoogle": "Conectar Google Calendar",
+        "hideGoogle": "Ocultar los eventos de Google Calendar",
+        "showGoogle": "Mostrar los eventos de Google Calendar",
+        "loading": "Cargando...",
+        "googleCount": "Google ({count})",
+        "googleUnreachable": "No se pudo contactar con Google Calendar.",
+        "noTitle": "(sin título)"
+    }
+}

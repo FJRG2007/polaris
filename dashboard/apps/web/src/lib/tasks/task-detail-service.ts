@@ -16,6 +16,9 @@ import * as comments from "@/lib/comments/comments";
 import { runAutomations } from "./automation-service";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
 import { spaceShelf } from "./shelf";
+import { translate } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { TaskRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
 // Comments
@@ -63,7 +66,7 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
         await notify({
             userId,
             event: "tasks.comment",
-            title: task?.name ?? "A task",
+            title: task?.name ?? translate(await getUserLocale(userId), "tasks.notify.aTask"),
             body: input.body.slice(0, 200),
             href: `/tasks/t/${input.taskId}`,
             shelf
@@ -74,7 +77,7 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
     await notifyMentions({
         body: input.body,
         actorId,
-        title: task?.name ?? "A task",
+        title: task?.name ?? translate(await getUserLocale(actorId), "tasks.notify.aTask"),
         href: `/tasks/t/${input.taskId}`,
         spaceId: task?.spaceId ?? null,
         except: [...recipients]
@@ -193,12 +196,12 @@ export async function moveChecklist(
         },
         move
     );
-    if (order === null) throw new Error("That spot has moved. Try again");
+    if (order === null) throw new TaskRefusal("refusals.spotMovedShort");
     const { count } = await prisma.taskChecklist.updateMany({
         where: { id: checklistId, taskId },
         data: { order }
     });
-    if (count === 0) throw new Error("That checklist no longer exists");
+    if (count === 0) throw new TaskRefusal("refusals.checklistGone");
 }
 
 /**
@@ -223,9 +226,9 @@ export async function moveChecklistItem(
     ]);
     // Both ends have to be on the task the caller was authorized for, or a drag
     // would be a way to write into a checklist on somebody else's task.
-    if (!item || item.checklist.taskId !== taskId) throw new Error("That step no longer exists");
+    if (!item || item.checklist.taskId !== taskId) throw new TaskRefusal("refusals.stepGone");
     if (!destination || destination.taskId !== taskId)
-        throw new Error("That checklist no longer exists");
+        throw new TaskRefusal("refusals.checklistGone");
 
     const order = await orderForDrop(
         async (id) =>
@@ -249,7 +252,7 @@ export async function moveChecklistItem(
         },
         move
     );
-    if (order === null) throw new Error("That spot has moved. Try again");
+    if (order === null) throw new TaskRefusal("refusals.spotMovedShort");
     await prisma.taskChecklistItem.update({
         where: { id: itemId },
         data: { checklistId: move.checklistId, order }
@@ -264,7 +267,7 @@ export async function moveChecklistItem(
 
 export async function deleteChecklist(taskId: string, checklistId: string): Promise<void> {
     const { count } = await prisma.taskChecklist.deleteMany({ where: { id: checklistId, taskId } });
-    if (count === 0) throw new Error("That checklist no longer exists");
+    if (count === 0) throw new TaskRefusal("refusals.checklistGone");
 }
 
 export async function addChecklistItem(
@@ -276,7 +279,7 @@ export async function addChecklistItem(
         where: { id: checklistId, taskId },
         select: { id: true }
     });
-    if (!checklist) throw new Error("That checklist no longer exists");
+    if (!checklist) throw new TaskRefusal("refusals.checklistGone");
     const last = await prisma.taskChecklistItem.findFirst({
         where: { checklistId },
         orderBy: { order: "desc" },
@@ -298,7 +301,7 @@ export async function setChecklistItemDone(
         where: { id: itemId, checklist: { taskId } },
         data: { done: done === true, doneAt: done === true ? new Date() : null }
     });
-    if (count === 0) throw new Error("That step no longer exists");
+    if (count === 0) throw new TaskRefusal("refusals.stepGone");
 }
 
 export async function updateChecklistItem(
@@ -319,7 +322,7 @@ export async function deleteChecklistItem(taskId: string, itemId: string): Promi
     const { count } = await prisma.taskChecklistItem.deleteMany({
         where: { id: itemId, checklist: { taskId } }
     });
-    if (count === 0) throw new Error("That step no longer exists");
+    if (count === 0) throw new TaskRefusal("refusals.stepGone");
 }
 
 /**
@@ -353,13 +356,13 @@ export async function promoteChecklistItem(
  * and the moment to catch it is the moment somebody draws it.
  */
 export async function addDependency(spaceId: string, input: core.DependencyInput): Promise<void> {
-    if (input.taskId === input.relatedTaskId) throw new Error("A task cannot depend on itself");
+    if (input.taskId === input.relatedTaskId) throw new TaskRefusal("refusals.selfDependency");
 
     const related = await prisma.task.findFirst({
         where: { id: input.relatedTaskId, spaceId },
         select: { id: true }
     });
-    if (!related) throw new Error("That task is not in this space");
+    if (!related) throw new TaskRefusal("refusals.taskNotInSpace");
 
     const blockerId = input.reverse ? input.relatedTaskId : input.taskId;
     const blockedId = input.reverse ? input.taskId : input.relatedTaskId;
@@ -370,7 +373,7 @@ export async function addDependency(spaceId: string, input: core.DependencyInput
             select: { blockerId: true, blockedId: true }
         });
         if (core.wouldCycle(edges, blockerId, blockedId)) {
-            throw new Error("That would make the two tasks wait on each other");
+            throw new TaskRefusal("refusals.circularDependency");
         }
     }
 
@@ -416,7 +419,7 @@ export async function setCustomValue(
         where: { id: fieldId, spaceId },
         select: { id: true }
     });
-    if (!field) throw new Error("That field is not in this space");
+    if (!field) throw new TaskRefusal("refusals.fieldNotInSpace");
 
     if (value === "") {
         await prisma.taskCustomFieldValue.deleteMany({ where: { taskId, fieldId } });
@@ -491,7 +494,7 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
                     userId: reminder.userId,
                     event: "tasks.due",
                     title: reminder.task.name,
-                    body: reminder.note || "The reminder you set on this task.",
+                    body: reminder.note || translate(await getUserLocale(reminder.userId), "tasks.notify.reminder"),
                     href: `/tasks/t/${reminder.taskId}`,
                     shelf: { orgId: reminder.task.space.orgId }
                 });

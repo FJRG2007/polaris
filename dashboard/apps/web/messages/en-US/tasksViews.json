@@ -1,1 +1,115 @@
-{}
+{
+    "everything": {
+        "title": "Everything",
+        "assignedTo": "Tasks assigned to {name}",
+        "assignedToOne": "Tasks assigned to one person",
+        "subtitle": "Every task across every space you can see"
+    },
+    "gantt": {
+        "task": "Task",
+        "barTitle": "{name}: {start} to {end}",
+        "empty": "Nothing is scheduled. Give a task a start or due date and it appears here.",
+        "undated": "{count, plural, one {# task is} other {# tasks are}} undated and not on the timeline."
+    },
+    "filter": {
+        "button": "Filter",
+        "count": "{count, plural, one {# filter} other {# filters}}",
+        "showMatching": "Show tasks matching",
+        "all": "all",
+        "any": "any",
+        "matchLabel": "Match all or any",
+        "ofThese": "of these",
+        "field": "Field",
+        "pickField": "Pick a field",
+        "customField": "Custom field",
+        "operator": "Operator",
+        "value": "Value",
+        "removeThis": "Remove this condition",
+        "remove": "Remove condition",
+        "condition": "Condition",
+        "clearAll": "Clear all"
+    },
+    "bulk": {
+        "shortfall": "{verb, select, deleted {Deleted} other {Changed}} {count} of {asked}: {rest, plural, one {one task is} other {# tasks are}} not yours to change.",
+        "tasks": "{count} tasks",
+        "copied": "Copied {label}",
+        "archive": "Archive",
+        "delete": "Delete",
+        "clear": "Clear selection",
+        "clearKey": "Clear selection (Esc)",
+        "deleteTitle": "{count, plural, one {Delete task} other {Delete tasks}}",
+        "deleteQuestion": "Delete <strong>{name}</strong>?",
+        "deleteDescription": "Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board.",
+        "deleteConfirm": "{count, plural, one {Delete task} other {Delete # tasks}}"
+    },
+    "paste": {
+        "aStatus": "a status",
+        "aTag": "a tag",
+        "tags": "tags",
+        "people": "people",
+        "joiner": ", no ",
+        "pasted": "{count, plural, one {Pasted one task} other {Pasted # tasks}}",
+        "leftOff": "This space has no {items} to match, so that was left off."
+    },
+    "views": {
+        "myOrder": "My order"
+    },
+    "toolbar": {
+        "newTaskKey": "New task (N)",
+        "newTask": "New task",
+        "group": "Group: {label}",
+        "groupBy": "Group by",
+        "sort": "Sort: {label}",
+        "sortBy": "Sort by",
+        "ascending": "Ascending",
+        "descending": "Descending",
+        "showClosed": "Show closed",
+        "search": "Search tasks"
+    },
+    "empty": {
+        "title": "Nothing here yet.",
+        "description": "Add the first task and it appears on every view of this list.",
+        "add": "Add a task"
+    },
+    "hint": "Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes everything between, Esc clears the selection, and N starts a new task.",
+    "list": {
+        "expand": "Expand {name}",
+        "collapse": "Collapse {name}",
+        "addTo": "Add a task to {name}",
+        "quickPlaceholder": "Task name, then enter",
+        "noMatch": "No tasks match this view.",
+        "noMatchDescription": "Change the filters, or add the first one."
+    },
+    "table": {
+        "task": "Task",
+        "status": "Status",
+        "assignees": "Assignees",
+        "priority": "Priority",
+        "due": "Due",
+        "estimate": "Estimate",
+        "tracked": "Tracked"
+    },
+    "calendar": {
+        "previous": "Previous {scope}",
+        "next": "Next {scope}",
+        "today": "Today",
+        "scope": {
+            "day": "Day",
+            "week": "Week",
+            "month": "Month"
+        },
+        "undated": "{count} {count, plural, one {task has} other {tasks have}} no dates and are not shown here.",
+        "doubleClick": "Double-click {scope, select, month {a day} other {an hour}} to add a task there.",
+        "allDay": "All day",
+        "googleEvent": "{title} (Google Calendar)",
+        "nothingToday": "Nothing on this day.",
+        "reconnectGoogle": "Reconnect Google Calendar",
+        "connectGoogle": "Connect Google Calendar",
+        "hideGoogle": "Hide Google Calendar events",
+        "showGoogle": "Show Google Calendar events",
+        "loading": "Loading...",
+        "googleCount": "Google ({count})",
+        "googleUnreachable": "Google Calendar could not be reached.",
+        "noTitle": "(no title)"
+    }
+}

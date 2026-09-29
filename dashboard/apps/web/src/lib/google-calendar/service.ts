@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import { refusalMessage, refusalReason } from "@/lib/connections/refusal";
+import { getTranslations } from "@/lib/i18n/request";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const CALENDAR_PROVIDER = "google";
@@ -360,6 +361,9 @@ export async function listGoogleEvents(
     url.searchParams.set("maxResults", "250");
 
     const body = await fetchJson(url.toString(), eventsSchema, { Authorization: `Bearer ${accessToken}` });
+    // Read in a request - the events route - so the placeholder for an event
+    // with no title is in the reader's language.
+    const untitled = (await getTranslations("tasksViews"))("calendar.noTitle");
     const events: CalendarEventView[] = [];
     for (const item of body.items ?? []) {
         if (item.status === "cancelled") continue;
@@ -367,7 +371,7 @@ export async function listGoogleEvents(
         if (!start) continue;
         events.push({
             id: item.id,
-            title: item.summary?.trim() || "(no title)",
+            title: item.summary?.trim() || untitled,
             start,
             end: item.end?.dateTime ?? item.end?.date ?? null,
             allDay: item.start?.dateTime === undefined,

@@ -8,6 +8,7 @@
  */
 
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     TASK_SELECTION_MAX,
     type TaskGroup,
@@ -156,10 +157,12 @@ export type BulkVerb = "Changed" | "Deleted";
 export function shortfallMessage(
     count: number | undefined,
     asked: number,
-    verb: BulkVerb
+    verb: BulkVerb,
+    t?: NamespaceTranslator<"tasksViews">
 ): string | null {
     if (count === undefined || count >= asked) return null;
     const rest = asked - count;
+    if (t) return t("bulk.shortfall", { verb: verb === "Deleted" ? "deleted" : "changed", count, asked, rest });
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 

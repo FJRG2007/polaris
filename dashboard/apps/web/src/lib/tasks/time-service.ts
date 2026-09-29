@@ -9,6 +9,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { scopeTaskWhere, type TaskScope } from "./access";
+import { TaskRefusal } from "./refusal";
 
 export interface RunningTimer {
     readonly entryId: string;
@@ -100,7 +101,7 @@ export async function deleteTimeEntry(
     const deleted = await prisma.taskTimeEntry.deleteMany({
         where: canModerate ? { id: entryId, taskId } : { id: entryId, taskId, userId }
     });
-    if (deleted.count === 0) throw new Error("You can only remove your own entries");
+    if (deleted.count === 0) throw new TaskRefusal("refusals.ownEntriesOnly");
 }
 
 // ---------------------------------------------------------------------------

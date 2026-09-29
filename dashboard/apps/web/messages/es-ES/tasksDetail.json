@@ -1,1 +1,74 @@
-{}
+{
+    "agent": {
+        "giveThis": "Pasar esto a un agente",
+        "give": "Pasar a un agente",
+        "promptTail": "Actualiza la tarea en Polaris sobre la marcha.",
+        "title": "Pasar {reference} a un agente",
+        "noRepos": "Un agente trabaja en un repositorio al que ya llega la app Agentes, y todavía no hay ninguno conectado.",
+        "repository": "Repositorio",
+        "pickRepository": "Elige un repositorio",
+        "agent": "Agente",
+        "prompt": "Lo que se le pide",
+        "start": "Empezar"
+    },
+    "files": {
+        "uploadFailed": "No se pudo subir ese archivo",
+        "title": "Archivos",
+        "attach": "Adjuntar",
+        "attachTitle": "Adjuntar a esta tarea",
+        "drop": "Suelta aquí una captura, una grabación o un documento",
+        "removeNamed": "Quitar {name}",
+        "remove": "Quitar",
+        "nothing": "No hay nada adjunto."
+    },
+    "commits": {
+        "title": "Commits",
+        "linkLabel": "el enlace del commit",
+        "unlinkNamed": "Desvincular {sha}",
+        "unlink": "Desvincular",
+        "placeholder": "Pega el enlace de un commit, o owner/repo@sha",
+        "link": "Vincular"
+    },
+    "create": {
+        "title": "Nueva tarea",
+        "in": "en",
+        "list": "Lista",
+        "name": "Nombre de la tarea",
+        "namePlaceholder": "¿Qué hay que hacer?",
+        "description": "Descripción",
+        "descriptionPlaceholder": "¿Cómo se ve terminada? Escribe / para un bloque, @ para alguien, # para una tarea.",
+        "restored": "Retomado donde lo dejaste.",
+        "startAgain": "Empezar de nuevo",
+        "creating": "Creando",
+        "submit": "Crear tarea",
+        "keepTitle": "¿Guardar este borrador?",
+        "keepDescription": "Se queda en este navegador y se te ofrecerá la próxima vez que escribas una tarea en esta lista.",
+        "discard": "Descartarlo",
+        "keepWriting": "Seguir escribiendo",
+        "saveDraft": "Guardar borrador"
+    },
+    "props": {
+        "status": "Estado",
+        "assignees": "Responsables",
+        "nobody": "Nadie todavía",
+        "dates": "Fechas",
+        "startDate": "Fecha de inicio",
+        "dueDate": "Fecha límite",
+        "timeOfDay": "Hora del día",
+        "priority": "Prioridad",
+        "blocked": "Bloqueada",
+        "blockedUntil": "Bloqueada hasta",
+        "blockedWhy": "Por qué está bloqueada",
+        "blockedWhyPlaceholder": "Por qué, si no es una tarea ni una fecha",
+        "waitingOn": "Esperando a {count} {count, plural, one {tarea sin terminar} other {tareas sin terminar}}",
+        "points": "Puntos",
+        "storyPoints": "Puntos de historia",
+        "empty": "Vacío",
+        "estimate": "Estimación",
+        "trackTime": "Registrar tiempo",
+        "tags": "Etiquetas",
+        "fields": "Campos",
+        "hideEmpty": "Ocultar {count} {count, plural, one {campo vacío} other {campos vacíos}}",
+        "showEmpty": "Mostrar {count} {count, plural, one {campo vacío} other {campos vacíos}}"
+    }
+}

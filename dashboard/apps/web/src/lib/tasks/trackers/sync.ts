@@ -44,10 +44,13 @@ export async function syncTracker(trackerId: string): Promise<SyncResult> {
             enabled: true
         }
     });
+    // The English is stored on the connection and translated where it is read
+    // (`trackerSentence` in the trackers actions).
+    // i18n-ignore
     if (!tracker) return { added: 0, updated: 0, error: "That connection no longer exists." };
     if (!tracker.enabled) return { added: 0, updated: 0, error: null };
     if (!core.isIssueTracker(tracker.provider)) {
-        return { added: 0, updated: 0, error: "This build does not know that tracker." };
+        return { added: 0, updated: 0, error: "This build does not know that tracker." }; // i18n-ignore
     }
     // The same row with its provider narrowed to one this build knows, which the
     // guard above has just established and the column's type cannot say.
