@@ -429,7 +429,9 @@ describe("versions", () => {
         expect(atLeast("1.21.5", [1, 21, 5])).toBe(true);
         expect(atLeast("1.20", [1, 21, 2])).toBe(false);
         expect(atLeast("1.21.10", [1, 21, 5])).toBe(true);
-        expect(atLeast(null, [1, 21, 5])).toBe(true);
+        // Unknown is not the newest: it is not at least anything.
+        expect(atLeast(null, [1, 21, 5])).toBe(false);
+        expect(atLeast(null, [1, 16])).toBe(false);
         expect(atLeast("24w14a", [1, 21, 5])).toBe(true);
     });
 });
@@ -570,6 +572,43 @@ describe("letting go of chunks", () => {
         expect(chunks.spareHeld("forceload remove 40 -20", null)).toEqual([
             "forceload remove 40 -20"
         ]);
+    });
+});
+
+describe("what the server understands, when its version is unknown", () => {
+    it("reads a probe the game parsed apart from one it refused", () => {
+        // 1.20.5 and later, and 1.16 and later: nobody has the tag.
+        expect(commands.probeParsed("No player was found")).toBe(true);
+        expect(commands.probeParsed("No entity was found")).toBe(true);
+        // Items written the other way, before 1.20.5.
+        expect(
+            commands.probeParsed(
+                "Expected whitespace to end one argument, but found trailing data\n...tone[minecraft:custom_data={polaris_event:1b}] 0<--[HERE]"
+            )
+        ).toBe(false);
+        // No `attribute` before 1.16, vanilla and Spigot.
+        expect(commands.probeParsed("Unknown command\n...attribute<--[HERE]")).toBe(false);
+        expect(commands.probeParsed('Unknown command. Type "/help" for help.')).toBe(false);
+        // No answer at all is no evidence.
+        expect(commands.probeParsed("")).toBe(false);
+    });
+
+    it("knows `attribute` is there even where the probe's old id is not (1.21.2 on)", () => {
+        // Paper 1.21.4, as it answered.
+        expect(
+            commands.commandKnown(
+                "Can't find element 'minecraft:generic.max_health' of type 'minecraft:attribute'\n...max_health get<--[HERE]"
+            )
+        ).toBe(true);
+        expect(commands.commandKnown("No entity was found")).toBe(true);
+        expect(commands.commandKnown("Unknown command\n...attribute<--[HERE]")).toBe(false);
+        expect(commands.commandKnown('Unknown command. Type "/help" for help.')).toBe(false);
+        expect(commands.commandKnown("")).toBe(false);
+    });
+
+    it("takes nothing from anybody with either probe", () => {
+        expect(commands.PROBE_COMPONENTS).toMatch(/^clear @a\[tag=pe_probe\] \S+ 0$/);
+        expect(commands.PROBE_ATTRIBUTE).toMatch(/^attribute @e\[tag=pe_probe,limit=1\] \S+ get$/);
     });
 });
 

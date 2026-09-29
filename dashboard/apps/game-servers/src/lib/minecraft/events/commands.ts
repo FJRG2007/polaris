@@ -479,6 +479,37 @@ export function readTest(output: string): "passed" | "failed" | "unloaded" | "un
     return "unknown";
 }
 
+// ------------------------------------------------------------------ what the server understands
+
+/**
+ * A command that parses only where items are written with components (1.20.5
+ * on), and one that exists only from 1.16. Both name nobody - a tag no player
+ * has - so neither can do anything; `clear` with a count of 0 takes nothing even
+ * from somebody it finds.
+ */
+export const PROBE_COMPONENTS =
+    "clear @a[tag=pe_probe] minecraft:stone[minecraft:custom_data={polaris_event:1b}] 0";
+export const PROBE_ATTRIBUTE = "attribute @e[tag=pe_probe,limit=1] minecraft:generic.max_health get";
+
+/** Whether the game read a probe as a command it knows, rather than refusing it. */
+export function probeParsed(output: string): boolean {
+    const said = output.trim();
+    return (
+        said.length > 0 &&
+        !/<--\[HERE\]|unknown command|unknown or incomplete|incorrect argument|expected/i.test(said)
+    );
+}
+
+/**
+ * Whether the game has the command at all, whatever it made of the rest: from
+ * 1.21.2 the attribute probe's id is refused as unknown, which is still an
+ * `attribute` command answering.
+ */
+export function commandKnown(output: string): boolean {
+    const said = output.trim();
+    return said.length > 0 && !/unknown (or incomplete )?command/i.test(said);
+}
+
 // ------------------------------------------------------------------ finding a place
 
 /**

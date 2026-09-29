@@ -288,6 +288,26 @@ async function giveUpSite(ctx: KindContext, place: stored.Point): Promise<void> 
 }
 
 /**
+ * How the kit is marked, the way this server reads an item: the version's
+ * choice, checked by asking the game to take the marked item from nobody -
+ * `clear` of a tag no player has, 0 of them - which a server that writes items
+ * the other way refuses to read. A kit in the wrong syntax is never given, and
+ * never taken back either.
+ */
+async function kitMarker(ctx: KindContext): Promise<stored.Marker> {
+    const guess: stored.Marker = (await ctx.atLeast([1, 20, 5])) ? "components" : "tag";
+    const other: stored.Marker = guess === "components" ? "tag" : "components";
+    const reads = async (marker: stored.Marker) =>
+        commands.probeParsed(
+            await ctx.server
+                .say([`${arena.clearMarked("@a[tag=pe_probe]", "minecraft:stone", marker)} 0`])
+                .catch(() => "")
+        );
+    if (await reads(guess)) return guess;
+    return (await reads(other)) ? other : guess;
+}
+
+/**
  * Everybody in: where each of them is written down first, and never read again
  * for anybody already written down - a restart halfway through must not take
  * the arena for somebody's home.
@@ -297,8 +317,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const language = ctx.language;
     const box = run.arena!.box;
     const duelling = run.preset.kind === "team-duel";
-    const marker: stored.Marker =
-        run.marker ?? ((await ctx.atLeast([1, 20, 5])) ? "components" : "tag");
+    const marker: stored.Marker = run.marker ?? (await kitMarker(ctx));
     const kit = duelling
         ? duel.duelKit((run.preset.options as catalog.EventOptions<"team-duel">).kit)
         : build.KIT_IDS;

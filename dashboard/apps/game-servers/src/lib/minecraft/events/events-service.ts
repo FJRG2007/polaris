@@ -20,24 +20,24 @@ import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
 import * as waves from "./kinds/waves";
-import * as meteors from "./kinds/meteor-shower";
 import * as commands from "./commands";
 import * as messages from "./messages";
 import * as stage from "./kinds/stage";
-import * as stageService from "./kinds/stage-service";
-import * as arenaService from "./kinds/arena-service";
-import * as duel from "./kinds/team-duel";
-import { parseProperties } from "../parse";
 import * as playing from "../activity";
 import * as trivia from "./trivia-bank";
 import * as chunks from "./kinds/chunks";
 import { host } from "@polaris/app-host";
+import * as duel from "./kinds/team-duel";
 import * as boost from "./kinds/xp-boost";
+import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
 import * as rareCatch from "./kinds/rare-catch";
+import * as meteors from "./kinds/meteor-shower";
+import * as stageService from "./kinds/stage-service";
+import * as arenaService from "./kinds/arena-service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import {
@@ -63,7 +63,8 @@ const PLACE_TRIES = 10;
 /** How much ground a chest or a boss is judged by around where it goes. */
 const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
-const LOG_FILE = "/data/logs/latest.log";
+const LOG_DIR = "/data/logs";
+const LOG_FILE = `${LOG_DIR}/latest.log`;
 const SERVER_PROPERTIES = "/data/server.properties";
 
 interface Loop {
@@ -82,7 +83,7 @@ interface Loop {
     /** World boss: where it was last seen standing. */
     bossAt: stored.Point | null;
     /** How this server writes a name into an entity, and its attribute ids. */
-    modern: { text: boolean; ids: boolean } | null;
+    modern: { ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
     logFrom: number | null;
     /** Which names this server knows its ground blocks by, once asked; `none`
@@ -394,14 +395,12 @@ export async function startEvent(input: {
     // The kit's marker, and what a dropped item remembers of who threw it, are
     // read the way 1.16 and later write them.
     if (catalog.playsInArena(preset)) {
-        const version = await withServerContainer(
-            row.ownerId,
-            input.installedAppId,
-            versionOf
+        const recent = await withServerContainer(row.ownerId, input.installedAppId, (server) =>
+            serverAtLeast(server, [1, 16])
         ).catch(() => null);
-        if (!atLeast(version, [1, 16])) {
+        if (recent === false) {
             throw new Error(
-                `${catalog.KIND_INFO[preset.kind].label} needs Minecraft 1.16 or later; this server runs ${version}.`
+                `${catalog.KIND_INFO[preset.kind].label} needs Minecraft 1.16 or later, and this server runs an older one.`
             );
         }
     }
@@ -1325,7 +1324,7 @@ function kindContext(
             findPlace(installedAppId, loop, server, place, distance, radius),
         giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
         chat: () => chatSince(loop, server),
-        atLeast: async (wanted) => atLeast(await versionOf(server), wanted),
+        atLeast: (wanted) => serverAtLeast(server, wanted),
         owed: async () => {
             const row = await readRow(installedAppId);
             return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
@@ -1449,7 +1448,11 @@ async function worldBoss(
         }
         await server.sayAll([
             commands.bossHeal(options.health),
-            commands.bossNameCommand(name, modern.text),
+            // Both ways a name has been written, the older first: up to 1.21.4 the
+            // newer is not a name at all and is passed over; from 1.21.5 the older
+            // would show as its own text, and the newer replaces it.
+            commands.bossNameCommand(name, false),
+            commands.bossNameCommand(name, true),
             commands.CLEAR_MARK,
             `bossbar set ${commands.BAR} max ${options.health}`,
             commands.say(
@@ -2380,10 +2383,9 @@ async function newLog(server: ServerContainer, loop: Loop): Promise<string | nul
 }
 
 async function stageFlavour(server: ServerContainer): Promise<stage.Flavour> {
-    const version = await versionOf(server);
     return {
-        items: atLeast(version, [1, 20, 5]) ? "components" : "nbt",
-        top: atLeast(version, [1, 18]) ? 319 : 255
+        items: (await serverAtLeast(server, [1, 20, 5])) ? "components" : "nbt",
+        top: (await serverAtLeast(server, [1, 18])) ? 319 : 255
     };
 }
 
@@ -2923,24 +2925,57 @@ async function give(
     return items.length === 0 && levels === 0 ? null : { items, levels };
 }
 
-/** How this server's version writes names into entities, and its attribute ids. */
-async function modernity(server: ServerContainer): Promise<{ text: boolean; ids: boolean }> {
-    const version = await versionOf(server);
-    return { text: atLeast(version, [1, 21, 5]), ids: atLeast(version, [1, 21, 2]) };
+/** Whether this server's attribute ids have lost their `generic.`: the one tried first. */
+async function modernity(server: ServerContainer): Promise<{ ids: boolean }> {
+    return { ids: await serverAtLeast(server, [1, 21, 2]) };
 }
 
-/** The version the server said it started as, out of its log; null when unread. */
+const VERSION_LINE = "Starting minecraft server version [^ ]*";
+
+/**
+ * The version the server said it started as, out of its log; null when unread.
+ *
+ * The line is written once, when the server starts, and the log is rolled over
+ * into `logs/<date>-<n>.log.gz` at the first midnight after that - so a server
+ * that has been up since yesterday has no such line in `latest.log`. The newest
+ * archive that has it is then this run's start: every start rolls the log over
+ * too, so an older start is always in an older file.
+ */
 async function versionOf(server: ServerContainer): Promise<string | null> {
-    const result = await server
-        .run(["sh", "-c", `grep -m1 -o 'Starting minecraft server version [^ ]*' ${LOG_FILE}`])
-        .catch(() => null);
-    return /version (\S+)/.exec(result?.output ?? "")?.[1] ?? null;
+    const read = async (script: string) => {
+        const result = await server.run(["sh", "-c", script]).catch(() => null);
+        return /version (\S+)/.exec(result?.output ?? "")?.[1] ?? null;
+    };
+    return (
+        (await read(`grep -m1 -o '${VERSION_LINE}' ${LOG_FILE}`)) ??
+        (await read(
+            `for f in $(ls -t ${LOG_DIR}/*.log.gz 2>/dev/null | head -n 60); do gzip -dc "$f" 2>/dev/null | grep -m1 -o '${VERSION_LINE}' && break; done`
+        ))
+    );
 }
 
-/** Whether a version is at least another. A snapshot or an unreadable one is
- *  taken as recent, which is what a server of unknown version most likely is. */
+/**
+ * Whether this server runs at least a version. Out of its log when it can be
+ * read; when it cannot, the version is unknown - never taken for the newest -
+ * and what the game itself answers to a harmless probe gives the lowest it can
+ * be. Past what a probe can tell, the answer is no: every caller's older choice
+ * is the one that works, or fails harmlessly, on a newer server too.
+ */
+async function serverAtLeast(server: ServerContainer, wanted: readonly number[]): Promise<boolean> {
+    const version = await versionOf(server);
+    if (version !== null) return atLeast(version, wanted);
+    const ask = (line: string) => server.say([line]).catch(() => "");
+    if (commands.probeParsed(await ask(commands.PROBE_COMPONENTS)))
+        return atLeast("1.20.5", wanted);
+    if (commands.commandKnown(await ask(commands.PROBE_ATTRIBUTE))) return atLeast("1.16", wanted);
+    return false;
+}
+
+/** Whether a version is at least another. A snapshot is taken as recent; one
+ *  that cannot be read at all as unknown, which is not at least anything. */
 export function atLeast(version: string | null, wanted: readonly number[]): boolean {
-    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version ?? "");
+    if (version === null) return false;
+    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version);
     if (!match) return true;
     const have = [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
     for (let index = 0; index < wanted.length; index += 1) {

@@ -97,8 +97,15 @@ interface World {
     dealt: Record<string, number>;
     died: Record<string, number>;
     pk: Record<string, number>;
-    /** The version the server's log says it started as. */
+    /** The version the server runs. */
     version: string;
+    /** Where the line that says so is: this run's log, an archive of it rolled
+     *  over at midnight, or nowhere at all. */
+    versionIn: "latest" | "archive" | "none";
+    /** Lines the game refused to read. */
+    refused: string[];
+    /** The name over the boss's head, as a player reads it. */
+    bossName: string;
     /** How long the storm lasts, in ticks, as the last `weather thunder` left it. */
     stormTicks: number;
 }
@@ -155,6 +162,9 @@ const world: World = {
     died: {},
     pk: {},
     version: "1.21.4",
+    versionIn: "latest",
+    refused: [],
+    bossName: "",
     stormTicks: 0
 };
 let config: Record<string, unknown> = {};
@@ -187,8 +197,52 @@ function dimension(id: string): string {
     return String({ "minecraft:the_nether": -1, "minecraft:the_end": 1 }[id] ?? 0);
 }
 
+/** How a server refuses a line it cannot read: the brigadier error and where it stopped. */
+function refuse(line: string, why: string): string {
+    world.refused.push(line);
+    return `${why}\n...${line.slice(-30)}<--[HERE]`;
+}
+
+/** Whether an item argument is written the way this version reads one: data
+ *  components in brackets from 1.20.5, an NBT tag in braces before. */
+function itemReadable(item: string): boolean {
+    const components = events.atLeast(world.version, [1, 20, 5]);
+    return components ? !/^[^[]*\{/.test(item) : !item.includes("[");
+}
+
 function answer(line: string): string {
     world.sent.push(line);
+    // Up to 1.21.4 a name is JSON in a string, and anything else is passed over;
+    // from 1.21.5 it is a text component, which a plain string is too.
+    const named = /^data merge entity @e\[tag=pe_boss,limit=1\] \{CustomName:(.*)\}$/.exec(line);
+    if (named) {
+        const value = named[1]!;
+        const modern = events.atLeast(world.version, [1, 21, 5]);
+        const plain = (part: unknown): string =>
+            typeof part === "string"
+                ? part
+                : Array.isArray(part)
+                  ? part.map(plain).join("")
+                  : String((part as { text?: string }).text ?? "");
+        if (value.startsWith("'")) {
+            const inner = value.slice(1, -1).replace(/\\(.)/g, "$1");
+            world.bossName = modern ? inner : plain(JSON.parse(inner));
+        } else if (modern) {
+            world.bossName = JSON.parse(/text:("(?:[^"\\]|\\.)*")/.exec(value)![1]!) as string;
+        }
+        return "Modified entity data of Wither Skeleton";
+    }
+    if (line.startsWith("attribute ") && !events.atLeast(world.version, [1, 16]))
+        return refuse(line, "Unknown command");
+    const cleared = /^clear (\S+) (\S+)(?: (\d+))?$/.exec(line);
+    if (cleared) {
+        if (!itemReadable(cleared[2]!))
+            return refuse(line, "Expected whitespace to end one argument, but found trailing data");
+        if (cleared[1]!.startsWith("@a[tag=pe_probe]")) return "No player was found";
+        return world.online.includes(cleared[1]!)
+            ? `Removed 1 item(s) from player ${cleared[1]}`
+            : "No player was found";
+    }
     const filled = fillAnswer(line);
     if (filled !== null) return filled;
     const moved = /^execute in (\S+) run tp (\w+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(line);
@@ -496,6 +550,8 @@ function answer(line: string): string {
         return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
     if (line.startsWith("give ")) {
         const [, name, item] = line.split(" ") as [string, string, string];
+        if (!itemReadable(item))
+            return refuse(line, "Expected whitespace to end one argument, but found trailing data");
         if (world.unknownItems.includes(item)) return `Unknown item '${item}'`;
         return world.online.includes(name) ? `Gave 1 [Item] to ${name}` : "No player was found";
     }
@@ -554,10 +610,16 @@ const server = {
     sayAll: async (lines: readonly string[]) => {
         for (const line of lines) answer(line);
     },
-    run: async (argv: readonly string[]) =>
-        argv[0] === "stat"
-            ? { code: 0, output: String(world.log.length) }
-            : { code: 0, output: `Starting minecraft server version ${world.version}` },
+    run: async (argv: readonly string[]) => {
+        if (argv[0] === "stat") return { code: 0, output: String(world.log.length) };
+        // The shell reads the line out of whichever file it looks in.
+        const script = argv.join(" ");
+        const looks =
+            world.versionIn === "latest"
+                ? script.includes("latest.log")
+                : world.versionIn === "archive" && script.includes(".log.gz");
+        return { code: 0, output: looks ? `Starting minecraft server version ${world.version}` : "" };
+    },
     runOk: async () => "",
     readFile: async () => new ReadableStream(),
     trimWorld: null
@@ -705,6 +767,9 @@ beforeEach(() => {
     world.died = {};
     world.pk = {};
     world.version = "1.21.4";
+    world.versionIn = "latest";
+    world.refused = [];
+    world.bossName = "";
     world.stormTicks = 0;
     events.forgetPlayers();
     held.length = 0;
@@ -3614,6 +3679,69 @@ describe("a team duel", () => {
         chat(["Ana", "join"], ["Ben", "join"], ["Cy", "join"]);
         await play(50_000);
         expect(state().run?.entrants.map((one) => one.name)).toEqual(["Ben", "Cy"]);
+    });
+});
+
+describe("a server whose version is not in today's log", () => {
+    const duel = () => ({ ...catalog.newPreset("team-duel", "duel"), minutes: 3 });
+    const kitGiven = () =>
+        world.sent.filter((line) => line.startsWith("give ") && line.includes("polaris_event"));
+
+    it("reads it out of the log rolled over at midnight", async () => {
+        world.version = "1.20.1";
+        world.versionIn = "archive";
+        world.online = ["Ana", "Ben"];
+        setUp([duel()]);
+        await joinAndStart("duel");
+        await play(10_000);
+        expect(kitGiven().length).toBeGreaterThan(0);
+        expect(world.refused.filter((line) => line.startsWith("give "))).toEqual([]);
+    });
+
+    it.each(["1.20.1", "1.21.4"])(
+        "gives a duel's kit the way %s reads it when no log says which that is",
+        async (version) => {
+            world.version = version;
+            world.versionIn = "none";
+            world.online = ["Ana", "Ben"];
+            setUp([duel()]);
+            await joinAndStart("duel");
+            await play(10_000);
+            expect(kitGiven().length).toBeGreaterThan(0);
+            expect(world.refused.filter((line) => line.startsWith("give "))).toEqual([]);
+        }
+    );
+
+    it("does not start a duel on a server older than 1.16, known only by what it answers", async () => {
+        world.version = "1.15.2";
+        world.versionIn = "none";
+        setUp([duel()]);
+        await expect(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "duel",
+                trigger: "manual",
+                startedBy: null
+            })
+        ).rejects.toThrow(/needs Minecraft 1.16/);
+    });
+});
+
+describe("a world boss whose server's version is unknown", () => {
+    it.each(["1.20.1", "1.21.4", "1.21.5", "26.1"])("wears its own name on %s", async (version) => {
+        world.version = version;
+        world.versionIn = "none";
+        setUp([{ ...catalog.newPreset("world-boss", "boss"), minutes: 3 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(8_100);
+        expect(world.bossName).toMatch(/^[A-Z][\w ]+$/);
     });
 });
 
