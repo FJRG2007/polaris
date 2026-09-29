@@ -1,1 +1,220 @@
-{}
+{
+    "nouns": {
+        "account": "{count, plural, one {{n} cuenta} other {{n} cuentas}}",
+        "activeAccount": "{count, plural, one {{n} cuenta activa} other {{n} cuentas activas}}",
+        "character": "{count, plural, one {{n} carácter} other {{n} caracteres}}",
+        "session": "{count, plural, one {{n} sesión} other {{n} sesiones}}",
+        "entry": "{count, plural, one {{n} entrada} other {{n} entradas}}",
+        "item": "{count, plural, one {{n} elemento} other {{n} elementos}}",
+        "itemWithCopy": "{count, plural, one {{n} elemento con copia} other {{n} elementos con copia}}",
+        "key": "{count, plural, one {{n} clave} other {{n} claves}}",
+        "domainInUse": "{count, plural, one {{n} dominio en uso} other {{n} dominios en uso}}",
+        "scope": "{count, plural, one {{n} ámbito} other {{n} ámbitos}}",
+        "configuredScope": "{count, plural, one {{n} ámbito configurado} other {{n} ámbitos configurados}}",
+        "service": "{count, plural, one {{n} servicio} other {{n} servicios}}",
+        "day": "{count, plural, one {{n} día} other {{n} días}}",
+        "hour": "{count, plural, one {{n} hora} other {{n} horas}}",
+        "minute": "{count, plural, one {{n} minuto} other {{n} minutos}}"
+    },
+    "share": "{part} de {whole}",
+    "frequency": {
+        "day": "cada día",
+        "hour": "cada hora",
+        "every": "una vez cada {duration}"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "factors": {
+        "totp": "App de autenticación",
+        "email": "Código por correo"
+    },
+    "retention": {
+        "d1": "Un día",
+        "d7": "Una semana",
+        "d30": "30 días",
+        "d90": "3 meses",
+        "d180": "6 meses",
+        "d365": "Un año",
+        "d0": "Siempre"
+    },
+    "sections": {
+        "authentication": {
+            "title": "Inicio de sesión y segundo factor"
+        },
+        "sessions": {
+            "title": "Sesiones"
+        },
+        "administrators": {
+            "title": "Administradores"
+        },
+        "audit": {
+            "title": "Registro de auditoría"
+        },
+        "backups": {
+            "title": "Copias de seguridad"
+        },
+        "secrets": {
+            "title": "Secretos"
+        },
+        "tls": {
+            "title": "TLS en dominios"
+        },
+        "firewall": {
+            "title": "Firewall"
+        },
+        "rateLimits": {
+            "title": "Límites de frecuencia"
+        },
+        "headers": {
+            "title": "Cabeceras de seguridad"
+        }
+    },
+    "where": {
+        "security": "Administración > Seguridad",
+        "email": "Administración > Correo",
+        "accountSecurity": "Mi cuenta > Seguridad",
+        "users": "Administración > Usuarios",
+        "activity": "Administración > Actividad",
+        "retention": "Administración > Conservación de registros",
+        "serviceVariables": "Servicio > Variables",
+        "runnerSecrets": "Runners > Secretos",
+        "serviceSettings": "Servicio > Ajustes",
+        "accountDomains": "Mi cuenta > Dominios",
+        "trafficProtection": "Servicio > Ajustes > Protección del tráfico",
+        "securityHeaders": "Servicio > Ajustes > Cabeceras de seguridad"
+    },
+    "facts": {
+        "secondFactor": "Segundo factor",
+        "requiredOfEvery": "Obligatorio en todas las cuentas",
+        "notRequired": "No obligatorio",
+        "factorsThatCount": "Factores que cuentan",
+        "afterConnected": "Tras iniciar sesión con GitHub o Google",
+        "askedToo": "También se pide el segundo factor",
+        "standsForBoth": "El inicio de sesión de la cuenta vale por los dos pasos",
+        "withSecondFactor": "Cuentas con segundo factor",
+        "withPasskey": "Cuentas con llave de acceso",
+        "shortestPassword": "Contraseña más corta permitida",
+        "sessionLifetime": "Duración de sesión",
+        "lifetimeText": "{duration}, renovada como mucho {frequency}",
+        "signOutSooner": "Cuentas que cierran la sesión antes",
+        "lockWhenIdle": "Cuentas que se bloquean por inactividad",
+        "addressBound": "Sesiones ligadas a la dirección que las abrió",
+        "loginApproval": "Inicios de sesión nuevos aprobados desde una sesión abierta",
+        "clientBound": "Sesiones ligadas al navegador y al sistema que las abrieron",
+        "openSessions": "Sesiones abiertas",
+        "adminsWithout": "Administradores sin segundo factor",
+        "notCheckedYet": "Aún sin comprobar",
+        "broken": "{reason} (entrada {seq})",
+        "intact": "Intacta en {entries}",
+        "auditKept": "Registro de auditoría conservado durante",
+        "activityKept": "Actividad conservada durante",
+        "sealed": "Entradas selladas en la cadena",
+        "sealedPending": "{sealed}, con {pending} pendientes de sellar",
+        "lastCheck": "Última comprobación de integridad",
+        "whatItFound": "Qué encontró",
+        "chainHead": "Cabeza de la cadena",
+        "nothingSealed": "Aún no hay nada sellado",
+        "protectedItems": "Elementos protegidos",
+        "onSchedule": "Con programación",
+        "newestEncrypted": "Copia más reciente cifrada en todos los sitios donde se guarda",
+        "lastRunFailed": "La última ejecución falló",
+        "keysInUse": "Claves de copia en uso",
+        "kind": "Tipo",
+        "schedule": "Programación",
+        "encrypted": "Cifrado",
+        "lastGoodCopy": "Última copia correcta",
+        "never": "Nunca",
+        "lastRun": "Última ejecución",
+        "notRunYet": "Aún sin ejecutar",
+        "secretEncrypted": "Variables secretas cifradas en reposo",
+        "secretClear": "Variables secretas guardadas sin cifrar",
+        "plainVariables": "Variables no marcadas como secretas",
+        "storedAsWritten": "{count}, guardadas tal cual",
+        "runnerSecrets": "Secretos de runners",
+        "allEncrypted": "{count}, todos cifrados en reposo",
+        "overHttps": "Dominios de servicios servidos por HTTPS",
+        "letsEncrypt": "Con un certificado de Let's Encrypt",
+        "internalCa": "Con un certificado de la propia autoridad de esta instancia",
+        "uploaded": "Con un certificado que aportaste tú",
+        "plainHttp": "Servidos por HTTP sin cifrar",
+        "ownDomains": "Certificados de tus propios dominios",
+        "issuedWaiting": "{issued} emitidos, {pending} pendientes",
+        "issued": "{issued} emitidos",
+        "notIssued": "Certificados que no se pudieron emitir",
+        "expiringWithin": "Caducan en menos de {days} días",
+        "packsEveryService": "Paquetes de reglas en todos los servicios",
+        "theDefaults": "{count}, los predeterminados",
+        "packsPolaris": "Paquetes de reglas delante del propio Polaris",
+        "injectionChecks": "Comprobaciones de inyección SQL y cross-site scripting",
+        "onEverywhere": "Activadas en todas partes",
+        "offIn": "Desactivadas en {scopes}",
+        "customRules": "Reglas personalizadas",
+        "across": "{rules} en {scopes}",
+        "refused": "Direcciones y rangos rechazados",
+        "allowOnly": "Ámbitos que solo admiten direcciones de la lista",
+        "requireSignIn": "Ámbitos que exigen iniciar sesión en Polaris",
+        "bannedNow": "Direcciones vetadas ahora",
+        "withRateLimit": "Servicios con límite de frecuencia",
+        "rateInForce": "Límites de frecuencia en vigor",
+        "concurrencyCap": "Servicios con tope de peticiones simultáneas",
+        "challenge": "Servicios que ponen a prueba a los visitantes",
+        "strictPreset": "Servicios con el preajuste estricto",
+        "recommendedPreset": "Servicios con el preajuste recomendado",
+        "noPreset": "Servicios sin preajuste",
+        "ownHeaders": "Servicios que envían cabeceras propias"
+    },
+    "notes": {
+        "noEmailChannel": "Se aceptan códigos por correo, pero no hay ningún canal de correo configurado, así que solo se puede activar la app de autenticación.",
+        "sessionsFixed": "La duración y su renovación son fijas en Polaris. El resto lo define cada cuenta para sí misma; no hay un interruptor para toda la instancia.",
+        "firstAdmin": "El primer administrador, creado durante la instalación, no tiene entrada en el registro de auditoría.",
+        "chain": "La cadena muestra una entrada editada o eliminada después de sellarla. Eliminar las entradas más recientes solo se detecta comparando con una copia de la cabeza guardada fuera de Polaris.",
+        "localUnencrypted": "Una copia guardada en el disco de lo que protege se escribe sin cifrar a propósito; toda copia que sale de él va cifrada.",
+        "listShows": "La lista muestra los {shown} elementos copiados más recientemente de {total}; las cifras de arriba los cuentan todos.",
+        "masterKey": "Cifrados con la clave maestra de la instancia, que no se guarda en la base de datos.",
+        "builtInLimits": "Los límites que Polaris pone a sus propios códigos y contraseñas de enlaces son internos, no ajustes, y no se cuentan aquí."
+    },
+    "chainBreak": {
+        "missing": "Falta una entrada en la cadena",
+        "altered": "Se cambió una entrada después de sellarla",
+        "relinked": "Una entrada ya no apunta a la anterior"
+    },
+    "backups": {
+        "paused": "En pausa",
+        "sourceGone": "El origen ya no existe",
+        "onDemand": "Solo a petición",
+        "noCopy": "Aún sin copia",
+        "partly": "En parte",
+        "result": {
+            "ok": "OK",
+            "partial": "Parcial",
+            "failed": "Fallida"
+        }
+    },
+    "outside": {
+        "disks": "Si están cifrados los discos de las máquinas en las que funciona Polaris.",
+        "copies": "Dónde se guardan, fuera de esta instancia, las copias de la clave maestra, las claves de recuperación de las copias de seguridad y la cabeza de la cadena de auditoría.",
+        "older": "Las entradas más antiguas que el periodo de conservación del registro de auditoría, y los cambios hechos antes de que el registro los recogiera.",
+        "processes": "Los procesos propios de la organización: revisiones de acceso, altas y bajas, formación, gestión de proveedores, respuesta a incidentes y seguridad física."
+    },
+    "export": {
+        "configuredIn": "Configurado en: {where}",
+        "controlHeader": "| Control | Valor |",
+        "attention": "(atención)",
+        "rowsShown": "### {title} ({shown} de {total})",
+        "name": "Nombre",
+        "lastChanged": "Último cambio: {at}, por {who} (`{action}`).",
+        "noChange": "El registro de auditoría no recoge ningún cambio en esta área.",
+        "note": "Nota: {note}",
+        "title": "# Evidencias de configuración de Polaris",
+        "instance": "- Instancia: {url}",
+        "build": "- Build: {build}",
+        "notRecorded": "no registrado",
+        "readAt": "- Leído el: {at}",
+        "digest": "- SHA-256 de la exportación JSON: `{digest}`",
+        "notCertified": "Polaris no está certificado según SOC 2 ni ISO 27001. La certificación es una auditoría de la organización que lo gestiona; este informe es una evidencia de cómo estaba configurada esta instancia en el momento indicado arriba.",
+        "attentionMeans": "Los elementos marcados con (atención) son protecciones desactivadas o comprobaciones que no se superaron.",
+        "outsideTitle": "## Fuera de lo que Polaris puede ver",
+        "checkingTitle": "## Comprobar una copia",
+        "checking": "El SHA-256 de una exportación JSON sin cambios es igual al valor de arriba. El mismo valor queda registrado, con quién la exportó y cuándo, en la entrada `evidence.export` del registro de auditoría."
+    }
+}

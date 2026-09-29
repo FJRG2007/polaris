@@ -1458,6 +1458,10 @@
         "extension/src/lib/locale-store.ts",
         "web/src/app/api/extension/session/route.ts",
         "web/src/lib/integrations/registry.ts",
-        "web/src/lib/integrations/registry-words.ts"
+        "web/src/lib/integrations/registry-words.ts",
+        "web/src/lib/compliance/evidence-sections.ts",
+        "web/src/lib/compliance/evidence.ts",
+        "web/src/lib/compliance/evidence-export.ts",
+        "web/src/lib/compliance/evidence-readings.ts"
     ]
 }

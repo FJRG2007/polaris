@@ -1,1 +1,220 @@
-{}
+{
+    "nouns": {
+        "account": "{count, plural, one {{n} account} other {{n} accounts}}",
+        "activeAccount": "{count, plural, one {{n} active account} other {{n} active accounts}}",
+        "character": "{count, plural, one {{n} character} other {{n} characters}}",
+        "session": "{count, plural, one {{n} session} other {{n} sessions}}",
+        "entry": "{count, plural, one {{n} entry} other {{n} entries}}",
+        "item": "{count, plural, one {{n} item} other {{n} items}}",
+        "itemWithCopy": "{count, plural, one {{n} item with a copy} other {{n} items with a copy}}",
+        "key": "{count, plural, one {{n} key} other {{n} keys}}",
+        "domainInUse": "{count, plural, one {{n} domain in use} other {{n} domains in use}}",
+        "scope": "{count, plural, one {{n} scope} other {{n} scopes}}",
+        "configuredScope": "{count, plural, one {{n} configured scope} other {{n} configured scopes}}",
+        "service": "{count, plural, one {{n} service} other {{n} services}}",
+        "day": "{count, plural, one {{n} day} other {{n} days}}",
+        "hour": "{count, plural, one {{n} hour} other {{n} hours}}",
+        "minute": "{count, plural, one {{n} minute} other {{n} minutes}}"
+    },
+    "share": "{part} of {whole}",
+    "frequency": {
+        "day": "once a day",
+        "hour": "once an hour",
+        "every": "once every {duration}"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "factors": {
+        "totp": "Authenticator app",
+        "email": "Email code"
+    },
+    "retention": {
+        "d1": "A day",
+        "d7": "A week",
+        "d30": "30 days",
+        "d90": "3 months",
+        "d180": "6 months",
+        "d365": "A year",
+        "d0": "Forever"
+    },
+    "sections": {
+        "authentication": {
+            "title": "Sign-in and second factor"
+        },
+        "sessions": {
+            "title": "Sessions"
+        },
+        "administrators": {
+            "title": "Administrators"
+        },
+        "audit": {
+            "title": "Audit trail"
+        },
+        "backups": {
+            "title": "Backups"
+        },
+        "secrets": {
+            "title": "Secrets"
+        },
+        "tls": {
+            "title": "TLS on domains"
+        },
+        "firewall": {
+            "title": "Firewall"
+        },
+        "rateLimits": {
+            "title": "Rate limits"
+        },
+        "headers": {
+            "title": "Security headers"
+        }
+    },
+    "where": {
+        "security": "Management > Security",
+        "email": "Management > Email",
+        "accountSecurity": "My account > Security",
+        "users": "Management > Users",
+        "activity": "Management > Activity",
+        "retention": "Management > Keeping records",
+        "serviceVariables": "Service > Variables",
+        "runnerSecrets": "Runners > Secrets",
+        "serviceSettings": "Service > Settings",
+        "accountDomains": "My account > Domains",
+        "trafficProtection": "Service > Settings > Traffic protection",
+        "securityHeaders": "Service > Settings > Security headers"
+    },
+    "facts": {
+        "secondFactor": "Second factor",
+        "requiredOfEvery": "Required of every account",
+        "notRequired": "Not required",
+        "factorsThatCount": "Factors that count",
+        "afterConnected": "After a GitHub or Google sign-in",
+        "askedToo": "The second factor is asked for too",
+        "standsForBoth": "The account's own sign-in stands for both steps",
+        "withSecondFactor": "Accounts with a second factor",
+        "withPasskey": "Accounts with a passkey",
+        "shortestPassword": "Shortest password allowed",
+        "sessionLifetime": "Session lifetime",
+        "lifetimeText": "{duration}, renewed at most {frequency}",
+        "signOutSooner": "Accounts that sign out sooner",
+        "lockWhenIdle": "Accounts that lock when idle",
+        "addressBound": "Sessions tied to the address that opened them",
+        "loginApproval": "New sign-ins approved from an open session",
+        "clientBound": "Sessions tied to the browser and system that opened them",
+        "openSessions": "Open sessions",
+        "adminsWithout": "Administrators without a second factor",
+        "notCheckedYet": "Not checked yet",
+        "broken": "{reason} (entry {seq})",
+        "intact": "Intact across {entries}",
+        "auditKept": "Audit log kept for",
+        "activityKept": "Activity kept for",
+        "sealed": "Entries sealed into the chain",
+        "sealedPending": "{sealed}, with {pending} waiting to be sealed",
+        "lastCheck": "Last integrity check",
+        "whatItFound": "What it found",
+        "chainHead": "Chain head",
+        "nothingSealed": "Nothing sealed yet",
+        "protectedItems": "Protected items",
+        "onSchedule": "On a schedule",
+        "newestEncrypted": "Newest copy encrypted everywhere it is kept",
+        "lastRunFailed": "Last run failed",
+        "keysInUse": "Backup keys in use",
+        "kind": "Kind",
+        "schedule": "Schedule",
+        "encrypted": "Encrypted",
+        "lastGoodCopy": "Last good copy",
+        "never": "Never",
+        "lastRun": "Last run",
+        "notRunYet": "Not run yet",
+        "secretEncrypted": "Secret variables encrypted at rest",
+        "secretClear": "Secret variables stored unencrypted",
+        "plainVariables": "Variables not marked secret",
+        "storedAsWritten": "{count}, stored as written",
+        "runnerSecrets": "Runner secrets",
+        "allEncrypted": "{count}, all encrypted at rest",
+        "overHttps": "Service domains served over HTTPS",
+        "letsEncrypt": "With a Let's Encrypt certificate",
+        "internalCa": "With a certificate from this instance's own authority",
+        "uploaded": "With a certificate you supplied",
+        "plainHttp": "Served over plain HTTP",
+        "ownDomains": "Certificates for your own domains",
+        "issuedWaiting": "{issued} issued, {pending} waiting",
+        "issued": "{issued} issued",
+        "notIssued": "Certificates that could not be issued",
+        "expiringWithin": "Expiring within {days} days",
+        "packsEveryService": "Rule packs on every service",
+        "theDefaults": "{count}, the defaults",
+        "packsPolaris": "Rule packs in front of Polaris itself",
+        "injectionChecks": "SQL injection and cross-site scripting checks",
+        "onEverywhere": "On everywhere",
+        "offIn": "Off in {scopes}",
+        "customRules": "Custom rules",
+        "across": "{rules} across {scopes}",
+        "refused": "Addresses and ranges refused",
+        "allowOnly": "Scopes that admit listed addresses only",
+        "requireSignIn": "Scopes that require a Polaris sign-in",
+        "bannedNow": "Addresses banned now",
+        "withRateLimit": "Services with a rate limit",
+        "rateInForce": "Rate limits in force",
+        "concurrencyCap": "Services with a cap on requests at once",
+        "challenge": "Services that challenge visitors",
+        "strictPreset": "Services on the strict preset",
+        "recommendedPreset": "Services on the recommended preset",
+        "noPreset": "Services with no preset",
+        "ownHeaders": "Services sending headers of their own"
+    },
+    "notes": {
+        "noEmailChannel": "Email codes are accepted, but no email channel is set, so only the authenticator can be armed.",
+        "sessionsFixed": "The lifetime and its renewal are fixed in Polaris. The rest is set by each account for itself; there is no instance-wide switch.",
+        "firstAdmin": "The first administrator, made during setup, has no entry in the audit trail.",
+        "chain": "The chain shows an entry edited or removed after it was sealed. Removing the newest entries is caught only against a copy of the head kept outside Polaris.",
+        "localUnencrypted": "A copy kept on the disk of the thing it protects is written unencrypted by design; every copy that leaves it is encrypted.",
+        "listShows": "The list shows the {shown} most recently backed-up items of {total}; the figures above count them all.",
+        "masterKey": "Encrypted under the instance's master key, which is not stored in the database.",
+        "builtInLimits": "The limits Polaris puts on its own codes and link passwords are built in, not settings, and are not counted here."
+    },
+    "chainBreak": {
+        "missing": "An entry is missing from the chain",
+        "altered": "An entry was changed after it was sealed",
+        "relinked": "An entry no longer points at the one before it"
+    },
+    "backups": {
+        "paused": "Paused",
+        "sourceGone": "Source gone",
+        "onDemand": "On demand only",
+        "noCopy": "No copy yet",
+        "partly": "Partly",
+        "result": {
+            "ok": "OK",
+            "partial": "Partial",
+            "failed": "Failed"
+        }
+    },
+    "outside": {
+        "disks": "Whether the disks of the machines Polaris runs on are encrypted.",
+        "copies": "Where copies of the master key, the backup recovery keys and the audit chain head are kept outside this instance.",
+        "older": "Entries older than the audit log's retention period, and changes made before the trail recorded them.",
+        "processes": "The organization's own processes: access reviews, joiners and leavers, training, vendor management, incident response and physical security."
+    },
+    "export": {
+        "configuredIn": "Configured in: {where}",
+        "controlHeader": "| Control | Value |",
+        "attention": "(attention)",
+        "rowsShown": "### {title} ({shown} of {total})",
+        "name": "Name",
+        "lastChanged": "Last changed {at} by {who} (`{action}`).",
+        "noChange": "No change to this area is recorded in the audit trail.",
+        "note": "Note: {note}",
+        "title": "# Polaris configuration evidence",
+        "instance": "- Instance: {url}",
+        "build": "- Build: {build}",
+        "notRecorded": "not recorded",
+        "readAt": "- Read at: {at}",
+        "digest": "- SHA-256 of the JSON export: `{digest}`",
+        "notCertified": "Polaris is not certified against SOC 2 or ISO 27001. Certification is an audit of the organization that runs it; this report is evidence of how this instance was configured at the moment above.",
+        "attentionMeans": "Items marked (attention) are protections that are off or checks that did not pass.",
+        "outsideTitle": "## Outside what Polaris can see",
+        "checkingTitle": "## Checking a copy",
+        "checking": "The SHA-256 of an unchanged JSON export equals the value above. The same value is recorded, with who exported it and when, in the audit trail entry `evidence.export`."
+    }
+}

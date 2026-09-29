@@ -9,10 +9,42 @@
  * Pure.
  */
 
-import * as core from "@polaris/core";
-import { resourceKindLabel } from "@/lib/backups/kinds";
-import { BACKUP_EVERY_OPTIONS } from "@/lib/backups/policy";
+import type * as core from "@polaris/core";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import { everyLabel, kindLabel } from "@/lib/backups/words";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import type { BackupReading, EvidenceReadings, EvidenceSection } from "@/lib/compliance/evidence";
+
+/** The words a report is written in: the `compliance` catalog, and the backups
+ *  one for what a backup plan and a kind of item are called. */
+export interface EvidenceWords {
+    readonly t: NamespaceTranslator<"compliance">;
+    readonly backups: NamespaceTranslator<"backups">;
+}
+
+/** English, for a report nobody in particular asked for - and for the tests that
+ *  hold the builders to what they said before they had a catalog. */
+export function evidenceWordsIn(locale: core.Locale = DEFAULT_LOCALE): EvidenceWords {
+    return { t: translatorFor(locale, "compliance"), backups: translatorFor(locale, "backups") };
+}
+
+type Noun =
+    | "account"
+    | "activeAccount"
+    | "character"
+    | "session"
+    | "entry"
+    | "item"
+    | "itemWithCopy"
+    | "key"
+    | "domainInUse"
+    | "scope"
+    | "configuredScope"
+    | "service"
+    | "day"
+    | "hour"
+    | "minute";
 
 /** A managed certificate this close to expiring is worth a second look. */
 const EXPIRING_SOON_DAYS = 14;
@@ -21,167 +53,185 @@ const EXPIRING_SOON_DAYS = 14;
 type SectionDraft = Omit<EvidenceSection, "lastChange">;
 
 /** "1 account", "3 accounts". */
-function count(value: number, singular: string, plural = `${singular}s`): string {
-    return `${value} ${value === 1 ? singular : plural}`;
+function count(t: EvidenceWords["t"], value: number, noun: Noun): string {
+    // The figure as written rather than grouped, so a report reads "5000 entries"
+    // in every language, the way it always has.
+    return t(`nouns.${noun}`, { count: value, n: String(value) });
 }
 
 /** "3 of 12 accounts". */
-function share(part: number, whole: number, noun: string, plural?: string): string {
-    return `${part} of ${count(whole, noun, plural)}`;
+function share(t: EvidenceWords["t"], part: number, whole: number, noun: Noun): string {
+    return t("share", { part: String(part), whole: count(t, whole, noun) });
 }
 
 /** A length of time in the largest whole unit it fills. */
-function duration(seconds: number): string {
-    if (seconds % 86_400 === 0) return count(seconds / 86_400, "day");
-    if (seconds % 3_600 === 0) return count(seconds / 3_600, "hour");
-    return count(Math.round(seconds / 60), "minute");
+function duration(t: EvidenceWords["t"], seconds: number): string {
+    if (seconds % 86_400 === 0) return count(t, seconds / 86_400, "day");
+    if (seconds % 3_600 === 0) return count(t, seconds / 3_600, "hour");
+    return count(t, Math.round(seconds / 60), "minute");
 }
 
 /** "once a day", "once every 6 hours". */
-function frequency(seconds: number): string {
-    if (seconds === 86_400) return "once a day";
-    if (seconds === 3_600) return "once an hour";
-    return `once every ${duration(seconds)}`;
+function frequency(t: EvidenceWords["t"], seconds: number): string {
+    if (seconds === 86_400) return t("frequency.day");
+    if (seconds === 3_600) return t("frequency.hour");
+    return t("frequency.every", { duration: duration(t, seconds) });
 }
 
-function yesNo(value: boolean): string {
-    return value ? "Yes" : "No";
+function yesNo(t: EvidenceWords["t"], value: boolean): string {
+    return value ? t("yes") : t("no");
 }
 
-function authentication(readings: EvidenceReadings): SectionDraft {
+/** A second factor, as the security settings name it. */
+function factorLabel(t: EvidenceWords["t"], factor: string): string {
+    return t.has(`factors.${factor}`) ? t(`factors.${factor}` as NamespaceKey<"compliance">) : factor;
+}
+
+/** A retention period, as the records settings name it. */
+function retentionLabel(t: EvidenceWords["t"], days: number): string {
+    return t.has(`retention.d${days}`) ? t(`retention.d${days}` as NamespaceKey<"compliance">) : String(days);
+}
+
+function authentication(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const { policy, mailReady, accounts, withSecondFactor, withPasskey, minPasswordLength } = readings.authentication;
-    const accepted = policy.acceptedFactors.map((factor) => core.SECOND_FACTOR_ENROLLMENT_INFO[factor].label);
+    const accepted = policy.acceptedFactors.map((factor) => factorLabel(t, factor));
     return {
         id: "authentication",
-        title: "Sign-in and second factor",
+        title: t("sections.authentication.title"),
         where: [
-            { label: "Management > Security", href: "/admin/security" },
-            { label: "Management > Email", href: "/admin/email" }
+            { label: t("where.security"), href: "/admin/security" },
+            { label: t("where.email"), href: "/admin/email" }
         ],
         facts: [
             {
                 id: "second-factor.required",
-                label: "Second factor",
+                label: t("facts.secondFactor"),
                 value: policy.requireSecondFactor,
-                text: policy.requireSecondFactor ? "Required of every account" : "Not required",
+                text: policy.requireSecondFactor ? t("facts.requiredOfEvery") : t("facts.notRequired"),
                 attention: !policy.requireSecondFactor
             },
             {
                 id: "second-factor.accepted",
-                label: "Factors that count",
+                label: t("facts.factorsThatCount"),
                 value: policy.acceptedFactors.join(","),
                 text: accepted.join(", ")
             },
             {
                 id: "second-factor.connected-sign-in",
-                label: "After a GitHub or Google sign-in",
+                label: t("facts.afterConnected"),
                 value: policy.challengeConnectionSignIn,
-                text: policy.challengeConnectionSignIn
-                    ? "The second factor is asked for too"
-                    : "The account's own sign-in stands for both steps"
+                text: policy.challengeConnectionSignIn ? t("facts.askedToo") : t("facts.standsForBoth")
             },
             {
                 id: "accounts.second-factor",
-                label: "Accounts with a second factor",
+                label: t("facts.withSecondFactor"),
                 value: withSecondFactor,
-                text: share(withSecondFactor, accounts, "active account"),
+                text: share(t, withSecondFactor, accounts, "activeAccount"),
                 attention: withSecondFactor < accounts
             },
             {
                 id: "accounts.passkey",
-                label: "Accounts with a passkey",
+                label: t("facts.withPasskey"),
                 value: withPasskey,
-                text: share(withPasskey, accounts, "active account")
+                text: share(t, withPasskey, accounts, "activeAccount")
             },
             {
                 id: "password.min-length",
-                label: "Shortest password allowed",
+                label: t("facts.shortestPassword"),
                 value: minPasswordLength,
-                text: count(minPasswordLength, "character")
+                text: count(t, minPasswordLength, "character")
             }
         ],
         notes:
             policy.acceptedFactors.includes("email") && !mailReady
-                ? ["Email codes are accepted, but no email channel is set, so only the authenticator can be armed."]
+                ? [t("notes.noEmailChannel")]
                 : []
     };
 }
 
-function sessions(readings: EvidenceReadings): SectionDraft {
+function sessions(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const s = readings.sessions;
     return {
         id: "sessions",
-        title: "Sessions",
-        where: [{ label: "My account > Security", href: "/account/security" }],
+        title: t("sections.sessions.title"),
+        where: [{ label: t("where.accountSecurity"), href: "/account/security" }],
         facts: [
             {
                 id: "session.lifetime",
-                label: "Session lifetime",
+                label: t("facts.sessionLifetime"),
                 value: s.maxAgeSeconds,
-                text: `${duration(s.maxAgeSeconds)}, renewed at most ${frequency(s.updateAgeSeconds)}`
+                text: t("facts.lifetimeText", {
+                    duration: duration(t, s.maxAgeSeconds),
+                    frequency: frequency(t, s.updateAgeSeconds)
+                })
             },
             {
                 id: "session.shorter-lifetime",
-                label: "Accounts that sign out sooner",
+                label: t("facts.signOutSooner"),
                 value: s.shorterLifetime,
-                text: share(s.shorterLifetime, s.accounts, "account")
+                text: share(t, s.shorterLifetime, s.accounts, "account")
             },
             {
                 id: "session.idle-lock",
-                label: "Accounts that lock when idle",
+                label: t("facts.lockWhenIdle"),
                 value: s.idleLock,
-                text: share(s.idleLock, s.accounts, "account")
+                text: share(t, s.idleLock, s.accounts, "account")
             },
             {
                 id: "session.client-binding",
-                label: "Sessions tied to the browser and system that opened them",
+                label: t("facts.clientBound"),
                 value: s.accounts - s.clientBindingOff,
-                text: share(s.accounts - s.clientBindingOff, s.accounts, "account")
+                text: share(t, s.accounts - s.clientBindingOff, s.accounts, "account")
             },
             {
                 id: "session.address-binding",
-                label: "Sessions tied to the address that opened them",
+                label: t("facts.addressBound"),
                 value: s.addressPinned,
-                text: share(s.addressPinned, s.accounts, "account")
+                text: share(t, s.addressPinned, s.accounts, "account")
             },
             {
                 id: "session.login-approval",
-                label: "New sign-ins approved from an open session",
+                label: t("facts.loginApproval"),
                 value: s.loginApproval,
-                text: share(s.loginApproval, s.accounts, "account")
+                text: share(t, s.loginApproval, s.accounts, "account")
             },
             {
                 id: "session.open",
-                label: "Open sessions",
+                label: t("facts.openSessions"),
                 value: s.open,
-                text: count(s.open, "session")
+                text: count(t, s.open, "session")
             }
         ],
         notes: [
-            "The lifetime and its renewal are fixed in Polaris. The rest is set by each account for itself; there is no instance-wide switch."
+            t("notes.sessionsFixed")
         ]
     };
 }
 
-function administrators(readings: EvidenceReadings): SectionDraft {
+function administrators(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const admins = readings.administrators;
     const without = admins.filter((admin) => !admin.secondFactor).length;
     return {
         id: "administrators",
-        title: "Administrators",
-        where: [{ label: "Management > Users", href: "/admin/users" }],
+        title: t("sections.administrators.title"),
+        where: [{ label: t("where.users"), href: "/admin/users" }],
         facts: [
-            { id: "admins.count", label: "Administrators", value: admins.length, text: count(admins.length, "account") },
+            {
+                id: "admins.count",
+                label: t("sections.administrators.title"),
+                value: admins.length,
+                text: count(t, admins.length, "account")
+            },
             {
                 id: "admins.without-second-factor",
-                label: "Administrators without a second factor",
+                label: t("facts.adminsWithout"),
                 value: without,
                 text: String(without),
                 attention: without > 0
             }
         ],
         rows: {
-            title: "Administrators",
+            title: t("sections.administrators.title"),
             total: admins.length,
             items: admins.map((admin) => ({
                 id: admin.id,
@@ -190,76 +240,76 @@ function administrators(readings: EvidenceReadings): SectionDraft {
                 facts: [
                     {
                         id: "second-factor",
-                        label: "Second factor",
+                        label: t("facts.secondFactor"),
                         value: admin.secondFactor,
-                        text: yesNo(admin.secondFactor),
+                        text: yesNo(t, admin.secondFactor),
                         attention: !admin.secondFactor
                     }
                 ]
             }))
         },
-        notes: ["The first administrator, made during setup, has no entry in the audit trail."]
+        notes: [t("notes.firstAdmin")]
     };
 }
 
-function audit(readings: EvidenceReadings): SectionDraft {
+function audit(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const a = readings.audit;
     const last = a.lastVerification;
     const result = !last
-        ? "Not checked yet"
+        ? t("facts.notCheckedYet")
         : last.broken
-          ? `${core.AUDIT_CHAIN_BREAK_LABELS[last.broken.reason]} (entry ${last.broken.seq})`
-          : `Intact across ${count(last.checked, "entry", "entries")}`;
+          ? t("facts.broken", { reason: t(`chainBreak.${last.broken.reason}`), seq: String(last.broken.seq) })
+          : t("facts.intact", { entries: count(t, last.checked, "entry") });
     return {
         id: "audit",
-        title: "Audit trail",
+        title: t("sections.audit.title"),
         where: [
-            { label: "Management > Activity", href: "/admin/activity" },
-            { label: "Management > Keeping records", href: "/admin/retention" }
+            { label: t("where.activity"), href: "/admin/activity" },
+            { label: t("where.retention"), href: "/admin/retention" }
         ],
         facts: [
             {
                 id: "audit.retention-days",
-                label: "Audit log kept for",
+                label: t("facts.auditKept"),
                 value: a.retention.audit,
-                text: core.RETENTION_LABELS[a.retention.audit as core.RetentionDays]
+                text: retentionLabel(t, a.retention.audit)
             },
             {
                 id: "activity.retention-days",
-                label: "Activity kept for",
+                label: t("facts.activityKept"),
                 value: a.retention.activity,
-                text: core.RETENTION_LABELS[a.retention.activity as core.RetentionDays]
+                text: retentionLabel(t, a.retention.activity)
             },
             {
                 id: "audit.sealed",
-                label: "Entries sealed into the chain",
+                label: t("facts.sealed"),
                 value: a.sealed,
-                text: a.pending > 0 ? `${a.sealed}, with ${a.pending} waiting to be sealed` : String(a.sealed)
+                text: a.pending > 0 ? t("facts.sealedPending", { sealed: String(a.sealed), pending: String(a.pending) }) : String(a.sealed)
             },
             {
                 id: "audit.last-check",
-                label: "Last integrity check",
+                label: t("facts.lastCheck"),
                 value: last?.at ?? null,
-                text: "Not checked yet",
+                text: t("facts.notCheckedYet"),
                 date: true,
                 attention: !last
             },
             {
                 id: "audit.last-check-result",
-                label: "What it found",
+                label: t("facts.whatItFound"),
                 value: last ? last.ok : null,
                 text: result,
                 attention: last ? !last.ok : false
             },
             {
                 id: "audit.head",
-                label: "Chain head",
+                label: t("facts.chainHead"),
                 value: a.head ? `${a.head.seq} ${a.head.hash}` : null,
-                text: a.head ? `#${a.head.seq} ${a.head.hash}` : "Nothing sealed yet"
+                text: a.head ? `#${a.head.seq} ${a.head.hash}` : t("facts.nothingSealed")
             }
         ],
         notes: [
-            "The chain shows an entry edited or removed after it was sealed. Removing the newest entries is caught only against a copy of the head kept outside Polaris."
+            t("notes.chain")
         ]
     };
 }
@@ -270,84 +320,95 @@ function isScheduled(item: BackupReading): boolean {
 }
 
 /** "Every day", "Paused", "On demand only". */
-function scheduleText(item: BackupReading): string {
-    if (item.status === "paused") return "Paused";
-    if (item.status === "missing") return "Source gone";
-    if (!isScheduled(item)) return "On demand only";
-    return BACKUP_EVERY_OPTIONS.find((option) => option.value === item.every)?.label ?? String(item.every);
+function scheduleText(t: EvidenceWords["t"], tb: EvidenceWords["backups"], item: BackupReading): string {
+    if (item.status === "paused") return t("backups.paused");
+    if (item.status === "missing") return t("backups.sourceGone");
+    if (!isScheduled(item)) return t("backups.onDemand");
+    return everyLabel(tb, String(item.every));
 }
 
 /** Whether the newest copy of an item is encrypted everywhere it is stored. */
-function encryptionOf(item: BackupReading): { value: string; text: string; attention: boolean } {
-    if (item.sealed + item.clear === 0) return { value: "none", text: "No copy yet", attention: false };
-    if (item.clear === 0) return { value: "all", text: "Yes", attention: false };
-    if (item.sealed === 0) return { value: "no", text: "No", attention: true };
-    return { value: "some", text: "Partly", attention: true };
+function encryptionOf(
+    t: EvidenceWords["t"],
+    item: BackupReading
+): { value: string; text: string; attention: boolean } {
+    if (item.sealed + item.clear === 0) return { value: "none", text: t("backups.noCopy"), attention: false };
+    if (item.clear === 0) return { value: "all", text: t("yes"), attention: false };
+    if (item.sealed === 0) return { value: "no", text: t("no"), attention: true };
+    return { value: "some", text: t("backups.partly"), attention: true };
 }
 
-const LAST_RESULT_TEXT: Readonly<Record<string, string>> = { ok: "OK", partial: "Partial", failed: "Failed" };
+/** How the last run went, as a word; a status this build does not know is said as stored. */
+function lastResultText(t: EvidenceWords["t"], status: string): string {
+    return status === "ok" || status === "partial" || status === "failed" ? t(`backups.result.${status}`) : status;
+}
 
-function backups(readings: EvidenceReadings): SectionDraft {
+function backups(readings: EvidenceReadings, { t, backups: tb }: EvidenceWords): SectionDraft {
     const b = readings.backups;
     return {
         id: "backups",
-        title: "Backups",
-        where: [{ label: "Backups", href: "/apps/backups" }],
+        title: t("sections.backups.title"),
+        where: [{ label: t("sections.backups.title"), href: "/apps/backups" }],
         facts: [
-            { id: "backups.protected", label: "Protected items", value: b.total, text: String(b.total) },
+            { id: "backups.protected", label: t("facts.protectedItems"), value: b.total, text: String(b.total) },
             {
                 id: "backups.scheduled",
-                label: "On a schedule",
+                label: t("facts.onSchedule"),
                 value: b.scheduled,
-                text: share(b.scheduled, b.total, "item")
+                text: share(t, b.scheduled, b.total, "item")
             },
             {
                 id: "backups.encrypted",
-                label: "Newest copy encrypted everywhere it is kept",
+                label: t("facts.newestEncrypted"),
                 value: b.encrypted,
-                text: share(b.encrypted, b.withCopy, "item with a copy", "items with a copy"),
+                text: share(t, b.encrypted, b.withCopy, "itemWithCopy"),
                 attention: b.encrypted < b.withCopy
             },
             {
                 id: "backups.failing",
-                label: "Last run failed",
+                label: t("facts.lastRunFailed"),
                 value: b.failing,
-                text: count(b.failing, "item"),
+                text: count(t, b.failing, "item"),
                 attention: b.failing > 0
             },
             {
                 id: "backups.keys",
-                label: "Backup keys in use",
+                label: t("facts.keysInUse"),
                 value: b.activeKeys,
-                text: count(b.activeKeys, "key")
+                text: count(t, b.activeKeys, "key")
             }
         ],
         rows: {
-            title: "Protected items",
+            title: t("facts.protectedItems"),
             total: b.total,
             items: b.items.map((item) => {
-                const encryption = encryptionOf(item);
+                const encryption = encryptionOf(t, item);
                 return {
                     id: item.id,
                     label: item.name,
                     href: `/apps/backups/${item.id}`,
                     facts: [
-                        { id: "kind", label: "Kind", value: item.kind, text: resourceKindLabel(item.kind) },
-                        { id: "schedule", label: "Schedule", value: item.every ?? "off", text: scheduleText(item) },
-                        { id: "encrypted", label: "Encrypted", ...encryption },
+                        { id: "kind", label: t("facts.kind"), value: item.kind, text: kindLabel(tb, item.kind) },
+                        {
+                            id: "schedule",
+                            label: t("facts.schedule"),
+                            value: item.every ?? "off",
+                            text: scheduleText(t, tb, item)
+                        },
+                        { id: "encrypted", label: t("facts.encrypted"), ...encryption },
                         {
                             id: "last-success",
-                            label: "Last good copy",
+                            label: t("facts.lastGoodCopy"),
                             value: item.lastSuccessAt,
-                            text: "Never",
+                            text: t("facts.never"),
                             date: true,
                             attention: item.lastSuccessAt === null
                         },
                         {
                             id: "last-result",
-                            label: "Last run",
+                            label: t("facts.lastRun"),
                             value: item.lastStatus,
-                            text: item.lastStatus ? (LAST_RESULT_TEXT[item.lastStatus] ?? item.lastStatus) : "Not run yet",
+                            text: item.lastStatus ? lastResultText(t, item.lastStatus) : t("facts.notRunYet"),
                             attention: item.lastStatus === "failed" || item.lastStatus === "partial"
                         }
                     ]
@@ -355,119 +416,115 @@ function backups(readings: EvidenceReadings): SectionDraft {
             })
         },
         notes: [
-            "A copy kept on the disk of the thing it protects is written unencrypted by design; every copy that leaves it is encrypted.",
-            ...(b.total > b.items.length
-                ? [
-                      `The list shows the ${b.items.length} most recently backed-up items of ${b.total}; the figures above count them all.`
-                  ]
-                : [])
+            t("notes.localUnencrypted"),
+            ...(b.total > b.items.length ? [t("notes.listShows", { shown: String(b.items.length), total: String(b.total) })] : [])
         ]
     };
 }
 
-function secrets(readings: EvidenceReadings): SectionDraft {
+function secrets(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const s = readings.secrets;
     return {
         id: "secrets",
-        title: "Secrets",
+        title: t("sections.secrets.title"),
         where: [
-            { label: "Service > Variables", href: "/apps/deploy" },
-            { label: "Runners > Secrets", href: "/apps/runners/secrets" }
+            { label: t("where.serviceVariables"), href: "/apps/deploy" },
+            { label: t("where.runnerSecrets"), href: "/apps/runners/secrets" }
         ],
         facts: [
             {
                 id: "secrets.encrypted",
-                label: "Secret variables encrypted at rest",
+                label: t("facts.secretEncrypted"),
                 value: s.secretEncrypted,
                 text: String(s.secretEncrypted)
             },
             {
                 id: "secrets.clear",
-                label: "Secret variables stored unencrypted",
+                label: t("facts.secretClear"),
                 value: s.secretClear,
                 text: String(s.secretClear),
                 attention: s.secretClear > 0
             },
             {
                 id: "variables.plain",
-                label: "Variables not marked secret",
+                label: t("facts.plainVariables"),
                 value: s.plainVariables,
-                text: `${s.plainVariables}, stored as written`
+                text: t("facts.storedAsWritten", { count: String(s.plainVariables) })
             },
             {
                 id: "runner-secrets.encrypted",
-                label: "Runner secrets",
+                label: t("facts.runnerSecrets"),
                 value: s.runnerSecrets,
-                text: `${s.runnerSecrets}, all encrypted at rest`
+                text: t("facts.allEncrypted", { count: String(s.runnerSecrets) })
             }
         ],
-        notes: ["Encrypted under the instance's master key, which is not stored in the database."]
+        notes: [t("notes.masterKey")]
     };
 }
 
-function tls(readings: EvidenceReadings): SectionDraft {
-    const t = readings.tls;
+function tls(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
+    const tl = readings.tls;
     const soon = readings.now.getTime() + EXPIRING_SOON_DAYS * 86_400_000;
-    const expiring = t.managed.expiries.filter((at) => new Date(at).getTime() < soon).length;
-    const withCertificate = t.letsEncrypt + t.internalCa;
+    const expiring = tl.managed.expiries.filter((at) => new Date(at).getTime() < soon).length;
+    const withCertificate = tl.letsEncrypt + tl.internalCa;
     return {
         id: "tls",
-        title: "TLS on domains",
+        title: t("sections.tls.title"),
         where: [
-            { label: "Service > Settings", href: "/apps/deploy" },
-            { label: "My account > Domains", href: "/account/domains" }
+            { label: t("where.serviceSettings"), href: "/apps/deploy" },
+            { label: t("where.accountDomains"), href: "/account/domains" }
         ],
         facts: [
             {
                 id: "tls.with-certificate",
-                label: "Service domains served over HTTPS",
+                label: t("facts.overHttps"),
                 value: withCertificate,
-                text: share(withCertificate, t.domains, "domain in use", "domains in use")
+                text: share(t, withCertificate, tl.domains, "domainInUse")
             },
             {
                 id: "tls.lets-encrypt",
-                label: "With a Let's Encrypt certificate",
-                value: t.letsEncrypt,
-                text: String(t.letsEncrypt)
+                label: t("facts.letsEncrypt"),
+                value: tl.letsEncrypt,
+                text: String(tl.letsEncrypt)
             },
             {
                 id: "tls.internal-ca",
-                label: "With a certificate from this instance's own authority",
-                value: t.internalCa,
-                text: String(t.internalCa)
+                label: t("facts.internalCa"),
+                value: tl.internalCa,
+                text: String(tl.internalCa)
             },
             {
                 id: "tls.uploaded",
-                label: "With a certificate you supplied",
-                value: t.uploaded,
-                text: String(t.uploaded)
+                label: t("facts.uploaded"),
+                value: tl.uploaded,
+                text: String(tl.uploaded)
             },
             {
                 id: "tls.plain-http",
-                label: "Served over plain HTTP",
-                value: t.plainHttp,
-                text: String(t.plainHttp),
-                attention: t.plainHttp > 0
+                label: t("facts.plainHttp"),
+                value: tl.plainHttp,
+                text: String(tl.plainHttp),
+                attention: tl.plainHttp > 0
             },
             {
                 id: "tls.managed-issued",
-                label: "Certificates for your own domains",
-                value: t.managed.issued,
+                label: t("facts.ownDomains"),
+                value: tl.managed.issued,
                 text:
-                    t.managed.pending > 0
-                        ? `${t.managed.issued} issued, ${t.managed.pending} waiting`
-                        : `${t.managed.issued} issued`
+                    tl.managed.pending > 0
+                        ? t("facts.issuedWaiting", { issued: String(tl.managed.issued), pending: String(tl.managed.pending) })
+                        : t("facts.issued", { issued: String(tl.managed.issued) })
             },
             {
                 id: "tls.managed-failed",
-                label: "Certificates that could not be issued",
-                value: t.managed.failed,
-                text: String(t.managed.failed),
-                attention: t.managed.failed > 0
+                label: t("facts.notIssued"),
+                value: tl.managed.failed,
+                text: String(tl.managed.failed),
+                attention: tl.managed.failed > 0
             },
             {
                 id: "tls.managed-expiring",
-                label: `Expiring within ${EXPIRING_SOON_DAYS} days`,
+                label: t("facts.expiringWithin", { days: EXPIRING_SOON_DAYS }),
                 value: expiring,
                 text: String(expiring),
                 attention: expiring > 0
@@ -477,59 +534,62 @@ function tls(readings: EvidenceReadings): SectionDraft {
     };
 }
 
-function firewall(readings: EvidenceReadings): SectionDraft {
+function firewall(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const f = readings.firewall;
     return {
         id: "firewall",
-        title: "Firewall",
-        where: [{ label: "Firewall", href: "/apps/firewall" }],
+        title: t("sections.firewall.title"),
+        where: [{ label: t("sections.firewall.title"), href: "/apps/firewall" }],
         facts: [
             {
                 id: "firewall.instance-packs",
-                label: "Rule packs on every service",
+                label: t("facts.packsEveryService"),
                 value: f.instancePacks,
-                text: f.instanceDefaults ? `${f.instancePacks}, the defaults` : String(f.instancePacks)
+                text: f.instanceDefaults ? t("facts.theDefaults", { count: String(f.instancePacks) }) : String(f.instancePacks)
             },
             {
                 id: "firewall.polaris-packs",
-                label: "Rule packs in front of Polaris itself",
+                label: t("facts.packsPolaris"),
                 value: f.polarisPacks,
-                text: f.polarisDefaults ? `${f.polarisPacks}, the defaults` : String(f.polarisPacks)
+                text: f.polarisDefaults ? t("facts.theDefaults", { count: String(f.polarisPacks) }) : String(f.polarisPacks)
             },
             {
                 id: "firewall.injection-off",
-                label: "SQL injection and cross-site scripting checks",
+                label: t("facts.injectionChecks"),
                 value: f.injectionOffScopes,
-                text: f.injectionOffScopes === 0 ? "On everywhere" : `Off in ${count(f.injectionOffScopes, "scope")}`,
+                text:
+                    f.injectionOffScopes === 0
+                        ? t("facts.onEverywhere")
+                        : t("facts.offIn", { scopes: count(t, f.injectionOffScopes, "scope") }),
                 attention: f.injectionOffScopes > 0
             },
             {
                 id: "firewall.custom-rules",
-                label: "Custom rules",
+                label: t("facts.customRules"),
                 value: f.customRules,
-                text: `${f.customRules} across ${count(f.scopes, "configured scope")}`
+                text: t("facts.across", { rules: String(f.customRules), scopes: count(t, f.scopes, "configuredScope") })
             },
             {
                 id: "firewall.deny",
-                label: "Addresses and ranges refused",
+                label: t("facts.refused"),
                 value: f.denyEntries,
                 text: String(f.denyEntries)
             },
             {
                 id: "firewall.allow-scopes",
-                label: "Scopes that admit listed addresses only",
+                label: t("facts.allowOnly"),
                 value: f.allowScopes,
                 text: String(f.allowScopes)
             },
             {
                 id: "firewall.login-scopes",
-                label: "Scopes that require a Polaris sign-in",
+                label: t("facts.requireSignIn"),
                 value: f.loginScopes,
                 text: String(f.loginScopes)
             },
             {
                 id: "firewall.bans",
-                label: "Addresses banned now",
+                label: t("facts.bannedNow"),
                 value: f.activeBans,
                 text: String(f.activeBans)
             }
@@ -538,67 +598,67 @@ function firewall(readings: EvidenceReadings): SectionDraft {
     };
 }
 
-function rateLimits(readings: EvidenceReadings): SectionDraft {
+function rateLimits(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const e = readings.edge;
     return {
         id: "rate-limits",
-        title: "Rate limits",
-        where: [{ label: "Service > Settings > Traffic protection", href: "/apps/deploy" }],
+        title: t("sections.rateLimits.title"),
+        where: [{ label: t("where.trafficProtection"), href: "/apps/deploy" }],
         facts: [
             {
                 id: "rate.services",
-                label: "Services with a rate limit",
+                label: t("facts.withRateLimit"),
                 value: e.rateLimited,
-                text: share(e.rateLimited, e.services, "service")
+                text: share(t, e.rateLimited, e.services, "service")
             },
-            { id: "rate.rules", label: "Rate limits in force", value: e.rateRules, text: String(e.rateRules) },
+            { id: "rate.rules", label: t("facts.rateInForce"), value: e.rateRules, text: String(e.rateRules) },
             {
                 id: "rate.concurrency",
-                label: "Services with a cap on requests at once",
+                label: t("facts.concurrencyCap"),
                 value: e.concurrencyCapped,
-                text: share(e.concurrencyCapped, e.services, "service")
+                text: share(t, e.concurrencyCapped, e.services, "service")
             },
             {
                 id: "rate.challenge",
-                label: "Services that challenge visitors",
+                label: t("facts.challenge"),
                 value: e.challenged,
-                text: share(e.challenged, e.services, "service")
+                text: share(t, e.challenged, e.services, "service")
             }
         ],
-        notes: ["The limits Polaris puts on its own codes and link passwords are built in, not settings, and are not counted here."]
+        notes: [t("notes.builtInLimits")]
     };
 }
 
-function headers(readings: EvidenceReadings): SectionDraft {
+function headers(readings: EvidenceReadings, { t }: EvidenceWords): SectionDraft {
     const e = readings.edge;
     return {
         id: "headers",
-        title: "Security headers",
-        where: [{ label: "Service > Settings > Security headers", href: "/apps/deploy" }],
+        title: t("sections.headers.title"),
+        where: [{ label: t("where.securityHeaders"), href: "/apps/deploy" }],
         facts: [
             {
                 id: "headers.strict",
-                label: "Services on the strict preset",
+                label: t("facts.strictPreset"),
                 value: e.headers.strict,
-                text: share(e.headers.strict, e.services, "service")
+                text: share(t, e.headers.strict, e.services, "service")
             },
             {
                 id: "headers.recommended",
-                label: "Services on the recommended preset",
+                label: t("facts.recommendedPreset"),
                 value: e.headers.recommended,
-                text: share(e.headers.recommended, e.services, "service")
+                text: share(t, e.headers.recommended, e.services, "service")
             },
             {
                 id: "headers.off",
-                label: "Services with no preset",
+                label: t("facts.noPreset"),
                 value: e.headers.off,
-                text: share(e.headers.off, e.services, "service")
+                text: share(t, e.headers.off, e.services, "service")
             },
             {
                 id: "headers.custom",
-                label: "Services sending headers of their own",
+                label: t("facts.ownHeaders"),
                 value: e.customHeaders,
-                text: share(e.customHeaders, e.services, "service")
+                text: share(t, e.customHeaders, e.services, "service")
             }
         ],
         notes: []
@@ -606,7 +666,7 @@ function headers(readings: EvidenceReadings): SectionDraft {
 }
 
 /** Every area, in the order the report presents them. */
-export const EVIDENCE_SECTIONS: readonly ((readings: EvidenceReadings) => SectionDraft)[] = [
+export const EVIDENCE_SECTIONS: readonly ((readings: EvidenceReadings, words: EvidenceWords) => SectionDraft)[] = [
     authentication,
     sessions,
     administrators,

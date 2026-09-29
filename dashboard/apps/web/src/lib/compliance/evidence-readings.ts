@@ -25,6 +25,7 @@ import { retentionPolicy } from "@/lib/retention-service";
 import { isSealedCopy } from "@/lib/backups/sealed-copies";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { MIN_PASSWORD_LENGTH, SESSION_MAX_AGE, SESSION_UPDATE_AGE } from "@polaris/auth";
+import type { EvidenceWords } from "@/lib/compliance/evidence-sections";
 
 /** What a person is called in the report: the name they chose, or their handle. */
 function displayName(user: { name: string; username: string | null; email: string }): string {
@@ -342,7 +343,11 @@ async function readChanges(): Promise<evidence.EvidenceReadings["changes"]> {
 }
 
 /** Everything the evidence reports, read now. */
-export async function readEvidence(now: Date = new Date()): Promise<evidence.EvidenceReport> {
+export async function readEvidence(
+    now: Date = new Date(),
+    /** The reader's words; English when none are handed in. */
+    words?: EvidenceWords
+): Promise<evidence.EvidenceReport> {
     const env = loadEnv();
     const [url, authentication, sessions, administrators, audit] = await Promise.all([
         appBaseUrl(),
@@ -359,18 +364,21 @@ export async function readEvidence(now: Date = new Date()): Promise<evidence.Evi
         readEdge(),
         readChanges()
     ]);
-    return evidence.buildEvidence({
-        now,
-        instance: { url, build: env.POLARIS_BUILD_SHA ? env.POLARIS_BUILD_SHA.slice(0, 12) : null },
-        authentication,
-        sessions,
-        administrators,
-        audit,
-        backups,
-        secrets,
-        tls,
-        firewall,
-        edge,
-        changes
-    });
+    return evidence.buildEvidence(
+        {
+            now,
+            instance: { url, build: env.POLARIS_BUILD_SHA ? env.POLARIS_BUILD_SHA.slice(0, 12) : null },
+            authentication,
+            sessions,
+            administrators,
+            audit,
+            backups,
+            secrets,
+            tls,
+            firewall,
+            edge,
+            changes
+        },
+        words
+    );
 }

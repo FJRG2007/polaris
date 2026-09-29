@@ -18,7 +18,10 @@ export async function GET(): Promise<Response> {
     const user = await apiAdmin();
     if (user instanceof Response) return user;
     try {
-        return NextResponse.json(await readEvidence(), { headers: { "cache-control": "private, no-store" } });
+        const words = { t: await readerWords("compliance"), backups: await readerWords("backups") };
+        return NextResponse.json(await readEvidence(new Date(), words), {
+            headers: { "cache-control": "private, no-store" }
+        });
     } catch (caught) {
         console.error("polaris: the compliance evidence could not be read:", caught);
         return NextResponse.json({ error: (await readerWords("api"))("errors.evidenceReadFailed") }, { status: 500 });

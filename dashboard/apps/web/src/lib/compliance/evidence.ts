@@ -23,7 +23,7 @@
  */
 
 import type * as core from "@polaris/core";
-import { EVIDENCE_SECTIONS } from "@/lib/compliance/evidence-sections";
+import { EVIDENCE_SECTIONS, evidenceWordsIn, type EvidenceWords } from "@/lib/compliance/evidence-sections";
 
 /** Written into every export, so a reader of the file knows which shape it has. */
 export const EVIDENCE_FORMAT = "polaris-evidence/1";
@@ -289,7 +289,8 @@ export function factText(fact: EvidenceFact, formatDate: (iso: string) => string
     return fact.date && typeof fact.value === "string" ? formatDate(fact.value) : fact.text;
 }
 
-/** What Polaris cannot see from where it runs, said once rather than guessed at. */
+/** What Polaris cannot see from where it runs, said once rather than guessed at.
+ *  In English; the report says it in its reader's words (`outsidePolaris`). */
 export const OUTSIDE_POLARIS: readonly string[] = [
     "Whether the disks of the machines Polaris runs on are encrypted.",
     "Where copies of the master key, the backup recovery keys and the audit chain head are kept outside this instance.",
@@ -297,16 +298,22 @@ export const OUTSIDE_POLARIS: readonly string[] = [
     "The organization's own processes: access reviews, joiners and leavers, training, vendor management, incident response and physical security."
 ];
 
-/** The whole report, from one set of readings. */
-export function buildEvidence(readings: EvidenceReadings): EvidenceReport {
+/** The same four lines in a reader's words. */
+export function outsidePolaris(t: EvidenceWords["t"]): readonly string[] {
+    return [t("outside.disks"), t("outside.copies"), t("outside.older"), t("outside.processes")];
+}
+
+/** The whole report, from one set of readings, in the words it is handed -
+ *  English when it is handed none. */
+export function buildEvidence(readings: EvidenceReadings, words: EvidenceWords = evidenceWordsIn()): EvidenceReport {
     return {
         format: EVIDENCE_FORMAT,
         generatedAt: readings.now.toISOString(),
         instance: readings.instance,
         sections: EVIDENCE_SECTIONS.map((section) => {
-            const built = section(readings);
+            const built = section(readings, words);
             return { ...built, lastChange: readings.changes[built.id] };
         }),
-        outsidePolaris: OUTSIDE_POLARIS
+        outsidePolaris: outsidePolaris(words.t)
     };
 }

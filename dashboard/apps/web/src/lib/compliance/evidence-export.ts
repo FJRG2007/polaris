@@ -12,6 +12,9 @@
 
 import { createHash } from "node:crypto";
 import { factText, type EvidenceReport, type EvidenceSection } from "@/lib/compliance/evidence";
+import { evidenceWordsIn, type EvidenceWords } from "@/lib/compliance/evidence-sections";
+
+type Words = EvidenceWords["t"];
 
 /**
  * The JSON export, byte for byte.
@@ -49,12 +52,17 @@ function cell(value: string): string {
     return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
 }
 
-function sectionMarkdown(section: EvidenceSection): string[] {
+function sectionMarkdown(section: EvidenceSection, t: Words): string[] {
     const lines = [`## ${section.title}`, ""];
-    lines.push(`Configured in: ${section.where.map((where) => `${where.label} (\`${where.href}\`)`).join("; ")}`, "");
-    lines.push("| Control | Value |", "| --- | --- |");
+    lines.push(
+        t("export.configuredIn", {
+            where: section.where.map((where) => `${where.label} (\`${where.href}\`)`).join("; ")
+        }),
+        ""
+    );
+    lines.push(t("export.controlHeader"), "| --- | --- |");
     for (const fact of section.facts) {
-        const flag = fact.attention ? " (attention)" : "";
+        const flag = fact.attention ? ` ${t("export.attention")}` : "";
         lines.push(`| ${cell(fact.label)} | ${cell(factText(fact, utcStamp))}${flag} |`);
     }
     lines.push("");
@@ -63,10 +71,12 @@ function sectionMarkdown(section: EvidenceSection): string[] {
         const columns = section.rows.items[0]?.facts.map((fact) => fact.label) ?? [];
         const shown = section.rows.items.length;
         lines.push(
-            `### ${section.rows.title}${shown < section.rows.total ? ` (${shown} of ${section.rows.total})` : ""}`,
+            shown < section.rows.total
+                ? t("export.rowsShown", { title: section.rows.title, shown: String(shown), total: String(section.rows.total) })
+                : `### ${section.rows.title}`,
             ""
         );
-        lines.push(`| Name | ${columns.map(cell).join(" | ")} |`);
+        lines.push(`| ${t("export.name")} | ${columns.map(cell).join(" | ")} |`);
         lines.push(`| --- | ${columns.map(() => "---").join(" | ")} |`);
         for (const row of section.rows.items) {
             const values = row.facts.map((fact) => cell(factText(fact, utcStamp)));
@@ -78,10 +88,10 @@ function sectionMarkdown(section: EvidenceSection): string[] {
     const change = section.lastChange;
     lines.push(
         change
-            ? `Last changed ${utcStamp(change.at)} by ${change.actorName} (\`${change.action}\`).`
-            : "No change to this area is recorded in the audit trail."
+            ? t("export.lastChanged", { at: utcStamp(change.at), who: change.actorName, action: change.action })
+            : t("export.noChange")
     );
-    for (const note of section.notes) lines.push("", `Note: ${note}`);
+    for (const note of section.notes) lines.push("", t("export.note", { note }));
     lines.push("");
     return lines;
 }
@@ -90,30 +100,24 @@ function sectionMarkdown(section: EvidenceSection): string[] {
  * The printable report: every fact the JSON holds, as tables, headed by when it
  * was read, which instance it describes and the hash of the JSON beside it.
  */
-export function evidenceMarkdown(report: EvidenceReport, digest: string): string {
+export function evidenceMarkdown(report: EvidenceReport, digest: string, t: Words = evidenceWordsIn().t): string {
     const lines = [
-        "# Polaris configuration evidence",
+        t("export.title"),
         "",
-        `- Instance: ${report.instance.url}`,
-        `- Build: ${report.instance.build ?? "not recorded"}`,
-        `- Read at: ${utcStamp(report.generatedAt)}`,
-        `- SHA-256 of the JSON export: \`${digest}\``,
+        t("export.instance", { url: report.instance.url }),
+        t("export.build", { build: report.instance.build ?? t("export.notRecorded") }),
+        t("export.readAt", { at: utcStamp(report.generatedAt) }),
+        t("export.digest", { digest }),
         "",
-        "Polaris is not certified against SOC 2 or ISO 27001. Certification is an audit of the organization that runs it; this report is evidence of how this instance was configured at the moment above.",
+        t("export.notCertified"),
         "",
-        "Items marked (attention) are protections that are off or checks that did not pass.",
+        t("export.attentionMeans"),
         ""
     ];
-    for (const section of report.sections) lines.push(...sectionMarkdown(section));
-    lines.push("## Outside what Polaris can see", "");
+    for (const section of report.sections) lines.push(...sectionMarkdown(section, t));
+    lines.push(t("export.outsideTitle"), "");
     for (const item of report.outsidePolaris) lines.push(`- ${item}`);
-    lines.push(
-        "",
-        "## Checking a copy",
-        "",
-        "The SHA-256 of an unchanged JSON export equals the value above. The same value is recorded, with who exported it and when, in the audit trail entry `evidence.export`.",
-        ""
-    );
+    lines.push("", t("export.checkingTitle"), "", t("export.checking"), "");
     return lines.join("\n");
 }
 
@@ -126,13 +130,13 @@ export interface EvidenceExport {
 }
 
 /** One report as the two files an export hands over. */
-export function evidenceExport(report: EvidenceReport): EvidenceExport {
+export function evidenceExport(report: EvidenceReport, t: Words = evidenceWordsIn().t): EvidenceExport {
     const json = evidenceJson(report);
     const sha256 = evidenceDigest(json);
     return {
         generatedAt: report.generatedAt,
         sha256,
         json: { name: evidenceFilename(report.generatedAt, "json"), body: json },
-        markdown: { name: evidenceFilename(report.generatedAt, "md"), body: evidenceMarkdown(report, sha256) }
+        markdown: { name: evidenceFilename(report.generatedAt, "md"), body: evidenceMarkdown(report, sha256, t) }
     };
 }

@@ -31,8 +31,11 @@ export async function POST(): Promise<Response> {
     const user = await apiAdmin();
     if (user instanceof Response) return user;
     try {
-        const report = await readEvidence();
-        const answer = evidenceExport(report);
+        // In the reader's words, the file as much as the screen: they are the
+        // same report, and the one sent to an auditor is the one they read here.
+        const words = { t: await readerWords("compliance"), backups: await readerWords("backups") };
+        const report = await readEvidence(new Date(), words);
+        const answer = evidenceExport(report, words.t);
         await recordAudit({
             actorId: user.id,
             action: "evidence.export",
