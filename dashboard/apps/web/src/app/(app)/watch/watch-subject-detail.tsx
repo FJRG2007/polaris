@@ -18,14 +18,14 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProjectWebhooks } from "@/components/project-webhooks";
 import type { BreakdownMetric } from "@/lib/watch/breakdown-shape";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
-import { alarmUnit, describeThreshold, METRIC_LABEL, type AlarmMetric } from "@/lib/watch/alarm-metrics";
+import { alarmUnit } from "@/lib/watch/alarm-metrics";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { alarmStateWord, metricWord, thresholdWords, watchText } from "@/lib/watch/words";
 import {
-    BREAKDOWN_LABELS,
+    breakdownTitle,
     MetricBreakdownDialog,
     type OpenBreakdown
 } from "@/app/(app)/watch/watch-metric-breakdown";
-
-const STATE_LABEL: Record<string, string> = { ok: "OK", alarm: "Alarm", insufficient: "No data" };
 
 export function WatchSubjectDetail({
     kind,
@@ -51,12 +51,13 @@ export function WatchSubjectDetail({
     breakdowns: BreakdownMetric[];
 }) {
     const display = useDisplayFormat();
+    const t = useTranslations("watch");
     const [tab, setTab] = useState<"metrics" | "alarms" | "webhooks">("metrics");
     const [opened, setOpened] = useState<OpenBreakdown | null>(null);
     const tabs: { id: typeof tab; label: string }[] = [
-        { id: "metrics", label: "Metrics" },
-        { id: "alarms", label: `Alarms (${alarms.length})` },
-        ...(projectId ? [{ id: "webhooks" as const, label: "Webhooks" }] : [])
+        { id: "metrics", label: t("subject.metrics") },
+        { id: "alarms", label: t("subject.alarms", { count: alarms.length }) },
+        ...(projectId ? [{ id: "webhooks" as const, label: t("webhooks.title") }] : [])
     ];
 
     // A server's series is keyed by host id under a subject of its own; a service
@@ -78,13 +79,13 @@ export function WatchSubjectDetail({
                 return {
                     ...metric,
                     breakdown: {
-                        label: BREAKDOWN_LABELS[offered].strip,
+                        label: breakdownTitle(t, offered),
                         open: (window: { from: number; to: number }) =>
                             setOpened({ metric: offered, ...window })
                     }
                 };
             }),
-        [breakdowns]
+        [breakdowns, t]
     );
 
     return (
@@ -95,19 +96,19 @@ export function WatchSubjectDetail({
                         href="/watch"
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
-                        <ArrowLeft className="size-3" /> Watch
+                        <ArrowLeft className="size-3" /> {t("overview.title")}
                     </Link>
                     <h1 title={name} className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight">
                         {name}
                     </h1>
-                    <p title={detail} className="truncate text-sm text-muted-foreground">
-                        {detail}
+                    <p title={watchText(t, detail)} className="truncate text-sm text-muted-foreground">
+                        {watchText(t, detail)}
                     </p>
                 </div>
                 {serviceHref && (
                     <Button asChild variant="ghost" size="sm">
                         <Link href={serviceHref}>
-                            <ExternalLink className="size-4" /> Open in Deploy
+                            <ExternalLink className="size-4" /> {t("subject.openInDeploy")}
                         </Link>
                     </Button>
                 )}
@@ -136,9 +137,7 @@ export function WatchSubjectDetail({
                 <div className="flex flex-col gap-2">
                     <MetricsHistory endpoint={endpoint} live={live} metrics={metrics} />
                     <p className="text-xs text-muted-foreground">
-                        {kind === "server"
-                            ? "Read from the machine itself, not only from what Polaris runs on it."
-                            : "Measured from the service's own container."}
+                        {kind === "server" ? t("subject.serverSource") : t("subject.serviceSource")}
                     </p>
                 </div>
             )}
@@ -148,12 +147,9 @@ export function WatchSubjectDetail({
                     {alarms.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 px-4 py-10 text-center">
                             <Bell className="size-5 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">
-                                Nothing is watching this yet. An alarm fires when a threshold holds for long enough to
-                                mean something.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("subject.noAlarms")}</p>
                             <Button asChild variant="secondary" size="sm">
-                                <Link href="/watch/alarms">Create an alarm</Link>
+                                <Link href="/watch/alarms">{t("subject.createAlarm")}</Link>
                             </Button>
                         </div>
                     ) : (
@@ -166,17 +162,15 @@ export function WatchSubjectDetail({
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium">{alarm.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {alarm.threshold != null && alarmUnit(alarm.metric, alarm.targetType)
-                                                ? describeThreshold(
-                                                      alarm.metric,
-                                                      alarm.targetType,
-                                                      alarm.operator,
-                                                      alarm.threshold
-                                                  )
-                                                : (METRIC_LABEL[alarm.metric as AlarmMetric] ?? alarm.metric)}
-                                            {alarm.lastEvaluatedAt
-                                                ? ` - checked ${display.dateTime(alarm.lastEvaluatedAt)}`
-                                                : " - not evaluated yet"}
+                                            {t("alarms.line", {
+                                                target:
+                                                    alarm.threshold != null && alarmUnit(alarm.metric, alarm.targetType)
+                                                        ? thresholdWords(t, { ...alarm, threshold: alarm.threshold })
+                                                        : metricWord(t, alarm.metric),
+                                                summary: alarm.lastEvaluatedAt
+                                                    ? t("subject.checked", { time: display.dateTime(alarm.lastEvaluatedAt) })
+                                                    : t("subject.notEvaluated")
+                                            })}
                                         </p>
                                     </div>
                                     <span
@@ -189,14 +183,14 @@ export function WatchSubjectDetail({
                                                   : "border-border/60 text-muted-foreground"
                                         )}
                                     >
-                                        {STATE_LABEL[alarm.state] ?? alarm.state}
+                                        {alarmStateWord(t, alarm.state)}
                                     </span>
                                 </div>
                             ))}
                         </div>
                     )}
                     <Link href="/watch/alarms" className="text-xs text-primary hover:underline">
-                        Manage every alarm
+                        {t("subject.manage")}
                     </Link>
                 </div>
             )}

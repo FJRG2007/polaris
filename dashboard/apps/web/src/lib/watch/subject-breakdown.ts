@@ -84,6 +84,7 @@ export const breakdownRequestSchema = z
         z.object({ kind: z.literal("server"), id: serverIdSchema, ...chartWindow }),
         z.object({ kind: z.literal("service"), id: z.string().uuid(), ...chartWindow })
     ])
+    // i18n-ignore said in the reader's words by lib/watch/words.ts
     .refine((value) => value.to > value.from, { message: "That window has no time in it" });
 
 export type BreakdownRequest = z.infer<typeof breakdownRequestSchema>;
@@ -248,7 +249,9 @@ async function machineLoad(
             key: "rest",
             label:
                 metric === "cpu"
+                    // i18n-ignore said in the reader's words by lib/watch/words.ts
                     ? "Idle, and anything outside a container"
+                    // i18n-ignore said in the reader's words by lib/watch/words.ts
                     : "Free, and anything outside a container",
             detail: "The machine itself, and whatever is installed on it directly."
         });
@@ -324,6 +327,7 @@ function describeContainer(
         const part = describePart(container);
         return {
             key: container.id,
+            // i18n-ignore said in the reader's words by lib/watch/words.ts
             label: `Polaris - ${part.label}`,
             detail: part.summary || null,
             href: containerHref
@@ -404,8 +408,11 @@ function targetOn(serverId: string): Prisma.DeployTargetWhereInput {
 const STORAGE_SCREEN = `/apps/servers/${LOCAL_SERVER_ID}?tab=storage`;
 
 const STORE_ROWS: { key: "images" | "buildCache" | "containers"; label: string; detail: string }[] = [
+    // i18n-ignore said in the reader's words by lib/watch/words.ts
     { key: "images", label: "Images", detail: "What every deployed service runs from." },
+    // i18n-ignore said in the reader's words by lib/watch/words.ts
     { key: "buildCache", label: "Build cache", detail: "Comes back on the next build." },
+    // i18n-ignore said in the reader's words by lib/watch/words.ts
     { key: "containers", label: "Containers", detail: "What running services wrote outside a volume." }
 ];
 
@@ -472,6 +479,7 @@ async function machineStorage(): Promise<Breakdown> {
     const total = wholeOf(disk?.used ?? null, parts);
     const rest = remainder(total, parts, {
         key: "rest",
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
         label: "Everything else on this machine",
         detail: "The system itself and anything installed outside Polaris."
     });
@@ -651,6 +659,7 @@ async function machineTraffic(viewerId: string, request: BreakdownRequest): Prom
     const total = wholeOf(machineRate, parts);
     const rest = remainder(total, parts, {
         key: "rest",
+        // i18n-ignore said in the reader's words by lib/watch/words.ts
         label: "Everything else on this machine",
         detail: "Containers Polaris did not deploy, and the machine's own traffic."
     });

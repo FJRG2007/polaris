@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { alarmInputSchema } from "@/lib/watch/watch-schema";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { alarmStateWord, metricWord, thresholdWords, watchText } from "@/lib/watch/words";
 import { Activity, Bell, BellOff, Loader2, Plus, Trash2 } from "lucide-react";
 import type { AlarmEventView, AlarmTargets, AlarmView } from "@/lib/watch-service";
 import { createAlarmAction, deleteAlarmAction, setAlarmEnabledAction } from "./actions";
@@ -20,8 +22,6 @@ import {
     ALARM_TARGET_TYPES,
     alarmUnit,
     defaultThreshold,
-    describeThreshold,
-    METRIC_LABEL,
     metricsFor,
     type AlarmMetric,
     type AlarmTargetType
@@ -43,10 +43,6 @@ import {
     cn
 } from "@polaris/ui";
 
-const TARGET_LABEL: Record<AlarmTargetType, string> = { application: "App", host: "Server", domain: "Domain" };
-
-const STATE_LABEL: Record<string, string> = { ok: "OK", alarm: "Alarm", insufficient: "No data" };
-
 function stateTone(state: string): string | undefined {
     if (state === "alarm") return "border-danger-edge text-danger";
     if (state === "ok") return "border-success-edge text-success";
@@ -67,6 +63,7 @@ export function WatchView({
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
+    const t = useTranslations("watch");
     const [creating, setCreating] = useState(false);
 
     const targetName = useMemo(() => {
@@ -79,19 +76,22 @@ export function WatchView({
 
     function describe(alarm: AlarmView): string {
         if (alarmUnit(alarm.metric, alarm.targetType)) {
-            return `${describeThreshold(alarm.metric, alarm.targetType, alarm.operator, alarm.threshold ?? 0)} for ${alarm.forPeriods}`;
+            return t("alarms.thresholdFor", {
+                threshold: thresholdWords(t, { ...alarm, threshold: alarm.threshold ?? 0 }),
+                count: alarm.forPeriods
+            });
         }
-        return alarm.targetType === "domain" ? "Domain reachability" : "Service liveness";
+        return alarm.targetType === "domain" ? t("alarms.domainReachability") : t("alarms.serviceLiveness");
     }
 
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
-                title="Watch"
-                description="Alarms on your apps, servers and domains - CPU, memory, disk or network past a threshold, a service down, an unreachable domain."
+                title={t("overview.title")}
+                description={t("alarms.description")}
                 actions={
                     <Button size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New alarm
+                        <Plus className="size-4" /> {t("alarms.new")}
                     </Button>
                 }
             />
@@ -100,23 +100,23 @@ export function WatchView({
                 {routes.length === 0 ? (
                     <>
                         <BellOff className="size-4 shrink-0 text-warning" />
-                        A firing alarm is not sent anywhere.
+                        {t("alarms.sentNowhere")}
                     </>
                 ) : (
                     <>
                         <Bell className="size-4 shrink-0" />
-                        A firing alarm is sent to {routes.join(", ")}.
+                        {t("alarms.sentTo", { routes: routes.join(", ") })}
                     </>
                 )}
                 <Link href="/account/notifications" className="text-primary hover:underline">
-                    Change
+                    {t("alarms.change")}
                 </Link>
             </p>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Alarms</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">{t("overview.alarms")}</h2>
                 {initialAlarms.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No alarms yet. Create one to start watching.</p>
+                    <p className="text-sm text-muted-foreground">{t("alarms.none")}</p>
                 ) : (
                     <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                         {initialAlarms.map((alarm) => (
@@ -127,24 +127,27 @@ export function WatchView({
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">{alarm.name}</p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {targetName.get(alarm.targetId) ?? "unknown"} - {describe(alarm)}
+                                                {t("alarms.line", {
+                                                    target: targetName.get(alarm.targetId) ?? t("alarms.unknownTarget"),
+                                                    summary: describe(alarm)
+                                                })}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Badge className={cn(stateTone(alarm.state))}>
-                                            {STATE_LABEL[alarm.state] ?? alarm.state}
+                                            {alarmStateWord(t, alarm.state)}
                                         </Badge>
                                         <Switch
                                             checked={alarm.enabled}
                                             onChange={(next) =>
                                                 void setAlarmEnabledAction(alarm.id, next).then(() => router.refresh())
                                             }
-                                            aria-label={alarm.enabled ? "Disable alarm" : "Enable alarm"}
+                                            aria-label={alarm.enabled ? t("alarms.disable") : t("alarms.enable")}
                                         />
                                         <button
                                             type="button"
-                                            aria-label="Delete alarm"
+                                            aria-label={t("alarms.delete")}
                                             className="text-muted-foreground hover:text-danger"
                                             onClick={() =>
                                                 void deleteAlarmAction(alarm.id).then(() => router.refresh())
@@ -161,18 +164,20 @@ export function WatchView({
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Recent events</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">{t("alarms.recent")}</h2>
                 {initialEvents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No events yet.</p>
+                    <p className="text-sm text-muted-foreground">{t("alarms.noEvents")}</p>
                 ) : (
                     <div className="flex flex-col gap-1">
                         {initialEvents.map((event) => (
                             <div key={event.id} className="flex items-center gap-2 text-sm">
                                 <Badge className={cn(event.kind === "triggered" ? "border-danger-edge text-danger" : "border-success-edge text-success")}>
-                                    {event.kind === "triggered" ? "Fired" : "Cleared"}
+                                    {event.kind === "triggered" ? t("alarms.fired") : t("alarms.cleared")}
                                 </Badge>
                                 <span className="font-medium">{event.alarmName}</span>
-                                <span className="truncate text-muted-foreground">{event.detail}</span>
+                                <span className="truncate text-muted-foreground">
+                                    {event.detail ? watchText(t, event.detail) : null}
+                                </span>
                                 <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                                     {format.dateTime(event.createdAt)}
                                 </span>
@@ -198,6 +203,8 @@ function CreateAlarmDialog({
     onClose: () => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("watch");
+    const tcommon = useTranslations("common");
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
     const [targetType, setTargetType] = useState<AlarmTargetType>("application");
@@ -218,7 +225,7 @@ function CreateAlarmDialog({
     const metricOptions = metricsFor(targetType)
         // A server reached over SSH has no disk reading to judge.
         .filter((entry) => entry !== "disk" || targetType !== "host" || !chosenHost || chosenHost.measuresDisk)
-        .map((entry) => ({ value: entry, label: METRIC_LABEL[entry] }));
+        .map((entry) => ({ value: entry, label: metricWord(t, entry) }));
     const unit = alarmUnit(metric, targetType);
 
     function chooseMetric(next: AlarmMetric, type: AlarmTargetType = targetType): void {
@@ -239,7 +246,8 @@ function CreateAlarmDialog({
         };
         const parsed = alarmInputSchema.safeParse(input);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the form");
+            const message = parsed.error.issues[0]?.message;
+            setError(message ? watchText(t, message) : t("alarms.checkForm"));
             return;
         }
         startTransition(async () => {
@@ -256,16 +264,20 @@ function CreateAlarmDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New alarm</DialogTitle>
-                    <DialogDescription>Watch an app, server or domain and get notified when it breaches.</DialogDescription>
+                    <DialogTitle>{t("alarms.new")}</DialogTitle>
+                    <DialogDescription>{t("alarms.newDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="API CPU high" />
+                        <span className="font-medium">{t("alarms.name")}</span>
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder={t("alarms.namePlaceholder")}
+                        />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Target</span>
+                        <span className="font-medium">{t("alarms.target")}</span>
                         <Select
                             value={targetType}
                             onValueChange={(value) => {
@@ -274,11 +286,11 @@ function CreateAlarmDialog({
                                 setTargetId("");
                                 chooseMetric(metricsFor(next)[0] ?? "cpu", next);
                             }}
-                            options={ALARM_TARGET_TYPES.map((type) => ({ value: type, label: TARGET_LABEL[type] }))}
+                            options={ALARM_TARGET_TYPES.map((type) => ({ value: type, label: t(`labels.target.${type}`) }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{TARGET_LABEL[targetType]}</span>
+                        <span className="font-medium">{t(`labels.target.${targetType}`)}</span>
                         <Select
                             value={targetId}
                             onValueChange={(value) => {
@@ -287,32 +299,32 @@ function CreateAlarmDialog({
                                 const host = targetType === "host" ? targets.hosts.find((entry) => entry.id === value) : undefined;
                                 if (metric === "disk" && host && !host.measuresDisk) chooseMetric("cpu");
                             }}
-                            placeholder="Choose one"
+                            placeholder={t("alarms.chooseOne")}
                             options={options}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Metric</span>
+                        <span className="font-medium">{t("alarms.metric")}</span>
                         <Select value={metric} onValueChange={(value) => chooseMetric(value as AlarmMetric)} options={metricOptions} />
                     </label>
                     {metric === "disk" && targetType === "application" && (
-                        <p className="text-xs text-muted-foreground">What the service's volumes hold together.</p>
+                        <p className="text-xs text-muted-foreground">{t("alarms.volumesHint")}</p>
                     )}
                     {unit && (
                         <div className="flex gap-2">
                             <label className="flex flex-1 flex-col gap-1 text-sm">
-                                <span className="font-medium">When</span>
+                                <span className="font-medium">{t("alarms.when")}</span>
                                 <Select
                                     value={operator}
                                     onValueChange={(value) => setOperator(value as "gt" | "lt")}
                                     options={[
-                                        { value: "gt", label: "Above" },
-                                        { value: "lt", label: "Below" }
+                                        { value: "gt", label: t("alarms.above") },
+                                        { value: "lt", label: t("alarms.below") }
                                     ]}
                                 />
                             </label>
                             <label className="flex flex-1 flex-col gap-1 text-sm">
-                                <span className="font-medium">Threshold ({unit})</span>
+                                <span className="font-medium">{t("alarms.threshold", { unit })}</span>
                                 <Input
                                     type="number"
                                     min={0}
@@ -325,17 +337,17 @@ function CreateAlarmDialog({
                         </div>
                     )}
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">For consecutive checks</span>
+                        <span className="font-medium">{t("alarms.forChecks")}</span>
                         <Input type="number" value={forPeriods} onChange={(event) => setForPeriods(event.target.value)} />
                     </label>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !name.trim() || !targetId}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Create
+                            {t("alarms.create")}
                         </Button>
                     </div>
                 </div>

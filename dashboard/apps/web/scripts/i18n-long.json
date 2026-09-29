@@ -328,5 +328,14 @@
     "web/telemetry:grid.off (es-ES)",
     "web/telemetry:rules.policies.anywhere.label (es-ES)",
     "web/vault:app.lock (es-ES)",
-    "web/vault:unlock.unlock (es-ES)"
+    "web/vault:unlock.unlock (es-ES)",
+    "web/watch:alarms.above (es-ES)",
+    "web/watch:alarms.below (es-ES)",
+    "web/watch:alarms.checkForm (es-ES)",
+    "web/watch:alarms.unknownTarget (es-ES)",
+    "web/watch:cards.sortBy (es-ES)",
+    "web/watch:labels.metric.service (es-ES)",
+    "web/watch:overview.title (es-ES)",
+    "web/watch:text.buildCache (es-ES)",
+    "web/watch:text.unknownMetric (es-ES)"
 ]

@@ -33,13 +33,6 @@ export const DEFAULT_DIRECTION: Record<ConsumptionOrder, SortDirection> = {
     state: "asc"
 };
 
-export const ORDER_LABELS: Record<ConsumptionOrder, string> = {
-    cpu: "CPU",
-    memory: "Memory",
-    name: "Name",
-    state: "State"
-};
-
 /** Whether this row has nothing to compare for the given order. */
 function unmeasured(row: ConsumptionRow, order: ConsumptionOrder): boolean {
     if (order === "cpu") return row.cpuPercent == null;

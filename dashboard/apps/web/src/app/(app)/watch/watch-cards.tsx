@@ -14,7 +14,9 @@ import { useMemo, useState } from "react";
 import { Bell, Container, Rocket, Server } from "lucide-react";
 import { cn, Select, Skeleton } from "@polaris/ui";
 import type { WatchCard, WatchSubjectKind } from "@/lib/watch-overview-service";
-import { ORDER_LABELS, sortByConsumption, type ConsumptionOrder } from "@/lib/watch/card-order";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { watchText } from "@/lib/watch/words";
+import { sortByConsumption, type ConsumptionOrder } from "@/lib/watch/card-order";
 
 const KIND_ICON: Record<WatchSubjectKind, typeof Server> = {
     server: Server,
@@ -51,10 +53,11 @@ function loadTone(cpu: number | null): string {
 function Sparkline({ points, tone }: { points: { t: number; v: number | null }[]; tone: string }) {
     const values = points.map((point) => point.v);
     const present = values.filter((value): value is number => value != null);
+    const t = useTranslations("watch");
     if (present.length < 2) {
         return (
             <div className="flex h-10 items-center justify-center rounded bg-muted/30 text-[0.625rem] text-muted-foreground">
-                Not enough history yet
+                {t("cards.noHistory")}
             </div>
         );
     }
@@ -148,6 +151,7 @@ export function WatchCardList({
     /** What the list holds, for the control's accessible name. */
     label: string;
 }) {
+    const t = useTranslations("watch");
     const [order, setOrder] = useState<ConsumptionOrder>("cpu");
     const sorted = useMemo(() => sortByConsumption(cards, order), [cards, order]);
 
@@ -155,13 +159,13 @@ export function WatchCardList({
         <div className="flex flex-col gap-3">
             {cards.length > 1 ? (
                 <div className="flex items-center justify-end gap-2">
-                    <span className="text-xs text-muted-foreground">Sort by</span>
+                    <span className="text-xs text-muted-foreground">{t("cards.sortBy")}</span>
                     <Select
                         value={order}
                         onValueChange={(value) => setOrder(value as ConsumptionOrder)}
-                        aria-label={`Sort ${label} by`}
+                        aria-label={t("cards.sortLabel", { label })}
                         className="w-32"
-                        options={ORDERS.map((option) => ({ value: option, label: ORDER_LABELS[option] }))}
+                        options={ORDERS.map((option) => ({ value: option, label: t(`cards.order.${option}`) }))}
                     />
                 </div>
             ) : null}
@@ -188,6 +192,7 @@ export function WatchCardGrid({ cards, empty }: { cards: WatchCard[]; empty: str
 }
 
 function WatchSubjectCard({ card }: { card: WatchCard }) {
+    const t = useTranslations("watch");
     const Icon = KIND_ICON[card.kind];
     const dot = card.state === "up" ? "bg-success" : card.state === "down" ? "bg-danger" : "bg-muted-foreground";
     const memShare =
@@ -205,7 +210,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                     </span>
                     <div className="min-w-0">
                         <p className="truncate text-sm font-medium group-hover:text-primary">{card.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{card.detail}</p>
+                        <p className="truncate text-xs text-muted-foreground">{watchText(t, card.detail)}</p>
                     </div>
                 </div>
                 {card.alarms > 0 && (
@@ -221,7 +226,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                 <div className="min-w-0">
                     <p className={cn("text-lg font-medium tabular-nums", loadTone(card.cpuPercent))}>
                         {card.cpuPercent == null ? "-" : `${card.cpuPercent}%`}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">CPU</span>
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">{t("labels.metric.cpu")}</span>
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                         {formatBytes(card.memUsedBytes)}
@@ -231,7 +236,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                 </div>
                 <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                     <span className={cn("size-1.5 rounded-full", dot)} />
-                    {card.stateLabel}
+                    {watchText(t, card.stateLabel)}
                 </span>
             </div>
         </Link>

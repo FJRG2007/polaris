@@ -3,6 +3,7 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { WatchWebhooks } from "./watch-webhooks";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { visibleProjectIds } from "@/lib/deploy-project-access";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function WatchWebhooksPage() {
     const user = await requirePermission("deploy.read");
     const ids = await visibleProjectIds(user.id);
+    const t = await getTranslations("watch");
     const projects = await prisma.project.findMany({
         where: { id: { in: ids } },
         orderBy: { name: "asc" },
@@ -25,18 +27,20 @@ export default async function WatchWebhooksPage() {
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
             <PageHeader
-                title="Webhooks"
-                description="Where deploys are reported. These belong to their project, so they keep working after whoever added them is gone."
+                title={t("webhooks.title")}
+                description={t("webhooks.description")}
             />
 
             {projects.length === 0 ? (
                 <div className="rounded-lg border border-border/60 px-4 py-10 text-center">
                     <p className="text-sm text-muted-foreground">
-                        No projects yet.{" "}
-                        <Link href="/apps/deploy" className="text-primary hover:underline">
-                            Create one in Deploy
-                        </Link>
-                        .
+                        {t.rich("webhooks.noProjects", {
+                            link: (chunks) => (
+                                <Link key="deploy" href="/apps/deploy" className="text-primary hover:underline">
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
                     </p>
                 </div>
             ) : (
@@ -50,11 +54,13 @@ export default async function WatchWebhooksPage() {
             )}
 
             <p className="text-xs text-muted-foreground">
-                Alerts that go to you rather than to a project - email, your phone, your own webhooks - are set in{" "}
-                <Link href="/account/notifications" className="text-primary hover:underline">
-                    notification preferences
-                </Link>
-                .
+                {t.rich("webhooks.personal", {
+                    link: (chunks) => (
+                        <Link key="prefs" href="/account/notifications" className="text-primary hover:underline">
+                            {chunks}
+                        </Link>
+                    )
+                })}
             </p>
         </div>
     );

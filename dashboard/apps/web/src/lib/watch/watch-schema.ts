@@ -31,7 +31,9 @@ export const alarmInputSchema = z
                 path: ["metric"],
                 message:
                     value.targetType === "domain"
+                        // i18n-ignore said in the reader's words by lib/watch/words.ts
                         ? "Domains use the http reachability metric"
+                        // i18n-ignore said in the reader's words by lib/watch/words.ts
                         : "That metric cannot be watched on this target"
             });
             return;
@@ -42,6 +44,7 @@ export const alarmInputSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["threshold"],
+                // i18n-ignore said in the reader's words by lib/watch/words.ts
                 message: `A threshold in ${unit} is required for this metric`
             });
             return;
@@ -50,6 +53,7 @@ export const alarmInputSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["threshold"],
+                // i18n-ignore said in the reader's words by lib/watch/words.ts
                 message: "A percentage threshold is at most 100"
             });
         }

@@ -57,11 +57,13 @@ export default async function WatchSubjectPage({
                 <WatchSubjectDetail
                     kind="server"
                     id={id}
+                    // i18n-ignore the same word in both languages
                     name={localHost?.name ?? "Local"}
+                    // Said in the reader's words by the detail screen.
                     detail={
                         localHost
-                            ? `${localHost.username}@${localHost.address} - the machine Polaris runs on`
-                            : "The machine Polaris runs on"
+                            ? `${localHost.username}@${localHost.address} - the machine Polaris runs on` // i18n-ignore
+                            : "The machine Polaris runs on" // i18n-ignore
                     }
                     // An alarm on this machine names the server row it was
                     // enrolled as, or - before it was enrolled - its reserved

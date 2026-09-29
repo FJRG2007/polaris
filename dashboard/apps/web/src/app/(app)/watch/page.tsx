@@ -4,6 +4,7 @@ import { WatchCardGrid } from "./watch-cards";
 import { sortByConsumption } from "@/lib/watch/card-order";
 import { Button, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { WatchContainersSection } from "./watch-containers";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 
@@ -25,37 +26,40 @@ const GROUP_LIMIT = 6;
 export default async function WatchPage() {
     const user = await requirePermission("deploy.read");
     const overview = await getWatchOverview(user.id);
+    const t = await getTranslations("watch");
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader
-                    title="Watch"
-                    description="Servers, services, and containers - what they are doing and what is wrong."
+                    title={t("overview.title")}
+                    description={t("overview.description")}
                 />
                 <Button asChild variant={overview.firing > 0 ? "danger" : "ghost"} size="sm">
                     <Link href="/watch/alarms">
                         <Bell className="size-4" />
-                        {overview.firing > 0
-                            ? `${overview.firing} alarm${overview.firing === 1 ? "" : "s"} firing`
-                            : "Alarms"}
+                        {overview.firing > 0 ? t("overview.firing", { count: overview.firing }) : t("overview.alarms")}
                     </Link>
                 </Button>
             </div>
 
             <Group
-                title="Servers"
+                title={t("overview.servers")}
                 href="/watch/servers"
                 count={overview.servers.length}
                 cards={overview.servers}
-                empty="No servers yet. The machine Polaris runs on appears here once it has been sampled."
+                empty={t("overview.noServers")}
+                viewAll={t("overview.viewAll")}
+                viewAllCount={t("overview.viewAllCount", { count: overview.servers.length })}
             />
             <Group
-                title="Services"
+                title={t("overview.services")}
                 href="/watch/services"
                 count={overview.services.length}
                 cards={overview.services}
-                empty="No deployed services yet."
+                empty={t("overview.noServices")}
+                viewAll={t("overview.viewAll")}
+                viewAllCount={t("overview.viewAllCount", { count: overview.services.length })}
             />
             <WatchContainersSection limit={GROUP_LIMIT} />
         </div>
@@ -67,13 +71,18 @@ function Group({
     href,
     count,
     cards,
-    empty
+    empty,
+    viewAll,
+    viewAllCount
 }: {
     title: string;
     href: string;
     count: number;
     cards: Awaited<ReturnType<typeof getWatchOverview>>["servers"];
     empty: string;
+    /** The link's words, and the same with the count, in the reader's language. */
+    viewAll: string;
+    viewAllCount: string;
 }) {
     // Busiest first, because a group that stops at six has to be the six worth
     // stopping at. The screen behind "View all" is where the whole list is, in
@@ -86,7 +95,7 @@ function Group({
                     {title} <span className="text-muted-foreground">({count})</span>
                 </h2>
                 <Link href={href} className="text-xs text-primary hover:underline">
-                    {count > shown.length ? `View all ${count}` : "View all"}
+                    {count > shown.length ? viewAllCount : viewAll}
                 </Link>
             </div>
             <WatchCardGrid cards={shown} empty={empty} />

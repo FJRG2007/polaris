@@ -15,6 +15,8 @@
 
 import { prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { watchText } from "@/lib/watch/words";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
 import { COLLECT_TICK_MS, LOCAL_HOST_SUBJECT, STORAGE_EVERY_TICKS } from "@/lib/metrics-shared";
 import {
@@ -257,11 +259,14 @@ async function notifyTransition(
     detail: string
 ): Promise<void> {
     const triggered = kind === "triggered";
+    // Stored as the sentence it says, so it is worded for the owner who reads it.
+    const t = await wordsFor(alarm.ownerId, "watch");
+    const said = watchText(t, detail);
     await notify({
         userId: alarm.ownerId,
         event: triggered ? "watch.alarm" : "watch.ok",
-        title: triggered ? `Alarm: ${alarm.name}` : `Recovered: ${alarm.name}`,
-        body: detail,
+        title: triggered ? t("notices.alarm", { name: alarm.name }) : t("notices.recovered", { name: alarm.name }),
+        body: said,
         actionRequired: triggered,
         href: "/watch",
         metadata: { alarmId: alarm.id }
@@ -270,7 +275,9 @@ async function notifyTransition(
         try {
             await bridgeSend(alarm.notifyChannelId, {
                 peerId: alarm.notifyPeerId,
-                text: `${triggered ? "ALARM" : "Recovered"}: ${alarm.name} - ${detail}`
+                text: triggered
+                    ? t("notices.alarmMessage", { name: alarm.name, detail: said })
+                    : t("notices.recoveredMessage", { name: alarm.name, detail: said })
             });
         } catch {
             // The channel may be disconnected; the in-app notification still fired.

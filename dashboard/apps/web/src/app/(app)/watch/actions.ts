@@ -7,6 +7,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { watchText } from "@/lib/watch/words";
 import { nothingToShow, type Breakdown } from "@/lib/watch/breakdown-shape";
 import { alarmInputSchema, type AlarmInput } from "@/lib/watch/watch-schema";
 import {
@@ -56,27 +58,43 @@ export async function watchStateAction(): Promise<{
 export async function subjectBreakdownAction(input: unknown): Promise<Breakdown> {
     const user = await requirePermission("deploy.read");
     const parsed = breakdownRequestSchema.safeParse(input);
-    if (!parsed.success) return nothingToShow("There is nothing to break down over that window.");
+    const t = await getTranslations("watch");
+    if (!parsed.success) return nothingToShow(t("text.nothingToBreakDown"));
     try {
         const canReadMachine = await userHasManage(user, MACHINE_PERMISSION);
-        return await subjectBreakdown({ id: user.id, canReadMachine }, parsed.data);
+        const answer = await subjectBreakdown({ id: user.id, canReadMachine }, parsed.data);
+        // The service says its rows and reasons in English; the reader gets theirs.
+        return {
+            ...answer,
+            note: answer.note ? watchText(t, answer.note) : answer.note,
+            unavailable: answer.unavailable ? watchText(t, answer.unavailable) : answer.unavailable,
+            rows: answer.rows.map((row) => ({
+                ...row,
+                label: watchText(t, row.label),
+                detail: row.detail ? watchText(t, row.detail) : row.detail
+            }))
+        };
     } catch {
         // Whatever went wrong names a host, a socket or a query. What the reader
         // can do about it is the same either way.
-        return nothingToShow("Polaris could not work out what is using this just now.");
+        return nothingToShow(t("text.breakdownFailed"));
     }
 }
 
 export async function createAlarmAction(input: AlarmInput): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = alarmInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    const t = await getTranslations("watch");
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return { error: message ? watchText(t, message) : t("alarms.checkForm") };
+    }
     try {
         const id = await createAlarm(user.id, parsed.data);
         revalidatePath("/watch");
         return { id };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the alarm" };
+        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.createFailed") };
     }
 }
 
@@ -87,7 +105,8 @@ export async function setAlarmEnabledAction(id: string, enabled: boolean): Promi
         revalidatePath("/watch");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the alarm" };
+        const t = await getTranslations("watch");
+        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.updateFailed") };
     }
 }
 
@@ -98,6 +117,7 @@ export async function deleteAlarmAction(id: string): Promise<{ error?: string }>
         revalidatePath("/watch");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the alarm" };
+        const t = await getTranslations("watch");
+        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.deleteFailed") };
     }
 }

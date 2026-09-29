@@ -285,6 +285,7 @@ export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> 
         {
             id: LOCAL_HOST_SUBJECT,
             connectionId: LOCAL_DOCKER_CONNECTION_ID,
+            // i18n-ignore the same word in both languages
             label: local?.name ?? "Local",
             open: async () => localDockerDriver()
         },

@@ -24,6 +24,8 @@
 import Link from "next/link";
 import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { subjectBreakdownAction } from "./actions";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { formatRate, percent } from "@/components/metrics-history";
@@ -47,22 +49,23 @@ export interface OpenBreakdown {
 }
 
 /**
- * What each metric is called on the strip that opens it and in the panel it
- * opens, and how its figures are written.
- *
- * One entry per metric so the strip and the title cannot drift apart: a card
- * offering "where the room went" that opens a panel headed "Storage breakdown"
- * reads as two different features.
+ * How each metric's figures are written. What it is called - on the strip that
+ * opens it and in the panel it opens - is one catalog entry per metric
+ * (`breakdown.title.<metric>`), so the strip and the title cannot drift apart: a
+ * card offering "where the room went" that opens a panel headed "Storage
+ * breakdown" reads as two different features.
  */
-export const BREAKDOWN_LABELS: Record<
-    BreakdownMetric,
-    { strip: string; title: string; format: (value: number) => string }
-> = {
-    cpu: { strip: "What is using the CPU", title: "What is using the CPU", format: percent },
-    mem: { strip: "What is holding the memory", title: "What is holding the memory", format: formatBytes },
-    disk: { strip: "Where the room went", title: "Where the room went", format: formatBytes },
-    net: { strip: "What is sending", title: "What is sending", format: formatRate }
+export const BREAKDOWN_FORMAT: Record<BreakdownMetric, (value: number) => string> = {
+    cpu: percent,
+    mem: formatBytes,
+    disk: formatBytes,
+    net: formatRate
 };
+
+/** What a metric's breakdown is called, on its strip and in its title. */
+export function breakdownTitle(t: NamespaceTranslator<"watch">, metric: BreakdownMetric): string {
+    return t(`breakdown.title.${metric}`);
+}
 
 const ICONS = { container: Box, volume: HardDrive, store: Layers, rest: MoreHorizontal };
 
@@ -81,6 +84,7 @@ export function MetricBreakdownDialog({
     open: OpenBreakdown | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("watch");
     const [result, setResult] = useState<Breakdown | null>(null);
 
     useEffect(() => {
@@ -100,16 +104,16 @@ export function MetricBreakdownDialog({
         };
     }, [open, subject.kind, subject.id]);
 
-    const words = open ? BREAKDOWN_LABELS[open.metric] : null;
+    const format = open ? BREAKDOWN_FORMAT[open.metric] : null;
     const age = result?.at == null ? null : Date.now() - result.at;
 
     return (
         <Dialog open={open !== null} onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{words?.title ?? ""}</DialogTitle>
+                    <DialogTitle>{open ? breakdownTitle(t, open.metric) : ""}</DialogTitle>
                     <DialogDescription>
-                        {result === null ? "Working out what is behind this figure" : summarize(open, result)}
+                        {result === null ? t("breakdown.working") : summarize(t, open, result)}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -120,18 +124,18 @@ export function MetricBreakdownDialog({
                         ))}
                     </div>
                 ) : result.unavailable ? (
-                    <EmptyState bare icon={<SearchX />} title="Nothing to rank" description={result.unavailable} />
+                    <EmptyState bare icon={<SearchX />} title={t("breakdown.nothingToRank")} description={result.unavailable} />
                 ) : result.rows.length === 0 ? (
                     <EmptyState
                         bare
                         icon={<SearchX />}
-                        title="Nothing is using it"
-                        description="Everything measured here is at zero."
+                        title={t("breakdown.nothingUsing")}
+                        description={t("breakdown.allZero")}
                     />
                 ) : (
                     <ul className="flex flex-col">
                         {result.rows.map((row) => (
-                            <Row key={row.key} row={row} format={words?.format ?? formatBytes} />
+                            <Row key={row.key} row={row} format={format ?? formatBytes} />
                         ))}
                     </ul>
                 )}
@@ -139,7 +143,7 @@ export function MetricBreakdownDialog({
                 {result && (result.note || age !== null) ? (
                     <p className="mt-3 text-xs text-muted-foreground">
                         {result.note}
-                        {age !== null && age > STALE_AFTER_MS ? ` Read ${formatAge(age)} ago.` : ""}
+                        {age !== null && age > STALE_AFTER_MS ? ` ${t("breakdown.readAgo", { age: formatAge(age) })}` : ""}
                     </p>
                 ) : null}
             </DialogContent>
@@ -154,10 +158,10 @@ export function MetricBreakdownDialog({
  * by definition, and "100% in total" is a sentence that tells nobody anything -
  * so it says what the percentages mean instead.
  */
-function summarize(open: OpenBreakdown | null, result: Breakdown): string {
-    if (!open || result.total === null) return "Heaviest first.";
-    if (open.metric === "cpu") return "Share of the whole machine, heaviest first.";
-    return `${BREAKDOWN_LABELS[open.metric].format(result.total)} in total, heaviest first.`;
+function summarize(t: NamespaceTranslator<"watch">, open: OpenBreakdown | null, result: Breakdown): string {
+    if (!open || result.total === null) return t("breakdown.heaviestFirst");
+    if (open.metric === "cpu") return t("breakdown.shareOfMachine");
+    return t("breakdown.inTotal", { total: BREAKDOWN_FORMAT[open.metric](result.total) });
 }
 
 function Row({ row, format }: { row: BreakdownRow; format: (value: number) => string }) {

@@ -1192,6 +1192,21 @@
         "web/src/app/(app)/apps/code/layout.tsx",
         "web/src/app/(app)/apps/marketplace/actions.ts",
         "web/src/app/(app)/apps/marketplace/marketplace-view.tsx",
-        "web/src/app/(app)/apps/marketplace/layout.tsx"
+        "web/src/app/(app)/apps/marketplace/layout.tsx",
+        "web/src/app/(app)/watch/page.tsx",
+        "web/src/app/(app)/watch/containers/page.tsx",
+        "web/src/app/(app)/watch/servers/page.tsx",
+        "web/src/app/(app)/watch/services/page.tsx",
+        "web/src/app/(app)/watch/webhooks/page.tsx",
+        "web/src/app/(app)/watch/alarms/page.tsx",
+        "web/src/app/(app)/watch/[kind]/[id]/page.tsx",
+        "web/src/app/(app)/watch/watch-view.tsx",
+        "web/src/app/(app)/watch/watch-cards.tsx",
+        "web/src/app/(app)/watch/watch-containers.tsx",
+        "web/src/app/(app)/watch/watch-metric-breakdown.tsx",
+        "web/src/app/(app)/watch/watch-subject-detail.tsx",
+        "web/src/app/(app)/watch/actions.ts",
+        "web/src/lib/watch/alarm-evaluator.ts",
+        "web/src/lib/watch/words.ts"
     ]
 }
