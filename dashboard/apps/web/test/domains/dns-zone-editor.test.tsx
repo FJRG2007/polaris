@@ -18,6 +18,7 @@ import { writeSnapshot } from "@/lib/snapshot-cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DnsRecordView, ZoneRecords } from "@/lib/dns/zone-records";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const actions = vi.hoisted(() => ({
     zoneRecordsAction: vi.fn(),
@@ -63,7 +64,7 @@ function deferred<T>() {
 }
 
 async function mount() {
-    render(<DnsZoneEditor scope={scope} />);
+    render(<DnsZoneEditor scope={scope} />, { wrapper: MessagesWrapper });
     await screen.findByText("203.0.113.10");
 }
 
@@ -81,7 +82,7 @@ describe("entering a zone", () => {
     it("paints the records it showed last while the read behind them is still out", async () => {
         writeSnapshot(`personal:dns.records.${JSON.stringify(scope)}`, zone);
         actions.zoneRecordsAction.mockReturnValue(new Promise(() => undefined));
-        render(<DnsZoneEditor scope={scope} />);
+        render(<DnsZoneEditor scope={scope} />, { wrapper: MessagesWrapper });
 
         expect(await screen.findByText("203.0.113.10")).toBeTruthy();
         expect(actions.zoneRecordsAction).toHaveBeenCalledTimes(1);
@@ -89,7 +90,7 @@ describe("entering a zone", () => {
 
     it("draws its filters and its table before there is anything to list", () => {
         actions.zoneRecordsAction.mockReturnValue(new Promise(() => undefined));
-        render(<DnsZoneEditor scope={scope} />);
+        render(<DnsZoneEditor scope={scope} />, { wrapper: MessagesWrapper });
 
         expect(screen.getByRole("textbox", { name: "Search records" })).toBeTruthy();
         expect(screen.getByText("Proxy status")).toBeTruthy();

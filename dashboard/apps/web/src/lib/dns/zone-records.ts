@@ -13,7 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import type { MessageParams } from "@polaris/core";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { openText } from "@/lib/tls/managed-certificates";
@@ -56,7 +56,7 @@ export class DnsEditError extends Error {
 
 /** A refusal in the language of whoever asked. */
 async function refusal(key: NamespaceKey<"dns">, params?: MessageParams, problems?: DraftProblems): Promise<DnsEditError> {
-    const t = await getTranslations("dns");
+    const t = await readerWords("dns");
     return new DnsEditError(t(key, params), problems);
 }
 
@@ -246,7 +246,7 @@ export async function saveZoneRecord(
     if (recordId !== null && !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))) {
         throw await refusal("errors.recordNotInZone");
     }
-    const t = await getTranslations("dns");
+    const t = await readerWords("dns");
     const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId }, t);
     if (!checked.ok) {
         const problems = { ...checked.problems };

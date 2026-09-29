@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { OwnerDomainView } from "@/lib/owner-domains";
+import { withMessages } from "../setup/i18n";
 
 vi.mock("../../src/app/(app)/account/domains/actions", () => ({}));
 vi.mock("../../src/app/(app)/account/domains/dns-actions", () => ({}));
@@ -35,7 +36,7 @@ function domain(overrides: Partial<OwnerDomainView>): OwnerDomainView {
 }
 
 function render(domains: OwnerDomainView[]): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <OwnerDomainsView
             owner={{ kind: "user" }}
             domains={domains}
@@ -44,7 +45,7 @@ function render(domains: OwnerDomainView[]): string {
             publicIp="203.0.113.10"
             instanceDomains={[]}
         />
-    );
+    ));
 }
 
 describe("a domain of one's own", () => {

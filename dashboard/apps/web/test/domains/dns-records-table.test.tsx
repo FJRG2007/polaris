@@ -13,6 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { DnsRecordView } from "@/lib/dns/zone-records";
 import { emptyDraft, recordFields } from "@/lib/dns/record-schema";
 import { DnsRecordsTable } from "@/components/dns/dns-records-table";
+import { withMessages } from "../setup/i18n";
 
 function record(overrides: Partial<DnsRecordView> & Pick<DnsRecordView, "id" | "type" | "relative">): DnsRecordView {
     const name = overrides.relative === "@" ? "example.test" : `${overrides.relative}.example.test`;
@@ -39,7 +40,7 @@ const records: DnsRecordView[] = [
 ];
 
 function render(rows: readonly DnsRecordView[] | null, pending: string[] = []): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <DnsRecordsTable
             records={rows}
             pending={new Set(pending)}
@@ -49,7 +50,7 @@ function render(rows: readonly DnsRecordView[] | null, pending: string[] = []): 
             onEdit={() => undefined}
             onDelete={() => undefined}
         />
-    );
+    ));
 }
 
 describe("the order and the filters", () => {
