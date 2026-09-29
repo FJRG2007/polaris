@@ -20,7 +20,8 @@
         "install": "Could not install the app",
         "servers": "Could not load your servers",
         "checkForm": "Check the form and try again",
-        "invalid": "Invalid install request"
+        "invalid": "Invalid install request",
+        "chooseNas": "Choose a NAS connection for this volume"
     },
     "view": {
         "results": "Results",

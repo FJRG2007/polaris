@@ -354,11 +354,13 @@ export async function claimEnrollment(
     if (
         !(await rateLimit(`enroll:claim:${sourceIp ?? "unknown"}`, CLAIM_LIMIT, CLAIM_WINDOW_MS)).ok
     ) {
+        // i18n-ignore answered to the enrolling server, a machine
         return { ok: false, error: "Too many attempts" };
     }
 
     const row = await prisma.enrollment.findUnique({ where: { tokenHash: hashToken(token) } });
     if (!row || row.claimedAt || row.expiresAt < new Date())
+        // i18n-ignore answered to the enrolling server, a machine
         return { ok: false, error: "Enrollment unavailable" };
 
     // Burn first. Everything below can fail, and none of it should be retryable

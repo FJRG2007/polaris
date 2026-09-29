@@ -12,8 +12,9 @@ import { listHosts } from "@/lib/host-service";
 import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp, listInstalledApps, type InstalledAppView } from "@/lib/apps/install-service";
-import { appInstallInputSchema, type AppInstallInput } from "@/lib/apps/install-schema";
+import { appInstallInputSchema, NAS_CONNECTION_REQUIRED, type AppInstallInput } from "@/lib/apps/install-schema";
 import { getTranslations } from "@/lib/i18n/request";
+import { validationMessage } from "@/components/i18n/validation-message";
 
 const MARKETPLACE_PATH = "/apps/marketplace";
 
@@ -55,7 +56,17 @@ export async function listInstalledAppsAction(): Promise<InstalledAppView[]> {
 export async function installAppAction(input: AppInstallInput): Promise<{ error?: string; installedAppId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = appInstallInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("marketplace"))("errors.invalid") };
+    if (!parsed.success) {
+        const t = await getTranslations("marketplace");
+        const message = parsed.error.issues[0]?.message;
+        if (!message) return { error: t("errors.invalid") };
+        return {
+            error:
+                message === NAS_CONNECTION_REQUIRED
+                    ? t("errors.chooseNas")
+                    : validationMessage(await getTranslations("validation"), message)
+        };
+    }
     try {
         const result = await installApp(user.id, user.id, parsed.data);
         await recordAudit({

@@ -260,6 +260,7 @@ export async function sweepStaleRuns(): Promise<number> {
             state: "failed",
             finishedAt: new Date(),
             tokenHash: null,
+            // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
             error: "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as."
         }
     });

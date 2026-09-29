@@ -419,6 +419,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
             state !== "failed"
                 ? null
                 : (run.error ??
+                  // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
                   `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`),
         // Already recorded by the run's own report, where there was one. Passing
         // it back keeps `finishAgentRun` from clearing it, which would leave the

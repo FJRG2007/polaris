@@ -23,6 +23,7 @@ import * as core from "@polaris/core";
 import { currentReleaseRef } from "./releases";
 import { notify } from "../notifications/dispatch";
 import { getPorts, type TargetRow } from "./runtime";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 /** The end of the output kept per run. The end of a log is where the reason is. */
 export const CRON_OUTPUT_LIMIT = 64 * 1024;
@@ -244,6 +245,7 @@ export async function tickServiceCrons(now = new Date()): Promise<{ started: num
                     cronId: cron.id,
                     trigger: retrying ? "retry" : "schedule",
                     status: "skipped",
+                    // i18n-ignore stored with the run, so written once in the default language
                     error: "The previous run was still going.",
                     finishedAt: now
                 }
@@ -359,11 +361,12 @@ async function execute(runId: string): Promise<void> {
     // that will be retried may well succeed, and a manual run is being watched.
     if (status !== "succeeded" && !retry && run.trigger !== "manual") {
         const project = app.environment.project;
+        const t = await wordsFor(ownerId, "notices");
         await notify({
             userId: ownerId,
             event: "cron.failed",
-            title: `Scheduled job failed: ${project.name} / ${app.name} / ${cron.name}`,
-            body: error ?? "It did not finish.",
+            title: t("cron.failedTitle", { job: `${project.name} / ${app.name} / ${cron.name}` }),
+            body: error ?? t("cron.didNotFinish"),
             href: `/apps/deploy/${project.id}?service=${app.id}`,
             shelf: { orgId: project.orgId },
             actionRequired: true,

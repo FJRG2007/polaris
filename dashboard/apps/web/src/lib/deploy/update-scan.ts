@@ -108,6 +108,7 @@ export async function checkService(
                 image: ref,
                 baseline: prior?.baseline ?? null,
                 latest: prior?.latest ?? null,
+                // i18n-ignore stored with the scan, written once in the default language
                 error: "The registry could not be read, so this was not checked."
             });
         }

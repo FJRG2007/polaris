@@ -41,6 +41,8 @@ import {
 } from "@polaris/core";
 import { listOpenPullRequests, pullRequestIsOpen, type OpenPullRequest } from "../github-service";
 import { recipientShelf } from "../workspace-scope";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** What makes an environment a preview. */
 export interface PreviewOrigin {
@@ -420,9 +422,9 @@ export function previewName(repo: string, number: number): string {
 }
 
 /** The keys named in a sentence short enough for a notification. */
-function keyList(keys: readonly string[]): string {
+function keyList(t: NamespaceTranslator<"notices">, keys: readonly string[]): string {
     const shown = keys.slice(0, 8).join(", ");
-    return keys.length > 8 ? `${shown} and ${keys.length - 8} more` : shown;
+    return keys.length > 8 ? t("preview.keysMore", { shown, count: keys.length - 8 }) : shown;
 }
 
 /**
@@ -473,11 +475,12 @@ export async function ensurePullRequestPreview(
                 preview: { pullRequest: pull.number, repo, sha: pull.headSha }
             });
             if (environment.withheld.length > 0) {
+                const t = await wordsFor(project.ownerId, "notices");
                 await createNotification({
                     userId: project.ownerId,
                     type: "deploy.preview-secrets",
-                    title: `The preview of ${repo}#${pull.number} has no secrets`,
-                    body: `Secrets are not copied into pull request previews, so it starts without ${keyList(environment.withheld)}. Set any it needs on the preview.`,
+                    title: t("preview.noSecretsTitle", { pull: `${repo}#${pull.number}` }),
+                    body: t("preview.noSecretsBody", { keys: keyList(t, environment.withheld) }),
                     href: `/apps/deploy/${project.projectId}?env=${environment.id}`,
                     shelf: await recipientShelf(project.ownerId, { orgId: project.orgId }),
                     level: "warning",

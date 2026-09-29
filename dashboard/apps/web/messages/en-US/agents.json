@@ -149,7 +149,8 @@
         "unknownAgent": "Polaris no longer knows an agent called {cli}.",
         "noTerminal": "its agent never opened a terminal to type into",
         "unknownReason": "unknown",
-        "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below."
+        "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below.",
+        "workflowFinished": "The workflow finished as {conclusion}. Its log is on the run in GitHub Actions."
     },
     "errors": {
         "checkSettings": "Check the settings",

@@ -222,5 +222,19 @@
         "staleTitle": "{domain} does not point at this server",
         "notUpdated": "This server now answers on {current}, but the records could not be updated: {detail}",
         "conflict": "This server now answers on {current}, but {names} points at {contents}. Polaris does not repoint a record it did not write - change it yourself if it should name this server."
+    },
+    "preview": {
+        "noSecretsTitle": "The preview of {pull} has no secrets",
+        "noSecretsBody": "Secrets are not copied into pull request previews, so it starts without {keys}. Set any it needs on the preview.",
+        "keysMore": "{shown} and {count} more"
+    },
+    "disk": {
+        "fullTitle": "This server's disk is {percent}% full",
+        "freedBody": "Polaris handed back everything nothing was using. What is left is volumes and the files somebody put in them, and only a person can decide what goes.",
+        "nothingFreedBody": "There was nothing left to hand back. What is using it is volumes and the files somebody put in them, and only a person can decide what goes."
+    },
+    "cron": {
+        "failedTitle": "Scheduled job failed: {job}",
+        "didNotFinish": "It did not finish."
     }
 }

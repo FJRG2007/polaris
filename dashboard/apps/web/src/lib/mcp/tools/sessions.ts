@@ -28,6 +28,7 @@ const listInput = z.object({
 const listSessionsTool: McpTool<z.infer<typeof listInput>> = {
     name: "agent_sessions_list",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "The coding-agent sessions this key can reach, and what each is doing. A session marked as needing somebody is blocked on a question.",
     input: listInput,
     scope: "agents.read",
@@ -61,6 +62,7 @@ const getInput = z.object({ sessionId: z.string().uuid() });
 const getSessionTool: McpTool<z.infer<typeof getInput>> = {
     name: "agent_session_get",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "What one session has been asked, what it has done, and whether it is waiting on anybody.",
     input: getInput,
     scope: "agents.read",
@@ -101,6 +103,7 @@ const promptInput = z.object({
 const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
     name: "agent_session_prompt",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Send a running session the next thing, or the answer to what it asked. It goes into the agent's own prompt, so write it as you would say it.",
     input: promptInput,
     scope: "agents.manage",
@@ -131,6 +134,7 @@ const startInput = z.object({
 const startSessionTool: McpTool<z.infer<typeof startInput>> = {
     name: "agent_session_start",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Put a coding agent on a piece of work in its own branch. Use this to hand off something separable from what you are doing - not to split the work you were asked to do yourself.",
     input: startInput,
     scope: "agents.manage",

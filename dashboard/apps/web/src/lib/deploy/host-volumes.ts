@@ -312,6 +312,7 @@ export async function hostVolumes(
                   ? {
                         kind: "managedDatabase",
                         id: database.id,
+                        // i18n-ignore a machine-level description, stored with the volume
                         description: `Data of the ${database.name} database (${database.engine})`,
                         purpose: "database"
                     }

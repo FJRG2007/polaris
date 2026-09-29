@@ -8,6 +8,11 @@
 import { z } from "zod";
 
 /** Where an app's volume lives: a server-local docker volume, or a NAS mount. */
+/** The one refusal of the install form that is not a shared field message; the
+ *  Marketplace says it in the reader's words. */
+// i18n-ignore said through the marketplace catalog
+export const NAS_CONNECTION_REQUIRED = "Choose a NAS connection for this volume";
+
 export const appStorageChoiceSchema = z
     .object({
         volumeName: z.string().trim().min(1).max(64),
@@ -20,7 +25,7 @@ export const appStorageChoiceSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["connectionId"],
-                message: "Choose a NAS connection for this volume"
+                message: NAS_CONNECTION_REQUIRED
             });
         }
     });

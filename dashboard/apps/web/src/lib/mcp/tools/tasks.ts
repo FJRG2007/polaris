@@ -163,6 +163,7 @@ const listInput = z.object({
 const listTasksTool: McpTool<z.infer<typeof listInput>> = {
     name: "tasks_list",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Find tasks this key can reach. Returns a summary of each - reference, name, status, assignees - not the full description; use tasks_get for that.",
     input: listInput,
     scope: "tasks.read",
@@ -220,6 +221,7 @@ const getInput = z.object({ task: taskRef });
 const getTaskTool: McpTool<z.infer<typeof getInput>> = {
     name: "tasks_get",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Read one task in full: its description, status, assignees, subtasks and comments.",
     input: getInput,
     scope: "tasks.read",
@@ -247,6 +249,7 @@ const getTaskTool: McpTool<z.infer<typeof getInput>> = {
             .join("\n");
         return text(body, {
             task: summarize(detail.task),
+            // i18n-ignore read by the calling model, not shown to a person
             description: detail.task.description,
             subtasks: detail.subtasks.map(summarize)
         });
@@ -256,6 +259,7 @@ const getTaskTool: McpTool<z.infer<typeof getInput>> = {
 const createInput = z.object({
     list: z.string().trim().min(1).max(80).describe("The list to put it in, by name or id."),
     name: z.string().trim().min(1).max(200),
+    // i18n-ignore read by the calling model, not shown to a person
     description: z.string().max(20_000).default(""),
     priority: z.enum(core.TASK_PRIORITIES).default("none"),
     assignToMe: z.boolean().default(false)
@@ -264,6 +268,7 @@ const createInput = z.object({
 const createTaskTool: McpTool<z.infer<typeof createInput>> = {
     name: "tasks_create",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Create a task. Use this for work you found that is out of scope for what you were asked to do, rather than doing it unasked.",
     input: createInput,
     scope: "tasks.manage",
@@ -288,6 +293,7 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
             ...core.taskCreateSchema.parse({
                 listId: list.id,
                 name: input.name,
+                // i18n-ignore read by the calling model, not shown to a person
                 description: input.description,
                 priority: input.priority,
                 assigneeIds: input.assignToMe ? [caller.userId] : []
@@ -309,6 +315,7 @@ const updateInput = z.object({
         .optional()
         .describe('The status to move it to, by name ("In Progress").'),
     name: z.string().trim().min(1).max(200).optional(),
+    // i18n-ignore read by the calling model, not shown to a person
     description: z.string().max(20_000).optional(),
     priority: z.enum(core.TASK_PRIORITIES).optional(),
     assignToMe: z.boolean().optional().describe("Put the account this key belongs to on it.")
@@ -317,6 +324,7 @@ const updateInput = z.object({
 const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
     name: "tasks_update",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Change a task: move it to another status, rename it, set its priority, take it. Only the fields you send are written.",
     input: updateInput,
     scope: "tasks.manage",
@@ -340,6 +348,7 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
         await tasks.updateTask(caller.userId, {
             taskId: id,
             ...(input.name === undefined ? {} : { name: input.name }),
+            // i18n-ignore read by the calling model, not shown to a person
             ...(input.description === undefined ? {} : { description: input.description }),
             ...(input.priority === undefined ? {} : { priority: input.priority }),
             ...(statusId === undefined ? {} : { statusId }),
@@ -357,6 +366,7 @@ const commentInput = z.object({
 const commentTaskTool: McpTool<z.infer<typeof commentInput>> = {
     name: "tasks_comment",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Leave a comment on a task. This is where what you found, what you changed and what you could not do belong - not in the task description.",
     input: commentInput,
     scope: "tasks.manage",
@@ -380,6 +390,7 @@ const spacesInput = z.object({});
 const listSpacesTool: McpTool<z.infer<typeof spacesInput>> = {
     name: "tasks_spaces",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "The spaces, lists and statuses this key can reach. Call this once if you need to know what a status or a list is called before using it.",
     input: spacesInput,
     scope: "tasks.read",

@@ -222,5 +222,19 @@
         "staleTitle": "{domain} no apunta a este servidor",
         "notUpdated": "Este servidor responde ahora en {current}, pero no se pudieron actualizar los registros: {detail}",
         "conflict": "Este servidor responde ahora en {current}, pero {names} apunta a {contents}. Polaris no redirige un registro que no escribió: cámbialo tú si debe apuntar a este servidor."
+    },
+    "preview": {
+        "noSecretsTitle": "La vista previa de {pull} no tiene secretos",
+        "noSecretsBody": "Los secretos no se copian en las vistas previas de pull requests, así que arranca sin {keys}. Define en la vista previa los que necesite.",
+        "keysMore": "{shown} y {count} más"
+    },
+    "disk": {
+        "fullTitle": "El disco de este servidor está al {percent}%",
+        "freedBody": "Polaris liberó todo lo que nada usaba. Lo que queda son volúmenes y los archivos que alguien puso en ellos, y solo una persona puede decidir qué sobra.",
+        "nothingFreedBody": "No quedaba nada que liberar. Lo que lo ocupa son volúmenes y los archivos que alguien puso en ellos, y solo una persona puede decidir qué sobra."
+    },
+    "cron": {
+        "failedTitle": "Falló una tarea programada: {job}",
+        "didNotFinish": "No terminó."
     }
 }

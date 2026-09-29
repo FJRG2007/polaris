@@ -276,6 +276,7 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
                 repo: info.repo,
                 ref: info.commitSha,
                 environment: info.environment,
+                // i18n-ignore shown on GitHub, next to the commit
                 description: `Deploying ${info.label} on Polaris`,
                 production: info.production,
                 token
@@ -307,12 +308,14 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
             where: { id: deploymentId },
             data: { githubRepo: `${info.owner}/${info.repo}`, githubDeploymentId: githubId }
         });
+        // i18n-ignore shown on GitHub, next to the commit
         await announceCheck(info, "queued", "Waiting for a build slot", deploymentId);
         await setDeploymentState({
             owner: info.owner,
             repo: info.repo,
             deploymentId: githubId,
             state: "queued",
+            // i18n-ignore shown on GitHub, next to the commit
             description: "Waiting for a build slot",
             logUrl: await logUrl(info.applicationId),
             token: info.token

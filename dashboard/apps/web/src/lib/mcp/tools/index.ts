@@ -26,6 +26,7 @@ const whoamiInput = z.object({});
  */
 const whoami: McpTool<z.infer<typeof whoamiInput>> = {
     name: "polaris_whoami",
+    // i18n-ignore read by the calling model, not shown to a person
     description: "Who this key acts as on this Polaris, and what it is allowed to do.",
     input: whoamiInput,
     scope: null,

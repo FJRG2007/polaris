@@ -76,6 +76,7 @@ export const importVariablesSchema = z.object({
 /** `?redeploy=1` on a call that has no body to say it in. */
 export const redeployQuerySchema = z.object({
     redeploy: z
+        // i18n-ignore the deploy API answers programs, in one language
         .enum(["1", "true", "0", "false"], { message: "redeploy is 1 or 0" })
         .optional()
         .transform((value) => value === "1" || value === "true")

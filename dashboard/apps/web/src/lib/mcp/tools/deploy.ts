@@ -63,6 +63,7 @@ const projectsInput = z.object({});
 const projectsTool: McpTool<z.infer<typeof projectsInput>> = {
     name: "deploy_projects",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Every Deploy project this key can reach, with each environment's services and what they are doing. Start here to find the name of a service.",
     input: projectsInput,
     scope: "deploy.read",
@@ -89,6 +90,7 @@ const projectsTool: McpTool<z.infer<typeof projectsInput>> = {
 const serviceTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_service",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "One service: where its code or image comes from, whether it is running, and the hostnames it answers on.",
     input: serviceInput,
     scope: "deploy.read",
@@ -114,6 +116,7 @@ const serviceTool: McpTool<z.infer<typeof serviceInput>> = {
 const startTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_start",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Deploy a service from its configured source. Returns at once with the deployment id; read its progress with deploy_deployment. Does not change how the service is built.",
     input: serviceInput,
     scope: "deploy.manage",
@@ -131,6 +134,7 @@ const startTool: McpTool<z.infer<typeof serviceInput>> = {
 
 const deploymentsTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_deployments",
+    // i18n-ignore read by the calling model, not shown to a person
     description: "A service's recent deployments, newest first, with status and commit.",
     input: serviceInput,
     scope: "deploy.read",
@@ -170,6 +174,7 @@ const deploymentInput = z.object({
 const deploymentTool: McpTool<z.infer<typeof deploymentInput>> = {
     name: "deploy_deployment",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "A deployment's status and the end of its build log - what to read when a deploy failed, or to see whether it has finished.",
     input: deploymentInput,
     scope: "deploy.read",
@@ -197,6 +202,7 @@ const logsInput = serviceInput.extend({
 const logsTool: McpTool<z.infer<typeof logsInput>> = {
     name: "deploy_logs",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "What a service's running container has printed recently. For a failed build use deploy_deployment instead - this is the app's own output.",
     input: logsInput,
     scope: "deploy.read",
@@ -212,6 +218,7 @@ const logsTool: McpTool<z.infer<typeof logsInput>> = {
 const variablesTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_variables",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "A service's environment variables by name. Secret values are never shown - only that the variable exists.",
     input: serviceInput,
     scope: "deploy.read",
@@ -235,6 +242,7 @@ const setVariableInput = serviceInput.merge(setVariableSchema);
 const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
     name: "deploy_set_variable",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Set one environment variable on a service (secret by default). The running service keeps its old value until it is redeployed: pass redeploy to do that now, or deploy once after setting several.",
     input: setVariableInput,
     scope: "deploy.manage",
@@ -258,6 +266,7 @@ const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
 
 const domainsTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_domains",
+    // i18n-ignore read by the calling model, not shown to a person
     description: "The hostnames a service answers on, with whether each is enabled and reachable.",
     input: serviceInput,
     scope: "deploy.read",
@@ -284,6 +293,7 @@ const addDomainInput = serviceInput.merge(addDomainSchema);
 const addDomainTool: McpTool<z.infer<typeof addDomainInput>> = {
     name: "deploy_add_domain",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Attach a hostname to a service, or its free subdomain when no hostname is given. Does not buy or register a domain.",
     input: addDomainInput,
     scope: "deploy.manage",
@@ -303,6 +313,7 @@ const addDomainTool: McpTool<z.infer<typeof addDomainInput>> = {
 const restartTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_restart",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Restart a service's running container from its current configuration. Does not rebuild it.",
     input: serviceInput,
     scope: "deploy.manage",
@@ -322,6 +333,7 @@ const rollbackInput = z.object({
 const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
     name: "deploy_rollback",
     description:
+        // i18n-ignore read by the calling model, not shown to a person
         "Make an earlier deployment of a service its running release again, from its kept image - nothing is rebuilt. Only releases deploy_deployments marks as able to roll back qualify.",
     input: rollbackInput,
     scope: "deploy.manage",

@@ -21,6 +21,7 @@ function params(request: Request): Record<string, string> {
 }
 
 function refused(error: { issues: { message: string }[] }): Response {
+    // i18n-ignore a schema always names its issue; this fallback is never reached
     return NextResponse.json({ error: error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
 }
 

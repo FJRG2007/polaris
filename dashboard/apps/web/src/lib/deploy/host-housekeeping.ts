@@ -43,6 +43,7 @@ import {
     serverDiskFullness,
     serversWithDeployments
 } from "@/lib/deploy/server-space";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 /** What was last reported, so a disk that is tight for a month is one message
  *  rather than a hundred and twenty. */
@@ -216,20 +217,18 @@ async function warn(fullness: number, freed: number): Promise<void> {
             .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
             .catch(() => []);
         const sent = await Promise.allSettled(
-            admins.map((admin) =>
-                notify({
+            admins.map(async (admin) => {
+                const t = await wordsFor(admin.id, "notices");
+                return notify({
                     userId: admin.id,
                     event: "server.space",
-                    title: `This server's disk is ${Math.round(fullness * 100)}% full`,
-                    body:
-                        freed > 0
-                            ? "Polaris handed back everything nothing was using. What is left is volumes and the files somebody put in them, and only a person can decide what goes."
-                            : "There was nothing left to hand back. What is using it is volumes and the files somebody put in them, and only a person can decide what goes.",
+                    title: t("disk.fullTitle", { percent: Math.round(fullness * 100) }),
+                    body: freed > 0 ? t("disk.freedBody") : t("disk.nothingFreedBody"),
                     audience: "admins",
                     actionRequired: true,
                     href: "/apps/servers"
-                })
-            )
+                });
+            })
         );
         // Written last, and only once the alert is out. The other way round - the
         // order this was in - a dispatch that failed still marked the band as

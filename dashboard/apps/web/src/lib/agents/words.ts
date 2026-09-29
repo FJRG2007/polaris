@@ -146,7 +146,8 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
     ],
     [/^Polaris no longer knows an agent called (.+)\.$/, "text.unknownAgent", ["cli"]],
     [/^GitHub returned (\d+) starting the workflow$/, "text.githubStart", ["status"]],
-    [/^GitHub returned (\d+) reading the repository$/, "text.githubRead", ["status"]]
+    [/^GitHub returned (\d+) reading the repository$/, "text.githubRead", ["status"]],
+    [/^The workflow finished as (.+)\. Its log is on the run in GitHub Actions\.$/, "text.workflowFinished", ["conclusion"]]
 ];
 
 /** The usage-limit refusal, which names whose limit, what and over what window. */

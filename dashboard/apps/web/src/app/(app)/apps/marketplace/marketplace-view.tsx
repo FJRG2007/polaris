@@ -33,7 +33,7 @@ import { AppMark } from "@/components/app-mark";
 import { appProvenance } from "@/lib/apps/provenance";
 import { Loader2, Search, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { appInstallInputSchema } from "@/lib/apps/install-schema";
+import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -70,6 +70,7 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { validationMessage } from "@/components/i18n/validation-message";
 
 type Words = NamespaceTranslator<"marketplace">;
 
@@ -519,6 +520,7 @@ function AppCard({
 
 function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void }) {
     const t = useTranslations("marketplace");
+    const tvalidation = useTranslations("validation");
     const tcommon = useTranslations("common");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -578,7 +580,14 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
         };
         const parsed = appInstallInputSchema.safeParse(input);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? t("errors.checkForm"));
+            const message = parsed.error.issues[0]?.message;
+            setError(
+                !message
+                    ? t("errors.checkForm")
+                    : message === NAS_CONNECTION_REQUIRED
+                      ? t("errors.chooseNas")
+                      : validationMessage(tvalidation, message)
+            );
             return;
         }
         startTransition(async () => {

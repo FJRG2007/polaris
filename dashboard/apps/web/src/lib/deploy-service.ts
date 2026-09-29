@@ -4173,6 +4173,7 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
     running.get(deploymentId)?.abort(new Error("cancelled"));
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
+        // i18n-ignore stored with the deployment, written once in the default language
         error: "Cancelled",
         finishedAt: new Date()
     });
@@ -4201,6 +4202,7 @@ export async function recoverAbandonedDeployments(): Promise<void> {
         where: { id: { in: abandoned.map((row) => row.id) } },
         data: {
             status: "failed",
+            // i18n-ignore stored with the deployment, written once in the default language
             error: "Polaris restarted while this deploy was running",
             finishedAt: new Date()
         }
@@ -4358,6 +4360,7 @@ export async function executeDeployment(
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
         await settleDeployment(deploymentId, {
             status: "failed",
+            // i18n-ignore stored with the deployment, written once in the default language
             error: error instanceof Error ? error.message : "deploy failed",
             finishedAt: new Date()
         });
@@ -4414,7 +4417,9 @@ async function settleCancelled(
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
         error: timedOut
+            // i18n-ignore stored with the deployment, written once in the default language
             ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
+            // i18n-ignore stored with the deployment, written once in the default language
             : "Cancelled",
         finishedAt: new Date()
     });

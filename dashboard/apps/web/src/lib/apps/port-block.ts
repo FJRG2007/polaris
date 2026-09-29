@@ -66,8 +66,10 @@ const blockSchema = z
         start: z.number().int().min(1024).max(65535),
         end: z.number().int().min(1024).max(65535)
     })
+    // i18n-ignore the form checks with parseBlockInput and says its own sentence; this guards the store
     .refine((block) => block.start <= block.end, { message: "The block starts after it ends" })
     .refine((block) => !RESERVED_PORTS.some((port) => port >= block.start && port <= block.end), {
+        // i18n-ignore the form checks with parseBlockInput and says its own sentence; this guards the store
         message: "The block cannot contain 80 or 443, which carry the websites Polaris serves"
     });
 

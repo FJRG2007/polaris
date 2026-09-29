@@ -173,6 +173,7 @@ export async function installWorkflow(params: {
         method: "PUT",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
+            // i18n-ignore a commit message in the repository, read on GitHub
             message: sha ? "Update the Polaris agent workflow" : "Add the Polaris agent workflow",
             content: Buffer.from(params.content, "utf8").toString("base64"),
             ...(sha ? { sha } : {})
@@ -342,6 +343,7 @@ export async function removeWorkflow(params: { token: string; repoFullName: stri
     await fetch(path, {
         method: "DELETE",
         headers: { ...headers, "Content-Type": "application/json" },
+        // i18n-ignore a commit message in the repository, read on GitHub
         body: JSON.stringify({ message: "Remove the Polaris agent workflow", sha: body.sha })
     });
 }

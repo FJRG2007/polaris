@@ -39,8 +39,10 @@ function digest(value: string): Buffer {
  */
 export function authorizeCron(request: Request): Response | null {
     const secret = loadEnv().POLARIS_CRON_SECRET;
+    // i18n-ignore answered to the cron caller, a machine
     if (!secret) return Response.json({ error: "Cron is not configured." }, { status: 503 });
     if (!timingSafeEqual(digest(presentedToken(request)), digest(secret))) {
+        // i18n-ignore answered to the cron caller, a machine
         return Response.json({ error: "Not authorized." }, { status: 401 });
     }
     return null;

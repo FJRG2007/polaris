@@ -64,6 +64,7 @@ export function publicFailure(caught: unknown, operation: string): PublicFailure
         return { status: caught.status, message: caught.message };
     }
     const message = caught instanceof Error ? caught.message.trim() : "";
+    // i18n-ignore the deploy API answers programs, in one language
     if (NOT_FOUND.test(message)) return { status: 404, message: "Not found" };
     // A subclass is somebody else's error type - the ORM, the runtime, a driver -
     // and a `code` is an errno or a driver's own classification. Neither is a
@@ -84,6 +85,7 @@ export function publicFailure(caught: unknown, operation: string): PublicFailure
     console.error(`deploy api: could not ${operation}:`, caught);
     return {
         status: 500,
+        // i18n-ignore the deploy API answers programs, in one language
         message: `Polaris could not ${operation}. The reason has been logged on the server.`
     };
 }
