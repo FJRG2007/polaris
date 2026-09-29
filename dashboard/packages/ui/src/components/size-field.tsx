@@ -21,6 +21,7 @@ import { Input } from "./input";
 import { Select } from "./select";
 import { useEffect, useState } from "react";
 import { convertSize, readableSize, unitsFrom, type SizeUnit } from "@polaris/core";
+import { useUiStrings } from "../lib/ui-strings";
 
 export interface SizeFieldProps {
     /** The value, in `stored`. */
@@ -50,6 +51,7 @@ export function SizeField({
 }: SizeFieldProps) {
     const units = unitsFrom(stored);
     const [unit, setUnit] = useState<SizeUnit>(() => readableSize(value, stored).unit);
+    const words = useUiStrings();
     const [text, setText] = useState(() => String(readableSize(value, stored).value));
 
     // The value can move underneath this - a form that loaded, a reset, another
@@ -104,7 +106,7 @@ export function SizeField({
                 }}
                 options={units.map((entry) => ({ value: entry, label: entry }))}
                 className="w-20"
-                aria-label="Unit"
+                aria-label={words.unit}
             />
         </div>
     );

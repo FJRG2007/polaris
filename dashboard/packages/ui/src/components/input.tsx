@@ -9,6 +9,7 @@
 import { cn } from "../lib/cn";
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
+import { useUiStrings } from "../lib/ui-strings";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     /**
@@ -41,6 +42,7 @@ const bareClass =
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type, bare, ...props }, ref) => {
     const [revealed, setRevealed] = useState(false);
+    const words = useUiStrings();
     const isPassword = type === "password";
 
     const field = (
@@ -62,8 +64,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type
                 tabIndex={-1}
                 onClick={() => setRevealed((value) => !value)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
-                aria-label={revealed ? "Hide password" : "Show password"}
-                title={revealed ? "Hide password" : "Show password"}
+                aria-label={revealed ? words.hidePassword : words.showPassword}
+                title={revealed ? words.hidePassword : words.showPassword}
             >
                 {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>

@@ -6,6 +6,7 @@ import { cn } from "../lib/cn";
 import { X } from "lucide-react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { useUiStrings } from "../lib/ui-strings";
 
 export const Dialog = RadixDialog.Root;
 export const DialogTrigger = RadixDialog.Trigger;
@@ -36,13 +37,20 @@ export const DialogContent = forwardRef<
             {showClose ? (
                 <RadixDialog.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground ">
                     <X className="size-4" />
-                    <span className="sr-only">Close</span>
+                    <span className="sr-only">
+                        <CloseWord />
+                    </span>
                 </RadixDialog.Close>
             ) : null}
         </RadixDialog.Content>
     </RadixDialog.Portal>
 ));
 DialogContent.displayName = "DialogContent";
+
+/** The close button's name, in the reader's words. */
+function CloseWord() {
+    return <>{useUiStrings().close}</>;
+}
 
 /**
  * A dialog that opens beside something rather than over everything.

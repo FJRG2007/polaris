@@ -62,7 +62,36 @@ function UiWords({ children }: { children: ReactNode }) {
             deleteQuestion: (name) => parts(t.rich("ui.deleteQuestion", { name })),
             typeToConfirm: (name) => parts(t.rich("ui.typeToConfirm", { name })),
             copy: t("ui.copy"),
-            copyNamed: (label) => t("ui.copyNamed", { label })
+            copyNamed: (label) => t("ui.copyNamed", { label }),
+            close: t("ui.close"),
+            showPassword: t("ui.showPassword"),
+            hidePassword: t("ui.hidePassword"),
+            noData: t("ui.noData"),
+            noDataInRange: t("ui.noDataInRange"),
+            hexColour: t("ui.hexColour"),
+            hexOf: (label) => t("ui.hexOf", { label }),
+            unit: t("ui.unit"),
+            reply: t("ui.reply"),
+            send: t("ui.send"),
+            sent: t("ui.sent"),
+            dismiss: t("ui.dismiss"),
+            couldNotSend: t("ui.couldNotSend"),
+            didNotWork: t("ui.didNotWork"),
+            openNavigation: t("ui.openNavigation"),
+            navigation: t("ui.navigation"),
+            resetToDefault: t("ui.resetToDefault"),
+            resetLayout: t("ui.resetLayout"),
+            dns: {
+                type: t("ui.dns.type"),
+                name: t("ui.dns.name"),
+                content: t("ui.dns.content"),
+                status: t("ui.dns.status"),
+                done: t("ui.dns.done"),
+                waiting: t("ui.dns.waiting"),
+                conflict: t("ui.dns.conflict"),
+                nameOf: (name) => t("ui.dns.nameOf", { name }),
+                valueOf: (value) => t("ui.dns.valueOf", { value })
+            }
         };
     }, [t]);
     return <UiStringsProvider strings={strings}>{children}</UiStringsProvider>;

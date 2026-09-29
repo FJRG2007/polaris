@@ -40,6 +40,7 @@ import {
     type PointerEvent as ReactPointerEvent,
     type KeyboardEvent
 } from "react";
+import { useUiStrings } from "../lib/ui-strings";
 
 /** How far one arrow press moves it. A step small enough to arrive somewhere
  *  deliberate, large enough that crossing a panel is not a hundred presses. */
@@ -93,6 +94,7 @@ export function ResizeHandle({
     label: string;
     className?: string;
 }) {
+    const words = useUiStrings();
     // Where the press started, and how big the panel was then. Held in a ref
     // rather than in state: it changes on every pointer event and nothing drawn
     // depends on it, so a render per pixel would be a render for nothing.
@@ -188,13 +190,13 @@ export function ResizeHandle({
                 {onReset && (
                     <ContextMenuItem onSelect={onReset}>
                         <RotateCcw className="size-3.5" />
-                        Reset to default
+                        {words.resetToDefault}
                     </ContextMenuItem>
                 )}
                 {onResetAll && (
                     <ContextMenuItem onSelect={onResetAll}>
                         <LayoutPanelLeft className="size-3.5" />
-                        Reset layout
+                        {words.resetLayout}
                     </ContextMenuItem>
                 )}
             </ContextMenuContent>

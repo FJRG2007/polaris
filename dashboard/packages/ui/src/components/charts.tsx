@@ -11,6 +11,7 @@
 import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { cn } from "../lib/cn";
 import { summarizeSeries, type SeriesSummary } from "../lib/series-summary";
+import { useUiStrings } from "../lib/ui-strings";
 
 export type GaugeTone = "primary" | "success" | "warning" | "danger";
 
@@ -137,6 +138,7 @@ export function TimeSeriesChart({
     const gradientId = useId();
     const plotRef = useRef<HTMLDivElement>(null);
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+    const words = useUiStrings();
     const width = 600;
     const span = Math.max(1, to - from);
     const present = points.filter((point): point is { t: number; v: number } => point.v != null);
@@ -228,7 +230,7 @@ export function TimeSeriesChart({
                     className="mt-2 flex items-center justify-center rounded-md text-xs text-muted-foreground"
                     style={{ height }}
                 >
-                    No data in this range
+                    {words.noDataInRange}
                 </div>
             ) : (
                 <div
@@ -305,7 +307,7 @@ export function TimeSeriesChart({
                             >
                                 <span className="flex items-baseline gap-2">
                                     <span className="font-medium text-foreground">
-                                        {hovered.v != null ? format(hovered.v) : "No data"}
+                                        {hovered.v != null ? format(hovered.v) : words.noData}
                                     </span>
                                     <span className="text-muted-foreground">{stamp(hovered.t)}</span>
                                 </span>

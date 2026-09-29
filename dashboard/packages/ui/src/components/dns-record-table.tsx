@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * DNS records somebody has to create at their registrar, as a table in the
  * columns a registrar's own list uses: type, name, content, and whether each is
@@ -16,6 +18,7 @@ import { Badge } from "./badge";
 import type { ReactNode } from "react";
 import { CopyButton } from "./copy-button";
 import { CheckCircle2, Clock, TriangleAlert } from "lucide-react";
+import { useUiStrings } from "../lib/ui-strings";
 
 export type DnsRecordStatus = "done" | "waiting" | "conflict";
 
@@ -33,10 +36,11 @@ export interface DnsRecordRow {
     readonly note?: ReactNode;
 }
 
-const STATUS: Record<DnsRecordStatus, { label: string; variant: "success" | "neutral" | "warning" }> = {
-    done: { label: "In place", variant: "success" },
-    waiting: { label: "Not seen yet", variant: "neutral" },
-    conflict: { label: "Points elsewhere", variant: "warning" }
+/** How each state is drawn; what it is called is `UiStrings.dns.<status>`. */
+const STATUS_VARIANT: Record<DnsRecordStatus, "success" | "neutral" | "warning"> = {
+    done: "success",
+    waiting: "neutral",
+    conflict: "warning"
 };
 
 function StatusIcon({ status }: { status: DnsRecordStatus }) {
@@ -46,6 +50,7 @@ function StatusIcon({ status }: { status: DnsRecordStatus }) {
 }
 
 export function DnsRecordTable({ records, className }: { records: readonly DnsRecordRow[]; className?: string }) {
+    const words = useUiStrings().dns;
     const withStatus = records.some((record) => record.status);
     return (
         <div className={cn("min-w-0 overflow-x-auto rounded-lg border border-border bg-card", className)}>
@@ -53,17 +58,17 @@ export function DnsRecordTable({ records, className }: { records: readonly DnsRe
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-16 px-3 py-2 font-medium">
-                            Type
+                            {words.type}
                         </th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            Name
+                            {words.name}
                         </th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            Content
+                            {words.content}
                         </th>
                         {withStatus && (
                             <th scope="col" className="px-3 py-2 font-medium">
-                                Status
+                                {words.status}
                             </th>
                         )}
                     </tr>
@@ -79,7 +84,7 @@ export function DnsRecordTable({ records, className }: { records: readonly DnsRe
                                     <code className="min-w-0 break-all font-mono text-xs text-foreground">
                                         {record.name}
                                     </code>
-                                    <CopyButton value={record.name} label={`name ${record.name}`} className="mt-px shrink-0" />
+                                    <CopyButton value={record.name} label={words.nameOf(record.name)} className="mt-px shrink-0" />
                                 </span>
                                 {record.note ? (
                                     <span className="mt-0.5 block text-xs text-muted-foreground">{record.note}</span>
@@ -93,7 +98,7 @@ export function DnsRecordTable({ records, className }: { records: readonly DnsRe
                                         </code>
                                         <CopyButton
                                             value={record.value}
-                                            label={`value ${record.value}`}
+                                            label={words.valueOf(record.value)}
                                             className="mt-px shrink-0"
                                         />
                                     </span>
@@ -106,9 +111,9 @@ export function DnsRecordTable({ records, className }: { records: readonly DnsRe
                             {withStatus && (
                                 <td className="whitespace-nowrap px-3 py-2">
                                     {record.status ? (
-                                        <Badge variant={STATUS[record.status].variant}>
+                                        <Badge variant={STATUS_VARIANT[record.status]}>
                                             <StatusIcon status={record.status} />
-                                            {record.statusLabel ?? STATUS[record.status].label}
+                                            {record.statusLabel ?? words[record.status]}
                                         </Badge>
                                     ) : null}
                                 </td>

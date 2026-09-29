@@ -28,6 +28,7 @@
 import { cn } from "../lib/cn";
 import { hexToHsv, hsvToHex, type Hsv } from "@polaris/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useUiStrings } from "../lib/ui-strings";
 
 /** A handful of colours that look right on a dashboard, so the common case is
  *  one press rather than a drag. */
@@ -57,6 +58,7 @@ export function ColorPicker({
     label?: string;
     className?: string;
 }) {
+    const words = useUiStrings();
     /**
      * The colour being dragged, in the space it is being dragged in.
      *
@@ -195,7 +197,7 @@ export function ColorPicker({
                 />
                 <input
                     value={typed}
-                    aria-label={label ? `${label}: hex` : "Hex colour"}
+                    aria-label={label ? words.hexOf(label) : words.hexColour}
                     spellCheck={false}
                     onChange={(event) => {
                         const next = event.target.value;

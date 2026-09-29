@@ -48,6 +48,7 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useUiStrings } from "../lib/ui-strings";
 
 /** How many are on screen at once. */
 const MOST = 4;
@@ -218,6 +219,7 @@ function useSeen(): boolean {
 }
 
 function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }) {
+    const words = useUiStrings();
     const [held, setHeld] = useState(false);
     /** The answer being written on it: null while nobody has asked to. */
     const [answer, setAnswer] = useState<string | null>(null);
@@ -249,7 +251,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         setSending(true);
         setProblem(null);
         const sentFrom = showing.current;
-        const refused = await toast.reply.send(text).catch(() => "That could not be sent");
+        const refused = await toast.reply.send(text).catch(() => words.couldNotSend);
         setSending(false);
         if (refused) {
             setProblem(refused);
@@ -264,7 +266,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         const actedFrom = showing.current;
         setActing(action.label);
         setProblem(null);
-        const refused = await action.run().catch(() => "That did not work");
+        const refused = await action.run().catch(() => words.didNotWork);
         setActing(null);
         if (showing.current !== actedFrom) return;
         if (refused) setProblem(refused);
@@ -319,7 +321,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                     // what the note points at.
                     <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
                         {sent ? (
-                            <span className="block text-xs text-muted-foreground">Sent</span>
+                            <span className="block text-xs text-muted-foreground">{words.sent}</span>
                         ) : answer === null || !toast.reply ? (
                             <span className="flex flex-wrap items-center gap-1">
                                 {toast.reply ? (
@@ -330,7 +332,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                                         className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-card-hover disabled:opacity-50"
                                     >
                                         <Reply className="size-3.5" />
-                                        Reply
+                                        {words.reply}
                                     </button>
                                 ) : null}
                                 {toast.actions?.map((action) => (
@@ -376,8 +378,8 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                                     type="button"
                                     onClick={() => void send()}
                                     disabled={sending || answer.trim().length === 0}
-                                    aria-label="Send"
-                                    title="Send"
+                                    aria-label={words.send}
+                                    title={words.send}
                                     className="shrink-0 rounded p-1.5 text-primary transition-colors hover:bg-card-hover disabled:opacity-50"
                                 >
                                     {sending ? (
@@ -398,7 +400,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
             </span>
             <button
                 type="button"
-                aria-label="Dismiss"
+                aria-label={words.dismiss}
                 onClick={(event) => {
                     // The note itself may be pressable, and dismissing is not
                     // the same as opening what it points at.
