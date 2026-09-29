@@ -1180,6 +1180,10 @@
         "web/src/app/(app)/apps/telemetry/projects-grid.tsx",
         "web/src/app/(app)/apps/telemetry/reporter-rules.tsx",
         "web/src/app/(app)/apps/telemetry/telemetry-view.tsx",
-        "web/src/app/(app)/apps/telemetry/layout.tsx"
+        "web/src/app/(app)/apps/telemetry/layout.tsx",
+        "web/src/app/(app)/apps/analytics/actions.ts",
+        "web/src/app/(app)/apps/analytics/analytics-view.tsx",
+        "web/src/app/(app)/apps/analytics/site-catalog.ts",
+        "web/src/app/(app)/apps/analytics/layout.tsx"
     ]
 }

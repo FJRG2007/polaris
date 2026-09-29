@@ -1,1 +1,102 @@
-{}
+{
+    "scopes": {
+        "application": "Servicio",
+        "polaris": "Polaris"
+    },
+    "ranges": {
+        "r24h": "Últimas 24 horas",
+        "r7d": "Últimos 7 días",
+        "r30d": "Últimos 30 días",
+        "r90d": "Últimos 90 días",
+        "r12m": "Últimos 12 meses"
+    },
+    "view": {
+        "title": "Analítica",
+        "online": "{count} en línea",
+        "noServices": "Aún no hay servicios. Despliega uno y sus visitas aparecerán aquí solas, sin añadir ningún script.",
+        "whatToMeasure": "Qué medir",
+        "noServicesShort": "Aún no hay servicios.",
+        "traffic": "Tráfico",
+        "fromDaily": "De los totales diarios - una barra es un día"
+    },
+    "cards": {
+        "dailyVisitors": "Visitantes diarios",
+        "visitors": "Visitantes",
+        "dailyVisitorsHint": "Visitas distintas. Quien vuelve otro día cuenta de nuevo: las sesiones no usan cookies y cambian cada día, así que no hay nada con que unirlas.",
+        "visitorsHint": "Visitas distintas en las últimas 24 horas.",
+        "pageviews": "Vistas",
+        "pageviewsHint": "Páginas leídas.",
+        "bounce": "Tasa de rebote",
+        "bounceHint": "Visitas que leyeron exactamente una página.",
+        "duration": "Duración",
+        "durationHint": "Media, de las visitas lo bastante largas para medirse.",
+        "durationOff": "Solo se puede medir con el rastreador activado. Sin él, una visita es una línea de registro sin final."
+    },
+    "breakdowns": {
+        "notKept": "No se guarda en los totales diarios de los que sale este periodo. Elige un periodo más corto para verlo.",
+        "pages": "Páginas",
+        "noPages": "Aún no se ha leído ninguna página.",
+        "entry": "Entrada",
+        "exit": "Salida",
+        "noVisits": "Aún no hay visitas.",
+        "referrers": "Referentes",
+        "nowhere": "Aún de ningún sitio.",
+        "channels": "Canales",
+        "nothing": "Aún nada.",
+        "campaigns": "Campañas",
+        "noCampaigns": "Aún no hay enlaces etiquetados.",
+        "browsers": "Navegadores",
+        "systems": "Sistemas",
+        "devices": "Dispositivos",
+        "screens": "Pantallas",
+        "noScreens": "Un registro no ve pantallas. Activa el rastreador para esto.",
+        "countries": "Países",
+        "noCountries": "Aún no hay ubicación. Se lee de la zona horaria del visitante, así que necesita el rastreador.",
+        "languages": "Idiomas",
+        "addresses": "Direcciones",
+        "events": "Eventos",
+        "noEvents": "No hay eventos propios. Llama a polaris.event(''name'') desde tu página.",
+        "firewall": "Bloquear o inspeccionar {ip} en el cortafuegos"
+    },
+    "recent": {
+        "title": "Visitas recientes",
+        "none": "Aún nadie. Una visita aparece aquí en menos de un minuto.",
+        "lastSeen": "Última vez",
+        "address": "Dirección",
+        "whereFrom": "De dónde",
+        "lastPage": "Última página",
+        "client": "Cliente",
+        "time": "Tiempo",
+        "direct": "Directo",
+        "clientOn": "{browser} en {os}"
+    },
+    "tracker": {
+        "title": "Rastreador",
+        "intro": "Las páginas vistas, los referentes y los dispositivos ya se cuentan desde el borde: este servicio no necesitó configuración para eso. El script añade las cuatro cosas que un registro del servidor no ve: cuánto duró una visita, la pantalla en que se leyó, los cambios de ruta de una sola página y tus propios eventos.",
+        "accept": "Aceptar latidos del rastreador",
+        "acceptHint": "Mientras esté desactivado, el endpoint ignora esta clave, así que un script que quede en una página tras desactivarlo no registra nada.",
+        "paste": "Pégalo en el head de la página",
+        "copied": "Copiado",
+        "copy": "Copiar",
+        "noCookies": "Sin cookies y sin guardar nada en el equipo del visitante, así que aquí no hay nada para lo que pedir consentimiento.",
+        "newKey": "Nueva clave"
+    },
+    "settings": {
+        "title": "Recogida",
+        "wholeInstance": "Toda la instancia",
+        "edgeLog": "Contar visitas del registro del borde",
+        "edgeLogHint": "Así obtiene analítica cada servicio desplegado sin script. Desactivarlo deja solo lo que envía el rastreador.",
+        "bots": "Contar los bots reconocidos como visitantes",
+        "botsHint": "Desactivado, porque un panel donde un rastreador supera a todas las páginas reales es uno que nadie lee. El cortafuegos es donde merece la pena mirar el tráfico de bots.",
+        "keepFor": "Guardar detalle de visitas",
+        "days": "días",
+        "keepHint": "Después se descartan las direcciones, las visitas individuales y sus páginas. Se conservan los totales diarios de los gráficos, así que el historial sigue siendo comparable sin guardar una fila por petición."
+    },
+    "errors": {
+        "notMeasured": "Eso no es algo que mida Polaris.",
+        "range": "Periodo desconocido.",
+        "notYoursToSee": "Eso no es tuyo para verlo.",
+        "notYoursToChange": "Eso no es tuyo para cambiarlo.",
+        "settings": "Esos ajustes no son válidos."
+    }
+}

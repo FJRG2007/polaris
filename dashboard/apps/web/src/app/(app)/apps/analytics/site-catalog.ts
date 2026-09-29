@@ -7,8 +7,9 @@
  */
 
 export const ANALYTICS_SCOPES = [
+    // i18n-ignore drawn as analytics.scopes.<value> in the reader's words
     { value: "application", label: "Service" },
-    { value: "polaris", label: "Polaris" }
+    { value: "polaris", label: "Polaris" } // i18n-ignore the product's name
 ] as const;
 
 export type AnalyticsScope = (typeof ANALYTICS_SCOPES)[number]["value"];

@@ -28,6 +28,13 @@ import {
     type AnalyticsScopeType,
     type AnalyticsSiteView
 } from "@/lib/analytics-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** A reply in the reader's language. */
+async function say(key: NamespaceKey<"analytics">): Promise<string> {
+    return (await getTranslations("analytics"))(key);
+}
 
 const ANALYTICS_PATH = "/apps/analytics";
 
@@ -145,12 +152,12 @@ export async function getAnalyticsOverviewAction(input: {
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse({ scopeType: input.scopeType, scopeId: input.scopeId });
-    if (!scope.success) return { error: "That is not something Polaris measures." };
+    if (!scope.success) return { error: await say("errors.notMeasured") };
     const range = visitRangeSchema.safeParse(input.range);
-    if (!range.success) return { error: "Unknown time range." };
+    if (!range.success) return { error: await say("errors.range") };
 
     const site = await resolveSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
-    if (!site) return { error: "That is not yours to look at." };
+    if (!site) return { error: await say("errors.notYoursToSee") };
 
     const [view, recent, settings] = await Promise.all([
         readAnalytics(site, range.data),
@@ -168,14 +175,14 @@ export async function setTrackerEnabledAction(input: {
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
-    if (!scope.success) return { error: "That is not something Polaris measures." };
+    if (!scope.success) return { error: await say("errors.notMeasured") };
     const site = await resolveWritableSite(
         user.id,
         canOperate,
         scope.data.scopeType,
         scope.data.scopeId
     );
-    if (!site) return { error: "That is not yours to change." };
+    if (!site) return { error: await say("errors.notYoursToChange") };
 
     await setTrackerEnabled(site.id, input.enabled === true);
     await recordAudit({
@@ -195,14 +202,14 @@ export async function rotateTrackerKeyAction(input: {
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
-    if (!scope.success) return { error: "That is not something Polaris measures." };
+    if (!scope.success) return { error: await say("errors.notMeasured") };
     const site = await resolveWritableSite(
         user.id,
         canOperate,
         scope.data.scopeType,
         scope.data.scopeId
     );
-    if (!site) return { error: "That is not yours to change." };
+    if (!site) return { error: await say("errors.notYoursToChange") };
 
     const publicKey = await rotateTrackerKey(site.id);
     await recordAudit({
@@ -220,7 +227,7 @@ export async function setAnalyticsSettingsAction(input: unknown): Promise<{ erro
     const user = await requirePermission("system.manage");
     const parsed = analyticsSettingsSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Those settings are not valid." };
+        return { error: await say("errors.settings") };
     await setAnalyticsSettings(parsed.data);
     await recordAudit({
         actorId: user.id,

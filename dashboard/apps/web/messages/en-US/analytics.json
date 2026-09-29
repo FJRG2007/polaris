@@ -1,1 +1,102 @@
-{}
+{
+    "scopes": {
+        "application": "Service",
+        "polaris": "Polaris"
+    },
+    "ranges": {
+        "r24h": "Last 24 hours",
+        "r7d": "Last 7 days",
+        "r30d": "Last 30 days",
+        "r90d": "Last 90 days",
+        "r12m": "Last 12 months"
+    },
+    "view": {
+        "title": "Analytics",
+        "online": "{count} online",
+        "noServices": "No services yet. Deploy one and its visitors appear here on their own - no script to add.",
+        "whatToMeasure": "What to measure",
+        "noServicesShort": "No services yet.",
+        "traffic": "Traffic",
+        "fromDaily": "From daily totals - one bar is a day"
+    },
+    "cards": {
+        "dailyVisitors": "Daily visitors",
+        "visitors": "Visitors",
+        "dailyVisitorsHint": "Distinct visits. Someone who came back on another day counts again - sessions are cookieless and rotate daily, so there is nothing to join them by.",
+        "visitorsHint": "Distinct visits in the last 24 hours.",
+        "pageviews": "Pageviews",
+        "pageviewsHint": "Pages read.",
+        "bounce": "Bounce rate",
+        "bounceHint": "Visits that read exactly one page.",
+        "duration": "Visit duration",
+        "durationHint": "Average, over the visits long enough to measure.",
+        "durationOff": "Only measurable with the tracker on. Without it, a visit is one line in a log with no end."
+    },
+    "breakdowns": {
+        "notKept": "Not kept in the daily totals this range is drawn from. Choose a shorter range to see it.",
+        "pages": "Pages",
+        "noPages": "No pages read yet.",
+        "entry": "Entry",
+        "exit": "Exit",
+        "noVisits": "No visits yet.",
+        "referrers": "Referrers",
+        "nowhere": "Nowhere yet.",
+        "channels": "Channels",
+        "nothing": "Nothing yet.",
+        "campaigns": "Campaigns",
+        "noCampaigns": "No tagged links yet.",
+        "browsers": "Browsers",
+        "systems": "Systems",
+        "devices": "Devices",
+        "screens": "Screens",
+        "noScreens": "A log cannot see a screen. Turn the tracker on for this one.",
+        "countries": "Countries",
+        "noCountries": "No location yet. It is read from the visitor's time zone, so it needs the tracker.",
+        "languages": "Languages",
+        "addresses": "Addresses",
+        "events": "Events",
+        "noEvents": "No custom events. Call polaris.event(''name'') from your page.",
+        "firewall": "Block or inspect {ip} in the firewall"
+    },
+    "recent": {
+        "title": "Recent visits",
+        "none": "Nobody yet. A visit appears here within a minute of it happening.",
+        "lastSeen": "Last seen",
+        "address": "Address",
+        "whereFrom": "Where from",
+        "lastPage": "Last page",
+        "client": "Client",
+        "time": "Time",
+        "direct": "Direct",
+        "clientOn": "{browser} on {os}"
+    },
+    "tracker": {
+        "title": "Tracker",
+        "intro": "Pageviews, referrers and devices are already being counted from the edge - this service needed no setup for that. The script adds the four things a server-side log cannot see: how long a visit lasted, the screen it was read on, single-page route changes, and your own events.",
+        "accept": "Accept beats from the tracker",
+        "acceptHint": "While this is off the endpoint ignores this key, so a script left on a page after you turn it off records nothing.",
+        "paste": "Paste into the page's head",
+        "copied": "Copied",
+        "copy": "Copy",
+        "noCookies": "No cookies and nothing stored on the visitor's machine, so there is nothing here to ask consent for.",
+        "newKey": "New key"
+    },
+    "settings": {
+        "title": "Collection",
+        "wholeInstance": "Whole instance",
+        "edgeLog": "Count visits from the edge log",
+        "edgeLogHint": "How every deployed service gets analytics without a script. Turning this off leaves only what the tracker sends.",
+        "bots": "Count recognized bots as visitors",
+        "botsHint": "Off, because a dashboard where a crawler outranks every real page is one nobody reads. The firewall is where bot traffic is worth looking at.",
+        "keepFor": "Keep per-visit detail for",
+        "days": "days",
+        "keepHint": "Addresses, individual visits and their pages are dropped after this. The daily totals behind the charts are kept, so history stays comparable without keeping a row per request."
+    },
+    "errors": {
+        "notMeasured": "That is not something Polaris measures.",
+        "range": "Unknown time range.",
+        "notYoursToSee": "That is not yours to look at.",
+        "notYoursToChange": "That is not yours to change.",
+        "settings": "Those settings are not valid."
+    }
+}

@@ -22,7 +22,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
 import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
-import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
+import { countryFlag, countryName, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
@@ -32,6 +32,8 @@ import {
     setTrackerEnabledAction,
     type AnalyticsOverview
 } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
@@ -65,6 +67,7 @@ export function AnalyticsView({
     range: VisitRange;
     canOperate: boolean;
 }) {
+    const t = useTranslations("analytics");
     const router = useRouter();
     const [data, setData] = useState<AnalyticsOverview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
@@ -145,7 +148,7 @@ export function AnalyticsView({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-2">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Analytics</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("view.title")}</h1>
                     {data ? (
                         <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">
                             {data.site.name}
@@ -154,7 +157,7 @@ export function AnalyticsView({
                     {data && data.view.online > 0 ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-ink">
                             <span className="size-1.5 animate-pulse rounded-full bg-success" />
-                            {grouped(data.view.online)} online
+                            {t("view.online", { count: grouped(data.view.online) })}
                         </span>
                     ) : null}
                 </div>
@@ -168,7 +171,7 @@ export function AnalyticsView({
 
             {nothingToMeasure ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    No services yet. Deploy one and its visitors appear here on their own - no script to add.
+                    {t("view.noServices")}
                 </p>
             ) : (
                 <>
@@ -197,6 +200,7 @@ function SitePicker({
     services: SiteOption[] | null;
     canOperate: boolean;
 }) {
+    const t = useTranslations("analytics");
     const router = useRouter();
     const params = useSearchParams();
     const scopes = ANALYTICS_SCOPES.filter((entry) => canOperate || entry.value !== "polaris");
@@ -212,9 +216,9 @@ function SitePicker({
     const scopeSelect = (
         <Select
             value={scope}
-            aria-label="What to measure"
+            aria-label={t("view.whatToMeasure")}
             className="h-8 min-w-0 flex-1 font-medium md:w-36 md:min-w-[9rem] md:flex-none"
-            options={scopes.map((entry) => ({ value: entry.value, label: entry.label }))}
+            options={scopes.map((entry) => ({ value: entry.value, label: t(`scopes.${entry.value}`) }))}
             onValueChange={(value) => {
                 const next = value as AnalyticsScope;
                 go(next, next === "application" ? (services?.[0]?.id ?? "") : "");
@@ -229,13 +233,13 @@ function SitePicker({
     ) : services.length > 0 ? (
         <Select
             value={siteId || (services[0]?.id ?? "")}
-            aria-label="Service"
+            aria-label={t("scopes.application")}
             className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
             options={services.map((service) => ({ value: service.id, label: service.label }))}
             onValueChange={(value) => go(scope, value)}
         />
     ) : (
-        <span className="whitespace-nowrap text-sm text-muted-foreground">No services yet.</span>
+        <span className="whitespace-nowrap text-sm text-muted-foreground">{t("view.noServicesShort")}</span>
     );
 
     return (
@@ -257,6 +261,7 @@ function SitePicker({
 }
 
 function RangeTabs({ range }: { range: VisitRange }) {
+    const t = useTranslations("analytics");
     const params = useSearchParams();
     return (
         <ScrollRow className="no-scrollbar -mx-1 flex gap-1 px-1">
@@ -277,7 +282,7 @@ function RangeTabs({ range }: { range: VisitRange }) {
                                 : "border-border text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {VISIT_RANGE_SPEC[value].label}
+                        {t(`ranges.r${value}` as NamespaceKey<"analytics">)}
                     </Link>
                 );
             })}
@@ -286,33 +291,30 @@ function RangeTabs({ range }: { range: VisitRange }) {
 }
 
 function Overview({ data, range }: { data: AnalyticsOverview | null; range: VisitRange }) {
+    const t = useTranslations("analytics");
     const format = useDisplayFormat();
     const multiDay = range !== "24h";
 
     const cards: { label: string; value: string; hint: string }[] = data
         ? [
               {
-                  label: multiDay ? "Daily visitors" : "Visitors",
+                  label: multiDay ? t("cards.dailyVisitors") : t("cards.visitors"),
                   value: grouped(data.view.overview.visitors),
                   // Sessions rotate daily and are cookieless, so there is no identity to
                   // deduplicate across days. Saying so beats quietly showing a number
                   // that means something different at every range.
-                  hint: multiDay
-                      ? "Distinct visits. Someone who came back on another day counts again - sessions are cookieless and rotate daily, so there is nothing to join them by."
-                      : "Distinct visits in the last 24 hours."
+                  hint: multiDay ? t("cards.dailyVisitorsHint") : t("cards.visitorsHint")
               },
-              { label: "Pageviews", value: grouped(data.view.overview.views), hint: "Pages read." },
+              { label: t("cards.pageviews"), value: grouped(data.view.overview.views), hint: t("cards.pageviewsHint") },
               {
-                  label: "Bounce rate",
+                  label: t("cards.bounce"),
                   value: percent(data.view.overview.bounceRate),
-                  hint: "Visits that read exactly one page."
+                  hint: t("cards.bounceHint")
               },
               {
-                  label: "Visit duration",
+                  label: t("cards.duration"),
                   value: duration(data.view.overview.avgVisitSec),
-                  hint: data.site.trackerEnabled
-                      ? "Average, over the visits long enough to measure."
-                      : "Only measurable with the tracker on. Without it, a visit is one line in a log with no end."
+                  hint: data.site.trackerEnabled ? t("cards.durationHint") : t("cards.durationOff")
               }
           ]
         : [];
@@ -346,10 +348,10 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
             <Card>
                 <CardHeader className="flex-row items-center justify-between gap-2">
                     <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="size-4 text-muted-foreground" /> Traffic
+                        <TrendingUp className="size-4 text-muted-foreground" /> {t("view.traffic")}
                     </CardTitle>
                     {data?.view.source === "daily" ? (
-                        <span className="text-xs text-muted-foreground">From daily totals - one bar is a day</span>
+                        <span className="text-xs text-muted-foreground">{t("view.fromDaily")}</span>
                     ) : null}
                 </CardHeader>
                 <CardBody>
@@ -359,7 +361,7 @@ function Overview({ data, range }: { data: AnalyticsOverview | null; range: Visi
                             from={data.view.from}
                             to={data.view.to}
                             summary="sum"
-                            label="Pageviews"
+                            label={t("cards.pageviews")}
                             format={grouped}
                             formatTime={(at) => format.dateTime(at)}
                         />
@@ -452,6 +454,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
 }
 
 function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
+    const t = useTranslations("analytics");
     const rows = data?.view.breakdowns ?? null;
     // Over a long range these come from the daily totals, which do not carry the
     // per-visit dimensions. Saying so beats an empty panel that reads as "nobody used
@@ -459,35 +462,39 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
     const unavailable = new Set(data?.view.unavailable ?? []);
     const why = (dimension: VisitDimension, otherwise: string) =>
         unavailable.has(dimension)
-            ? "Not kept in the daily totals this range is drawn from. Choose a shorter range to see it."
+            ? t("breakdowns.notKept")
             : otherwise;
 
     return (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <BreakdownCard
                 panels={[
-                    { label: "Pages", rows: rows?.path ?? null, empty: "No pages read yet." },
-                    { label: "Entry", rows: rows?.entry ?? null, empty: why("entry", "No visits yet.") },
-                    { label: "Exit", rows: rows?.exit ?? null, empty: why("exit", "No visits yet.") }
+                    { label: t("breakdowns.pages"), rows: rows?.path ?? null, empty: t("breakdowns.noPages") },
+                    { label: t("breakdowns.entry"), rows: rows?.entry ?? null, empty: why("entry", t("breakdowns.noVisits")) },
+                    { label: t("breakdowns.exit"), rows: rows?.exit ?? null, empty: why("exit", t("breakdowns.noVisits")) }
                 ]}
             />
             <BreakdownCard
                 panels={[
-                    { label: "Referrers", rows: rows?.referrer ?? null, empty: "Nowhere yet." },
-                    { label: "Channels", rows: rows?.channel ?? null, empty: "Nothing yet." },
-                    { label: "Campaigns", rows: rows?.campaign ?? null, empty: why("campaign", "No tagged links yet.") }
+                    { label: t("breakdowns.referrers"), rows: rows?.referrer ?? null, empty: t("breakdowns.nowhere") },
+                    { label: t("breakdowns.channels"), rows: rows?.channel ?? null, empty: t("breakdowns.nothing") },
+                    {
+                        label: t("breakdowns.campaigns"),
+                        rows: rows?.campaign ?? null,
+                        empty: why("campaign", t("breakdowns.noCampaigns"))
+                    }
                 ]}
             />
             <BreakdownCard
                 icon={MonitorSmartphone}
                 panels={[
-                    { label: "Browsers", rows: rows?.browser ?? null, empty: "Nothing yet." },
-                    { label: "Systems", rows: rows?.os ?? null, empty: "Nothing yet." },
-                    { label: "Devices", rows: rows?.device ?? null, empty: "Nothing yet." },
+                    { label: t("breakdowns.browsers"), rows: rows?.browser ?? null, empty: t("breakdowns.nothing") },
+                    { label: t("breakdowns.systems"), rows: rows?.os ?? null, empty: t("breakdowns.nothing") },
+                    { label: t("breakdowns.devices"), rows: rows?.device ?? null, empty: t("breakdowns.nothing") },
                     {
-                        label: "Screens",
+                        label: t("breakdowns.screens"),
                         rows: rows?.screen ?? null,
-                        empty: why("screen", "A log cannot see a screen. Turn the tracker on for this one.")
+                        empty: why("screen", t("breakdowns.noScreens"))
                     }
                 ]}
             />
@@ -495,20 +502,20 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
                 icon={Globe}
                 panels={[
                     {
-                        label: "Countries",
+                        label: t("breakdowns.countries"),
                         rows: rows?.country ?? null,
-                        empty: "No location yet. It is read from the visitor's time zone, so it needs the tracker.",
+                        empty: t("breakdowns.noCountries"),
                         render: (code) => `${countryFlag(code)} ${countryName(code)}`
                     },
-                    { label: "Languages", rows: rows?.language ?? null, empty: why("language", "Nothing yet.") }
+                    { label: t("breakdowns.languages"), rows: rows?.language ?? null, empty: why("language", t("breakdowns.nothing")) }
                 ]}
             />
             <BreakdownCard
                 panels={[
                     {
-                        label: "Addresses",
+                        label: t("breakdowns.addresses"),
                         rows: rows?.ip ?? null,
-                        empty: why("ip", "Nothing yet."),
+                        empty: why("ip", t("breakdowns.nothing")),
                         render: (ip) => <IpRow ip={ip} />
                     }
                 ]}
@@ -516,9 +523,9 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
             <BreakdownCard
                 panels={[
                     {
-                        label: "Events",
+                        label: t("breakdowns.events"),
                         rows: rows?.event ?? null,
-                        empty: "No custom events. Call polaris.event('name') from your page."
+                        empty: t("breakdowns.noEvents")
                     }
                 ]}
             />
@@ -529,12 +536,13 @@ function Breakdowns({ data }: { data: AnalyticsOverview | null; }) {
 /** An address is the start of a question, not the end of one - so it links at the
  *  place that can answer it. */
 function IpRow({ ip }: { ip: string }) {
+    const t = useTranslations("analytics");
     return (
         <span className="inline-flex min-w-0 items-center gap-1.5">
             <span className="truncate font-mono text-xs">{ip}</span>
             <Link
                 href="/apps/firewall"
-                title={`Block or inspect ${ip} in the firewall`}
+                title={t("breakdowns.firewall", { ip })}
                 className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
             >
                 <ShieldCheck className="size-3.5" />
@@ -544,12 +552,13 @@ function IpRow({ ip }: { ip: string }) {
 }
 
 function Recent({ data }: { data: AnalyticsOverview | null }) {
+    const t = useTranslations("analytics");
     const format = useDisplayFormat();
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-sm">
-                    <Activity className="size-4 text-muted-foreground" /> Recent visits
+                    <Activity className="size-4 text-muted-foreground" /> {t("recent.title")}
                 </CardTitle>
             </CardHeader>
             <CardBody>
@@ -561,20 +570,20 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                     </div>
                 ) : data.recent.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nobody yet. A visit appears here within a minute of it happening.
+                        {t("recent.none")}
                     </p>
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
                         <table className="w-full min-w-[40rem] text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-border/60">
-                                    <th className="px-2 py-1.5 font-medium">Last seen</th>
-                                    <th className="px-2 py-1.5 font-medium">Address</th>
-                                    <th className="px-2 py-1.5 font-medium">Where from</th>
-                                    <th className="px-2 py-1.5 font-medium">Last page</th>
-                                    <th className="px-2 py-1.5 font-medium">Client</th>
-                                    <th className="px-2 py-1.5 text-right font-medium">Pages</th>
-                                    <th className="px-2 py-1.5 text-right font-medium">Time</th>
+                                    <th className="px-2 py-1.5 font-medium">{t("recent.lastSeen")}</th>
+                                    <th className="px-2 py-1.5 font-medium">{t("recent.address")}</th>
+                                    <th className="px-2 py-1.5 font-medium">{t("recent.whereFrom")}</th>
+                                    <th className="px-2 py-1.5 font-medium">{t("recent.lastPage")}</th>
+                                    <th className="px-2 py-1.5 font-medium">{t("recent.client")}</th>
+                                    <th className="px-2 py-1.5 text-right font-medium">{t("breakdowns.pages")}</th>
+                                    <th className="px-2 py-1.5 text-right font-medium">{t("recent.time")}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/40">
@@ -588,13 +597,13 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                         </td>
                                         <td className="whitespace-nowrap px-2 py-1.5">
                                             {visit.country ? `${countryFlag(visit.country)} ` : ""}
-                                            {visit.referrerSource ?? "Direct"}
+                                            {visit.referrerSource ?? t("recent.direct")}
                                         </td>
                                         <td className="max-w-[16rem] truncate px-2 py-1.5 font-mono text-xs" title={visit.lastPath ?? undefined}>
                                             {visit.lastPath ?? "-"}
                                         </td>
                                         <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
-                                            {visit.browser} on {visit.os}
+                                            {t("recent.clientOn", { browser: visit.browser, os: visit.os })}
                                         </td>
                                         <td className="px-2 py-1.5 text-right tabular-nums">{grouped(visit.views)}</td>
                                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
@@ -624,6 +633,7 @@ function TrackerPanel({
     siteId: string;
     mutate: Mutate;
 }) {
+    const t = useTranslations("analytics");
     const [copied, setCopied] = useState(false);
     const [rotating, startRotate] = useTransition();
     // The snippet is pasted into somebody else's site, so it has to name the address
@@ -637,14 +647,10 @@ function TrackerPanel({
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-sm">Tracker</CardTitle>
+                <CardTitle className="text-sm">{t("tracker.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                    Pageviews, referrers and devices are already being counted from the edge - this service needed no
-                    setup for that. The script adds the four things a server-side log cannot see: how long a visit
-                    lasted, the screen it was read on, single-page route changes, and your own events.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("tracker.intro")}</p>
 
                 <label className="flex items-start gap-3">
                     <Switch
@@ -655,21 +661,18 @@ function TrackerPanel({
                                 () => setTrackerEnabledAction({ scopeType: scope, scopeId: siteId, enabled: checked })
                             )
                         }
-                        aria-label="Accept beats from the tracker"
+                        aria-label={t("tracker.accept")}
                     />
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Accept beats from the tracker</span>
-                        <span className="text-xs text-muted-foreground">
-                            While this is off the endpoint ignores this key, so a script left on a page after you turn
-                            it off records nothing.
-                        </span>
+                        <span className="text-sm font-medium">{t("tracker.accept")}</span>
+                        <span className="text-xs text-muted-foreground">{t("tracker.acceptHint")}</span>
                     </span>
                 </label>
 
                 {data.site.trackerEnabled ? (
                     <div className="flex flex-col gap-2">
                         <span className="text-xs font-medium text-muted-foreground">
-                            Paste into the page&apos;s head
+                            {t("tracker.paste")}
                         </span>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={snippet} className="min-w-0 flex-1 font-mono text-xs" />
@@ -686,14 +689,11 @@ function TrackerPanel({
                                 }}
                             >
                                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                                {copied ? "Copied" : "Copy"}
+                                {copied ? t("tracker.copied") : t("tracker.copy")}
                             </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>
-                                No cookies and nothing stored on the visitor&apos;s machine, so there is nothing here to
-                                ask consent for.
-                            </span>
+                            <span>{t("tracker.noCookies")}</span>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -705,7 +705,7 @@ function TrackerPanel({
                                     })
                                 }
                             >
-                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} /> New key
+                                <RefreshCw className={cn("size-3.5", rotating && "animate-spin")} /> {t("tracker.newKey")}
                             </Button>
                         </div>
                     </div>
@@ -716,6 +716,7 @@ function TrackerPanel({
 }
 
 function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Mutate }) {
+    const t = useTranslations("analytics");
     const settings = data.settings;
     const [retention, setRetention] = useState(String(settings.retentionDays));
 
@@ -729,22 +730,19 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
     return (
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-2">
-                <CardTitle className="text-sm">Collection</CardTitle>
-                <Badge variant="neutral">Whole instance</Badge>
+                <CardTitle className="text-sm">{t("settings.title")}</CardTitle>
+                <Badge variant="neutral">{t("settings.wholeInstance")}</Badge>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <label className="flex items-start gap-3">
                     <Switch
                         checked={settings.ingestEdgeLog}
                         onChange={(checked) => save({ ...settings, ingestEdgeLog: checked })}
-                        aria-label="Count visits from the edge log"
+                        aria-label={t("settings.edgeLog")}
                     />
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Count visits from the edge log</span>
-                        <span className="text-xs text-muted-foreground">
-                            How every deployed service gets analytics without a script. Turning this off leaves only
-                            what the tracker sends.
-                        </span>
+                        <span className="text-sm font-medium">{t("settings.edgeLog")}</span>
+                        <span className="text-xs text-muted-foreground">{t("settings.edgeLogHint")}</span>
                     </span>
                 </label>
 
@@ -752,19 +750,16 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                     <Switch
                         checked={settings.countBots}
                         onChange={(checked) => save({ ...settings, countBots: checked })}
-                        aria-label="Count recognized bots as visitors"
+                        aria-label={t("settings.bots")}
                     />
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Count recognized bots as visitors</span>
-                        <span className="text-xs text-muted-foreground">
-                            Off, because a dashboard where a crawler outranks every real page is one nobody reads. The
-                            firewall is where bot traffic is worth looking at.
-                        </span>
+                        <span className="text-sm font-medium">{t("settings.bots")}</span>
+                        <span className="text-xs text-muted-foreground">{t("settings.botsHint")}</span>
                     </span>
                 </label>
 
                 <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium">Keep per-visit detail for</span>
+                    <span className="text-sm font-medium">{t("settings.keepFor")}</span>
                     <span className="flex items-center gap-2">
                         <Input
                             type="number"
@@ -782,12 +777,9 @@ function SettingsPanel({ data, mutate }: { data: AnalyticsOverview; mutate: Muta
                             }}
                             className="w-28"
                         />
-                        <span className="text-sm text-muted-foreground">days</span>
+                        <span className="text-sm text-muted-foreground">{t("settings.days")}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                        Addresses, individual visits and their pages are dropped after this. The daily totals behind the
-                        charts are kept, so history stays comparable without keeping a row per request.
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("settings.keepHint")}</span>
                 </label>
             </CardBody>
         </Card>
