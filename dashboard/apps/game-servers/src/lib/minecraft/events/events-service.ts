@@ -1532,7 +1532,7 @@ async function worldBoss(
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         const modern = loop.modern ?? (loop.modern = await modernity(server));
-        await server.sayAll(commands.summonBoss(options.boss));
+        await server.sayAll(commands.summonBoss(options.boss, options.health));
         if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "passed") {
             await retryPlace(installedAppId, loop, server, found);
             return null;

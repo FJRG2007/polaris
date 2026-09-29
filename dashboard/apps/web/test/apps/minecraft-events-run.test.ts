@@ -108,6 +108,8 @@ interface World {
     refused: string[];
     /** The name over the boss's head, as a player reads it. */
     bossName: string;
+    /** The boss's greatest health, as the game has it. */
+    bossMaxHealth: number;
     /** A Bukkit-family server (Paper, Spigot, Purpur), and whether EssentialsX
      *  is on it - whose commands answer to vanilla's names. */
     bukkit: boolean;
@@ -183,6 +185,7 @@ const world: World = {
     versionIn: "latest",
     refused: [],
     bossName: "",
+    bossMaxHealth: 0,
     bukkit: false,
     essentials: false,
     pluginGot: [],
@@ -296,6 +299,27 @@ function answer(sent: string): string {
     }
     if (line.startsWith("attribute ") && !events.atLeast(world.version, [1, 16]))
         return refuse(line, "Unknown command");
+    // A boss's own data: its attributes by the names of its version - camelCase
+    // up to 1.15 - and anything else passed over.
+    const summoned = /run summon minecraft:\S+ ~ ~ ~ \{.*Tags:\["pe_boss"\].*\}$/.exec(line);
+    if (summoned) {
+        world.bossMaxHealth = 20;
+        const legacy = /\{Name:"generic\.maxHealth",Base:([\d.]+)d\}/.exec(line);
+        if (legacy && !events.atLeast(world.version, [1, 16]))
+            world.bossMaxHealth = Number(legacy[1]);
+        return "Summoned new Wither Skeleton";
+    }
+    const maxHealth =
+        /^attribute @e\[tag=pe_boss,limit=1\] minecraft:(generic\.)?max_health base set (\d+)$/.exec(
+            line
+        );
+    if (maxHealth) {
+        const modern = events.atLeast(world.version, [1, 21, 2]);
+        if (modern === Boolean(maxHealth[1]))
+            return refuse(line, "Can't find element of type 'minecraft:attribute'");
+        world.bossMaxHealth = Number(maxHealth[2]);
+        return `Set base value of attribute Max Health for entity Wither Skeleton to ${maxHealth[2]}.0`;
+    }
     const cleared = /^clear (\S+) (\S+)(?: (\d+))?$/.exec(line);
     if (cleared) {
         if (!itemReadable(cleared[2]!))
@@ -912,6 +936,7 @@ beforeEach(() => {
     world.versionIn = "latest";
     world.refused = [];
     world.bossName = "";
+    world.bossMaxHealth = 0;
     world.bukkit = false;
     world.essentials = false;
     world.pluginGot = [];
@@ -4104,6 +4129,27 @@ describe("a treasure hunt on 1.13, which has no `execute if data`", () => {
         // The unopened one is gone, the opened one is the finder's.
         expect(world.chests).toEqual([`${first!.x} ${first!.y} ${first!.z}`]);
     });
+});
+
+describe("a world boss's health", () => {
+    it.each(["1.13.2", "1.15.2", "1.16.5", "1.21.4"])(
+        "is what the event set on %s",
+        async (version) => {
+            world.version = version;
+            setUp([{ ...catalog.newPreset("world-boss", "boss"), minutes: 3 }]);
+            await events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "boss",
+                trigger: "manual",
+                startedBy: null
+            });
+            await play(8_100);
+            const health = (state().run?.preset.options as catalog.EventOptions<"world-boss">)
+                .health;
+            expect(world.bossMaxHealth).toBe(Math.min(health, 1024));
+        }
+    );
 });
 
 describe("a world boss whose server's version is unknown", () => {
