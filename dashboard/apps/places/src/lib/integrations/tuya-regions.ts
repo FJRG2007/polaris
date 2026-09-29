@@ -11,6 +11,8 @@
  * Pure. No credentials, no network, nothing but their addresses.
  */
 
+import { englishPlaces as en } from "../../../messages";
+
 /**
  * Where an account's devices live.
  *
@@ -20,12 +22,12 @@
  * asks for it in those words.
  */
 export const TUYA_REGIONS = [
-    { value: "eu", label: "Central Europe", host: "https://openapi.tuyaeu.com" },
-    { value: "weu", label: "Western Europe", host: "https://openapi-weaz.tuyaeu.com" },
-    { value: "us", label: "Western America", host: "https://openapi.tuyaus.com" },
-    { value: "eus", label: "Eastern America", host: "https://openapi-ueaz.tuyaus.com" },
-    { value: "cn", label: "China", host: "https://openapi.tuyacn.com" },
-    { value: "in", label: "India", host: "https://openapi.tuyain.com" }
+    { value: "eu", label: en("connections.regions.eu"), host: "https://openapi.tuyaeu.com" },
+    { value: "weu", label: en("connections.regions.weu"), host: "https://openapi-weaz.tuyaeu.com" },
+    { value: "us", label: en("connections.regions.us"), host: "https://openapi.tuyaus.com" },
+    { value: "eus", label: en("connections.regions.eus"), host: "https://openapi-ueaz.tuyaus.com" },
+    { value: "cn", label: en("connections.regions.cn"), host: "https://openapi.tuyacn.com" },
+    { value: "in", label: en("connections.regions.in"), host: "https://openapi.tuyain.com" }
 ] as const;
 
 export type TuyaRegion = (typeof TUYA_REGIONS)[number]["value"];

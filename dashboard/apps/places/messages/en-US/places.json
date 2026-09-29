@@ -278,5 +278,331 @@
         },
         "listFailed": "The cameras could not be listed",
         "unzoned": "Everywhere else"
+    },
+    "dialog": {
+        "videoFailed": "The camera is reachable, but its video would not open. {reason}",
+        "recommended": "{name} - recommended",
+        "appConsent": "Recent firmware refuses every local connection until it is allowed. In the Tapo app: <em>{path}</em>.",
+        "password": "Password",
+        "tapoPassword": "Tapo account password",
+        "noOwnAlerts": "A camera like this has no way to tell Polaris what it saw, so its own alerts stay in the Tapo app. Polaris connects when you open it, and lets go when you leave.",
+        "facesOn": "Face recognition is on. Teach it who lives here under People and this camera starts using their names.",
+        "sensitivity": "Sensitivity - {value}",
+        "noAnswer": "The camera did not answer.",
+        "videoMainOnly": "The video opened. This camera publishes only its full-size stream, so that is what Polaris uses.",
+        "videoWorks": "The video opened. This camera works.",
+        "somethingAnswers": "Something is answering there. Save it, and ask again to try the video.",
+        "answered": "The camera answered",
+        "editIntro": "Change how this camera is reached, what it notices, and what is kept.",
+        "addIntro": "Polaris asks the camera what it streams, so most of this fills itself in.",
+        "sections": {
+            "camera": "The camera",
+            "reach": "Reached from",
+            "notice": "What it should notice",
+            "keep": "What to keep"
+        },
+        "namePlaceholder": "Front door",
+        "zone": "Where it points",
+        "zoneHint": "Groups the wall. Leave it blank if you only have a few.",
+        "zonePlaceholder": "Outside",
+        "brand": "Brand",
+        "model": "Model",
+        "modelHint": "Type it if the list is long. TP-Link cameras are sold as Tapo, so both names find them.",
+        "connection": "How Polaris connects",
+        "connectionHint": "Both reach the same camera. Take the recommended one unless you have a reason not to.",
+        "power": "How it is powered",
+        "powerHint": "This decides what Polaris is allowed to do with it, so it is worth getting right.",
+        "address": "Address",
+        "rtspPort": "Stream port",
+        "account": "Account",
+        "passwordStored": "Stored. Type to replace it.",
+        "passwordInherited": "Leave it blank to use the password from your other TP-Link cameras - it is one password for the whole account.",
+        "passwordTapo": "The password for your TP-Link account. There is no email or account name to give - the camera checks the password and nothing else.",
+        "unchanged": "Unchanged",
+        "ask": "Ask the camera",
+        "mainPath": "Stream path",
+        "mainPathHint": "Left blank, the make's usual one is used.",
+        "subPath": "Small stream",
+        "subPathHint": "What detection reads. Cheaper by a lot.",
+        "reachHint": "A camera on another network - behind a repeater, or at another address - is reached by a server that lives there and is connected to Polaris under Servers. The stream comes back over that connection, so no extra port has to be opened.",
+        "direct": "Polaris itself",
+        "openSettings": "Open Settings",
+        "runsOn": "Runs on",
+        "runsOnHint": "The machine that reaches this camera also analyzes it - the stream is already there.",
+        "sensitivityHint": "Higher notices smaller changes. Too high and every shadow is an event.",
+        "sensitivityLabel": "Sensitivity",
+        "settle": "Ignore anything shorter than",
+        "settleHint": "Seconds. The knob that keeps moths, gusts and passing lorries out of the log - nearly every false alarm is over within one or two. Zero reports the instant anything moves.",
+        "gap": "Wait between detections",
+        "gapHint": "The knob that decides what this camera costs. Seconds.",
+        "hours": "Only at certain hours",
+        "fromHour": "From hour",
+        "to": "to",
+        "toHour": "To hour",
+        "hoursHint": "24-hour clock. 22 to 6 is overnight.",
+        "classes": "Worth reporting",
+        "faceThreshold": "Sure enough to name somebody",
+        "faceThresholdHint": "Below this they are reported as a stranger rather than as the nearest match.",
+        "keep": {
+            "off": "Nothing",
+            "motion": "When something happens",
+            "continuous": "Everything"
+        },
+        "storeOn": "Store on",
+        "storeOnHint": "Footage already written stays where it is; this decides where the next of it goes.",
+        "keepFor": "Keep for",
+        "keepForHint": "Days. Anything you pin survives this.",
+        "enabled": "Switched on",
+        "enabledHint": "Off means Polaris does not connect to it at all.",
+        "addCamera": "Add camera"
+    },
+    "activity": {
+        "none": "No detector has reported on this camera. If you have just saved it, give it a minute - the worker asks for its cameras every half minute.",
+        "motion": "Movement {since}.",
+        "found": "Last looked properly {looked}, and found {found} {at}.",
+        "foundNothing": "Last looked properly {looked} and found nothing it was asked to report.",
+        "something": "something",
+        "limited": "It is {reason}.",
+        "noModel": "this machine has no detection model, so movement only",
+        "noSize": "the camera would not say how big its picture is, so movement only",
+        "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+        "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+        "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
+        "watching": "Watching this camera.",
+        "notWatching": "Not connected to this camera right now.",
+        "noMotion": "Nothing has moved in front of it yet.",
+        "justNow": "just now"
+    },
+    "refusals": {
+        "notSetUp": "Home is not set up yet",
+        "noAccess": "You do not have access to that",
+        "giveName": "Give it a name",
+        "chooseKinds": "Choose what it should tell you about",
+        "chooseWho": "Choose who to tell",
+        "alertGone": "Alert not found",
+        "cameraGone": "Camera not found",
+        "areaTaken": "An area on this camera is already called that.",
+        "areaGone": "Area not found",
+        "oldConnection": "That connection was made by a version of Polaris that is no longer here",
+        "connectionGone": "That connection is not here",
+        "cannotConnect": "Polaris cannot connect that yet",
+        "deviceGone": "That device is not here",
+        "noBroker": "That connection is missing the broker's address",
+        "deviceCannot": "That device cannot be told to do that",
+        "nukiCannot": "A Nuki device cannot be told to do that",
+        "noToken": "That connection is missing its token",
+        "noKeys": "That connection is missing its keys",
+        "tuyaCannot": "A Tuya device cannot be told to do that",
+        "eventGone": "Event not found",
+        "giveThemName": "Give them a name",
+        "notFound": "Not found",
+        "noFaces": "Face recognition is not set up yet",
+        "photoRefused": "The recognizer would not take that photograph",
+        "forgetRefused": "The recognizer would not forget them, so nothing was removed",
+        "placeGone": "Place not found",
+        "moveCameras": "Move or remove its cameras first",
+        "lastPlace": "There has to be somewhere for cameras to be",
+        "noPtz": "This camera does not move",
+        "notInstalled": "Home is not installed",
+        "recognizerMissing": "The recognizer was installed but cannot be found",
+        "recognizerAddress": "Write the address as http://192.168.1.20:8000",
+        "clipGone": "Clip not found",
+        "relayQuiet": "The camera relay was installed but is not answering yet",
+        "relayRefused": "The relay would not accept that camera",
+        "cameraNotShared": "That camera is not shared with you",
+        "cannotOperate": "You cannot operate that from here",
+        "deviceNotShared": "That device is not shared with you",
+        "serverNotConnected": "That server is not connected",
+        "failed": "That did not work. Nothing was changed.",
+        "deviceSilent": "That device is no longer announcing itself on the broker",
+        "noCommand": "That device published no way to work it",
+        "brokerCredentials": "The broker refused those credentials.",
+        "addressUnknown": "That address could not be found on this network.",
+        "nothingAnswered": "Nothing answered on that address and port.",
+        "brokerUnreachable": "The broker could not be reached.",
+        "brokerRead": "The broker would not let Polaris read that.",
+        "brokerCommand": "The broker would not take that command.",
+        "nukiUnreachable": "Nuki could not be reached. Try again in a moment.",
+        "nukiToken": "Nuki refused the token. It may have been revoked.",
+        "nukiRate": "Nuki is answering too many requests at once. Try again in a minute.",
+        "nukiOdd": "Nuki answered with something unexpected.",
+        "tuyaUnreachable": "Tuya could not be reached. Try again in a moment.",
+        "tuyaOdd": "Tuya answered with something unexpected.",
+        "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
+        "tuyaRefused": "Tuya refused the request.",
+        "reconnect": "{name} has to be connected again",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turn-on {turn on} other {turn off}}",
+        "watchOnly": "{name} is set to be watched, not operated",
+        "notConnected": "{name} is not connected to anything",
+        "notAnswering": "{name} was not answering when it was last checked",
+        "nothingUnderPrefix": "Nothing on that broker is announcing itself under \"{prefix}\". Check that discovery is switched on in whatever publishes your devices, and that it uses this prefix.",
+        "noNukiUnderPrefix": "Nothing on that broker is publishing as a Nuki device under \"{prefix}\". Check that MQTT is switched on in the Nuki app and pointed at this broker.",
+        "nukiHttp": "Nuki refused the request (HTTP {status}).",
+        "tuyaKeysBecause": "Tuya refused the keys: {detail}.",
+        "tuyaRefusedBecause": "Tuya refused the request: {detail}.",
+        "accountUnreachable": "{name} could not be reached",
+        "relayQuiet2": "The relay did not answer.",
+        "relayNoVideo": "The camera accepted the connection and sent no video. The commonest cause by far is the password: on a Tapo it is the one for your TP-Link account, not one set on the camera. After that, Third-Party Compatibility being off in the Tapo app under Me > Third-Party Services - and on a battery model, the camera going back to sleep.",
+        "relayPassword": "The camera refused the password. It is the one for your TP-Link account - the one you sign into the Tapo app with - and not one set on the camera. If that is what you typed, check Third-Party Compatibility is on in the Tapo app, under Me > Third-Party Services.",
+        "relayRefusedOutright": "The camera refused the connection outright. Its account may not be allowed to stream, or another app is holding the one connection it gives.",
+        "relayNoStream": "The camera has no stream at that address. If it is a make with a stream path, the path is wrong; if it is one that picks by quality, it may publish only its full-size stream.",
+        "relayStopped": "The camera stopped answering partway through. On a battery model that is it going back to sleep; otherwise it is the network between here and it.",
+        "relayCodec": "The camera is sending something the relay cannot read. That is usually a codec this relay does not carry yet.",
+        "schemaWhere": "Where is the camera?",
+        "schemaAddress": "Just the address: no slashes, spaces or credentials",
+        "schemaReach": "Choose where this camera is reached from",
+        "schemaRunsOn": "Choose where detection should run",
+        "schemaAreaName": "Give the area a name",
+        "schemaCorners": "An area needs at least three corners",
+        "schemaTooManyCorners": "That is more corners than an area needs",
+        "schemaPlace": "Unknown place",
+        "schemaCamera": "Unknown camera",
+        "schemaPerson": "Unknown person",
+        "schemaSubnet": "Write it as 192.168.1.0/24",
+        "schemaConnect": "Pick how to connect it",
+        "relayStatus": "The relay refused it ({status})."
+    },
+    "connections": {
+        "nuki-web": {
+            "label": "Nuki Web account",
+            "summary": "One token for every lock on the account, and it answers from another country as readily as from the next room.",
+            "note": "Everything goes through Nuki's own servers, so it is as reachable as they are and the state it reports is as recent as the last time a lock spoke to them. Checking again asks the locks themselves, which is why that is a button rather than a timer.",
+            "steps": {
+                "s0": "Open Nuki Web and sign in with the account the locks are on.",
+                "s1": "Under API, create a token that may see and operate your Smart Locks.",
+                "s2": "Paste it here. Nuki shows it once."
+            },
+            "link": "Nuki Web",
+            "fields": {
+                "token": {
+                    "label": "API token",
+                    "placeholder": "Paste the token"
+                }
+            }
+        },
+        "nuki-local": {
+            "label": "Nuki on your own network",
+            "summary": "The locks talk to a broker in the building, so they answer in milliseconds and keep working when nobody's servers do.",
+            "note": "This is the way in the newer locks actually have: a Smart Lock Pro, Ultra or Go has wifi of its own and no local web address at all, but it will publish itself to an MQTT broker on its own network. It costs the lock nothing to be read, so the state here is always current. What it cannot do is reach a lock from anywhere else, and it does not carry the account's record of who opened the door - the web account does both, and the two are worth having together. Nuki's firmware has no room for encryption, so this only ever runs unencrypted on a network you control, which is their rule rather than ours.",
+            "steps": {
+                "s0": "You need an MQTT broker running on the same network as the locks. Anything already running one - a smart-home hub, a Zigbee bridge - is the same broker.",
+                "s1": "In the Nuki app, open Device Administration then MQTT, switch it on and enter that broker's address and credentials.",
+                "s2": "Put the same address and credentials here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Broker address",
+                    "hint": "A name or address on the same network as the locks. Nuki's firmware will not connect to anything outside it.",
+                    "placeholder": "192.168.1.20"
+                },
+                "port": {
+                    "label": "Port"
+                },
+                "username": {
+                    "label": "Username"
+                },
+                "password": {
+                    "label": "Password"
+                },
+                "prefix": {
+                    "label": "Topic prefix",
+                    "hint": "What the locks publish under. Nuki's own default, unless you changed it."
+                }
+            }
+        },
+        "mqtt-discovery": {
+            "label": "A broker on your own network",
+            "summary": "Every switch, plug and light that announces itself on your broker, whatever made it - one connection instead of one per brand.",
+            "note": "Zigbee2MQTT, Tasmota, ESPHome, Shelly and anything written against them publish a description of each device alongside its state, and this reads those. Nothing here talks to Home Assistant or needs it installed; the convention is what is being read, and a broker that has one on it is simply a broker with these topics on it. Things that are on or off and things that lock arrive; sensors, blinds and thermostats announce themselves the same way and are left out until Polaris can draw them honestly.",
+            "steps": {
+                "s0": "You need an MQTT broker on the same network, which anything publishing devices this way already has.",
+                "s1": "Switch discovery on in whatever publishes them. It is on by default in Zigbee2MQTT and Tasmota.",
+                "s2": "Put the broker's address and credentials here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Broker address",
+                    "hint": "A name or address Polaris can reach on this network.",
+                    "placeholder": "192.168.1.20"
+                },
+                "port": {
+                    "label": "Port"
+                },
+                "username": {
+                    "label": "Username"
+                },
+                "password": {
+                    "label": "Password"
+                },
+                "prefix": {
+                    "label": "Discovery prefix",
+                    "hint": "What the descriptions are published under. The convention's own default, unless you changed it."
+                }
+            }
+        },
+        "tuya-cloud": {
+            "label": "Tuya cloud project",
+            "summary": "Everything on the Smart Life or Tuya app account, whatever brand is printed on it: switches, sockets and lights.",
+            "note": "Tuya is what is inside a few thousand makes, so a plug with somebody else's name on the box is usually this. The keys come from their developer console, which is free, and the app account has to be linked to the project there - keys that work while the account is not linked are the one way this goes wrong quietly, so Polaris says so rather than showing an empty list.",
+            "steps": {
+                "s0": "Open the Tuya IoT console and create a cloud project, choosing the data centre your app account is in.",
+                "s1": "On the project's Devices tab, link the Smart Life or Tuya app account your devices are on.",
+                "s2": "Copy the Access ID and Access Secret from the project overview."
+            },
+            "link": "the Tuya IoT console",
+            "fields": {
+                "accessId": {
+                    "label": "Access ID",
+                    "placeholder": "From the project overview"
+                },
+                "accessSecret": {
+                    "label": "Access Secret",
+                    "placeholder": "Shown next to the Access ID"
+                },
+                "region": {
+                    "label": "Data centre",
+                    "hint": "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty."
+                }
+            }
+        },
+        "reach": {
+            "anywhere": "From anywhere",
+            "same-network": "On the same network"
+        },
+        "brandMqtt": "Anything on MQTT",
+        "regions": {
+            "eu": "Central Europe",
+            "weu": "Western Europe",
+            "us": "Western America",
+            "eus": "Eastern America",
+            "cn": "China",
+            "in": "India"
+        },
+        "tooShort": "That looks too short to be the {field}",
+        "tooLong": "That is longer than the {field} can be",
+        "pickListed": "Pick one of the listed options"
+    },
+    "actions": {
+        "defaultStorage": "Wherever this Polaris keeps footage ({name})",
+        "thisServer": "This server",
+        "thisMachine": "This machine",
+        "notSharing": "The camera is there but is not sharing its video. In the Tapo app: {path}, and turn it on.",
+        "fillIn": "Fill in what {name} needs and try again",
+        "someWrong": "Some of that is not right.",
+        "checkDetails": "Check the details and try again",
+        "placeNotSaved": "That place could not be saved.",
+        "alertNotSaved": "That alert could not be saved.",
+        "checkAddress": "Check the address and the account.",
+        "nothingToAsk": "There is nothing to ask this camera on.",
+        "asleep": "Nothing answered at that address. One of these closes everything down while it sleeps, so open it once in the Tapo app and ask again - and check the address is the one the app shows for it.",
+        "nothingAtAddress": "Nothing answered at that address. Check it is the one the Tapo app shows for this camera.",
+        "subnet": "Write the network as 192.168.1.0/24.",
+        "subnetRemote": "Give the address range on that network, like 192.168.1.0/24.",
+        "cameraNotSaved": "That camera could not be saved.",
+        "areasUnread": "Those areas could not be read.",
+        "areaNotSaved": "That area could not be saved.",
+        "personNotAdded": "They could not be added.",
+        "photoTooLarge": "That photograph is too large.",
+        "nameNotSaved": "That name could not be saved."
     }
 }

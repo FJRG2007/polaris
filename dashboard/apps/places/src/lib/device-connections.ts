@@ -30,6 +30,8 @@
 
 import { TUYA_REGIONS } from "./integrations/tuya-regions";
 import type { DeviceKind } from "./device-kinds";
+import type { PlacesTranslator } from "./i18n";
+import { englishPlaces as en, type PlacesKey } from "../../messages";
 
 /** One thing a connection has to be told. */
 export interface ConnectionField {
@@ -61,8 +63,8 @@ export interface ConnectionField {
 export type ConnectionReach = "anywhere" | "same-network";
 
 export const REACH_LABELS: Readonly<Record<ConnectionReach, string>> = {
-    anywhere: "From anywhere",
-    "same-network": "On the same network"
+    anywhere: en("connections.reach.anywhere"),
+    "same-network": en("connections.reach.same-network")
 };
 
 /** One way of reaching one make's devices. */
@@ -117,22 +119,21 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "nuki-web",
         brand: "Nuki",
         logo: "nuki",
-        label: "Nuki Web account",
+        label: en("connections.nuki-web.label"),
         reach: "anywhere",
-        summary:
-            "One token for every lock on the account, and it answers from another country as readily as from the next room.",
-        note: "Everything goes through Nuki's own servers, so it is as reachable as they are and the state it reports is as recent as the last time a lock spoke to them. Checking again asks the locks themselves, which is why that is a button rather than a timer.",
+        summary: en("connections.nuki-web.summary"),
+        note: en("connections.nuki-web.note"),
         steps: [
-            "Open Nuki Web and sign in with the account the locks are on.",
-            "Under API, create a token that may see and operate your Smart Locks.",
-            "Paste it here. Nuki shows it once."
+            en("connections.nuki-web.steps.s0"),
+            en("connections.nuki-web.steps.s1"),
+            en("connections.nuki-web.steps.s2")
         ],
-        link: { label: "Nuki Web", href: NUKI_TOKEN_PAGE },
+        link: { label: en("connections.nuki-web.link"), href: NUKI_TOKEN_PAGE },
         fields: [
             {
                 key: "token",
-                label: "API token",
-                placeholder: "Paste the token",
+                label: en("connections.nuki-web.fields.token.label"),
+                placeholder: en("connections.nuki-web.fields.token.placeholder"),
                 secret: true,
                 minLength: 20,
                 maxLength: 500
@@ -145,48 +146,47 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "nuki-local",
         brand: "Nuki",
         logo: "nuki",
-        label: "Nuki on your own network",
+        label: en("connections.nuki-local.label"),
         reach: "same-network",
-        summary:
-            "The locks talk to a broker in the building, so they answer in milliseconds and keep working when nobody's servers do.",
-        note: "This is the way in the newer locks actually have: a Smart Lock Pro, Ultra or Go has wifi of its own and no local web address at all, but it will publish itself to an MQTT broker on its own network. It costs the lock nothing to be read, so the state here is always current. What it cannot do is reach a lock from anywhere else, and it does not carry the account's record of who opened the door - the web account does both, and the two are worth having together. Nuki's firmware has no room for encryption, so this only ever runs unencrypted on a network you control, which is their rule rather than ours.",
+        summary: en("connections.nuki-local.summary"),
+        note: en("connections.nuki-local.note"),
         steps: [
-            "You need an MQTT broker running on the same network as the locks. Anything already running one - a smart-home hub, a Zigbee bridge - is the same broker.",
-            "In the Nuki app, open Device Administration then MQTT, switch it on and enter that broker's address and credentials.",
-            "Put the same address and credentials here."
+            en("connections.nuki-local.steps.s0"),
+            en("connections.nuki-local.steps.s1"),
+            en("connections.nuki-local.steps.s2")
         ],
         fields: [
             {
                 key: "host",
-                label: "Broker address",
-                hint: "A name or address on the same network as the locks. Nuki's firmware will not connect to anything outside it.",
-                placeholder: "192.168.1.20",
+                label: en("connections.nuki-local.fields.host.label"),
+                hint: en("connections.nuki-local.fields.host.hint"),
+                placeholder: en("connections.nuki-local.fields.host.placeholder"),
                 maxLength: 200
             },
             {
                 key: "port",
-                label: "Port",
+                label: en("connections.nuki-local.fields.port.label"),
                 defaultValue: "1883",
                 optional: true,
                 maxLength: 5
             },
             {
                 key: "username",
-                label: "Username",
+                label: en("connections.nuki-local.fields.username.label"),
                 optional: true,
                 maxLength: 32
             },
             {
                 key: "password",
-                label: "Password",
+                label: en("connections.nuki-local.fields.password.label"),
                 secret: true,
                 optional: true,
                 maxLength: 32
             },
             {
                 key: "prefix",
-                label: "Topic prefix",
-                hint: "What the locks publish under. Nuki's own default, unless you changed it.",
+                label: en("connections.nuki-local.fields.prefix.label"),
+                hint: en("connections.nuki-local.fields.prefix.hint"),
                 defaultValue: "nuki",
                 optional: true,
                 maxLength: 60
@@ -197,33 +197,32 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     },
     {
         id: "mqtt-discovery",
-        brand: "Anything on MQTT",
+        brand: en("connections.brandMqtt"),
         logo: "",
-        label: "A broker on your own network",
+        label: en("connections.mqtt-discovery.label"),
         reach: "same-network",
-        summary:
-            "Every switch, plug and light that announces itself on your broker, whatever made it - one connection instead of one per brand.",
-        note: "Zigbee2MQTT, Tasmota, ESPHome, Shelly and anything written against them publish a description of each device alongside its state, and this reads those. Nothing here talks to Home Assistant or needs it installed; the convention is what is being read, and a broker that has one on it is simply a broker with these topics on it. Things that are on or off and things that lock arrive; sensors, blinds and thermostats announce themselves the same way and are left out until Polaris can draw them honestly.",
+        summary: en("connections.mqtt-discovery.summary"),
+        note: en("connections.mqtt-discovery.note"),
         steps: [
-            "You need an MQTT broker on the same network, which anything publishing devices this way already has.",
-            "Switch discovery on in whatever publishes them. It is on by default in Zigbee2MQTT and Tasmota.",
-            "Put the broker's address and credentials here."
+            en("connections.mqtt-discovery.steps.s0"),
+            en("connections.mqtt-discovery.steps.s1"),
+            en("connections.mqtt-discovery.steps.s2")
         ],
         fields: [
             {
                 key: "host",
-                label: "Broker address",
-                hint: "A name or address Polaris can reach on this network.",
-                placeholder: "192.168.1.20",
+                label: en("connections.mqtt-discovery.fields.host.label"),
+                hint: en("connections.mqtt-discovery.fields.host.hint"),
+                placeholder: en("connections.mqtt-discovery.fields.host.placeholder"),
                 maxLength: 200
             },
-            { key: "port", label: "Port", defaultValue: "1883", optional: true, maxLength: 5 },
-            { key: "username", label: "Username", optional: true, maxLength: 120 },
-            { key: "password", label: "Password", secret: true, optional: true, maxLength: 200 },
+            { key: "port", label: en("connections.mqtt-discovery.fields.port.label"), defaultValue: "1883", optional: true, maxLength: 5 },
+            { key: "username", label: en("connections.mqtt-discovery.fields.username.label"), optional: true, maxLength: 120 },
+            { key: "password", label: en("connections.mqtt-discovery.fields.password.label"), secret: true, optional: true, maxLength: 200 },
             {
                 key: "prefix",
-                label: "Discovery prefix",
-                hint: "What the descriptions are published under. The convention's own default, unless you changed it.",
+                label: en("connections.mqtt-discovery.fields.prefix.label"),
+                hint: en("connections.mqtt-discovery.fields.prefix.hint"),
                 defaultValue: "homeassistant",
                 optional: true,
                 maxLength: 60
@@ -248,37 +247,36 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         id: "tuya-cloud",
         brand: "Tuya",
         logo: "tuya",
-        label: "Tuya cloud project",
+        label: en("connections.tuya-cloud.label"),
         reach: "anywhere",
-        summary:
-            "Everything on the Smart Life or Tuya app account, whatever brand is printed on it: switches, sockets and lights.",
-        note: "Tuya is what is inside a few thousand makes, so a plug with somebody else's name on the box is usually this. The keys come from their developer console, which is free, and the app account has to be linked to the project there - keys that work while the account is not linked are the one way this goes wrong quietly, so Polaris says so rather than showing an empty list.",
+        summary: en("connections.tuya-cloud.summary"),
+        note: en("connections.tuya-cloud.note"),
         steps: [
-            "Open the Tuya IoT console and create a cloud project, choosing the data centre your app account is in.",
-            "On the project's Devices tab, link the Smart Life or Tuya app account your devices are on.",
-            "Copy the Access ID and Access Secret from the project overview."
+            en("connections.tuya-cloud.steps.s0"),
+            en("connections.tuya-cloud.steps.s1"),
+            en("connections.tuya-cloud.steps.s2")
         ],
-        link: { label: "the Tuya IoT console", href: TUYA_CONSOLE },
+        link: { label: en("connections.tuya-cloud.link"), href: TUYA_CONSOLE },
         fields: [
             {
                 key: "accessId",
-                label: "Access ID",
-                placeholder: "From the project overview",
+                label: en("connections.tuya-cloud.fields.accessId.label"),
+                placeholder: en("connections.tuya-cloud.fields.accessId.placeholder"),
                 minLength: 8,
                 maxLength: 128
             },
             {
                 key: "accessSecret",
-                label: "Access Secret",
-                placeholder: "Shown next to the Access ID",
+                label: en("connections.tuya-cloud.fields.accessSecret.label"),
+                placeholder: en("connections.tuya-cloud.fields.accessSecret.placeholder"),
                 secret: true,
                 minLength: 8,
                 maxLength: 256
             },
             {
                 key: "region",
-                label: "Data centre",
-                hint: "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty.",
+                label: en("connections.tuya-cloud.fields.region.label"),
+                hint: en("connections.tuya-cloud.fields.region.hint"),
                 defaultValue: "eu",
                 choices: TUYA_REGIONS.map((region) => ({
                     value: region.value,
@@ -376,17 +374,22 @@ export function shownFields(connection: DeviceConnection): readonly ConnectionFi
  * somebody off for not having finished. So emptiness is left to the submit button
  * being unavailable, and this only ever complains about something actually typed.
  */
-export function fieldIssue(field: ConnectionField, value: string): string | null {
+export function fieldIssue(
+    field: ConnectionField,
+    value: string,
+    t: PlacesTranslator = en,
+    label: string = field.label
+): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
     if (field.minLength !== undefined && trimmed.length < field.minLength) {
-        return `That looks too short to be the ${field.label.toLowerCase()}`;
+        return t("connections.tooShort", { field: label.toLowerCase() });
     }
     if (field.maxLength !== undefined && trimmed.length > field.maxLength) {
-        return `That is longer than the ${field.label.toLowerCase()} can be`;
+        return t("connections.tooLong", { field: label.toLowerCase() });
     }
     if (field.choices && !field.choices.some((choice) => choice.value === trimmed)) {
-        return "Pick one of the listed options";
+        return t("connections.pickListed");
     }
     return null;
 }
@@ -424,4 +427,37 @@ export function normalizeFields(
         if (value) clean[field.key] = value;
     }
     return clean;
+}
+
+/**
+ * A connection's words in the reader's language. The data above carries the
+ * English, for the server and for search; a screen draws these.
+ */
+export function connectionWords(t: PlacesTranslator, connection: DeviceConnection) {
+    const base = `connections.${connection.id}`;
+    const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
+    return {
+        brand: connection.brand === en("connections.brandMqtt") ? t("connections.brandMqtt") : connection.brand,
+        label: say(`${base}.label`) ?? connection.label,
+        summary: say(`${base}.summary`) ?? connection.summary,
+        note: say(`${base}.note`) ?? connection.note,
+        steps: (connection.steps ?? []).map((step, index) => say(`${base}.steps.s${index}`) ?? step),
+        link: connection.link ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label } : undefined,
+        reach: t(`connections.reach.${connection.reach}`)
+    };
+}
+
+/** One field's words in the reader's language. */
+export function fieldWords(t: PlacesTranslator, connection: DeviceConnection, field: ConnectionField) {
+    const base = `connections.${connection.id}.fields.${field.key}`;
+    const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
+    return {
+        label: say(`${base}.label`) ?? field.label,
+        hint: field.hint ? (say(`${base}.hint`) ?? field.hint) : undefined,
+        placeholder: field.placeholder ? (say(`${base}.placeholder`) ?? field.placeholder) : undefined,
+        choices: field.choices?.map((choice) => ({
+            value: choice.value,
+            label: say(`connections.regions.${choice.value}`) ?? choice.label
+        }))
+    };
 }

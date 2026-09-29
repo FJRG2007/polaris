@@ -278,5 +278,331 @@
         },
         "listFailed": "No se han podido listar las cámaras",
         "unzoned": "Resto de sitios"
+    },
+    "dialog": {
+        "videoFailed": "Se llega a la cámara, pero su vídeo no se abrió. {reason}",
+        "recommended": "{name} (recomendada)",
+        "appConsent": "El firmware reciente rechaza toda conexión local hasta que se permite. En la app Tapo: <em>{path}</em>.",
+        "password": "Contraseña",
+        "tapoPassword": "Contraseña de Tapo",
+        "noOwnAlerts": "Una cámara así no puede contarle a Polaris lo que vio, así que sus propios avisos se quedan en la app Tapo. Polaris se conecta al abrirla y la suelta al salir.",
+        "facesOn": "El reconocimiento facial está activado. Enséñale quién vive aquí en Personas y esta cámara empezará a usar sus nombres.",
+        "sensitivity": "Sensibilidad: {value}",
+        "noAnswer": "La cámara no respondió.",
+        "videoMainOnly": "El vídeo se abrió. Esta cámara solo publica su flujo a tamaño completo, así que Polaris usa ese.",
+        "videoWorks": "El vídeo se abrió. Esta cámara funciona.",
+        "somethingAnswers": "Algo responde ahí. Guárdala y vuelve a preguntar para probar el vídeo.",
+        "answered": "La cámara respondió",
+        "editIntro": "Cambia cómo se llega a esta cámara, qué detecta y qué se guarda.",
+        "addIntro": "Polaris pregunta a la cámara qué emite, así que casi todo se rellena solo.",
+        "sections": {
+            "camera": "La cámara",
+            "reach": "Se llega desde",
+            "notice": "Qué debe detectar",
+            "keep": "Qué guardar"
+        },
+        "namePlaceholder": "Entrada",
+        "zone": "Hacia dónde apunta",
+        "zoneHint": "Agrupa el muro. Déjalo vacío si tienes pocas.",
+        "zonePlaceholder": "Fuera",
+        "brand": "Marca",
+        "model": "Modelo",
+        "modelHint": "Escríbelo si la lista es larga. Las cámaras TP-Link se venden como Tapo, así que ambos nombres las encuentran.",
+        "connection": "Cómo conecta Polaris",
+        "connectionHint": "Las dos llegan a la misma cámara. Elige la recomendada salvo que tengas un motivo.",
+        "power": "Cómo se alimenta",
+        "powerHint": "Esto decide qué puede hacer Polaris con ella, así que conviene acertar.",
+        "address": "Dirección",
+        "rtspPort": "Puerto RTSP",
+        "account": "Cuenta",
+        "passwordStored": "Guardada. Escribe para sustituirla.",
+        "passwordInherited": "Déjala vacía para usar la contraseña de tus otras cámaras TP-Link: es una sola contraseña para toda la cuenta.",
+        "passwordTapo": "La contraseña de tu cuenta de TP-Link. No hay correo ni nombre de cuenta que dar: la cámara solo comprueba la contraseña.",
+        "unchanged": "Sin cambios",
+        "ask": "Consultar cámara",
+        "mainPath": "Ruta del vídeo",
+        "mainPathHint": "Si lo dejas vacío, se usa la habitual de la marca.",
+        "subPath": "Flujo pequeño",
+        "subPathHint": "Lo que lee la detección. Mucho más barato.",
+        "reachHint": "A una cámara en otra red (tras un repetidor o en otra dirección) se llega mediante un servidor que esté allí y conectado a Polaris en Servidores. El vídeo vuelve por esa conexión, así que no hay que abrir ningún puerto más.",
+        "direct": "El propio Polaris",
+        "openSettings": "Abrir Ajustes",
+        "runsOn": "Corre en",
+        "runsOnHint": "La máquina que llega a esta cámara también la analiza: el vídeo ya está allí.",
+        "sensitivityHint": "Más alto detecta cambios más pequeños. Demasiado alto y cada sombra es un evento.",
+        "sensitivityLabel": "Sensibilidad",
+        "settle": "Ignorar lo que dure menos de",
+        "settleHint": "Segundos. El ajuste que deja fuera del registro polillas, ráfagas y camiones que pasan: casi toda falsa alarma dura uno o dos. Cero avisa en cuanto algo se mueve.",
+        "gap": "Espera entre detecciones",
+        "gapHint": "El ajuste que decide lo que cuesta esta cámara. Segundos.",
+        "hours": "Solo a ciertas horas",
+        "fromHour": "Hora inicial",
+        "to": "a",
+        "toHour": "Hora final",
+        "hoursHint": "Reloj de 24 horas. De 22 a 6 es por la noche.",
+        "classes": "Qué avisar",
+        "faceThreshold": "Certeza para dar un nombre",
+        "faceThresholdHint": "Por debajo, se avisa como desconocido en lugar de como el más parecido.",
+        "keep": {
+            "off": "Nada",
+            "motion": "Cuando pasa algo",
+            "continuous": "Todo"
+        },
+        "storeOn": "Guardar en",
+        "storeOnHint": "Lo ya grabado se queda donde está; esto decide adónde va lo siguiente.",
+        "keepFor": "Conservar",
+        "keepForHint": "Días. Lo que fijes sobrevive a esto.",
+        "enabled": "Encendida",
+        "enabledHint": "Apagada significa que Polaris no se conecta a ella en absoluto.",
+        "addCamera": "Añadir cámara"
+    },
+    "activity": {
+        "none": "Ningún detector ha informado sobre esta cámara. Si acabas de guardarla, dale un minuto: el proceso pide sus cámaras cada medio minuto.",
+        "motion": "Movimiento {since}.",
+        "found": "Miró con detalle por última vez {looked} y encontró {found} {at}.",
+        "foundNothing": "Miró con detalle por última vez {looked} y no encontró nada de lo que debía avisar.",
+        "something": "algo",
+        "limited": "Está {reason}.",
+        "noModel": "sin modelo de detección en esta máquina, así que solo movimiento",
+        "noSize": "sin saber el tamaño de la imagen de la cámara, así que solo movimiento",
+        "minutesAgo": "{count, plural, one {hace # minuto} other {hace # minutos}}",
+        "hoursAgo": "{count, plural, one {hace # hora} other {hace # horas}}",
+        "daysAgo": "{count, plural, one {hace # día} other {hace # días}}",
+        "watching": "Vigilando esta cámara.",
+        "notWatching": "Ahora mismo no está conectado a esta cámara.",
+        "noMotion": "Todavía no se ha movido nada delante.",
+        "justNow": "ahora mismo"
+    },
+    "refusals": {
+        "notSetUp": "Places aún no está listo",
+        "noAccess": "No tienes acceso a eso",
+        "giveName": "Ponle un nombre",
+        "chooseKinds": "Elige de qué debe avisarte",
+        "chooseWho": "Elige a quién avisar",
+        "alertGone": "Aviso inexistente",
+        "cameraGone": "Cámara inexistente",
+        "areaTaken": "Ya hay un área con ese nombre en esta cámara.",
+        "areaGone": "Área inexistente",
+        "oldConnection": "Esa conexión la hizo una versión de Polaris que ya no está",
+        "connectionGone": "Esa conexión no está aquí",
+        "cannotConnect": "Polaris aún no puede conectar eso",
+        "deviceGone": "Ese dispositivo no está aquí",
+        "noBroker": "A esa conexión le falta la dirección del bróker",
+        "deviceCannot": "A ese dispositivo no se le puede pedir eso",
+        "nukiCannot": "A un dispositivo Nuki no se le puede pedir eso",
+        "noToken": "A esa conexión le falta su token",
+        "noKeys": "A esa conexión le faltan sus claves",
+        "tuyaCannot": "A un dispositivo Tuya no se le puede pedir eso",
+        "eventGone": "Evento inexistente",
+        "giveThemName": "Ponle un nombre",
+        "notFound": "No existe",
+        "noFaces": "El reconocimiento facial aún no está listo",
+        "photoRefused": "El reconocedor no aceptó esa fotografía",
+        "forgetRefused": "El reconocedor no quiso olvidarla, así que no se quitó nada",
+        "placeGone": "Sitio inexistente",
+        "moveCameras": "Mueve o quita antes sus cámaras",
+        "lastPlace": "Tiene que haber un sitio para las cámaras",
+        "noPtz": "Esta cámara no se mueve",
+        "notInstalled": "Places no está instalado",
+        "recognizerMissing": "El reconocedor se instaló pero no aparece",
+        "recognizerAddress": "Escribe la dirección como http://192.168.1.20:8000",
+        "clipGone": "Clip inexistente",
+        "relayQuiet": "El relé de cámaras se instaló pero aún no responde",
+        "relayRefused": "El relé no aceptó esa cámara",
+        "cameraNotShared": "Esa cámara no está compartida contigo",
+        "cannotOperate": "No puedes manejar eso desde aquí",
+        "deviceNotShared": "Ese dispositivo no está compartido contigo",
+        "serverNotConnected": "Ese servidor no está conectado",
+        "failed": "No ha funcionado. No se ha cambiado nada.",
+        "deviceSilent": "Ese dispositivo ya no se anuncia en el bróker",
+        "noCommand": "Ese dispositivo no publicó ninguna forma de manejarlo",
+        "brokerCredentials": "El bróker rechazó esas credenciales.",
+        "addressUnknown": "No se encontró esa dirección en esta red.",
+        "nothingAnswered": "Nada respondió en esa dirección y puerto.",
+        "brokerUnreachable": "No se pudo contactar con el bróker.",
+        "brokerRead": "El bróker no dejó a Polaris leer eso.",
+        "brokerCommand": "El bróker no aceptó esa orden.",
+        "nukiUnreachable": "No se pudo contactar con Nuki. Inténtalo de nuevo en un momento.",
+        "nukiToken": "Nuki rechazó el token. Puede que se haya revocado.",
+        "nukiRate": "Nuki está atendiendo demasiadas peticiones a la vez. Inténtalo de nuevo en un minuto.",
+        "nukiOdd": "Nuki respondió algo inesperado.",
+        "tuyaUnreachable": "No se pudo contactar con Tuya. Inténtalo de nuevo en un momento.",
+        "tuyaOdd": "Tuya respondió algo inesperado.",
+        "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
+        "tuyaRefused": "Tuya rechazó la petición.",
+        "reconnect": "Hay que volver a conectar {name}",
+        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turn-on {se encienda} other {se apague}}",
+        "watchOnly": "{name} está configurado para vigilarse, no para manejarse",
+        "notConnected": "{name} no está conectado a nada",
+        "notAnswering": "{name} no respondía la última vez que se comprobó",
+        "nothingUnderPrefix": "Nada en ese bróker se anuncia bajo \"{prefix}\". Comprueba que el descubrimiento está activado en lo que publica tus dispositivos y que usa este prefijo.",
+        "noNukiUnderPrefix": "Nada en ese bróker publica como dispositivo Nuki bajo \"{prefix}\". Comprueba que MQTT está activado en la app Nuki y apunta a este bróker.",
+        "nukiHttp": "Nuki rechazó la petición (HTTP {status}).",
+        "tuyaKeysBecause": "Tuya rechazó las claves: {detail}.",
+        "tuyaRefusedBecause": "Tuya rechazó la petición: {detail}.",
+        "accountUnreachable": "No se pudo contactar con {name}",
+        "relayQuiet2": "El relé no respondió.",
+        "relayNoVideo": "La cámara aceptó la conexión y no envió vídeo. La causa más habitual con diferencia es la contraseña: en una Tapo es la de tu cuenta de TP-Link, no una puesta en la cámara. Después, que Third-Party Compatibility esté desactivado en la app Tapo, en Me > Third-Party Services; y en un modelo con batería, que la cámara se vuelva a dormir.",
+        "relayPassword": "La cámara rechazó la contraseña. Es la de tu cuenta de TP-Link (con la que entras en la app Tapo), no una puesta en la cámara. Si es la que escribiste, comprueba que Third-Party Compatibility está activado en la app Tapo, en Me > Third-Party Services.",
+        "relayRefusedOutright": "La cámara rechazó la conexión directamente. Puede que su cuenta no pueda emitir, o que otra app tenga ocupada la única conexión que da.",
+        "relayNoStream": "La cámara no tiene vídeo en esa dirección. Si es una marca con ruta de vídeo, la ruta es incorrecta; si elige por calidad, puede que solo publique el flujo a tamaño completo.",
+        "relayStopped": "La cámara dejó de responder a mitad. En un modelo con batería es que vuelve a dormirse; si no, es la red entre aquí y ella.",
+        "relayCodec": "La cámara envía algo que el relé no puede leer. Suele ser un códec que este relé todavía no incluye.",
+        "schemaWhere": "¿Dónde está la cámara?",
+        "schemaAddress": "Solo la dirección: sin barras, espacios ni credenciales",
+        "schemaReach": "Elige desde dónde se llega a esta cámara",
+        "schemaRunsOn": "Elige dónde debe ejecutarse la detección",
+        "schemaAreaName": "Ponle un nombre al área",
+        "schemaCorners": "Un área necesita al menos tres esquinas",
+        "schemaTooManyCorners": "Son más esquinas de las que necesita un área",
+        "schemaPlace": "Sitio desconocido",
+        "schemaCamera": "Cámara desconocida",
+        "schemaPerson": "Persona no válida",
+        "schemaSubnet": "Escríbelo como 192.168.1.0/24",
+        "schemaConnect": "Elige cómo conectarlo",
+        "relayStatus": "El relé lo rechazó ({status})."
+    },
+    "connections": {
+        "nuki-web": {
+            "label": "Cuenta de Nuki Web",
+            "summary": "Un token para todas las cerraduras de la cuenta, y responde desde otro país igual que desde la habitación de al lado.",
+            "note": "Todo pasa por los servidores de Nuki, así que es tan accesible como ellos y el estado que muestra es tan reciente como la última vez que una cerradura habló con ellos. Volver a comprobar pregunta a las propias cerraduras; por eso es un botón y no un temporizador.",
+            "steps": {
+                "s0": "Abre Nuki Web e inicia sesión con la cuenta en la que están las cerraduras.",
+                "s1": "En API, crea un token que pueda ver y manejar tus Smart Locks.",
+                "s2": "Pégalo aquí. Nuki solo lo muestra una vez."
+            },
+            "link": "Nuki Web",
+            "fields": {
+                "token": {
+                    "label": "Token de API",
+                    "placeholder": "Pega el token"
+                }
+            }
+        },
+        "nuki-local": {
+            "label": "Nuki en tu propia red",
+            "summary": "Las cerraduras hablan con un bróker del edificio, así que responden en milisegundos y siguen funcionando aunque caigan los servidores de otros.",
+            "note": "Esta es la vía que tienen de verdad las cerraduras nuevas: una Smart Lock Pro, Ultra o Go tiene wifi propia y ninguna dirección web local, pero se publica en un bróker MQTT de su propia red. Leerla no le cuesta nada a la cerradura, así que el estado aquí siempre está al día. Lo que no puede hacer es llegar a una cerradura desde otro sitio, ni trae el registro de la cuenta de quién abrió la puerta: la cuenta web hace ambas cosas, y merece la pena tener las dos. El firmware de Nuki no tiene sitio para cifrado, así que esto solo funciona sin cifrar en una red que controles, que es regla suya y no nuestra.",
+            "steps": {
+                "s0": "Necesitas un bróker MQTT en la misma red que las cerraduras. Cualquier cosa que ya tenga uno (un hub domótico, un puente Zigbee) sirve como bróker.",
+                "s1": "En la app Nuki, abre la administración del dispositivo y luego MQTT, actívalo y pon la dirección y las credenciales de ese bróker.",
+                "s2": "Pon aquí la misma dirección y las mismas credenciales."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección del bróker",
+                    "hint": "Un nombre o dirección en la misma red que las cerraduras. El firmware de Nuki no se conecta a nada fuera de ella.",
+                    "placeholder": "192.168.1.20"
+                },
+                "port": {
+                    "label": "Puerto"
+                },
+                "username": {
+                    "label": "Usuario"
+                },
+                "password": {
+                    "label": "Contraseña"
+                },
+                "prefix": {
+                    "label": "Prefijo de temas",
+                    "hint": "Bajo qué publican las cerraduras. El valor por defecto de Nuki, salvo que lo cambiaras."
+                }
+            }
+        },
+        "mqtt-discovery": {
+            "label": "Un bróker en tu propia red",
+            "summary": "Cada interruptor, enchufe y luz que se anuncie en tu bróker, lo fabrique quien lo fabrique: una conexión en lugar de una por marca.",
+            "note": "Zigbee2MQTT, Tasmota, ESPHome, Shelly y todo lo que se basa en ellos publican una descripción de cada dispositivo junto a su estado, y esto las lee. Aquí nada habla con Home Assistant ni lo necesita instalado; lo que se lee es la convención, y un bróker que la usa es solo un bróker con esos temas. Llega lo que se enciende o se apaga y lo que se cierra; los sensores, persianas y termostatos se anuncian igual y se quedan fuera hasta que Polaris pueda mostrarlos bien.",
+            "steps": {
+                "s0": "Necesitas un bróker MQTT en la misma red, que ya tiene cualquier cosa que publique dispositivos así.",
+                "s1": "Activa el descubrimiento en lo que los publique. Viene activado por defecto en Zigbee2MQTT y Tasmota.",
+                "s2": "Pon aquí la dirección y las credenciales del bróker."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección del bróker",
+                    "hint": "Un nombre o dirección al que Polaris llegue en esta red.",
+                    "placeholder": "192.168.1.20"
+                },
+                "port": {
+                    "label": "Puerto"
+                },
+                "username": {
+                    "label": "Usuario"
+                },
+                "password": {
+                    "label": "Contraseña"
+                },
+                "prefix": {
+                    "label": "Prefijo de descubrimiento",
+                    "hint": "Bajo qué se publican las descripciones. El valor por defecto de la convención, salvo que lo cambiaras."
+                }
+            }
+        },
+        "tuya-cloud": {
+            "label": "Proyecto en la nube de Tuya",
+            "summary": "Todo lo de la cuenta de la app Smart Life o Tuya, lleve la marca que lleve: interruptores, enchufes y luces.",
+            "note": "Tuya es lo que hay dentro de unos miles de marcas, así que un enchufe con otro nombre en la caja suele ser esto. Las claves salen de su consola de desarrollo, que es gratuita, y la cuenta de la app tiene que estar vinculada al proyecto allí: unas claves que funcionan sin la cuenta vinculada son la única forma de que esto falle en silencio, así que Polaris lo dice en lugar de mostrar una lista vacía.",
+            "steps": {
+                "s0": "Abre la consola de Tuya IoT y crea un proyecto en la nube, eligiendo el centro de datos en el que está tu cuenta de la app.",
+                "s1": "En la pestaña Devices del proyecto, vincula la cuenta de la app Smart Life o Tuya en la que están tus dispositivos.",
+                "s2": "Copia el Access ID y el Access Secret del resumen del proyecto."
+            },
+            "link": "la consola de Tuya IoT",
+            "fields": {
+                "accessId": {
+                    "label": "Access ID",
+                    "placeholder": "Del resumen del proyecto"
+                },
+                "accessSecret": {
+                    "label": "Access Secret",
+                    "placeholder": "Junto al Access ID"
+                },
+                "region": {
+                    "label": "Centro de datos",
+                    "hint": "En el que se creó el proyecto. Los dispositivos solo existen en ese, así que cualquier otro responde como si la cuenta estuviera vacía."
+                }
+            }
+        },
+        "reach": {
+            "anywhere": "Desde cualquier sitio",
+            "same-network": "En la misma red"
+        },
+        "brandMqtt": "Cualquier cosa en MQTT",
+        "regions": {
+            "eu": "Europa central",
+            "weu": "Europa occidental",
+            "us": "América occidental",
+            "eus": "América oriental",
+            "cn": "China",
+            "in": "India"
+        },
+        "tooShort": "Parece demasiado corto para ser el campo {field}",
+        "tooLong": "Es más largo de lo que puede ser el campo {field}",
+        "pickListed": "Elige una de las opciones"
+    },
+    "actions": {
+        "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
+        "thisServer": "Este servidor",
+        "thisMachine": "Esta máquina",
+        "notSharing": "La cámara está ahí pero no comparte su vídeo. En la app Tapo: {path}, y actívalo.",
+        "fillIn": "Rellena lo que necesita {name} e inténtalo de nuevo",
+        "someWrong": "Algo de eso no es correcto.",
+        "checkDetails": "Revisa los datos y reinténtalo",
+        "placeNotSaved": "No se pudo guardar ese sitio.",
+        "alertNotSaved": "No se pudo guardar ese aviso.",
+        "checkAddress": "Revisa la dirección y la cuenta.",
+        "nothingToAsk": "No hay nada en lo que preguntar a esta cámara.",
+        "asleep": "Nada respondió en esa dirección. Estas lo cierran todo mientras duermen, así que ábrela una vez en la app Tapo y vuelve a preguntar; y comprueba que la dirección es la que muestra la app.",
+        "nothingAtAddress": "Nada respondió en esa dirección. Comprueba que es la que muestra la app Tapo para esta cámara.",
+        "subnet": "Escribe la red como 192.168.1.0/24.",
+        "subnetRemote": "Indica el rango de direcciones de esa red, como 192.168.1.0/24.",
+        "cameraNotSaved": "No se pudo guardar esa cámara.",
+        "areasUnread": "No se pudieron leer esas áreas.",
+        "areaNotSaved": "No se pudo guardar esa área.",
+        "personNotAdded": "No se pudo añadir.",
+        "photoTooLarge": "Esa fotografía es demasiado grande.",
+        "nameNotSaved": "No se pudo guardar ese nombre."
     }
 }

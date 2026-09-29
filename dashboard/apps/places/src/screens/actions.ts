@@ -59,6 +59,11 @@ import {
     setFaceRecognition
 } from "../lib/recognizer";
 import { host } from "@polaris/app-host";
+import type { MessageParams } from "@polaris/core";
+import { placesT } from "../lib/i18n";
+import type { PlacesKey } from "../../messages";
+import { placesRefusalText } from "../lib/refusal-text";
+import { connectionWords } from "../lib/device-connections";
 
 const { requireUser } = host.session;
 const { listHosts } = host.hostService;
@@ -66,6 +71,18 @@ const { recordAudit } = host.auditService;
 const { storageTargetOptions } = host.storageTarget;
 
 const PATH = "/places";
+
+/** A sentence of the action's own, in the language of whoever asked. */
+async function say(key: PlacesKey, params?: MessageParams): Promise<string> {
+    return (await placesT())(key, params);
+}
+
+/** A schema's first complaint in the reader's words, or the fallback when it
+ *  gave none. */
+async function schemaSay(message: string | undefined, fallback: PlacesKey): Promise<string> {
+    const t = await placesT();
+    return message ? placesRefusalText(t, message) : t(fallback);
+}
 
 /**
  * Turn a refusal into a sentence, and a fault into a line in the log.
@@ -83,9 +100,10 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof HomeError) return { error: caught.message };
+        const t = await placesT();
+        if (caught instanceof HomeError) return { error: placesRefusalText(t, caught.message) };
         console.error("places: an action failed", caught);
-        return { error: "That did not work. Nothing was changed." };
+        return { error: t("refusals.failed") };
     }
 }
 
@@ -165,7 +183,7 @@ export async function savePlaceAction(
         id ? places.updatePlace(install.id, id, shape) : places.createPlace(install.id, shape)
     );
     if (result.error || !result.value)
-        return { error: result.error ?? "That place could not be saved." };
+        return { error: result.error ?? await say("actions.placeNotSaved") };
     revalidatePath(PATH);
     return { place: result.value };
 }
@@ -221,7 +239,7 @@ export async function saveAlertAction(
     const { user, install } = await requireHome("home.manage");
     const parsed = schemas.alertRuleInputSchema.safeParse(input ?? {});
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
     }
     const result = await guard(async () => {
         // A rule with no place is one that watches everywhere, which is a
@@ -230,7 +248,7 @@ export async function saveAlertAction(
         return alerts.saveAlertRule(install.id, id, user.id, { ...parsed.data, placeId });
     });
     if (result.error || !result.value)
-        return { error: result.error ?? "That alert could not be saved." };
+        return { error: result.error ?? await say("actions.alertNotSaved") };
     revalidatePath(`${PATH}/alerts`);
     return { rule: result.value };
 }
@@ -270,14 +288,15 @@ export async function listStorageOptionsAction(): Promise<{
     error?: string;
 }> {
     await requireHome("home.read");
+    const t = await placesT();
     const result = await guard(async () => {
         const [fallback, connections] = await Promise.all([
             footageTarget(null),
             storageTargetOptions()
         ]);
         return [
-            { id: "", label: `Wherever this Polaris keeps footage (${fallback.name})` },
-            { id: LOCAL_TARGET, label: "This server" },
+            { id: "", label: t("actions.defaultStorage", { name: fallback.name }) },
+            { id: LOCAL_TARGET, label: t("actions.thisServer") },
             ...connections.map((connection) => ({ id: connection.id, label: connection.name }))
         ];
     });
@@ -290,10 +309,11 @@ export async function listServersAction(): Promise<{
     error?: string;
 }> {
     const { install } = await requireHome("home.read");
+    const t = await placesT();
     const result = await guard(async () => {
         const hosts = await listHosts(install.ownerId);
         return [
-            { id: LOCAL_MACHINE, label: "This machine" },
+            { id: LOCAL_MACHINE, label: t("actions.thisMachine") },
             ...hosts.map((host) => ({ id: host.id, label: host.name }))
         ];
     });
@@ -331,7 +351,7 @@ export async function probeCameraAction(input: unknown): Promise<{
     const parsed = schemas.cameraProbeInputSchema.safeParse(
         schemas.normalizeCameraInput((input ?? {}) as Record<string, unknown>)
     );
-    if (!parsed.success) return { error: "Check the address and the account." };
+    if (!parsed.success) return { error: await say("actions.checkAddress") };
 
     const vendor = cameraVendor(parsed.data.vendor);
 
@@ -341,7 +361,7 @@ export async function probeCameraAction(input: unknown): Promise<{
     // a credential that was right, for a camera that is working.
     if (vendor.noOnvif) {
         const port = vendor.nativePort ?? parsed.data.onvifPort;
-        if (!port) return { error: "There is nothing to ask this camera on." };
+        if (!port) return { error: await say("actions.nothingToAsk") };
         // Two questions, because "nothing answered" has two causes with two
         // different fixes and the reader cannot tell them apart from one answer.
         // The video port is the one that matters; the control port only decides
@@ -359,13 +379,13 @@ export async function probeCameraAction(input: unknown): Promise<{
             // why nobody finds it by looking at the camera's own settings.
             if (answering && vendor.appConsent) {
                 return {
-                    error: `The camera is there but is not sharing its video. In the Tapo app: ${vendor.appConsent}, and turn it on.`
+                    error: await say("actions.notSharing", { path: vendor.appConsent })
                 };
             }
             return {
                 error: vendor.battery
-                    ? "Nothing answered at that address. One of these closes everything down while it sleeps, so open it once in the Tapo app and ask again - and check the address is the one the app shows for it."
-                    : "Nothing answered at that address. Check it is the one the Tapo app shows for this camera."
+                    ? await say("actions.asleep")
+                    : await say("actions.nothingAtAddress")
             };
         }
         return {
@@ -392,7 +412,7 @@ export async function probeCameraAction(input: unknown): Promise<{
         })
     );
     if (result.error || !result.value)
-        return { error: result.error ?? "The camera did not answer." };
+        return { error: result.error ?? await say("dialog.noAnswer") };
 
     // Only the path is kept from what the camera answered. Its URL carries the
     // host it thinks it is on, which on a camera behind a repeater is an address
@@ -459,7 +479,11 @@ export async function testCameraStreamAction(
     });
     if (result.error) return { error: result.error };
     if (!result.value || "failed" in result.value) {
-        return { error: result.value?.failed ?? "The relay did not answer." };
+        return {
+            error: result.value?.failed
+                ? placesRefusalText(await placesT(), result.value.failed)
+                : await say("refusals.relayQuiet2")
+        };
     }
     return { ok: true, streams: result.value.streams };
 }
@@ -471,11 +495,11 @@ export async function discoverCamerasAction(input: unknown): Promise<{
 }> {
     const { install } = await requireHome("home.manage");
     const parsed = schemas.discoveryInputSchema.safeParse(input ?? {});
-    if (!parsed.success) return { error: "Write the network as 192.168.1.0/24." };
+    if (!parsed.success) return { error: await say("actions.subnet") };
     // Looking from another server is only meaningful with a range to look at:
     // the multicast probe is a thing Polaris does on its own segment.
     if (parsed.data.fromServerId && !parsed.data.subnet) {
-        return { error: "Give the address range on that network, like 192.168.1.0/24." };
+        return { error: await say("actions.subnetRemote") };
     }
     const result = await guard(() =>
         discoverCameras(
@@ -497,7 +521,7 @@ export async function saveCameraAction(
         schemas.normalizeCameraInput((input ?? {}) as Record<string, unknown>)
     );
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
     }
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
@@ -518,7 +542,7 @@ export async function saveCameraAction(
             : cameras.createCamera(install.id, parsed.data);
     });
     if (result.error || !result.value)
-        return { error: result.error ?? "That camera could not be saved." };
+        return { error: result.error ?? await say("actions.cameraNotSaved") };
     revalidatePath(PATH);
     return { camera: result.value };
 }
@@ -594,7 +618,7 @@ export async function listCameraZonesAction(cameraId: string): Promise<{
     const { install } = await requireHome("home.read");
     const result = await guard(() => cameraZones.listCameraZones(install.id, cameraId));
     if (result.error || !result.value)
-        return { error: result.error ?? "Those areas could not be read." };
+        return { error: result.error ?? await say("actions.areasUnread") };
     return { zones: result.value };
 }
 
@@ -606,14 +630,14 @@ export async function saveCameraZoneAction(
     const { install } = await requireHome("home.manage");
     const parsed = schemas.cameraZoneInputSchema.safeParse(schemas.normalizeZoneInput(input));
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.someWrong") };
     const result = await guard(() =>
         id
             ? cameraZones.updateCameraZone(install.id, cameraId, id, parsed.data)
             : cameraZones.createCameraZone(install.id, cameraId, parsed.data)
     );
     if (result.error || !result.value)
-        return { error: result.error ?? "That area could not be saved." };
+        return { error: result.error ?? await say("actions.areaNotSaved") };
     revalidatePath(PATH);
     return { zone: result.value };
 }
@@ -649,7 +673,7 @@ export async function listPlaceZoneNamesAction(): Promise<{ zones?: string[]; er
         return [...names].sort((first, second) => first.localeCompare(second));
     });
     if (result.error || !result.value)
-        return { error: result.error ?? "Those areas could not be read." };
+        return { error: result.error ?? await say("actions.areasUnread") };
     return { zones: result.value };
 }
 
@@ -817,7 +841,7 @@ export async function addPersonAction(
 ): Promise<{ person?: people.PersonView; error?: string }> {
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.addPerson(install.id, String(name)));
-    if (result.error || !result.value) return { error: result.error ?? "They could not be added." };
+    if (result.error || !result.value) return { error: result.error ?? await say("actions.personNotAdded") };
     revalidatePath(`${PATH}/people`);
     return { person: result.value };
 }
@@ -838,7 +862,7 @@ export async function addFaceAction(
     contentType?: string
 ): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
-    if (image.byteLength > 8_000_000) return { error: "That photograph is too large." };
+    if (image.byteLength > 8_000_000) return { error: await say("actions.photoTooLarge") };
     const result = await guard(() =>
         people.addFace(install.id, id, image, faceImageType(contentType))
     );
@@ -854,7 +878,7 @@ export async function renamePersonAction(
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.renamePerson(install.id, id, String(name)));
     if (result.error || !result.value)
-        return { error: result.error ?? "That name could not be saved." };
+        return { error: result.error ?? await say("actions.nameNotSaved") };
     revalidatePath(`${PATH}/people`);
     return { person: result.value };
 }
@@ -1230,7 +1254,7 @@ export async function saveDeviceAction(
         schemas.normalizeDeviceInput((input ?? {}) as Record<string, unknown>)
     );
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
     const result = await guard(() =>
         devices.updateDevice(install.id, String(deviceId), parsed.data)
     );
@@ -1303,12 +1327,12 @@ export async function connectDeviceAccountAction(input: unknown): Promise<{
     const { user, install } = await requireHome("home.manage");
     const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
-    if (!connection) return { error: "Polaris cannot connect that yet" };
+    if (!connection) return { error: await say("refusals.cannotConnect") };
     const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
     if (!deviceConnections.fieldsComplete(connection, fields)) {
-        return { error: `Fill in what ${connection.label} needs and try again` };
+        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
     }
 
     const result = await guard(async () => {
@@ -1352,12 +1376,12 @@ export async function reconnectDeviceAccountAction(
     const { user, install } = await requireHome("home.manage");
     const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
-    if (!connection) return { error: "Polaris cannot connect that yet" };
+    if (!connection) return { error: await say("refusals.cannotConnect") };
     const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
     if (!deviceConnections.fieldsComplete(connection, fields)) {
-        return { error: `Fill in what ${connection.label} needs and try again` };
+        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
     }
 
     const result = await guard(async () => {

@@ -22,12 +22,19 @@ import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "../../lib/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
 import { BrandPicker, ModelPicker } from "./model-picker";
-import { cameraVendor, reportsOwnAlerts, usesAccountPassword } from "../../lib/vendors";
+import {
+    cameraVendor,
+    reportsOwnAlerts,
+    usesAccountPassword,
+    vendorMethod,
+    vendorNote
+} from "../../lib/vendors";
+import { usePlacesT } from "../use-places-t";
+import type { PlacesTranslator } from "../../lib/i18n";
 import {
     BATTERY_COST_WARNING,
-    POWER_LABELS,
-    POWER_NOTES,
     POWER_SOURCES,
+    modelNote,
     askPowerFor,
     cameraModel,
     connectionsFor,
@@ -38,11 +45,8 @@ import {
 import {
     DEFAULT_DETECTION,
     DETECTORS,
-    DETECTOR_META,
     LOCAL_MACHINE,
     OBJECT_CLASSES,
-    OBJECT_CLASS_HINTS,
-    OBJECT_CLASS_LABELS,
     needsSomewhereToRun,
     type Detector,
     type ObjectClass
@@ -179,6 +183,7 @@ export function CameraDialog({
     onClose: () => void;
     onSaved: (saved: CameraView) => void;
 }) {
+    const t = usePlacesT();
     const [form, setForm] = useState<FormState>(() => initial(camera, prefill, defaults));
     const [busy, setBusy] = useState(false);
     const [testing, setTesting] = useState(false);
@@ -363,7 +368,7 @@ export function CameraDialog({
         const result = await runAction(() => actions.probeCameraAction(payload()), setError);
         if (!result?.probe || result.error) {
             setTesting(false);
-            if (result) setError(result.error ?? "The camera did not answer.");
+            if (result) setError(result.error ?? t("dialog.noAnswer"));
             return;
         }
         // A saved camera gets a second call after this one, and the button has to
@@ -391,7 +396,7 @@ export function CameraDialog({
             setTesting(false);
             if (!stream) return;
             if (stream.error) {
-                setError(`The camera is reachable, but its video would not open. ${stream.error}`);
+                setError(t("dialog.videoFailed", { reason: stream.error }));
                 return;
             }
             setTested(
@@ -399,8 +404,8 @@ export function CameraDialog({
                     ? // Worth saying rather than hiding: it is the whole reason
                       // this camera drew nothing, and it means every picture of
                       // it now costs the full-size stream.
-                      "The video opened. This camera publishes only its full-size stream, so that is what Polaris uses."
-                    : "The video opened. This camera works."
+                      t("dialog.videoMainOnly")
+                    : t("dialog.videoWorks")
             );
             return;
         }
@@ -410,9 +415,9 @@ export function CameraDialog({
                   // maker's protocol before it has been saved. Said plainly,
                   // because "the camera answered" over a password nobody checked
                   // is the reassurance that costs an evening.
-                  "Something is answering there. Save it, and ask again to try the video."
+                  t("dialog.somethingAnswers")
                 : [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
-                      "The camera answered"
+                      t("dialog.answered")
         );
     };
 
@@ -440,34 +445,34 @@ export function CameraDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{camera ? camera.name : "Add a camera"}</DialogTitle>
+                    <DialogTitle>{camera ? camera.name : t("cameras.add")}</DialogTitle>
                     <DialogDescription>
                         {camera
-                            ? "Change how this camera is reached, what it notices, and what is kept."
-                            : "Polaris asks the camera what it streams, so most of this fills itself in."}
+                            ? t("dialog.editIntro")
+                            : t("dialog.addIntro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-5">
-                    <Section title="The camera">
-                        <Field label="Name" required>
+                    <Section title={t("dialog.sections.camera")}>
+                        <Field label={t("placeDialog.name")} required>
                             <Input
                                 value={form.name}
                                 onChange={(event) => set("name", event.target.value)}
-                                placeholder="Front door"
+                                placeholder={t("dialog.namePlaceholder")}
                             />
                         </Field>
                         <Field
-                            label="Where it points"
-                            hint="Groups the wall. Leave it blank if you only have a few."
+                            label={t("dialog.zone")}
+                            hint={t("dialog.zoneHint")}
                         >
                             <Input
                                 value={form.zone}
                                 onChange={(event) => set("zone", event.target.value)}
-                                placeholder="Outside"
+                                placeholder={t("dialog.zonePlaceholder")}
                             />
                         </Field>
-                        <Field label="Brand" required>
+                        <Field label={t("dialog.brand")} required>
                             <BrandPicker
                                 value={form.brand}
                                 onChange={(brand) =>
@@ -485,8 +490,8 @@ export function CameraDialog({
                             />
                         </Field>
                         <Field
-                            label="Model"
-                            hint="Type it if the list is long. TP-Link cameras are sold as Tapo, so both names find them."
+                            label={t("dialog.model")}
+                            hint={t("dialog.modelHint")}
                             required
                         >
                             <ModelPicker
@@ -510,18 +515,17 @@ export function CameraDialog({
                             rather than merely listed first. */}
                         {connections.length > 1 ? (
                             <Field
-                                label="How Polaris connects"
-                                hint="Both reach the same camera. Take the recommended one unless you have a reason not to."
+                                label={t("dialog.connection")}
+                                hint={t("dialog.connectionHint")}
                             >
                                 <Select
                                     value={vendorId}
                                     onValueChange={(value) => set("vendor", value)}
                                     options={connections.map((id, index) => {
-                                        const profile = cameraVendor(id);
-                                        const name = profile.method ?? profile.label;
+                                        const name = vendorMethod(id, t);
                                         return {
                                             value: id,
-                                            label: index === 0 ? `${name} - recommended` : name
+                                            label: index === 0 ? t("dialog.recommended", { name }) : name
                                         };
                                     })}
                                 />
@@ -530,22 +534,22 @@ export function CameraDialog({
                         {/* What is true of this model and not of its make - the
                             doorbells that answer RTSP only once they are wired
                             up, and nothing else. */}
-                        {model?.note ? (
+                        {model && modelNote(model, t) ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                {model.note}
+                                {modelNote(model, t)}
                             </p>
                         ) : null}
                         {askPower ? (
                             <Field
-                                label="How it is powered"
-                                hint="This decides what Polaris is allowed to do with it, so it is worth getting right."
+                                label={t("dialog.power")}
+                                hint={t("dialog.powerHint")}
                             >
                                 <Select
                                     value={form.power}
                                     onValueChange={(value) => set("power", value as PowerSource)}
                                     options={POWER_SOURCES.map((source) => ({
                                         value: source,
-                                        label: POWER_LABELS[source]
+                                        label: t(`power.labels.${source}`)
                                     }))}
                                 />
                             </Field>
@@ -563,13 +567,13 @@ export function CameraDialog({
                             >
                                 {battery &&
                                 (needsSomewhereToRun(form.detector) || form.recording !== "off")
-                                    ? BATTERY_COST_WARNING
-                                    : POWER_NOTES[form.power]}
+                                    ? t(BATTERY_COST_WARNING)
+                                    : t(`power.notes.${form.power}`)}
                             </p>
                         ) : null}
-                        {vendor.note ? (
+                        {vendorNote(vendorId, t) ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                {vendor.note}
+                                {vendorNote(vendorId, t)}
                             </p>
                         ) : null}
                         {/* Not a Polaris setting and not one Polaris can reach,
@@ -577,13 +581,14 @@ export function CameraDialog({
                             camera refuses and the password gets the blame. */}
                         {vendor.appConsent ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                Recent firmware refuses every local connection until it is allowed.
-                                In the Tapo app:{" "}
-                                <span className="text-foreground">{vendor.appConsent}</span>.
+                                {t.rich("dialog.appConsent", {
+                                    path: vendor.appConsent,
+                                    em: (chunks) => <span className="text-foreground">{chunks}</span>
+                                })}
                             </p>
                         ) : null}
                         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                            <Field label="Address" required>
+                            <Field label={t("dialog.address")} required>
                                 <Input
                                     value={form.address}
                                     onChange={(event) => set("address", event.target.value)}
@@ -591,7 +596,7 @@ export function CameraDialog({
                                 />
                             </Field>
                             {usesRtsp ? (
-                                <Field label="Stream port">
+                                <Field label={t("dialog.rtspPort")}>
                                     <Input
                                         value={form.rtspPort}
                                         onChange={(event) => set("rtspPort", event.target.value)}
@@ -603,7 +608,7 @@ export function CameraDialog({
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {usesRtsp ? (
-                                <Field label="Account">
+                                <Field label={t("dialog.account")}>
                                     <Input
                                         value={form.username}
                                         onChange={(event) => set("username", event.target.value)}
@@ -612,13 +617,13 @@ export function CameraDialog({
                                 </Field>
                             ) : null}
                             <Field
-                                label={usesRtsp ? "Password" : "Tapo account password"}
+                                label={usesRtsp ? t("dialog.password") : t("dialog.tapoPassword")}
                                 required={!usesRtsp && !inheritsPassword}
                                 hint={
                                     camera?.hasPassword
-                                        ? "Stored. Type to replace it."
+                                        ? t("dialog.passwordStored")
                                         : inheritsPassword
-                                          ? "Leave it blank to use the password from your other TP-Link cameras - it is one password for the whole account."
+                                          ? t("dialog.passwordInherited")
                                           : usesRtsp
                                             ? undefined
                                             : // The question everybody asks at this
@@ -627,7 +632,7 @@ export function CameraDialog({
                                               // never asks who is presenting it,
                                               // so there is no address to give and
                                               // its absence is not a missing step.
-                                              "The password for your TP-Link account. There is no email or account name to give - the camera checks the password and nothing else."
+                                              t("dialog.passwordTapo")
                                 }
                             >
                                 {/* enigma:allow-no-breach-check - nothing is being
@@ -644,7 +649,7 @@ export function CameraDialog({
                                     value={form.password}
                                     onChange={(event) => set("password", event.target.value)}
                                     autoComplete="off"
-                                    placeholder={camera?.hasPassword ? "Unchanged" : ""}
+                                    placeholder={camera?.hasPassword ? t("dialog.unchanged") : ""}
                                 />
                             </Field>
                         </div>
@@ -661,7 +666,7 @@ export function CameraDialog({
                                 ) : (
                                     <Sparkles className="size-4 shrink-0" />
                                 )}
-                                Ask the camera
+                                {t("dialog.ask")}
                             </Button>
                             {tested ? (
                                 <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
@@ -673,8 +678,8 @@ export function CameraDialog({
                         {usesRtsp ? (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Field
-                                    label="Stream path"
-                                    hint="Left blank, the make's usual one is used."
+                                    label={t("dialog.mainPath")}
+                                    hint={t("dialog.mainPathHint")}
                                 >
                                     <Input
                                         value={form.mainPath}
@@ -683,8 +688,8 @@ export function CameraDialog({
                                     />
                                 </Field>
                                 <Field
-                                    label="Small stream"
-                                    hint="What detection reads. Cheaper by a lot."
+                                    label={t("dialog.subPath")}
+                                    hint={t("dialog.subPathHint")}
                                 >
                                     <Input
                                         value={form.subPath}
@@ -697,14 +702,14 @@ export function CameraDialog({
                     </Section>
 
                     <Section
-                        title="Reached from"
-                        hint="A camera on another network - behind a repeater, or at another address - is reached by a server that lives there and is connected to Polaris under Servers. The stream comes back over that connection, so no extra port has to be opened."
+                        title={t("dialog.sections.reach")}
+                        hint={t("dialog.reachHint")}
                     >
                         <Select
                             value={form.reachVia}
                             onValueChange={(value) => set("reachVia", value)}
                             options={[
-                                { value: "direct", label: "Polaris itself" },
+                                { value: "direct", label: t("dialog.direct") },
                                 ...servers
                                     .filter((server) => server.id !== "local")
                                     .map((server) => ({
@@ -715,19 +720,19 @@ export function CameraDialog({
                         />
                     </Section>
 
-                    <Section title="What it should notice">
+                    <Section title={t("dialog.sections.notice")}>
                         <Select
                             value={form.detector}
                             onValueChange={(value) => set("detector", value as Detector)}
                             options={rungs.map((id) => ({
                                 value: id,
-                                label: DETECTOR_META[id].label
+                                label: t(`detectors.${id}.label`)
                             }))}
                         />
                         <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                            {DETECTOR_META[form.detector].summary}{" "}
+                            {t(`detectors.${form.detector}.summary`)}{" "}
                             <span className="text-foreground-subtle">
-                                {DETECTOR_META[form.detector].cost}
+                                {t(`detectors.${form.detector}.cost`)}
                             </span>
                         </p>
                         {/* Only when it is actually a problem. The line used to
@@ -737,25 +742,23 @@ export function CameraDialog({
                             sentence and had no way to tell the two apart. */}
                         {form.detector === "faces" && recognizes === false ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
-                                {DETECTOR_META.faces.requires}{" "}
+                                {t("detectors.faces.requires")}{" "}
                                 <Link
                                     href="/places/settings"
                                     className="underline underline-offset-2"
                                 >
-                                    Open Settings
+                                    {t("dialog.openSettings")}
                                 </Link>
                             </p>
                         ) : null}
                         {battery && needsSomewhereToRun(form.detector) ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
-                                {BATTERY_COST_WARNING}
+                                {t(BATTERY_COST_WARNING)}
                             </p>
                         ) : null}
                         {battery && !ownAlerts && form.detector === "none" ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                A camera like this has no way to tell Polaris what it saw, so its
-                                own alerts stay in the Tapo app. Polaris connects when you open it,
-                                and lets go when you leave.
+                                {t("dialog.noOwnAlerts")}
                             </p>
                         ) : null}
                         {camera?.id && form.detector !== "none" ? (
@@ -763,8 +766,7 @@ export function CameraDialog({
                         ) : null}
                         {form.detector === "faces" && recognizes === true ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                Face recognition is on. Teach it who lives here under People and
-                                this camera starts using their names.
+                                {t("dialog.facesOn")}
                             </p>
                         ) : null}
 
@@ -775,8 +777,8 @@ export function CameraDialog({
                                 // not reach the camera over, to look at it here,
                                 // would be the slowest possible way to do it.
                                 <Field
-                                    label="Runs on"
-                                    hint="The machine that reaches this camera also analyzes it - the stream is already there."
+                                    label={t("dialog.runsOn")}
+                                    hint={t("dialog.runsOnHint")}
                                 >
                                     <Input
                                         value={
@@ -788,7 +790,7 @@ export function CameraDialog({
                                     />
                                 </Field>
                             ) : (
-                                <Field label="Runs on">
+                                <Field label={t("dialog.runsOn")}>
                                     <Select
                                         value={form.detectorTargetId}
                                         onValueChange={(value) => set("detectorTargetId", value)}
@@ -808,8 +810,8 @@ export function CameraDialog({
                                     looking has that setting in its own app. */}
                                 {needsSomewhereToRun(form.detector) ? (
                                     <Field
-                                        label={`Sensitivity - ${form.sensitivity}`}
-                                        hint="Higher notices smaller changes. Too high and every shadow is an event."
+                                        label={t("dialog.sensitivity", { value: form.sensitivity })}
+                                        hint={t("dialog.sensitivityHint")}
                                     >
                                         <input
                                             type="range"
@@ -820,13 +822,13 @@ export function CameraDialog({
                                                 set("sensitivity", Number(event.target.value))
                                             }
                                             className="w-64 accent-primary"
-                                            aria-label="Sensitivity"
+                                            aria-label={t("dialog.sensitivityLabel")}
                                         />
                                     </Field>
                                 ) : null}
                                 <Field
-                                    label="Ignore anything shorter than"
-                                    hint="Seconds. The knob that keeps moths, gusts and passing lorries out of the log - nearly every false alarm is over within one or two. Zero reports the instant anything moves."
+                                    label={t("dialog.settle")}
+                                    hint={t("dialog.settleHint")}
                                 >
                                     <Input
                                         value={form.settleSeconds}
@@ -838,8 +840,8 @@ export function CameraDialog({
                                     />
                                 </Field>
                                 <Field
-                                    label="Wait between detections"
-                                    hint="The knob that decides what this camera costs. Seconds."
+                                    label={t("dialog.gap")}
+                                    hint={t("dialog.gapHint")}
                                 >
                                     <Input
                                         value={form.minGapSeconds}
@@ -852,7 +854,7 @@ export function CameraDialog({
                                 </Field>
                                 <label className="flex items-center justify-between gap-3">
                                     <span className="text-[0.8125rem] text-foreground">
-                                        Only at certain hours
+                                        {t("dialog.hours")}
                                     </span>
                                     <Switch
                                         checked={form.hoursOn}
@@ -868,20 +870,20 @@ export function CameraDialog({
                                             }
                                             className="w-20"
                                             inputMode="numeric"
-                                            aria-label="From hour"
+                                            aria-label={t("dialog.fromHour")}
                                         />
                                         <span className="text-[0.75rem] text-muted-foreground">
-                                            to
+                                            {t("dialog.to")}
                                         </span>
                                         <Input
                                             value={form.hoursTo}
                                             onChange={(event) => set("hoursTo", event.target.value)}
                                             className="w-20"
                                             inputMode="numeric"
-                                            aria-label="To hour"
+                                            aria-label={t("dialog.toHour")}
                                         />
                                         <span className="text-[0.75rem] text-foreground-subtle">
-                                            24-hour clock. 22 to 6 is overnight.
+                                            {t("dialog.hoursHint")}
                                         </span>
                                     </div>
                                 ) : null}
@@ -889,7 +891,7 @@ export function CameraDialog({
                         ) : null}
 
                         {form.detector === "objects" || form.detector === "faces" ? (
-                            <Field label="Worth reporting">
+                            <Field label={t("dialog.classes")}>
                                 <div className="flex flex-wrap gap-3">
                                     {OBJECT_CLASSES.map((item) => (
                                         <label
@@ -909,13 +911,13 @@ export function CameraDialog({
                                                     )
                                                 }
                                             />
-                                            {OBJECT_CLASS_LABELS[item]}
+                                            {t(`objects.${item}`)}
                                         </label>
                                     ))}
                                 </div>
                                 {form.classes.includes("package") ? (
                                     <p className="text-[0.75rem] text-foreground-subtle">
-                                        {OBJECT_CLASS_HINTS.package}
+                                        {t("objects.packageHint")}
                                     </p>
                                 ) : null}
                             </Field>
@@ -923,8 +925,8 @@ export function CameraDialog({
 
                         {form.detector === "faces" ? (
                             <Field
-                                label="Sure enough to name somebody"
-                                hint="Below this they are reported as a stranger rather than as the nearest match."
+                                label={t("dialog.faceThreshold")}
+                                hint={t("dialog.faceThresholdHint")}
                             >
                                 <Input
                                     value={form.faceThreshold}
@@ -936,27 +938,27 @@ export function CameraDialog({
                         ) : null}
                     </Section>
 
-                    <Section title="What to keep">
+                    <Section title={t("dialog.sections.keep")}>
                         <SegmentedControl
                             value={form.recording}
                             onValueChange={(value) =>
                                 set("recording", value as FormState["recording"])
                             }
                             options={[
-                                { value: "off", label: "Nothing" },
-                                { value: "motion", label: "When something happens" },
-                                { value: "continuous", label: "Everything" }
+                                { value: "off", label: t("dialog.keep.off") },
+                                { value: "motion", label: t("dialog.keep.motion") },
+                                { value: "continuous", label: t("dialog.keep.continuous") }
                             ]}
                         />
                         {battery && form.recording !== "off" ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
-                                {BATTERY_COST_WARNING}
+                                {t(BATTERY_COST_WARNING)}
                             </p>
                         ) : null}
                         {form.recording !== "off" ? (
                             <Field
-                                label="Store on"
-                                hint="Footage already written stays where it is; this decides where the next of it goes."
+                                label={t("dialog.storeOn")}
+                                hint={t("dialog.storeOnHint")}
                             >
                                 <Select
                                     value={form.storageTarget}
@@ -969,7 +971,7 @@ export function CameraDialog({
                             </Field>
                         ) : null}
                         {form.recording !== "off" ? (
-                            <Field label="Keep for" hint="Days. Anything you pin survives this.">
+                            <Field label={t("dialog.keepFor")} hint={t("dialog.keepForHint")}>
                                 <Input
                                     value={form.retentionDays}
                                     onChange={(event) => set("retentionDays", event.target.value)}
@@ -980,9 +982,9 @@ export function CameraDialog({
                         ) : null}
                         <label className="flex items-center justify-between gap-3">
                             <span className="text-[0.8125rem] text-foreground">
-                                Switched on
+                                {t("dialog.enabled")}
                                 <span className="block text-[0.75rem] text-foreground-subtle">
-                                    Off means Polaris does not connect to it at all.
+                                    {t("dialog.enabledHint")}
                                 </span>
                             </span>
                             <Switch
@@ -997,11 +999,11 @@ export function CameraDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button onClick={save} disabled={busy || incomplete}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        {camera ? "Save" : "Add camera"}
+                        {camera ? t("common.save") : t("dialog.addCamera")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -1070,25 +1072,29 @@ function Field({
  * never "at what time". Nothing is hidden behind a hover.
  */
 function DetectorActivity({ activity }: { activity: CameraActivity | null | undefined }) {
+    const t = usePlacesT();
     if (activity === undefined) return <Skeleton className="h-4 w-64" />;
     if (activity === null) {
         return (
             <p className="text-[0.75rem] leading-relaxed text-warning">
-                No detector has reported on this camera. If you have just saved it, give it a minute
-                - the worker asks for its cameras every half minute.
+                {t("activity.none")}
             </p>
         );
     }
 
     const lines = [
-        activity.watching ? "Watching this camera." : "Not connected to this camera right now.",
+        activity.watching ? t("activity.watching") : t("activity.notWatching"),
         activity.motionAt
-            ? `Movement ${since(activity.motionAt)}.`
-            : "Nothing has moved in front of it yet.",
+            ? t("activity.motion", { since: since(activity.motionAt, t) })
+            : t("activity.noMotion"),
         activity.lookedAt
             ? activity.foundAt
-                ? `Last looked properly ${since(activity.lookedAt)}, and found ${activity.found ?? "something"} ${since(activity.foundAt)}.`
-                : `Last looked properly ${since(activity.lookedAt)} and found nothing it was asked to report.`
+                ? t("activity.found", {
+                      looked: since(activity.lookedAt, t),
+                      found: activity.found ?? t("activity.something"),
+                      at: since(activity.foundAt, t)
+                  })
+                : t("activity.foundNothing", { looked: since(activity.lookedAt, t) })
             : null
     ].filter(Boolean);
 
@@ -1099,7 +1105,7 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
             </p>
             {activity.limitedTo ? (
                 <p className="text-[0.75rem] leading-relaxed text-warning">
-                    It is {activity.limitedTo}.
+                    {t("activity.limited", { reason: limitReason(activity.limitedTo, t) })}
                 </p>
             ) : null}
         </div>
@@ -1107,13 +1113,22 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
 }
 
 /** How long ago, in the words somebody reads a status line in. */
-function since(at: number): string {
+function since(at: number, t: PlacesTranslator): string {
     const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
-    if (seconds < 45) return "just now";
+    if (seconds < 45) return t("activity.justNow");
     const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+    if (minutes < 60) return t("activity.minutesAgo", { count: minutes });
     const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-    const days = Math.round(hours / 24);
-    return `${days} ${days === 1 ? "day" : "days"} ago`;
+    if (hours < 24) return t("activity.hoursAgo", { count: hours });
+    return t("activity.daysAgo", { count: Math.round(hours / 24) });
+}
+
+/** The vision worker's two reasons for looking less than it was asked to,
+ *  in the reader's words; anything else as the worker said it. */
+function limitReason(reason: string, t: PlacesTranslator): string {
+    if (reason === "this machine has no detection model, so movement only") return t("activity.noModel");
+    if (reason === "the camera would not say how big its picture is, so movement only") {
+        return t("activity.noSize");
+    }
+    return reason;
 }
