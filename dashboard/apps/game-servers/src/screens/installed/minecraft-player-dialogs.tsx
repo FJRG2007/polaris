@@ -16,6 +16,7 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { useGameText } from "../game-text";
 import type { PlayerStats } from "../../lib/games-activity";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import { PlayerRecordPanel } from "../../components/player-history";
@@ -83,6 +84,7 @@ export function ExperienceDialog({
     onClose: () => void;
     onApply: (change: { mode: ExperienceMode; amount: number; unit: ExperienceUnit }) => void;
 }) {
+    const t = useGameText("minecraft");
     const [mode, setMode] = useState<ExperienceMode>("add");
     const [unit, setUnit] = useState<ExperienceUnit>("levels");
     const [amount, setAmount] = useState(1);
@@ -90,9 +92,9 @@ export function ExperienceDialog({
     return (
         <PlayerFormDialog
             title={`${player}'s experience`}
-            description="Applied to the player standing on the server, so they see it happen."
+            description={t("players.appliedToThePlayerStanding")}
             confirmLabel={
-                mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"
+                mode === "set" ? t("players.setIt") : mode === "remove" ? t("players.takeItAway") : t("players.giveIt")
             }
             ready={amount >= 0}
             pending={pending}
@@ -101,25 +103,25 @@ export function ExperienceDialog({
             onClose={onClose}
             onConfirm={() => onApply({ mode, amount, unit })}
         >
-            <PlayerFormField label="What to do">
+            <PlayerFormField label={t("players.whatToDo")}>
                 <Select
                     value={mode}
-                    aria-label="What to do"
+                    aria-label={t("players.whatToDo")}
                     onValueChange={(next) => setMode(next as ExperienceMode)}
                     options={[
-                        { value: "add", label: "Give them" },
-                        { value: "remove", label: "Take away" },
-                        { value: "set", label: "Put them on" }
+                        { value: "add", label: t("players.giveThem") },
+                        { value: "remove", label: t("players.takeAway") },
+                        { value: "set", label: t("players.putThemOn") }
                     ]}
                 />
             </PlayerFormField>
 
             <PlayerFormField
-                label="How much"
+                label={t("players.howMuch")}
                 hint={
                     unit === "levels"
-                        ? "Levels are what the player sees over their hotbar."
-                        : "Points are what a level is made of, and a level costs more of them the higher it is."
+                        ? t("players.levelsAreWhatThePlayer")
+                        : t("players.pointsAreWhatALevel")
                 }
             >
                 <div className="flex items-center gap-2">
@@ -129,7 +131,7 @@ export function ExperienceDialog({
                         min={0}
                         max={MAX_EXPERIENCE}
                         value={amount}
-                        aria-label="How much"
+                        aria-label={t("players.howMuch")}
                         className="w-28"
                         onChange={(event) =>
                             setAmount(
@@ -143,7 +145,7 @@ export function ExperienceDialog({
                     <Select
                         value={unit}
                         className="w-32"
-                        aria-label="Levels or points"
+                        aria-label={t("players.levelsOrPoints")}
                         onValueChange={(next) => setUnit(next as ExperienceUnit)}
                         options={[
                             { value: "levels", label: "levels" },
@@ -177,6 +179,7 @@ export function TeleportDialog({
     onClose: () => void;
     onTeleport: (destination: string) => void;
 }) {
+    const t = useGameText("minecraft");
     const [destination, setDestination] = useState("");
     const value = destination.trim();
     const valid = PLAYER_NAME.test(value) || COORDINATES.test(value);
@@ -188,11 +191,11 @@ export function TeleportDialog({
     return (
         <PlayerFormDialog
             title={`Teleport ${player}`}
-            description="To another player who is on, or to a place."
+            description={t("players.toAnotherPlayerWhoIs")}
             onClose={onClose}
             pending={pending}
             ready={valid && !pending}
-            confirmLabel="Teleport"
+            confirmLabel={t("players.teleport")}
             onConfirm={() => onTeleport(value)}
         >
             {others.length > 0 && (
@@ -209,12 +212,12 @@ export function TeleportDialog({
                     ))}
                 </div>
             )}
-            <PlayerFormField label="Player or coordinates" error={error}>
+            <PlayerFormField label={t("players.playerOrCoordinates")} error={error}>
                 <Input
                     autoFocus
                     value={destination}
                     spellCheck={false}
-                    placeholder="Alice, or 100 64 -220"
+                    placeholder={t("players.aliceOr10064220")}
                     onChange={(event) => setDestination(event.target.value)}
                 />
             </PlayerFormField>
@@ -256,6 +259,7 @@ export function InventoryDialog({
      *  write that lands in that queue has to ask it to read the list again. */
     onChanged: () => void;
 }) {
+    const t = useGameText("minecraft");
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto overscroll-contain">
@@ -263,8 +267,8 @@ export function InventoryDialog({
                     <DialogTitle>{player}&apos;s inventory</DialogTitle>
                     <DialogDescription>
                         {canEdit
-                            ? "Drag to rearrange it, or drop an item from the palette into a slot."
-                            : "As the server last had it."}
+                            ? t("players.dragToRearrangeItOr")
+                            : t("players.asTheServerLastHad")}
                     </DialogDescription>
                 </DialogHeader>
                 <InventoryEditor
@@ -276,7 +280,7 @@ export function InventoryDialog({
                 />
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Close
+                        {t("players.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -300,6 +304,7 @@ export function LocationDialog({
     player: string;
     onClose: () => void;
 }) {
+    const t = useGameText("minecraft");
     const read = useCallback(
         () => actions.readPlayerPositionAction(installedAppId, player),
         [installedAppId, player]
@@ -310,7 +315,7 @@ export function LocationDialog({
     return (
         <Reading
             title={`Where ${player} is`}
-            description="Read from the running server, so it is where they were a moment ago."
+            description={t("players.readFromTheRunningServer")}
             icon={<MapPin className="size-6" />}
             loadingLabel="Asking the server..."
             empty="The server did not say."
@@ -327,6 +332,7 @@ export function LocationDialog({
 /** The three numbers, big enough to read off the screen and copyable as the one
  *  string that goes into a `tp` or a note. */
 function Coordinates({ player, position }: { player: string; position: PlayerPosition }) {
+    const t = useGameText("minecraft");
     const coordinates = formatCoordinates(position);
 
     return (
@@ -351,7 +357,7 @@ function Coordinates({ player, position }: { player: string; position: PlayerPos
                 />
             </div>
             <p className="text-xs text-muted-foreground">
-                {position.dimension ? dimensionLabel(position.dimension) : "World not reported"} -
+                {position.dimension ? dimensionLabel(position.dimension) : t("players.worldNotReported")} -
                 exactly{" "}
                 <span className="font-mono">
                     {position.x.toFixed(2)} {position.y.toFixed(2)} {position.z.toFixed(2)}
@@ -429,6 +435,7 @@ function Reading({
     onRefresh: () => void;
     onClose: () => void;
 }) {
+    const t = useGameText("minecraft");
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-lg">
@@ -456,10 +463,10 @@ function Reading({
                 <DialogFooter>
                     <Button variant="secondary" onClick={onRefresh} disabled={loading}>
                         <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
-                        Refresh
+                        {t("players.refresh")}
                     </Button>
                     <Button variant="ghost" onClick={onClose}>
-                        Close
+                        {t("players.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -500,6 +507,7 @@ export function HistoryDialog({
     /** Absent when the viewer may not change the list. */
     onRegister?: (address: string) => void;
 }) {
+    const t = useGameText("minecraft");
     const newestFirst = [...sessions].reverse();
     const known = new Set(registered);
     const [record, setRecord] = useState<PlayerRecordReading | null>(null);
@@ -528,7 +536,7 @@ export function HistoryDialog({
                 <DialogHeader>
                     <DialogTitle>{player} on this server</DialogTitle>
                     <DialogDescription>
-                        What Polaris has watched, and what the world itself has counted.
+                        {t("players.whatPolarisHasWatchedAnd")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -540,7 +548,7 @@ export function HistoryDialog({
 
                 {newestFirst.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
-                        Nothing in the log this far back.
+                        {t("players.nothingInTheLogThis")}
                     </p>
                 ) : (
                     <ul className="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain text-sm">
@@ -556,7 +564,7 @@ export function HistoryDialog({
                                             : "text-muted-foreground"
                                     }
                                 >
-                                    {event.kind === "join" ? "Joined" : "Left"}
+                                    {event.kind === "join" ? t("players.joined") : t("players.left")}
                                 </span>
                                 <span className="flex items-center gap-3 text-xs text-muted-foreground">
                                     {event.address && (
@@ -573,13 +581,13 @@ export function HistoryDialog({
                                             className="text-primary hover:underline"
                                             onClick={() => onRegister(event.address as string)}
                                         >
-                                            Allow this address
+                                            {t("players.allowThisAddress")}
                                         </button>
                                     )}
                                     <span>
                                         {event.at
                                             ? new Date(event.at).toLocaleString()
-                                            : "time not logged"}
+                                            : t("players.timeNotLogged")}
                                     </span>
                                 </span>
                             </li>
@@ -588,7 +596,7 @@ export function HistoryDialog({
                 )}
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Close
+                        {t("players.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -668,6 +676,7 @@ export function PlayerAccessDialog({
         error?: string;
     }>;
 }) {
+    const t = useGameText("minecraft");
     const editing = player !== null;
     const linkedTo = player?.linkedTo ?? null;
     /** Linked, and their addresses are the account's sign-ins - which is the one
@@ -806,18 +815,18 @@ export function PlayerAccessDialog({
 
     return (
         <PlayerFormDialog
-            title={editing ? `Edit ${player.username}` : "Add a player"}
+            title={editing ? `Edit ${player.username}` : t("players.addAPlayer")}
             description={
                 following
                     ? `${player?.username} joins from wherever ${linkedTo?.name} is signed in to Polaris.`
                     : linkedTo
                       ? `${player?.username} is ${linkedTo.name} on Polaris. Where they join from is the addresses below.`
                       : editing
-                        ? "Add another address they play from, change the note, or tie them to a Polaris account. The name itself is what the server checks."
-                        : "A player is let in when the name is on this list and they arrive from an address registered to it."
+                        ? t("players.addAnotherAddressTheyPlay")
+                        : t("players.aPlayerIsLetIn")
             }
             confirmLabel={
-                following || invited ? "Done" : linking ? "Link" : editing ? "Save" : "Add player"
+                following || invited ? t("players.done") : linking ? t("players.link") : editing ? t("players.save") : t("players.addPlayer")
             }
             ready={ready || invited !== null}
             pending={pending || inviting}
@@ -851,12 +860,12 @@ export function PlayerAccessDialog({
         >
             {!linkedTo && onLookUp && (
                 <PlayerFormField
-                    label={editing ? "Their Polaris account" : "Somebody with a Polaris account"}
+                    label={editing ? t("players.theirPolarisAccount") : t("players.somebodyWithAPolarisAccount")}
                     error={lookUpError}
                     hint={
                         editing
-                            ? "Any account, whatever it is called and whether or not it has linked Minecraft. An email that is nobody yet can be invited."
-                            : "If they have linked Minecraft, their name and the addresses they connect from fill themselves in."
+                            ? t("players.anyAccountWhateverItIs")
+                            : t("players.ifTheyHaveLinkedMinecraft")
                     }
                 >
                     <div className="flex items-center gap-1">
@@ -872,8 +881,8 @@ export function PlayerAccessDialog({
                             // typed rather than picked still is.
                             onPick={(picked) => lookUp(picked.username || picked.email)}
                             onEnter={() => lookUp(person)}
-                            placeholder="pau, or pau@example.com"
-                            aria-label="Polaris username or email address"
+                            placeholder={t("players.pauOrPauExampleCom")}
+                            aria-label={t("players.polarisUsernameOrEmailAddress")}
                         />
                         <Button
                             type="button"
@@ -881,8 +890,8 @@ export function PlayerAccessDialog({
                             variant="ghost"
                             onClick={() => lookUp(person)}
                             disabled={looking || person.trim().length === 0}
-                            aria-label="Find their Polaris account"
-                            title="Find their Polaris account"
+                            aria-label={t("players.findTheirPolarisAccount")}
+                            title={t("players.findTheirPolarisAccount")}
                         >
                             {looking ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -910,8 +919,7 @@ export function PlayerAccessDialog({
                     )}
                     {addressesHidden && (
                         <p className="pt-1 text-xs text-muted-foreground">
-                            This Polaris does not show where other people sign in from. Ask them for
-                            the address they play from.
+                            {t("players.thisPolarisDoesNotShow")}
                         </p>
                     )}
                     {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
@@ -929,7 +937,7 @@ export function PlayerAccessDialog({
                                     <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
                                         {invited.url}
                                     </code>
-                                    <CopyButton value={invited.url} label="the invite link" />
+                                    <CopyButton value={invited.url} label={t("players.theInviteLink")} />
                                 </span>
                             )}
                         </div>
@@ -945,7 +953,7 @@ export function PlayerAccessDialog({
                     <div
                         className="flex flex-wrap gap-1"
                         role="radiogroup"
-                        aria-label="Where they can join from"
+                        aria-label={t("players.whereTheyCanJoinFrom")}
                     >
                         <Button
                             type="button"
@@ -955,7 +963,7 @@ export function PlayerAccessDialog({
                             variant={follow ? "secondary" : "ghost"}
                             onClick={() => setFollow(true)}
                         >
-                            Wherever they are signed in to Polaris
+                            {t("players.whereverTheyAreSignedIn")}
                         </Button>
                         <Button
                             type="button"
@@ -965,7 +973,7 @@ export function PlayerAccessDialog({
                             variant={follow ? "ghost" : "secondary"}
                             onClick={() => setFollow(false)}
                         >
-                            {editing && hasAddresses ? "Keep these addresses" : "A fixed address"}
+                            {editing && hasAddresses ? t("players.keepTheseAddresses") : t("players.aFixedAddress")}
                         </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -977,8 +985,8 @@ export function PlayerAccessDialog({
             )}
 
             <PlayerFormField
-                label={edition === "bedrock" ? "Gamertag" : "Username"}
-                error={nameInvalid ? "That is not a username this edition accepts" : null}
+                label={edition === "bedrock" ? t("players.gamertag") : t("players.username")}
+                error={nameInvalid ? t("players.thatIsNotAUsername") : null}
                 hint={
                     !editing && account && noMinecraft
                         ? `${account.name} has not linked Minecraft, so type their username.`
@@ -990,9 +998,9 @@ export function PlayerAccessDialog({
                 <Input
                     value={editing ? player.username : username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={edition === "bedrock" ? "Gamertag" : "Username"}
+                    placeholder={edition === "bedrock" ? t("players.gamertag") : t("players.username")}
                     disabled={editing}
-                    aria-label="Player"
+                    aria-label={t("players.player")}
                 />
             </PlayerFormField>
 
@@ -1014,7 +1022,7 @@ export function PlayerAccessDialog({
                             disabled={pending}
                             onClick={() => onUnlink(player.username)}
                         >
-                            Unlink
+                            {t("players.unlink")}
                         </Button>
                     )}
                 </div>
@@ -1023,7 +1031,7 @@ export function PlayerAccessDialog({
             {editing && player.addresses.length > 0 && !(linking && followsNow) && (
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">
-                        {following ? "Signed in from" : "Addresses they play from"}
+                        {following ? t("players.signedInFrom") : t("players.addressesTheyPlayFrom")}
                     </span>
                     <div className="flex flex-wrap gap-1">
                         {player.addresses.map((held) => (
@@ -1052,13 +1060,13 @@ export function PlayerAccessDialog({
 
             {!following && !(linking && followsNow) && (
                 <PlayerFormField
-                    label={editing ? "Another address" : "Address they connect from"}
-                    error={addressInvalid ? "That is not an address or a range" : null}
+                    label={editing ? t("players.anotherAddress") : t("players.addressTheyConnectFrom")}
+                    error={addressInvalid ? t("players.thatIsNotAnAddress") : null}
                     hint={
                         detectFailed
-                            ? "Polaris could not read the address this request came from. Type it in instead."
+                            ? t("players.polarisCouldNotReadThe")
                             : editing
-                              ? "Leave it empty to change only the note."
+                              ? t("players.leaveItEmptyToChange")
                               : undefined
                     }
                 >
@@ -1067,8 +1075,8 @@ export function PlayerAccessDialog({
                             autoFocus={editing && Boolean(linkedTo)}
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}
-                            placeholder="203.0.113.9, 203.0.113.0/24 or any"
-                            aria-label="Address they connect from"
+                            placeholder={t("players.20301139203")}
+                            aria-label={t("players.addressTheyConnectFrom")}
                         />
                         <Button
                             type="button"
@@ -1076,8 +1084,8 @@ export function PlayerAccessDialog({
                             variant="ghost"
                             onClick={detect}
                             disabled={pending || detecting}
-                            aria-label="Use the address you are on now"
-                            title="Use the address you are on now"
+                            aria-label={t("players.useTheAddressYouAre")}
+                            title={t("players.useTheAddressYouAre")}
                         >
                             {detecting ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -1091,7 +1099,7 @@ export function PlayerAccessDialog({
                     field is the wrong address for everybody but themselves. */}
                     {offer.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1 pt-1">
-                            <span className="text-xs text-muted-foreground">They sign in from</span>
+                            <span className="text-xs text-muted-foreground">{t("players.theySignInFrom")}</span>
                             {offer.map((known) => (
                                 <button
                                     key={known}
@@ -1109,15 +1117,15 @@ export function PlayerAccessDialog({
 
             {!following && !(linking && followsNow) && (
                 <PlayerFormField
-                    label="Note"
-                    hint="Who this is, for whoever reads the list next. Only Polaris sees it."
+                    label={t("players.note")}
+                    hint={t("players.whoThisIsForWhoever")}
                 >
                     <Input
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
-                        placeholder="Who this is"
+                        placeholder={t("players.whoThisIs")}
                         maxLength={120}
-                        aria-label="Note"
+                        aria-label={t("players.note")}
                     />
                 </PlayerFormField>
             )}

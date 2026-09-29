@@ -28,6 +28,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
+import { useGameText } from "./game-text";
 import Link from "next/link";
 import * as list from "./list";
 import { useRouter } from "next/navigation";
@@ -145,6 +146,7 @@ export function GamesView({
      *  not an offer to start more. */
     canCreate: boolean;
 }) {
+    const t = useGameText("games");
     const managerInstalled = installed;
     const router = useRouter();
     // What this tab last read paints first, so the players, versions and addresses
@@ -354,16 +356,16 @@ export function GamesView({
     return (
         <div className="flex flex-col gap-4">
             <PageHeader
-                title="Game servers"
+                title={t("list.gameServers")}
                 description={
                     rows.length === 0
-                        ? "Run game servers on your own machines."
+                        ? t("list.runGameServersOnYour")
                         : `${rows.length} ${rows.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
                 }
                 actions={
                     canCreate ? (
                         <Button onClick={() => setCreating(true)}>
-                            <Plus className="size-4" /> New server
+                            <Plus className="size-4" /> {t("list.newServer")}
                         </Button>
                     ) : null
                 }
@@ -375,14 +377,13 @@ export function GamesView({
                 <Card>
                     <CardBody className="flex flex-col items-center gap-3 py-12 text-center">
                         <Gamepad2 className="size-8 text-muted-foreground" />
-                        <p className="text-sm font-medium">No servers yet</p>
+                        <p className="text-sm font-medium">{t("list.noServersYet")}</p>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Pick the game, say who plays on it, and Polaris sizes it, closes it to
-                            everyone else and gives it an address.
+                            {t("list.pickTheGameSayWho")}
                         </p>
                         {canCreate && (
                             <Button onClick={() => setCreating(true)}>
-                                <Plus className="size-4" /> New server
+                                <Plus className="size-4" /> {t("list.newServer")}
                             </Button>
                         )}
                     </CardBody>
@@ -395,32 +396,32 @@ export function GamesView({
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search servers, addresses, machines or versions"
+                                placeholder={t("list.searchServersAddressesMachinesOr")}
                                 className="pl-8"
-                                aria-label="Search servers"
+                                aria-label={t("list.searchServers")}
                             />
                         </div>
                         <Select
                             value={gameFilter}
                             onValueChange={setGameFilter}
-                            aria-label="Filter by game"
+                            aria-label={t("list.filterByGame")}
                             className="w-40"
                             options={[
-                                { value: "", label: "Every game" },
+                                { value: "", label: t("list.everyGame") },
                                 ...GAMES.map((game) => ({ value: game.id, label: game.name }))
                             ]}
                         />
                         <Select
                             value={statusFilter}
                             onValueChange={setStatusFilter}
-                            aria-label="Filter by status"
+                            aria-label={t("list.filterByStatus")}
                             className="w-40"
                             options={[
-                                { value: "", label: "Any status" },
-                                { value: "online", label: "Online" },
-                                { value: "starting", label: "Starting" },
-                                { value: "stopped", label: "Stopped" },
-                                { value: "problem", label: "Needs attention" }
+                                { value: "", label: t("list.anyStatus") },
+                                { value: "online", label: t("list.online") },
+                                { value: "starting", label: t("list.starting") },
+                                { value: "stopped", label: t("list.stopped") },
+                                { value: "problem", label: t("list.needsAttention") }
                             ]}
                         />
                         {(archivedCount > 0 || showArchived) && (
@@ -429,8 +430,8 @@ export function GamesView({
                                 onClick={() => setShowArchived((shown) => !shown)}
                                 title={
                                     showArchived
-                                        ? "Back to the servers you use"
-                                        : "The servers you put away"
+                                        ? t("list.backToTheServersYou")
+                                        : t("list.theServersYouPutAway")
                                 }
                             >
                                 <Archive className="size-4" />
@@ -443,23 +444,23 @@ export function GamesView({
                         <table className="w-full min-w-[52rem] text-sm">
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="px-3 py-2 font-medium">Server</th>
+                                    <th className="px-3 py-2 font-medium">{t("list.server")}</th>
                                     <SortHeader
-                                        label="Status"
+                                        label={t("list.status")}
                                         sorted={sortKey === "status" ? sortDir : null}
                                         onClick={() => toggleSort("status")}
                                     />
                                     <SortHeader
-                                        label="Players"
+                                        label={t("list.players")}
                                         sorted={sortKey === "players" ? sortDir : null}
                                         onClick={() => toggleSort("players")}
                                     />
                                     <th className="hidden px-3 py-2 font-medium md:table-cell">
-                                        Version
+                                        {t("list.version")}
                                     </th>
-                                    <th className="px-3 py-2 font-medium">Address</th>
+                                    <th className="px-3 py-2 font-medium">{t("list.address")}</th>
                                     <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                        Machine
+                                        {t("list.machine")}
                                     </th>
                                     <th className="px-3 py-2" />
                                 </tr>
@@ -489,7 +490,7 @@ export function GamesView({
                                         >
                                             {filtering ? (
                                                 <span className="flex flex-col items-center gap-2">
-                                                    No server matches what you asked for.
+                                                    {t("list.noServerMatchesWhatYou")}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -499,13 +500,13 @@ export function GamesView({
                                                             setStatusFilter("");
                                                         }}
                                                     >
-                                                        Clear the filters
+                                                        {t("list.clearTheFilters")}
                                                     </Button>
                                                 </span>
                                             ) : showArchived ? (
-                                                "Nothing is archived."
+                                                t("list.nothingIsArchived")
                                             ) : (
-                                                "Every server is archived."
+                                                t("list.everyServerIsArchived")
                                             )}
                                         </td>
                                     </tr>
@@ -522,7 +523,7 @@ export function GamesView({
                 onOpenChange={(open) => !open && !pending && setDeleting(null)}
                 name={deleting?.name ?? ""}
                 kind="server"
-                description="The server is stopped and its container removed. The world and everything else on a server-local volume goes with it; data on a NAS mount is kept."
+                description={t("list.theServerIsStoppedAnd")}
                 error={deleteError}
                 pending={pending}
                 onConfirm={onConfirmDelete}
@@ -575,6 +576,7 @@ function SortHeader({
  * nobody finds out until the disk is full.
  */
 function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
+    const t = useGameText("games");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -593,15 +595,13 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader title="Game servers" description="Run game servers on your own machines." />
+            <PageHeader title={t("list.gameServers")} description={t("list.runGameServersOnYour")} />
             <Card>
                 <CardBody className="flex flex-col gap-4 py-8">
                     <div className="flex flex-col gap-1">
-                        <p className="text-sm font-medium">Run game servers</p>
+                        <p className="text-sm font-medium">{t("list.runGameServers")}</p>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            Create as many as you want, of any game below, each with its own
-                            address, console, players and settings. Nothing is downloaded until you
-                            create a server, and only for the game that server plays.
+                            {t("list.createAsManyAsYou")}
                         </p>
                     </div>
 
@@ -628,7 +628,7 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
                     {canAdd && (
                         <Button className="w-fit" onClick={turnOn} disabled={pending}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Turn on game servers
+                            {t("list.turnOnGameServers")}
                         </Button>
                     )}
 
@@ -640,7 +640,7 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
                             rel="noreferrer"
                             className="underline underline-offset-2 hover:text-foreground"
                         >
-                            Minecraft EULA
+                            {t("list.minecraftEula")}
                         </a>
                         .
                     </p>
@@ -695,6 +695,7 @@ function ServerRow({
     onPref: (patch: { favorite?: boolean; archived?: boolean }) => void;
     onDelete: () => void;
 }) {
+    const t = useGameText("games");
     const { facts, live } = server;
     const definition = GAMES.find((game) => game.id === server.game) ?? null;
     const href = `/apps/installed/${server.id}`;
@@ -843,14 +844,14 @@ function ServerRow({
                 <ContextMenuSeparator />
                 <ContextMenuItem asChild>
                     <Link href={href}>
-                        <ExternalLink className="size-4" /> Open
+                        <ExternalLink className="size-4" /> {t("list.open")}
                     </Link>
                 </ContextMenuItem>
                 {files &&
                     (browsable ? (
                         <ContextMenuItem asChild>
                             <Link href={files}>
-                                <FolderOpen className="size-4" /> Files
+                                <FolderOpen className="size-4" /> {t("list.files")}
                             </Link>
                         </ContextMenuItem>
                     ) : (
@@ -858,13 +859,13 @@ function ServerRow({
                         // it is disabled rather than holding the reason in a
                         // tooltip nobody can reach.
                         <ContextMenuItem disabled>
-                            <FolderOpen className="size-4" /> Files
+                            <FolderOpen className="size-4" /> {t("list.files")}
                             <span className="ml-auto pl-3 text-xs">{FILES_NEED_DEPLOY}</span>
                         </ContextMenuItem>
                     ))}
                 {known && address && (
                     <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(address)}>
-                        <Copy className="size-4" /> Copy address
+                        <Copy className="size-4" /> {t("list.copyAddress")}
                     </ContextMenuItem>
                 )}
                 <ContextMenuSeparator />
@@ -875,7 +876,7 @@ function ServerRow({
                     <Star
                         className={cn("size-4", server.favorite && "fill-amber-400 text-amber-400")}
                     />
-                    {server.favorite ? "Remove from favorites" : "Add to favorites"}
+                    {server.favorite ? t("list.removeFromFavorites") : t("list.addToFavorites")}
                 </ContextMenuItem>
                 <ContextMenuItem
                     disabled={pending}
@@ -886,7 +887,7 @@ function ServerRow({
                     ) : (
                         <Archive className="size-4" />
                     )}
-                    {server.archived ? "Put back in the list" : "Archive"}
+                    {server.archived ? t("list.putBackInTheList") : t("list.archive")}
                 </ContextMenuItem>
                 {canManage && (
                     <>
@@ -898,13 +899,13 @@ function ServerRow({
                             }
                         >
                             {running ? <Square className="size-4" /> : <Play className="size-4" />}
-                            {running ? "Stop" : "Start"}
+                            {running ? t("list.stop") : t("list.start")}
                         </ContextMenuItem>
                         <ContextMenuItem
                             disabled={pending || !server.applicationId}
                             onSelect={() => onRun(() => redeployGameServerAction(server.id))}
                         >
-                            <RefreshCw className="size-4" /> Redeploy
+                            <RefreshCw className="size-4" /> {t("list.redeploy")}
                         </ContextMenuItem>
                     </>
                 )}
@@ -912,7 +913,7 @@ function ServerRow({
                     <>
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" disabled={pending} onSelect={onDelete}>
-                            <Trash2 className="size-4" /> Delete
+                            <Trash2 className="size-4" /> {t("list.delete")}
                         </ContextMenuItem>
                     </>
                 )}
@@ -931,6 +932,7 @@ function PlayersCell({
     facts: GameServerFacts | null;
     live: GameServerLive | null;
 }) {
+    const t = useGameText("games");
     // A server nobody can be on still has a size, and it is worth saying: "0 / 20"
     // is the same shape as every other row, where a dash reads as "not known" and
     // makes the column impossible to scan down.
@@ -944,10 +946,10 @@ function PlayersCell({
             className={cn("flex items-center gap-1", !answering && "text-muted-foreground/60")}
             title={
                 !answering
-                    ? "Nobody can be on: the server is not answering"
+                    ? t("list.nobodyCanBeOnThe")
                     : live && live.players.length > 0
                       ? live.players.join(", ")
-                      : "Nobody is playing right now"
+                      : t("list.nobodyIsPlayingRightNow")
             }
         >
             <Users className="size-3.5" />
@@ -966,6 +968,7 @@ function PlayersCell({
  * nothing useful to put here.
  */
 function VersionCell({ facts }: { facts: GameServerFacts | null }) {
+    const t = useGameText("games");
     if (facts === null) return <Skeleton className="h-4 w-16" />;
     const release = list.releaseLabel(facts);
     if (!release) return <span className="text-xs text-muted-foreground">-</span>;
@@ -977,9 +980,9 @@ function VersionCell({ facts }: { facts: GameServerFacts | null }) {
             {facts.crossplay && (
                 <span
                     className="truncate text-xs text-muted-foreground"
-                    title="Bedrock clients can join this Java server"
+                    title={t("list.bedrockClientsCanJoinThis")}
                 >
-                    Bedrock too
+                    {t("list.bedrockToo")}
                 </span>
             )}
         </div>
@@ -998,11 +1001,12 @@ function AddressCell({
     /** False while `facts` is the kept reading: the address is shown, not copied. */
     fresh: boolean;
 }) {
+    const t = useGameText("games");
     if (facts === null) return <Skeleton className="h-4 w-40" />;
     if (!facts.address) {
         return (
             <span className="text-xs text-muted-foreground">
-                {facts.message ?? "No address yet"}
+                {facts.message ?? t("list.noAddressYet")}
             </span>
         );
     }

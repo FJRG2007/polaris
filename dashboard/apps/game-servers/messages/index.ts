@@ -12,3 +12,9 @@ export const gameCatalogs = defineCatalogs({ "en-US": enUS, "es-ES": esES });
 
 /** Every key in the `challenges` namespace. */
 export type ChallengesKey = MessageKey<(typeof enUS)["challenges"]>;
+
+/** A namespace of the app's catalogs. */
+export type GameNamespace = keyof typeof enUS & string;
+
+/** Every key in one namespace. */
+export type GameKey<N extends GameNamespace> = MessageKey<(typeof enUS)[N]>;

@@ -22,6 +22,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
+import { useGameText } from "./game-text";
 import { useRouter } from "next/navigation";
 import * as arkAccess from "../lib/ark/access";
 import * as world from "../lib/minecraft/world";
@@ -76,6 +77,7 @@ function mintPassword(): string {
 }
 
 export function NewServerDialog({ onClose }: { onClose: () => void }) {
+    const t = useGameText("games");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [setup, setSetup] = useState<GameSetup | null>(null);
@@ -357,7 +359,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Gamepad2 className="size-5" /> New server
+                        <Gamepad2 className="size-5" /> {t("create.newServer")}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -367,7 +369,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         a form people fill in twice. Asked as a picker rather than a
                         row of cards because the list of games only grows. */}
                     <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">Game</span>
+                        <span className="text-sm font-medium">{t("create.game")}</span>
                         {setup === null ? (
                             <Skeleton className="h-14 w-full" />
                         ) : (
@@ -376,7 +378,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("create.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
@@ -393,7 +395,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     {game === "minecraft" ? (
                         <>
                             <div className="flex flex-col gap-2">
-                                <span className="text-sm font-medium">Who plays on it</span>
+                                <span className="text-sm font-medium">{t("create.whoPlaysOnIt")}</span>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                     <Choice
                                         selected={edition === "java" && !crossplay}
@@ -401,13 +403,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             setEdition("java");
                                             setCrossplay(false);
                                         }}
-                                        title="Java"
+                                        title={t("create.java")}
                                         detail="PC players"
                                     />
                                     <Choice
                                         selected={edition === "bedrock"}
                                         onSelect={() => setEdition("bedrock")}
-                                        title="Bedrock"
+                                        title={t("create.bedrock")}
                                         detail="Phones, consoles, Windows app"
                                     />
                                     <Choice
@@ -416,7 +418,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             setEdition("java");
                                             setCrossplay(true);
                                         }}
-                                        title="Both"
+                                        title={t("create.both")}
                                         detail="A Java world Bedrock can join, through Geyser"
                                     />
                                 </div>
@@ -428,7 +430,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 they can all still be changed. */}
                             {templates.length > 0 && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Build it like one you saved</span>
+                                    <span className="font-medium">{t("create.buildItLikeOneYou")}</span>
                                     <Select
                                         value={templateId}
                                         onValueChange={(id) => {
@@ -451,18 +453,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             });
                                         }}
                                         options={[
-                                            { value: "", label: "Start from a blueprint instead" },
+                                            { value: "", label: t("create.startFromABlueprintInstead") },
                                             ...templates.map((entry) => ({
                                                 value: entry.id,
                                                 label: `${entry.name} (${entry.settings} settings)`
                                             }))
                                         ]}
-                                        aria-label="A server you saved to build again"
+                                        aria-label={t("create.aServerYouSavedTo")}
                                     />
                                     <span className="text-xs text-muted-foreground">
                                         {templates.find((entry) => entry.id === templateId)
                                             ?.summary ||
-                                            "Its settings are applied on top of the blueprint. The address, the players and the ports are this server's own."}
+                                            t("create.itsSettingsAreAppliedOn")}
                                     </span>
                                 </label>
                             )}
@@ -477,7 +479,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     ) : game === "hytale" ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Memory</span>
+                                <span className="font-medium">{t("create.memory")}</span>
                                 <Input
                                     value={hytaleMemory}
                                     onChange={(event) => setHytaleMemory(event.target.value)}
@@ -487,7 +489,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     spellCheck={false}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    How much the server may take, as 3G or 4096M.
+                                    {t("create.howMuchTheServerMay")}
                                 </span>
                             </label>
                             {/* Said before the server exists rather than after it
@@ -495,15 +497,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 the account that owns the game, so this is the one
                                 step Polaris cannot do for anybody. */}
                             <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
-                                Hytale gives out its server files through your own account. Once
-                                this server exists, put HytaleServer.jar and Assets.zip into its
-                                Files and it starts by itself.
+                                {t("create.hytaleGivesOutItsServer")}
                             </p>
                         </>
                     ) : game === "fivem" ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Server key</span>
+                                <span className="font-medium">{t("create.serverKey")}</span>
                                 <Input
                                     value={licenseKey}
                                     onChange={(event) => setLicenseKey(event.target.value)}
@@ -527,7 +527,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                                 rel="noreferrer"
                                                 className="text-primary hover:underline"
                                             >
-                                                get one from keymaster
+                                                {t("create.getOneFromKeymaster")}
                                             </a>
                                             .
                                         </>
@@ -537,15 +537,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Name in the server browser</span>
+                                    <span className="font-medium">{t("create.nameInTheServerBrowser")}</span>
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
                                         placeholder={name.trim() || "Los Santos"}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Blank uses the name above. This is what players search for
-                                        in game.
+                                        {t("create.blankUsesTheNameAbove")}
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
@@ -556,9 +555,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             setOnesync(value as "on" | "legacy" | "off")
                                         }
                                         options={[
-                                            { value: "on", label: "On" },
-                                            { value: "legacy", label: "Legacy" },
-                                            { value: "off", label: "Off" }
+                                            { value: "on", label: t("create.on") },
+                                            { value: "legacy", label: t("create.legacy") },
+                                            { value: "off", label: t("create.off") }
                                         ]}
                                         aria-label="OneSync"
                                     />
@@ -569,7 +568,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         )}
                                     >
                                         {onesyncError ??
-                                            "What everything above 32 slots and most roleplay resources need. Leave it on unless something asks otherwise."}
+                                            t("create.whatEverythingAbove32Slots")}
                                     </span>
                                 </label>
                             </div>
@@ -578,7 +577,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         <>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Map</span>
+                                    <span className="font-medium">{t("create.map")}</span>
                                     <Select
                                         value={map}
                                         onValueChange={setMap}
@@ -594,25 +593,24 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Name in the server browser</span>
+                                    <span className="font-medium">{t("create.nameInTheServerBrowser")}</span>
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
                                         placeholder={name.trim() || "The Island"}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Blank uses the name above. This is what players search for
-                                        in game.
+                                        {t("create.blankUsesTheNameAbove")}
                                     </span>
                                 </label>
                             </div>
 
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Mods</span>
+                                <span className="font-medium">{t("create.mods")}</span>
                                 <Input
                                     value={mods}
                                     onChange={(event) => setMods(event.target.value)}
-                                    placeholder="Steam Workshop ids, comma separated"
+                                    placeholder={t("create.steamWorkshopIdsCommaSeparated")}
                                 />
                                 <span
                                     className={cn(
@@ -621,7 +619,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     )}
                                 >
                                     {modsError ??
-                                        "Optional. Every player needs the same mods to join."}
+                                        t("create.optionalEveryPlayerNeedsThe")}
                                 </span>
                             </label>
                         </>
@@ -629,7 +627,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Player slots</span>
+                            <span className="font-medium">{t("create.playerSlots")}</span>
                             <Input
                                 type="number"
                                 min={1}
@@ -638,7 +636,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Playing at once, usually</span>
+                            <span className="font-medium">{t("create.playingAtOnceUsually")}</span>
                             <Input
                                 type="number"
                                 min={1}
@@ -689,7 +687,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     )}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Runs on</span>
+                        <span className="font-medium">{t("create.runsOn")}</span>
                         {setup === null ? (
                             <Skeleton className="h-9 w-full" />
                         ) : (
@@ -707,13 +705,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 <Users className="size-3" />
                                 {machine.committedMb > 0
                                     ? `${formatMemory(machine.committedMb)} already promised to servers here.`
-                                    : "No other game server on this machine yet."}
+                                    : t("create.noOtherGameServerOn")}
                             </span>
                         )}
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Address</span>
+                        <span className="font-medium">{t("create.address")}</span>
                         {address ? (
                             <>
                                 <Input
@@ -731,20 +729,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             </>
                         ) : (
                             <span className="text-xs text-muted-foreground">
-                                No domain is configured, so players connect to this machine&apos;s
-                                address and port. Add a domain under Settings to give servers names.
+                                {t("create.noDomainIsConfiguredSo")}
                             </span>
                         )}
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">Who can connect</span>
+                        <span className="text-sm font-medium">{t("create.whoCanConnect")}</span>
                         {game === "fivem" ? (
                             <>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
                                         <span className="text-muted-foreground">
-                                            Your player identifier
+                                            {t("create.yourPlayerIdentifier")}
                                         </span>
                                         <Input
                                             value={ownerIdentifier}
@@ -765,46 +762,46 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             )}
                                         >
                                             {identifierError ??
-                                                "Optional. Your Discord user id is the easiest to copy; a license: one comes from the game. Leave it blank and add yourself from the Players screen after you connect."}
+                                                t("create.optionalYourDiscordUserId")}
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         <span className="text-muted-foreground">
-                                            Your name on the list
+                                            {t("create.yourNameOnTheList")}
                                         </span>
                                         <Input
                                             value={ownerPlayer}
                                             onChange={(event) => setOwnerPlayer(event.target.value)}
-                                            placeholder="You"
+                                            placeholder={t("create.you")}
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            Optional. An identifier names nobody at a glance.
+                                            {t("create.optionalAnIdentifierNamesNobody")}
                                         </span>
                                     </label>
                                 </div>
                                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                                     <span className="flex flex-col gap-0.5 text-sm">
                                         <span className="font-medium">
-                                            Only players you add can join
+                                            {t("create.onlyPlayersYouAddCan")}
                                         </span>
                                         <span className="text-xs text-muted-foreground">
                                             {ownerIdentifier.trim().length > 0
-                                                ? "Everyone else is turned away at the door until you add them."
-                                                : "Needs your identifier above - a closed server with nobody on its list is one you cannot join either."}
+                                                ? t("create.everyoneElseIsTurnedAway")
+                                                : t("create.needsYourIdentifierAboveA")}
                                         </span>
                                     </span>
                                     <Switch
                                         checked={exclusiveJoin && ownerIdentifier.trim().length > 0}
                                         onChange={setExclusiveJoin}
                                         disabled={ownerIdentifier.trim().length === 0}
-                                        aria-label="Only players you add can join"
+                                        aria-label={t("create.onlyPlayersYouAddCan")}
                                     />
                                 </label>
                             </>
                         ) : game === "ark" ? (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-muted-foreground">Join password</span>
+                                    <span className="text-muted-foreground">{t("create.joinPassword")}</span>
                                     <div className="flex items-center gap-1">
                                         <Input
                                             value={joinPassword}
@@ -817,14 +814,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             size="icon"
                                             variant="ghost"
                                             onClick={() => setJoinPassword(mintPassword())}
-                                            aria-label="Generate another password"
-                                            title="Generate another password"
+                                            aria-label={t("create.generateAnotherPassword")}
+                                            title={t("create.generateAnotherPassword")}
                                         >
                                             <RefreshCw className="size-4" />
                                         </Button>
                                         <CopyButton
                                             value={joinPassword}
-                                            label="the join password"
+                                            label={t("create.theJoinPassword")}
                                         />
                                     </div>
                                     <span
@@ -834,12 +831,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         )}
                                     >
                                         {passwordError ??
-                                            "Everyone who joins types this. Copy it before you create."}
+                                            t("create.everyoneWhoJoinsTypesThis")}
                                     </span>
                                 </label>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="text-muted-foreground">Your Steam id</span>
+                                        <span className="text-muted-foreground">{t("create.yourSteamId")}</span>
                                         <Input
                                             value={ownerSteamId}
                                             onChange={(event) =>
@@ -857,38 +854,36 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             )}
                                         >
                                             {steamIdError ??
-                                                "The 17-digit number on your Steam profile."}
+                                                t("create.the17DigitNumberOn")}
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         <span className="text-muted-foreground">
-                                            Your name on the list
+                                            {t("create.yourNameOnTheList")}
                                         </span>
                                         <Input
                                             value={ownerPlayer}
                                             onChange={(event) => setOwnerPlayer(event.target.value)}
-                                            placeholder="You"
+                                            placeholder={t("create.you")}
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            Optional. A 17-digit number identifies nobody at a
-                                            glance.
+                                            {t("create.optionalA17DigitNumber")}
                                         </span>
                                     </label>
                                 </div>
                                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                                     <span className="flex flex-col gap-0.5 text-sm">
                                         <span className="font-medium">
-                                            Only players you add can join
+                                            {t("create.onlyPlayersYouAddCan")}
                                         </span>
                                         <span className="text-xs text-muted-foreground">
-                                            On top of the password. Off leaves the password as the
-                                            only lock.
+                                            {t("create.onTopOfThePassword")}
                                         </span>
                                     </span>
                                     <Switch
                                         checked={exclusiveJoin}
                                         onChange={setExclusiveJoin}
-                                        aria-label="Only players you add can join"
+                                        aria-label={t("create.onlyPlayersYouAddCan")}
                                     />
                                 </label>
                             </>
@@ -897,20 +892,20 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="text-muted-foreground">
                                         {edition === "bedrock"
-                                            ? "Your gamertag"
-                                            : "Your Minecraft username"}
+                                            ? t("create.yourGamertag")
+                                            : t("create.yourMinecraftUsername")}
                                     </span>
                                     <Input
                                         value={ownerPlayer}
                                         onChange={(event) => setOwnerPlayer(event.target.value)}
-                                        placeholder={edition === "bedrock" ? "Gamertag" : "Steve"}
+                                        placeholder={edition === "bedrock" ? t("create.gamertag") : "Steve"}
                                     />
                                     {playerError && (
                                         <span className="text-xs text-danger">{playerError}</span>
                                     )}
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-muted-foreground">Connecting from</span>
+                                    <span className="text-muted-foreground">{t("create.connectingFrom")}</span>
                                     <Input
                                         value={ownerAddress}
                                         onChange={(event) => setOwnerAddress(event.target.value)}
@@ -932,10 +927,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <ShieldCheck className="size-4 shrink-0" />
                             <span>
                                 {game === "ark"
-                                    ? "The server starts closed: a password of its own, an admin password Polaris keeps for you, and nobody else let in until you add them. It is opened from the server's own Access screen."
+                                    ? t("create.theServerStartsClosedA")
                                     : game === "fivem"
-                                      ? "It starts with a console password Polaris keeps for you, player addresses hidden and ScriptHook mods refused. Who may join is changed from the server's own Security screen."
-                                      : "The server starts closed: nobody else can join until you add them, and each player is only let in from the address registered to them. Change it later under Firewall."}
+                                      ? t("create.itStartsWithAConsole")
+                                      : t("create.theServerStartsClosedNobody")}
                             </span>
                         </p>
                     </div>
@@ -944,11 +939,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {t("create.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Create server
+                            {t("create.createServer")}
                         </Button>
                     </div>
                 </div>

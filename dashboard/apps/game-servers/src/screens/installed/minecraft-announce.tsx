@@ -13,6 +13,7 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
+import { useGameText } from "../game-text";
 import { McLine } from "../../components/mc-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { FormattedTextField } from "../../components/formatted-text-field";
@@ -120,6 +121,7 @@ export function FieldNote({
     /** The values already settled, like the server's name, counted as they are. */
     known?: KnownValues;
 }) {
+    const t = useGameText("minecraft");
     const used = visibleLength(mc.stripMotd(text), known);
     return (
         <span
@@ -136,9 +138,9 @@ export function FieldNote({
 
 /** What "Stays on screen" offers. */
 const HOLDS: readonly { readonly value: Hold; readonly label: string }[] = [
-    { value: "timed", label: "For the time below" },
-    { value: "until", label: "Until a moment" },
-    { value: "manual", label: "Until it is taken down" }
+    { value: "timed", label: t("announce.forTheTimeBelow") },
+    { value: "until", label: t("announce.untilAMoment") },
+    { value: "manual", label: t("announce.untilItIsTakenDown") }
 ];
 
 /** An ISO moment as a `datetime-local` input reads it, in this browser's time. */
@@ -175,6 +177,7 @@ export function MinecraftAnnounce({
     /** Who is on, to send to one of them. */
     players: readonly string[];
 }) {
+    const t = useGameText("minecraft");
     const [draft, setDraft] = useState<Announcement>(BLANK_ANNOUNCEMENT);
     // What this tab last read paints first - the saved templates and what is
     // pinned - so a revisit does not wait on either; the reads replace what moved.
@@ -364,8 +367,8 @@ export function MinecraftAnnounce({
     async function forget(template: AnnouncementTemplate): Promise<void> {
         const agreed = await confirm({
             title: `Delete "${template.name}"?`,
-            description: "It goes for everybody who runs this server.",
-            confirmLabel: "Delete",
+            description: t("announce.itGoesForEverybodyWho"),
+            confirmLabel: t("announce.delete"),
             danger: true
         });
         if (!agreed) return;
@@ -387,10 +390,9 @@ export function MinecraftAnnounce({
                 <Card>
                     <CardBody className="flex flex-col gap-4">
                         <div>
-                            <p className="text-sm font-medium">Announce</p>
+                            <p className="text-sm font-medium">{t("announce.announce")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Select some text and pick a color or a style for it. Leave a part
-                                empty to skip it.
+                                {t("announce.selectSomeTextAndPick")}
                             </p>
                         </div>
 
@@ -408,7 +410,7 @@ export function MinecraftAnnounce({
                                             .slice(0, 60)}
                                         {" - "}
                                         {live.pinned.endsAt === null
-                                            ? "until it is taken down"
+                                            ? t("announce.untilItIsTakenDown2")
                                             : `until ${new Date(live.pinned.endsAt).toLocaleString()}`}
                                     </span>
                                 </span>
@@ -418,20 +420,19 @@ export function MinecraftAnnounce({
                                     disabled={pending || !liveHeard}
                                     onClick={stopPinned}
                                 >
-                                    Take it down
+                                    {t("announce.takeItDown")}
                                 </Button>
                             </div>
                         )}
 
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">
-                                Templates
+                                {t("announce.templates")}
                             </span>
                             <div className="flex flex-wrap items-center gap-1.5">
                                 {templates.length === 0 && (
                                     <span className="text-xs text-muted-foreground">
-                                        None yet. Write one below and save it to send it again
-                                        later.
+                                        {t("announce.noneYetWriteOneBelow")}
                                     </span>
                                 )}
                                 {templates.map((template) => (
@@ -489,7 +490,7 @@ export function MinecraftAnnounce({
                                                     className="text-danger"
                                                     onSelect={() => void forget(template)}
                                                 >
-                                                    <Trash2 className="size-4" /> Delete
+                                                    <Trash2 className="size-4" /> {t("announce.delete")}
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -506,13 +507,13 @@ export function MinecraftAnnounce({
                             problem={problems.target}
                         />
 
-                        <Section title="Title" hint="Big, in the middle of the screen.">
+                        <Section title={t("announce.title")} hint={t("announce.bigInTheMiddleOf")}>
                             <FormattedTextField
                                 value={draft.title}
                                 onChange={(title) => set({ title })}
                                 rows={1}
                                 singleLine
-                                label="Title"
+                                label={t("announce.title")}
                                 inserts={inserts}
                                 footnote={
                                     <FieldNote
@@ -522,16 +523,16 @@ export function MinecraftAnnounce({
                                         problem={problems.title}
                                     />
                                 }
-                                placeholder="Server restart"
+                                placeholder={t("announce.serverRestart")}
                             />
                         </Section>
-                        <Section title="Subtitle" hint="Smaller, under the title.">
+                        <Section title={t("announce.subtitle")} hint={t("announce.smallerUnderTheTitle")}>
                             <FormattedTextField
                                 value={draft.subtitle}
                                 onChange={(subtitle) => set({ subtitle })}
                                 rows={1}
                                 singleLine
-                                label="Subtitle"
+                                label={t("announce.subtitle")}
                                 inserts={inserts}
                                 footnote={
                                     <FieldNote
@@ -541,16 +542,16 @@ export function MinecraftAnnounce({
                                         problem={problems.subtitle}
                                     />
                                 }
-                                placeholder="Back in a minute, don't leave"
+                                placeholder={t("announce.backInAMinuteDon")}
                             />
                         </Section>
-                        <Section title="Action bar" hint="One line just above the hotbar.">
+                        <Section title={t("announce.actionBar")} hint={t("announce.oneLineJustAboveThe")}>
                             <FormattedTextField
                                 value={draft.actionbar}
                                 onChange={(actionbar) => set({ actionbar })}
                                 rows={1}
                                 singleLine
-                                label="Action bar"
+                                label={t("announce.actionBar")}
                                 inserts={inserts}
                                 footnote={
                                     <FieldNote
@@ -560,15 +561,15 @@ export function MinecraftAnnounce({
                                         problem={problems.actionbar}
                                     />
                                 }
-                                placeholder="Check your inventory for a gift"
+                                placeholder={t("announce.checkYourInventoryForA")}
                             />
                         </Section>
-                        <Section title="Chat" hint={`Up to ${CHAT_MAX_LINES} lines in the chat.`}>
+                        <Section title={t("announce.chat")} hint={`Up to ${CHAT_MAX_LINES} lines in the chat.`}>
                             <FormattedTextField
                                 value={draft.chat}
                                 onChange={(chat) => set({ chat })}
                                 rows={3}
-                                label="Chat message"
+                                label={t("announce.chatMessage")}
                                 inserts={inserts}
                                 footnote={
                                     <FieldNote
@@ -578,15 +579,15 @@ export function MinecraftAnnounce({
                                         problem={problems.chat}
                                     />
                                 }
-                                placeholder="Thanks for your patience!"
+                                placeholder={t("announce.thanksForYourPatience")}
                                 actions={
                                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                         <Switch
                                             checked={draft.tagged}
                                             onChange={(tagged) => set({ tagged })}
-                                            aria-label="Start the chat message with [Polaris]"
+                                            aria-label={t("announce.startTheChatMessageWith")}
                                         />
-                                        [Polaris] in front
+                                        {t("announce.polarisInFront")}
                                     </label>
                                 }
                             />
@@ -628,7 +629,7 @@ export function MinecraftAnnounce({
                         </div>
 
                         <div className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Stays on screen</span>
+                            <span className="font-medium">{t("announce.staysOnScreen")}</span>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 <Select
                                     value={draft.hold}
@@ -642,7 +643,7 @@ export function MinecraftAnnounce({
                                         value: hold.value,
                                         label: hold.label
                                     }))}
-                                    aria-label="How long it stays on screen"
+                                    aria-label={t("announce.howLongItStaysOn")}
                                 />
                                 {draft.hold === "until" && (
                                     <Input
@@ -656,7 +657,7 @@ export function MinecraftAnnounce({
                                                     : ""
                                             });
                                         }}
-                                        aria-label="Until when"
+                                        aria-label={t("announce.untilWhen")}
                                     />
                                 )}
                             </div>
@@ -668,15 +669,15 @@ export function MinecraftAnnounce({
                             {!problems.hold && !problems.until && needsRepeating(draft) && (
                                 <span className="text-xs text-muted-foreground">
                                     {draft.hold === "timed"
-                                        ? "The game shows an action bar for about three seconds, so Polaris sends it again until the time is up."
-                                        : "Polaris keeps sending it until then. You can take it down from here at any time."}
+                                        ? t("announce.theGameShowsAnAction")
+                                        : t("announce.polarisKeepsSendingItUntil")}
                                 </span>
                             )}
                         </div>
 
                         {java && (
                             <div className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Sound</span>
+                                <span className="font-medium">{t("announce.sound")}</span>
                                 <span className="flex items-center gap-1">
                                     <span className="min-w-0 flex-1">
                                         <Select
@@ -691,7 +692,7 @@ export function MinecraftAnnounce({
                                                 value: sound.id || NO_SOUND,
                                                 label: sound.label
                                             }))}
-                                            aria-label="Sound"
+                                            aria-label={t("announce.sound")}
                                         />
                                     </span>
                                     <Button
@@ -700,8 +701,8 @@ export function MinecraftAnnounce({
                                         variant="ghost"
                                         disabled={!draft.sound || hearing}
                                         onClick={() => hear(draft.sound)}
-                                        aria-label="Hear this sound"
-                                        title="Hear this sound"
+                                        aria-label={t("announce.hearThisSound")}
+                                        title={t("announce.hearThisSound")}
                                     >
                                         {hearing ? (
                                             <Loader2 className="size-4 animate-spin" />
@@ -724,7 +725,7 @@ export function MinecraftAnnounce({
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="text-xs text-muted-foreground">
-                                {note ?? (running ? "" : "Start the server to send it.")}
+                                {note ?? (running ? "" : t("announce.startTheServerToSend"))}
                             </span>
                             <span className="flex items-center gap-2">
                                 <Button
@@ -744,7 +745,7 @@ export function MinecraftAnnounce({
                                     }
                                 >
                                     <Save className="size-4" />{" "}
-                                    {from ? "Save template" : "Save as template"}
+                                    {from ? t("announce.saveTemplate") : t("announce.saveAsTemplate")}
                                 </Button>
                                 <Button
                                     disabled={
@@ -761,7 +762,7 @@ export function MinecraftAnnounce({
                                     ) : (
                                         <Send className="size-4" />
                                     )}
-                                    Send
+                                    {t("announce.send")}
                                 </Button>
                             </span>
                         </div>
@@ -769,12 +770,12 @@ export function MinecraftAnnounce({
                         <details className="group rounded-md border border-border">
                             <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
                                 <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
-                                The commands this sends
+                                {t("announce.theCommandsThisSends")}
                             </summary>
                             <div className="flex flex-col gap-1 border-t border-border p-2">
                                 {built.lines.length === 0 ? (
                                     <span className="text-xs text-muted-foreground">
-                                        Nothing yet.
+                                        {t("announce.nothingYet")}
                                     </span>
                                 ) : (
                                     built.lines.map((line, index) => (
@@ -788,7 +789,7 @@ export function MinecraftAnnounce({
                                             >
                                                 {line}
                                             </code>
-                                            <CopyButton value={line} label="this command" />
+                                            <CopyButton value={line} label={t("announce.thisCommand")} />
                                         </span>
                                     ))
                                 )}
@@ -810,19 +811,19 @@ export function MinecraftAnnounce({
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>
-                                {naming.id ? "Save the template" : "Save as a template"}
+                                {naming.id ? t("announce.saveTheTemplate") : t("announce.saveAsATemplate")}
                             </DialogTitle>
                             <DialogDescription>
-                                Everybody who runs this server can load it and send it again.
+                                {t("announce.everybodyWhoRunsThisServer")}
                             </DialogDescription>
                         </DialogHeader>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Name *</span>
+                            <span className="font-medium">{t("announce.name")}</span>
                             <Input
                                 autoFocus
                                 value={naming.name}
                                 maxLength={MAX_TEMPLATE_NAME}
-                                placeholder="Restart warning"
+                                placeholder={t("announce.restartWarning")}
                                 onChange={(event) =>
                                     setNaming({ ...naming, name: event.target.value })
                                 }
@@ -833,23 +834,23 @@ export function MinecraftAnnounce({
                         </label>
                         <DialogFooter>
                             <Button variant="ghost" onClick={() => setNaming(null)}>
-                                Cancel
+                                {t("announce.cancel")}
                             </Button>
                             {naming.id && (
                                 <Button
                                     variant="secondary"
                                     disabled={pending || naming.name.trim().length === 0}
                                     onClick={() => setNaming({ name: naming.name })}
-                                    title="Keep the old one and save this as a new template"
+                                    title={t("announce.keepTheOldOneAnd")}
                                 >
-                                    Save as new
+                                    {t("announce.saveAsNew")}
                                 </Button>
                             )}
                             <Button
                                 disabled={pending || naming.name.trim().length === 0}
                                 onClick={keep}
                             >
-                                {naming.id ? "Save" : "Save template"}
+                                {naming.id ? t("announce.save") : t("announce.saveTemplate")}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -899,6 +900,7 @@ function AnnouncementPreview({
     announcement: Announcement;
     edition: MinecraftEdition;
 }) {
+    const t = useGameText("minecraft");
     const [phase, setPhase] = useState<Phase>("still");
     const timers = useRef<number[]>([]);
     // A name where {player} is, as one of the recipients would read it.
@@ -957,11 +959,11 @@ function AnnouncementPreview({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
                     <div>
-                        <p className="text-sm font-medium">Preview</p>
+                        <p className="text-sm font-medium">{t("announce.preview")}</p>
                         <p className="text-xs text-muted-foreground">
                             {edition === "bedrock"
-                                ? "Bedrock has no custom colors, underline or strikethrough; the nearest it has is shown."
-                                : "How it looks in the game, as you type."}
+                                ? t("announce.bedrockHasNoCustomColors")
+                                : t("announce.howItLooksInThe")}
                         </p>
                     </div>
                     <Button
@@ -985,7 +987,7 @@ function AnnouncementPreview({
                         background:
                             "linear-gradient(180deg, #6b9bd8 0%, #9cc2ee 45%, #3f6b2e 45.5%, #2f5222 70%, #213a18 100%)"
                     }}
-                    aria-label="Preview of the announcement in the game"
+                    aria-label={t("announce.previewOfTheAnnouncementIn")}
                 >
                     {/* Crosshair */}
                     <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[14px] leading-none text-white/80">
@@ -1060,7 +1062,7 @@ function AnnouncementPreview({
                     )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Minecraft draws its own font, so the spacing here is close rather than exact.
+                    {t("announce.minecraftDrawsItsOwnFont")}
                 </p>
             </CardBody>
         </Card>
