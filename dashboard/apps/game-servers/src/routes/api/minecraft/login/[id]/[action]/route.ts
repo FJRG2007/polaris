@@ -14,7 +14,6 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../../../../../../screens/game-words";
 import * as login from "../../../../../../lib/minecraft/polaris-login";
 import * as service from "../../../../../../lib/minecraft/polaris-login-service";
 
@@ -91,7 +90,8 @@ export async function POST(
     try {
         json = JSON.parse(text);
     } catch {
-        return reply(400, { error: "invalid", message: (await gameWords("games"))("errors.theRequestIsNotJson") });
+        // i18n-ignore: said to the login mod, which shows it in the game; not a page
+        return reply(400, { error: "invalid", message: "The request is not JSON" });
     }
 
     try {
@@ -169,6 +169,7 @@ export async function POST(
 function invalid(error: z.ZodError): Response {
     return reply(400, {
         error: "invalid",
-        message: error.issues[0]?.message ?? (await gameWords("games"))("errors.theRequestIsNotValid")
+        // i18n-ignore: said to the login mod, which shows it in the game; not a page
+        message: error.issues[0]?.message ?? "The request is not valid"
     });
 }

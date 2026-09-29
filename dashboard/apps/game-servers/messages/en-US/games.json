@@ -140,8 +140,6 @@
         "couldNotReadThisServer2": "Could not read this server's list",
         "searchForAModOr": "Search for a mod or plugin by name",
         "couldNotReadTheWorld": "Could not read the world",
-        "theRequestIsNotJson": "The request is not JSON",
-        "theRequestIsNotValid": "The request is not valid",
         "checkTheDetailsAndTry": "Check the details and try again",
         "couldNotCreateTheServer": "Could not create the server",
         "giveTheTemplateAName": "Give the template a name",

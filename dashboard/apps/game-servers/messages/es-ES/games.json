@@ -140,8 +140,6 @@
         "couldNotReadThisServer2": "No se pudo leer la lista del servidor",
         "searchForAModOr": "Busca un mod o plugin por su nombre",
         "couldNotReadTheWorld": "No se pudo leer el mundo",
-        "theRequestIsNotJson": "La petición no es JSON",
-        "theRequestIsNotValid": "La petición no es válida",
         "checkTheDetailsAndTry": "Revisa los datos y vuelve a intentarlo",
         "couldNotCreateTheServer": "No se pudo crear el servidor",
         "giveTheTemplateAName": "Ponle nombre a la plantilla",
