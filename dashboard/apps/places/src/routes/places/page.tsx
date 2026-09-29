@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Wall } from "../../screens/wall";
 import { Button, PageHeader } from "@polaris/ui";
+import { placesT } from "../../lib/i18n";
 import { requireHomeReach } from "../../lib/access";
 import { currentPlace } from "../../lib/current-place";
 import { PlaceSwitcher } from "../../screens/place-switcher";
@@ -19,6 +20,7 @@ import { PlaceSwitcher } from "../../screens/place-switcher";
 export const dynamic = "force-dynamic";
 
 export default async function PlacePage() {
+    const t = await placesT();
     // A visitor lent one camera lands here too, and the wall draws that one.
     const { install, canManage, canControl } = await requireHomeReach();
     const place = await currentPlace(install.id);
@@ -28,7 +30,7 @@ export default async function PlacePage() {
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader
                     title={place.current.name}
-                    description="Every camera here, and what it can see right now."
+                    description={t("pages.place.description")}
                 />
                 <div className="flex flex-wrap items-center gap-2">
                     <PlaceSwitcher
@@ -40,7 +42,7 @@ export default async function PlacePage() {
                         <Button asChild size="sm" variant="ghost">
                             <Link href="/places/cameras">
                                 <Plus className="size-4 shrink-0" />
-                                Add a camera
+                                {t("pages.place.addCamera")}
                             </Link>
                         </Button>
                     ) : null}

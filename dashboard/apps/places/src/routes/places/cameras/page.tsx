@@ -9,6 +9,7 @@
 import { PageHeader } from "@polaris/ui";
 import { CamerasView } from "../../../screens/cameras/cameras-view";
 import { requireHomeUser } from "../../../lib/access";
+import { placesT } from "../../../lib/i18n";
 import { currentPlace } from "../../../lib/current-place";
 import { PlaceSwitcher } from "../../../screens/place-switcher";
 
@@ -19,6 +20,7 @@ export default async function CamerasPage({
 }: {
     searchParams: Promise<{ open?: string }>;
 }) {
+    const t = await placesT();
     const { install, canManage } = await requireHomeUser("home.read");
     const place = await currentPlace(install.id);
     const { open } = await searchParams;
@@ -27,8 +29,8 @@ export default async function CamerasPage({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader
-                    title="Cameras"
-                    description="What each camera is, how Polaris reaches it, and what it is allowed to notice."
+                    title={t("pages.cameras.title")}
+                    description={t("pages.cameras.description")}
                 />
                 <PlaceSwitcher
                     places={place.places}

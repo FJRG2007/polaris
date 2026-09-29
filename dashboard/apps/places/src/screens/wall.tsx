@@ -20,10 +20,12 @@ import { CameraTile } from "./camera-tile";
 import { CameraViewer } from "./camera-viewer";
 import { useEffect, useMemo, useState } from "react";
 import { useDetections } from "./use-detections";
+import { usePlacesT } from "./use-places-t";
 import type { CameraView } from "../lib/cameras";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
 export function Wall({ canManage, canControl }: { canManage: boolean; canControl: boolean }) {
+    const t = usePlacesT();
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [live, setLive] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         return (
             <EmptyState
                 icon={<Cctv />}
-                title="The cameras could not be listed"
+                title={t("wall.listFailed")}
                 description={error}
             />
         );
@@ -67,18 +69,18 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
         return (
             <EmptyState
                 icon={<Cctv />}
-                title="No cameras yet"
+                title={t("wall.empty.title")}
                 description={
                     canManage
-                        ? "Add one and Polaris will find its streams, or look for the ones already on your network."
-                        : "Nobody has added a camera to this house yet."
+                        ? t("wall.empty.manage")
+                        : t("wall.empty.view")
                 }
                 action={
                     canManage ? (
                         <Button asChild size="sm">
                             <Link href="/places/cameras">
                                 <Plus className="size-4 shrink-0" />
-                                Add a camera
+                                {t("wall.empty.add")}
                             </Link>
                         </Button>
                     ) : undefined
@@ -97,7 +99,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                 <section key={zone || "unplaced"} className="flex flex-col gap-2">
                     {zones.length > 1 ? (
                         <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle">
-                            {zone || "Everywhere else"}
+                            {zone || t("wall.unzoned")}
                         </h2>
                     ) : null}
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -43,6 +43,7 @@ import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
+import { usePlacesT } from "./use-places-t";
 import { drawsFromBattery } from "../lib/camera-models";
 import { quietSince } from "../lib/availability";
 import {
@@ -157,6 +158,7 @@ export function CameraTile({
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
     const format = useDisplayFormat();
+    const t = usePlacesT();
     /** When this camera stopped answering, in the reader's own format, or null
      *  while it is answering. Read off the row rather than from what this tab
      *  managed to draw, so it survives a reload and says the same thing on every
@@ -385,7 +387,7 @@ export function CameraTile({
                                   <DetectionBox
                                       key={found.id}
                                       box={found.box}
-                                      label={boxLabel(found.label, found.score)}
+                                      label={boxLabel(found.label, found.score, t)}
                                       picture={shape}
                                       tile={TILE_SHAPE}
                                       fit="cover"
@@ -407,10 +409,10 @@ export function CameraTile({
                                     // can see is false. Its settings ask the
                                     // relay and give the real answer.
                                     battery
-                                        ? "No picture. Open its settings to test it."
+                                        ? t("camera.batteryNoPicture")
                                         : since
-                                          ? `Not answering since ${since}`
-                                          : "Not answering"
+                                          ? t("camera.notAnsweringSince", { since })
+                                          : t("camera.notAnswering")
                                 }
                             />
                         ) : null}
@@ -420,7 +422,7 @@ export function CameraTile({
                             the person who stopped it. */}
                         {idle && drawn !== false ? (
                             <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
-                                Paused
+                                {t("camera.paused")}
                             </span>
                         ) : null}
                         {/* The same reasoning as Paused: the picture is a moment
@@ -430,7 +432,7 @@ export function CameraTile({
                             of the wall is. */}
                         {battery && !idle && drawn !== false ? (
                             <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
-                                On battery - open it to watch
+                                {t("camera.batteryOpenToWatch")}
                             </span>
                         ) : null}
                     </>
@@ -444,7 +446,7 @@ export function CameraTile({
                 <button
                     type="button"
                     onClick={onOpen}
-                    aria-label={`Open ${camera.name}`}
+                    aria-label={t("camera.open", { name: camera.name })}
                     className="absolute inset-0 cursor-zoom-in"
                 />
                 <span
@@ -479,13 +481,13 @@ export function CameraTile({
                         pass has not run since - and a red badge over a moving
                         picture reads as a bug. */}
                     {since && drawn !== true && !playing ? (
-                        <Badge variant="danger" title={`Not answering since ${since}`}>
-                            Quiet
+                        <Badge variant="danger" title={t("camera.notAnsweringSince", { since })}>
+                            {t("camera.quiet")}
                         </Badge>
                     ) : null}
                     {camera.recording !== "off" ? (
-                        <Badge variant="danger" title="Recording">
-                            REC
+                        <Badge variant="danger" title={t("camera.recording")}>
+                            {t("camera.rec")}
                         </Badge>
                     ) : null}
                     {canControl ? (
@@ -493,8 +495,8 @@ export function CameraTile({
                             asChild
                             variant="ghost"
                             size="icon"
-                            aria-label={`Settings for ${camera.name}`}
-                            title="Settings"
+                            aria-label={t("camera.settingsFor", { name: camera.name })}
+                            title={t("camera.settings")}
                         >
                             <Link href={`/places/cameras?open=${camera.id}`}>
                                 <Camera className="size-4 shrink-0" />
@@ -524,18 +526,19 @@ function Unavailable({
     live: boolean;
     since: string | null;
 }) {
+    const t = usePlacesT();
     if (!camera.enabled)
-        return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />;
+        return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label={t("camera.switchedOff")} />;
     if (since)
         return (
             <Placeholder
                 icon={<Camera className="size-5 shrink-0" />}
-                label={`Not answering since ${since}`}
+                label={t("camera.notAnsweringSince", { since })}
             />
         );
     if (!live)
-        return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Starting" />;
-    return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />;
+        return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={t("camera.starting")} />;
+    return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={t("camera.notAnswering")} />;
 }
 
 function Placeholder({ icon, label }: { icon: React.ReactNode; label: string }) {

@@ -18,6 +18,7 @@
 import { Select } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { PlaceDialog } from "./place-dialog";
+import { usePlacesT } from "./use-places-t";
 import { choosePlaceAction } from "./actions";
 import { useState, useTransition } from "react";
 import type { PlaceView } from "../lib/place-kinds";
@@ -41,6 +42,7 @@ export function PlaceSwitcher({
     current: PlaceView;
     canManage: boolean;
 }) {
+    const t = usePlacesT();
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [adding, setAdding] = useState(false);
@@ -71,7 +73,7 @@ export function PlaceSwitcher({
                 value={current.id}
                 onValueChange={choose}
                 disabled={pending}
-                aria-label="Which place"
+                aria-label={t("switcher.label")}
                 className="w-56"
                 options={
                     canManage
@@ -79,7 +81,7 @@ export function PlaceSwitcher({
                               ...options,
                               {
                                   value: "new",
-                                  label: "Add a place",
+                                  label: t("switcher.add"),
                                   icon: <Plus className="size-4 shrink-0" />
                               }
                           ]

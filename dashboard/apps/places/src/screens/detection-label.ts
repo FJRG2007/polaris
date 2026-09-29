@@ -10,17 +10,15 @@
  * is a name and is written down exactly as the person who added it typed it.
  */
 
-/** The classes a camera can report, in the words the house uses for them. */
-export const KIND_LABEL: Readonly<Record<string, string>> = {
-    motion: "Movement",
-    person: "Somebody",
-    vehicle: "A vehicle",
-    animal: "An animal",
-    package: "A box or bag",
-    face: "Recognized",
-    tamper: "Camera tampered with",
-    offline: "Camera went quiet"
-};
+import type { PlacesTranslator } from "../lib/i18n";
+import { englishPlaces } from "../../messages";
+
+/** A class a camera can report, in the words the house uses for it; anything
+ *  else - a name - as it came. */
+export function kindLabel(label: string, t: PlacesTranslator = englishPlaces): string {
+    const key = `detection.kinds.${label}`;
+    return t.has(key) ? t(key) : label;
+}
 
 /**
  * The line on a live box.
@@ -30,7 +28,7 @@ export const KIND_LABEL: Readonly<Record<string, string>> = {
  * their own camera deserves to see the difference rather than be shown a
  * confident-looking box around a bush.
  */
-export function boxLabel(label: string, score: number): string {
-    const said = KIND_LABEL[label] ?? label;
-    return score > 0 ? `${said} ${score}%` : said;
+export function boxLabel(label: string, score: number, t: PlacesTranslator = englishPlaces): string {
+    const said = kindLabel(label, t);
+    return score > 0 ? t("detection.box", { label: said, score }) : said;
 }

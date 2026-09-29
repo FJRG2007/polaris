@@ -18,10 +18,12 @@
  * Pure and client-safe: the add-camera form reads the same list the server does.
  */
 
+import type { PlacesTranslator } from "./i18n";
+import { englishPlaces, type PlacesKey } from "../../messages";
+
 /** A make Polaris knows something about beyond "it speaks RTSP". */
 export interface CameraVendor {
     readonly id: string;
-    readonly label: string;
     /** Path of the full-quality stream, below the host. */
     readonly mainPath: string;
     /** Path of the small stream detection reads. Absent when the make publishes
@@ -32,19 +34,6 @@ export interface CameraVendor {
     /** Whether the make's cameras generally point somewhere on command. Only a
      *  hint for the form - what a particular camera can do is asked of it. */
     readonly ptz?: boolean;
-    /**
-     * What this profile IS, as a way of reaching a camera rather than as a make.
-     *
-     * The labels above name a make, which is what the list of makes needed. Once
-     * a model has been chosen, the same profiles are a choice between transports
-     * for that one camera - and "TP-Link Tapo (camera account)" does not tell
-     * anybody which of the two is the one that streams better.
-     */
-    readonly method?: string;
-    /** What somebody adding one of these has to know first. Shown on the form,
-     *  because every one of these is a support question that would otherwise be
-     *  asked as "it says wrong password". */
-    readonly note?: string;
     /**
      * The maker's own protocol, when using it beats RTSP.
      *
@@ -119,8 +108,6 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         // somebody already has, and the one that avoids the camera-account
         // detour every other Tapo setup starts with.
         id: "tapo-cloud",
-        method: "TP-Link's own protocol",
-        label: "TP-Link Tapo (Tapo password)",
         // Reached over TP-Link's own protocol rather than RTSP, so there are no
         // paths to resolve - the subtype does that job.
         mainPath: "",
@@ -130,8 +117,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         nativePasswordOnly: true,
         nativePort: TAPO_NATIVE_PORT,
         nativeControlPort: TAPO_CONTROL_PORT,
-        appConsent: "Me > Third-Party Services > Third-Party Compatibility",
-        note: "The password for your TP-Link account - the one you sign into the Tapo app with, not one set on the camera. No camera account, and the microphone works both ways."
+        appConsent: "Me > Third-Party Services > Third-Party Compatibility"
     },
     {
         // The battery models, which are not a variation on the one above: they
@@ -141,8 +127,6 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         // permanent connection has nothing to connect to. The maker's own
         // protocol is the only way in, which is also how the phone app does it.
         id: "tapo-battery",
-        method: "TP-Link's own protocol",
-        label: "TP-Link Tapo (battery, no RTSP)",
         mainPath: "",
         // Fixed lenses, every one of them, so there is nothing to point.
         ptz: false,
@@ -152,74 +136,83 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         nativePasswordOnly: true,
         nativePort: TAPO_NATIVE_PORT,
         nativeControlPort: TAPO_CONTROL_PORT,
-        appConsent: "Me > Third-Party Services > Third-Party Compatibility",
-        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. One of these is asleep almost all the time and answers nothing at all while it is: it wakes on its own movement, or when the Tapo app opens it. Polaris can watch one while it is awake and cannot wake one itself, so treat it as a camera you look in on rather than one that is always there."
+        appConsent: "Me > Third-Party Services > Third-Party Compatibility"
     },
     {
         id: "tapo",
-        method: "RTSP, with a camera account",
-        label: "TP-Link Tapo (camera account)",
         mainPath: "/stream1",
         subPath: "/stream2",
         // Tapo does not answer ONVIF on 80. It listens on 2020, and only once a
         // camera account exists.
         onvifPort: 2020,
-        ptz: true,
-        note: "In the Tapo app: Settings > Advanced > Camera Account. The account you create there is the one Polaris needs - your TP-Link login will not work."
+        ptz: true
     },
     {
         id: "vigi",
-        method: "RTSP, with a camera account",
-        label: "TP-Link VIGI",
         mainPath: "/stream1",
         subPath: "/stream2",
         onvifPort: 2020,
-        ptz: true,
-        note: "Use the camera's own account, set when it was first configured in VIGI."
+        ptz: true
     },
     {
         id: "reolink",
-        label: "Reolink",
         mainPath: "/h264Preview_01_main",
         subPath: "/h264Preview_01_sub",
         ptz: true
     },
     {
         id: "hikvision",
-        label: "Hikvision",
         mainPath: "/Streaming/Channels/101",
         subPath: "/Streaming/Channels/102",
         ptz: true
     },
     {
         id: "dahua",
-        label: "Dahua",
         mainPath: "/cam/realmonitor?channel=1&subtype=0",
         subPath: "/cam/realmonitor?channel=1&subtype=1",
         ptz: true
     },
     {
         id: "amcrest",
-        label: "Amcrest",
         mainPath: "/cam/realmonitor?channel=1&subtype=0",
         subPath: "/cam/realmonitor?channel=1&subtype=1",
         ptz: true
     },
     {
         id: "onvif",
-        label: "Any ONVIF camera",
         // Nothing is assumed: the camera is asked what it publishes.
         mainPath: "",
-        ptz: true,
-        note: "Polaris asks the camera what it streams. Most cameras made in the last ten years answer."
+        ptz: true
     },
     {
         id: "generic",
-        label: "Something else",
-        mainPath: "",
-        note: "Paste the camera's RTSP address and Polaris will use exactly that."
+        mainPath: ""
     }
 ];
+
+/**
+ * The words for a profile, from the catalog (`vendors.<id>`): its `label`, which
+ * names a make; its `method`, what it IS as a way of reaching a camera once a
+ * model has been chosen - "TP-Link Tapo (camera account)" does not tell anybody
+ * which of two transports streams better; and its `note`, what somebody adding
+ * one has to know first, because every one of those is a support question that
+ * would otherwise be asked as "it says wrong password".
+ */
+export function vendorLabel(id: string, t: PlacesTranslator = englishPlaces): string {
+    return t(`vendors.${cameraVendor(id).id}.label` as PlacesKey);
+}
+
+/** How this profile reaches a camera, or its label where the two are the same. */
+export function vendorMethod(id: string, t: PlacesTranslator = englishPlaces): string {
+    const key = `vendors.${cameraVendor(id).id}.method`;
+    return t.has(key) ? t(key) : vendorLabel(id, t);
+}
+
+/** What to know before adding one, or null for a profile with nothing to say. */
+export function vendorNote(id: string, t: PlacesTranslator = englishPlaces): string | null {
+    const key = `vendors.${cameraVendor(id).id}.note`;
+    return t.has(key) ? t(key) : null;
+}
 
 /** One make by id, or the generic profile for anything unrecognized. */
 export function cameraVendor(id: string): CameraVendor {

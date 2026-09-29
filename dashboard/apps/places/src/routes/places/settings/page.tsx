@@ -9,19 +9,21 @@
 import { PageHeader } from "@polaris/ui";
 import { footageTarget } from "../../../lib/stills";
 import { requireHomeUser } from "../../../lib/access";
+import { placesT } from "../../../lib/i18n";
 import { HomeSettingsView } from "../../../screens/settings/settings-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomeSettingsPage() {
+    const t = await placesT();
     const { user } = await requireHomeUser("home.manage");
     const footage = await footageTarget(null);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
             <PageHeader
-                title="Settings"
-                description="Where the house keeps what it records, and what recognizes faces."
+                title={t("pages.settings.title")}
+                description={t("pages.settings.description")}
             />
             <HomeSettingsView storage={footage.name} canAdmin={user.isAdmin} />
         </div>

@@ -26,7 +26,9 @@
  * Pure and client-safe: the picker and the server read the same list.
  */
 
+import type { PlacesTranslator } from "./i18n";
 import { cameraVendor } from "./vendors";
+import { englishPlaces, type PlacesKey } from "../../messages";
 
 /** How a camera is powered, which is a question only its owner can answer -
  *  several of these are sold as a battery camera and run just as happily on a
@@ -35,19 +37,8 @@ export const POWER_SOURCES = ["mains", "battery", "battery-solar"] as const;
 
 export type PowerSource = (typeof POWER_SOURCES)[number];
 
-export const POWER_LABELS: Record<PowerSource, string> = {
-    mains: "Plugged in",
-    battery: "Battery",
-    "battery-solar": "Battery and a solar panel"
-};
-
-export const POWER_NOTES: Record<PowerSource, string> = {
-    mains: "Polaris treats it like any other camera: it keeps the picture up to date and tells you when it stops answering.",
-    battery:
-        "Polaris connects only while you are looking. It will not check on it and it will not watch for movement, because both of those mean holding the stream open, which is what empties the battery.",
-    "battery-solar":
-        "The same as on a battery. A panel replaces what a day costs, not what a permanent connection costs, so nothing here holds one open."
-};
+// What each is called, and what Polaris does with a camera powered that way,
+// are in the catalog under `power.labels` and `power.notes`.
 
 /**
  * What it costs to ask Polaris to watch a camera that is running off its own
@@ -58,8 +49,7 @@ export const POWER_NOTES: Record<PowerSource, string> = {
  * and somebody with one on a pole deserves to know what they are agreeing to
  * before the camera is dark and they are working out why.
  */
-export const BATTERY_COST_WARNING =
-    "This camera is running off its own charge, and anything Polaris watches for itself means holding its stream open all day. That is a large increase in what it draws: if it is not recharging faster than that, it will run flat and switch itself off, and Polaris cannot wake it.";
+export const BATTERY_COST_WARNING: PlacesKey = "power.batteryCost";
 
 /** One camera anybody can buy. */
 export interface CameraModel {
@@ -166,8 +156,7 @@ const TAPO_BATTERY = [
  */
 const TAPO_CONDITIONAL = ["D225", "D235", "TD25"] as const;
 
-const CONDITIONAL_NOTE =
-    "This one answers RTSP only when it is wired for power, has the jumper fitted, and is set to stay awake in the Tapo app. On its battery it publishes nothing, and Polaris reaches it over TP-Link's own protocol instead.";
+const CONDITIONAL_NOTE = englishPlaces("models.conditionalNote");
 
 function tapo(
     name: string,
@@ -242,6 +231,24 @@ export const CAMERA_MODELS: readonly CameraModel[] = [
         search: ["generic", "any", "unknown", "rtsp"]
     }
 ];
+
+/** The name on the box, in the reader's words where it is not a model number
+ *  ("Any Reolink camera", "Something else"). */
+export function modelName(model: CameraModel, t: PlacesTranslator = englishPlaces): string {
+    const key = `models.names.${model.id}`;
+    return t.has(key) ? t(key) : model.name;
+}
+
+/** A make as the reader says it: its own name, or the catch-all. */
+export function brandName(brand: string, t: PlacesTranslator = englishPlaces): string {
+    return brand === "Other" ? t("models.brandOther") : brand;
+}
+
+/** What the owner has to know about this model, in the reader's words. The only
+ *  note so far is the conditional-RTSP one. */
+export function modelNote(model: CameraModel, t: PlacesTranslator = englishPlaces): string | null {
+    return model.note === CONDITIONAL_NOTE ? t("models.conditionalNote") : (model.note ?? null);
+}
 
 /** One model by id, or null for an id from before this list existed. */
 export function cameraModel(id: string | null | undefined): CameraModel | null {

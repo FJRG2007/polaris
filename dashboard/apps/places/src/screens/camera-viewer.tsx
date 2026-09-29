@@ -29,6 +29,7 @@
 import { PtzPad } from "./ptz-pad";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
+import { usePlacesT } from "./use-places-t";
 import { useDetections } from "./use-detections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -151,6 +152,7 @@ export function CameraViewer({
     canControl: boolean;
     onClose: () => void;
 }) {
+    const t = usePlacesT();
     const frame = useRef<HTMLDivElement | null>(null);
     /** Takes the wheel listener off again, held here because the ref callback
      *  that put it on is the only thing that knows about it. */
@@ -513,7 +515,7 @@ export function CameraViewer({
                             <DetectionBox
                                 key={found.id}
                                 box={found.box}
-                                label={boxLabel(found.label, found.score)}
+                                label={boxLabel(found.label, found.score, t)}
                                 picture={shape}
                                 tile={surfaceShape}
                             />
@@ -523,7 +525,7 @@ export function CameraViewer({
                     {drawn === false && !playing ? (
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">
                             <Camera className="size-6 shrink-0" />
-                            <span className="text-[0.75rem]">This camera is not answering</span>
+                            <span className="text-[0.75rem]">{t("viewer.notAnswering")}</span>
                         </span>
                     ) : null}
 
@@ -536,18 +538,22 @@ export function CameraViewer({
                     {!trying && drawn ? (
                         <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-[0.6875rem] text-white/80">
                             <Camera className="size-3.5 shrink-0" />
-                            Pictures only - the live stream would not start
-                            <button
-                                type="button"
-                                className="pointer-events-auto underline underline-offset-2"
-                                onClick={() => {
-                                    setTransport(preferredTransport());
-                                    setSwapped(false);
-                                    setTrying(true);
-                                }}
-                            >
-                                Try again
-                            </button>
+                            {t.rich("viewer.picturesOnly", {
+                                retry: (chunks) => (
+                                    <button
+                                        key="retry"
+                                        type="button"
+                                        className="pointer-events-auto underline underline-offset-2"
+                                        onClick={() => {
+                                            setTransport(preferredTransport());
+                                            setSwapped(false);
+                                            setTrying(true);
+                                        }}
+                                    >
+                                        {chunks}
+                                    </button>
+                                )
+                            })}
                         </span>
                     ) : null}
 
@@ -598,7 +604,7 @@ export function CameraViewer({
                         )}
                     >
                         <Control
-                            label={full ? "Leave fullscreen" : "Fullscreen"}
+                            label={full ? t("viewer.leaveFullscreen") : t("viewer.fullscreen")}
                             onClick={toggleFullscreen}
                         >
                             {full ? (
@@ -613,7 +619,7 @@ export function CameraViewer({
                         {playing ? (
                             <>
                                 <Control
-                                    label={paused ? "Play" : "Pause"}
+                                    label={paused ? t("viewer.play") : t("viewer.pause")}
                                     onClick={() => setPaused((current) => !current)}
                                 >
                                     {paused ? (
@@ -623,7 +629,7 @@ export function CameraViewer({
                                     )}
                                 </Control>
                                 <Control
-                                    label={muted ? "Turn the sound on" : "Mute"}
+                                    label={muted ? t("viewer.unmute") : t("viewer.mute")}
                                     onClick={() => setMuted((current) => !current)}
                                 >
                                     {muted ? (
@@ -635,7 +641,7 @@ export function CameraViewer({
                             </>
                         ) : null}
                         <Control
-                            label="Zoom out"
+                            label={t("viewer.zoomOut")}
                             disabled={!isZoomed(zoom)}
                             onClick={() =>
                                 setZoom((current) =>
@@ -646,7 +652,7 @@ export function CameraViewer({
                             <ZoomOut className="size-4 shrink-0" />
                         </Control>
                         <Control
-                            label="Zoom in"
+                            label={t("viewer.zoomIn")}
                             onClick={() =>
                                 setZoom((current) => zoomBy(current, ZOOM_STEP, undefined, cover))
                             }
@@ -662,7 +668,7 @@ export function CameraViewer({
                                 onClick={() => setZoom(NO_ZOOM)}
                                 className="rounded-full bg-black/60 px-2 py-1 text-[0.6875rem] text-white/80 transition-colors hover:bg-black/80 hover:text-white"
                             >
-                                {zoom.scale.toFixed(1)}x - reset
+                                {t("viewer.zoomReset", { scale: zoom.scale.toFixed(1) })}
                             </button>
                         ) : null}
                     </div>

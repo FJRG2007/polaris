@@ -1,0 +1,282 @@
+{
+    "camera": {
+        "batteryNoPicture": "Sin imagen. Abre sus ajustes para probarla.",
+        "batteryOpenToWatch": "Con batería: ábrela para verla",
+        "notAnswering": "No responde",
+        "notAnsweringSince": "No responde desde {since}",
+        "open": "Abrir {name}",
+        "paused": "En pausa",
+        "quiet": "Sin señal",
+        "rec": "REC",
+        "recording": "Grabando",
+        "settings": "Ajustes",
+        "settingsFor": "Ajustes de {name}",
+        "starting": "Iniciando",
+        "switchedOff": "Apagada"
+    },
+    "cameras": {
+        "add": "Añadir una cámara",
+        "area": "Zona",
+        "areaCount": "{area} - {count}",
+        "areas": "Zonas",
+        "change": "Cambiar",
+        "changeName": "Cambiar {name}",
+        "columns": {
+            "camera": "Cámara",
+            "keeps": "Guarda",
+            "notices": "Detecta"
+        },
+        "discover": "Buscar cámaras",
+        "drawAreas": "Dibujar zonas",
+        "drawAreasOn": "Dibujar zonas en {name}",
+        "empty": {
+            "manage": "Añade una por su dirección o deja que Polaris busque las que ya están en tu red.",
+            "title": "Aún no hay cámaras",
+            "view": "Nadie ha añadido todavía una cámara a esta casa."
+        },
+        "everyArea": "Todas las zonas - {count}",
+        "extrasFailed": "No se han podido leer las máquinas y los discos con los que se configura una cámara, así que no se pueden añadir ni cambiar cámaras. Recarga la página para volver a intentarlo.",
+        "keeps": {
+            "continuous": "Se guarda siempre",
+            "motion": "Se guarda con movimiento",
+            "off": "No se guarda nada"
+        },
+        "noArea": "Sin zona",
+        "noMatch": {
+            "description": "En la zona que estás viendo no hay nada que se llame así ni que esté en esa dirección.",
+            "title": "Ninguna cámara coincide"
+        },
+        "nothingToChange": "Aquí no hay nada que cambiar",
+        "off": "Apagada",
+        "readFailed": "No se han podido leer tus cámaras. Recarga la página para volver a intentarlo.",
+        "remove": "Quitar",
+        "removeConfirm": {
+            "description": "Polaris deja de conectarse a ella y se borra todo lo que ha grabado. La cámara sigue funcionando.",
+            "title": "¿Quitar {name}?"
+        },
+        "removeName": "Quitar {name}",
+        "renameAndChange": "Renombrar y cambiar",
+        "retention": " - {days} d",
+        "search": "Buscar cámaras",
+        "share": "Compartir",
+        "shareName": "Compartir {name}",
+        "subtitleQuiet": "No responde desde {since}"
+    },
+    "common": {
+        "cancel": "Cancelar",
+        "required": " *",
+        "save": "Guardar"
+    },
+    "detection": {
+        "box": "{label} {score} %",
+        "kinds": {
+            "animal": "Un animal",
+            "face": "Reconocido",
+            "motion": "Movimiento",
+            "offline": "La cámara dejó de responder",
+            "package": "Una caja o bolsa",
+            "person": "Alguien",
+            "tamper": "Cámara manipulada",
+            "vehicle": "Un vehículo"
+        }
+    },
+    "detectors": {
+        "camera": {
+            "cost": "Ninguno. La cámara hace el trabajo y Polaris solo escucha.",
+            "label": "Los avisos de la propia cámara",
+            "summary": "La cámara decide si algo se ha movido y se lo dice a Polaris. Casi todas las cámaras de los últimos diez años pueden."
+        },
+        "faces": {
+            "cost": "El más alto, y el menos frecuente: se ejecuta sobre las personas ya encontradas, no sobre toda la imagen.",
+            "label": "Quién es",
+            "requires": "El reconocimiento facial, que está desactivado hasta que lo actives en Ajustes. Mientras tanto, esta cámara sigue avisando de que hay alguien, pero no de quién.",
+            "summary": "Cuando se ve a alguien, compara su cara con las personas que le has enseñado. Cualquier otra persona se notifica como desconocida."
+        },
+        "motion": {
+            "cost": "Pequeño. Un par de imágenes de baja resolución por segundo y nada de la emisión buena.",
+            "label": "Movimiento",
+            "summary": "Polaris vigila la emisión pequeña en busca de movimiento, comparándola con el aspecto habitual de la vista: un árbol que se mece toda la tarde deja de contar y alguien que entra, no. Úsalo cuando la cámara no pueda avisar de su propio movimiento o avise demasiado."
+        },
+        "none": {
+            "cost": "Ninguno.",
+            "label": "Nada",
+            "summary": "Verla en directo y grabar si lo has pedido. No se analiza nada."
+        },
+        "objects": {
+            "cost": "Moderado, y solo mientras pasa algo de verdad. El resto del tiempo, en reposo.",
+            "label": "Personas, vehículos y animales",
+            "summary": "Cuando algo se mueve, Polaris mira con detalle mientras siga ahí y dice qué era y en qué parte de la imagen. Cada llegada es una entrada, con su imagen más clara. Es lo que evita que una rama al viento despierte a toda la casa. Dice que hay una persona, nunca cuál: eso es el nivel siguiente."
+        }
+    },
+    "modelPicker": {
+        "brandEmpty": "No hay ninguna marca con ese nombre. Elige Otra y Polaris le preguntará el resto a la cámara.",
+        "brandLabel": "Marca de la cámara",
+        "brandNone": "Quién la fabrica",
+        "brandPlaceholder": "Tapo, TP-Link, Reolink",
+        "modelEmpty": "No hay ninguna cámara con ese nombre. Elige la más parecida o «Otra cosa».",
+        "modelLabel": "Modelo de la cámara",
+        "modelNone": "Elige la cámara",
+        "modelPlaceholder": "C410, tapo c200, tplink"
+    },
+    "models": {
+        "brandOther": "Otra",
+        "conditionalNote": "Esta solo responde por RTSP cuando está conectada a la corriente, tiene el puente puesto y está configurada para no dormirse en la app de Tapo. Con batería no publica nada, y Polaris llega a ella por el protocolo propio de TP-Link.",
+        "names": {
+            "amcrest-other": "Cualquier cámara Amcrest",
+            "dahua-other": "Cualquier cámara Dahua",
+            "generic-other": "Otra cosa",
+            "hikvision-other": "Cualquier cámara Hikvision",
+            "onvif-other": "Cualquier cámara ONVIF",
+            "reolink-other": "Cualquier cámara Reolink",
+            "tapo-other": "Otra cámara Tapo",
+            "vigi-other": "Cualquier cámara VIGI"
+        }
+    },
+    "objects": {
+        "animal": "Animales",
+        "package": "Paquetes",
+        "packageHint": "Una caja o una bolsa que se queda a la vista, que es lo más cerca que se puede llegar sin enseñarle tu propia puerta.",
+        "person": "Personas",
+        "vehicle": "Vehículos"
+    },
+    "pages": {
+        "alerts": {
+            "description": "Lo que merece interrumpir a alguien. Cada aviso llega como mensaje en una conversación con las personas que nombra.",
+            "title": "Avisos"
+        },
+        "cameras": {
+            "description": "Qué es cada cámara, cómo llega Polaris a ella y qué puede detectar.",
+            "title": "Cámaras"
+        },
+        "clips": {
+            "description": "Grabaciones, de la más reciente a la más antigua. Lo que conserves sobrevive al periodo de retención.",
+            "title": "Clips"
+        },
+        "devices": {
+            "description": "Las cerraduras, interruptores y luces de este sitio: qué están haciendo, quién los ha usado y los botones para manejarlos.",
+            "title": "Dispositivos"
+        },
+        "events": {
+            "description": "Todo lo que han detectado las cámaras. Filtra por una cámara, una persona o una noche, y abre cualquier evento para ver la grabación de ese momento.",
+            "title": "Eventos"
+        },
+        "people": {
+            "description": "Enseña a las cámaras quién vive aquí, para que solo se avise de los demás. Las fotos se quedan en la máquina que ejecuta el reconocedor.",
+            "title": "Personas"
+        },
+        "place": {
+            "addCamera": "Añadir una cámara",
+            "description": "Todas las cámaras de este sitio y lo que ven ahora mismo."
+        },
+        "settings": {
+            "description": "Dónde guarda la casa lo que graba y qué reconoce las caras.",
+            "title": "Ajustes"
+        }
+    },
+    "placeDialog": {
+        "add": "Añadir sitio",
+        "addTitle": "Añadir un sitio",
+        "address": "Dónde está",
+        "addressPlaceholder": "Opcional; solo se guarda como texto",
+        "description": "Una casa, una oficina, un taller: cualquier sitio con sus propias cámaras.",
+        "kind": "Qué es",
+        "name": "Nombre",
+        "namePlaceholder": "El piso"
+    },
+    "placeKinds": {
+        "house": "Casa",
+        "office": "Oficina",
+        "other": "Otro sitio",
+        "site": "Instalación"
+    },
+    "power": {
+        "batteryCost": "Esta cámara funciona con su propia batería, y todo lo que Polaris vigile por su cuenta obliga a mantener la emisión abierta todo el día. Eso aumenta mucho el consumo: si no se recarga más rápido, se quedará sin batería, se apagará y Polaris no podrá despertarla.",
+        "labels": {
+            "battery": "Batería",
+            "battery-solar": "Batería y panel solar",
+            "mains": "Enchufada"
+        },
+        "notes": {
+            "battery": "Polaris solo se conecta mientras estás mirando. No la comprobará ni vigilará movimiento, porque ambas cosas obligan a mantener la emisión abierta, que es lo que vacía la batería.",
+            "battery-solar": "Igual que con batería. Un panel repone lo que se gasta en un día, no lo que cuesta una conexión permanente, así que aquí nada la mantiene abierta.",
+            "mains": "Polaris la trata como a cualquier otra cámara: mantiene la imagen al día y te avisa cuando deja de responder."
+        }
+    },
+    "ptz": {
+        "down": "Abajo",
+        "in": "Acercar",
+        "left": "Izquierda",
+        "out": "Alejar",
+        "right": "Derecha",
+        "up": "Arriba"
+    },
+    "switcher": {
+        "add": "Añadir un sitio",
+        "label": "Qué sitio"
+    },
+    "vendors": {
+        "amcrest": {
+            "label": "Amcrest"
+        },
+        "dahua": {
+            "label": "Dahua"
+        },
+        "generic": {
+            "label": "Otra cosa",
+            "note": "Pega la dirección RTSP de la cámara y Polaris usará exactamente esa."
+        },
+        "hikvision": {
+            "label": "Hikvision"
+        },
+        "onvif": {
+            "label": "Cualquier cámara ONVIF",
+            "note": "Polaris le pregunta a la cámara qué emite. Casi todas las cámaras de los últimos diez años responden."
+        },
+        "reolink": {
+            "label": "Reolink"
+        },
+        "tapo": {
+            "label": "TP-Link Tapo (cuenta de cámara)",
+            "method": "RTSP, con una cuenta de cámara",
+            "note": "En la app de Tapo: Settings > Advanced > Camera Account. La cuenta que crees ahí es la que necesita Polaris; tu inicio de sesión de TP-Link no sirve."
+        },
+        "tapo-battery": {
+            "label": "TP-Link Tapo (batería, sin RTSP)",
+            "method": "Protocolo propio de TP-Link",
+            "note": "Para las que llevan batería (C400, C410, C420, C425, D230), que no publican RTSP se configuren como se configuren. Pasan casi todo el tiempo dormidas y mientras tanto no responden a nada: se despiertan con su propio movimiento o cuando las abre la app de Tapo. Polaris puede verlas mientras están despiertas, pero no despertarlas, así que trátalas como cámaras que consultas de vez en cuando, no como cámaras que siempre están ahí."
+        },
+        "tapo-cloud": {
+            "label": "TP-Link Tapo (contraseña de Tapo)",
+            "method": "Protocolo propio de TP-Link",
+            "note": "La contraseña de tu cuenta de TP-Link, la que usas para iniciar sesión en la app de Tapo, no una configurada en la cámara. Sin cuenta de cámara, y el micrófono funciona en los dos sentidos."
+        },
+        "vigi": {
+            "label": "TP-Link VIGI",
+            "method": "RTSP, con una cuenta de cámara",
+            "note": "Usa la cuenta propia de la cámara, la que se creó al configurarla por primera vez en VIGI."
+        }
+    },
+    "viewer": {
+        "fullscreen": "Pantalla completa",
+        "leaveFullscreen": "Salir de pantalla completa",
+        "mute": "Silenciar",
+        "notAnswering": "Esta cámara no responde",
+        "pause": "Pausar",
+        "picturesOnly": "Solo imágenes: la emisión en directo no ha arrancado<retry>Reintentar</retry>",
+        "play": "Reproducir",
+        "unmute": "Activar el sonido",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "zoomReset": "{scale}x - restablecer"
+    },
+    "wall": {
+        "empty": {
+            "add": "Añadir una cámara",
+            "manage": "Añade una y Polaris encontrará sus emisiones, o busca las que ya están en tu red.",
+            "title": "Aún no hay cámaras",
+            "view": "Nadie ha añadido todavía una cámara a esta casa."
+        },
+        "listFailed": "No se han podido listar las cámaras",
+        "unzoned": "Resto de sitios"
+    }
+}

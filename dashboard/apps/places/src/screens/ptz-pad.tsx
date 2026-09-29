@@ -14,28 +14,30 @@
 
 import { cn } from "@polaris/ui";
 import * as actions from "./actions";
+import { usePlacesT } from "./use-places-t";
 import type { PtzDirection } from "../lib/ptz";
 import { useCallback, useEffect, useRef } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus } from "lucide-react";
 
 const ARROWS: {
     direction: PtzDirection;
-    label: string;
+    label: "up" | "left" | "right" | "down" | "in" | "out";
     icon: typeof ArrowUp;
     className: string;
 }[] = [
-    { direction: "up", label: "Up", icon: ArrowUp, className: "col-start-2 row-start-1" },
-    { direction: "left", label: "Left", icon: ArrowLeft, className: "col-start-1 row-start-2" },
-    { direction: "right", label: "Right", icon: ArrowRight, className: "col-start-3 row-start-2" },
-    { direction: "down", label: "Down", icon: ArrowDown, className: "col-start-2 row-start-3" },
-    { direction: "in", label: "Zoom in", icon: Plus, className: "col-start-3 row-start-1" },
-    { direction: "out", label: "Zoom out", icon: Minus, className: "col-start-1 row-start-1" }
+    { direction: "up", label: "up", icon: ArrowUp, className: "col-start-2 row-start-1" },
+    { direction: "left", label: "left", icon: ArrowLeft, className: "col-start-1 row-start-2" },
+    { direction: "right", label: "right", icon: ArrowRight, className: "col-start-3 row-start-2" },
+    { direction: "down", label: "down", icon: ArrowDown, className: "col-start-2 row-start-3" },
+    { direction: "in", label: "in", icon: Plus, className: "col-start-3 row-start-1" },
+    { direction: "out", label: "out", icon: Minus, className: "col-start-1 row-start-1" }
 ];
 
 export function PtzPad({ cameraId }: { cameraId: string }) {
     // Whether this pad has a camera moving right now, so the cleanup only sends a
     // stop when there is something to stop.
     const moving = useRef(false);
+    const t = usePlacesT();
 
     const stop = useCallback(() => {
         if (!moving.current) return;
@@ -72,8 +74,8 @@ export function PtzPad({ cameraId }: { cameraId: string }) {
                 <button
                     key={arrow.direction}
                     type="button"
-                    aria-label={arrow.label}
-                    title={arrow.label}
+                    aria-label={t(`ptz.${arrow.label}`)}
+                    title={t(`ptz.${arrow.label}`)}
                     className={cn(
                         "flex size-7 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15 hover:text-white",
                         arrow.className

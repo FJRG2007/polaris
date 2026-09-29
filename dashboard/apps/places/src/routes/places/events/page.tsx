@@ -8,12 +8,14 @@
 import { PageHeader } from "@polaris/ui";
 import { EventsView } from "../../../screens/events/events-view";
 import { requireHomeUser } from "../../../lib/access";
+import { placesT } from "../../../lib/i18n";
 import { currentPlace } from "../../../lib/current-place";
 import { PlaceSwitcher } from "../../../screens/place-switcher";
 
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
+    const t = await placesT();
     const { install, canControl, canManage } = await requireHomeUser("home.read");
     const place = await currentPlace(install.id);
 
@@ -21,8 +23,8 @@ export default async function EventsPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader
-                    title="Events"
-                    description="Everything the cameras noticed. Narrow it to one camera, one person or one night, and open any of it to see the footage of that moment."
+                    title={t("pages.events.title")}
+                    description={t("pages.events.description")}
                 />
                 <PlaceSwitcher
                     places={place.places}
