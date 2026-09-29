@@ -1143,7 +1143,7 @@ function Row({
      * that grows to three lines pushes the conversation below it off the screen.
      */
     // Or, when they said nothing, what they are playing or listening to.
-    const said = presenceLine(usePresence(personId));
+    const said = presenceLine(usePresence(personId), useTranslations("components"));
     const row = (
         <PersonRow
             as={Link}

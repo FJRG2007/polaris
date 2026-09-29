@@ -198,6 +198,9 @@ export interface ActivityView {
     readonly startedAt: string;
     /** When a track ends, for the progress bar. Null for anything without an end. */
     readonly endsAt: string | null;
+    /** The game catalog's id (`minecraft`) for somebody playing on a server here,
+     *  so the card can draw the game's mark beside the server's picture. */
+    readonly gameId?: string | null;
 }
 
 /** The one line a crowded row has room for: "Playing Hollow Knight", "Listening

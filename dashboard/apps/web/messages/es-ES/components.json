@@ -15,7 +15,11 @@
         "by": "de {artist}",
         "on": "en {album}",
         "elapsed": "{time} transcurrido",
-        "trackPosition": "Posición"
+        "trackPosition": "Posición",
+        "short": {
+            "listening": "Escuchando {name}",
+            "playing": "Jugando a {name}"
+        }
     },
     "activityTable": {
         "when": "CuÃ¡ndo",

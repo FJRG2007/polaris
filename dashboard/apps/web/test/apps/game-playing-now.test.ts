@@ -68,7 +68,17 @@ describe("who is playing on a server here", () => {
     it("is an account whose link follows its sign-ins, with the server's name", async () => {
         fake.links = [{ installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }];
         expect(await playingMinecraftNow([ADA])).toEqual([
-            { userId: ADA, game: "Minecraft", server: "Survival", since: JOINED }
+            {
+                userId: ADA,
+                game: "Minecraft",
+                server: "Survival",
+                since: JOINED,
+                installedAppId: "s1",
+                gameId: "minecraft",
+                // The server's own icon for the card, which falls back to the
+                // game's mark when the server has none.
+                imageUrl: "/api/apps/installed/s1/minecraft/card-icon"
+            }
         ]);
     });
 

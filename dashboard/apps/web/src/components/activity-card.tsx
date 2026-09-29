@@ -20,7 +20,7 @@
 
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { useNow } from "@/components/presence";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -28,6 +28,7 @@ import { useSessionScope } from "@/components/session-scope";
 import { ListenAlongButton } from "@/components/listen-along-button";
 import { Gamepad2, Pickaxe } from "lucide-react";
 import { SpotifyMark } from "@/components/brand-icons";
+import { GameLogo } from "@/components/game-logo";
 import { usePresence, type PresenceOf } from "@/components/presence-store";
 
 /** The icon a source is drawn with where there is no art. */
@@ -36,6 +37,21 @@ const SOURCE_ICONS: Record<core.ActivitySource, ComponentType<{ className?: stri
     game: Gamepad2,
     minecraft: Pickaxe
 };
+
+/** The game's own mark, when the activity names a game in the catalog. */
+function gameOf(activity: Pick<core.ActivityView, "gameId">): core.GameDefinition | null {
+    return activity.gameId ? (core.findGame(activity.gameId) ?? null) : null;
+}
+
+/** "Playing Minecraft", "Listening to <track>", in the reader's language. */
+export function activityLine(
+    activity: Pick<core.ActivityView, "source" | "name">,
+    t: NamespaceTranslator<"components">
+): string {
+    return activity.source === "spotify"
+        ? t("activity.short.listening", { name: activity.name })
+        : t("activity.short.playing", { name: activity.name });
+}
 
 /** The small heading over a card. */
 function heading(activity: core.ActivityView, t: NamespaceTranslator<"components">): string {
@@ -49,11 +65,14 @@ function heading(activity: core.ActivityView, t: NamespaceTranslator<"components
  * otherwise what they are doing. A status is a sentence somebody chose to put
  * there, so it wins over a fact a machine observed.
  */
-export function presenceLine(where: PresenceOf | null | undefined): string {
+export function presenceLine(
+    where: PresenceOf | null | undefined,
+    t: NamespaceTranslator<"components">
+): string {
     const said = where?.note?.trim();
     if (said) return said;
     const first = where?.activity?.[0];
-    return first ? core.activityShortLine(first) : "";
+    return first ? activityLine(first, t) : "";
 }
 
 /** What one person is doing, as one short line with its icon. Nothing when
@@ -65,16 +84,18 @@ export function ActivityLine({
     personId: string | null | undefined;
     className?: string;
 }) {
+    const t = useTranslations("components");
     const first = usePresence(personId)?.activity?.[0];
     if (!first) return null;
     const Icon = SOURCE_ICONS[first.source];
-    const line = core.activityShortLine(first);
+    const game = gameOf(first);
+    const line = activityLine(first, t);
     return (
         <span
             className={cn("flex min-w-0 items-center gap-1 text-xs text-muted-foreground", className)}
             title={line}
         >
-            <Icon className="size-3 shrink-0" aria-hidden />
+            {game ? <GameLogo game={game} className="size-3" /> : <Icon className="size-3 shrink-0" aria-hidden />}
             <span className="min-w-0 truncate">{line}</span>
         </span>
     );
@@ -128,29 +149,47 @@ export function ActivityCard({
 }) {
     const t = useTranslations("components");
     const Icon = SOURCE_ICONS[activity.source];
+    const game = gameOf(activity);
+    // A picture that did not load - a server with no icon, a stopped one - is
+    // replaced by the game's mark rather than left as a broken image.
+    const [broken, setBroken] = useState(false);
+    const picture = activity.imageUrl && !broken ? activity.imageUrl : null;
     return (
         <section
-            aria-label={core.activityShortLine(activity)}
+            aria-label={activityLine(activity, t)}
             className="w-full rounded-md bg-muted/40 px-3 py-2.5 text-left"
         >
             <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                 {heading(activity, t)}
             </p>
             <div className="mt-2 flex items-center gap-3">
-                <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                    {activity.imageUrl ? (
-                        // A picture from the music service's own CDN, at the size
-                        // it was handed: there is no second copy to optimize.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={activity.imageUrl}
-                            alt=""
-                            className="size-full object-cover"
-                            referrerPolicy="no-referrer"
-                        />
-                    ) : (
-                        <Icon className="size-6 text-muted-foreground" aria-hidden />
-                    )}
+                <span className="relative size-14 shrink-0">
+                    <span className="flex size-full items-center justify-center overflow-hidden rounded-md bg-muted">
+                        {picture ? (
+                            // A picture from the music service's CDN or the
+                            // server's own icon, at the size it was handed:
+                            // there is no second copy to optimize.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={picture}
+                                alt=""
+                                className="size-full object-cover [image-rendering:pixelated]"
+                                referrerPolicy="no-referrer"
+                                onError={() => setBroken(true)}
+                            />
+                        ) : game ? (
+                            <GameLogo game={game} className="size-10" />
+                        ) : (
+                            <Icon className="size-6 text-muted-foreground" aria-hidden />
+                        )}
+                    </span>
+                    {/* The game, small in the corner, when the big picture is
+                        the server's own rather than the game's. */}
+                    {picture && game ? (
+                        <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-md bg-card p-0.5 shadow-sm ring-1 ring-border">
+                            <GameLogo game={game} className="size-full" />
+                        </span>
+                    ) : null}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
                     {activity.linkUrl ? (

@@ -15,7 +15,11 @@
         "by": "by {artist}",
         "on": "on {album}",
         "elapsed": "{time} elapsed",
-        "trackPosition": "Track position"
+        "trackPosition": "Track position",
+        "short": {
+            "listening": "Listening to {name}",
+            "playing": "Playing {name}"
+        }
     },
     "activityTable": {
         "when": "When",

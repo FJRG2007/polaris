@@ -273,6 +273,7 @@ function MemberRow({
     onError: (message: string) => void;
 }) {
     const t = useTranslations("chat");
+    const tc = useTranslations("components");
     const role = ROLE_WORDS[member.role];
     // What they are showing right now. Already on screen for the avatar's dot,
     // so this costs nothing: the store asked about them either way.
@@ -282,7 +283,7 @@ function MemberRow({
     // lines under a name in a 14rem column is a wall.
     // What they are doing comes after what they said and before the role, for
     // the same reason: it is this afternoon, and the role is every afternoon.
-    const under = presenceLine(where) || role;
+    const under = presenceLine(where, tc) || role;
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.
     const plate = usePersonNameplate(member.userId);

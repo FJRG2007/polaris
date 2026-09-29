@@ -242,6 +242,12 @@ export interface PlayingNow {
     readonly server: string;
     /** When this visit started. */
     readonly since: Date;
+    /** The installed server, for its picture. */
+    readonly installedAppId?: string;
+    /** The game catalog's id (`minecraft`), for its mark. */
+    readonly gameId?: string;
+    /** Where the server's own picture is served from, when it can have one. */
+    readonly imageUrl?: string | null;
 }
 
 /** One Chat message on its way into a game, already decided to be wanted. */

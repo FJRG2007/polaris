@@ -26,6 +26,12 @@ export interface MinecraftVisit {
     readonly game: string;
     readonly server: string;
     readonly since: Date;
+    readonly installedAppId: string;
+    readonly gameId: string;
+    /** The server's own icon (`server-icon.png`), which any signed-in reader may
+     *  see - the game shows it to anybody who lists the server. The card falls
+     *  back to the game's mark when there is none. */
+    readonly imageUrl: string;
 }
 
 export async function playingMinecraftNow(
@@ -93,7 +99,10 @@ export async function playingMinecraftNow(
             userId: link.userId,
             game: gameOfServer(install.catalogId)?.name ?? "Minecraft",
             server: install.name,
-            since: visit.joinedAt
+            since: visit.joinedAt,
+            installedAppId: install.id,
+            gameId: gameOfServer(install.catalogId)?.id ?? "minecraft",
+            imageUrl: `/api/apps/installed/${install.id}/minecraft/card-icon`
         });
     }
     return visits;

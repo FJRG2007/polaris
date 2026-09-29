@@ -290,10 +290,11 @@ export async function activitiesFor(
             name: visit.game,
             details: visit.server,
             state: "",
-            imageUrl: null,
+            imageUrl: visit.imageUrl ?? null,
             linkUrl: null,
             startedAt: visit.since.toISOString(),
-            endsAt: null
+            endsAt: null,
+            gameId: visit.gameId ?? null
         });
     }
     for (const [userId, list] of answer) {
