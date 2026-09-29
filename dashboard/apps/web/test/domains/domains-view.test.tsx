@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 
 // The panel's server actions, which a render never calls but the import graph
@@ -29,7 +30,7 @@ const { DomainsView } = await import("../../src/app/(app)/admin/domains/domains-
 
 describe("the domains panel before its read lands", () => {
     it("is already the page an operator can navigate by", () => {
-        const markup = renderToStaticMarkup(<DomainsView />);
+        const markup = renderToStaticMarkup(withMessages(<DomainsView />));
 
         expect(markup).toContain("Guided setup");
         expect(markup).toContain("own addresses");
@@ -44,14 +45,14 @@ describe("the domains panel before its read lands", () => {
     });
 
     it("holds the shape of what is coming rather than a blank or a spinner", () => {
-        const markup = renderToStaticMarkup(<DomainsView />);
+        const markup = renderToStaticMarkup(withMessages(<DomainsView />));
 
         expect(markup).toContain("animate-pulse");
         expect(markup).not.toContain("animate-spin");
     });
 
     it("says nothing about the game ports until it knows there are any", () => {
-        const markup = renderToStaticMarkup(<DomainsView />);
+        const markup = renderToStaticMarkup(withMessages(<DomainsView />));
 
         // A deployment that runs no game server has no card there at all, so a
         // placeholder would be a page that moves under whoever is reading it.

@@ -7,6 +7,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { legalContactSchema } from "@polaris/core";
 import { setLegalContact } from "@/lib/legal/service";
 import { saveUpdateSource } from "@/lib/update-source";
@@ -40,7 +41,7 @@ export async function triggerHostUpdateAction(): Promise<{ status: UpdateTrigger
 export async function saveUpdateSourceAction(input: unknown): Promise<{ source?: UpdateSource; error?: string; }> {
     await requireAdmin();
     const parsed = updateSourceSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not a way of updating Polaris." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("settings.errors.notASource") };
     await saveUpdateSource(parsed.data);
     resetUpdateStatus();
     return { source: parsed.data };
@@ -59,7 +60,7 @@ export async function autoUpdatePolicyAction(): Promise<AutoUpdatePolicy> {
 export async function saveAutoUpdateAction(input: unknown): Promise<{ policy?: AutoUpdatePolicy; error?: string; }> {
     await requireAdmin();
     const parsed = autoUpdatePolicySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That schedule is not valid." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("settings.errors.invalidSchedule") };
     await saveAutoUpdatePolicy(parsed.data);
     return { policy: parsed.data };
 }
@@ -74,7 +75,7 @@ export async function saveAutoUpdateAction(input: unknown): Promise<{ policy?: A
 export async function saveLegalContactAction(input: unknown): Promise<{ contact?: string; error?: string; }> {
     await requireAdmin();
     const parsed = legalContactSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a contact." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("settings.errors.notAContact") };
     await setLegalContact(parsed.data || null);
     return { contact: parsed.data };
 }

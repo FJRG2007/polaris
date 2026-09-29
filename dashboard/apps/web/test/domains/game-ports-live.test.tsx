@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_PORT_BLOCKS } from "../../src/lib/apps/port-block";
 import type { GamePortsReading } from "@polaris-app/game-servers/src/lib/games-service";
@@ -22,7 +23,7 @@ const pending = [{ port: 25565, protocol: "tcp" as const }];
 
 function markupFor(shown: GamePortsReading): string {
     return renderToStaticMarkup(
-        <GamePortsLive reading={shown} stale={null} refreshing={false} onRefresh={() => {}} />
+        withMessages(<GamePortsLive reading={shown} stale={null} refreshing={false} onRefresh={() => {}} />)
     );
 }
 

@@ -2344,5 +2344,137 @@
             "shownOnce": "Solo se muestra una vez. Polaris guarda únicamente un hash, así que no se puede volver a consultar.",
             "done": "Hecho"
         }
+    },
+    "settings": {
+        "page": {
+            "title": "Ajustes",
+            "description": "Configuración general de este despliegue de Polaris."
+        },
+        "source": {
+            "label": "Actualizar con",
+            "ariaLabel": "De dónde vienen las actualizaciones",
+            "image": "Compilación publicada",
+            "build": "Compilar en este servidor",
+            "imageHint": "Descarga la compilación que GitHub ya ha hecho. Es lo más rápido, y es la misma compilación que usan todos los demás despliegues.",
+            "buildHint": "Avanza el repositorio en el servidor y compila allí la imagen. Es más lento y necesita espacio para compilar, pero instala la rama tal como está en vez de esperar a una compilación publicada."
+        },
+        "schedule": {
+            "label": "Instalar actualizaciones",
+            "ariaLabel": "Cuándo se instalan solas las actualizaciones",
+            "timeLabel": "Hora del día a la que se instalan las actualizaciones",
+            "off": "Solo avisarme",
+            "immediate": "En cuanto se publique una",
+            "daily": "Todos los días a las",
+            "offHint": "Se avisa a quien puede actualizar Polaris cuando hay una compilación lista. Nada se instala solo.",
+            "immediateHint": "Una compilación publicada se instala sola. El panel sigue funcionando mientras se hace el relevo.",
+            "dailyHint": "Se instala a las {at} siguientes a que aparezca una compilación. Si Polaris está apagado a esa hora, se instala cuando vuelva."
+        },
+        "updates": {
+            "title": "Actualizaciones",
+            "check": "Buscar actualizaciones",
+            "checking": "Comprobando...",
+            "updating": "Actualizando...",
+            "updatingStep": "Actualizando - {step}",
+            "available": "Hay una actualización disponible.",
+            "availableBehind": "Hay una actualización disponible: {count, plural, one {{shown} commit} other {{shown} commits}} por detrás de {branch}.",
+            "blocked": "La compilación que se instalaría no ha superado sus comprobaciones.",
+            "blockedWithLink": "La compilación que se instalaría no ha superado sus comprobaciones. <link>Ver qué ha fallado</link>",
+            "building": "{count, plural, one {{shown} commit espera} other {{shown} commits esperan}} a que se compile. En este despliegue no está pasando nada; la actualización aparecerá aquí cuando se publique la imagen.",
+            "buildingNew": "Hay commits nuevos esperando a que se compilen. En este despliegue no está pasando nada; la actualización aparecerá aquí cuando se publique la imagen.",
+            "upToDate": "Todo al día.",
+            "unknown": "Estado de actualización desconocido (esta compilación no lleva referencia de commit).",
+            "runningBuild": "Compilación en uso",
+            "latestOn": "Lo último en {branch}",
+            "publishedBuild": "Compilación publicada",
+            "fromHere": "Actualizar desde aquí",
+            "allowed": "permitido",
+            "blockedHere": "bloqueado en este servidor",
+            "lastChecked": "Última comprobación",
+            "never": "nunca",
+            "viewChanges": "<link>Mira los cambios</link> antes de instalar, o actualiza ya: el panel sigue funcionando durante el relevo.",
+            "updateNow": "Actualizar ahora",
+            "manual": "Ejecuta <code>polaris update</code> en el servidor para descargar las últimas imágenes y volver a desplegar."
+        },
+        "run": {
+            "starting": "La actualización está empezando; esperando a que informe.",
+            "reattached": "Conectado de nuevo a una actualización que ya estaba en curso.",
+            "finishedAt": "La última actualización terminó a las {at}.",
+            "neverReported": "Había una actualización en curso a las {at} y nunca informó de un resultado. Puede que siga en marcha o que se haya cortado.",
+            "lastFailed": "La última actualización falló (código de salida {code}). Mira el registro de abajo.",
+            "reportFailed": "No se ha podido preparar el informe. Puedes adjuntar a mano el registro de arriba a una incidencia.",
+            "started": "El panel sigue funcionando mientras arranca la nueva compilación; esta página se recarga cuando tome el relevo.",
+            "unavailable": "Este despliegue no instala sus propias actualizaciones; se actualiza desde la máquina en la que se ejecuta.",
+            "disabled": "La actualización automática está desactivada en este servidor.",
+            "unreachable": "No se ha podido contactar con el agente del servidor. Usa el comando manual de abajo.",
+            "updated": "Actualizado. Recargando...",
+            "slow": "Está tardando más de lo esperado. El registro de arriba sigue siendo el que está en directo.",
+            "noLiveLog": "Actualizando. Este servidor no escribe registro en directo. Se volverá a conectar cuando Polaris vuelva...",
+            "serving": "La nueva compilación ya está sirviendo. Recargando...",
+            "complete": "Actualización completada. Recargando...",
+            "failed": "La actualización ha fallado (código de salida {code}). Mira el registro de abajo.",
+            "failedUnknown": "La actualización ha fallado (código de salida desconocido). Mira el registro de abajo."
+        },
+        "log": {
+            "title": "Registro de la actualización",
+            "empty": "El actualizador no ha escrito nada.",
+            "waiting": "Esperando al actualizador...",
+            "noResult": "sin resultado",
+            "success": "correcta",
+            "failed": "fallida (salida {code})",
+            "preparing": "Preparando...",
+            "report": "Informar de este fallo",
+            "reportNote": "El informe abre una incidencia rellenada con este registro, tu compilación, el tipo de servidor y el dominio. No se envía nada hasta que la mandes tú."
+        },
+        "deployment": {
+            "title": "Despliegue",
+            "reachableAt": "Accesible en",
+            "localHostname": "Nombre de host local",
+            "serverIp": "IP del servidor",
+            "publicIp": "IP pública",
+            "unknown": "desconocida",
+            "notDetected": "no detectada",
+            "repository": "Repositorio",
+            "branch": "Rama de publicación"
+        },
+        "publicPages": {
+            "title": "Páginas públicas",
+            "intro": "Todo lo demás está detrás del inicio de sesión. Estas tres no, porque un servicio en el que registras un cliente OAuth no verificará uno que no puede leer: Google rechaza una página de inicio que pide iniciar sesión, y pide la política de privacidad y las condiciones en el mismo dominio.",
+            "home": "Página de inicio",
+            "privacy": "Política de privacidad",
+            "terms": "Condiciones del servicio",
+            "contact": "Contacto",
+            "contactLabel": "Contacto público",
+            "contactHint": "Una dirección o un enlace, que aparece en las páginas de privacidad y condiciones como forma de contactar con quien gestiona este despliegue. Si lo dejas vacío, esas páginas no muestran ningún contacto."
+        },
+        "transfer": {
+            "title": "Mover a otra máquina",
+            "intro": "Todo lo que sabe este Polaris (cuentas, servicios, ajustes y secretos) en un solo archivo, sellado con una frase de contraseña. Las sesiones y las métricas se quedan aquí.",
+            "passphrase": "Frase de contraseña",
+            "passphraseAgain": "Repite la frase de contraseña",
+            "export": "Exportar",
+            "tooShort": "Usa al menos {min} caracteres",
+            "differ": "Las dos frases de contraseña no coinciden",
+            "exported": "{count, plural, one {Exportada {shown} fila} other {Exportadas {shown} filas}}.{unreadable, plural, =0 {} other { {unreadableShown} secretos guardados no se han podido abrir aquí y habrá que volver a introducirlos.}} Sin la frase de contraseña el archivo no se puede abrir.",
+            "importIntro": "En una instalación nueva: importa una exportación. Sustituye todas las cuentas y ajustes de aquí, incluida esta.",
+            "itsPassphrase": "Su frase de contraseña",
+            "uploading": "Subiendo",
+            "checkFile": "Comprobar archivo",
+            "uploadFailed": "No se ha podido subir el archivo",
+            "summary": "Exportado el {when}: {rows, plural, one {{rowsShown} fila} other {{rowsShown} filas}} en {tables, plural, one {{tablesShown} tabla} other {{tablesShown} tablas}}, {secrets, plural, one {{secretsShown} secreto} other {{secretsShown} secretos}}.",
+            "unreadable": "{count, plural, one {{shown} secreto no se ha podido abrir} other {{shown} secretos no se han podido abrir}} donde se exportó y habrá que volver a introducirlos.",
+            "skipped": "Omitidas, esta versión no las tiene: {tables}.",
+            "confirmPlaceholder": "Escribe \"replace\"",
+            "import": "Importar"
+        },
+        "errors": {
+            "notASource": "Esa no es una forma de actualizar Polaris.",
+            "invalidSchedule": "Ese horario no es válido.",
+            "notAContact": "Eso no es un contacto.",
+            "transferFailed": "No ha funcionado. No se ha cambiado nada.",
+            "passphraseTooLong": "Esa frase de contraseña es más larga de lo necesario",
+            "wrongPassphrase": "La frase de contraseña no es correcta, o el archivo se ha modificado",
+            "confirmReplace": "Confirma que se sustituye todo lo de aquí",
+            "uploadExpired": "Esa subida ha caducado. Vuelve a subir el archivo."
+        }
     }
 }

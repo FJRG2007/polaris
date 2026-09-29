@@ -21,12 +21,14 @@
 
 import type { SettingsOverview } from "./overview";
 import { LogViewer } from "@/components/log-viewer";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { PublicUrls } from "@/lib/legal/service";
 import { normalizeLegalContact } from "@polaris/core";
 import { AddressList } from "@/components/address-list";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { CheckedAddress } from "@/lib/address-health";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
     isRecentRun,
@@ -74,21 +76,22 @@ interface Deployment {
     readonly autoUpdate: boolean;
 }
 
-const SOURCE_CHOICES: { value: UpdateSource; label: string }[] = [
-    { value: "image", label: "Published build" },
-    { value: "build", label: "Build on this host" }
-];
+type Translate = NamespaceTranslator<"admin">;
 
-function sourceHint(source: UpdateSource): string {
-    if (source === "build") {
-        return "Advances the checkout on the host and builds the image there. Slower, and it needs room to build, but it installs the branch as it stands instead of waiting for a published build.";
-    }
-    return "Downloads the build GitHub already made. Fastest, and it is the build every other deployment runs.";
+function sourceChoices(t: Translate): { value: UpdateSource; label: string }[] {
+    return [
+        { value: "image", label: t("settings.source.image") },
+        { value: "build", label: t("settings.source.build") }
+    ];
 }
 
-function formatChecked(iso: string, format: DisplayFormat): string {
+function sourceHint(source: UpdateSource, t: Translate): string {
+    return source === "build" ? t("settings.source.buildHint") : t("settings.source.imageHint");
+}
+
+function formatChecked(iso: string, format: DisplayFormat, t: Translate): string {
     const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? "never" : format.dateTime(date);
+    return Number.isNaN(date.getTime()) ? t("settings.updates.never") : format.dateTime(date);
 }
 
 // Last auto-check timestamp, module-level so the 30s throttle survives navigating
@@ -112,23 +115,21 @@ const TAIL_BYTES = 128 * 1024;
 /** The updater's completion marker, which is bookkeeping rather than output. */
 const MARKER_RE = /^.*POLARIS_UPDATE_EXIT=-?\d+.*$\n?/gm;
 
-const UPDATE_MODES: { value: AutoUpdateMode; label: string }[] = [
-    { value: "off", label: "Only tell me" },
-    { value: "immediate", label: "As soon as one is published" },
-    { value: "daily", label: "Every day at" }
-];
+function updateModes(t: Translate): { value: AutoUpdateMode; label: string }[] {
+    return [
+        { value: "off", label: t("settings.schedule.off") },
+        { value: "immediate", label: t("settings.schedule.immediate") },
+        { value: "daily", label: t("settings.schedule.daily") }
+    ];
+}
 
 /** A complete 24-hour time. The time field reports "" until one is typed. */
 const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function scheduleHint(policy: AutoUpdatePolicy): string {
-    if (policy.mode === "immediate") {
-        return "A published build installs itself. The dashboard keeps serving while it rolls over.";
-    }
-    if (policy.mode === "daily") {
-        return `Installs at the first ${policy.at} after a build appears. If Polaris is off then, it installs when it comes back.`;
-    }
-    return "Everyone who can update Polaris is told when a build is ready. Nothing installs on its own.";
+function scheduleHint(policy: AutoUpdatePolicy, t: Translate): string {
+    if (policy.mode === "immediate") return t("settings.schedule.immediateHint");
+    if (policy.mode === "daily") return t("settings.schedule.dailyHint", { at: policy.at });
+    return t("settings.schedule.offHint");
 }
 
 /** How a run ended. A null code is a run that reported none - unknown, which is
@@ -142,9 +143,9 @@ function isFailure(result: UpdateResult | null): boolean {
     return result !== null && result.code !== null && result.code !== 0;
 }
 
-function outcomeLabel(result: UpdateResult): string {
-    if (result.code === null) return "no result reported";
-    return result.code === 0 ? "success" : `failed (exit ${result.code})`;
+function outcomeLabel(result: UpdateResult, t: Translate): string {
+    if (result.code === null) return t("settings.log.noResult");
+    return result.code === 0 ? t("settings.log.success") : t("settings.log.failed", { code: result.code });
 }
 
 function outcomeTone(result: UpdateResult): string {
@@ -181,6 +182,7 @@ export function SettingsView({
     deployment: Deployment;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("admin");
     // Null until the overview lands. The card draws its shape meanwhile rather
     // than a sentence about a check that has not happened - "Up to date" before
     // anybody has looked is the one thing this line must never say.
@@ -343,7 +345,7 @@ export function SettingsView({
                     if (data.now - started <= UPDATE_START_GRACE_MS) {
                         runFrom.current = started;
                         setUpdating(true);
-                        setUpdateMsg("The update is starting; waiting for it to report.");
+                        setUpdateMsg(t("settings.run.starting"));
                         pollLogs();
                         waitForUpdate();
                         return;
@@ -354,7 +356,7 @@ export function SettingsView({
                 if (isUpdateInFlight(data, data.now)) {
                     runFrom.current = started;
                     setUpdating(true);
-                    setUpdateMsg("Reattached to an update already running.");
+                    setUpdateMsg(t("settings.run.reattached"));
                     pollLogs();
                     waitForUpdate();
                     return;
@@ -437,10 +439,10 @@ export function SettingsView({
         const at = format.time(first.updatedAt);
         setUpdateMsg(
             first.exitCode === 0
-                ? `Last update finished at ${at}.`
+                ? t("settings.run.finishedAt", { at })
                 : first.exitCode === null
-                  ? `An update was running at ${at} and never reported a result. It may still be going, or it may have been cut off.`
-                  : `The last update failed (exit code ${first.exitCode}). See the log below.`
+                  ? t("settings.run.neverReported", { at })
+                  : t("settings.run.lastFailed", { code: first.exitCode })
         );
     }
 
@@ -477,9 +479,7 @@ export function SettingsView({
             }
         } catch {
             tab?.close();
-            setUpdateMsg(
-                "Could not prepare the report. The log above can be attached to an issue by hand."
-            );
+            setUpdateMsg(t("settings.run.reportFailed"));
         } finally {
             setReporting(false);
         }
@@ -500,9 +500,7 @@ export function SettingsView({
         const { status: result } = await triggerHostUpdateAction();
         if (result === "started") {
             if (runFrom.current !== null) rememberRunStart(runFrom.current);
-            setUpdateMsg(
-                "The dashboard keeps serving while the new build starts; this page reloads when it takes over."
-            );
+            setUpdateMsg(t("settings.run.started"));
             pollLogs();
             // Watch health as well: an older updater restarts the dashboard in place
             // instead of rolling it over, and that restart is then the only signal.
@@ -511,15 +509,13 @@ export function SettingsView({
         }
         setUpdating(false);
         if (result === "unavailable") {
-            setUpdateMsg(
-                "This deployment does not install its own updates; it is updated from the machine it runs on."
-            );
+            setUpdateMsg(t("settings.run.unavailable"));
             setShowManual(true);
         } else if (result === "disabled") {
-            setUpdateMsg("Auto-update is disabled on this host.");
+            setUpdateMsg(t("settings.run.disabled"));
             setShowManual(true);
         } else {
-            setUpdateMsg("Couldn't reach the host agent. Use the manual command below.");
+            setUpdateMsg(t("settings.run.unreachable"));
             setShowManual(true);
         }
     }
@@ -538,7 +534,7 @@ export function SettingsView({
                 const res = await fetch("/api/health", { cache: "no-store" });
                 if (res.ok) {
                     failures = 0;
-                    if (sawDown) finish("Updated - reloading...");
+                    if (sawDown) finish(t("settings.run.updated"));
                 } else {
                     failures += 1;
                 }
@@ -553,9 +549,7 @@ export function SettingsView({
             if (tries >= 300) {
                 stopPolling();
                 setUpdating(false);
-                setUpdateMsg(
-                    "This is taking longer than expected. The log above is still the live one."
-                );
+                setUpdateMsg(t("settings.run.slow"));
             }
         }, 2000);
     }
@@ -596,9 +590,7 @@ export function SettingsView({
                     missing += 1;
                     if (missing >= 4 && !sawContent) {
                         stopPolling();
-                        setUpdateMsg(
-                            "Updating - this host writes no live log. Reconnecting when Polaris is back..."
-                        );
+                        setUpdateMsg(t("settings.run.noLiveLog"));
                         waitForUpdate();
                     }
                     return;
@@ -614,7 +606,7 @@ export function SettingsView({
                 if (!logIsFromRun(data, runFrom.current)) {
                     if (data.build && startBuild.current && data.build !== startBuild.current) {
                         setLogResult({ code: 0 });
-                        finish("The new build is serving - reloading...");
+                        finish(t("settings.run.serving"));
                     }
                     return;
                 }
@@ -629,7 +621,7 @@ export function SettingsView({
                 // if the updater never got to write its marker.
                 if (data.build && startBuild.current && data.build !== startBuild.current) {
                     setLogResult({ code: 0 });
-                    finish("The new build is serving - reloading...");
+                    finish(t("settings.run.serving"));
                     return;
                 }
                 if (!startBuild.current) startBuild.current = data.build;
@@ -637,11 +629,13 @@ export function SettingsView({
                     stopPolling();
                     setLogResult({ code: data.exitCode });
                     if (data.exitCode === 0) {
-                        finish("Update complete - reloading...");
+                        finish(t("settings.run.complete"));
                     } else {
                         setUpdating(false);
                         setUpdateMsg(
-                            `Update failed (exit code ${data.exitCode ?? "unknown"}). See the log below.`
+                            data.exitCode === null
+                                ? t("settings.run.failedUnknown")
+                                : t("settings.run.failed", { code: data.exitCode })
                         );
                     }
                 }
@@ -662,7 +656,7 @@ export function SettingsView({
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">
-                        <CardTitle>Updates</CardTitle>
+                        <CardTitle>{t("settings.updates.title")}</CardTitle>
                         <Button
                             size="sm"
                             variant="secondary"
@@ -670,7 +664,7 @@ export function SettingsView({
                             disabled={pending || updating}
                         >
                             <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
-                            {pending ? "Checking..." : "Check for updates"}
+                            {pending ? t("settings.updates.checking") : t("settings.updates.check")}
                         </Button>
                     </div>
                 </CardHeader>
@@ -681,7 +675,7 @@ export function SettingsView({
                         {updating ? (
                             <>
                                 <RefreshCw className="size-4 animate-spin text-primary" />
-                                <span>Updating{step ? ` - ${step}` : "..."}</span>
+                                <span>{step ? t("settings.updates.updatingStep", { step }) : t("settings.updates.updating")}</span>
                             </>
                         ) : !status ? (
                             <Skeleton className="h-4 w-56" />
@@ -694,106 +688,119 @@ export function SettingsView({
                             <>
                                 <DownloadCloud className="size-4 text-primary" />
                                 <span>
-                                    Update available
                                     {typeof status.behindBy === "number" && status.behindBy > 0
-                                        ? ` - ${status.behindBy} commit${status.behindBy === 1 ? "" : "s"} behind ${deployment.branch}.`
-                                        : "."}
+                                        ? t("settings.updates.availableBehind", {
+                                              count: status.behindBy,
+                                              shown: String(status.behindBy),
+                                              branch: deployment.branch
+                                          })
+                                        : t("settings.updates.available")}
                                 </span>
                             </>
                         ) : status.phase === "blocked" ? (
                             <>
                                 <TriangleAlert className="size-4 text-warning" />
                                 <span>
-                                    The build this would install failed its checks.{" "}
-                                    {status.checksUrl ? (
-                                        <a
-                                            className="text-primary hover:underline"
-                                            href={status.checksUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            See what failed
-                                        </a>
-                                    ) : null}
+                                    {status.checksUrl
+                                        ? t.rich("settings.updates.blockedWithLink", {
+                                              link: (chunks) => (
+                                                  <a
+                                                      key="link"
+                                                      className="text-primary hover:underline"
+                                                      href={status.checksUrl ?? undefined}
+                                                      target="_blank"
+                                                      rel="noreferrer"
+                                                  >
+                                                      {chunks}
+                                                  </a>
+                                              )
+                                          })
+                                        : t("settings.updates.blocked")}
                                 </span>
                             </>
                         ) : status.phase === "building" ? (
                             <>
                                 <Hammer className="size-4 text-muted-foreground" />
                                 <span>
-                                    {status.buildingCount ?? "New"} commit
-                                    {status.buildingCount === 1 ? "" : "s"} waiting on a build.
-                                    Nothing is happening on this deployment; the update appears here
-                                    once the image is published.
+                                    {typeof status.buildingCount === "number"
+                                        ? t("settings.updates.building", {
+                                              count: status.buildingCount,
+                                              shown: String(status.buildingCount)
+                                          })
+                                        : t("settings.updates.buildingNew")}
                                 </span>
                             </>
                         ) : status.phase === "up-to-date" ? (
                             <>
                                 <CheckCircle2 className="size-4 text-success" />
-                                <span>Up to date.</span>
+                                <span>{t("settings.updates.upToDate")}</span>
                             </>
                         ) : (
                             <>
                                 <CircleDashed className="size-4 text-muted-foreground" />
                                 <span className="text-muted-foreground">
-                                    Update state unknown (this build carries no commit reference).
+                                    {t("settings.updates.unknown")}
                                 </span>
                             </>
                         )}
                     </div>
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label="Running build" value={status?.current ?? null} />
+                        <Row label={t("settings.updates.runningBuild")} value={status?.current ?? null} />
                         <Row
                             label={
                                 status?.source === "build"
-                                    ? `Latest on ${deployment.branch}`
-                                    : "Published build"
+                                    ? t("settings.updates.latestOn", { branch: deployment.branch })
+                                    : t("settings.updates.publishedBuild")
                             }
                             value={status ? (status.latest ?? "-") : null}
                         />
                         <Row
-                            label="Updates from here"
-                            value={deployment.autoUpdate ? "allowed" : "blocked on this host"}
+                            label={t("settings.updates.fromHere")}
+                            value={
+                                deployment.autoUpdate
+                                    ? t("settings.updates.allowed")
+                                    : t("settings.updates.blockedHere")
+                            }
                         />
                         <Row
-                            label="Last checked"
-                            value={status ? formatChecked(status.checkedAt, format) : null}
+                            label={t("settings.updates.lastChecked")}
+                            value={status ? formatChecked(status.checkedAt, format, t) : null}
                         />
                     </dl>
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm">Update with</span>
+                            <span className="text-sm">{t("settings.source.label")}</span>
                             <Select
-                                aria-label="Where updates come from"
+                                aria-label={t("settings.source.ariaLabel")}
                                 value={source}
                                 onValueChange={(next) => void onSource(next as UpdateSource)}
-                                options={SOURCE_CHOICES}
+                                options={sourceChoices(t)}
                                 className="w-60"
                                 disabled={updating}
                             />
                         </div>
-                        <p className="text-xs text-muted-foreground">{sourceHint(source)}</p>
+                        <p className="text-xs text-muted-foreground">{sourceHint(source, t)}</p>
                     </div>
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm">Install updates</span>
+                            <span className="text-sm">{t("settings.schedule.label")}</span>
                             <Select
-                                aria-label="When updates install themselves"
+                                aria-label={t("settings.schedule.ariaLabel")}
                                 value={policy.mode}
                                 onValueChange={(mode) =>
                                     void onSchedule({ ...policy, mode: mode as AutoUpdateMode })
                                 }
-                                options={UPDATE_MODES}
+                                options={updateModes(t)}
                                 className="w-60"
                                 disabled={updating}
                             />
                             {policy.mode === "daily" ? (
                                 <Input
                                     type="time"
-                                    aria-label="Time of day updates install"
+                                    aria-label={t("settings.schedule.timeLabel")}
                                     className="w-32"
                                     value={timeDraft}
                                     disabled={updating}
@@ -808,7 +815,7 @@ export function SettingsView({
                                 />
                             ) : null}
                         </div>
-                        <p className="text-xs text-muted-foreground">{scheduleHint(policy)}</p>
+                        <p className="text-xs text-muted-foreground">{scheduleHint(policy, t)}</p>
                         {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
                     </div>
 
@@ -817,16 +824,19 @@ export function SettingsView({
                             {available ? (
                                 <div className="flex items-center justify-between gap-2">
                                     <span>
-                                        <a
-                                            className="text-primary hover:underline"
-                                            href={status.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            View changes
-                                        </a>{" "}
-                                        before installing, or update now - the dashboard stays up
-                                        while it rolls over.
+                                        {t.rich("settings.updates.viewChanges", {
+                                            link: (chunks) => (
+                                                <a
+                                                    key="link"
+                                                    className="text-primary hover:underline"
+                                                    href={status.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    {chunks}
+                                                </a>
+                                            )
+                                        })}
                                     </span>
                                     <Button size="sm" onClick={onUpdate} disabled={updating}>
                                         {updating ? (
@@ -834,15 +844,20 @@ export function SettingsView({
                                         ) : (
                                             <DownloadCloud className="size-4" />
                                         )}
-                                        {updating ? "Updating..." : "Update now"}
+                                        {updating ? t("settings.updates.updating") : t("settings.updates.updateNow")}
                                     </Button>
                                 </div>
                             ) : null}
                             {updateMsg ? <p className="text-foreground">{updateMsg}</p> : null}
                             {showManual ? (
                                 <p>
-                                    Run <code className="text-foreground">polaris update</code> on
-                                    the host to pull the latest images and redeploy.
+                                    {t.rich("settings.updates.manual", {
+                                        code: (chunks) => (
+                                            <code key="code" className="text-foreground">
+                                                {chunks}
+                                            </code>
+                                        )
+                                    })}
                                 </p>
                             ) : null}
                             {/* Rendered on the outcome as well as the text: a run cut
@@ -855,17 +870,17 @@ export function SettingsView({
                                     className="h-64"
                                     emptyText={
                                         logResult
-                                            ? "The updater wrote nothing."
-                                            : "Waiting for the updater..."
+                                            ? t("settings.log.empty")
+                                            : t("settings.log.waiting")
                                     }
                                     header={
                                         <div className="flex items-center gap-2">
                                             <span className="font-medium text-foreground">
-                                                Update log
+                                                {t("settings.log.title")}
                                             </span>
                                             {logResult ? (
                                                 <span className={outcomeTone(logResult)}>
-                                                    {outcomeLabel(logResult)}
+                                                    {outcomeLabel(logResult, t)}
                                                 </span>
                                             ) : null}
                                             {isFailure(logResult) ? (
@@ -877,8 +892,8 @@ export function SettingsView({
                                                 >
                                                     <Bug className="size-3.5" />
                                                     {reporting
-                                                        ? "Preparing..."
-                                                        : "Report this failure"}
+                                                        ? t("settings.log.preparing")
+                                                        : t("settings.log.report")}
                                                 </Button>
                                             ) : null}
                                         </div>
@@ -886,10 +901,7 @@ export function SettingsView({
                                 />
                             ) : null}
                             {isFailure(logResult) ? (
-                                <p>
-                                    The report opens a prefilled issue with this log, your build,
-                                    server type and domain. Nothing is sent until you submit it.
-                                </p>
+                                <p>{t("settings.log.reportNote")}</p>
                             ) : null}
                         </div>
                     ) : null}
@@ -898,11 +910,11 @@ export function SettingsView({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Deployment</CardTitle>
+                    <CardTitle>{t("settings.deployment.title")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm text-muted-foreground">Reachable at</span>
+                        <span className="text-sm text-muted-foreground">{t("settings.deployment.reachableAt")}</span>
                         {addresses ? (
                             <AddressList
                                 addresses={addresses}
@@ -919,21 +931,21 @@ export function SettingsView({
                         )}
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label="Local hostname" value={`${deployment.hostname}.local`} />
+                        <Row label={t("settings.deployment.localHostname")} value={`${deployment.hostname}.local`} />
                         <Row
-                            label="Server IP"
-                            value={network ? (network.serverIp ?? "unknown") : null}
+                            label={t("settings.deployment.serverIp")}
+                            value={network ? (network.serverIp ?? t("settings.deployment.unknown")) : null}
                         />
                         <Row
-                            label="Public IP"
-                            value={network ? (network.publicIp ?? "not detected") : null}
+                            label={t("settings.deployment.publicIp")}
+                            value={network ? (network.publicIp ?? t("settings.deployment.notDetected")) : null}
                         />
                         <Row
-                            label="Repository"
+                            label={t("settings.deployment.repository")}
                             value={deployment.repo}
                             href={`https://github.com/${deployment.repo}`}
                         />
-                        <Row label="Release branch" value={deployment.branch} />
+                        <Row label={t("settings.deployment.branch")} value={deployment.branch} />
                     </dl>
                 </CardBody>
             </Card>
@@ -959,6 +971,8 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
     const [saved, setSaved] = useState(initialContact);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
 
     // Nothing to save when it comes back to what is stored: a value edited and
     // put back is not a change.
@@ -981,40 +995,33 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Public pages</CardTitle>
+                <CardTitle>{t("settings.publicPages.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                    Everything else here is behind the login. These three are not, because a service
-                    you register an OAuth client with will not verify one it cannot read - Google
-                    refuses a home page behind a sign-in, and asks for the privacy policy and terms
-                    on the same domain.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("settings.publicPages.intro")}</p>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <Row label="Home page" value={pages.home} href={pages.home} />
-                    <Row label="Privacy policy" value={pages.privacy} href={pages.privacy} />
-                    <Row label="Terms of service" value={pages.terms} href={pages.terms} />
+                    <Row label={t("settings.publicPages.home")} value={pages.home} href={pages.home} />
+                    <Row label={t("settings.publicPages.privacy")} value={pages.privacy} href={pages.privacy} />
+                    <Row label={t("settings.publicPages.terms")} value={pages.terms} href={pages.terms} />
                 </dl>
 
                 <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium">Contact</span>
+                    <span className="font-medium">{t("settings.publicPages.contact")}</span>
                     <div className="flex items-center gap-2">
                         <Input
                             value={contact}
                             onChange={(event) => setContact(event.target.value)}
                             placeholder="you@example.com"
                             autoComplete="off"
-                            aria-label="Public contact"
+                            aria-label={t("settings.publicPages.contactLabel")}
                         />
                         <Button size="sm" onClick={onSave} disabled={pending || !dirty}>
-                            {pending ? "Saving..." : "Save"}
+                            {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        An address or a link, shown on the privacy and terms pages as the way to
-                        reach whoever runs this deployment. Left empty, those pages carry no contact
-                        at all.
+                        {t("settings.publicPages.contactHint")}
                     </span>
                     {error ? <span className="text-xs text-danger">{error}</span> : null}
                 </label>

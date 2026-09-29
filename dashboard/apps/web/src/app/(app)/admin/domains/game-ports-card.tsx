@@ -25,7 +25,7 @@
  * that resolves into nothing is a page that moves under whoever is reading it.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { PageSection } from "@/components/page-section";
 import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
@@ -73,7 +73,7 @@ export function GamePortsCard() {
                     {reading.policy === "range" ? (
                         <>
                             {" "}
-                            {t.rich("domainsPorts.game.range", {
+                            {t.rich<ReactNode>("domainsPorts.game.range", {
                                 tcp: (chunks) => (
                                     <span key="tcp" className="font-mono text-foreground">
                                         {chunks}

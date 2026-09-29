@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_PORT_BLOCKS, parseBlockInput } from "../../src/lib/apps/port-block";
 
@@ -24,7 +25,7 @@ const { PortPolicyForm } = await import("../../src/app/(app)/admin/domains/port-
  *  as far as saving. */
 function markupFor(policy: "range" | "per-port"): string {
     return renderToStaticMarkup(
-        <PortPolicyForm policy={policy} blocks={DEFAULT_PORT_BLOCKS} onSaved={() => {}} />
+        withMessages(<PortPolicyForm policy={policy} blocks={DEFAULT_PORT_BLOCKS} onSaved={() => {}} />)
     );
 }
 

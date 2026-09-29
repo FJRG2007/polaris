@@ -2344,5 +2344,137 @@
             "shownOnce": "This is shown once. Polaris keeps only a hash of it, so it cannot be looked up again.",
             "done": "Done"
         }
+    },
+    "settings": {
+        "page": {
+            "title": "Settings",
+            "description": "General configuration for this Polaris deployment."
+        },
+        "source": {
+            "label": "Update with",
+            "ariaLabel": "Where updates come from",
+            "image": "Published build",
+            "build": "Build on this host",
+            "imageHint": "Downloads the build GitHub already made. Fastest, and it is the build every other deployment runs.",
+            "buildHint": "Advances the checkout on the host and builds the image there. Slower, and it needs room to build, but it installs the branch as it stands instead of waiting for a published build."
+        },
+        "schedule": {
+            "label": "Install updates",
+            "ariaLabel": "When updates install themselves",
+            "timeLabel": "Time of day updates install",
+            "off": "Only tell me",
+            "immediate": "As soon as one is published",
+            "daily": "Every day at",
+            "offHint": "Everyone who can update Polaris is told when a build is ready. Nothing installs on its own.",
+            "immediateHint": "A published build installs itself. The dashboard keeps serving while it rolls over.",
+            "dailyHint": "Installs at the first {at} after a build appears. If Polaris is off then, it installs when it comes back."
+        },
+        "updates": {
+            "title": "Updates",
+            "check": "Check for updates",
+            "checking": "Checking...",
+            "updating": "Updating...",
+            "updatingStep": "Updating - {step}",
+            "available": "Update available.",
+            "availableBehind": "Update available - {count, plural, one {{shown} commit} other {{shown} commits}} behind {branch}.",
+            "blocked": "The build this would install failed its checks.",
+            "blockedWithLink": "The build this would install failed its checks. <link>See what failed</link>",
+            "building": "{count, plural, one {{shown} commit} other {{shown} commits}} waiting on a build. Nothing is happening on this deployment; the update appears here once the image is published.",
+            "buildingNew": "New commits waiting on a build. Nothing is happening on this deployment; the update appears here once the image is published.",
+            "upToDate": "Up to date.",
+            "unknown": "Update state unknown (this build carries no commit reference).",
+            "runningBuild": "Running build",
+            "latestOn": "Latest on {branch}",
+            "publishedBuild": "Published build",
+            "fromHere": "Updates from here",
+            "allowed": "allowed",
+            "blockedHere": "blocked on this host",
+            "lastChecked": "Last checked",
+            "never": "never",
+            "viewChanges": "<link>View changes</link> before installing, or update now - the dashboard stays up while it rolls over.",
+            "updateNow": "Update now",
+            "manual": "Run <code>polaris update</code> on the host to pull the latest images and redeploy."
+        },
+        "run": {
+            "starting": "The update is starting; waiting for it to report.",
+            "reattached": "Reattached to an update already running.",
+            "finishedAt": "Last update finished at {at}.",
+            "neverReported": "An update was running at {at} and never reported a result. It may still be going, or it may have been cut off.",
+            "lastFailed": "The last update failed (exit code {code}). See the log below.",
+            "reportFailed": "Could not prepare the report. The log above can be attached to an issue by hand.",
+            "started": "The dashboard keeps serving while the new build starts; this page reloads when it takes over.",
+            "unavailable": "This deployment does not install its own updates; it is updated from the machine it runs on.",
+            "disabled": "Auto-update is disabled on this host.",
+            "unreachable": "Couldn't reach the host agent. Use the manual command below.",
+            "updated": "Updated - reloading...",
+            "slow": "This is taking longer than expected. The log above is still the live one.",
+            "noLiveLog": "Updating - this host writes no live log. Reconnecting when Polaris is back...",
+            "serving": "The new build is serving - reloading...",
+            "complete": "Update complete - reloading...",
+            "failed": "Update failed (exit code {code}). See the log below.",
+            "failedUnknown": "Update failed (exit code unknown). See the log below."
+        },
+        "log": {
+            "title": "Update log",
+            "empty": "The updater wrote nothing.",
+            "waiting": "Waiting for the updater...",
+            "noResult": "no result reported",
+            "success": "success",
+            "failed": "failed (exit {code})",
+            "preparing": "Preparing...",
+            "report": "Report this failure",
+            "reportNote": "The report opens a prefilled issue with this log, your build, server type and domain. Nothing is sent until you submit it."
+        },
+        "deployment": {
+            "title": "Deployment",
+            "reachableAt": "Reachable at",
+            "localHostname": "Local hostname",
+            "serverIp": "Server IP",
+            "publicIp": "Public IP",
+            "unknown": "unknown",
+            "notDetected": "not detected",
+            "repository": "Repository",
+            "branch": "Release branch"
+        },
+        "publicPages": {
+            "title": "Public pages",
+            "intro": "Everything else here is behind the login. These three are not, because a service you register an OAuth client with will not verify one it cannot read - Google refuses a home page behind a sign-in, and asks for the privacy policy and terms on the same domain.",
+            "home": "Home page",
+            "privacy": "Privacy policy",
+            "terms": "Terms of service",
+            "contact": "Contact",
+            "contactLabel": "Public contact",
+            "contactHint": "An address or a link, shown on the privacy and terms pages as the way to reach whoever runs this deployment. Left empty, those pages carry no contact at all."
+        },
+        "transfer": {
+            "title": "Move to another machine",
+            "intro": "Everything this Polaris knows - accounts, services, settings and secrets - in one file, sealed with a passphrase. Sessions and metrics stay behind.",
+            "passphrase": "Passphrase",
+            "passphraseAgain": "Passphrase again",
+            "export": "Export",
+            "tooShort": "Use at least {min} characters",
+            "differ": "The two passphrases differ",
+            "exported": "Exported {count, plural, one {{shown} row} other {{shown} rows}}.{unreadable, plural, =0 {} other { {unreadableShown} saved secrets could not be opened here and will need entering again.}} Without the passphrase the file cannot be opened.",
+            "importIntro": "On a fresh install: read an export in. It replaces every account and setting here, this one included.",
+            "itsPassphrase": "Its passphrase",
+            "uploading": "Uploading",
+            "checkFile": "Check file",
+            "uploadFailed": "The file could not be uploaded",
+            "summary": "Exported {when}: {rows, plural, one {{rowsShown} row} other {{rowsShown} rows}} in {tables, plural, one {{tablesShown} table} other {{tablesShown} tables}}, {secrets, plural, one {{secretsShown} secret} other {{secretsShown} secrets}}.",
+            "unreadable": "{count, plural, one {{shown} secret} other {{shown} secrets}} could not be opened where it was exported and will need entering again.",
+            "skipped": "Skipped, this version does not have them: {tables}.",
+            "confirmPlaceholder": "Type \"replace\"",
+            "import": "Import"
+        },
+        "errors": {
+            "notASource": "That is not a way of updating Polaris.",
+            "invalidSchedule": "That schedule is not valid.",
+            "notAContact": "That is not a contact.",
+            "transferFailed": "That did not work. Nothing was changed.",
+            "passphraseTooLong": "That passphrase is longer than it needs to be",
+            "wrongPassphrase": "The passphrase is wrong, or the file has been changed",
+            "confirmReplace": "Confirm that everything here is replaced",
+            "uploadExpired": "That upload has expired. Upload the file again."
+        }
     }
 }

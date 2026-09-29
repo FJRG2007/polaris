@@ -15,19 +15,23 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { BREACHED_PASSWORD_MESSAGE, IDENTITY_PASSWORD_MESSAGE } from "@polaris/core";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
 
 const MIN_PASSPHRASE = 12;
 
-function passphraseProblem(value: string): string | null {
-    if (!value) return null;
-    return value.length < MIN_PASSPHRASE ? `Use at least ${MIN_PASSPHRASE} characters` : null;
+/** Whether a passphrase is too short to seal an export with. */
+function tooShort(value: string): boolean {
+    return value.length > 0 && value.length < MIN_PASSPHRASE;
 }
 
 export function TransferCard({ identity }: { identity: readonly string[] }) {
     const format = useDisplayFormat();
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [exportPass, setExportPass] = useState("");
     const [exportConfirm, setExportConfirm] = useState("");
     const [exporting, setExporting] = useState(false);
@@ -43,11 +47,18 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
 
     // The file is only as safe as this passphrase once it leaves: one already in a
     // breach list, or made of this deployment's own name, is the first guess.
+    // The hook answers in the shared English sentences; they are the two it can give.
     const unsafe = usePasswordSafety(exportPass, ["polaris", ...identity]);
+    const unsafeText =
+        unsafe === BREACHED_PASSWORD_MESSAGE
+            ? tc("passwordSafety.breached")
+            : unsafe === IDENTITY_PASSWORD_MESSAGE
+              ? tc("passwordSafety.identity")
+              : unsafe;
     const exportProblem =
-        passphraseProblem(exportPass) ??
-        unsafe ??
-        (exportConfirm && exportConfirm !== exportPass ? "The two passphrases differ" : null);
+        (tooShort(exportPass) ? t("settings.transfer.tooShort", { min: MIN_PASSPHRASE }) : null) ??
+        unsafeText ??
+        (exportConfirm && exportConfirm !== exportPass ? t("settings.transfer.differ") : null);
 
     async function runExport() {
         setError(null);
@@ -92,7 +103,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
             }
             if (!response.ok || !answer.id) {
                 setBusy(null);
-                setError(answer?.error ?? "The file could not be uploaded");
+                setError(answer?.error ?? t("settings.transfer.uploadFailed"));
                 return;
             }
             id = answer.id;
@@ -120,18 +131,16 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     }
 
     const rows = preview?.summary.tables.reduce((sum, table) => sum + table.rows, 0) ?? 0;
+    const exportedRows = exported?.summary.tables.reduce((sum, table) => sum + table.rows, 0) ?? 0;
 
     return (
         <Card className="mt-4">
             <CardHeader>
-                <CardTitle>Move to another machine</CardTitle>
+                <CardTitle>{t("settings.transfer.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-5 text-sm">
                 <section className="flex flex-col gap-2">
-                    <p className="text-muted-foreground">
-                        Everything this Polaris knows - accounts, services, settings and secrets - in one file, sealed
-                        with a passphrase. Sessions and metrics stay behind.
-                    </p>
+                    <p className="text-muted-foreground">{t("settings.transfer.intro")}</p>
                     <div className="flex flex-wrap gap-2">
                         {/* enigma:allow-identity-password - the refusal is usePasswordSafety above,
                             fed this account's name and address, and exportInstanceAction repeats it. */}
@@ -139,7 +148,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             type="password"
                             value={exportPass}
                             onChange={(event) => setExportPass(event.target.value)}
-                            placeholder="Passphrase"
+                            placeholder={t("settings.transfer.passphrase")}
                             autoComplete="new-password"
                             className="min-w-0 flex-1"
                         />
@@ -147,7 +156,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             type="password"
                             value={exportConfirm}
                             onChange={(event) => setExportConfirm(event.target.value)}
-                            placeholder="Passphrase again"
+                            placeholder={t("settings.transfer.passphraseAgain")}
                             autoComplete="new-password"
                             className="min-w-0 flex-1"
                         />
@@ -155,25 +164,24 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             onClick={() => void runExport()}
                             disabled={exporting || !exportPass || exportConfirm !== exportPass || exportProblem !== null}
                         >
-                            {exporting && <Loader2 className="size-4 animate-spin" />} Export
+                            {exporting && <Loader2 className="size-4 animate-spin" />} {t("settings.transfer.export")}
                         </Button>
                     </div>
                     {exportProblem && <p className="text-xs text-danger">{exportProblem}</p>}
                     {exported && (
                         <p className="text-xs text-muted-foreground">
-                            Exported {exported.summary.tables.reduce((sum, table) => sum + table.rows, 0)} rows.
-                            {exported.summary.unreadableSecrets > 0 &&
-                                ` ${exported.summary.unreadableSecrets} saved secrets could not be opened here and will need entering again.`}{" "}
-                            Without the passphrase the file cannot be opened.
+                            {t("settings.transfer.exported", {
+                                count: exportedRows,
+                                shown: String(exportedRows),
+                                unreadable: exported.summary.unreadableSecrets,
+                                unreadableShown: String(exported.summary.unreadableSecrets)
+                            })}
                         </p>
                     )}
                 </section>
 
                 <section className="flex flex-col gap-2 border-t border-border pt-4">
-                    <p className="text-muted-foreground">
-                        On a fresh install: read an export in. It replaces every account and setting here, this one
-                        included.
-                    </p>
+                    <p className="text-muted-foreground">{t("settings.transfer.importIntro")}</p>
                     <div className="flex flex-wrap gap-2">
                         <input
                             type="file"
@@ -192,7 +200,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                                 setImportPass(event.target.value);
                                 setPreview(null);
                             }}
-                            placeholder="Its passphrase"
+                            placeholder={t("settings.transfer.itsPassphrase")}
                             autoComplete="off"
                             className="min-w-0 flex-1"
                         />
@@ -202,25 +210,33 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             disabled={busy !== null || !file || importPass.length < MIN_PASSPHRASE}
                         >
                             {(busy === "upload" || busy === "preview") && <Loader2 className="size-4 animate-spin" />}{" "}
-                            {busy === "upload" ? "Uploading" : "Check file"}
+                            {busy === "upload" ? t("settings.transfer.uploading") : t("settings.transfer.checkFile")}
                         </Button>
                     </div>
                     {preview && (
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-xs">
                             <p>
-                                Exported {format.dateTime(preview.summary.exportedAt)}:{" "}
-                                {rows} rows in {preview.summary.tables.length} tables, {preview.summary.carriedSecrets}{" "}
-                                secrets.
+                                {t("settings.transfer.summary", {
+                                    when: format.dateTime(preview.summary.exportedAt),
+                                    rows,
+                                    rowsShown: String(rows),
+                                    tables: preview.summary.tables.length,
+                                    tablesShown: String(preview.summary.tables.length),
+                                    secrets: preview.summary.carriedSecrets,
+                                    secretsShown: String(preview.summary.carriedSecrets)
+                                })}
                             </p>
                             {preview.summary.unreadableSecrets > 0 && (
                                 <p className="text-warning">
-                                    {preview.summary.unreadableSecrets} secrets could not be opened where it was exported
-                                    and will need entering again.
+                                    {t("settings.transfer.unreadable", {
+                                        count: preview.summary.unreadableSecrets,
+                                        shown: String(preview.summary.unreadableSecrets)
+                                    })}
                                 </p>
                             )}
                             {preview.summary.unknownTables.length > 0 && (
                                 <p className="text-warning">
-                                    Skipped, this version does not have them: {preview.summary.unknownTables.join(", ")}.
+                                    {t("settings.transfer.skipped", { tables: preview.summary.unknownTables.join(", ") })}
                                 </p>
                             )}
                             {preview.refused ? (
@@ -230,7 +246,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                                     <Input
                                         value={confirm}
                                         onChange={(event) => setConfirm(event.target.value)}
-                                        placeholder='Type "replace"'
+                                        placeholder={t("settings.transfer.confirmPlaceholder")}
                                         className="max-w-48"
                                     />
                                     <Button
@@ -238,7 +254,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                                         onClick={() => void runApply()}
                                         disabled={busy !== null || confirm !== "replace"}
                                     >
-                                        {busy === "apply" && <Loader2 className="size-4 animate-spin" />} Import
+                                        {busy === "apply" && <Loader2 className="size-4 animate-spin" />} {t("settings.transfer.import")}
                                     </Button>
                                 </div>
                             )}
