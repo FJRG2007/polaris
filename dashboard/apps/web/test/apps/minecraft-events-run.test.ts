@@ -427,7 +427,7 @@ function answer(line: string): string {
             world.markAt = [Math.floor(Number(over[1])), Math.floor(Number(over[2]))];
             return `Teleported Armor Stand to ${over[1]}, 70.0, ${over[2]}`;
         }
-        return "Teleported Armor Stand to 300.500000, 70.000000, 0.500000";
+        return `Teleported Armor Stand to ${world.markAt[0]}.500000, 70.000000, ${world.markAt[1]}.500000`;
     }
     if (line.includes("spreadplayers") && line.includes("pe_mark") && world.allWater) {
         return "Could not spread 1 entity around 300, 0 (too many entities for space - try using spread of at most 0.0)";
@@ -468,9 +468,9 @@ function answer(line: string): string {
         }
     }
     if (line.includes("spreadplayers") && line.includes("pe_mark"))
-        return "Spread 1 entity around 300.5, 0.5 with an average distance of 0 blocks apart";
+        return `Spread 1 entity around ${world.markAt[0]}.5, ${world.markAt[1]}.5 with an average distance of 0 blocks apart`;
     if (line.startsWith("data get entity @e[tag=pe_mark"))
-        return "Armor Stand has the following entity data: [300.5d, 70.0d, 0.5d]";
+        return `Armor Stand has the following entity data: [${world.markAt[0]}.5d, 70.0d, ${world.markAt[1]}.5d]`;
     if (line.includes("if data block") && line.includes("LootTable")) {
         world.chestChecks += 1;
         return world.chestChecks > world.chestOpenedAfter ? "Test failed" : "Test passed";
@@ -823,6 +823,47 @@ describe("a mining rush, from start to podium", () => {
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 14 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
         expect(world.sent.some((line) => line.startsWith("give Ana"))).toBe(false);
+    });
+});
+
+/** Every chunk a `forceload remove` sent to the server let go of, as `x,z`. */
+function chunksLetGo(): Set<string> {
+    const gone = new Set<string>();
+    for (const line of world.sent) {
+        const match = /forceload remove (-?\d+) (-?\d+)(?: (-?\d+) (-?\d+))?$/.exec(line);
+        if (!match) continue;
+        const [x1, z1] = [Number(match[1]), Number(match[2])];
+        const [x2, z2] = [Number(match[3] ?? match[1]), Number(match[4] ?? match[2])];
+        for (let x = Math.min(x1, x2) >> 4; x <= Math.max(x1, x2) >> 4; x += 1)
+            for (let z = Math.min(z1, z2) >> 4; z <= Math.max(z1, z2) >> 4; z += 1)
+                gone.add(`${x},${z}`);
+    }
+    return gone;
+}
+
+describe("chunks somebody else keeps loaded", () => {
+    it("are never let go of by an event that loaded ground over them", async () => {
+        // The operator keeps the chunk the drop lands in, and one next to it,
+        // loaded for a farm: judging the ground loads an area over both and
+        // lets it go again, and the end lets the drop's own chunk go.
+        world.forced =
+            "2 force loaded chunks were found in minecraft:overworld at: [18, 0], [18, -1]";
+        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 10 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(30_000);
+        expect(state().history[0]?.note).toBe("Found by Ana");
+        expect(world.sent.some((line) => line.includes("forceload add"))).toBe(true);
+        const gone = chunksLetGo();
+        expect(gone.has("18,0")).toBe(false);
+        expect(gone.has("18,-1")).toBe(false);
+        // What the event loaded itself round them is still let go of.
+        expect(gone.has("19,0")).toBe(true);
     });
 });
 

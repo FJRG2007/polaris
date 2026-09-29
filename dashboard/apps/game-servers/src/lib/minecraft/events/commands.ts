@@ -1096,6 +1096,10 @@ export const BOSS_REACH = 48;
 
 /** Out of the world, without a drop: an escaped boss leaves nothing behind. */
 export const BOSS_BANISH = `execute as @e[tag=${BOSS_TAG}] at @s run tp @s ~ -1000 ~`;
+/** And then gone at once, down there where anything it drops is lost: the void
+ *  takes a boss with hundreds of health a while, and a chunk let go of before
+ *  then kept it, falling, for the next time it loaded. */
+export const BOSS_GONE = `kill @e[tag=${BOSS_TAG}]`;
 
 // ------------------------------------------------------------------ explorer and the hill
 
@@ -1354,7 +1358,7 @@ export function cleanup(
     ];
     for (const one of components(preset))
         lines.push(`scoreboard objectives remove ${one.objective}`);
-    if (preset.kind === "world-boss") lines.push(BOSS_BANISH);
+    if (preset.kind === "world-boss") lines.push(BOSS_BANISH, BOSS_GONE);
     if (preset.kind === "blood-moon") lines.push(...daybreak(rules, timeBefore));
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));

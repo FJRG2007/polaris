@@ -434,6 +434,50 @@ describe("versions", () => {
     });
 });
 
+describe("a world boss's end", () => {
+    it("takes the boss away for good, not only out of sight", () => {
+        const lines = commands.cleanup(catalog.newPreset("world-boss", "b"), null);
+        expect(lines.indexOf("kill @e[tag=pe_boss]")).toBeGreaterThan(
+            lines.indexOf("execute as @e[tag=pe_boss] at @s run tp @s ~ -1000 ~")
+        );
+    });
+});
+
+describe("letting go of chunks", () => {
+    it("spares the chunks somebody else held, and lets go of the rest one by one", () => {
+        const keep = new Set(["2,-1"]);
+        expect(
+            chunks.spareHeld(
+                "execute in minecraft:overworld run forceload remove 10 -35 34 -11",
+                keep
+            )
+        ).toEqual([
+            "execute in minecraft:overworld run forceload remove 0 -48",
+            "execute in minecraft:overworld run forceload remove 0 -32",
+            "execute in minecraft:overworld run forceload remove 0 -16",
+            "execute in minecraft:overworld run forceload remove 16 -48",
+            "execute in minecraft:overworld run forceload remove 16 -32",
+            "execute in minecraft:overworld run forceload remove 16 -16",
+            "execute in minecraft:overworld run forceload remove 32 -48",
+            "execute in minecraft:overworld run forceload remove 32 -32"
+        ]);
+        expect(
+            chunks.spareHeld("execute in minecraft:overworld run forceload remove 40 -10", keep)
+        ).toEqual([]);
+    });
+
+    it("leaves everything else as it was", () => {
+        const keep = new Set(["2,-1"]);
+        const line = "execute in minecraft:overworld run forceload remove 100 100";
+        expect(chunks.spareHeld(line, keep)).toEqual([line]);
+        expect(chunks.spareHeld("forceload add 40 -20", keep)).toEqual(["forceload add 40 -20"]);
+        // Nothing known held: nothing to spare.
+        expect(chunks.spareHeld("forceload remove 40 -20", null)).toEqual([
+            "forceload remove 40 -20"
+        ]);
+    });
+});
+
 describe("a mining rush cannot be farmed", () => {
     it("takes off every ore block placed during it", () => {
         const lines = commands.scoreTick(catalog.newPreset("mining-rush", "r"));

@@ -160,16 +160,28 @@ export const stageLeftoverSchema = z.object({
     runId: z.string(),
     area: areaSchema.nullable(),
     boxes: z.array(boxSchema),
-    saved: z.array(savedSchema)
+    saved: z.array(savedSchema),
+    /** The chunks held before the event, which letting its area go must spare. */
+    keepForced: z.array(z.string()).nullable().default(null)
 });
 
 export type Leftover = z.infer<typeof stageLeftoverSchema>;
 
 /** Everything of an arena that still has to be undone, or null when nothing does. */
-export function leftoverOf(runId: string, arena: StageState | null): Leftover | null {
+export function leftoverOf(
+    runId: string,
+    arena: StageState | null,
+    keepForced: readonly string[] | null = null
+): Leftover | null {
     if (!arena) return null;
     if (arena.boxes.length === 0 && arena.saved.length === 0 && !arena.area) return null;
-    return { runId, area: arena.area, boxes: arena.boxes, saved: arena.saved };
+    return {
+        runId,
+        area: arena.area,
+        boxes: arena.boxes,
+        saved: arena.saved,
+        keepForced: keepForced ? [...keepForced] : null
+    };
 }
 
 /** The list with this leftover in it - in place of an older copy of the same run's. */

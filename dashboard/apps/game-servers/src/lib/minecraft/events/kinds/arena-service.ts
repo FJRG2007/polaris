@@ -647,6 +647,7 @@ export function leftoverOf(
         kit: run.kit,
         entrants,
         gamerules: { ...gamerules },
+        keepForced: run.keepForced ? [...run.keepForced] : null,
         createdAt: Date.now()
     };
 }

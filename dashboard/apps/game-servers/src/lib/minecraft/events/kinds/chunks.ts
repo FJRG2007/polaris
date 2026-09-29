@@ -55,3 +55,60 @@ export function holdChunk(chunk: Chunk): string {
 export function releaseChunk(chunk: Chunk): string {
     return `execute in minecraft:overworld run forceload remove ${chunk.x * 16} ${chunk.z * 16}`;
 }
+
+const REMOVE =
+    /^(?:execute in minecraft:overworld run )?forceload remove (-?\d+) (-?\d+)(?: (-?\d+) (-?\d+))?$/;
+
+/**
+ * A `forceload remove` that would let go of a chunk somebody else holds loaded,
+ * rewritten to let go of only the rest - chunk by chunk - or of nothing.
+ *
+ * Finding a place loads the ground it judges and lets it go again, a chest's or
+ * an arena's chunks are let go at the end, and each of those is one command over
+ * a point or an area. The game's `forceload remove` does not know who loaded a
+ * chunk: over an area that took in a chunk the operator keeps loaded for a farm,
+ * it unloaded that too, and the farm stopped. Every other line is left as it is.
+ */
+export function spareHeld(line: string, keep: ReadonlySet<string> | null): string[] {
+    const match = REMOVE.exec(line);
+    if (!match || !keep || keep.size === 0) return [line];
+    const [x1, z1] = [Number(match[1]), Number(match[2])];
+    const [x2, z2] = [Number(match[3] ?? match[1]), Number(match[4] ?? match[2])];
+    const covered: Chunk[] = [];
+    for (let cx = Math.min(x1, x2) >> 4; cx <= Math.max(x1, x2) >> 4; cx += 1) {
+        for (let cz = Math.min(z1, z2) >> 4; cz <= Math.max(z1, z2) >> 4; cz += 1)
+            covered.push({ x: cx, z: cz });
+    }
+    if (!covered.some((chunk) => keep.has(`${chunk.x},${chunk.z}`))) return [line];
+    return covered.filter((chunk) => !keep.has(`${chunk.x},${chunk.z}`)).map(releaseChunk);
+}
+
+/** A server whose `forceload remove` lines never let go of the chunks in `keep`
+ *  (see `spareHeld`), asked for anew on every line. */
+export function sparing<
+    T extends {
+        say(argv: readonly string[]): Promise<string>;
+        sayAll(lines: readonly string[]): Promise<void>;
+    }
+>(server: T, keep: () => ReadonlySet<string> | null): T {
+    return {
+        ...server,
+        say: async (argv: readonly string[]) => {
+            const line = argv.join(" ");
+            const lines = spareHeld(line, keep());
+            if (lines.length === 1 && lines[0] === line) return server.say(argv);
+            let output = "";
+            for (const one of lines) output += await server.say([one]);
+            return output;
+        },
+        sayAll: (lines: readonly string[]) =>
+            server.sayAll(lines.flatMap((line) => spareHeld(line, keep())))
+    };
+}
+
+/** The chunks held before an event touched any, as `x,z` keys; null when unread. */
+export function heldBefore(run: {
+    readonly keepForced: readonly string[] | null;
+}): ReadonlySet<string> | null {
+    return run.keepForced ? new Set(run.keepForced) : null;
+}

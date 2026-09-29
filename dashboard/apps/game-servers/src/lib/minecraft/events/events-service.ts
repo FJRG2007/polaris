@@ -344,6 +344,13 @@ export async function startEvent(input: {
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error("The server is not running");
     if (seen.size === 0) throw new Error("Nobody is on the server");
+    // The chunks somebody already keeps loaded - a farm, a spawn - before the
+    // event loads any: whatever it lets go of at the end, never these.
+    const keepForced = await withServerContainer(
+        row.ownerId,
+        input.installedAppId,
+        async (server) => chunks.readForced(await server.say([chunks.READ_FORCED]))
+    ).catch(() => null);
     // The minimum is for events that start on their own. An operator who
     // presses Run has looked at who is on and decided.
     const active = plan.playersFor(preset, seen, config.settings.afkMinutes, Date.now()).length;
@@ -439,6 +446,7 @@ export async function startEvent(input: {
                   )
                 : null,
         survived: {},
+        keepForced: keepForced ? [...keepForced] : null,
         chunks: [],
         meteors: [],
         landings: 0,
@@ -582,7 +590,13 @@ async function dropLink(loop: Loop): Promise<void> {
 }
 
 async function serverFor(installedAppId: string, loop: Loop): Promise<ServerContainer | null> {
-    if (!loop.link) loop.link = await openServerContainer(loop.ownerId, installedAppId);
+    if (!loop.link) {
+        const link = await openServerContainer(loop.ownerId, installedAppId);
+        loop.link = {
+            server: chunks.sparing(link.server, () => chunks.heldBefore(loop.run)),
+            close: link.close
+        };
+    }
     return loop.link.server.running ? loop.link.server : null;
 }
 
@@ -2418,7 +2432,7 @@ async function finish(
     const pending: stored.PendingReward[] = [];
     const lines: string[] = [];
     /** A parkour's or spleef's blocks and players, until they are all put back. */
-    let stageLeftover = stage.leftoverOf(run.id, run.stage);
+    let stageLeftover = stage.leftoverOf(run.id, run.stage, run.keepForced);
     /** What of a team duel's or build battle's arena and its players is still
      *  to undo once this is over. */
     let arenaLeftover: stored.ArenaLeftover | null | undefined;
@@ -2675,7 +2689,8 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running) await later.sayAll(cleanupOf(run));
+        if (later.running)
+            await chunks.sparing(later, () => chunks.heldBefore(run)).sayAll(cleanupOf(run));
     }).catch(() => undefined);
 }
 
@@ -2718,7 +2733,7 @@ async function abandon(
                   // Its stage or arena, if it had one, is undone by the sweep from here.
                   stageLeftovers: stage.withLeftover(
                       state.stageLeftovers,
-                      stage.leftoverOf(run.id, state.run.stage)
+                      stage.leftoverOf(run.id, state.run.stage, state.run.keepForced)
                   ),
                   arenaLeftovers: arenaLeftover
                       ? [...state.arenaLeftovers, arenaLeftover]
@@ -2742,7 +2757,8 @@ async function settleArenaLeftovers(
     await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return;
         for (const one of leftovers) {
-            settled.set(one.id, await arenaService.closeArena(server, one, language));
+            const spared = chunks.sparing(server, () => chunks.heldBefore(one));
+            settled.set(one.id, await arenaService.closeArena(spared, one, language));
         }
     }).catch((error: unknown) =>
         console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
@@ -3129,8 +3145,10 @@ async function settleStageLeftovers(
         if (due.length === 0) return null;
         const flavour = await stageFlavour(server);
         const after = new Map<string, stage.Leftover | null>();
-        for (const one of due)
-            after.set(one.runId, await stageService.settle(server, one, flavour, language));
+        for (const one of due) {
+            const spared = chunks.sparing(server, () => chunks.heldBefore(one));
+            after.set(one.runId, await stageService.settle(spared, one, flavour, language));
+        }
         return after;
     });
     if (!settled) return;

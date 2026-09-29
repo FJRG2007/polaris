@@ -145,6 +145,10 @@ export const runSchema = z.object({
      *  ended, by name. The wave itself is `round` (from 0), open until
      *  `roundEndsAt`, and the last one closed at `closedAt`. */
     survived: z.record(z.number()).default({}),
+    /** Every chunk that was held loaded before the event touched any, as `x,z`
+     *  chunk keys - somebody else's, never let go of by the event. Null when the
+     *  server would not say, or the run is older than this. */
+    keepForced: z.array(z.string()).nullable().default(null),
     /** Chunks the event holds loaded besides its place's own - by chunk
      *  coordinates, only ones nobody held before it - let go at the end. */
     chunks: z.array(z.object({ x: z.number().int(), z: z.number().int() })).default([]),
@@ -239,6 +243,8 @@ const arenaLeftoverSchema = z.object({
     entrants: z.array(entrantSchema),
     /** Game rules still to put back, when the server was not answering at the end. */
     gamerules: z.record(z.string()).default({}),
+    /** The chunks held before the event, which letting its own go must spare. */
+    keepForced: z.array(z.string()).nullable().default(null),
     createdAt: z.number()
 });
 
