@@ -15,13 +15,20 @@ import { SECURITY_QUESTION_COUNT, SECURITY_QUESTION_SUGGESTIONS, securityQuestio
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { clearSecurityQuestionsAction, setSecurityQuestionsAction } from "./actions";
 import { Feedback } from "./setting-card";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { knownMessage, questionLabel } from "./known-messages";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const CUSTOM = "__custom__";
 
-const SUGGESTION_OPTIONS = [
-    ...SECURITY_QUESTION_SUGGESTIONS.map((question) => ({ value: question, label: question })),
-    { value: CUSTOM, label: "Write my own question" }
-];
+/** The suggestions, drawn in the reader's language. The value stays the English
+ *  wording, which is what is stored and what a stored question is matched by. */
+function suggestionOptions(t: NamespaceTranslator<"accountSecurity">) {
+    return [
+        ...SECURITY_QUESTION_SUGGESTIONS.map((question) => ({ value: question, label: questionLabel(t, question) })),
+        { value: CUSTOM, label: t("questions.writeOwn") }
+    ];
+}
 
 interface Entry {
     question: string;
@@ -49,6 +56,9 @@ export function SecurityQuestionsDialog({
     onOpenChange: (open: boolean) => void;
     existing: string[];
 }) {
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const [entries, setEntries] = useState<Entry[]>(() => initialEntries(existing));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -63,12 +73,13 @@ export function SecurityQuestionsDialog({
         const answers = entries.map((entry) => ({ question: entry.question, answer: entry.answer }));
         const parsed = securityQuestionsSchema.safeParse({ answers });
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the form.");
+            const issue = parsed.error.issues[0]?.message;
+            setError(issue ? knownMessage(t, tv, issue) : t("errors.checkForm"));
             return;
         }
         const unique = new Set(answers.map((entry) => entry.question.trim().toLowerCase()));
         if (unique.size !== answers.length) {
-            setError("Use a different question for each answer.");
+            setError(t("questions.duplicate"));
             return;
         }
         setBusy(true);
@@ -95,19 +106,16 @@ export function SecurityQuestionsDialog({
         >
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Security questions</DialogTitle>
-                    <DialogDescription>
-                        All {SECURITY_QUESTION_COUNT} must be answered correctly to set a new password without the
-                        old one.
-                    </DialogDescription>
+                    <DialogTitle>{t("view.questions.title")}</DialogTitle>
+                    <DialogDescription>{t("questions.description", { count: SECURITY_QUESTION_COUNT })}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-4">
                     {entries.map((entry, index) => (
                         <div key={index} className="flex flex-col gap-2">
                             <Select
                                 value={entry.custom ? CUSTOM : entry.question}
-                                options={SUGGESTION_OPTIONS}
-                                aria-label={`Question ${index + 1}`}
+                                options={suggestionOptions(t)}
+                                aria-label={t("questions.number", { number: index + 1 })}
                                 onValueChange={(value) =>
                                     update(index, {
                                         custom: value === CUSTOM,
@@ -118,14 +126,14 @@ export function SecurityQuestionsDialog({
                             {entry.custom ? (
                                 <Input
                                     value={entry.question}
-                                    placeholder="Your question"
+                                    placeholder={t("questions.yourQuestion")}
                                     autoComplete="off"
                                     onChange={(event) => update(index, { question: event.target.value })}
                                 />
                             ) : null}
                             <Input
                                 value={entry.answer}
-                                placeholder="Answer"
+                                placeholder={t("questions.answer")}
                                 autoComplete="off"
                                 required
                                 onChange={(event) => update(index, { answer: event.target.value })}
@@ -133,16 +141,16 @@ export function SecurityQuestionsDialog({
                         </div>
                     ))}
                     <label className="flex flex-col gap-1 text-sm">
-                        Account password
+                        {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? "Saving..." : "Save questions"}
+                            {busy ? tc("actions.saving") : t("questions.save")}
                         </Button>
                     </div>
                 </form>
@@ -158,6 +166,8 @@ export function ClearQuestionsDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -180,23 +190,21 @@ export function ClearQuestionsDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Remove security questions</DialogTitle>
-                    <DialogDescription>
-                        Without them, a forgotten password can only be recovered with an authenticator code.
-                    </DialogDescription>
+                    <DialogTitle>{t("questions.removeTitle")}</DialogTitle>
+                    <DialogDescription>{t("questions.removeDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Account password
+                        {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? "Removing..." : "Remove"}
+                            {busy ? t("dialog.removing") : t("passkeys.remove")}
                         </Button>
                     </div>
                 </form>

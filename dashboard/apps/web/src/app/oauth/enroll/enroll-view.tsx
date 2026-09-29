@@ -41,9 +41,10 @@ import { authClient } from "@/lib/auth-client";
 import { KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Card, CardBody, Input, PolarisMark } from "@polaris/ui";
-import { SECOND_FACTOR_ENROLLMENT_INFO, type SecondFactorEnrollment } from "@polaris/core";
+import type { SecondFactorEnrollment } from "@polaris/core";
 import { armByEmailAction, noteAuthenticatorArmedAction, sendEnrollmentCodeAction } from "./actions";
 import { CodeInput, isWholeCode } from "@/components/code-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** One way in, as the server decided this deployment can offer it. */
 export interface EnrollmentChoice {
@@ -63,16 +64,14 @@ function secretFromUri(uri: string): string {
 
 const FACTOR_ICON = { totp: KeyRound, email: Mail } as const;
 
-/**
- * Why the box is there at all.
+/*
+ * Why the password box is there at all (`enroll.passwordReason`).
  *
  * Only shown when it really is being asked for - which, after this screen
  * learned to take the password from the sign-in that led to it, is somebody
  * who got here with a passkey or with a session from yesterday. Asking without
  * saying why reads as a form that forgot what just happened.
  */
-const PASSWORD_REASON =
-    "Asked because this changes how you sign in. A passkey does not answer for it.";
 
 export function EnrollView({
     account,
@@ -93,6 +92,7 @@ export function EnrollView({
     onDone?: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("auth");
     // Only one way in means there is nothing to choose, so the screen starts on it
     // rather than asking a question with one answer.
     const [factor, setFactor] = useState<SecondFactorEnrollment | null>(
@@ -114,17 +114,13 @@ export function EnrollView({
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <PolarisMark />
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Add a second step to signing in</h1>
-                <p className="text-sm text-muted-foreground">
-                    This Polaris asks every account for one. Your password stays as it is; from now on
-                    signing in also asks for a code. You are signed in as {name} ({account}).
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("enroll.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("enroll.intro", { name, account })}</p>
             </header>
 
             {factor === null ? (
                 <div className="flex flex-col gap-2">
                     {options.map((option) => {
-                        const info = SECOND_FACTOR_ENROLLMENT_INFO[option.factor];
                         const Icon = FACTOR_ICON[option.factor];
                         return (
                             <button
@@ -137,8 +133,10 @@ export function EnrollView({
                                     <Icon className="size-5" />
                                 </span>
                                 <span className="flex min-w-0 flex-col">
-                                    <span className="text-sm font-medium">{info.label}</span>
-                                    <span className="text-xs text-muted-foreground">{info.description}</span>
+                                    <span className="text-sm font-medium">{t(`enroll.factors.${option.factor}.label`)}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t(`enroll.factors.${option.factor}.description`)}
+                                    </span>
                                     {option.target ? (
                                         <span className="mt-1 text-xs text-muted-foreground">{option.target}</span>
                                     ) : null}
@@ -181,6 +179,7 @@ function EmailFactor({
     onArmed: (codes: string[]) => void;
     onBack: (() => void) | null;
 }) {
+    const t = useTranslations("auth");
     const [sent, setSent] = useState(false);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
@@ -220,37 +219,35 @@ function EmailFactor({
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">Email code</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Codes go to {target}. Keep that mailbox reachable - it is how you sign in from now on.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("enroll.email.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("enroll.email.hint", { target })}</p>
                 </div>
 
                 {!sent ? (
                     <Button onClick={() => void send()} disabled={busy}>
-                        {busy ? "Sending..." : "Send me a code"}
+                        {busy ? t("enroll.email.sending") : t("enroll.email.send")}
                     </Button>
                 ) : (
                     <form className="flex flex-col gap-3" onSubmit={(event) => void arm(event)}>
                         <label className="flex flex-col gap-1 text-sm">
-                            Code from the email
+                            {t("enroll.email.code")}
                             <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
                         {password === undefined ? (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Your password
+                                    {t("enroll.yourPassword")}
                                     <Input name="password" type="password" autoComplete="current-password" required />
                                 </label>
-                                <p className="text-xs text-muted-foreground">{PASSWORD_REASON}</p>
+                                <p className="text-xs text-muted-foreground">{t("enroll.passwordReason")}</p>
                             </>
                         ) : null}
                         <div className="flex items-center gap-2">
                             <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                                {busy ? "Turning on..." : "Turn on"}
+                                {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
                             </Button>
                             <Button type="button" variant="ghost" onClick={() => void send()} disabled={busy}>
-                                Send another
+                                {t("enroll.email.sendAnother")}
                             </Button>
                         </div>
                     </form>
@@ -259,7 +256,7 @@ function EmailFactor({
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
                     <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
-                        Use something else
+                        {t("enroll.somethingElse")}
                     </button>
                 ) : null}
             </CardBody>
@@ -280,6 +277,7 @@ function AuthenticatorFactor({
     onArmed: (codes: string[]) => void;
     onBack: (() => void) | null;
 }) {
+    const t = useTranslations("auth");
     const [totpUri, setTotpUri] = useState("");
     const [codes, setCodes] = useState<string[]>([]);
     const [code, setCode] = useState("");
@@ -292,7 +290,7 @@ function AuthenticatorFactor({
         const { data, error: enableError } = await authClient.twoFactor.enable({ password: given });
         setBusy(false);
         if (enableError || !data) {
-            setError(enableError?.message ?? "Could not start setup. Check your password.");
+            setError(enableError?.message ?? t("enroll.authenticator.startFailed"));
             return;
         }
         setTotpUri(data.totpURI);
@@ -319,7 +317,7 @@ function AuthenticatorFactor({
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
         if (verifyError) {
             setBusy(false);
-            setError("That code did not match. Check the clock on your device and try again.");
+            setError(t("enroll.authenticator.mismatch"));
             return;
         }
         // The server hears about the authenticator from here, because better-auth
@@ -335,16 +333,14 @@ function AuthenticatorFactor({
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">Authenticator app</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Any authenticator works - the one built into your phone, or a password manager.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("enroll.authenticator.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("enroll.authenticator.hint")}</p>
                 </div>
 
                 {!totpUri ? (
                     password !== undefined ? (
                         <p className="text-xs text-muted-foreground">
-                            {busy || error === null ? "Setting up..." : "Setup did not start."}
+                            {busy || error === null ? t("enroll.authenticator.settingUp") : t("enroll.authenticator.notStarted")}
                         </p>
                     ) : (
                         <form
@@ -355,12 +351,12 @@ function AuthenticatorFactor({
                             }}
                         >
                             <label className="flex flex-col gap-1 text-sm">
-                                Your password
+                                {t("enroll.yourPassword")}
                                 <Input name="password" type="password" autoComplete="current-password" required />
                             </label>
-                            <p className="text-xs text-muted-foreground">{PASSWORD_REASON}</p>
+                            <p className="text-xs text-muted-foreground">{t("enroll.passwordReason")}</p>
                             <Button type="submit" disabled={busy}>
-                                {busy ? "Starting..." : "Continue"}
+                                {busy ? t("enroll.authenticator.starting") : t("enroll.authenticator.continue")}
                             </Button>
                         </form>
                     )
@@ -370,14 +366,21 @@ function AuthenticatorFactor({
                             <QRCodeSVG value={totpUri} size={168} />
                         </div>
                         <p className="break-all text-center text-xs text-muted-foreground">
-                            Or type this in: <span className="font-mono">{secret}</span>
+                            {t.rich("enroll.authenticator.typeIn", {
+                                secret,
+                                mono: (chunks) => (
+                                    <span key="secret" className="font-mono">
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                         </p>
                         <label className="flex flex-col gap-1 text-sm">
-                            Code from the app
+                            {t("enroll.authenticator.code")}
                             <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
                         <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                            {busy ? "Turning on..." : "Turn on"}
+                            {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
                         </Button>
                     </form>
                 )}
@@ -385,7 +388,7 @@ function AuthenticatorFactor({
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 {onBack ? (
                     <button type="button" className="self-start text-xs text-muted-foreground underline" onClick={onBack}>
-                        Use something else
+                        {t("enroll.somethingElse")}
                     </button>
                 ) : null}
             </CardBody>
@@ -402,6 +405,7 @@ function AuthenticatorFactor({
  * including an administrator - can read them back.
  */
 function BackupCodes({ codes, account, onDone }: { codes: string[]; account: string; onDone: () => void }) {
+    const t = useTranslations("auth");
     const [kept, setKept] = useState(false);
     const text = codes.join("\n");
 
@@ -409,11 +413,8 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
                 <ShieldCheck className="size-8 text-primary" />
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Two-step verification is on</h1>
-                <p className="text-sm text-muted-foreground">
-                    These are your way back into {account} if you lose the thing that gives you codes. Each
-                    one works once. This is the only time they are shown.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("enroll.backup.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("enroll.backup.intro", { account })}</p>
             </header>
 
             <Card>
@@ -425,7 +426,7 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
                     </ul>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={() => void navigator.clipboard.writeText(text)}>
-                            Copy
+                            {t("enroll.backup.copy")}
                         </Button>
                         <Button
                             variant="outline"
@@ -439,7 +440,7 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
                                 URL.revokeObjectURL(url);
                             }}
                         >
-                            Download
+                            {t("enroll.backup.download")}
                         </Button>
                     </div>
                 </CardBody>
@@ -452,10 +453,10 @@ function BackupCodes({ codes, account, onDone }: { codes: string[]; account: str
                     checked={kept}
                     onChange={(event) => setKept(event.target.checked)}
                 />
-                I have saved these somewhere I can reach without this account.
+                {t("enroll.backup.kept")}
             </label>
             <Button disabled={!kept} onClick={onDone}>
-                Continue to Polaris
+                {t("enroll.backup.continue")}
             </Button>
         </main>
     );

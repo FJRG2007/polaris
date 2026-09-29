@@ -1,0 +1,379 @@
+{
+    "form": {
+        "name": "Name",
+        "handle": "Handle",
+        "description": "Description",
+        "create": "Create",
+        "save": "Save",
+        "cancel": "Cancel",
+        "identifier": "Email or username",
+        "identifierPlaceholder": "someone@example.com",
+        "role": "Role",
+        "roleFor": "Role for {name}",
+        "you": "(you)",
+        "leave": "Leave",
+        "remove": "Remove",
+        "removeName": "Remove {name}",
+        "delete": "Delete",
+        "ofLimit": "{count} of {limit}"
+    },
+    "list": {
+        "title": "Organizations",
+        "intro": "Work that belongs to a group rather than to you. Members reach it through the teams the organization gives its spaces to.",
+        "none": "You are not part of any organization yet.",
+        "count": "{count, plural, one {# organization} other {# organizations}}",
+        "new": "New organization",
+        "emptyTitle": "An organization owns spaces on behalf of a group.",
+        "emptyBody": "Put people on its roster, group them into teams, and give a team a space. Joining the team is then the only thing anybody has to do to reach the work.",
+        "teams": "{count, plural, one {# team} other {# teams}}",
+        "spaces": "{count, plural, one {# space} other {# spaces}}",
+        "invitations": {
+            "heading": "{count, plural, one {You have an invitation} other {You have # invitations}}",
+            "askedBy": "{name} asked you to join as {role}",
+            "accept": "Accept",
+            "decline": "Turn down the invitation to {org}"
+        },
+        "restricted": {
+            "hint": "You reach only what somebody there granted to you directly.",
+            "leaveTitle": "Leave {org}?",
+            "leaveBody": "You lose whatever it granted you. Somebody there can invite you again."
+        },
+        "create": {
+            "title": "New organization",
+            "body": "You own it. Add people to its roster afterwards and put them on teams.",
+            "bodyWithLimit": "You own it. Add people to its roster afterwards and put them on teams. This Polaris allows up to {limit} members.",
+            "namePlaceholder": "Acme Design",
+            "handlePlaceholder": "acme-design",
+            "handleHint": "Used in links. Cannot be one an account already signs in with.",
+            "descriptionPlaceholder": "What this organization is for"
+        }
+    },
+    "overview": {
+        "tiles": {
+            "people": "People",
+            "teams": "Teams",
+            "spaces": "Spaces",
+            "roles": "Roles",
+            "domains": "Domains",
+            "services": "Services"
+        },
+        "recently": "Recently",
+        "allActivity": "All activity",
+        "nothingYet": "Nothing has been done here yet.",
+        "started": "Started {year} by {name}."
+    },
+    "activity": {
+        "title": "Activity",
+        "intro": "Everything done to {org}: its people, its teams, its roles, its domains and its work. What somebody does on their own account is not here.",
+        "who": "Who",
+        "empty": "Nothing has been done here yet."
+    },
+    "billing": {
+        "title": "Billing",
+        "intro": "What {org}'s projects used each month, priced at this Polaris's rates, and the budget it is measured against.",
+        "refresh": "Refresh",
+        "stale": "Showing the last statement read. {reason}",
+        "empty": "This organization has no projects yet. A project created while it is the open shelf belongs to it."
+    },
+    "budget": {
+        "title": "Monthly budget",
+        "noPrices": "This Polaris has no prices set, so the statement shows usage only and there is nothing to measure a budget against.",
+        "setPrices": "Set prices",
+        "adminsSetThem": "Its administrators set them.",
+        "whoIsTold": "The people who run this organization's settings are told when a month reaches {thresholds} of it.",
+        "threshold": "{value}%",
+        "spentOf": "{spent} of {amount}",
+        "otherCurrency": "This budget was set in {was} and prices are now in {now}. Set it again in {now} to keep it measured.",
+        "used": "Budget used",
+        "usedShare": "{share}% used.",
+        "usedShareIn": "{share}% used in {month}.",
+        "inputLabel": "Monthly budget in {currency}",
+        "perMonth": "{currency} a month",
+        "save": "Save budget",
+        "set": "Set budget",
+        "remove": "Remove the budget",
+        "removeTitle": "Remove the budget?",
+        "removeBody": "Nobody will be told when this organization's spending passes 80% or 100% of a month.",
+        "removeConfirm": "Remove budget"
+    },
+    "domains": {
+        "title": "Domains",
+        "intro": "Domains {org} owns, so its services answer on its own name rather than this Polaris’s."
+    },
+    "spaces": {
+        "emptyTitle": "{org} owns no work yet",
+        "emptyBody": "Switch to {org} in the header, then create a space in Tasks. It will belong to the organization rather than to you, and outlive anybody leaving.",
+        "openTasks": "Open Tasks",
+        "archived": "archived",
+        "reachedBy": "{count, plural, one {# task} other {# tasks}} - reached by {teams}",
+        "openToRoster": "{count, plural, one {# task} other {# tasks}} - open to everybody on this roster",
+        "noTeam": "{count, plural, one {# task} other {# tasks}} - no team reaches it yet",
+        "footer": "A team reaches a space because it was granted it, which is done from the space’s own access settings in Tasks."
+    },
+    "people": {
+        "title": "People",
+        "search": "Search people",
+        "columns": {
+            "person": "Person",
+            "teams": "Teams",
+            "joined": "Joined",
+            "role": "Role"
+        },
+        "noMatch": "Nobody here matches “{query}”.",
+        "noTeams": "None",
+        "leaveOrg": "Leave this organization",
+        "leaveTitle": "Leave this organization?",
+        "leaveBody": "You will lose everything its teams gave you.",
+        "removeTitle": "Remove {name}?",
+        "removeBody": "They come off every team here as well, and lose what those teams reached.",
+        "waiting": "Waiting to accept",
+        "emailedBy": "Emailed by {name}",
+        "notEmailed": "Not emailed yet - invited by {name}",
+        "invitedBy": "Invited by {name}",
+        "invitedByWithContact": "Invited by {name} - {contact}",
+        "until": "Until {date}",
+        "sendAgain": "Send again",
+        "sendAgainLabel": "Send the invitation to {email} again",
+        "sendAgainFailed": "{reason} Copy the new link from Invite somebody.",
+        "sentAgain": "Sent again to {email}.",
+        "withdraw": "Withdraw",
+        "withdrawLabel": "Withdraw the invitation to {name}",
+        "withdrawTitle": "Withdraw the invitation to {name}?",
+        "withdrawEmailBody": "The link stops working at once. They are not told.",
+        "withdrawAccountBody": "They are not told. You can invite them again at any time.",
+        "invite": {
+            "title": "Invite somebody",
+            "submit": "Invite",
+            "notEmailed": "The invitation was made but could not be emailed. Copy the link below.",
+            "emailed": "Invitation emailed to {email}.",
+            "sent": "Invitation sent. They will see it when they next sign in.",
+            "full": "This Polaris allows {limit} members per organization, counting invitations nobody has answered.",
+            "rolesHint": "What this role may do is set under <roles>Roles</roles>.",
+            "newPeople": "An email with no account behind it gets a link that creates the account and joins them here.",
+            "existingOnly": "Only people who already have an account can be invited from here.",
+            "linkHint": "Hand this link over yourself. It works once and expires in 7 days.",
+            "copyLink": "Copy the invitation link",
+            "copied": "Link copied.",
+            "defaultRole": "New invitations offer {picker} by default.",
+            "defaultRoleLabel": "The role new invitations offer by default"
+        }
+    },
+    "teams": {
+        "title": "Teams",
+        "new": "New team",
+        "columns": {
+            "team": "Team",
+            "people": "People",
+            "reaches": "Reaches"
+        },
+        "empty": "A team is what a space is given to. Nothing here reaches any work yet.",
+        "noGrants": "None yet",
+        "grants": "{count, plural, one {# grant} other {# grants}}",
+        "deleteLabel": "Delete {name}",
+        "deleteTitle": "Delete {name}?",
+        "deleteBody": "Everybody on it loses whatever this team reached. The work itself is untouched.",
+        "full": "This Polaris allows {limit} teams per organization.",
+        "create": {
+            "title": "New team",
+            "body": "Give it people, then give it a space in Tasks. Everybody on it reaches that space.",
+            "namePlaceholder": "Design",
+            "handlePlaceholder": "design",
+            "descriptionPlaceholder": "What this team works on"
+        },
+        "panel": {
+            "fallbackTitle": "Team",
+            "description": "{description} Everybody on it reaches whatever it has been given.",
+            "defaultDescription": "A team in {org}. Everybody on it reaches whatever it has been given.",
+            "nobody": "Nobody is on this team yet.",
+            "leave": "Leave this team",
+            "add": "Add",
+            "addHint": "They have to be on the organization already. {hint}",
+            "reaches": "What this team reaches",
+            "nothing": "Nothing yet. A space is given to a team from that space's own access settings in Tasks."
+        },
+        "roles": {
+            "member": "Member",
+            "maintainer": "Maintainer"
+        },
+        "roleHints": {
+            "member": "Reaches everything the team has been granted.",
+            "maintainer": "The same, plus adding and removing the team's own people."
+        },
+        "spaceRoles": {
+            "guest": "Guest",
+            "member": "Member",
+            "admin": "Admin"
+        }
+    },
+    "roles": {
+        "intro": "A role decides what somebody may do across this organization. Who holds which is set under <people>People</people>.",
+        "new": "New role",
+        "builtIn": "built-in",
+        "noImplicitAccess": "no implicit access",
+        "people": "{count, plural, one {# person} other {# people}}",
+        "deleteLabel": "Delete the {name} role",
+        "deleteTitle": "Delete the {name} role?",
+        "deleteNobody": "Nobody holds it, so nobody loses anything.",
+        "deleteSome": "{count, plural, one {# person becomes} other {# people become}} a Member, and lose whatever this role gave them.",
+        "deleteConfirm": "Delete role",
+        "locked": "Holds everything here, including anything a later version of Polaris adds. This is the role that keeps the organization runnable, so it cannot be narrowed.",
+        "restrictedNone": "Reaches only what is granted to them directly - not the roster, the files or internal work.",
+        "restrictedSome": "{held} of {total} permissions, without seeing the roster, the files or internal work.",
+        "plainNone": "Sees the organization and whatever their teams reach, and nothing else.",
+        "plainSome": "{held} of {total} permissions.",
+        "create": {
+            "title": "New role",
+            "body": "Name it after the job people actually do here. Everybody who holds it sees the organization; what else it reaches is up to you.",
+            "namePlaceholder": "Contractor",
+            "handlePlaceholder": "contractor",
+            "descriptionPlaceholder": "What somebody with this role is here to do"
+        },
+        "areas": {
+            "general": "General",
+            "people": "People",
+            "work": "Work"
+        },
+        "permissions": {
+            "orgRead": "See the organization, its people and its teams",
+            "settingsManage": "Change the name, handle, description and photo",
+            "activityRead": "Read what has been done here",
+            "peopleManage": "Add and remove people, and set their role",
+            "teamsManage": "Create teams and run their rosters",
+            "rolesManage": "Define what the organization's roles may do",
+            "spacesManage": "Create and administer the organization's spaces",
+            "deployManage": "Deploy and configure the organization's services",
+            "domainsManage": "Add and verify the organization's domains",
+            "vaultManage": "Run the shared vault's collections and members",
+            "driveManage": "Add to and change the organization's files",
+            "mailManage": "Hand out the organization's mailboxes"
+        }
+    },
+    "settings": {
+        "chat": {
+            "title": "Chat",
+            "label": "A chat of its own",
+            "hint": "Conversations between the people here stay here, apart from the ones they have with everybody else. They switch between the two the way they switch shelves, in the header. Turning this off later puts the conversations back rather than hiding them."
+        },
+        "profile": {
+            "title": "Profile",
+            "descriptionPlaceholder": "What this organization does"
+        },
+        "handle": {
+            "title": "Handle",
+            "confirmTitle": "Change the handle?",
+            "confirmBody": "Every link to /account/organizations/{slug} stops working. Anything anybody wrote down has to be updated.",
+            "confirm": "Change it",
+            "change": "Change",
+            "hint": "Links already handed out will stop working."
+        },
+        "transfer": {
+            "title": "Hand it over",
+            "nobody": "Only somebody already on the roster can be given the organization, and nobody else is on it yet.",
+            "to": "Hand over to",
+            "newOwner": "New owner",
+            "choose": "Choose somebody",
+            "confirmTitle": "Hand {org} to {name}?",
+            "confirmBody": "They become the owner and you stay on as an admin. Only they can undo it.",
+            "confirm": "Hand over"
+        },
+        "danger": {
+            "title": "Delete",
+            "body": "Deleting takes {spaces, plural, one {# space} other {# spaces}} and {tasks, plural, one {# task} other {# tasks}} with it, along with its teams, roles and domains.",
+            "projects": "Its {count, plural, one {# deploy project} other {# deploy projects}} go too, and the services they run are stopped.",
+            "drive": "Its Drive and everything on it go with it.",
+            "button": "Delete organization",
+            "dialogBody": "{spaces, plural, one {# space} other {# spaces}} and {tasks, plural, one {# task} other {# tasks}} are deleted with it, along with its teams, roles and domains.",
+            "cannotUndo": "This cannot be undone."
+        }
+    },
+    "successor": {
+        "title": "Successor",
+        "intro": "Somebody who can close this organization if you are gone. They get nothing else: not its work, not its roster, not a way to act as you. Without one, whoever you named on your own account answers for it.",
+        "change": "Change",
+        "nameOne": "Name one",
+        "removeLabel": "Remove this organization's successor",
+        "fromAccount": "From your account",
+        "nobody": "Nobody. Name somebody here, or on your own account, or this organization cannot be closed once you are gone.",
+        "dialog": {
+            "removeTitle": "Remove {org}'s successor",
+            "changeTitle": "Change {org}'s successor",
+            "nameTitle": "Name a successor for {org}",
+            "removeBody": "{name} stops answering for {org}. Whoever you named on your own account takes over again, and you can name somebody here at any time.",
+            "who": "Who",
+            "search": "Search by username, full name, or email address",
+            "warning": "They will be able to delete {org} and everything in it. They will not be able to read it, open it, or change anything in it while you are here. This is not a will and does not outrank one.",
+            "nameThem": "Name them"
+        }
+    },
+    "mailboxes": {
+        "title": "Mailboxes",
+        "intro": "Addresses this organization has given to its people. They appear in Mail when the person switches to this organization. Nobody here can read them.",
+        "handOne": "Hand one out",
+        "empty": "None yet. Hand out a company address and it is waiting for its holder the next time they open Mail on this organization.",
+        "holderDetail": "{holder} - {detail}",
+        "takeBack": "Take it back",
+        "takeBackTitle": "Take back {address}?",
+        "takeBackBody": "{holder} loses it here, along with everything Polaris holds for it: the cached mail, the filters and templates they wrote, the signature and the drafts. The mailbox itself and its mail are not touched, and it can be handed out again.",
+        "takenBack": "{address} was taken back.",
+        "dialogTitle": "Hand out a mailbox",
+        "done": "{holder} has it. Its mail is on its way.",
+        "whoFor": "Who it is for",
+        "states": {
+            "ok": "Connecting",
+            "auth": "Password refused",
+            "unreachable": "Cannot be reached",
+            "never": "Not tried yet"
+        }
+    },
+    "validation": {
+        "enterName": "Enter a name",
+        "handleEdges": "Cannot start or end with -",
+        "roleHandleCharacters": "Use letters, numbers or -",
+        "enterIdentifier": "Enter an email or a username",
+        "amountLike": "Enter an amount like 250",
+        "enterAmount": "Enter an amount",
+        "budgetPositive": "A budget has to be more than zero",
+        "budgetTooLarge": "That is more than Polaris can track"
+    },
+    "errors": {
+        "checkDetails": "Check the details and try again",
+        "checkHandle": "Check the handle and try again",
+        "checkAmount": "Check the amount and try again",
+        "checkForm": "Check the form.",
+        "checkDetailsShort": "Check the details.",
+        "confirmFirst": "Confirm it is you first",
+        "pickRole": "Pick a role",
+        "noSeparateChats": "This Polaris does not offer separate chats",
+        "createOrg": "Could not create the organization",
+        "saveOrg": "Could not save the organization",
+        "saveThat": "Could not save that",
+        "changeHandle": "Could not change the handle",
+        "handOver": "Could not hand over the organization",
+        "deleteOrg": "Could not delete the organization",
+        "invite": "Could not invite that person",
+        "resend": "Could not send that invitation again",
+        "withdraw": "Could not withdraw that invitation",
+        "answer": "Could not answer that invitation",
+        "changeRole": "Could not change that role",
+        "removePerson": "Could not remove that person",
+        "createTeam": "Could not create the team",
+        "saveTeam": "Could not save the team",
+        "deleteTeam": "Could not delete the team",
+        "addToTeam": "Could not add that person to the team",
+        "removeFromTeam": "Could not remove that person from the team",
+        "createRole": "Could not create the role",
+        "saveRole": "Could not save the role",
+        "deleteRole": "Could not delete the role",
+        "readTeam": "Could not read the team",
+        "noPrices": "This Polaris has no prices set yet, so a budget has nothing to be measured against.",
+        "saveBudget": "The budget could not be saved. Try again.",
+        "removeBudget": "The budget could not be removed. Try again.",
+        "orgGone": "That organization no longer exists",
+        "ownerOnly": "Only the owner can name who takes this organization over",
+        "sayWho": "Say who",
+        "nameSuccessor": "Could not name that successor.",
+        "chooseHolder": "Choose who this mailbox is for.",
+        "handOut": "That mailbox could not be handed out.",
+        "takeBack": "That mailbox could not be taken back."
+    }
+}

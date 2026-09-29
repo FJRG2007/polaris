@@ -17,19 +17,21 @@ import { auth } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { resolveSession } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 
 /** Attempts allowed per locked session before it must be signed in again. */
 const UNLOCK_LIMIT = 5;
 const UNLOCK_WINDOW_MS = 10 * 60 * 1000;
 
 export async function unlockSessionAction(secret: string, method: "pin" | "password"): Promise<{ error?: string }> {
+    const t = await getTranslations("auth");
     const session = await resolveSession();
-    if (!session) return { error: "Your session has ended. Sign in again." };
+    if (!session) return { error: t("lock.errors.ended") };
 
     const key = `session-unlock:${session.sessionId}`;
     const throttle = await rateLimit(key, UNLOCK_LIMIT, UNLOCK_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        return { error: t("lock.errors.tooMany", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
     const value = String(secret);
@@ -45,7 +47,7 @@ export async function unlockSessionAction(secret: string, method: "pin" | "passw
             targetId: session.sessionId,
             metadata: { method }
         });
-        return { error: method === "pin" ? "That PIN is not correct." : "That password is not correct." };
+        return { error: method === "pin" ? t("lock.errors.wrongPin") : t("lock.errors.wrongPassword") };
     }
 
     await prisma.sessionState.updateMany({

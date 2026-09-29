@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Badge } from "@polaris/ui";
 import type { ReactNode } from "react";
 import { OrgAvatar } from "@/components/avatar";
+import { Messages } from "@/components/i18n/messages";
 import { requireOrgFrame } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export default async function OrganizationLayout({
                     </p>
                 </div>
             </header>
-            {children}
+            <Messages namespaces={["accountOrgs", "validation"]}>{children}</Messages>
         </div>
     );
 }

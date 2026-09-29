@@ -16,12 +16,15 @@ import * as orgs from "@/lib/orgs/org-service";
 import { recordAudit } from "@/lib/audit-service";
 import { orgBudgetInputSchema } from "@polaris/core";
 import { getBillingRates } from "@/lib/billing/rates";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
 import { clearOrgBudget, setOrgBudget, type OrgBudget } from "@/lib/billing/budgets";
 
-function failure(caught: unknown, fallback: string): { error: string } {
+async function failure(caught: unknown, fallback: NamespaceKey<"accountOrgs">): Promise<{ error: string }> {
     if (caught instanceof orgs.OrgError) return { error: caught.message };
     console.error(caught);
-    return { error: fallback };
+    return { error: (await getTranslations("accountOrgs"))(fallback) };
 }
 
 export async function saveOrgBudgetAction(
@@ -30,12 +33,16 @@ export async function saveOrgBudgetAction(
 ): Promise<{ budget?: OrgBudget; error?: string }> {
     const user = await requireUser();
     const parsed = orgBudgetInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the amount and try again" };
+    if (!parsed.success) {
+        const [t, tv] = await Promise.all([getTranslations("accountOrgs"), getTranslations("validation")]);
+        const message = parsed.error.issues[0]?.message;
+        return { error: message === undefined ? t("errors.checkAmount") : orgValidationMessage(t, tv, message) };
+    }
     try {
         await orgs.requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "settings.manage");
         const rates = await getBillingRates();
         if (!rates) {
-            return { error: "This Polaris has no prices set yet, so a budget has nothing to be measured against." };
+            return { error: (await getTranslations("accountOrgs"))("errors.noPrices") };
         }
         const budget: OrgBudget = { amount: parsed.data.amount, currency: rates.currency };
         await setOrgBudget(orgId, budget);
@@ -50,7 +57,7 @@ export async function saveOrgBudgetAction(
         revalidatePath("/account/organizations", "layout");
         return { budget };
     } catch (caught) {
-        return failure(caught, "The budget could not be saved. Try again.");
+        return failure(caught, "errors.saveBudget");
     }
 }
 
@@ -69,6 +76,6 @@ export async function clearOrgBudgetAction(orgId: string): Promise<{ error?: str
         revalidatePath("/account/organizations", "layout");
         return {};
     } catch (caught) {
-        return failure(caught, "The budget could not be removed. Try again.");
+        return failure(caught, "errors.removeBudget");
     }
 }

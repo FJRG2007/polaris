@@ -9,6 +9,7 @@
  */
 
 import { BillingView } from "./billing-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { getOrgBudget } from "@/lib/billing/budgets";
 import { getBillingRates } from "@/lib/billing/rates";
 import { requireOrgPage } from "@/lib/orgs/page-access";
@@ -19,15 +20,13 @@ export default async function OrganizationBillingPage({ params }: { params: Prom
     const { slug } = await params;
     const { org, user } = await requireOrgPage(slug, "settings.manage");
     const [rates, budget] = await Promise.all([getBillingRates(), getOrgBudget(org.id)]);
+    const t = await getTranslations("accountOrgs");
 
     return (
         <div className="flex flex-col gap-4">
             <div>
-                <h2 className="text-base font-semibold">Billing</h2>
-                <p className="text-muted-foreground text-sm">
-                    What {org.name}&apos;s projects used each month, priced at this Polaris&apos;s rates, and the budget
-                    it is measured against.
-                </p>
+                <h2 className="text-base font-semibold">{t("billing.title")}</h2>
+                <p className="text-muted-foreground text-sm">{t("billing.intro", { org: org.name })}</p>
             </div>
             <BillingView
                 orgId={org.id}

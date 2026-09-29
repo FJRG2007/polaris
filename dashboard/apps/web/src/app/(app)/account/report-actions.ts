@@ -14,12 +14,13 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { firstIssue, localized } from "./security/action-messages";
 import { reportUser } from "@/lib/safety-queue";
 import { userReportSchema } from "@polaris/core";
 
 export async function reportPersonAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = userReportSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be read." };
-    return reportUser(user.id, parsed.data);
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.unreadable");
+    return localized(await reportUser(user.id, parsed.data));
 }

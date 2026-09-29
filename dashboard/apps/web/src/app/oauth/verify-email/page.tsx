@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
 import { consumeEmailVerification } from "@/lib/email-verification-service";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function VerifyEmailPage({
 }) {
     const { token } = await searchParams;
     const verified = token ? await consumeEmailVerification(token) : null;
+    const t = await getTranslations("auth");
 
     return (
         <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
@@ -29,10 +31,12 @@ export default async function VerifyEmailPage({
                 <>
                     <CheckCircle2 className="size-10 text-success" />
                     <div>
-                        <h1 className="text-[1.0625rem] font-semibold tracking-tight">Address confirmed</h1>
+                        <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("verifyEmail.confirmed")}</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            {verified.email} is verified
-                            {verified.primary ? " and is what you sign in with." : " on your account."}
+                            {t("verifyEmail.verified", {
+                                email: verified.email,
+                                primary: verified.primary ? "yes" : "no"
+                            })}
                         </p>
                     </div>
                 </>
@@ -40,11 +44,8 @@ export default async function VerifyEmailPage({
                 <>
                     <XCircle className="size-10 text-danger" />
                     <div>
-                        <h1 className="text-[1.0625rem] font-semibold tracking-tight">That link did not work</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            It has already been used, it expired, or the address is no longer on the
-                            account. Ask for a new one from your addresses.
-                        </p>
+                        <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("verifyEmail.failedTitle")}</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">{t("verifyEmail.failedBody")}</p>
                     </div>
                 </>
             )}
@@ -52,7 +53,7 @@ export default async function VerifyEmailPage({
                 {/* The addresses, not the profile: this is where somebody
                     lands after confirming one, and where they go to ask for
                     another when the link did not work. */}
-                <Link href="/account/details">Your email addresses</Link>
+                <Link href="/account/details">{t("verifyEmail.addresses")}</Link>
             </Button>
         </div>
     );

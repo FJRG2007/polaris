@@ -20,6 +20,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, ShieldAlert } from "lucide-react";
 import type { StepUpProofInput } from "@polaris/core";
 import { StepUpFields } from "@/components/step-up-fields";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SettingLock } from "./setting-card";
 import type { AccountStanding } from "@/lib/account-lifecycle";
 import { closeAccountAction, liftLockdownAction, raiseLockdownAction } from "./lifecycle-actions";
@@ -38,6 +40,15 @@ import {
 
 type Asking = "lockdown" | "lift" | "disabled" | "deleting";
 
+/** What a lockdown does, one line each - the same four `LOCKDOWN_EFFECTS` in
+ *  @polaris/core lists in English. */
+const EFFECTS: readonly NamespaceKey<"accountSecurity">[] = [
+    "lockdown.effects.protection",
+    "lockdown.effects.signIn",
+    "lockdown.effects.devices",
+    "lockdown.effects.administrator"
+];
+
 export function LockdownCard({
     standing,
     lock
@@ -48,6 +59,7 @@ export function LockdownCard({
     lock?: SettingLock;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
     const [asking, setAsking] = useState<Asking | null>(null);
     const locked = Boolean(lock);
 
@@ -60,57 +72,52 @@ export function LockdownCard({
                     />
                     <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium">
-                            {standing.lockedDown ? "This account is locked down" : "Lock this account down"}
+                            {standing.lockedDown ? t("lockdown.lockedTitle") : t("lockdown.title")}
                         </h2>
                         <p className="text-xs text-muted-foreground">
-                            {standing.lockedDown
-                                ? "It stays this way until you lift it. An administrator has been told and is looking at it."
-                                : "For when you think somebody else is in your account and you need everything to stop while you work out what happened."}
+                            {standing.lockedDown ? t("lockdown.lockedDescription") : t("lockdown.description")}
                         </p>
                     </div>
                 </div>
 
                 <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    {core.LOCKDOWN_EFFECTS.map((line) => (
+                    {EFFECTS.map((line) => (
                         <li key={line} className="flex gap-2">
                             <span aria-hidden>-</span>
-                            <span>{line}</span>
+                            <span>{t(line)}</span>
                         </li>
                     ))}
                 </ul>
 
                 {standing.lockedDown && standing.lockdownNote ? (
                     <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                        What you said: {standing.lockdownNote}
+                        {t("lockdown.whatYouSaid", { note: standing.lockdownNote })}
                     </p>
                 ) : null}
 
                 <div className="flex justify-end">
                     {standing.lockedDown ? (
                         <Button variant="secondary" onClick={() => setAsking("lift")}>
-                            Lift the lockdown
+                            {t("lockdown.lift")}
                         </Button>
                     ) : (
                         <Button variant="danger" disabled={locked} onClick={() => setAsking("lockdown")}>
-                            Lock it down
+                            {t("lockdown.lockItDown")}
                         </Button>
                     )}
                 </div>
 
                 <div className="flex flex-col gap-3 border-t border-border pt-4">
                     <div>
-                        <h2 className="text-sm font-medium">Switching off, and leaving</h2>
-                        <p className="text-xs text-muted-foreground">
-                            Both sign out every device. Signing in again is all it takes to undo
-                            either - there is nothing else to do and nobody to ask.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("lockdown.leaving.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("lockdown.leaving.description")}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         <Button variant="secondary" disabled={locked} onClick={() => setAsking("disabled")}>
-                            Switch off temporarily
+                            {t("lockdown.leaving.switchOff")}
                         </Button>
                         <Button variant="danger" disabled={locked} onClick={() => setAsking("deleting")}>
-                            Delete account
+                            {t("lockdown.leaving.delete")}
                         </Button>
                     </div>
                 </div>
@@ -133,42 +140,45 @@ export function LockdownCard({
 }
 
 /** What each of the four is called, warned about, and confirmed with. */
-const WORDING: Record<
-    Asking,
-    { title: string; description: string; confirm: string; danger: boolean; note: boolean }
-> = {
-    lockdown: {
-        title: "Lock this account down?",
-        description:
-            "Nothing about how it is protected can be changed and no new sign-in works. The devices already signed in keep working, so you can lift it again.",
-        confirm: "Lock it down",
-        danger: true,
-        note: true
-    },
-    lift: {
-        title: "Lift the lockdown?",
-        description:
-            "Sign-ins and security settings work again. The administrator looking at your account is not affected either way.",
-        confirm: "Lift it",
-        danger: false,
-        note: false
-    },
-    disabled: {
-        title: "Switch this account off?",
-        description:
-            "It disappears for everybody else and every device is signed out. Sign in whenever you like and it comes straight back.",
-        confirm: "Switch it off",
-        danger: true,
-        note: false
-    },
-    deleting: {
-        title: "Delete this account?",
-        description: `Nothing is removed for ${core.DELETION_GRACE_DAYS} days, and signing in before then calls it off. After that it is gone and cannot be brought back.`,
-        confirm: "Delete it",
-        danger: true,
-        note: false
+function wording(
+    t: NamespaceTranslator<"accountSecurity">,
+    asking: Asking
+): { title: string; description: string; confirm: string; danger: boolean; note: boolean } {
+    switch (asking) {
+        case "lockdown":
+            return {
+                title: t("lockdown.confirm.lockdown.title"),
+                description: t("lockdown.confirm.lockdown.description"),
+                confirm: t("lockdown.lockItDown"),
+                danger: true,
+                note: true
+            };
+        case "lift":
+            return {
+                title: t("lockdown.confirm.lift.title"),
+                description: t("lockdown.confirm.lift.description"),
+                confirm: t("lockdown.confirm.lift.confirm"),
+                danger: false,
+                note: false
+            };
+        case "disabled":
+            return {
+                title: t("lockdown.confirm.disabled.title"),
+                description: t("lockdown.confirm.disabled.description"),
+                confirm: t("lockdown.confirm.disabled.confirm"),
+                danger: true,
+                note: false
+            };
+        case "deleting":
+            return {
+                title: t("lockdown.confirm.deleting.title"),
+                description: t("lockdown.confirm.deleting.description", { days: core.DELETION_GRACE_DAYS }),
+                confirm: t("lockdown.confirm.deleting.confirm"),
+                danger: true,
+                note: false
+            };
     }
-};
+}
 
 function LockdownDialog({
     asking,
@@ -181,12 +191,14 @@ function LockdownDialog({
      *  away rather than refresh a page it cannot read. */
     onDone: (closed: boolean) => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const open = asking !== null;
-    const words = asking ? WORDING[asking] : null;
+    const words = asking ? wording(t, asking) : null;
 
     async function confirm(): Promise<void> {
         if (!asking || !proof) return;
@@ -227,12 +239,12 @@ function LockdownDialog({
                 <div className="flex flex-col gap-3">
                     {words?.note ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            What is happening?
+                            {t("lockdown.noteLabel")}
                             <Textarea
                                 rows={3}
                                 value={note}
                                 maxLength={core.MAX_LOCKDOWN_NOTE}
-                                placeholder="Optional. Whoever looks at this reads it."
+                                placeholder={t("lockdown.notePlaceholder")}
                                 onChange={(event) => setNote(event.target.value)}
                             />
                         </label>
@@ -253,7 +265,7 @@ function LockdownDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         variant={words?.danger ? "danger" : "primary"}

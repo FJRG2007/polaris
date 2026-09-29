@@ -10,8 +10,10 @@
  */
 
 import { AuditFeed } from "@/components/audit-feed";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ActivityView({ slug }: { slug: string }) {
+    const t = useTranslations("accountOrgs");
     const base = `/api/orgs/${encodeURIComponent(slug)}/activity`;
     return (
         <AuditFeed
@@ -19,8 +21,8 @@ export function ActivityView({ slug }: { slug: string }) {
             exportEndpoint={`${base}/export`}
             path={`/account/organizations/${slug}/activity`}
             cacheKey={`org.activity:${slug}`}
-            contextLabel="Who"
-            emptyLabel="Nothing has been done here yet."
+            contextLabel={t("activity.who")}
+            emptyLabel={t("activity.empty")}
             context={(entry) => entry.actorName}
         />
     );

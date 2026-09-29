@@ -17,6 +17,8 @@ import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "./action-messages";
 import { confirmAccountPassword } from "@polaris/auth";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 
@@ -41,9 +43,9 @@ export async function listPasskeys(): Promise<PasskeyView[]> {
 export async function confirmPasswordForPasskeyAction(password: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const ok = await confirmAccountPassword(auth, user.id, user.sessionId, String(password ?? ""));
-    if (!ok) return { error: "Current password is incorrect." };
+    if (!ok) return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     return {};
 }
 
@@ -91,11 +93,11 @@ export async function notePasskeyAddedAction(): Promise<void> {
 export async function removePasskeyAction(passkeyId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
-    if (typeof passkeyId !== "string") return { error: "Unknown passkey." };
+    if (blocked) return localized({ error: blocked });
+    if (typeof passkeyId !== "string") return { error: (await getTranslations("accountSecurity"))("errors.unknownPasskey") };
     // Scoped to the owner, so an id from somewhere else deletes nothing.
     const removed = await prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } });
-    if (removed.count === 0) return { error: "That passkey is no longer on your account." };
+    if (removed.count === 0) return { error: (await getTranslations("accountSecurity"))("errors.passkeyGone") };
     await recordAudit({ actorId: user.id, action: "account.passkey.removed", targetType: "passkey" });
     return {};
 }

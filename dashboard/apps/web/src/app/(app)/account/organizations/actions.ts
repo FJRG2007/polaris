@@ -24,6 +24,9 @@ import { recordAudit } from "@/lib/audit-service";
 import { orgChatOffered } from "@/lib/chat/isolation";
 import { canCreateOrganization } from "@/lib/orgs/policy";
 import * as invitations from "@/lib/orgs/invitation-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { orgValidationMessage } from "./org-validation";
 
 const ORGS_PATH = "/account/organizations";
 
@@ -32,10 +35,21 @@ async function actor(): Promise<orgs.OrgActor> {
     return { id: user.id, isAdmin: user.isAdmin };
 }
 
-function failure(caught: unknown, fallback: string): { error: string } {
+type OrgsKey = NamespaceKey<"accountOrgs">;
+
+/** A refused write, in the words of the reader: the service's own reason when it
+ *  gave one, the fallback otherwise. */
+async function failure(caught: unknown, fallback: OrgsKey): Promise<{ error: string }> {
     if (caught instanceof orgs.OrgError) return { error: caught.message };
     console.error(caught);
-    return { error: fallback };
+    return { error: (await getTranslations("accountOrgs"))(fallback) };
+}
+
+/** A payload the schema refused: its first issue in the reader's language, or
+ *  the fallback when it named none. */
+async function invalid(message: string | undefined, fallback: OrgsKey): Promise<{ error: string }> {
+    const [t, tv] = await Promise.all([getTranslations("accountOrgs"), getTranslations("validation")]);
+    return { error: message === undefined ? t(fallback) : orgValidationMessage(t, tv, message) };
 }
 
 /** An organization change can move what the Tasks app shows as well, since a
@@ -70,7 +84,7 @@ export async function createOrgAction(input: unknown): Promise<{ slug?: string; 
     const caller = await actor();
     const parsed = core.organizationSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         // The instance policy is checked here rather than in the service, so the
         // one place that says "may this account start one" is also the place the
@@ -86,7 +100,7 @@ export async function createOrgAction(input: unknown): Promise<{ slug?: string; 
         refresh();
         return { slug: parsed.data.slug };
     } catch (caught) {
-        return failure(caught, "Could not create the organization");
+        return failure(caught, "errors.createOrg");
     }
 }
 
@@ -94,7 +108,7 @@ export async function updateOrgAction(orgId: string, input: unknown): Promise<{ 
     const caller = await actor();
     const parsed = core.organizationProfileSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         // The name, the description and the photo are settings, not ownership:
         // whoever the organization trusted with its settings may change them.
@@ -104,7 +118,7 @@ export async function updateOrgAction(orgId: string, input: unknown): Promise<{ 
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not save the organization");
+        return failure(caught, "errors.saveOrg");
     }
 }
 
@@ -129,13 +143,13 @@ export async function setOrgChatAction(
     try {
         await orgs.requireOrgPermission(caller, orgId, "settings.manage");
         if (wanted && !(await orgChatOffered()))
-            return { error: "This Polaris does not offer separate chats" };
+            return { error: (await getTranslations("accountOrgs"))("errors.noSeparateChats") };
         await orgs.setOrgChat(orgId, wanted);
         await record(caller.id, orgId, "org.chat", { isolated: wanted });
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not save that");
+        return failure(caught, "errors.saveThat");
     }
 }
 
@@ -146,7 +160,7 @@ export async function changeOrgSlugAction(
     const caller = await actor();
     const parsed = core.orgSlugField.safeParse(slug);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the handle and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkHandle");
     try {
         await orgs.requireOrgPermission(caller, orgId, "settings.manage");
         await orgs.changeOrgSlug(orgId, parsed.data);
@@ -154,7 +168,7 @@ export async function changeOrgSlugAction(
         refresh();
         return { slug: parsed.data };
     } catch (caught) {
-        return failure(caught, "Could not change the handle");
+        return failure(caught, "errors.changeHandle");
     }
 }
 
@@ -170,7 +184,7 @@ export async function transferOrgAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not hand over the organization");
+        return failure(caught, "errors.handOver");
     }
 }
 
@@ -191,7 +205,7 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
     const caller = await actor();
     const parsed = core.stepUpProofSchema.safeParse(proof);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Confirm it is you first" };
+        return invalid(parsed.error.issues[0]?.message, "errors.confirmFirst");
     try {
         await orgs.requireOrgDeletion(caller, orgId);
         const proven = await proveStepUp(caller.id, `org-delete:${orgId}`, parsed.data);
@@ -210,7 +224,7 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not delete the organization");
+        return failure(caught, "errors.deleteOrg");
     }
 }
 
@@ -235,7 +249,7 @@ export async function inviteOrgMemberAction(
     const caller = await actor();
     const parsed = core.orgInviteSchema.safeParse({ identifier, role });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
         await orgs.requireRoleWithinOwn(access, orgId, parsed.data.role);
@@ -260,7 +274,7 @@ export async function inviteOrgMemberAction(
         if (sent.kind === "account") return {};
         return { emailed: !sent.sendError, url: sent.url, sendError: sent.sendError };
     } catch (caught) {
-        return failure(caught, "Could not invite that person");
+        return failure(caught, "errors.invite");
     }
 }
 
@@ -277,7 +291,7 @@ export async function resendOrgEmailInviteAction(
         refresh();
         return sent;
     } catch (caught) {
-        return failure(caught, "Could not send that invitation again");
+        return failure(caught, "errors.resend");
     }
 }
 
@@ -294,7 +308,7 @@ export async function revokeOrgEmailInviteAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not withdraw that invitation");
+        return failure(caught, "errors.withdraw");
     }
 }
 
@@ -311,7 +325,7 @@ export async function setOrgDefaultInviteRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.orgRoleSlugField.safeParse(role);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick a role" };
+    if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.pickRole");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
         await orgs.requireRoleWithinOwn(access, orgId, parsed.data);
@@ -320,7 +334,7 @@ export async function setOrgDefaultInviteRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not save that");
+        return failure(caught, "errors.saveThat");
     }
 }
 
@@ -336,7 +350,7 @@ export async function revokeOrgInvitationAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not withdraw that invitation");
+        return failure(caught, "errors.withdraw");
     }
 }
 
@@ -367,7 +381,7 @@ export async function respondToOrgInvitationAction(
         refresh();
         return accept ? { slug: answered.orgSlug, restricted: answered.restricted } : {};
     } catch (caught) {
-        return failure(caught, "Could not answer that invitation");
+        return failure(caught, "errors.answer");
     }
 }
 
@@ -387,7 +401,7 @@ export async function setOrgMemberRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change that role");
+        return failure(caught, "errors.changeRole");
     }
 }
 
@@ -426,7 +440,7 @@ export async function removeOrgMemberAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not remove that person");
+        return failure(caught, "errors.removePerson");
     }
 }
 
@@ -441,7 +455,7 @@ export async function createTeamAction(
     const caller = await actor();
     const parsed = core.teamSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         await orgs.requireOrgPermission(caller, orgId, "teams.manage");
         const id = await orgs.createTeam(orgId, parsed.data);
@@ -449,7 +463,7 @@ export async function createTeamAction(
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "Could not create the team");
+        return failure(caught, "errors.createTeam");
     }
 }
 
@@ -460,7 +474,7 @@ export async function updateTeamAction(
     const caller = await actor();
     const parsed = core.teamSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
         await orgs.updateTeam(teamId, parsed.data);
@@ -468,7 +482,7 @@ export async function updateTeamAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not save the team");
+        return failure(caught, "errors.saveTeam");
     }
 }
 
@@ -484,7 +498,7 @@ export async function deleteTeamAction(teamId: string): Promise<{ error?: string
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not delete the team");
+        return failure(caught, "errors.deleteTeam");
     }
 }
 
@@ -501,7 +515,7 @@ export async function addTeamMemberAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not add that person to the team");
+        return failure(caught, "errors.addToTeam");
     }
 }
 
@@ -518,7 +532,7 @@ export async function setTeamMemberRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change that role");
+        return failure(caught, "errors.changeRole");
     }
 }
 
@@ -538,7 +552,7 @@ export async function removeTeamMemberAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not remove that person from the team");
+        return failure(caught, "errors.removeFromTeam");
     }
 }
 
@@ -553,7 +567,7 @@ export async function createOrgRoleAction(
     const caller = await actor();
     const parsed = core.orgRoleSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
         orgs.requireWithinOwn(access, parsed.data.permissions);
@@ -565,7 +579,7 @@ export async function createOrgRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not create the role");
+        return failure(caught, "errors.createRole");
     }
 }
 
@@ -577,7 +591,7 @@ export async function updateOrgRoleAction(
     const caller = await actor();
     const parsed = core.orgRoleSchema.omit({ slug: true }).safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return invalid(parsed.error.issues[0]?.message, "errors.checkDetails");
     try {
         const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
         // The grants written, and the role as it stands: narrowing a role that
@@ -594,7 +608,7 @@ export async function updateOrgRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not save the role");
+        return failure(caught, "errors.saveRole");
     }
 }
 
@@ -610,7 +624,7 @@ export async function deleteOrgRoleAction(
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "Could not delete the role");
+        return failure(caught, "errors.deleteRole");
     }
 }
 
@@ -631,6 +645,6 @@ export async function teamDetailAction(teamId: string): Promise<{
         ]);
         return { members, grants, canManage };
     } catch (caught) {
-        return failure(caught, "Could not read the team");
+        return failure(caught, "errors.readTeam");
     }
 }

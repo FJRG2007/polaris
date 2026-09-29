@@ -23,6 +23,7 @@
 
 import { ShieldAlert } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpDialog } from "@/components/step-up-dialog";
 import { stepUpRemainingAction } from "@/app/(app)/account/step-up-actions";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -80,6 +81,7 @@ export function ConnectedSignInCard({
      * has. Asked once and held for two minutes, because a challenge that fires
      * per switch is a challenge people stop reading by the third.
      */
+    const t = useTranslations("accountSecurity");
     const [proved, setProved] = useState(false);
     const [asking, setAsking] = useState<(() => void) | null>(null);
 
@@ -118,15 +120,11 @@ export function ConnectedSignInCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Connected accounts</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Choose which of the accounts you have connected can sign you in.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("connected.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("connected.description")}</p>
                 </div>
                 {accounts.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        You have not connected any. Connect one under Connected accounts to use it here.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("connected.empty")}</p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {accounts.map((account) => (
@@ -149,8 +147,8 @@ export function ConnectedSignInCard({
                 <StepUpDialog
                     open={asking !== null}
                     purpose={PURPOSE}
-                    title="Confirm it is you"
-                    description="Changing which accounts can sign you in decides how this account is reached. You will not be asked again for a couple of minutes."
+                    title={t("stepUp.title")}
+                    description={t("connected.stepUp")}
                     onOpenChange={(open) => !open && setAsking(null)}
                     onProved={() => {
                         setProved(true);
@@ -174,6 +172,7 @@ function ChallengeRow({
     /** Runs the change, asking for a proof first when this browser owes one. */
     guard: (change: () => void) => void;
 }) {
+    const t = useTranslations("accountSecurity");
     const [enabled, setEnabled] = useState(challenge.enabled);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -199,21 +198,18 @@ function ChallengeRow({
         <div className="flex flex-col gap-1 border-t border-border pt-3">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm">Ask for my second step too</p>
-                    <p className="text-xs text-muted-foreground">
-                        Signing in this way answers the other service first, so Polaris does not ask again
-                        unless you want it to.
-                    </p>
+                    <p className="text-sm">{t("connected.challenge.title")}</p>
+                    <p className="text-xs text-muted-foreground">{t("connected.challenge.description")}</p>
                 </div>
                 <Switch
                     checked={challenge.enforced || enabled}
                     disabled={locked || pending || challenge.enforced}
                     onChange={toggle}
-                    aria-label="Ask for my second step after a connected account signs me in"
+                    aria-label={t("connected.challenge.label")}
                 />
             </div>
             {challenge.enforced ? (
-                <p className="text-xs text-muted-foreground">This Polaris asks for it on every account.</p>
+                <p className="text-xs text-muted-foreground">{t("connected.challenge.enforced")}</p>
             ) : null}
             <Feedback error={error} />
         </div>
@@ -229,6 +225,7 @@ function AccountRow({
     locked: boolean;
     guard: (change: () => void) => void;
 }) {
+    const t = useTranslations("accountSecurity");
     const [enabled, setEnabled] = useState(account.signInEnabled);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -258,15 +255,15 @@ function AccountRow({
                     <span className="truncate text-sm">{account.label}</span>
                     <span className="text-xs text-muted-foreground">
                         {account.allowedHere
-                            ? `Sign in with this ${account.providerName} account`
-                            : `${account.providerName} is not allowed as a way in on this Polaris`}
+                            ? t("connected.allowed", { provider: account.providerName })
+                            : t("connected.notAllowed", { provider: account.providerName })}
                     </span>
                 </span>
                 <Switch
                     checked={enabled}
                     disabled={locked || pending || !account.allowedHere}
                     onChange={toggle}
-                    aria-label={`Sign in with ${account.label}`}
+                    aria-label={t("connected.switch", { account: account.label })}
                 />
             </div>
             {enabled && account.warning ? (

@@ -21,6 +21,10 @@ import { sessionName } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { getTranslations } from "@/lib/i18n/request";
+import { translate } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
@@ -44,6 +48,20 @@ const trustedDeviceIdSchema = z.string().regex(/^trust-device-[A-Za-z0-9_-]{1,64
 const APPROVAL_LIMIT = 5;
 const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
 
+type SessionError =
+    | "errors.unknownSession"
+    | "errors.useSignOut"
+    | "errors.unknownSetting"
+    | "errors.sessionGone"
+    | "errors.deviceForgotten"
+    | "errors.unknownConnection"
+    | "errors.connectionEnded";
+
+/** One of this file's own refusals, in the reader's language. */
+async function refuse(key: SessionError): Promise<{ error: string }> {
+    return { error: (await getTranslations("accountSecurity"))(key) };
+}
+
 /**
  * Record that this device is signing itself out, immediately before it does.
  *
@@ -64,17 +82,19 @@ export async function noteSignOutAction(): Promise<void> {
     await notifySessionsClosed({
         userId: user.id,
         count: 1,
-        reason: `${sessionName(user.sessionId)} signed itself out.`
+        reason: translate(await getUserLocale(user.id), "accountSecurity.sessions.signedItselfOut", {
+            name: sessionName(user.sessionId)
+        })
     });
 }
 
 export async function revokeSessionAction(sessionId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionIdSchema.safeParse(sessionId);
-    if (!parsed.success) return { error: "Unknown session." };
-    if (parsed.data === user.sessionId) return { error: "Use Sign out to end this session." };
+    if (!parsed.success) return refuse("errors.unknownSession");
+    if (parsed.data === user.sessionId) return refuse("errors.useSignOut");
     await revokeUserSession(user.id, parsed.data);
     revalidatePath("/account/sessions");
     return {};
@@ -98,10 +118,10 @@ export async function pinSessionAction(
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionIdSchema.safeParse(sessionId);
-    if (!parsed.success) return { error: "Unknown session." };
-    if (pinned !== null && typeof pinned !== "boolean") return { error: "Unknown setting." };
+    if (!parsed.success) return refuse("errors.unknownSession");
+    if (pinned !== null && typeof pinned !== "boolean") return refuse("errors.unknownSetting");
 
     // Scoped to the caller's own account, so an id from somewhere else changes
     // nothing rather than reaching another account's session.
@@ -109,7 +129,7 @@ export async function pinSessionAction(
         where: { sessionId: parsed.data, userId: user.id },
         data: { pinToAddress: pinned }
     });
-    if (written.count === 0) return { error: "That session is no longer signed in." };
+    if (written.count === 0) return refuse("errors.sessionGone");
 
     await recordAudit({
         actorId: user.id,
@@ -125,7 +145,7 @@ export async function pinSessionAction(
 export async function revokeOtherSessionsAction(): Promise<{ count: number; error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { count: 0, error: blocked };
+    if (blocked) return localized({ count: 0, error: blocked });
     const count = await revokeOtherSessions(user.id, user.sessionId);
     revalidatePath("/account/sessions");
     return { count };
@@ -146,11 +166,11 @@ export async function revokeOtherSessionsAction(): Promise<{ count: number; erro
 export async function forgetTrustedDeviceAction(id: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = trustedDeviceIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "That device is no longer remembered." };
+    if (!parsed.success) return refuse("errors.deviceForgotten");
     if (!(await revokeTrustedDevice(user.id, parsed.data))) {
-        return { error: "That device is no longer remembered." };
+        return refuse("errors.deviceForgotten");
     }
     await recordAudit({ actorId: user.id, action: "account.2fa.trusted-device-revoked" });
     revalidatePath("/account/sessions");
@@ -169,9 +189,9 @@ export async function trustedDeviceAction(
 ): Promise<{ detail?: TrustedDeviceDetail; error?: string }> {
     const user = await requireUser();
     const parsed = trustedDeviceIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "That device is no longer remembered." };
+    if (!parsed.success) return refuse("errors.deviceForgotten");
     const detail = await trustedDeviceDetail(user.id, user.sessionId, parsed.data);
-    if (!detail) return { error: "That device is no longer remembered." };
+    if (!detail) return refuse("errors.deviceForgotten");
     return { detail };
 }
 
@@ -188,19 +208,19 @@ export async function signOutTrustedDeviceAction(
 ): Promise<{ count?: number; endedCurrent?: boolean; error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = trustedDeviceIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "That device is no longer remembered." };
+    if (!parsed.success) return refuse("errors.deviceForgotten");
     const result = await revokeDeviceSessions(user.id, user.sessionId, parsed.data);
     revalidatePath("/account/sessions");
-    return result;
+    return localized(result);
 }
 
 /** Stop remembering every browser at once. */
 export async function forgetTrustedDevicesAction(): Promise<{ count: number; error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { count: 0, error: blocked };
+    if (blocked) return localized({ count: 0, error: blocked });
     const count = await revokeTrustedDevices(user.id);
     if (count > 0) {
         await recordAudit({
@@ -224,21 +244,20 @@ export async function decideLoginApprovalAction(
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = sessionIdSchema.safeParse(sessionId);
-    if (!parsed.success) return { error: "Unknown session." };
+    if (!parsed.success) return refuse("errors.unknownSession");
     if (approve === true) {
         // Letting somebody else in is the one direction that needs the wait;
         // refusing a sign-in is always allowed, from any device.
         const blocked = await newDeviceRefusal(user);
-        if (blocked) return { error: blocked };
+        if (blocked) return localized({ error: blocked });
         const throttle = await rateLimit(
             `signin-approval:${user.id}`,
             APPROVAL_LIMIT,
             APPROVAL_WINDOW_MS
         );
         if (!throttle.ok) {
-            return {
-                error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.`
-            };
+            const t = await getTranslations("accountSecurity");
+            return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
         }
     }
     const result = await decideLoginApproval(
@@ -249,7 +268,7 @@ export async function decideLoginApprovalAction(
         user.sessionId
     );
     if (!result.error) revalidatePath("/account/sessions");
-    return result;
+    return localized(result);
 }
 
 /**
@@ -265,12 +284,12 @@ export async function decideLoginApprovalAction(
 export async function disconnectExtensionAction(id: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown connection." };
+    if (!parsed.success) return refuse("errors.unknownConnection");
 
     const ended = await revokeExtensionSession(user.id, parsed.data);
-    if (!ended.revoked) return { error: "That connection has already ended." };
+    if (!ended.revoked) return refuse("errors.connectionEnded");
 
     await recordAudit({
         actorId: user.id,
@@ -292,13 +311,13 @@ export async function pinExtensionAction(
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown connection." };
-    if (pinned !== null && typeof pinned !== "boolean") return { error: "Unknown setting." };
+    if (!parsed.success) return refuse("errors.unknownConnection");
+    if (pinned !== null && typeof pinned !== "boolean") return refuse("errors.unknownSetting");
 
     if (!(await pinExtensionSession(user.id, parsed.data, pinned))) {
-        return { error: "That connection has already ended." };
+        return refuse("errors.connectionEnded");
     }
     await recordAudit({
         actorId: user.id,

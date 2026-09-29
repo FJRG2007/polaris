@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import type { StepUpProofInput } from "@polaris/core";
 import { AccountInput } from "@/components/account-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpFields } from "@/components/step-up-fields";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearOrgSuccessorAction, setOrgSuccessorAction } from "./successor-actions";
@@ -66,6 +67,7 @@ export function OrgSuccessorCard({
     orgName: string;
     successor: OrgSuccessorPerson | null;
 }) {
+    const t = useTranslations("accountOrgs");
     const [mode, setMode] = useState<Mode>(null);
     const named = successor !== null && !successor.inherited;
 
@@ -75,18 +77,14 @@ export function OrgSuccessorCard({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                         <h2 className="flex items-center gap-2 text-sm font-medium">
-                            <HeartHandshake className="size-4 shrink-0" /> Successor
+                            <HeartHandshake className="size-4 shrink-0" /> {t("successor.title")}
                         </h2>
-                        <p className="text-muted-foreground text-xs">
-                            Somebody who can close this organization if you are gone. They get
-                            nothing else: not its work, not its roster, not a way to act as you.
-                            Without one, whoever you named on your own account answers for it.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("successor.intro")}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <Button size="sm" variant="secondary" onClick={() => setMode("set")}>
                             <UserPlus className="size-4 shrink-0" />
-                            {named ? "Change" : "Name one"}
+                            {named ? t("successor.change") : t("successor.nameOne")}
                         </Button>
                         {/* Only where there is one of this organization's own to
                             take off. Removing an inherited name would mean
@@ -95,8 +93,8 @@ export function OrgSuccessorCard({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                aria-label="Remove this organization's successor"
-                                title="Remove"
+                                aria-label={t("successor.removeLabel")}
+                                title={t("form.remove")}
                                 onClick={() => setMode("clear")}
                             >
                                 <Trash2 className="size-4 shrink-0" />
@@ -121,14 +119,13 @@ export function OrgSuccessorCard({
                         </div>
                         {successor.inherited ? (
                             <span className="text-muted-foreground shrink-0 text-[0.6875rem]">
-                                From your account
+                                {t("successor.fromAccount")}
                             </span>
                         ) : null}
                     </div>
                 ) : (
                     <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
-                        Nobody. Name somebody here, or on your own account, or this organization
-                        cannot be closed once you are gone.
+                        {t("successor.nobody")}
                     </p>
                 )}
             </CardBody>
@@ -157,6 +154,7 @@ function OrgSuccessorDialog({
     current: OrgSuccessorPerson | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [identifier, setIdentifier] = useState("");
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
@@ -196,10 +194,10 @@ function OrgSuccessorDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {clearing
-                            ? `Remove ${orgName}'s successor`
+                            ? t("successor.dialog.removeTitle", { org: orgName })
                             : current
-                              ? `Change ${orgName}'s successor`
-                              : `Name a successor for ${orgName}`}
+                              ? t("successor.dialog.changeTitle", { org: orgName })
+                              : t("successor.dialog.nameTitle", { org: orgName })}
                     </DialogTitle>
                 </DialogHeader>
                 <form
@@ -211,20 +209,18 @@ function OrgSuccessorDialog({
                 >
                     {clearing ? (
                         <p className="text-muted-foreground text-sm">
-                            {current?.name} stops answering for {orgName}. Whoever you named on your
-                            own account takes over again, and you can name somebody here at any
-                            time.
+                            {t("successor.dialog.removeBody", { name: current?.name ?? "", org: orgName })}
                         </p>
                     ) : (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Who
+                                {t("successor.dialog.who")}
                                 <AccountInput
                                     autoFocus
                                     value={identifier}
                                     className="h-9"
-                                    placeholder="someone@example.com"
-                                    aria-label="Search by username, full name, or email address"
+                                    placeholder={t("form.identifierPlaceholder")}
+                                    aria-label={t("successor.dialog.search")}
                                     onValueChange={setIdentifier}
                                 />
                             </label>
@@ -232,9 +228,7 @@ function OrgSuccessorDialog({
                                 box: the press is the consent, and a box beside it
                                 is one more thing to tick without reading. */}
                             <p className="text-muted-foreground text-xs">
-                                They will be able to delete {orgName} and everything in it. They
-                                will not be able to read it, open it, or change anything in it
-                                while you are here. This is not a will and does not outrank one.
+                                {t("successor.dialog.warning", { org: orgName })}
                             </p>
                         </>
                     )}
@@ -244,11 +238,11 @@ function OrgSuccessorDialog({
 
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={close}>
-                            Cancel
+                            {t("form.cancel")}
                         </Button>
                         <Button type="submit" disabled={!ready || busy}>
                             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {clearing ? "Remove" : "Name them"}
+                            {clearing ? t("form.remove") : t("successor.dialog.nameThem")}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -24,6 +24,8 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 import { changePasswordAction, recoverPasswordAction } from "./actions";
 import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
 import { Feedback } from "./setting-card";
+import { knownMessage, questionLabel } from "./known-messages";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ChangePasswordDialog({
     open,
@@ -32,6 +34,9 @@ export function ChangePasswordDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -41,14 +46,14 @@ export function ChangePasswordDialog({
         const form = new FormData(event.currentTarget);
         const next = String(form.get("newPassword") ?? "");
         if (next !== String(form.get("confirmPassword") ?? "")) {
-            setError("The new passwords do not match.");
+            setError(t("password.mismatch"));
             return;
         }
         setBusy(true);
         setError(null);
         if (await passwordWouldOpenVault(next)) {
             setBusy(false);
-            setError(SAME_AS_VAULT);
+            setError(knownMessage(t, tv, SAME_AS_VAULT));
             return;
         }
         const result = await changePasswordAction(String(form.get("currentPassword") ?? ""), next);
@@ -57,7 +62,7 @@ export function ChangePasswordDialog({
             setError(result.error);
             return;
         }
-        setDone("Password changed. Every other session was signed out.");
+        setDone(t("password.changed"));
     }
 
     return (
@@ -73,37 +78,37 @@ export function ChangePasswordDialog({
         >
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Change password</DialogTitle>
-                    <DialogDescription>Use at least 10 characters.</DialogDescription>
+                    <DialogTitle>{t("password.changeTitle")}</DialogTitle>
+                    <DialogDescription>{t("password.minimum")}</DialogDescription>
                 </DialogHeader>
                 {done ? (
                     <div className="flex flex-col gap-3">
                         <Feedback ok={done} />
                         <Button onClick={() => onOpenChange(false)} className="ml-auto">
-                            Done
+                            {t("dialog.done")}
                         </Button>
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Current password
+                            {t("dialog.currentPassword")}
                             <Input name="currentPassword" type="password" required autoComplete="current-password" />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            New password
+                            {t("password.new")}
                             <Input name="newPassword" type="password" required autoComplete="new-password" />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Confirm new password
+                            {t("password.confirm")}
                             <Input name="confirmPassword" type="password" required autoComplete="new-password" />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? "Changing..." : "Change password"}
+                                {busy ? t("password.changing") : t("password.changeTitle")}
                             </Button>
                         </div>
                     </form>
@@ -124,6 +129,9 @@ export function RecoverPasswordDialog({
     questions: string[];
     canUseAuthenticator: boolean;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
     const [method, setMethod] = useState<"questions" | "totp">(hasQuestions ? "questions" : "totp");
     const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""));
@@ -137,14 +145,14 @@ export function RecoverPasswordDialog({
         const form = new FormData(event.currentTarget);
         const next = String(form.get("newPassword") ?? "");
         if (next !== String(form.get("confirmPassword") ?? "")) {
-            setError("The new passwords do not match.");
+            setError(t("password.mismatch"));
             return;
         }
         setBusy(true);
         setError(null);
         if (await passwordWouldOpenVault(next)) {
             setBusy(false);
-            setError(SAME_AS_VAULT);
+            setError(knownMessage(t, tv, SAME_AS_VAULT));
             return;
         }
         const result = await recoverPasswordAction({
@@ -157,7 +165,7 @@ export function RecoverPasswordDialog({
             setError(result.error);
             return;
         }
-        setDone("Password set. Every other session was signed out.");
+        setDone(t("password.set"));
     }
 
     return (
@@ -174,22 +182,17 @@ export function RecoverPasswordDialog({
         >
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Set a new password</DialogTitle>
-                    <DialogDescription>
-                        Prove it is you without your current password, then choose a new one.
-                    </DialogDescription>
+                    <DialogTitle>{t("password.recoverTitle")}</DialogTitle>
+                    <DialogDescription>{t("password.recoverDescription")}</DialogDescription>
                 </DialogHeader>
 
                 {!hasQuestions && !canUseAuthenticator ? (
-                    <p className="text-sm text-muted-foreground">
-                        Set security questions or an authenticator first - without one of them there is no way to
-                        verify you here.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("password.noWayToVerify")}</p>
                 ) : done ? (
                     <div className="flex flex-col gap-3">
                         <Feedback ok={done} />
                         <Button onClick={() => onOpenChange(false)} className="ml-auto">
-                            Done
+                            {t("dialog.done")}
                         </Button>
                     </div>
                 ) : (
@@ -201,14 +204,14 @@ export function RecoverPasswordDialog({
                                     variant={method === "questions" ? "primary" : "ghost"}
                                     onClick={() => setMethod("questions")}
                                 >
-                                    Security questions
+                                    {t("view.questions.title")}
                                 </Button>
                                 <Button
                                     type="button"
                                     variant={method === "totp" ? "primary" : "ghost"}
                                     onClick={() => setMethod("totp")}
                                 >
-                                    Authenticator
+                                    {t("password.authenticator")}
                                 </Button>
                             </div>
                         ) : null}
@@ -216,7 +219,7 @@ export function RecoverPasswordDialog({
                         {method === "questions" && hasQuestions
                             ? questions.map((question, index) => (
                                   <label key={question} className="flex flex-col gap-1 text-sm">
-                                      {question}
+                                      {questionLabel(t, question)}
                                       <Input
                                           value={answers[index] ?? ""}
                                           autoComplete="off"
@@ -235,7 +238,7 @@ export function RecoverPasswordDialog({
 
                         {method === "totp" && canUseAuthenticator ? (
                             <label className="flex flex-col gap-1 text-sm">
-                                Authenticator code
+                                {t("password.authenticatorCode")}
                                 <CodeInput
                                     name="totpCode"
                                     value={totpCode}
@@ -246,23 +249,23 @@ export function RecoverPasswordDialog({
                         ) : null}
 
                         <label className="flex flex-col gap-1 text-sm">
-                            New password
+                            {t("password.new")}
                             <Input name="newPassword" type="password" required autoComplete="new-password" />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Confirm new password
+                            {t("password.confirm")}
                             <Input name="confirmPassword" type="password" required autoComplete="new-password" />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={busy || (method === "totp" && !isWholeCode(totpCode))}
                             >
-                                {busy ? "Saving..." : "Set password"}
+                                {busy ? tc("actions.saving") : t("password.setButton")}
                             </Button>
                         </div>
                     </form>

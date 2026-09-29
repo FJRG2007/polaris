@@ -24,6 +24,8 @@ import type { OrgDeletionImpact, OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepUpFields } from "@/components/step-up-fields";
 import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
 import { OrgSuccessorCard, type OrgSuccessorPerson } from "./successor-card";
 import {
     changeOrgSlugAction,
@@ -150,6 +152,7 @@ function ChatCard({
     isolated: boolean;
     onRun: Runner;
 }) {
+    const t = useTranslations("accountOrgs");
     const [on, setOn] = useState(isolated);
     const [saving, setSaving] = useState(false);
 
@@ -167,24 +170,19 @@ function ChatCard({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Chat</CardTitle>
+                <CardTitle>{t("settings.chat.title")}</CardTitle>
             </CardHeader>
             <CardBody>
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">A chat of its own</p>
-                        <p className="text-muted-foreground text-xs">
-                            Conversations between the people here stay here, apart from the ones
-                            they have with everybody else. They switch between the two the way
-                            they switch shelves, in the header. Turning this off later puts the
-                            conversations back rather than hiding them.
-                        </p>
+                        <p className="text-sm font-medium">{t("settings.chat.label")}</p>
+                        <p className="text-muted-foreground text-xs">{t("settings.chat.hint")}</p>
                     </div>
                     <Switch
                         checked={on}
                         onChange={change}
                         disabled={saving}
-                        aria-label="A chat of its own"
+                        aria-label={t("settings.chat.label")}
                     />
                 </div>
             </CardBody>
@@ -196,6 +194,8 @@ type Runner = (work: () => Promise<{ error?: string } | null>) => Promise<boolea
 type Confirm = ReturnType<typeof useConfirm>[0];
 
 function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
+    const t = useTranslations("accountOrgs");
+    const tv = useTranslations("validation");
     const [name, setName] = useState(org.name);
     const [description, setDescription] = useState(org.description);
 
@@ -207,7 +207,7 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Profile</CardTitle>
+                <CardTitle>{t("settings.profile.title")}</CardTitle>
             </CardHeader>
             <CardBody>
                 <form
@@ -219,24 +219,26 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
                     }}
                 >
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Name
+                        {t("form.name")}
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Description
+                        {t("form.description")}
                         <Textarea
                             value={description}
                             rows={2}
-                            placeholder="What this organization does"
+                            placeholder={t("settings.profile.descriptionPlaceholder")}
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </label>
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-danger text-xs">
-                            {changed && !parsed.success ? parsed.error.issues[0]?.message : ""}
+                            {changed && !parsed.success
+                                ? orgValidationMessage(t, tv, parsed.error.issues[0]?.message)
+                                : ""}
                         </p>
                         <Button type="submit" size="sm" disabled={!changed || !parsed.success}>
-                            Save
+                            {t("form.save")}
                         </Button>
                     </div>
                 </form>
@@ -254,6 +256,8 @@ function HandleCard({
     confirm: Confirm;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("accountOrgs");
+    const tv = useTranslations("validation");
     const router = useRouter();
     const [slug, setSlug] = useState(org.slug);
 
@@ -263,7 +267,7 @@ function HandleCard({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Handle</CardTitle>
+                <CardTitle>{t("settings.handle.title")}</CardTitle>
             </CardHeader>
             <CardBody>
                 <form
@@ -272,9 +276,9 @@ function HandleCard({
                         event.preventDefault();
                         if (!parsed.success || !changed) return;
                         const ok = await confirm({
-                            title: "Change the handle?",
-                            description: `Every link to /account/organizations/${org.slug} stops working. Anything anybody wrote down has to be updated.`,
-                            confirmLabel: "Change it"
+                            title: t("settings.handle.confirmTitle"),
+                            description: t("settings.handle.confirmBody", { slug: org.slug }),
+                            confirmLabel: t("settings.handle.confirm")
                         });
                         if (!ok) return;
                         onError("");
@@ -292,7 +296,7 @@ function HandleCard({
                     }}
                 >
                     <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                        Handle
+                        {t("form.handle")}
                         <Input
                             value={slug}
                             className="h-9"
@@ -305,12 +309,12 @@ function HandleCard({
                         variant="secondary"
                         disabled={!changed || !parsed.success}
                     >
-                        Change
+                        {t("settings.handle.change")}
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
                         {changed && !parsed.success
-                            ? parsed.error.issues[0]?.message
-                            : "Links already handed out will stop working."}
+                            ? orgValidationMessage(t, tv, parsed.error.issues[0]?.message)
+                            : t("settings.handle.hint")}
                     </p>
                 </form>
             </CardBody>
@@ -329,25 +333,23 @@ function TransferCard({
     confirm: Confirm;
     onRun: Runner;
 }) {
+    const t = useTranslations("accountOrgs");
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Hand it over</CardTitle>
+                <CardTitle>{t("settings.transfer.title")}</CardTitle>
             </CardHeader>
             <CardBody>
                 {candidates.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                        Only somebody already on the roster can be given the organization, and
-                        nobody else is on it yet.
-                    </p>
+                    <p className="text-muted-foreground text-sm">{t("settings.transfer.nobody")}</p>
                 ) : (
                     <label className="text-muted-foreground flex max-w-sm flex-col gap-1 text-xs">
-                        Hand over to
+                        {t("settings.transfer.to")}
                         <Select
                             value=""
                             className="h-9"
-                            aria-label="New owner"
-                            placeholder="Choose somebody"
+                            aria-label={t("settings.transfer.newOwner")}
+                            placeholder={t("settings.transfer.choose")}
                             options={candidates.map((member) => ({
                                 value: member.userId,
                                 label: member.name
@@ -357,10 +359,12 @@ function TransferCard({
                                     (member) => member.userId === userId
                                 );
                                 const ok = await confirm({
-                                    title: `Hand ${org.name} to ${person?.name}?`,
-                                    description:
-                                        "They become the owner and you stay on as an admin. Only they can undo it.",
-                                    confirmLabel: "Hand over"
+                                    title: t("settings.transfer.confirmTitle", {
+                                        org: org.name,
+                                        name: person?.name ?? ""
+                                    }),
+                                    description: t("settings.transfer.confirmBody"),
+                                    confirmLabel: t("settings.transfer.confirm")
                                 });
                                 if (ok) await onRun(() => transferOrgAction(org.id, userId));
                             }}
@@ -383,31 +387,28 @@ function TransferCard({
  * wrong about.
  */
 function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [proof, setProof] = useState<core.StepUpProofInput | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState("");
 
-    const spaces = `${impact.spaces} space${impact.spaces === 1 ? "" : "s"}`;
-    const tasks = `${impact.tasks} task${impact.tasks === 1 ? "" : "s"}`;
-    const projects = `${impact.projects} deploy project${impact.projects === 1 ? "" : "s"}`;
+    const counts = { spaces: impact.spaces, tasks: impact.tasks };
     // Named in both places rather than counted: what is on a company's shelf is
     // a walk of a whole storage away, and that there is one going at all is the
     // part somebody about to press this is wrong about.
-    const drive = impact.drive ? " Its Drive and everything on it go with it." : "";
+    const drive = impact.drive ? ` ${t("settings.danger.drive")}` : "";
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Delete</CardTitle>
+                <CardTitle>{t("settings.danger.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
-                    Deleting takes {spaces} and {tasks} with it, along with its teams, roles and
-                    domains.
-                    {impact.projects > 0 &&
-                        ` Its ${projects} go too, and the services they run are stopped.`}
+                    {t("settings.danger.body", counts)}
+                    {impact.projects > 0 && ` ${t("settings.danger.projects", { count: impact.projects })}`}
                     {drive}
                 </p>
                 <Button
@@ -418,7 +419,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
                         setOpen(true);
                     }}
                 >
-                    <Trash2 className="size-4 shrink-0" /> Delete organization
+                    <Trash2 className="size-4 shrink-0" /> {t("settings.danger.button")}
                 </Button>
             </CardBody>
 
@@ -427,11 +428,11 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
                 onOpenChange={setOpen}
                 name={org.name}
                 kind="organization"
-                confirmLabel="Delete organization"
+                confirmLabel={t("settings.danger.button")}
                 error={error}
                 pending={pending}
                 confirmDisabled={proof === null}
-                description={`${spaces} and ${tasks} are deleted with it, along with its teams, roles and domains.${drive} This cannot be undone.`}
+                description={`${t("settings.danger.dialogBody", counts)}${drive} ${t("settings.danger.cannotUndo")}`}
                 onConfirm={async () => {
                     if (!proof) return;
                     setPending(true);

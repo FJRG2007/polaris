@@ -11,9 +11,11 @@ import { useRouter } from "next/navigation";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { signOut } from "@/lib/auth-client";
 import { unlockSessionAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function LockView({ name, email, hasPin }: { name: string; email: string; hasPin: boolean }) {
     const router = useRouter();
+    const t = useTranslations("auth");
     const [method, setMethod] = useState<"pin" | "password">(hasPin ? "pin" : "password");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Locked</CardTitle>
+                    <CardTitle>{t("lock.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <p className="mb-3 text-center text-sm text-muted-foreground">
@@ -52,7 +54,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
                     </p>
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            {method === "pin" ? "Unlock PIN" : "Account password"}
+                            {method === "pin" ? t("lock.pin") : t("lock.password")}
                             <Input
                                 name="secret"
                                 type="password"
@@ -65,7 +67,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
                         </label>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Unlocking..." : "Unlock"}
+                            {pending ? t("lock.unlocking") : t("lock.unlock")}
                         </Button>
                     </form>
                     <div className="mt-4 flex justify-between text-xs">
@@ -78,7 +80,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
                                     setError(null);
                                 }}
                             >
-                                {method === "pin" ? "Use my password" : "Use my PIN"}
+                                {method === "pin" ? t("lock.usePassword") : t("lock.usePin")}
                             </button>
                         ) : (
                             <span />
@@ -88,7 +90,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
                             className="text-muted-foreground underline-offset-2 hover:underline"
                             onClick={() => void onSignOut()}
                         >
-                            Sign out
+                            {t("lock.signOut")}
                         </button>
                     </div>
                 </CardBody>

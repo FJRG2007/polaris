@@ -25,9 +25,11 @@
 import { useEffect } from "react";
 import { RotateCcw } from "lucide-react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 
 export default function OauthError({ error }: { error: Error & { digest?: string } }) {
+    const t = useTranslations("auth");
     const staleBuild = isStaleBuildError(error);
 
     useEffect(() => {
@@ -44,14 +46,12 @@ export default function OauthError({ error }: { error: Error & { digest?: string
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
                     <CardTitle>
-                        {staleBuild ? "Polaris was updated" : "This screen stopped working"}
+                        {staleBuild ? t("error.updatedTitle") : t("error.brokenTitle")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <p className="text-sm text-muted-foreground">
-                        {staleBuild
-                            ? "This tab is still running the build from before the update. Reloading picks up the new one."
-                            : "Reload to try again. If it keeps happening, this is what it failed with."}
+                        {staleBuild ? t("error.updatedBody") : t("error.brokenBody")}
                     </p>
                     {/* Not for the stale build: its message is an id nobody can do
                         anything with, under a heading that already says what
@@ -63,11 +63,11 @@ export default function OauthError({ error }: { error: Error & { digest?: string
                     ) : null}
                     {error.digest && !staleBuild ? (
                         <p className="font-mono text-xs text-muted-foreground">
-                            Reference: {error.digest}
+                            {t("error.reference", { digest: error.digest })}
                         </p>
                     ) : null}
                     <Button className="self-end" onClick={() => window.location.reload()}>
-                        <RotateCcw className="size-4" /> Reload
+                        <RotateCcw className="size-4" /> {t("error.reload")}
                     </Button>
                 </CardBody>
             </Card>

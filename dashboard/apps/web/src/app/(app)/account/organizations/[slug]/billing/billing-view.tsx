@@ -13,6 +13,7 @@ import { RefreshCw } from "lucide-react";
 import { BudgetCard } from "./budget-card";
 import type { CurrencyCode } from "@polaris/core";
 import * as parts from "@/components/billing/statement-parts";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function BillingView({
     orgId,
@@ -27,6 +28,7 @@ export function BillingView({
     budget: { amount: number; currency: CurrencyCode } | null;
     canSetPrices: boolean;
 }) {
+    const t = useTranslations("accountOrgs");
     const base = `/api/orgs/${encodeURIComponent(slug)}/billing`;
     const { data, error, stale, refreshing, refresh, month, months } = parts.useStatement(base, `org.billing:${slug}`);
 
@@ -47,19 +49,19 @@ export function BillingView({
                     size="icon"
                     onClick={refresh}
                     disabled={refreshing}
-                    aria-label="Refresh"
-                    title="Refresh"
+                    aria-label={t("billing.refresh")}
+                    title={t("billing.refresh")}
                 >
                     <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
                 </Button>
             </parts.StatementToolbar>
             {error ? <p className="text-danger text-sm">{error}</p> : null}
-            {stale ? <p className="text-warning-ink text-sm">Showing the last statement read. {stale}</p> : null}
+            {stale ? <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p> : null}
             <parts.StatementTotals view={data} />
             <parts.StatementTable
                 view={data}
                 showOwner={false}
-                emptyLabel="This organization has no projects yet. A project created while it is the open shelf belongs to it."
+                emptyLabel={t("billing.empty")}
             />
             <parts.StatementNotes view={data} />
         </div>

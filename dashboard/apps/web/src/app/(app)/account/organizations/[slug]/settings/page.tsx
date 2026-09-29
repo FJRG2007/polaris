@@ -16,6 +16,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { SettingsView } from "./settings-view";
+import { Messages } from "@/components/i18n/messages";
 import { hasOrgPermission } from "@polaris/core";
 import { requireOrgFrame } from "@/lib/orgs/page-access";
 import { canDeleteOrg, listOrgMembers, orgDeletionImpact } from "@/lib/orgs/org-service";
@@ -60,7 +61,9 @@ export default async function OrganizationSettingsPage({
         })
     ]);
 
+    // The photo card is the account screens' own, and reads their namespace.
     return (
+        <Messages namespaces={["account"]}>
         <SettingsView
             org={org}
             isOwner={access.isOwner}
@@ -74,5 +77,6 @@ export default async function OrganizationSettingsPage({
             chatIsolated={chat?.chatIsolated === true}
             chatOffered={chatOffered}
         />
+        </Messages>
     );
 }

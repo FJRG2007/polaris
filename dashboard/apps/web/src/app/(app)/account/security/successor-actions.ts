@@ -18,6 +18,8 @@ import { requireUser } from "@/lib/session";
 import { proveStepUp } from "@/lib/step-up";
 import { recordAudit } from "@/lib/audit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { getTranslations } from "@/lib/i18n/request";
+import { firstIssue, localized } from "./action-messages";
 import { accountSuccessorSchema, stepUpProofSchema } from "@polaris/core";
 import { clearSuccessor, setSuccessor, SuccessorError } from "@/lib/successor-service";
 
@@ -33,13 +35,13 @@ const nameSuccessorSchema = accountSuccessorSchema.extend({ proof: stepUpProofSc
 export async function setSuccessorAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = nameSuccessorSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const proven = await proveStepUp(user.id, PURPOSE, parsed.data.proof);
-    if (proven.error) return proven;
+    if (proven.error) return localized(proven);
 
     try {
         const successor = await setSuccessor(user.id, parsed.data.identifier);
@@ -52,22 +54,22 @@ export async function setSuccessorAction(input: unknown): Promise<ActionResult> 
         revalidatePath("/account/security");
         return {};
     } catch (caught) {
-        if (caught instanceof SuccessorError) return { error: caught.message };
+        if (caught instanceof SuccessorError) return localized({ error: caught.message });
         console.error("successor: could not name one:", caught);
-        return { error: "Could not name that successor." };
+        return { error: (await getTranslations("accountSecurity"))("errors.successorFailed") };
     }
 }
 
 export async function clearSuccessorAction(proof: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = z.object({ proof: stepUpProofSchema }).safeParse(proof);
-    if (!parsed.success) return { error: "Confirm it is you first." };
+    if (!parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.confirmFirst") };
 
     const proven = await proveStepUp(user.id, PURPOSE, parsed.data.proof);
-    if (proven.error) return proven;
+    if (proven.error) return localized(proven);
 
     await clearSuccessor(user.id);
     await recordAudit({ actorId: user.id, action: "account.successor.cleared" });

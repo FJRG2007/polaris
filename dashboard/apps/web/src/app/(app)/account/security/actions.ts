@@ -27,6 +27,8 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { setConnectionSignIn } from "@/lib/connections/store";
 import { stepUpGranted } from "@/lib/step-up-grant";
+import { getTranslations } from "@/lib/i18n/request";
+import { firstIssue, localized } from "./action-messages";
 import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
 import {
     newDeviceGraceSchema,
@@ -67,7 +69,13 @@ type ActionResult = { error?: string };
  * A sentence rather than a code, because it is shown: the dialog reopens on it
  * and the person types one proof rather than reading about an error.
  */
-const NEEDS_PROOF = "Confirm it is you again before changing this.";
+async function needsProof(): Promise<ActionResult> {
+    return { error: (await getTranslations("accountSecurity"))("errors.needsProof") };
+}
+
+async function refuse(key: "errors.noLongerConnected" | "errors.pickOfferedWait"): Promise<ActionResult> {
+    return { error: (await getTranslations("accountSecurity"))(key) };
+}
 
 /**
  * Allow, or stop allowing, one connected account as a way into this Polaris.
@@ -80,19 +88,19 @@ const NEEDS_PROOF = "Confirm it is you again before changing this.";
 export async function setConnectionSignInAction(connectionId: string, enabled: boolean): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     // Proved once for this screen and good for two minutes, so a person changing
     // three of these answers one challenge. See `step-up-grant` for why that is
     // the stronger gate rather than the softer one.
     if (!(await stepUpGranted(user.id, user.sessionId, "connected-sign-in"))) {
-        return { error: NEEDS_PROOF };
+        return needsProof();
     }
 
     const parsed = z.string().uuid().safeParse(connectionId);
-    if (!parsed.success) return { error: "That account is no longer connected." };
+    if (!parsed.success) return refuse("errors.noLongerConnected");
 
     const updated = await setConnectionSignIn(user.id, parsed.data, enabled === true);
-    if (!updated) return { error: "That account is no longer connected." };
+    if (!updated) return refuse("errors.noLongerConnected");
     revalidatePath("/account/security");
     return {};
 }
@@ -108,9 +116,9 @@ export async function setConnectionSignInAction(connectionId: string, enabled: b
 export async function setConnectionSignInChallengeAction(challenge: boolean): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     if (!(await stepUpGranted(user.id, user.sessionId, "connected-sign-in"))) {
-        return { error: NEEDS_PROOF };
+        return needsProof();
     }
 
     await setConnectionSignInChallenge(user.id, challenge === true);
@@ -145,7 +153,7 @@ export async function setConnectionSignInChallengeAction(challenge: boolean): Pr
 export async function setUsernameSignInAction(enabled: boolean): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     await setUsernameSignIn(user.id, enabled === true);
     await recordAudit({
@@ -160,7 +168,7 @@ export async function setUsernameSignInAction(enabled: boolean): Promise<ActionR
 export async function setEmailLinkSignInAction(enabled: boolean): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     await setEmailLinkSignIn(user.id, enabled === true);
     await recordAudit({
@@ -179,13 +187,13 @@ const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
 export async function changePasswordAction(currentPassword: string, newPassword: string): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const result = await changeUserPassword(auth, user.id, String(currentPassword), String(newPassword));
     if (!result.error) {
         await revokeOtherSessions(user.id, user.sessionId);
         await recordAudit({ actorId: user.id, action: "account.password.changed" });
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -197,13 +205,14 @@ export async function changePasswordAction(currentPassword: string, newPassword:
 export async function recoverPasswordAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = recoverPasswordSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const throttle = await rateLimit(`account-recovery:${user.id}`, RECOVERY_LIMIT, RECOVERY_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
     const proven = parsed.data.totpCode
@@ -212,7 +221,7 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
         : await verifySecurityAnswers(auth, user.id, parsed.data.answers);
     if (!proven) {
         await recordAudit({ actorId: user.id, action: "account.password.recovery-failed" });
-        return { error: "We could not verify that. Check your answers or code and try again." };
+        return { error: (await getTranslations("accountSecurity"))("errors.notVerified") };
     }
 
     const result = await resetUserPassword(auth, user.id, parsed.data.newPassword);
@@ -220,7 +229,7 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
         await revokeOtherSessions(user.id, user.sessionId);
         await recordAudit({ actorId: user.id, action: "account.password.recovered" });
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -246,32 +255,32 @@ export async function beginSessionRotationAction(): Promise<void> {
 export async function setPinAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = setPinSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     const result = await setQuickPin(auth, user.id, parsed.data.pin, parsed.data.password);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.set" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 export async function clearPinAction(password: string): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     // Approving a sign-in is what the PIN proves, so it cannot outlive the PIN.
     const security = await getUserSecurity(user.id);
     if (security.requireLoginApproval) {
-        return { error: "Turn off approving sign-ins from an open session first - it asks for this PIN." };
+        return { error: (await getTranslations("accountSecurity"))("errors.approvalNeedsPin") };
     }
     const result = await clearQuickPin(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.cleared" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -286,9 +295,9 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
 export async function setNewDeviceGraceAction(days: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = newDeviceGraceSchema.safeParse(days);
-    if (!parsed.success) return { error: "Pick one of the offered waits." };
+    if (!parsed.success) return refuse("errors.pickOfferedWait");
     await setNewDeviceGrace(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -311,9 +320,9 @@ export async function setNewDeviceGraceAction(days: unknown): Promise<ActionResu
 export async function updateSessionBindingAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionBindingSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     await updateSessionBinding(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -327,9 +336,9 @@ export async function updateSessionBindingAction(input: unknown): Promise<Action
 export async function updateSessionLimitsAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = sessionLimitsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     await updateSessionLimits(user.id, parsed.data);
     await recordAudit({ actorId: user.id, action: "account.session-limits.updated", metadata: parsed.data });
     revalidatePath("/account/security");
@@ -352,15 +361,15 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
 export async function setLoginApprovalAction(required: boolean, password: string): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     if (!(await verifyAccountPassword(auth, user.id, String(password)))) {
-        return { error: "Current password is incorrect." };
+        return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     }
     if (required === true && (await twoFactorEnabled(user.id))) {
-        return { error: "Turn the authenticator app off first - a sign-in asks for one of the two, not both." };
+        return { error: (await getTranslations("accountSecurity"))("errors.authenticatorFirst") };
     }
     if (required === true && !(await getUserSecurity(user.id)).hasPin) {
-        return { error: "Set a quick unlock PIN first - approving a sign-in asks for it." };
+        return { error: (await getTranslations("accountSecurity"))("errors.pinFirst") };
     }
     await setLoginApprovalRequired(user.id, required === true);
     await recordAudit({
@@ -374,25 +383,25 @@ export async function setLoginApprovalAction(required: boolean, password: string
 export async function setSecurityQuestionsAction(password: string, input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = securityQuestionsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     const result = await setSecurityQuestions(auth, user.id, String(password), parsed.data.answers);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.set" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 export async function clearSecurityQuestionsAction(password: string): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const result = await clearSecurityQuestions(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.cleared" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }

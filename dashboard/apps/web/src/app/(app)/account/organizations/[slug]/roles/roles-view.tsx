@@ -23,6 +23,8 @@ import { runAction } from "@/lib/run-action";
 import { IdCard, Plus, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgRoleView } from "@/lib/orgs/role-service";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     createOrgRoleAction,
     deleteOrgRoleAction,
@@ -59,6 +61,31 @@ const AREAS = core.ORG_PERMISSION_AREAS.map((area) => ({
     )
 })).filter((group) => group.permissions.length > 0);
 
+/** What each permission is called on screen. Core's own labels are the English
+ *  source; the keys here are checked against the catalog by the compiler. */
+const PERMISSION_LABELS: Readonly<Record<core.OrgPermission, NamespaceKey<"accountOrgs">>> = {
+    "org.read": "roles.permissions.orgRead",
+    "settings.manage": "roles.permissions.settingsManage",
+    "activity.read": "roles.permissions.activityRead",
+    "people.manage": "roles.permissions.peopleManage",
+    "teams.manage": "roles.permissions.teamsManage",
+    "roles.manage": "roles.permissions.rolesManage",
+    "spaces.manage": "roles.permissions.spacesManage",
+    "deploy.manage": "roles.permissions.deployManage",
+    "domains.manage": "roles.permissions.domainsManage",
+    "vault.manage": "roles.permissions.vaultManage",
+    "drive.manage": "roles.permissions.driveManage",
+    "mail.manage": "roles.permissions.mailManage"
+};
+
+/** The areas the grid is grouped by, by the name core gives them. An area core
+ *  adds later is drawn under its own name until it has one here. */
+const AREA_LABELS: Readonly<Record<string, NamespaceKey<"accountOrgs">>> = {
+    General: "roles.areas.general",
+    People: "roles.areas.people",
+    Work: "roles.areas.work"
+};
+
 function sameSet(held: Set<string>, saved: readonly string[]): boolean {
     const relevant = saved.filter((permission) => permission !== "org.read");
     return held.size === relevant.length && relevant.every((permission) => held.has(permission));
@@ -73,24 +100,27 @@ export function RolesView({
     orgSlug: string;
     roles: OrgRoleView[];
 }) {
+    const t = useTranslations("accountOrgs");
     const [creating, setCreating] = useState(false);
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
-                    A role decides what somebody may do across this organization. Who holds which is
-                    set under{" "}
-                    <a
-                        href={`/account/organizations/${orgSlug}/people`}
-                        className="hover:text-foreground underline"
-                    >
-                        People
-                    </a>
-                    .
+                    {t.rich("roles.intro", {
+                        people: (chunks) => (
+                            <a
+                                key="people"
+                                href={`/account/organizations/${orgSlug}/people`}
+                                className="hover:text-foreground underline"
+                            >
+                                {chunks}
+                            </a>
+                        )
+                    })}
                 </p>
                 <Button size="sm" onClick={() => setCreating(true)}>
-                    <Plus className="size-4 shrink-0" /> New role
+                    <Plus className="size-4 shrink-0" /> {t("roles.new")}
                 </Button>
             </div>
 
@@ -104,6 +134,7 @@ export function RolesView({
 }
 
 function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [held, setHeld] = useState<Set<string>>(
@@ -138,10 +169,10 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                         {role.name}
                     </CardTitle>
                     <span className="text-muted-foreground text-xs">@{role.slug}</span>
-                    {role.system ? <Badge>built-in</Badge> : null}
-                    {role.restricted ? <Badge variant="neutral">no implicit access</Badge> : null}
+                    {role.system ? <Badge>{t("roles.builtIn")}</Badge> : null}
+                    {role.restricted ? <Badge variant="neutral">{t("roles.noImplicitAccess")}</Badge> : null}
                     <span className="text-muted-foreground text-xs">
-                        {role.memberCount === 1 ? "1 person" : `${role.memberCount} people`}
+                        {t("roles.people", { count: role.memberCount })}
                     </span>
                 </div>
                 {!role.system && (
@@ -149,20 +180,16 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                         size="sm"
                         variant="ghost"
                         disabled={busy}
-                        aria-label={`Delete the ${role.name} role`}
-                        title={`Delete the ${role.name} role`}
+                        aria-label={t("roles.deleteLabel", { name: role.name })}
+                        title={t("roles.deleteLabel", { name: role.name })}
                         onClick={async () => {
                             const ok = await confirm({
-                                title: `Delete the ${role.name} role?`,
+                                title: t("roles.deleteTitle", { name: role.name }),
                                 description:
                                     role.memberCount === 0
-                                        ? "Nobody holds it, so nobody loses anything."
-                                        : `${role.memberCount} ${
-                                              role.memberCount === 1
-                                                  ? "person becomes"
-                                                  : "people become"
-                                          } a Member, and lose whatever this role gave them.`,
-                                confirmLabel: "Delete role",
+                                        ? t("roles.deleteNobody")
+                                        : t("roles.deleteSome", { count: role.memberCount }),
+                                confirmLabel: t("roles.deleteConfirm"),
                                 danger: true
                             });
                             if (ok) await run(() => deleteOrgRoleAction(orgId, role.slug));
@@ -177,11 +204,7 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     <p className="text-muted-foreground text-sm">{role.description}</p>
                 )}
                 {locked ? (
-                    <p className="text-muted-foreground text-sm">
-                        Holds everything here, including anything a later version of Polaris adds.
-                        This is the role that keeps the organization runnable, so it cannot be
-                        narrowed.
-                    </p>
+                    <p className="text-muted-foreground text-sm">{t("roles.locked")}</p>
                 ) : (
                     <>
                         <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
@@ -189,11 +212,11 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                             <p className="text-muted-foreground text-xs">
                                 {role.restricted
                                     ? held.size === 0
-                                        ? "Reaches only what is granted to them directly - not the roster, the files or internal work."
-                                        : `${held.size} of ${GRANTABLE.length} permissions, without seeing the roster, the files or internal work.`
+                                        ? t("roles.restrictedNone")
+                                        : t("roles.restrictedSome", { held: held.size, total: GRANTABLE.length })
                                     : held.size === 0
-                                      ? "Sees the organization and whatever their teams reach, and nothing else."
-                                      : `${held.size} of ${GRANTABLE.length} permissions.`}
+                                      ? t("roles.plainNone")
+                                      : t("roles.plainSome", { held: held.size, total: GRANTABLE.length })}
                             </p>
                             <Button
                                 size="sm"
@@ -208,7 +231,7 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                                     )
                                 }
                             >
-                                Save
+                                {t("form.save")}
                             </Button>
                         </div>
                     </>
@@ -233,11 +256,16 @@ function PermissionGrid({
     disabled: boolean;
     onChange: (next: Set<string>) => void;
 }) {
+    const t = useTranslations("accountOrgs");
+    const areaLabel = (area: string) => {
+        const key = AREA_LABELS[area];
+        return key ? t(key) : area;
+    };
     return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {AREAS.map(({ area, permissions }) => (
                 <div key={area} className="flex flex-col gap-1.5">
-                    <p className="text-muted-foreground text-xs font-medium">{area}</p>
+                    <p className="text-muted-foreground text-xs font-medium">{areaLabel(area)}</p>
                     {permissions.map((permission) => (
                         <label
                             key={permission}
@@ -247,7 +275,7 @@ function PermissionGrid({
                                 className="mt-0.5"
                                 checked={held.has(permission)}
                                 disabled={disabled}
-                                aria-label={core.ORG_PERMISSION_META[permission].label}
+                                aria-label={t(PERMISSION_LABELS[permission])}
                                 onChange={(event) => {
                                     const next = new Set(held);
                                     if (event.target.checked) next.add(permission);
@@ -256,7 +284,7 @@ function PermissionGrid({
                                 }}
                             />
                             <span className="min-w-0">
-                                {core.ORG_PERMISSION_META[permission].label}
+                                {t(PERMISSION_LABELS[permission])}
                             </span>
                         </label>
                     ))}
@@ -275,6 +303,7 @@ function NewRoleDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [name, setName] = useState("");
     const [slug, setSlug] = useState("");
@@ -310,11 +339,8 @@ function NewRoleDialog({
         >
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>New role</DialogTitle>
-                    <DialogDescription>
-                        Name it after the job people actually do here. Everybody who holds it sees
-                        the organization; what else it reaches is up to you.
-                    </DialogDescription>
+                    <DialogTitle>{t("roles.create.title")}</DialogTitle>
+                    <DialogDescription>{t("roles.create.body")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -338,11 +364,11 @@ function NewRoleDialog({
                 >
                     <div className="flex flex-wrap gap-3">
                         <label className="text-muted-foreground flex min-w-40 flex-1 flex-col gap-1 text-xs">
-                            Name
+                            {t("form.name")}
                             <Input
                                 value={name}
                                 autoFocus
-                                placeholder="Contractor"
+                                placeholder={t("roles.create.namePlaceholder")}
                                 onChange={(event) => {
                                     setName(event.target.value);
                                     if (!slugTouched) setSlug(core.suggestSlug(event.target.value));
@@ -350,10 +376,10 @@ function NewRoleDialog({
                             />
                         </label>
                         <label className="text-muted-foreground flex min-w-40 flex-1 flex-col gap-1 text-xs">
-                            Handle
+                            {t("form.handle")}
                             <Input
                                 value={slug}
-                                placeholder="contractor"
+                                placeholder={t("roles.create.handlePlaceholder")}
                                 onChange={(event) => {
                                     setSlugTouched(true);
                                     setSlug(event.target.value);
@@ -362,11 +388,11 @@ function NewRoleDialog({
                         </label>
                     </div>
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Description
+                        {t("form.description")}
                         <Textarea
                             value={description}
                             rows={2}
-                            placeholder="What somebody with this role is here to do"
+                            placeholder={t("roles.create.descriptionPlaceholder")}
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </label>
@@ -381,10 +407,10 @@ function NewRoleDialog({
                     )}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("form.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy || !parsed.success}>
-                            Create
+                            {t("form.create")}
                         </Button>
                     </DialogFooter>
                 </form>

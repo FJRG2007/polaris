@@ -18,6 +18,8 @@ import { KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { BackupCodesPanel } from "./backup-codes-panel";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { regenerateBackupCodesAction } from "./two-factor-actions";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
@@ -28,27 +30,27 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 const LOW_WATER_MARK = 3;
 
 /** What the card says about a set, given what the server could count. */
-function describe(remaining: number | null): { status: string; description: string; low: boolean } {
+function describe(
+    t: NamespaceTranslator<"accountSecurity">,
+    remaining: number | null
+): { status: string; description: string; low: boolean } {
     if (remaining === null) {
         return {
-            status: "Unknown",
-            description: "The stored set could not be read. Generating a new one replaces it.",
+            status: t("backupCodes.unknown"),
+            description: t("backupCodes.unreadable"),
             low: true
         };
     }
     if (remaining === 0) {
         return {
-            status: "None left",
-            description: "Every code has been used. Without the authenticator there is no way back in.",
+            status: t("backupCodes.noneLeft"),
+            description: t("backupCodes.allUsed"),
             low: true
         };
     }
     return {
-        status: `${remaining} left`,
-        description:
-            remaining <= LOW_WATER_MARK
-                ? "Running low. Generate a new set before you need one."
-                : "Single-use codes that stand in for the authenticator when you cannot reach it.",
+        status: t("backupCodes.left", { count: remaining }),
+        description: remaining <= LOW_WATER_MARK ? t("backupCodes.runningLow") : t("backupCodes.description"),
         low: remaining <= LOW_WATER_MARK
     };
 }
@@ -67,6 +69,7 @@ export function BackupCodesCard({
     /** Codes still unspent, or null when no readable set exists. */
     remaining: number | null;
 }) {
+    const t = useTranslations("accountSecurity");
     const [open, setOpen] = useState(false);
 
     // Backup codes are minted with the authenticator and die with it, so with the
@@ -76,27 +79,27 @@ export function BackupCodesCard({
     if (!twoFactorEnabled) {
         return (
             <SettingCard
-                title="Backup codes"
-                description="Single-use codes that get you in without the authenticator. They come with it."
-                status="Off"
+                title={t("backupCodes.title")}
+                description={t("backupCodes.offDescription")}
+                status={t("status.off")}
                 statusTone="off"
             />
         );
     }
 
-    const { status, description, low } = describe(remaining);
+    const { status, description, low } = describe(t, remaining);
 
     return (
         <>
             <SettingCard
-                title="Backup codes"
+                title={t("backupCodes.title")}
                 description={description}
                 status={status}
                 statusTone={low ? "off" : "on"}
             >
                 <Button variant={low ? "primary" : "outline"} disabled={Boolean(lock)} onClick={() => setOpen(true)}>
                     <KeyRound className="size-4" />
-                    New codes
+                    {t("backupCodes.newCodes")}
                 </Button>
             </SettingCard>
             <RegenerateDialog open={open} onOpenChange={setOpen} account={account} />
@@ -122,6 +125,8 @@ function RegenerateDialog({
     account: string;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [codes, setCodes] = useState<string[] | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -145,7 +150,7 @@ function RegenerateDialog({
         const result = await regenerateBackupCodesAction({ password });
         setBusy(false);
         if (result.error || !result.codes) {
-            setError(result.error ?? "The codes could not be generated.");
+            setError(result.error ?? t("backupCodes.notGenerated"));
             return;
         }
         setCodes(result.codes);
@@ -155,11 +160,9 @@ function RegenerateDialog({
         <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{codes ? "Your new backup codes" : "Generate new backup codes"}</DialogTitle>
+                    <DialogTitle>{codes ? t("backupCodes.newTitle") : t("backupCodes.generateTitle")}</DialogTitle>
                     <DialogDescription>
-                        {codes
-                            ? "Save these now. This is the only time they are shown."
-                            : "Your current codes stop working straight away, including any you have printed."}
+                        {codes ? t("backupCodes.saveNow") : t("backupCodes.oldStopWorking")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -168,27 +171,27 @@ function RegenerateDialog({
                         <BackupCodesPanel
                             codes={codes}
                             account={account}
-                            label="Each code works once. Keep them somewhere you can reach without your phone."
+                            label={t("backupCodes.panelLabel")}
                         />
                         <div className="flex justify-end">
                             <Button type="button" onClick={close}>
-                                Done
+                                {t("dialog.done")}
                             </Button>
                         </div>
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Current password
+                            {t("dialog.currentPassword")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={close}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? "Generating..." : "Generate"}
+                                {busy ? t("backupCodes.generating") : t("backupCodes.generate")}
                             </Button>
                         </div>
                     </form>

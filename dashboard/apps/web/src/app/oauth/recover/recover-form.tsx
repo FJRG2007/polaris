@@ -15,7 +15,8 @@ import { useRouter } from "next/navigation";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
-import { BREACHED_PASSWORD_MESSAGE, SECURITY_QUESTION_COUNT, type AccountRecoveryStatus } from "@polaris/core";
+import { SECURITY_QUESTION_COUNT, type AccountRecoveryStatus } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     completeRecoveryAction,
     lookupRecoveryAction,
@@ -65,6 +66,8 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 
 export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     const router = useRouter();
+    const t = useTranslations("auth");
+    const tv = useTranslations("validation");
     const [step, setStep] = useState<Step>(initialTicket ? "waiting" : "identify");
     const [identifier, setIdentifier] = useState("");
     const [questions, setQuestions] = useState<string[]>([]);
@@ -148,7 +151,7 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     async function onIdentify(event: FormEvent) {
         event.preventDefault();
         if (!identifier.trim()) {
-            setError("Enter your email or username.");
+            setError(t("recover.errors.enterIdentifier"));
             return;
         }
         setPending(true);
@@ -167,7 +170,7 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     async function onRequest(event: FormEvent) {
         event.preventDefault();
         if (questions.length > 0 && answers.some((answer) => answer.trim().length < 2)) {
-            setError("Answer every question.");
+            setError(t("recover.errors.answerAll"));
             return;
         }
         setPending(true);
@@ -186,11 +189,11 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     async function onReset(event: FormEvent) {
         event.preventDefault();
         if (password.length < MIN_PASSWORD) {
-            setError(`Use at least ${MIN_PASSWORD} characters.`);
+            setError(t("recover.errors.tooShort", { count: MIN_PASSWORD }));
             return;
         }
         if (breached) {
-            setError(BREACHED_PASSWORD_MESSAGE);
+            setError(tv("passwordBreached"));
             return;
         }
         setPending(true);
@@ -216,27 +219,24 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
 
     if (step === "identify") {
         return (
-            <Shell title="Recover your account">
-                <p className="text-sm text-muted-foreground">
-                    If you have lost your password and every other way in, ask whoever runs this
-                    Polaris to let you back on.
-                </p>
+            <Shell title={t("recover.title")}>
+                <p className="text-sm text-muted-foreground">{t("recover.intro")}</p>
                 <form onSubmit={onIdentify} noValidate className="mt-3 flex flex-col gap-3">
                     <Input
-                        placeholder="Email or username"
+                        placeholder={t("recover.identifier")}
                         autoComplete="username"
                         value={identifier}
                         onChange={(event) => setIdentifier(event.target.value)}
                     />
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <Button type="submit" disabled={pending}>
-                        {pending ? "Checking..." : "Continue"}
+                        {pending ? t("recover.checking") : t("recover.continue")}
                     </Button>
                     <Link
                         href="/oauth/login"
                         className="text-center text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                     >
-                        Back to sign in
+                        {t("recover.backToSignIn")}
                     </Link>
                 </form>
             </Shell>
@@ -245,18 +245,11 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
 
     if (step === "prove") {
         return (
-            <Shell title="Recover your account">
+            <Shell title={t("recover.title")}>
                 {questions.length === SECURITY_QUESTION_COUNT ? (
-                    <p className="text-sm text-muted-foreground">
-                        Answer your security questions. They go with the request, so whoever decides
-                        it can see you got them right.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("recover.questionsIntro")}</p>
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        There are no security questions on this account, so nothing here can be
-                        checked automatically. Whoever runs this Polaris will have to recognize you
-                        another way before approving it.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("recover.noQuestions")}</p>
                 )}
                 <form onSubmit={onRequest} noValidate className="mt-3 flex flex-col gap-3">
                     {questions.map((question, index) => (
@@ -275,10 +268,10 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                     ))}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <Button type="submit" disabled={pending}>
-                        {pending ? "Sending..." : "Send request"}
+                        {pending ? t("recover.sending") : t("recover.sendRequest")}
                     </Button>
                     <Button type="button" variant="ghost" onClick={startOver}>
-                        Use a different account
+                        {t("recover.differentAccount")}
                     </Button>
                 </form>
             </Shell>
@@ -288,25 +281,19 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     if (step === "waiting") {
         const settled = status === "denied" || status === "expired";
         return (
-            <Shell title="Waiting for approval">
+            <Shell title={t("recover.waitingTitle")}>
                 {settled ? (
                     <>
                         <p className="text-sm text-muted-foreground">
-                            {status === "denied"
-                                ? "That request was turned down. Speak to whoever runs this Polaris."
-                                : "That request expired before it was decided."}
+                            {status === "denied" ? t("recover.denied") : t("recover.expired")}
                         </p>
                         <Button className="mt-3 w-full" onClick={startOver}>
-                            Start again
+                            {t("recover.startAgain")}
                         </Button>
                     </>
                 ) : (
                     <>
-                        <p className="text-sm text-muted-foreground">
-                            If that account exists, the administrators have been asked to approve it.
-                            Leave this page open - it turns into the password form the moment one of
-                            them says yes.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("recover.asked")}</p>
                         {/* The ticket used to be printed here as a path to copy,
                             which was a credential on a screen anybody walking past
                             could read and told nobody anything the address bar was
@@ -314,19 +301,16 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                             so the way back is to bookmark it or leave it open. */}
                         <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                            Waiting for a decision. Nothing here needs doing.
+                            {t("recover.waiting")}
                         </p>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                            If you close this tab, the address of this page is the way back to the
-                            request - bookmark it. It expires in 24 hours either way.
-                        </p>
+                        <p className="mt-3 text-xs text-muted-foreground">{t("recover.bookmark")}</p>
                     </>
                 )}
                 <Link
                     href="/oauth/login"
                     className="mt-4 block text-center text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 >
-                    Back to sign in
+                    {t("recover.backToSignIn")}
                 </Link>
             </Shell>
         );
@@ -334,11 +318,8 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
 
     if (step === "reset") {
         return (
-            <Shell title="Set a new password">
-                <p className="text-sm text-muted-foreground">
-                    Your request was approved. Choosing a password here signs out everything else on
-                    the account.
-                </p>
+            <Shell title={t("recover.resetTitle")}>
+                <p className="text-sm text-muted-foreground">{t("recover.approved")}</p>
                 <form onSubmit={onReset} noValidate className="mt-3 flex flex-col gap-3">
                     {/* A password manager needs to know which account it is saving this
                         under, and there is nothing else on the form to tell it. Absent when
@@ -353,16 +334,16 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                         account-recovery-service, where the account is known. */}
                     <Input
                         type="password"
-                        placeholder={`${MIN_PASSWORD}+ characters`}
+                        placeholder={t("recover.passwordPlaceholder", { count: MIN_PASSWORD })}
                         autoComplete="new-password"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         aria-invalid={breached}
                     />
-                    {breached ? <p className="text-sm text-danger">{BREACHED_PASSWORD_MESSAGE}</p> : null}
+                    {breached ? <p className="text-sm text-danger">{tv("passwordBreached")}</p> : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <Button type="submit" disabled={pending || breached}>
-                        {pending ? "Saving..." : "Set password"}
+                        {pending ? t("recover.saving") : t("recover.setPassword")}
                     </Button>
                 </form>
             </Shell>
@@ -370,12 +351,10 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
     }
 
     return (
-        <Shell title="You are back in">
-            <p className="text-sm text-muted-foreground">
-                Your password is set. Sign in with it to finish.
-            </p>
+        <Shell title={t("recover.doneTitle")}>
+            <p className="text-sm text-muted-foreground">{t("recover.done")}</p>
             <Button className="mt-3 w-full" onClick={() => router.push("/oauth/login")}>
-                Go to sign in
+                {t("recover.goToSignIn")}
             </Button>
         </Shell>
     );

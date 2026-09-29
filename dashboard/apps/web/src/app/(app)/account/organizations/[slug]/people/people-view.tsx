@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OrgMemberView } from "@/lib/orgs/org-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
@@ -71,6 +72,7 @@ export function PeopleView({
     canInviteNewPeople: boolean;
     memberLimit: number;
 }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const format = useDisplayFormat();
     const toast = useToast();
@@ -119,10 +121,11 @@ export function PeopleView({
                 <Card>
                     <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                         <CardTitle className="flex items-center gap-2">
-                            <Users className="size-4 shrink-0" /> People
+                            <Users className="size-4 shrink-0" /> {t("people.title")}
                             <span className="text-muted-foreground text-xs font-normal">
-                                {members.length}
-                                {memberLimit > 0 ? ` of ${memberLimit}` : ""}
+                                {memberLimit > 0
+                                    ? t("form.ofLimit", { count: members.length, limit: memberLimit })
+                                    : members.length}
                             </span>
                         </CardTitle>
                         {members.length >= SEARCH_FROM && (
@@ -130,8 +133,8 @@ export function PeopleView({
                                 <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2" />
                                 <Input
                                     value={query}
-                                    placeholder="Search people"
-                                    aria-label="Search people"
+                                    placeholder={t("people.search")}
+                                    aria-label={t("people.search")}
                                     className="h-8 pl-7 text-xs"
                                     onChange={(event) => setQuery(event.target.value)}
                                 />
@@ -148,14 +151,14 @@ export function PeopleView({
                             <table className="w-full text-sm">
                                 <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Person</th>
+                                        <th className="px-3 py-2 font-medium">{t("people.columns.person")}</th>
                                         <th className="hidden px-3 py-2 font-medium sm:table-cell">
-                                            Teams
+                                            {t("people.columns.teams")}
                                         </th>
                                         <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                            Joined
+                                            {t("people.columns.joined")}
                                         </th>
-                                        <th className="px-3 py-2 font-medium">Role</th>
+                                        <th className="px-3 py-2 font-medium">{t("people.columns.role")}</th>
                                         <th className="w-10 px-3 py-2" />
                                     </tr>
                                 </thead>
@@ -166,7 +169,7 @@ export function PeopleView({
                                                 colSpan={5}
                                                 className="text-muted-foreground px-3 py-8 text-center"
                                             >
-                                                Nobody here matches &ldquo;{query.trim()}&rdquo;.
+                                                {t("people.noMatch", { query: query.trim() })}
                                             </td>
                                         </tr>
                                     ) : (
@@ -198,7 +201,7 @@ export function PeopleView({
                                                                         {self ? (
                                                                             <span className="text-muted-foreground">
                                                                                 {" "}
-                                                                                (you)
+                                                                                {t("form.you")}
                                                                             </span>
                                                                         ) : null}
                                                                     </PersonName>
@@ -218,7 +221,7 @@ export function PeopleView({
                                                     >
                                                         {member.teams.length > 0
                                                             ? member.teams.join(", ")
-                                                            : "None"}
+                                                            : t("people.noTeams")}
                                                     </td>
                                                     <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
                                                         {member.joinedAt
@@ -236,7 +239,7 @@ export function PeopleView({
                                                             <Select
                                                                 value={member.role}
                                                                 options={options}
-                                                                aria-label={`Role for ${member.name}`}
+                                                                aria-label={t("form.roleFor", { name: member.name })}
                                                                 className="h-8 w-32 text-xs"
                                                                 onValueChange={(next) =>
                                                                     void run(() =>
@@ -256,22 +259,22 @@ export function PeopleView({
                                                                 type="button"
                                                                 aria-label={
                                                                     self
-                                                                        ? "Leave this organization"
-                                                                        : `Remove ${member.name}`
+                                                                        ? t("people.leaveOrg")
+                                                                        : t("form.removeName", { name: member.name })
                                                                 }
-                                                                title={self ? "Leave" : "Remove"}
+                                                                title={self ? t("form.leave") : t("form.remove")}
                                                                 className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                                 onClick={async () => {
                                                                     const ok = await confirm({
                                                                         title: self
-                                                                            ? "Leave this organization?"
-                                                                            : `Remove ${member.name}?`,
+                                                                            ? t("people.leaveTitle")
+                                                                            : t("people.removeTitle", { name: member.name }),
                                                                         description: self
-                                                                            ? "You will lose everything its teams gave you."
-                                                                            : "They come off every team here as well, and lose what those teams reached.",
+                                                                            ? t("people.leaveBody")
+                                                                            : t("people.removeBody"),
                                                                         confirmLabel: self
-                                                                            ? "Leave"
-                                                                            : "Remove",
+                                                                            ? t("form.leave")
+                                                                            : t("form.remove"),
                                                                         danger: true
                                                                     });
                                                                     if (!ok) return;
@@ -306,7 +309,7 @@ export function PeopleView({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <MailQuestion className="size-4 shrink-0" /> Waiting to accept
+                                <MailQuestion className="size-4 shrink-0" /> {t("people.waiting")}
                                 <span className="text-muted-foreground text-xs font-normal">
                                     {waiting}
                                 </span>
@@ -327,20 +330,20 @@ export function PeopleView({
                                         </p>
                                         <p className="text-muted-foreground truncate text-xs">
                                             {invite.sentAt
-                                                ? `Emailed by ${invite.invitedBy}`
-                                                : `Not emailed yet - invited by ${invite.invitedBy}`}
+                                                ? t("people.emailedBy", { name: invite.invitedBy })
+                                                : t("people.notEmailed", { name: invite.invitedBy })}
                                         </p>
                                     </div>
                                     <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
-                                        Until {format.date(invite.expiresAt)}
+                                        {t("people.until", { date: format.date(invite.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invite.roleName}</Badge>
                                     {canManage && (
                                         <>
                                             <button
                                                 type="button"
-                                                title="Send again"
-                                                aria-label={`Send the invitation to ${invite.email} again`}
+                                                title={t("people.sendAgain")}
+                                                aria-label={t("people.sendAgainLabel", { email: invite.email })}
                                                 className="text-muted-foreground hover:bg-card-hover hover:text-foreground rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     setError("");
@@ -350,10 +353,10 @@ export function PeopleView({
                                                         return;
                                                     }
                                                     if (result.sendError) {
-                                                        setError(`${result.sendError} Copy the new link from Invite somebody.`);
+                                                        setError(t("people.sendAgainFailed", { reason: result.sendError }));
                                                         setLastLink(result.url ?? null);
                                                     } else {
-                                                        toast.show({ title: `Sent again to ${invite.email}.` });
+                                                        toast.show({ title: t("people.sentAgain", { email: invite.email }) });
                                                     }
                                                     router.refresh();
                                                 }}
@@ -362,15 +365,14 @@ export function PeopleView({
                                             </button>
                                             <button
                                                 type="button"
-                                                title="Withdraw"
-                                                aria-label={`Withdraw the invitation to ${invite.email}`}
+                                                title={t("people.withdraw")}
+                                                aria-label={t("people.withdrawLabel", { name: invite.email })}
                                                 className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                 onClick={async () => {
                                                     const ok = await confirm({
-                                                        title: `Withdraw the invitation to ${invite.email}?`,
-                                                        description:
-                                                            "The link stops working at once. They are not told.",
-                                                        confirmLabel: "Withdraw",
+                                                        title: t("people.withdrawTitle", { name: invite.email }),
+                                                        description: t("people.withdrawEmailBody"),
+                                                        confirmLabel: t("people.withdraw"),
                                                         danger: true
                                                     });
                                                     if (!ok) return;
@@ -401,26 +403,29 @@ export function PeopleView({
                                             />
                                         </p>
                                         <p className="text-muted-foreground truncate text-xs">
-                                            Invited by {invitation.invitedBy}
-                                            {invitation.contact ? ` - ${invitation.contact}` : ""}
+                                            {invitation.contact
+                                                ? t("people.invitedByWithContact", {
+                                                      name: invitation.invitedBy,
+                                                      contact: invitation.contact
+                                                  })
+                                                : t("people.invitedBy", { name: invitation.invitedBy })}
                                         </p>
                                     </div>
                                     <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
-                                        Until {format.date(invitation.expiresAt)}
+                                        {t("people.until", { date: format.date(invitation.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invitation.roleName}</Badge>
                                     {canManage && (
                                         <button
                                             type="button"
-                                            title="Withdraw"
-                                            aria-label={`Withdraw the invitation to ${invitation.name}`}
+                                            title={t("people.withdraw")}
+                                            aria-label={t("people.withdrawLabel", { name: invitation.name })}
                                             className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                             onClick={async () => {
                                                 const ok = await confirm({
-                                                    title: `Withdraw the invitation to ${invitation.name}?`,
-                                                    description:
-                                                        "They are not told. You can invite them again at any time.",
-                                                    confirmLabel: "Withdraw",
+                                                    title: t("people.withdrawTitle", { name: invitation.name }),
+                                                    description: t("people.withdrawAccountBody"),
+                                                    confirmLabel: t("people.withdraw"),
                                                     danger: true
                                                 });
                                                 if (!ok) return;
@@ -485,6 +490,7 @@ function InvitePerson({
     onLink: (link: string | null) => void;
     onRun: (work: () => Promise<{ error?: string } | null>) => Promise<boolean>;
 }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const toast = useToast();
     const [identifier, setIdentifier] = useState("");
@@ -501,7 +507,7 @@ function InvitePerson({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Invite somebody</CardTitle>
+                <CardTitle>{t("people.invite.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <form
@@ -521,19 +527,19 @@ function InvitePerson({
                         setIdentifier("");
                         if (emailed.sendError) {
                             onLink(emailed.url ?? null);
-                            toast.show({ title: "The invitation was made but could not be emailed. Copy the link below." });
+                            toast.show({ title: t("people.invite.notEmailed") });
                         } else if (emailed.emailed) {
-                            toast.show({ title: `Invitation emailed to ${typed}.` });
+                            toast.show({ title: t("people.invite.emailed", { email: typed }) });
                         } else {
-                            toast.show({ title: "Invitation sent. They will see it when they next sign in." });
+                            toast.show({ title: t("people.invite.sent") });
                         }
                     }}
                 >
                     <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                        Email or username
+                        {t("form.identifier")}
                         <Input
                             value={identifier}
-                            placeholder="someone@example.com"
+                            placeholder={t("form.identifierPlaceholder")}
                             className="h-9"
                             disabled={full}
                             maxLength={254}
@@ -543,40 +549,38 @@ function InvitePerson({
                     <Select
                         value={role}
                         options={options}
-                        aria-label="Role"
+                        aria-label={t("form.role")}
                         className="h-9 w-36"
                         onValueChange={setRole}
                     />
                     <Button type="submit" size="sm" disabled={!identifier.trim() || full}>
-                        <UserPlus className="size-4 shrink-0" /> Invite
+                        <UserPlus className="size-4 shrink-0" /> {t("people.invite.submit")}
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
                         {full
-                            ? `This Polaris allows ${memberLimit} members per organization, counting invitations nobody has answered.`
-                            : hint || (
-                                  <>
-                                      What this role may do is set under{" "}
+                            ? t("people.invite.full", { limit: memberLimit })
+                            : hint ||
+                              t.rich("people.invite.rolesHint", {
+                                  roles: (chunks) => (
                                       <a
+                                          key="roles"
                                           href={`/account/organizations/${orgSlug}/roles`}
                                           className="hover:text-foreground underline"
                                       >
-                                          Roles
+                                          {chunks}
                                       </a>
-                                      .
-                                  </>
-                              )}
+                                  )
+                              })}
                     </p>
                     <p className="text-muted-foreground w-full text-xs">
-                        {canInviteNewPeople
-                            ? "An email with no account behind it gets a link that creates the account and joins them here."
-                            : "Only people who already have an account can be invited from here."}
+                        {canInviteNewPeople ? t("people.invite.newPeople") : t("people.invite.existingOnly")}
                     </p>
                 </form>
 
                 {lastLink ? (
                     <div className="border-border flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
                         <span className="text-muted-foreground w-full text-xs">
-                            Hand this link over yourself. It works once and expires in 7 days.
+                            {t("people.invite.linkHint")}
                         </span>
                         <code className="min-w-0 flex-1 truncate text-xs" title={lastLink}>
                             {lastLink}
@@ -584,12 +588,12 @@ function InvitePerson({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Copy the invitation link"
-                            title="Copy the invitation link"
+                            aria-label={t("people.invite.copyLink")}
+                            title={t("people.invite.copyLink")}
                             onClick={() =>
                                 void navigator.clipboard
                                     .writeText(lastLink)
-                                    .then(() => toast.show({ title: "Link copied." }))
+                                    .then(() => toast.show({ title: t("people.invite.copied") }))
                             }
                         >
                             <Copy className="size-4 shrink-0" />
@@ -598,24 +602,27 @@ function InvitePerson({
                 ) : null}
 
                 <label className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                    New invitations offer
-                    <Select
-                        value={roles.some((entry) => entry.slug === defaultRole) ? defaultRole : initial}
-                        options={options}
-                        aria-label="The role new invitations offer by default"
-                        className="h-8 w-40"
-                        disabled={savingDefault}
-                        onValueChange={async (next) => {
-                            setSavingDefault(true);
-                            const done = await onRun(() => setOrgDefaultInviteRoleAction(orgId, next));
-                            setSavingDefault(false);
-                            if (done) {
-                                setRole(next);
-                                router.refresh();
-                            }
-                        }}
-                    />
-                    by default.
+                    {t.rich("people.invite.defaultRole", {
+                        picker: (
+                            <Select
+                                key="picker"
+                                value={roles.some((entry) => entry.slug === defaultRole) ? defaultRole : initial}
+                                options={options}
+                                aria-label={t("people.invite.defaultRoleLabel")}
+                                className="h-8 w-40"
+                                disabled={savingDefault}
+                                onValueChange={async (next) => {
+                                    setSavingDefault(true);
+                                    const done = await onRun(() => setOrgDefaultInviteRoleAction(orgId, next));
+                                    setSavingDefault(false);
+                                    if (done) {
+                                        setRole(next);
+                                        router.refresh();
+                                    }
+                                }}
+                            />
+                        )
+                    })}
                 </label>
             </CardBody>
         </Card>

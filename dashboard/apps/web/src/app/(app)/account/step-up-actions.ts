@@ -15,6 +15,8 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "./security/action-messages";
 import { proveStepUp, sendStepUpCode, stepUpOptions, type StepUpChoice } from "@/lib/step-up";
 import { grantStepUp, stepUpRemainingMs, STEP_UP_PURPOSES } from "@/lib/step-up-grant";
 import {
@@ -51,8 +53,10 @@ export async function sendStepUpCodeAction(purpose: unknown, method: unknown): P
     const user = await requireUser();
     const parsedPurpose = purposeField.safeParse(purpose);
     const parsedMethod = methodField.safeParse(method);
-    if (!parsedPurpose.success || !parsedMethod.success) return { error: "Could not send a code." };
-    return sendStepUpCode(user.id, parsedPurpose.data, parsedMethod.data as TwoFactorDeliveryMethod);
+    if (!parsedPurpose.success || !parsedMethod.success) {
+        return { error: (await getTranslations("accountSecurity"))("errors.codeNotSent") };
+    }
+    return localized(await sendStepUpCode(user.id, parsedPurpose.data, parsedMethod.data as TwoFactorDeliveryMethod));
 }
 
 /**
@@ -72,10 +76,10 @@ export async function proveStepUpAction(purpose: unknown, proof: unknown): Promi
     const user = await requireUser();
     const scope = z.enum(STEP_UP_PURPOSES).safeParse(purpose);
     const parsed = stepUpProofSchema.safeParse(proof);
-    if (!scope.success || !parsed.success) return { error: "That could not be read." };
+    if (!scope.success || !parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.unreadable") };
 
     const result = await proveStepUp(user.id, scope.data, parsed.data);
-    if (result.error) return result;
+    if (result.error) return localized(result);
     await grantStepUp(user.id, user.sessionId, scope.data);
     return {};
 }

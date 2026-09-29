@@ -18,6 +18,7 @@
 
 import { headers } from "next/headers";
 import { resolveSession } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { setTotpUnclaimed } from "@polaris/auth";
 import type { EnrollmentChoice } from "./enroll-view";
 import { enrollmentOptions, owesSecondFactor } from "@/lib/instance-security";
@@ -54,25 +55,27 @@ export async function pendingEnrollmentAction(): Promise<PendingEnrollment | nul
 }
 
 export async function sendEnrollmentCodeAction(): Promise<ActionResult & { sentTo?: string }> {
+    const t = await getTranslations("auth");
     const user = await resolveSession();
-    if (!user) return { error: "Sign in again." };
+    if (!user) return { error: t("enroll.errors.signInAgain") };
     const result = await sendEnrollmentCode(user.id);
     if (result.error) return { error: result.error };
-    return { ok: "Code sent.", sentTo: result.sentTo };
+    return { ok: t("enroll.codeSent"), sentTo: result.sentTo };
 }
 
 export async function armByEmailAction(
     password: unknown,
     code: unknown
 ): Promise<ActionResult & { backupCodes?: string[] }> {
+    const t = await getTranslations("auth");
     const user = await resolveSession();
-    if (!user) return { error: "Sign in again." };
-    if (typeof password !== "string" || password.length === 0) return { error: "Enter your password." };
-    if (typeof code !== "string" || !/^\d{6}$/.test(code.trim())) return { error: "Enter the 6-digit code." };
+    if (!user) return { error: t("enroll.errors.signInAgain") };
+    if (typeof password !== "string" || password.length === 0) return { error: t("enroll.errors.enterPassword") };
+    if (typeof code !== "string" || !/^\d{6}$/.test(code.trim())) return { error: t("enroll.errors.enterCode") };
 
     const result = await armFactorByEmail(user.id, await headers(), password, code);
     if (result.error) return { error: result.error };
-    return { ok: "Two-step verification is on.", backupCodes: result.backupCodes };
+    return { ok: t("enroll.armed"), backupCodes: result.backupCodes };
 }
 
 /**
@@ -85,8 +88,9 @@ export async function armByEmailAction(
  * re-read from the account rather than trusted from the request.
  */
 export async function noteAuthenticatorArmedAction(): Promise<ActionResult> {
+    const t = await getTranslations("auth");
     const user = await resolveSession();
-    if (!user) return { error: "Sign in again." };
+    if (!user) return { error: t("enroll.errors.signInAgain") };
     await setTotpUnclaimed(user.id, false);
-    return { ok: "Two-step verification is on." };
+    return { ok: t("enroll.armed") };
 }

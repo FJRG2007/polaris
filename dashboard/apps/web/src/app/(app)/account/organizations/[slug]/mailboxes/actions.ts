@@ -18,12 +18,18 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import * as register from "@/lib/mailbox/org-mailboxes";
 import { MailSetupError } from "@/lib/mailbox/accounts";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { validationMessage } from "@/components/i18n/validation-message";
 
-function failure(caught: unknown, fallback: string): { error: string; field?: string } {
+async function failure(
+    caught: unknown,
+    fallback: NamespaceKey<"accountOrgs">
+): Promise<{ error: string; field?: string }> {
     if (caught instanceof register.OrgMailboxError) return { error: caught.message };
     if (caught instanceof MailSetupError) return { error: caught.message, field: caught.field };
     console.error(caught);
-    return { error: fallback };
+    return { error: (await getTranslations("accountOrgs"))(fallback) };
 }
 
 function refresh(slug: string): void {
@@ -40,18 +46,19 @@ export async function handOutMailboxAction(
     const parsed = core.mailAccountSetupSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
+        const [t, tv] = await Promise.all([getTranslations("accountOrgs"), getTranslations("validation")]);
         return {
-            error: issue?.message ?? "Check the details.",
+            error: issue ? validationMessage(tv, issue.message) : t("errors.checkDetailsShort"),
             field: String(issue?.path[0] ?? "")
         };
     }
-    if (!holderId) return { error: "Choose who this mailbox is for.", field: "holderId" };
+    if (!holderId) return { error: (await getTranslations("accountOrgs"))("errors.chooseHolder"), field: "holderId" };
     try {
         const mailboxes = await register.handOutMailbox({ id: user.id, isAdmin: user.isAdmin }, orgId, holderId, parsed.data);
         refresh(slug);
         return { mailboxes };
     } catch (caught) {
-        return failure(caught, "That mailbox could not be handed out.");
+        return failure(caught, "errors.handOut");
     }
 }
 
@@ -62,6 +69,6 @@ export async function takeBackMailboxAction(orgId: string, slug: string, account
         refresh(slug);
         return { mailboxes };
     } catch (caught) {
-        return failure(caught, "That mailbox could not be taken back.");
+        return failure(caught, "errors.takeBack");
     }
 }

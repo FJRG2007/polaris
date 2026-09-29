@@ -19,6 +19,9 @@ import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { getTranslations } from "@/lib/i18n/request";
+import { methodLabel } from "./known-messages";
+import { firstIssue, localized } from "./action-messages";
 import { normalizePeerId } from "@/lib/messaging-service";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
@@ -26,7 +29,6 @@ import {
     otpCodeField,
     phoneField,
     TWO_FACTOR_CODE_TTL_MINUTES,
-    TWO_FACTOR_METHOD_INFO,
     twoFactorPreferencesSchema
 } from "@polaris/core";
 import {
@@ -56,27 +58,27 @@ const setPhoneSchema = z.object({
 export async function setPhoneAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = setPhoneSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     const result = await setUserPhone(auth, user.id, parsed.data.phone, parsed.data.password);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.set" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 export async function removePhoneAction(password: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const result = await removeUserPhone(auth, user.id, String(password ?? ""));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.removed" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -90,10 +92,11 @@ export async function removePhoneAction(password: unknown): Promise<ActionResult
 export async function sendPhoneCodeAction(): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const throttle = await rateLimit(`phone-code:${user.id}`, CODE_SEND_LIMIT, CODE_SEND_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many codes asked for. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.tooManyCodes", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
     const channel = await prisma.channel.findFirst({
@@ -101,18 +104,22 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
         orderBy: { createdAt: "asc" },
         select: { id: true }
     });
-    if (!channel) return { error: "Connect one of your WhatsApp channels first - the code is sent through it." };
+    const t = await getTranslations("accountSecurity");
+    if (!channel) return { error: t("errors.connectWhatsAppFirst") };
 
     const issued = await issuePhoneCode(auth, user.id);
-    if (issued.error || !issued.code || !issued.phone) return { error: issued.error ?? "Add a phone number first." };
+    if (issued.error || !issued.code || !issued.phone) {
+        return issued.error ? localized({ error: issued.error }) : { error: t("known.addPhoneFirst") };
+    }
 
     try {
         await bridgeSend(channel.id, {
             peerId: normalizePeerId("whatsapp", issued.phone),
-            text: `${issued.code} is your Polaris confirmation code. It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes.`
+            // Sent to this same person, so in the language they are reading in.
+            text: t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES })
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The message could not be sent." };
+        return { error: caught instanceof Error ? caught.message : t("errors.messageNotSent") };
     }
     await recordAudit({ actorId: user.id, action: "account.phone.code-sent" });
     return {};
@@ -121,19 +128,20 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
 export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = otpCodeField.safeParse(code);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter the 6-digit code." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.enterCode");
     const throttle = await rateLimit(`phone-check:${user.id}`, CODE_CHECK_LIMIT, CODE_CHECK_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
     const result = await verifyPhoneCode(auth, user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.verified" });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 /** How often one account may mint a set of backup codes. The endpoint checks a
@@ -162,12 +170,13 @@ export async function regenerateBackupCodesAction(
 ): Promise<{ codes?: string[]; error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = regenerateBackupCodesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     const throttle = await rateLimit(`backup-codes:${user.id}`, BACKUP_CODES_LIMIT, BACKUP_CODES_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
     const result = await regenerateBackupCodes(auth, await headers(), parsed.data.password);
@@ -179,7 +188,7 @@ export async function regenerateBackupCodesAction(
         });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }
 
 const savePreferencesSchema = z.object({
@@ -198,16 +207,17 @@ const savePreferencesSchema = z.object({
 export async function saveTwoFactorPreferencesAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = savePreferencesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const statuses = await describeTwoFactorMethods(user.id);
     const unusable = parsed.data.preferences.methods.find(
         (method) => !statuses.find((status) => status.method === method)?.available
     );
     if (unusable) {
-        return { error: `${TWO_FACTOR_METHOD_INFO[unusable].label} cannot send anything yet.` };
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.methodCannotSend", { method: methodLabel(t, unusable) }) };
     }
 
     const result = await setTwoFactorPreferences(
@@ -227,5 +237,5 @@ export async function saveTwoFactorPreferencesAction(input: unknown): Promise<Ac
         });
         revalidatePath("/account/security");
     }
-    return result;
+    return localized(result);
 }

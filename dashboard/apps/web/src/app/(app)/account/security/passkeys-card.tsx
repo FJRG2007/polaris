@@ -23,6 +23,9 @@
  */
 
 import { useRouter } from "next/navigation";
+import { knownMessage } from "./known-messages";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { authClient } from "@/lib/auth-client";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -55,18 +58,19 @@ interface Here {
 /** Why this name cannot be used, or null when it can. Runs on every keystroke
  *  against the passkeys already on screen, so the problem is named before the
  *  device raises a prompt that would only fail. */
-function nameProblem(name: string, passkeys: PasskeyView[]): string | null {
+function nameProblem(t: NamespaceTranslator<"accountSecurity">, name: string, passkeys: PasskeyView[]): string | null {
     const trimmed = name.trim();
     if (!trimmed) return null;
-    if (trimmed.length > PASSKEY_NAME_MAX) return `Keep it under ${PASSKEY_NAME_MAX} characters.`;
+    if (trimmed.length > PASSKEY_NAME_MAX) return t("passkeys.nameTooLong", { max: PASSKEY_NAME_MAX });
     const key = passkeyNameKey(trimmed);
-    return passkeys.some((passkey) => passkeyNameKey(passkey.name) === key)
-        ? "You already have a passkey with this name."
-        : null;
+    return passkeys.some((passkey) => passkeyNameKey(passkey.name) === key) ? t("passkeys.nameTaken") : null;
 }
 
 export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock?: SettingLock }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const [confirm, confirmElement] = useConfirm();
     const [here, setHere] = useState<Here | null>(null);
     const [name, setName] = useState("");
@@ -82,7 +86,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         });
     }, []);
 
-    const problem = useMemo(() => nameProblem(name, passkeys), [name, passkeys]);
+    const problem = useMemo(() => nameProblem(t, name, passkeys), [t, name, passkeys]);
     const supported = Boolean(here?.host && here.secure);
     const canAdd = supported && !lock && name.trim().length > 0 && !problem;
     const noneHere = supported && passkeys.length > 0 && !passkeys.some((key) => key.host === here?.host);
@@ -95,7 +99,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         const result = await authClient.passkey.addPasskey({ name: name.trim() });
         setBusy(false);
         if (result?.error) {
-            setError(result.error.message ?? "That did not complete. Try again.");
+            setError(result.error.message ? knownMessage(t, tv, result.error.message) : t("passkeys.notCompleted"));
             return;
         }
         setName("");
@@ -123,9 +127,9 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
 
     async function remove(passkey: PasskeyView) {
         const ok = await confirm({
-            title: `Remove ${passkey.name}?`,
-            description: "That device can no longer sign in with this passkey.",
-            confirmLabel: "Remove",
+            title: t("passkeys.removeTitle", { name: passkey.name }),
+            description: t("passkeys.removeDescription"),
+            confirmLabel: t("passkeys.remove"),
             danger: true
         });
         if (!ok) return;
@@ -143,11 +147,8 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Passkeys</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Sign in with your device instead of a password. Each passkey works on the
-                        address it was added from, so add one per address you use.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("passkeys.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("passkeys.description")}</p>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-border">
@@ -162,12 +163,12 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                 {/* w-full max-w-0: the line folded under the name is nowrap
                                     text, and uncapped it sets a floor under this column
                                     that no truncating gets below. */}
-                                <th className="w-full max-w-0 px-3 py-2 font-medium">Name</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Added from</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Address</th>
-                                <th className="hidden px-3 py-2 font-medium xl:table-cell">Works on</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Added</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Last used</th>
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">{t("passkeys.columns.name")}</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("passkeys.columns.addedFrom")}</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("passkeys.columns.address")}</th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">{t("passkeys.columns.worksOn")}</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("passkeys.columns.added")}</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("passkeys.columns.lastUsed")}</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -175,7 +176,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                             {passkeys.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
-                                        No passkeys yet. Add one to sign in with this device.
+                                        {t("passkeys.empty")}
                                     </td>
                                 </tr>
                             ) : (
@@ -187,7 +188,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                                 <div className="min-w-0">
                                                     <p className="truncate">{passkey.name}</p>
                                                     <p className="truncate text-xs text-muted-foreground lg:hidden">
-                                                        {passkey.browser} on {passkey.os}
+                                                        {t("passkeys.browserOn", { browser: passkey.browser, os: passkey.os })}
                                                     </p>
                                                 </div>
                                             </div>
@@ -195,14 +196,14 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <span className="flex items-center gap-1.5">
                                                 <Laptop className="size-3.5 shrink-0" />
-                                                {passkey.browser} on {passkey.os}
+                                                {t("passkeys.browserOn", { browser: passkey.browser, os: passkey.os })}
                                             </span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                             {passkey.ip ? (
                                                 <span className="font-mono">{passkey.ip}</span>
                                             ) : (
-                                                "Not recorded"
+                                                t("passkeys.notRecorded")
                                             )}
                                         </td>
                                         <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
@@ -215,7 +216,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                             {passkey.lastUsedAt ? (
                                                 <RelativeTime iso={passkey.lastUsedAt} />
                                             ) : (
-                                                "Never used"
+                                                t("passkeys.neverUsed")
                                             )}
                                         </td>
                                         <td className="px-3 py-2">
@@ -223,8 +224,8 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={`Remove ${passkey.name}`}
-                                                    title="Remove"
+                                                    aria-label={t("passkeys.removeNamed", { name: passkey.name })}
+                                                    title={t("passkeys.remove")}
                                                     disabled={removing || Boolean(lock)}
                                                     onClick={() => void remove(passkey)}
                                                 >
@@ -240,21 +241,13 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 </div>
 
                 {here && !here.host && (
-                    <p className="text-xs text-warning">
-                        You are on an IP address. A passkey needs a hostname, so open Polaris on a
-                        domain or on its local name to add one.
-                    </p>
+                    <p className="text-xs text-warning">{t("passkeys.onIpAddress")}</p>
                 )}
                 {here?.host && !here.secure && (
-                    <p className="text-xs text-warning">
-                        This address is served over plain HTTP, and browsers only create passkeys
-                        over HTTPS. Open Polaris on {here.host} over HTTPS to add one.
-                    </p>
+                    <p className="text-xs text-warning">{t("passkeys.plainHttp", { host: here.host })}</p>
                 )}
                 {noneHere && (
-                    <p className="text-xs text-muted-foreground">
-                        None of these work on {here?.host}. Add one to sign in here with your device.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("passkeys.noneHere", { host: here?.host ?? "" })}</p>
                 )}
 
                 <div className="flex items-start gap-2">
@@ -264,15 +257,15 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                         <Input
                             value={name}
                             maxLength={PASSKEY_NAME_MAX}
-                            placeholder="Name this device"
-                            aria-label="Passkey name"
+                            placeholder={t("passkeys.namePlaceholder")}
+                            aria-label={t("passkeys.nameLabel")}
                             aria-invalid={problem ? true : undefined}
                             onChange={(event) => setName(event.target.value)}
                         />
                         {problem ? <p className="mt-1 text-xs text-danger">{problem}</p> : null}
                     </div>
                     <Button onClick={() => setAsking(true)} disabled={!canAdd}>
-                        Add a passkey
+                        {t("passkeys.add")}
                     </Button>
                 </div>
                 <Feedback error={lock?.reason ?? error} />
@@ -289,20 +282,17 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
             >
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm your password</DialogTitle>
-                        <DialogDescription>
-                            Adding a passkey adds a way into your account, so it asks for your
-                            password first. Your device will prompt you next.
-                        </DialogDescription>
+                        <DialogTitle>{t("passkeys.confirmTitle")}</DialogTitle>
+                        <DialogDescription>{t("passkeys.confirmDescription")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={confirmPassword} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Current password
+                            {t("dialog.currentPassword")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <ShieldCheck className="size-3.5 shrink-0" />
-                            Naming it &quot;{name.trim()}&quot;.
+                            {t("passkeys.naming", { name: name.trim() })}
                         </p>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
@@ -312,10 +302,10 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                 disabled={busy}
                                 onClick={() => setAsking(false)}
                             >
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? "Waiting..." : "Continue"}
+                                {busy ? t("dialog.waiting") : t("dialog.continue")}
                             </Button>
                         </div>
                     </form>

@@ -14,6 +14,8 @@ import { setPinSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
 import { Feedback } from "./setting-card";
+import { knownMessage } from "./known-messages";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function SetPinDialog({
     open,
@@ -24,6 +26,9 @@ export function SetPinDialog({
     onOpenChange: (open: boolean) => void;
     hasPin: boolean;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pin, setPin] = useState("");
@@ -47,7 +52,8 @@ export function SetPinDialog({
         event.preventDefault();
         const parsed = setPinSchema.safeParse(input);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the form.");
+            const issue = parsed.error.issues[0]?.message;
+            setError(issue ? knownMessage(t, tv, issue) : t("errors.checkForm"));
             return;
         }
         setBusy(true);
@@ -65,12 +71,12 @@ export function SetPinDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{hasPin ? "Change your unlock PIN" : "Set an unlock PIN"}</DialogTitle>
-                    <DialogDescription>4 to 6 digits, used only to reopen a locked dashboard.</DialogDescription>
+                    <DialogTitle>{hasPin ? t("pin.changeTitle") : t("pin.setTitle")}</DialogTitle>
+                    <DialogDescription>{t("pin.description")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        PIN
+                        {t("pin.pin")}
                         <Input
                             name="pin"
                             type="password"
@@ -82,7 +88,7 @@ export function SetPinDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Confirm PIN
+                        {t("pin.confirm")}
                         <Input
                             name="confirmPin"
                             type="password"
@@ -93,11 +99,11 @@ export function SetPinDialog({
                             required
                         />
                         {confirmPin.length >= pin.length && confirmPin !== "" && confirmPin !== pin ? (
-                            <span className="text-xs text-danger">The PINs do not match</span>
+                            <span className="text-xs text-danger">{t("known.pinsDiffer")}</span>
                         ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Account password
+                        {t("dialog.accountPassword")}
                         <Input
                             name="password"
                             type="password"
@@ -110,10 +116,10 @@ export function SetPinDialog({
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy || !ready}>
-                            {busy ? "Saving..." : "Save PIN"}
+                            {busy ? tc("actions.saving") : t("pin.save")}
                         </Button>
                     </div>
                 </form>
@@ -129,6 +135,8 @@ export function RemovePinDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -150,21 +158,21 @@ export function RemovePinDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Remove your unlock PIN</DialogTitle>
-                    <DialogDescription>A locked dashboard will then ask for your password.</DialogDescription>
+                    <DialogTitle>{t("pin.removeTitle")}</DialogTitle>
+                    <DialogDescription>{t("pin.removeDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Account password
+                        {t("dialog.accountPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? "Removing..." : "Remove PIN"}
+                            {busy ? t("dialog.removing") : t("pin.remove")}
                         </Button>
                     </div>
                 </form>

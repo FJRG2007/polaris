@@ -1,0 +1,72 @@
+{
+    "page": {
+        "title": "Seguridad",
+        "intro": "Cómo demuestras que eres tú y cuánto tiempo sigue abierta una sesión."
+    },
+    "newDevice": {
+        "unrecognized": "Este navegador no ha dicho qué es, así que cuenta como nuevo. Los ajustes de seguridad siguen bloqueados desde aquí.",
+        "waiting": "Esta cuenta hace esperar a un dispositivo nuevo {grace, plural, one {# día} other {# días}} antes de que pueda cambiar los ajustes de seguridad. A este le {left, plural, one {queda # día} other {quedan # días}}."
+    },
+    "feedback": {
+        "saved": "Guardado."
+    },
+    "status": {
+        "on": "Activado",
+        "off": "Desactivado",
+        "set": "Configurado",
+        "notSet": "Sin configurar"
+    },
+    "duration": {
+        "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+        "hours": "{count, plural, one {# hora} other {# horas}}",
+        "days": "{count, plural, one {# día} other {# días}}",
+        "noWait": "Sin espera",
+        "oneWeek": "1 semana",
+        "twoWeeks": "2 semanas"
+    },
+    "view": {
+        "change": "Cambiar",
+        "update": "Actualizar",
+        "setUp": "Configurar",
+        "turnOff": "Desactivar",
+        "newDevice": {
+            "title": "Este dispositivo todavía es nuevo aquí",
+            "hint": "Usa un dispositivo desde el que ya hayas iniciado sesión, o espera. Cerrar sesión desde aquí sigue funcionando."
+        },
+        "password": {
+            "title": "Contraseña",
+            "description": "Al cambiarla se cierran todas las demás sesiones.",
+            "forgot": "La he olvidado"
+        },
+        "authenticator": {
+            "title": "App de autenticación",
+            "description": "Un código temporal de tu móvil que se pide después de la contraseña."
+        },
+        "pin": {
+            "title": "PIN de desbloqueo rápido",
+            "description": "Vuelve a abrir el panel bloqueado y confirma los inicios de sesión que permitas desde aquí.",
+            "remove": "Quitar el PIN de desbloqueo rápido",
+            "set": "Establecer PIN"
+        },
+        "questions": {
+            "title": "Preguntas de seguridad",
+            "description": "Sirven para poner una contraseña nueva cuando has olvidado la actual.",
+            "remove": "Quitar las preguntas de seguridad"
+        },
+        "grace": {
+            "title": "Dispositivos nuevos",
+            "description": "Haz que un navegador desde el que nunca has iniciado sesión espere antes de poder cambiar nada en esta página. Te da tiempo a darte cuenta si alguien entra con tu contraseña.",
+            "label": "Espera antes de que un dispositivo nuevo pueda cambiar la seguridad",
+            "hint": "Un dispositivo en espera puede leer esta página y cerrar su propia sesión. No afecta a los dispositivos que ya usas, ni a aquel desde el que abriste esta cuenta."
+        },
+        "limits": {
+            "title": "Límites de sesión",
+            "description": "Cuándo bloquear el panel y cuándo terminar la sesión del todo.",
+            "idleLock": "Bloquear tras inactividad",
+            "never": "Nunca",
+            "signOutAfter": "Cerrar sesión tras",
+            "defaultMax": "Tras 30 días sin usarla",
+            "hint": "Para desbloquear se pide tu PIN, o tu contraseña si no tienes PIN."
+        }
+    }
+}

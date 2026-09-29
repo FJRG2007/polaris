@@ -9,6 +9,7 @@
  */
 
 import { ActivityView } from "./activity-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +17,15 @@ export const dynamic = "force-dynamic";
 export default async function OrganizationActivityPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
     const { org } = await requireOrgPage(slug, "activity.read");
+    const t = await getTranslations("accountOrgs");
 
     // The heading paints now and the rows arrive after, so opening this never
     // waits on the audit query.
     return (
         <div className="flex flex-col gap-4">
             <div>
-                <h2 className="text-base font-semibold">Activity</h2>
-                <p className="text-muted-foreground text-sm">
-                    Everything done to {org.name}: its people, its teams, its roles, its domains and its work. What
-                    somebody does on their own account is not here.
-                </p>
+                <h2 className="text-base font-semibold">{t("activity.title")}</h2>
+                <p className="text-muted-foreground text-sm">{t("activity.intro", { org: org.name })}</p>
             </div>
             <ActivityView slug={org.slug} />
         </div>

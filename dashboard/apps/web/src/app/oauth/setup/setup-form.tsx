@@ -21,6 +21,8 @@ import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { normalizePersonName, setupSchema } from "@polaris/core";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
 type Field = "name" | "username" | "email" | "password";
@@ -33,6 +35,8 @@ export function SetupForm({
     initialToken: string;
 }) {
     const router = useRouter();
+    const t = useTranslations("auth");
+    const tv = useTranslations("validation");
     const form = useZodForm(setupSchema);
     const [values, setValues] = useState({
         name: "",
@@ -50,7 +54,7 @@ export function SetupForm({
     // setupSchema and the action refuse both again on the server, which is the copy
     // that decides.
     const identity = [values.name, values.username, values.email];
-    const passwordError = usePasswordSafety(values.password, identity);
+    const passwordError = validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
 
     function update(field: Field, value: string) {
         const next = { ...values, [field]: value };
@@ -110,19 +114,17 @@ export function SetupForm({
                 <Card className="w-full max-w-sm">
                     <CardHeader className="items-center">
                         <PolarisMark className="mb-1" />
-                        <CardTitle>Set up Polaris</CardTitle>
+                        <CardTitle>{t("setup.title")}</CardTitle>
                     </CardHeader>
                     <CardBody>
-                        <p className="text-sm text-muted-foreground">
-                            The installer printed the link that creates the administrator. To see it
-                            again, run this where Polaris is installed:
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("setup.linkHint")}</p>
                         <pre className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-sm">
+                            {/* i18n-ignore - a command, typed as it is */}
                             polaris setup
                         </pre>
                         {tokenConfigured ? null : (
                             <p className="mt-3 text-xs text-warning">
-                                No setup token is configured yet. Re-run the installer to generate one.
+                                {t("setup.noToken")}
                             </p>
                         )}
                     </CardBody>
@@ -132,10 +134,27 @@ export function SetupForm({
     }
 
     const fields: Array<{ name: Field; label: string; type?: string; autoComplete?: string; placeholder?: string }> = [
-        { name: "name", label: "Your name", autoComplete: "name", placeholder: "Ada Lovelace" },
-        { name: "username", label: "Username", autoComplete: "username", placeholder: "ada" },
-        { name: "email", label: "Email", type: "email", autoComplete: "email", placeholder: "you@example.com" },
-        { name: "password", label: "Password", type: "password", autoComplete: "new-password", placeholder: "10+ characters" }
+        { name: "name", label: t("setup.fields.name"), autoComplete: "name", placeholder: t("setup.fields.namePlaceholder") },
+        {
+            name: "username",
+            label: t("setup.fields.username"),
+            autoComplete: "username",
+            placeholder: t("setup.fields.usernamePlaceholder")
+        },
+        {
+            name: "email",
+            label: t("setup.fields.email"),
+            type: "email",
+            autoComplete: "email",
+            placeholder: t("setup.fields.emailPlaceholder")
+        },
+        {
+            name: "password",
+            label: t("setup.fields.password"),
+            type: "password",
+            autoComplete: "new-password",
+            placeholder: t("setup.fields.passwordPlaceholder")
+        }
     ];
 
     return (
@@ -143,7 +162,7 @@ export function SetupForm({
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Set up Polaris</CardTitle>
+                    <CardTitle>{t("setup.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
@@ -152,7 +171,8 @@ export function SetupForm({
                             // make on its own; the name is written the same way
                             // whatever keyboard it arrives from.
                             const fieldError =
-                                form.error(field.name) ?? (field.name === "password" ? passwordError : null);
+                                validationMessage(tv, form.error(field.name)) ??
+                                (field.name === "password" ? passwordError : null);
                             const isName = field.name === "name";
                             return (
                                 <div key={field.name} className="flex flex-col gap-1">
@@ -182,7 +202,7 @@ export function SetupForm({
                         })}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Creating..." : "Create administrator"}
+                            {pending ? t("setup.creating") : t("setup.create")}
                         </Button>
                     </form>
                 </CardBody>

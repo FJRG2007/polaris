@@ -18,6 +18,7 @@ import { mergeUnchanged } from "@/lib/structural-merge";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TeamGrantView, TeamMemberView, TeamView } from "@/lib/orgs/org-service";
 import {
     Button,
@@ -36,10 +37,6 @@ import {
     teamDetailAction
 } from "@/app/(app)/account/organizations/actions";
 
-const ROLE_OPTIONS = core.TEAM_ROLES.map((role) => ({
-    value: role,
-    label: core.TEAM_ROLE_LABELS[role]
-}));
 
 /** What is kept of a team between openings: who is on it and what it reaches. */
 interface KeptTeam {
@@ -69,6 +66,8 @@ export function TeamPanel({
     currentUserId: string;
     onClose: () => void;
 }) {
+    const t = useTranslations("accountOrgs");
+    const roleOptions = core.TEAM_ROLES.map((role) => ({ value: role, label: t(`teams.roles.${role}`) }));
     const [members, setMembers] = useState<TeamMemberView[]>([]);
     const [grants, setGrants] = useState<TeamGrantView[]>([]);
     const [canManage, setCanManage] = useState(canAdmin);
@@ -142,10 +141,11 @@ export function TeamPanel({
         <Dialog open={team !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{team?.name ?? "Team"}</DialogTitle>
+                    <DialogTitle>{team?.name ?? t("teams.panel.fallbackTitle")}</DialogTitle>
                     <DialogDescription>
-                        {team?.description || `A team in ${orgName}.`} Everybody on it reaches
-                        whatever it has been given.
+                        {team?.description
+                            ? t("teams.panel.description", { description: team.description })
+                            : t("teams.panel.defaultDescription", { org: orgName })}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -169,7 +169,7 @@ export function TeamPanel({
                         <div className="flex flex-col gap-1">
                             {members.length === 0 ? (
                                 <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-5 text-center text-sm">
-                                    Nobody is on this team yet.
+                                    {t("teams.panel.nobody")}
                                 </p>
                             ) : (
                                 members.map((member) => (
@@ -184,7 +184,7 @@ export function TeamPanel({
                                                     {member.userId === currentUserId ? (
                                                         <span className="text-muted-foreground">
                                                             {" "}
-                                                            (you)
+                                                            {t("form.you")}
                                                         </span>
                                                     ) : null}
                                                 </PersonName>
@@ -199,8 +199,8 @@ export function TeamPanel({
                                         {manage ? (
                                             <Select
                                                 value={member.role}
-                                                options={ROLE_OPTIONS}
-                                                aria-label={`Role for ${member.name}`}
+                                                options={roleOptions}
+                                                aria-label={t("form.roleFor", { name: member.name })}
                                                 className="h-8 w-32 text-xs"
                                                 onValueChange={async (next) => {
                                                     if (!teamId) return;
@@ -218,7 +218,7 @@ export function TeamPanel({
                                             />
                                         ) : (
                                             <span className="text-muted-foreground text-xs">
-                                                {core.TEAM_ROLE_LABELS[member.role]}
+                                                {t(`teams.roles.${member.role}`)}
                                             </span>
                                         )}
                                         {heard &&
@@ -227,13 +227,13 @@ export function TeamPanel({
                                                     type="button"
                                                     aria-label={
                                                         member.userId === currentUserId
-                                                            ? "Leave this team"
-                                                            : `Remove ${member.name}`
+                                                            ? t("teams.panel.leave")
+                                                            : t("form.removeName", { name: member.name })
                                                     }
                                                     title={
                                                         member.userId === currentUserId
-                                                            ? "Leave"
-                                                            : "Remove"
+                                                            ? t("form.leave")
+                                                            : t("form.remove")
                                                     }
                                                     className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                                     onClick={async () => {
@@ -277,37 +277,35 @@ export function TeamPanel({
                                 }}
                             >
                                 <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                                    Email or username
+                                    {t("form.identifier")}
                                     <Input
                                         value={identifier}
-                                        placeholder="someone@example.com"
+                                        placeholder={t("form.identifierPlaceholder")}
                                         className="h-9"
                                         onChange={(event) => setIdentifier(event.target.value)}
                                     />
                                 </label>
                                 <Select
                                     value={role}
-                                    options={ROLE_OPTIONS}
-                                    aria-label="Role"
+                                    options={roleOptions}
+                                    aria-label={t("form.role")}
                                     className="h-9 w-36"
                                     onValueChange={(next) => setRole(next as core.TeamRole)}
                                 />
                                 <Button type="submit" size="sm" disabled={!identifier.trim()}>
-                                    <UserPlus className="size-4 shrink-0" /> Add
+                                    <UserPlus className="size-4 shrink-0" /> {t("teams.panel.add")}
                                 </Button>
                                 <p className="text-muted-foreground w-full text-xs">
-                                    They have to be on the organization already.{" "}
-                                    {core.TEAM_ROLE_HINTS[role]}
+                                    {t("teams.panel.addHint", { hint: t(`teams.roleHints.${role}`) })}
                                 </p>
                             </form>
                         )}
 
                         <div className="border-border border-t pt-3">
-                            <p className="mb-1 text-xs font-medium">What this team reaches</p>
+                            <p className="mb-1 text-xs font-medium">{t("teams.panel.reaches")}</p>
                             {grants.length === 0 ? (
                                 <p className="text-muted-foreground text-xs">
-                                    Nothing yet. A space is given to a team from that space&apos;s
-                                    own access settings in Tasks.
+                                    {t("teams.panel.nothing")}
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1">
@@ -326,7 +324,7 @@ export function TeamPanel({
                                                 ) : null}
                                             </span>
                                             <span className="text-muted-foreground shrink-0 text-xs">
-                                                {core.SPACE_ROLE_LABELS[grant.role]}
+                                                {t(`teams.spaceRoles.${grant.role}`)}
                                             </span>
                                         </li>
                                     ))}

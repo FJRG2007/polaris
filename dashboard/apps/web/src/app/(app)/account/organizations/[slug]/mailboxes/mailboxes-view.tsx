@@ -19,6 +19,8 @@ import { Mail, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMailboxView } from "@/lib/mailbox/org-mailboxes";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ConnectMailboxDialog } from "@/app/(app)/mail/connect-dialog";
 import { handOutMailboxAction, takeBackMailboxAction } from "./actions";
 import {
@@ -34,11 +36,11 @@ import {
 
 /** What each state means, said as the reader would say it rather than as the
  *  column stores it. */
-const STANDING: Record<string, { label: string; tone: "success" | "danger" | "neutral" }> = {
-    ok: { label: "Connecting", tone: "success" },
-    auth: { label: "Password refused", tone: "danger" },
-    unreachable: { label: "Cannot be reached", tone: "danger" },
-    never: { label: "Not tried yet", tone: "neutral" }
+const STANDING: Record<string, { label: NamespaceKey<"accountOrgs">; tone: "success" | "danger" | "neutral" }> = {
+    ok: { label: "mailboxes.states.ok", tone: "success" },
+    auth: { label: "mailboxes.states.auth", tone: "danger" },
+    unreachable: { label: "mailboxes.states.unreachable", tone: "danger" },
+    never: { label: "mailboxes.states.never", tone: "neutral" }
 };
 
 export function MailboxesView({
@@ -52,6 +54,7 @@ export function MailboxesView({
     mailboxes: OrgMailboxView[];
     members: readonly { id: string; name: string }[];
 }) {
+    const t = useTranslations("accountOrgs");
     const toast = useToast();
     const [confirm, confirmDialog] = useConfirm();
     const [rows, setRows] = useState(mailboxes);
@@ -71,12 +74,12 @@ export function MailboxesView({
 
     async function takeBack(row: OrgMailboxView): Promise<void> {
         const sure = await confirm({
-            title: `Take back ${row.address}?`,
+            title: t("mailboxes.takeBackTitle", { address: row.address }),
             // What is actually being destroyed, and what is not. The mailbox on
             // the provider is the company's account with them and is untouched;
             // what goes is this copy of it and the credential it was reached with.
-            description: `${row.holderName} loses it here, along with everything Polaris holds for it: the cached mail, the filters and templates they wrote, the signature and the drafts. The mailbox itself and its mail are not touched, and it can be handed out again.`,
-            confirmLabel: "Take it back",
+            description: t("mailboxes.takeBackBody", { holder: row.holderName }),
+            confirmLabel: t("mailboxes.takeBack"),
             danger: true
         });
         if (!sure) return;
@@ -90,18 +93,15 @@ export function MailboxesView({
             return;
         }
         setRows(answer.mailboxes);
-        toast.show({ title: `${row.address} was taken back.` });
+        toast.show({ title: t("mailboxes.takenBack", { address: row.address }) });
     }
 
     return (
         <Card>
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <CardTitle>Mailboxes</CardTitle>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                        Addresses this organization has given to its people. They appear in Mail
-                        when the person switches to this organization. Nobody here can read them.
-                    </p>
+                    <CardTitle>{t("mailboxes.title")}</CardTitle>
+                    <p className="mt-1 text-[13px] text-muted-foreground">{t("mailboxes.intro")}</p>
                 </div>
                 <Button
                     size="sm"
@@ -110,15 +110,12 @@ export function MailboxesView({
                     onClick={() => setAdding(true)}
                 >
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    Hand one out
+                    {t("mailboxes.handOne")}
                 </Button>
             </CardHeader>
             <CardBody>
                 {rows.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        None yet. Hand out a company address and it is waiting for its holder the
-                        next time they open Mail on this organization.
-                    </p>
+                    <p className="text-[13px] text-muted-foreground">{t("mailboxes.empty")}</p>
                 ) : (
                     <ul className="flex flex-col gap-1">
                         {rows.map((row) => {
@@ -140,15 +137,19 @@ export function MailboxesView({
                                             {row.address}
                                         </p>
                                         <p className="truncate text-[12px] text-muted-foreground">
-                                            {row.holderName}
-                                            {row.stateDetail ? ` - ${row.stateDetail}` : ""}
+                                            {row.stateDetail
+                                                ? t("mailboxes.holderDetail", {
+                                                      holder: row.holderName,
+                                                      detail: row.stateDetail
+                                                  })
+                                                : row.holderName}
                                         </p>
                                     </div>
-                                    <Badge variant={standing.tone}>{standing.label}</Badge>
+                                    <Badge variant={standing.tone}>{t(standing.label)}</Badge>
                                     <Button
                                         size="icon-sm"
                                         variant="ghost"
-                                        title="Take it back"
+                                        title={t("mailboxes.takeBack")}
                                         onClick={() => void takeBack(row)}
                                     >
                                         <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -162,8 +163,8 @@ export function MailboxesView({
 
             {adding ? (
                 <ConnectMailboxDialog
-                    title="Hand out a mailbox"
-                    done={`${holderName} has it. Its mail is on its way.`}
+                    title={t("mailboxes.dialogTitle")}
+                    done={t("mailboxes.done", { holder: holderName })}
                     taken={taken}
                     // A mailbox handed out belongs to its holder, and so would
                     // the authorization that connected it - which is theirs to
@@ -177,7 +178,7 @@ export function MailboxesView({
                     lead={
                         <label className="block">
                             <span className="mb-1 block text-[12px] text-muted-foreground">
-                                Who it is for <span aria-hidden>*</span>
+                                {t("mailboxes.whoFor")} <span aria-hidden>*</span>
                             </span>
                             <Select
                                 value={holderId}

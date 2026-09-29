@@ -13,6 +13,7 @@ import { orgTotals } from "@/lib/orgs/org-service";
 import { listOrgActivity } from "@/lib/audit-service";
 import { requireOrgPage } from "@/lib/orgs/page-access";
 import { RelativeTime } from "@/components/relative-time";
+import { getTranslations } from "@/lib/i18n/request";
 import { Globe, History, IdCard, Rocket, SquareCheckBig, Users, UsersRound, type LucideIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -31,27 +32,28 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
         canReadActivity ? listOrgActivity(org.id, { limit: RECENT }) : Promise.resolve([])
     ]);
 
+    const t = await getTranslations("accountOrgs");
     const base = `/account/organizations/${org.slug}`;
     const tiles: { label: string; count: number; href: string; icon: LucideIcon; shown: boolean }[] = [
-        { label: "People", count: totals.members, href: `${base}/people`, icon: Users, shown: true },
-        { label: "Teams", count: totals.teams, href: `${base}/teams`, icon: UsersRound, shown: true },
-        { label: "Spaces", count: totals.spaces, href: `${base}/spaces`, icon: SquareCheckBig, shown: true },
+        { label: t("overview.tiles.people"), count: totals.members, href: `${base}/people`, icon: Users, shown: true },
+        { label: t("overview.tiles.teams"), count: totals.teams, href: `${base}/teams`, icon: UsersRound, shown: true },
+        { label: t("overview.tiles.spaces"), count: totals.spaces, href: `${base}/spaces`, icon: SquareCheckBig, shown: true },
         {
-            label: "Roles",
+            label: t("overview.tiles.roles"),
             count: totals.roles,
             href: `${base}/roles`,
             icon: IdCard,
             shown: hasOrgPermission(access.permissions, "roles.manage")
         },
         {
-            label: "Domains",
+            label: t("overview.tiles.domains"),
             count: totals.domains,
             href: `${base}/domains`,
             icon: Globe,
             shown: hasOrgPermission(access.permissions, "domains.manage")
         },
         {
-            label: "Services",
+            label: t("overview.tiles.services"),
             count: totals.projects,
             href: "/apps/deploy",
             icon: Rocket,
@@ -84,14 +86,14 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
                     <CardBody className="flex flex-col gap-2">
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="flex items-center gap-2 text-sm font-medium">
-                                <History className="size-4 shrink-0" /> Recently
+                                <History className="size-4 shrink-0" /> {t("overview.recently")}
                             </h2>
                             <Link href={`${base}/activity`} className="text-muted-foreground hover:text-foreground text-xs">
-                                All activity
+                                {t("overview.allActivity")}
                             </Link>
                         </div>
                         {recent.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">Nothing has been done here yet.</p>
+                            <p className="text-muted-foreground text-sm">{t("overview.nothingYet")}</p>
                         ) : (
                             <ul className="flex flex-col">
                                 {recent.map((entry) => (
@@ -115,7 +117,7 @@ export default async function OrganizationOverviewPage({ params }: { params: Pro
             )}
 
             <p className="text-muted-foreground text-xs">
-                Started {new Date(org.createdAt).getFullYear()} by {org.ownerName}.
+                {t("overview.started", { year: String(new Date(org.createdAt).getFullYear()), name: org.ownerName })}
             </p>
         </div>
     );

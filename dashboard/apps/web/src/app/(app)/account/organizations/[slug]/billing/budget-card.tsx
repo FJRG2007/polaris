@@ -18,6 +18,8 @@ import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
 import { Button, Card, CardBody, Input, cn } from "@polaris/ui";
 import { clearOrgBudgetAction, saveOrgBudgetAction } from "./actions";
 import { useStatementFormat } from "@/components/billing/statement-parts";
@@ -42,6 +44,9 @@ export function BudgetCard({
     monthLabel: string | null;
     canSetPrices: boolean;
 }) {
+    const t = useTranslations("accountOrgs");
+    const tv = useTranslations("validation");
+    const locale = useLocale();
     const [saved, setSaved] = useState<Budget | null>(initial);
     const [draft, setDraft] = useState(initial ? String(initial.amount) : "");
     const [busy, setBusy] = useState(false);
@@ -50,7 +55,13 @@ export function BudgetCard({
     const format = useStatementFormat(saved?.currency ?? currency);
 
     const parsed = useMemo(() => orgBudgetInputSchema.safeParse({ amount: draft }), [draft]);
-    const problem = draft.trim() === "" || parsed.success ? null : (parsed.error.issues[0]?.message ?? null);
+    const problem =
+        draft.trim() === "" || parsed.success
+            ? null
+            : (orgValidationMessage(t, tv, parsed.error.issues[0]?.message) ?? null);
+    const thresholds = new Intl.ListFormat(locale, { type: "conjunction" }).format(
+        BUDGET_THRESHOLDS.map((threshold) => t("budget.threshold", { value: threshold }))
+    );
     const matches = saved !== null && saved.currency === currency;
     const unchanged = parsed.success && matches && parsed.data.amount === saved.amount;
 
@@ -75,9 +86,9 @@ export function BudgetCard({
 
     const clear = async () => {
         const ok = await confirm({
-            title: "Remove the budget?",
-            description: "Nobody will be told when this organization's spending passes 80% or 100% of a month.",
-            confirmLabel: "Remove budget",
+            title: t("budget.removeTitle"),
+            description: t("budget.removeBody"),
+            confirmLabel: t("budget.removeConfirm"),
             danger: true
         });
         if (!ok) return;
@@ -100,16 +111,15 @@ export function BudgetCard({
         return (
             <Card>
                 <CardBody className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">Monthly budget</h2>
+                    <h2 className="text-sm font-medium">{t("budget.title")}</h2>
                     <p className="text-muted-foreground text-xs">
-                        This Polaris has no prices set, so the statement shows usage only and there is nothing to measure
-                        a budget against.{" "}
+                        {t("budget.noPrices")}{" "}
                         {canSetPrices ? (
                             <Link href="/admin/billing" className="text-foreground underline underline-offset-2">
-                                Set prices
+                                {t("budget.setPrices")}
                             </Link>
                         ) : (
-                            "Its administrators set them."
+                            t("budget.adminsSetThem")
                         )}
                     </p>
                 </CardBody>
@@ -125,11 +135,8 @@ export function BudgetCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <h2 className="text-sm font-medium">Monthly budget</h2>
-                        <p className="text-muted-foreground text-xs">
-                            The people who run this organization&apos;s settings are told when a month reaches{" "}
-                            {BUDGET_THRESHOLDS.map((threshold) => `${threshold}%`).join(" and ")} of it.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("budget.title")}</h2>
+                        <p className="text-muted-foreground text-xs">{t("budget.whoIsTold", { thresholds })}</p>
                     </div>
                     {matches && share !== null ? (
                         <p
@@ -138,15 +145,17 @@ export function BudgetCard({
                                 level >= 100 ? "text-danger" : level >= 80 ? "text-warning-ink" : "text-foreground"
                             )}
                         >
-                            {format.currency(spent)} of {format.currency(saved.amount)}
+                            {t("budget.spentOf", {
+                                spent: format.currency(spent),
+                                amount: format.currency(saved.amount)
+                            })}
                         </p>
                     ) : null}
                 </div>
 
                 {saved && !matches ? (
                     <p className="border-warning-edge bg-warning-soft text-warning-ink rounded-md border px-3 py-2 text-xs">
-                        This budget was set in {saved.currency} and prices are now in {currency}. Set it again in{" "}
-                        {currency} to keep it measured.
+                        {t("budget.otherCurrency", { was: saved.currency, now: currency })}
                     </p>
                 ) : null}
 
@@ -155,7 +164,7 @@ export function BudgetCard({
                         <div
                             className="bg-muted h-2 overflow-hidden rounded-full"
                             role="progressbar"
-                            aria-label="Budget used"
+                            aria-label={t("budget.used")}
                             aria-valuemin={0}
                             aria-valuemax={100}
                             aria-valuenow={Math.min(100, Math.round(share))}
@@ -169,7 +178,9 @@ export function BudgetCard({
                             />
                         </div>
                         <p className="text-muted-foreground text-xs">
-                            {Math.round(share)}% used{monthLabel ? ` in ${monthLabel}` : ""}.
+                            {monthLabel
+                                ? t("budget.usedShareIn", { share: Math.round(share), month: monthLabel })
+                                : t("budget.usedShare", { share: Math.round(share) })}
                         </p>
                     </div>
                 ) : null}
@@ -177,7 +188,7 @@ export function BudgetCard({
                 <div className="flex flex-wrap items-start gap-2">
                     <div className="flex min-w-0 flex-col gap-1">
                         <label htmlFor="org-budget" className="sr-only">
-                            Monthly budget in {currency}
+                            {t("budget.inputLabel", { currency })}
                         </label>
                         <div className="flex items-center gap-2">
                             <Input
@@ -194,7 +205,7 @@ export function BudgetCard({
                                     if (event.key === "Enter") void save();
                                 }}
                             />
-                            <span className="text-muted-foreground text-xs">{currency} a month</span>
+                            <span className="text-muted-foreground text-xs">{t("budget.perMonth", { currency })}</span>
                         </div>
                         {problem ? (
                             <p id="org-budget-error" className="text-danger text-xs">
@@ -209,7 +220,7 @@ export function BudgetCard({
                         aria-disabled={busy || !parsed.success || unchanged}
                     >
                         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {saved ? "Save budget" : "Set budget"}
+                        {saved ? t("budget.save") : t("budget.set")}
                     </Button>
                     {saved ? (
                         <Button
@@ -217,8 +228,8 @@ export function BudgetCard({
                             variant="ghost"
                             onClick={() => void clear()}
                             disabled={busy}
-                            aria-label="Remove the budget"
-                            title="Remove the budget"
+                            aria-label={t("budget.remove")}
+                            title={t("budget.remove")}
                         >
                             <Trash2 className="size-4" aria-hidden />
                         </Button>

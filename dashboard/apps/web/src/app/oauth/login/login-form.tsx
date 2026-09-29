@@ -11,33 +11,33 @@ import { postLoginTarget } from "./post-login-target";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
 import { accountHasPasskey, emailLinkOffered, resolveIdentifier } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
 /** Where the last-used identifier is remembered so the field is prefilled. */
 const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
-const GENERIC_ERROR = "Invalid email/username or password";
 
 /** Why the previous session ended, when it ended for a reason worth explaining.
  *  Deliberately vague about network rules: the page is public, so it says the
  *  access was refused without describing the rule that refused it. */
-const SESSION_NOTICES: Readonly<Record<string, string>> = {
-    banned: "That account has been suspended.",
-    expired: "Your session reached its time limit. Sign in again.",
-    blocked: "Sign-in is not allowed from this location.",
-    denied: "That sign-in was denied from another device.",
+const SESSION_NOTICES: Readonly<Record<string, NamespaceKey<"auth">>> = {
+    banned: "login.sessionNotices.banned",
+    expired: "login.sessionNotices.expired",
+    blocked: "login.sessionNotices.blocked",
+    denied: "login.sessionNotices.denied",
     // The one notice that is about the person reading it rather than about the
     // session: whoever is at this screen may be the owner, and may be whoever
     // took the cookie. It says what happened and nothing about the account, and
     // the owner has the full account of it waiting on the other side.
-    compromised:
-        "That session was tied to another device or network and has been ended. The account owner has been told.",
+    compromised: "login.sessionNotices.compromised",
     // Said plainly, because whoever is reading it is either the owner - who
     // pressed this themselves and needs to know it worked - or somebody holding
     // their password, who learns only that it did not.
-    lockdown:
-        "That account is locked down. New sign-ins are refused until its owner lifts it from a device already signed in."
+    lockdown: "login.sessionNotices.lockdown"
 };
 
 /**
@@ -48,15 +48,16 @@ const SESSION_NOTICES: Readonly<Record<string, string>> = {
  * more detail would tell whoever holds that account something about this
  * deployment that is not theirs to know.
  */
-const CONNECTION_NOTICES: Readonly<Record<string, string>> = {
-    refused: "That account cannot sign in here. Sign in another way, then connect it and allow it under Security.",
-    unavailable: "That way of signing in is turned off here.",
-    cancelled: "That sign-in was cancelled.",
-    state_error: "That sign-in did not start on this page. Try again.",
-    error: "That service could not complete the sign-in."
+const CONNECTION_NOTICES: Readonly<Record<string, NamespaceKey<"auth">>> = {
+    refused: "login.connectionNotices.refused",
+    unavailable: "login.connectionNotices.unavailable",
+    cancelled: "login.connectionNotices.cancelled",
+    state_error: "login.connectionNotices.stateError",
+    error: "login.connectionNotices.error"
 };
 
-function sessionNotice(): string | null {
+/** The notice's key, translated where it is drawn. */
+function sessionNotice(): NamespaceKey<"auth"> | null {
     const params = new URLSearchParams(window.location.search);
     for (const [key, message] of Object.entries(SESSION_NOTICES)) {
         if (params.get(key) === "1") return message;
@@ -84,10 +85,12 @@ export function LoginForm({
     providers: SignInProvider[];
 }) {
     const router = useRouter();
+    const t = useTranslations("auth");
+    const tv = useTranslations("validation");
     const form = useZodForm(loginSchema);
     const [values, setValues] = useState({ identifier: "", password: "" });
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
+    const [notice, setNotice] = useState<NamespaceKey<"auth"> | null>(null);
     const [pending, setPending] = useState(false);
     const [canEmailLink, setCanEmailLink] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
@@ -151,7 +154,7 @@ export function LoginForm({
         const result = await authClient.signIn.passkey();
         setPending(false);
         if (result?.error) {
-            setError("That passkey did not work. Use your password instead.");
+            setError(t("login.passkeyFailed"));
             return;
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, values.identifier.trim());
@@ -196,13 +199,13 @@ export function LoginForm({
         const email = await resolveIdentifier(parsed.identifier);
         if (!email) {
             setPending(false);
-            setError(GENERIC_ERROR);
+            setError(t("login.invalid"));
             return;
         }
         const { data, error: signInError } = await signIn.email({ email, password: parsed.password });
         setPending(false);
         if (signInError) {
-            setError(GENERIC_ERROR);
+            setError(t("login.invalid"));
             return;
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
@@ -253,7 +256,7 @@ export function LoginForm({
             <Card className="w-full max-w-sm sm:max-w-2xl">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Sign in to Polaris</CardTitle>
+                    <CardTitle>{t("login.title")}</CardTitle>
                 </CardHeader>
                 {/* The QR sits beside the form from the `sm` breakpoint up, and is
                     left out below it - a phone cannot scan its own screen. */}
@@ -261,13 +264,13 @@ export function LoginForm({
                     <div>
                     {notice ? (
                         <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                            {notice}
+                            {t(notice)}
                         </p>
                     ) : null}
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
                             <Input
-                                placeholder="Email or username"
+                                placeholder={t("login.identifier")}
                                 autoComplete="username"
                                 value={values.identifier}
                                 onChange={(event) => update("identifier", event.target.value)}
@@ -275,13 +278,13 @@ export function LoginForm({
                                 aria-invalid={Boolean(form.error("identifier"))}
                             />
                             {form.error("identifier") ? (
-                                <p className="text-xs text-danger">{form.error("identifier")}</p>
+                                <p className="text-xs text-danger">{validationMessage(tv, form.error("identifier"))}</p>
                             ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
                             <Input
                                 type="password"
-                                placeholder="Password"
+                                placeholder={t("login.password")}
                                 autoComplete="current-password"
                                 value={values.password}
                                 onChange={(event) => update("password", event.target.value)}
@@ -289,12 +292,12 @@ export function LoginForm({
                                 aria-invalid={Boolean(form.error("password"))}
                             />
                             {form.error("password") ? (
-                                <p className="text-xs text-danger">{form.error("password")}</p>
+                                <p className="text-xs text-danger">{validationMessage(tv, form.error("password"))}</p>
                             ) : null}
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Signing in..." : "Sign in"}
+                            {pending ? t("login.submitting") : t("login.submit")}
                         </Button>
                         {hasPasskey ? (
                             <Button
@@ -304,12 +307,12 @@ export function LoginForm({
                                 onClick={() => void signInWithPasskey()}
                             >
                                 <KeyRound className="size-4" />
-                                Use your passkey
+                                {t("login.passkey")}
                             </Button>
                         ) : null}
                         {providers.length > 0 ? (
                             <div className="flex flex-col gap-2">
-                                <span className="text-center text-xs text-muted-foreground">or</span>
+                                <span className="text-center text-xs text-muted-foreground">{t("login.or")}</span>
                                 {providers.map((provider) => (
                                     <Button
                                         key={provider.slug}
@@ -319,7 +322,7 @@ export function LoginForm({
                                         onClick={() => signInWithProvider(provider.slug)}
                                     >
                                         <IntegrationLogo slug={provider.slug} className="size-4" />
-                                        Continue with {provider.name}
+                                        {t("login.continueWith", { provider: provider.name })}
                                     </Button>
                                 ))}
                             </div>
@@ -327,8 +330,7 @@ export function LoginForm({
                         {canEmailLink ? (
                             linkSent ? (
                                 <p className="text-center text-xs text-muted-foreground">
-                                    If that account exists, a sign-in link is on its way. It works
-                                    once and expires in 10 minutes.
+                                    {t("login.linkSent")}
                                 </p>
                             ) : (
                                 <Button
@@ -337,21 +339,25 @@ export function LoginForm({
                                     disabled={pending}
                                     onClick={() => void sendLink()}
                                 >
-                                    Email me a sign-in link
+                                    {t("login.emailLink")}
                                 </Button>
                             )
                         ) : null}
                     </form>
                     <p className="mt-4 text-center text-xs text-muted-foreground">
                         <Link href="/oauth/recover" className="underline underline-offset-2 hover:text-foreground">
-                            Forgot your password?
+                            {t("login.forgot")}
                         </Link>
                     </p>
                     {awaitingSetup ? (
                         <p className="mt-2 text-center text-xs text-muted-foreground">
-                            New accounts are by invitation. Setting up a new instance? The installer
-                            printed the link that creates the administrator;{" "}
-                            <code className="rounded bg-muted px-1">polaris setup</code> prints it again.
+                            {t.rich("login.awaitingSetup", {
+                                code: (chunks) => (
+                                    <code key="code" className="rounded bg-muted px-1">
+                                        {chunks}
+                                    </code>
+                                )
+                            })}
                         </p>
                     ) : null}
                     </div>

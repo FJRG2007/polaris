@@ -19,6 +19,9 @@ import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getSuccessor } from "@/lib/successor-service";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
 import { accountLifecycle } from "@/lib/account-lifecycle";
@@ -32,11 +35,23 @@ import {
     countTrustedDevices,
     getUserSecurity,
     listSecurityQuestions,
-    newDeviceWaitMessage,
-    twoFactorEnabled
+    twoFactorEnabled,
+    type DeviceStanding
 } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Why this browser may not change anything here yet, in the reader's language.
+ * The same sentence `newDeviceWaitMessage` in @polaris/auth writes in English.
+ */
+function waitMessage(standing: DeviceStanding, t: NamespaceTranslator<"accountSecurity">): string {
+    if (!standing.settlesAt) return t("newDevice.unrecognized");
+    const left = Math.max(1, Math.ceil((standing.settlesAt.getTime() - Date.now()) / DAY_MS));
+    return t("newDevice.waiting", { grace: standing.graceDays, left });
+}
 
 /**
  * The accounts this person has connected, each with what the operator has
@@ -87,7 +102,8 @@ export default async function SecurityPage() {
         successor,
         mail,
         lifecycle,
-        account
+        account,
+        t
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -117,56 +133,57 @@ export default async function SecurityPage() {
         accountLifecycle(user.id),
         // The handle itself, so the username switch names it rather than talking
         // about a concept.
-        prisma.user.findUnique({ where: { id: user.id }, select: { username: true } })
+        prisma.user.findUnique({ where: { id: user.id }, select: { username: true } }),
+        getTranslations("accountSecurity")
     ]);
-    const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
+    const lock = standing.settled ? undefined : { reason: waitMessage(standing, t) };
 
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Security</h1>
-                <p className="text-sm text-muted-foreground">
-                    How you prove it is you, and how long a session stays open.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
-            <SecurityView
-                lock={lock}
-                account={user.email}
-                newDeviceGraceDays={settings.newDeviceGraceDays}
-                hasPin={settings.hasPin}
-                idleLockMinutes={settings.idleLockMinutes}
-                bindSessionsToClient={settings.bindSessionsToClient}
-                pinSessionsToAddress={settings.pinSessionsToAddress}
-                standing={lifecycle}
-                sessionMaxMinutes={settings.sessionMaxMinutes}
-                requireLoginApproval={settings.requireLoginApproval}
-                emailLinkSignIn={settings.emailLinkSignIn}
-                usernameSignIn={settings.usernameSignIn}
-                username={account?.username ?? ""}
-                canSendMail={mail.channelId !== null}
-                twoFactorEnabled={hasTwoFactor}
-                backupCodesRemaining={backupCodes}
-                questions={questions.map((entry) => entry.question)}
-                passkeys={passkeys}
-                twoFactorMethods={methods}
-                trustedDevices={trustedDevices}
-                twoFactorPreferred={settings.twoFactorPreferred}
-                connections={connections}
-                connectionChallenge={{
-                    enabled: settings.challengeConnectionSignIn,
-                    enforced: instancePolicy.challengeConnectionSignIn
-                }}
-                otherSessions={sessions.filter((session) => !session.current).length}
-                successor={
-                    successor
-                        ? {
-                              userId: successor.userId,
-                              name: successor.name,
-                              contact: successor.contact
-                          }
-                        : null
-                }
-            />
+            <Messages namespaces={["accountSecurity", "validation"]}>
+                <SecurityView
+                    lock={lock}
+                    account={user.email}
+                    newDeviceGraceDays={settings.newDeviceGraceDays}
+                    hasPin={settings.hasPin}
+                    idleLockMinutes={settings.idleLockMinutes}
+                    bindSessionsToClient={settings.bindSessionsToClient}
+                    pinSessionsToAddress={settings.pinSessionsToAddress}
+                    standing={lifecycle}
+                    sessionMaxMinutes={settings.sessionMaxMinutes}
+                    requireLoginApproval={settings.requireLoginApproval}
+                    emailLinkSignIn={settings.emailLinkSignIn}
+                    usernameSignIn={settings.usernameSignIn}
+                    username={account?.username ?? ""}
+                    canSendMail={mail.channelId !== null}
+                    twoFactorEnabled={hasTwoFactor}
+                    backupCodesRemaining={backupCodes}
+                    questions={questions.map((entry) => entry.question)}
+                    passkeys={passkeys}
+                    twoFactorMethods={methods}
+                    trustedDevices={trustedDevices}
+                    twoFactorPreferred={settings.twoFactorPreferred}
+                    connections={connections}
+                    connectionChallenge={{
+                        enabled: settings.challengeConnectionSignIn,
+                        enforced: instancePolicy.challengeConnectionSignIn
+                    }}
+                    otherSessions={sessions.filter((session) => !session.current).length}
+                    successor={
+                        successor
+                            ? {
+                                  userId: successor.userId,
+                                  name: successor.name,
+                                  contact: successor.contact
+                              }
+                            : null
+                    }
+                />
+            </Messages>
         </div>
     );
 }

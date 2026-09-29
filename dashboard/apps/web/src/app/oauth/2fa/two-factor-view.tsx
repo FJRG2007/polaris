@@ -28,13 +28,10 @@ import {
     Input,
     PolarisMark
 } from "@polaris/ui";
-import {
-    TWO_FACTOR_METHOD_HEADER,
-    TWO_FACTOR_METHOD_INFO,
-    type TwoFactorMethod
-} from "@polaris/core";
+import { TWO_FACTOR_METHOD_HEADER, type TwoFactorMethod } from "@polaris/core";
 import { safeRedirect } from "@/lib/safe-redirect";
 import { CodeInput, isWholeCode } from "@/components/code-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Post-verification destination: a safe same-origin redirect, else the drive. */
 function target(): string {
@@ -53,6 +50,7 @@ const RESEND_COOLDOWN_SECONDS = 30;
 
 export function TwoFactorView({ options }: { options: ChallengeOptions }) {
     const router = useRouter();
+    const t = useTranslations("auth");
     const [method, setMethod] = useState<TwoFactorMethod>(options.preferred ?? "totp");
     const [backup, setBackup] = useState(false);
     const [code, setCode] = useState("");
@@ -80,11 +78,11 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
         });
         setPending(false);
         if (sendError) {
-            setError("Could not send a code. Try another way.");
+            setError(t("twoFactor.sendFailed"));
             return;
         }
         setCooldown(RESEND_COOLDOWN_SECONDS);
-        setSent(entry?.target ? `Code sent to ${entry.target}.` : "Code sent.");
+        setSent(entry?.target ? t("twoFactor.sentTo", { target: entry.target }) : t("twoFactor.sent"));
     }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -98,7 +96,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
               : await authClient.twoFactor.verifyOtp({ code, trustDevice });
         setPending(false);
         if (verifyError) {
-            setError(backup ? "That backup code is not valid." : "That code is not valid.");
+            setError(backup ? t("twoFactor.backupInvalid") : t("twoFactor.codeInvalid"));
             return;
         }
         router.push(target());
@@ -118,13 +116,12 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Two-step verification</CardTitle>
+                    <CardTitle>{t("twoFactor.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     {options.methods.length > 1 && !backup ? (
                         <div className="mb-4 flex flex-col gap-1">
                             {options.methods.map((option) => {
-                                const info = TWO_FACTOR_METHOD_INFO[option.method];
                                 const Icon = METHOD_ICON[option.method];
                                 const active = option.method === method;
                                 return (
@@ -141,9 +138,9 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                     >
                                         <Icon className="size-4 shrink-0 text-muted-foreground" />
                                         <span className="min-w-0">
-                                            <span className="block">{info.label}</span>
+                                            <span className="block">{t(`twoFactor.methods.${option.method}.label`)}</span>
                                             <span className="block truncate text-xs text-muted-foreground">
-                                                {option.target ?? info.description}
+                                                {option.target ?? t(`twoFactor.methods.${option.method}.description`)}
                                             </span>
                                         </span>
                                     </button>
@@ -161,24 +158,25 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                 onClick={() => void send()}
                             >
                                 {cooldown > 0
-                                    ? `Send again in ${cooldown}s`
+                                    ? t("twoFactor.sendAgainIn", { seconds: cooldown })
                                     : sent
-                                      ? "Send again"
-                                      : "Send a code"}
+                                      ? t("twoFactor.sendAgain")
+                                      : t("twoFactor.sendCode")}
                             </Button>
                         ) : null}
                         {sent ? <p className="text-sm text-success">{sent}</p> : null}
                         <label className="flex flex-col gap-1 text-sm">
                             {backup
-                                ? "Backup code"
+                                ? t("twoFactor.backupCode")
                                 : method === "totp"
-                                  ? "Code from your authenticator"
-                                  : "Code we sent you"}
+                                  ? t("twoFactor.authenticatorCode")
+                                  : t("twoFactor.sentCode")}
                             {backup ? (
                                 <Input
                                     name="code"
                                     autoFocus
                                     autoComplete="one-time-code"
+                                    // i18n-ignore - the shape of a backup code, not words
                                     placeholder="XXXXXXXX"
                                     value={code}
                                     onChange={(event) => setCode(event.target.value)}
@@ -200,7 +198,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                     checked={trustDevice}
                                     onChange={(event) => setTrustDevice(event.target.checked)}
                                 />
-                                Trust this device for 30 days
+                                {t("twoFactor.trustDevice")}
                             </label>
                         )}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -208,7 +206,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                             type="submit"
                             disabled={pending || (backup ? code.trim() === "" : !isWholeCode(code))}
                         >
-                            {pending ? "Verifying..." : "Verify"}
+                            {pending ? t("twoFactor.verifying") : t("twoFactor.verify")}
                         </Button>
                     </form>
 
@@ -223,7 +221,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                         }}
                     >
                         <KeyRound className="size-3" />
-                        {backup ? "Go back to your usual method" : "Use a backup code instead"}
+                        {backup ? t("twoFactor.usualMethod") : t("twoFactor.useBackup")}
                     </button>
 
                     {/* The way out. Without it the sign-in page keeps resuming this
@@ -236,7 +234,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                         className="mt-2 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
                         onClick={() => void abandonChallengeAction()}
                     >
-                        Sign in as someone else
+                        {t("twoFactor.someoneElse")}
                     </button>
                 </CardBody>
             </Card>

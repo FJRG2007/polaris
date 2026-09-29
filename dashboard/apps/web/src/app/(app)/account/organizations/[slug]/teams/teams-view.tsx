@@ -17,6 +17,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import type { TeamView } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createTeamAction, deleteTeamAction } from "@/app/(app)/account/organizations/actions";
 import {
     Button,
@@ -49,6 +50,7 @@ export function TeamsView({
     canManage: boolean;
     teamLimit: number;
 }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [open, setOpen] = useState<TeamView | null>(null);
@@ -68,10 +70,9 @@ export function TeamsView({
             <Card>
                 <CardHeader className="flex-row items-center justify-between">
                     <CardTitle>
-                        Teams
+                        {t("teams.title")}
                         <span className="text-muted-foreground ml-2 text-xs font-normal">
-                            {teams.length}
-                            {teamLimit > 0 ? ` of ${teamLimit}` : ""}
+                            {teamLimit > 0 ? t("form.ofLimit", { count: teams.length, limit: teamLimit }) : teams.length}
                         </span>
                     </CardTitle>
                     {canManage && (
@@ -81,7 +82,7 @@ export function TeamsView({
                             disabled={full}
                             onClick={() => setCreating(true)}
                         >
-                            <Plus className="size-4 shrink-0" /> New team
+                            <Plus className="size-4 shrink-0" /> {t("teams.new")}
                         </Button>
                     )}
                 </CardHeader>
@@ -94,9 +95,9 @@ export function TeamsView({
                         <table className="w-full text-sm">
                             <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
                                 <tr>
-                                    <th className="px-3 py-2 font-medium">Team</th>
-                                    <th className="px-3 py-2 font-medium">People</th>
-                                    <th className="px-3 py-2 font-medium">Reaches</th>
+                                    <th className="px-3 py-2 font-medium">{t("teams.columns.team")}</th>
+                                    <th className="px-3 py-2 font-medium">{t("teams.columns.people")}</th>
+                                    <th className="px-3 py-2 font-medium">{t("teams.columns.reaches")}</th>
                                     <th className="w-10 px-3 py-2" />
                                 </tr>
                             </thead>
@@ -107,8 +108,7 @@ export function TeamsView({
                                             colSpan={4}
                                             className="text-muted-foreground px-3 py-8 text-center"
                                         >
-                                            A team is what a space is given to. Nothing here
-                                            reaches any work yet.
+                                            {t("teams.empty")}
                                         </td>
                                     </tr>
                                 ) : (
@@ -138,24 +138,21 @@ export function TeamsView({
                                 </td>
                                 <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs">
                                     {team.spaceCount + team.folderCount === 0
-                                        ? "None yet"
-                                        : `${team.spaceCount + team.folderCount} grant${
-                                              team.spaceCount + team.folderCount === 1 ? "" : "s"
-                                          }`}
+                                        ? t("teams.noGrants")
+                                        : t("teams.grants", { count: team.spaceCount + team.folderCount })}
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                     {canManage && (
                                         <button
                                             type="button"
-                                            aria-label={`Delete ${team.name}`}
-                                            title="Delete"
+                                            aria-label={t("teams.deleteLabel", { name: team.name })}
+                                            title={t("form.delete")}
                                             className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
                                             onClick={async () => {
                                                 const ok = await confirm({
-                                                    title: `Delete ${team.name}?`,
-                                                    description:
-                                                        "Everybody on it loses whatever this team reached. The work itself is untouched.",
-                                                    confirmLabel: "Delete",
+                                                    title: t("teams.deleteTitle", { name: team.name }),
+                                                    description: t("teams.deleteBody"),
+                                                    confirmLabel: t("form.delete"),
                                                     danger: true
                                                 });
                                                 if (!ok) return;
@@ -178,7 +175,7 @@ export function TeamsView({
                     </div>
                     {full && (
                         <p className="text-muted-foreground text-xs">
-                            This Polaris allows {teamLimit} teams per organization.
+                            {t("teams.full", { limit: teamLimit })}
                         </p>
                     )}
                 </CardBody>
@@ -214,6 +211,7 @@ function NewTeamDialog({
     onOpenChange: (open: boolean) => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("accountOrgs");
     const [name, setName] = useState("");
     const [slug, setSlug] = useState("");
     const [slugTouched, setSlugTouched] = useState(false);
@@ -240,11 +238,8 @@ function NewTeamDialog({
         >
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>New team</DialogTitle>
-                    <DialogDescription>
-                        Give it people, then give it a space in Tasks. Everybody on it reaches that
-                        space.
-                    </DialogDescription>
+                    <DialogTitle>{t("teams.create.title")}</DialogTitle>
+                    <DialogDescription>{t("teams.create.body")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -266,11 +261,11 @@ function NewTeamDialog({
                     }}
                 >
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Name
+                        {t("form.name")}
                         <Input
                             value={name}
                             autoFocus
-                            placeholder="Design"
+                            placeholder={t("teams.create.namePlaceholder")}
                             onChange={(event) => {
                                 setName(event.target.value);
                                 if (!slugTouched) setSlug(core.suggestSlug(event.target.value));
@@ -278,10 +273,10 @@ function NewTeamDialog({
                         />
                     </label>
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Handle
+                        {t("form.handle")}
                         <Input
                             value={slug}
-                            placeholder="design"
+                            placeholder={t("teams.create.handlePlaceholder")}
                             onChange={(event) => {
                                 setSlugTouched(true);
                                 setSlug(event.target.value);
@@ -289,11 +284,11 @@ function NewTeamDialog({
                         />
                     </label>
                     <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                        Description
+                        {t("form.description")}
                         <Textarea
                             value={description}
                             rows={2}
-                            placeholder="What this team works on"
+                            placeholder={t("teams.create.descriptionPlaceholder")}
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </label>
@@ -307,10 +302,10 @@ function NewTeamDialog({
                     )}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("form.cancel")}
                         </Button>
                         <Button type="submit" disabled={!parsed.success}>
-                            Create
+                            {t("form.create")}
                         </Button>
                     </DialogFooter>
                 </form>

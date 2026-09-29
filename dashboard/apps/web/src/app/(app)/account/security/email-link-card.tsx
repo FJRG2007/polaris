@@ -17,6 +17,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, useTransition } from "react";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { setEmailLinkSignInAction } from "./actions";
@@ -33,6 +34,7 @@ export function EmailLinkCard({
     canSend: boolean;
     lock?: SettingLock;
 }) {
+    const t = useTranslations("accountSecurity");
     const [on, setOn] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -55,23 +57,18 @@ export function EmailLinkCard({
             <CardBody className="flex flex-col gap-1">
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Sign in with an emailed link</h2>
-                        <p className="text-xs text-muted-foreground">
-                            A link sent to your address opens the account without your password. It
-                            works once, expires in 10 minutes, and your second step is still asked for.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("emailLink.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("emailLink.description")}</p>
                     </div>
                     <Switch
                         checked={on}
                         disabled={locked || pending}
                         onChange={toggle}
-                        aria-label="Sign in with a link emailed to me"
+                        aria-label={t("emailLink.label")}
                     />
                 </div>
                 {canSend ? null : (
-                    <p className="text-xs text-muted-foreground">
-                        This Polaris cannot send email yet, so there is nowhere to send the link.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("emailLink.cannotSend")}</p>
                 )}
                 {lock ? <p className="text-xs text-muted-foreground">{lock.reason}</p> : null}
                 <Feedback error={error} />

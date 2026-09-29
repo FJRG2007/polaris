@@ -7,6 +7,8 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { OrganizationsView } from "./organizations-view";
 import { listMyOrgs, ownedOrgCount } from "@/lib/orgs/org-service";
 import { listMyInvitations } from "@/lib/orgs/invitation-service";
@@ -23,23 +25,23 @@ export default async function OrganizationsPage() {
         organizationPolicy()
     ]);
     const creation = await canCreateOrganization(user.isAdmin, owned);
+    const t = await getTranslations("accountOrgs");
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Organizations</h1>
-                <p className="text-muted-foreground text-sm">
-                    Work that belongs to a group rather than to you. Members reach it through the
-                    teams the organization gives its spaces to.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("list.title")}</h1>
+                <p className="text-muted-foreground text-sm">{t("list.intro")}</p>
             </div>
-            <OrganizationsView
-                orgs={orgs}
-                invitations={invitations}
-                canCreate={creation.ok}
-                blockedReason={creation.ok ? null : creation.reason}
-                memberLimit={policy.maxMembers}
-            />
+            <Messages namespaces={["accountOrgs", "validation"]}>
+                <OrganizationsView
+                    orgs={orgs}
+                    invitations={invitations}
+                    canCreate={creation.ok}
+                    blockedReason={creation.ok ? null : creation.reason}
+                    memberLimit={policy.maxMembers}
+                />
+            </Messages>
         </div>
     );
 }

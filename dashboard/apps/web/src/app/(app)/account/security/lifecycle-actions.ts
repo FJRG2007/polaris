@@ -22,6 +22,8 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { proveStepUp } from "@/lib/step-up";
+import { getTranslations } from "@/lib/i18n/request";
+import { firstIssue, localized } from "./action-messages";
 import { closeAccount, liftLockdown, raiseLockdown } from "@/lib/account-lifecycle";
 
 type ActionResult = { error?: string };
@@ -47,10 +49,10 @@ const liftInput = z.object({ proof: core.stepUpProofSchema });
 export async function raiseLockdownAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const parsed = lockdownInput.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const proved = await proveStepUp(user.id, "lockdown", parsed.data.proof);
-    if (proved.error) return proved;
+    if (proved.error) return localized(proved);
 
     await raiseLockdown(user.id, parsed.data.note);
     revalidatePath("/account/security");
@@ -66,10 +68,10 @@ export async function raiseLockdownAction(input: unknown): Promise<ActionResult>
 export async function liftLockdownAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const parsed = liftInput.safeParse(input);
-    if (!parsed.success) return { error: "That could not be read." };
+    if (!parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.unreadable") };
 
     const proved = await proveStepUp(user.id, "lockdown", parsed.data.proof);
-    if (proved.error) return proved;
+    if (proved.error) return localized(proved);
 
     await liftLockdown(user.id);
     revalidatePath("/account/security");
@@ -85,10 +87,10 @@ export async function liftLockdownAction(input: unknown): Promise<ActionResult> 
 export async function closeAccountAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const parsed = closeInput.safeParse(input);
-    if (!parsed.success) return { error: "That could not be read." };
+    if (!parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.unreadable") };
 
     const proved = await proveStepUp(user.id, "close-account", parsed.data.proof);
-    if (proved.error) return proved;
+    if (proved.error) return localized(proved);
 
     await closeAccount(user.id, parsed.data.closure);
     return {};

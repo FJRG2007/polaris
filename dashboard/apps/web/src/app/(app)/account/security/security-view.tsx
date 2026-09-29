@@ -16,6 +16,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PasskeysCard } from "./passkeys-card";
 import { EmailLinkCard } from "./email-link-card";
 import { UsernameSignInCard } from "./username-sign-in-card";
@@ -45,22 +47,22 @@ import {
     type TwoFactorMethod
 } from "@polaris/core";
 
+type Translate = NamespaceTranslator<"accountSecurity">;
+
 /** Human label for a minute count used by both limit dropdowns. */
-function describeMinutes(minutes: number, zeroLabel: string): string {
+function describeMinutes(t: Translate, minutes: number, zeroLabel: string): string {
     if (minutes === 0) return zeroLabel;
-    if (minutes < 60) return `${minutes} minutes`;
-    if (minutes < 1440) return `${minutes / 60} hour${minutes === 60 ? "" : "s"}`;
-    const days = minutes / 1440;
-    return `${days} day${days === 1 ? "" : "s"}`;
+    if (minutes < 60) return t("duration.minutes", { count: minutes });
+    if (minutes < 1440) return t("duration.hours", { count: minutes / 60 });
+    return t("duration.days", { count: minutes / 1440 });
 }
 
 /** Human label for a wait measured in days. */
-function describeDays(days: number): string {
-    if (days === 0) return "No wait";
-    if (days === 1) return "1 day";
-    if (days === 7) return "1 week";
-    if (days === 14) return "2 weeks";
-    return `${days} days`;
+function describeDays(t: Translate, days: number): string {
+    if (days === 0) return t("duration.noWait");
+    if (days === 7) return t("duration.oneWeek");
+    if (days === 14) return t("duration.twoWeeks");
+    return t("duration.days", { count: days });
 }
 
 export function SecurityView({
@@ -138,6 +140,8 @@ export function SecurityView({
     successor: SuccessorPerson | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [dialog, setDialog] = useState<string | null>(null);
     const close = () => setDialog(null);
 
@@ -152,7 +156,7 @@ export function SecurityView({
         setLimitsResult(null);
         const result = await updateSessionLimitsAction(limits);
         setLimitsBusy(false);
-        setLimitsResult(result.error ? result : { ok: "Saved." });
+        setLimitsResult(result.error ? result : { ok: t("feedback.saved") });
         if (!result.error) router.refresh();
     }
 
@@ -166,7 +170,7 @@ export function SecurityView({
         setGraceResult(null);
         const result = await setNewDeviceGraceAction(days);
         setGraceBusy(false);
-        setGraceResult(result.error ? result : { ok: "Saved." });
+        setGraceResult(result.error ? result : { ok: t("feedback.saved") });
         if (result.error) setGrace(newDeviceGraceDays);
         else router.refresh();
     }
@@ -181,12 +185,9 @@ export function SecurityView({
                     <CardBody className="flex items-start gap-3">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div>
-                            <h2 className="text-sm font-medium">This device is still new here</h2>
+                            <h2 className="text-sm font-medium">{t("view.newDevice.title")}</h2>
                             <p className="text-xs text-muted-foreground">{lock.reason}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Use a device you have signed in from before, or wait it out. Signing
-                                out from here still works.
-                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">{t("view.newDevice.hint")}</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -195,30 +196,30 @@ export function SecurityView({
             <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
                 <div className="flex flex-col gap-4">
                     <SettingCard
-                        title="Password"
-                        description="Changing it signs out every other session."
+                        title={t("view.password.title")}
+                        description={t("view.password.description")}
                     >
                         <Button variant="ghost" disabled={locked} onClick={() => setDialog("recover")}>
-                            I forgot it
+                            {t("view.password.forgot")}
                         </Button>
                         <Button disabled={locked} onClick={() => setDialog("password")}>
-                            Change
+                            {t("view.change")}
                         </Button>
                     </SettingCard>
 
                     <SettingCard
-                        title="Authenticator app"
-                        description="A time-based code from your phone, asked for after your password."
-                        status={twoFactorEnabled ? "On" : "Off"}
+                        title={t("view.authenticator.title")}
+                        description={t("view.authenticator.description")}
+                        status={twoFactorEnabled ? t("status.on") : t("status.off")}
                         statusTone={twoFactorEnabled ? "on" : "off"}
                     >
                         {twoFactorEnabled ? (
                             <Button variant="outline" disabled={locked} onClick={() => setDialog("2fa-off")}>
-                                Turn off
+                                {t("view.turnOff")}
                             </Button>
                         ) : (
                             <Button disabled={locked} onClick={() => setDialog("2fa-on")}>
-                                Set up
+                                {t("view.setUp")}
                             </Button>
                         )}
                     </SettingCard>
@@ -258,19 +259,19 @@ export function SecurityView({
                     />
 
                     <SettingCard
-                        title="Quick unlock PIN"
+                        title={t("view.pin.title")}
                         // Not conditional on the approval gate any more: the PIN also
                         // confirms a sign-in allowed by scanning the code on the sign-in
                         // screen, which every account can do whether or not that gate is on.
-                        description="Reopens a locked dashboard, and confirms a sign-in you allow from here."
-                        status={hasPin ? "Set" : "Not set"}
+                        description={t("view.pin.description")}
+                        status={hasPin ? t("status.set") : t("status.notSet")}
                         statusTone={hasPin ? "on" : "off"}
                     >
                         {hasPin ? (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Remove quick unlock PIN"
+                                aria-label={t("view.pin.remove")}
                                 disabled={locked}
                                 onClick={() => setDialog("pin-off")}
                             >
@@ -278,21 +279,21 @@ export function SecurityView({
                             </Button>
                         ) : null}
                         <Button disabled={locked} onClick={() => setDialog("pin")}>
-                            {hasPin ? "Change" : "Set PIN"}
+                            {hasPin ? t("view.change") : t("view.pin.set")}
                         </Button>
                     </SettingCard>
 
                     <SettingCard
-                        title="Security questions"
-                        description="Used to set a new password when you have forgotten the current one."
-                        status={hasQuestions ? "Set" : "Not set"}
+                        title={t("view.questions.title")}
+                        description={t("view.questions.description")}
+                        status={hasQuestions ? t("status.set") : t("status.notSet")}
                         statusTone={hasQuestions ? "on" : "off"}
                     >
                         {hasQuestions ? (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Remove security questions"
+                                aria-label={t("view.questions.remove")}
                                 disabled={locked}
                                 onClick={() => setDialog("questions-off")}
                             >
@@ -300,37 +301,29 @@ export function SecurityView({
                             </Button>
                         ) : null}
                         <Button disabled={locked} onClick={() => setDialog("questions")}>
-                            {hasQuestions ? "Update" : "Set up"}
+                            {hasQuestions ? t("view.update") : t("view.setUp")}
                         </Button>
                     </SettingCard>
 
                     <Card>
                         <CardBody className="flex flex-col gap-3">
                             <div>
-                                <h2 className="text-sm font-medium">New devices</h2>
-                                <p className="text-xs text-muted-foreground">
-                                    Make a browser you have not signed in from before wait before it
-                                    can change anything on this page. It buys you time to notice if
-                                    someone else signs in with your password.
-                                </p>
+                                <h2 className="text-sm font-medium">{t("view.grace.title")}</h2>
+                                <p className="text-xs text-muted-foreground">{t("view.grace.description")}</p>
                             </div>
                             <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
-                                Wait before a new device can change security
+                                {t("view.grace.label")}
                                 <Select
                                     value={String(grace)}
                                     disabled={locked || graceBusy}
                                     onValueChange={(value) => void saveGrace(Number(value))}
                                     options={NEW_DEVICE_GRACE_CHOICES.map((days) => ({
                                         value: String(days),
-                                        label: describeDays(days)
+                                        label: describeDays(t, days)
                                     }))}
                                 />
                             </label>
-                            <p className="text-xs text-muted-foreground">
-                                A waiting device can still read this page and sign itself out.
-                                Devices you already use are not affected, and neither is the one
-                                you opened this account from.
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("view.grace.hint")}</p>
                             <Feedback error={graceResult?.error} ok={graceResult?.ok} />
                         </CardBody>
                     </Card>
@@ -338,14 +331,12 @@ export function SecurityView({
                     <Card>
                         <CardBody className="flex flex-col gap-3">
                             <div>
-                                <h2 className="text-sm font-medium">Session limits</h2>
-                                <p className="text-xs text-muted-foreground">
-                                    When to lock the dashboard, and when to end the session outright.
-                                </p>
+                                <h2 className="text-sm font-medium">{t("view.limits.title")}</h2>
+                                <p className="text-xs text-muted-foreground">{t("view.limits.description")}</p>
                             </div>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Lock after inactivity
+                                    {t("view.limits.idleLock")}
                                     <Select
                                         value={String(limits.idleLockMinutes)}
                                         disabled={locked}
@@ -354,12 +345,12 @@ export function SecurityView({
                                         }
                                         options={IDLE_LOCK_CHOICES.map((minutes) => ({
                                             value: String(minutes),
-                                            label: describeMinutes(minutes, "Never")
+                                            label: describeMinutes(t, minutes, t("view.limits.never"))
                                         }))}
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Sign out after
+                                    {t("view.limits.signOutAfter")}
                                     <Select
                                         value={String(limits.sessionMaxMinutes)}
                                         disabled={locked}
@@ -368,14 +359,12 @@ export function SecurityView({
                                         }
                                         options={SESSION_MAX_CHOICES.map((minutes) => ({
                                             value: String(minutes),
-                                            label: describeMinutes(minutes, "After 30 days unused")
+                                            label: describeMinutes(t, minutes, t("view.limits.defaultMax"))
                                         }))}
                                     />
                                 </label>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Unlocking asks for your PIN, or your password when no PIN is set.
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("view.limits.hint")}</p>
                             <div className="flex items-center justify-between gap-2">
                                 <Feedback error={limitsResult?.error} ok={limitsResult?.ok} />
                                 <Button
@@ -383,7 +372,7 @@ export function SecurityView({
                                     disabled={locked || limitsBusy || !limitsChanged}
                                     className="ml-auto"
                                 >
-                                    {limitsBusy ? "Saving..." : "Save"}
+                                    {limitsBusy ? tc("actions.saving") : tc("actions.save")}
                                 </Button>
                             </div>
                         </CardBody>

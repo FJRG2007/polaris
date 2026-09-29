@@ -14,6 +14,8 @@
  */
 
 import { Copy, Download, Printer } from "lucide-react";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     backupCodesFile,
     backupCodesHtml,
@@ -27,6 +29,14 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from "@polaris/ui";
+
+/** Each download format's name on the menu. */
+const FORMAT_LABELS: Readonly<Record<BackupCodeFormat, NamespaceKey<"accountSecurity">>> = {
+    txt: "backupCodes.formats.txt",
+    json: "backupCodes.formats.json",
+    csv: "backupCodes.formats.csv",
+    pdf: "backupCodes.formats.pdf"
+};
 
 /** Hand a generated file to the browser as a download. */
 function download(codes: readonly string[], format: BackupCodeFormat, account: string): void {
@@ -68,11 +78,11 @@ export function BackupCodesPanel({
     account: string;
     label?: string;
 }) {
+    const t = useTranslations("accountSecurity");
     return (
         <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">
-                {label ??
-                    "Backup codes - each works once, store them somewhere safe. They are not shown again."}
+                {label ?? t("backupCodes.panelDefault")}
             </span>
             <div className="grid grid-cols-2 gap-1 rounded-md border border-border bg-muted/30 p-2 font-mono text-xs">
                 {codes.map((code) => (
@@ -87,13 +97,13 @@ export function BackupCodesPanel({
                     onClick={() => void navigator.clipboard.writeText(codes.join("\n"))}
                 >
                     <Copy className="size-4" />
-                    Copy
+                    {t("backupCodes.copy")}
                 </Button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button type="button" variant="ghost" size="sm">
                             <Download className="size-4" />
-                            Download
+                            {t("backupCodes.download")}
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
@@ -102,14 +112,14 @@ export function BackupCodesPanel({
                                 key={entry.format}
                                 onSelect={() => download(codes, entry.format, account)}
                             >
-                                {entry.label}
+                                {t(FORMAT_LABELS[entry.format])}
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
                 <Button type="button" variant="ghost" size="sm" onClick={() => printCodes(codes, account)}>
                     <Printer className="size-4" />
-                    Print
+                    {t("backupCodes.print")}
                 </Button>
             </div>
         </div>

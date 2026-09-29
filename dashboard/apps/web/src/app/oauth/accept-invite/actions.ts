@@ -12,7 +12,9 @@
 import { clientIp } from "@/lib/request-context";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { claimInvite, resolveInvite } from "@/lib/invite-service";
-import { BREACHED_PASSWORD_MESSAGE, claimInviteSchema, inviteCodeField, INVITE_REFUSALS } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
+import { validationMessage } from "@/components/i18n/validation-message";
+import { claimInviteSchema, inviteCodeField, INVITE_REFUSALS } from "@polaris/core";
 
 /**
  * Check an invitation code before asking its holder for anything else. Answers
@@ -22,22 +24,32 @@ import { BREACHED_PASSWORD_MESSAGE, claimInviteSchema, inviteCodeField, INVITE_R
 export async function lookupInviteCodeAction(
     input: unknown
 ): Promise<{ invite?: { email: string; needsPassword: boolean }; error?: string }> {
+    const t = await getTranslations("auth");
+    const tv = await getTranslations("validation");
     const parsed = inviteCodeField.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid code" };
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0]?.message;
+        return { error: issue === undefined ? t("invite.errors.invalidCode") : validationMessage(tv, issue) };
+    }
     const { invite, refusal } = await resolveInvite({ code: parsed.data }, await clientIp());
-    if (!invite) return { error: INVITE_REFUSALS[refusal ?? "unavailable"] };
+    if (!invite) return { error: validationMessage(tv, INVITE_REFUSALS[refusal ?? "unavailable"]) };
     return { invite: { email: invite.email, needsPassword: invite.needsPassword } };
 }
 
 export async function acceptInviteAction(input: unknown): Promise<{ email?: string; error?: string }> {
+    const t = await getTranslations("auth");
+    const tv = await getTranslations("validation");
     const parsed = claimInviteSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0]?.message;
+        return { error: issue === undefined ? t("invite.errors.invalidInput") : validationMessage(tv, issue) };
+    }
     const { token, code, oneTimePassword, name, username, password } = parsed.data;
-    if (!token && !code) return { error: "Missing invite token" };
+    if (!token && !code) return { error: t("invite.errors.missingToken") };
     // Checked here as well as in the browser, because the browser is not the
     // enforcement point. Unknown answers pass: an outage at somebody else's API
     // must never be the reason an invited person cannot join.
-    if (await passwordIsBreached(password)) return { error: BREACHED_PASSWORD_MESSAGE };
+    if (await passwordIsBreached(password)) return { error: tv("passwordBreached") };
 
     const result = await claimInvite({
         token: token || undefined,
@@ -48,7 +60,7 @@ export async function acceptInviteAction(input: unknown): Promise<{ email?: stri
         password,
         ip: await clientIp()
     });
-    if (result.refusal) return { error: INVITE_REFUSALS[result.refusal] };
+    if (result.refusal) return { error: validationMessage(tv, INVITE_REFUSALS[result.refusal]) };
     if (result.error) return { error: result.error };
     return { email: result.email };
 }

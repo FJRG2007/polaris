@@ -8,6 +8,7 @@
  */
 
 import { getPublicIp } from "@/lib/domain-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireOrgPage } from "@/lib/orgs/page-access";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
 import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
@@ -25,15 +26,13 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
         getPublicIp(),
         instanceDomains()
     ]);
+    const t = await getTranslations("accountOrgs");
 
     return (
         <div className="flex flex-col gap-4">
             <div>
-                <h2 className="text-base font-semibold">Domains</h2>
-                <p className="text-muted-foreground text-sm">
-                    Domains {org.name} owns, so its services answer on its own name rather than this
-                    Polaris&rsquo;s.
-                </p>
+                <h2 className="text-base font-semibold">{t("domains.title")}</h2>
+                <p className="text-muted-foreground text-sm">{t("domains.intro", { org: org.name })}</p>
             </div>
             <OwnerDomainsView
                 owner={{ kind: "org", orgId: org.id }}

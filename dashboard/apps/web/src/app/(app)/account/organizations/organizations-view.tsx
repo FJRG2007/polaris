@@ -15,6 +15,8 @@ import { useState } from "react";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { orgValidationMessage } from "./org-validation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
 import type { OrgSummary } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -47,6 +49,7 @@ import {
  * anybody: it simply stops being there.
  */
 function Invitations({ invitations }: { invitations: readonly OrgInvitationView[] }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [busy, setBusy] = useState("");
     const [error, setError] = useState("");
@@ -73,9 +76,7 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
         <Card>
             <CardBody className="flex flex-col gap-2">
                 <p className="text-sm font-medium">
-                    {invitations.length === 1
-                        ? "You have an invitation"
-                        : `You have ${invitations.length} invitations`}
+                    {t("list.invitations.heading", { count: invitations.length })}
                 </p>
                 <ul className="flex flex-col gap-2">
                     {invitations.map((invitation) => (
@@ -92,8 +93,10 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                                     {invitation.orgName}
                                 </span>
                                 <span className="text-muted-foreground block truncate text-xs">
-                                    {invitation.invitedBy} asked you to join as{" "}
-                                    {invitation.roleName.toLowerCase()}
+                                    {t("list.invitations.askedBy", {
+                                        name: invitation.invitedBy,
+                                        role: invitation.roleName.toLowerCase()
+                                    })}
                                 </span>
                             </span>
                             <Button
@@ -101,13 +104,13 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
                                 disabled={busy === invitation.id}
                                 onClick={() => void answer(invitation, true)}
                             >
-                                <Check className="size-3.5 shrink-0" /> Accept
+                                <Check className="size-3.5 shrink-0" /> {t("list.invitations.accept")}
                             </Button>
                             <Button
                                 size="xs"
                                 variant="ghost"
                                 disabled={busy === invitation.id}
-                                aria-label={`Turn down the invitation to ${invitation.orgName}`}
+                                aria-label={t("list.invitations.decline", { org: invitation.orgName })}
                                 onClick={() => void answer(invitation, false)}
                             >
                                 <X className="size-3.5 shrink-0" />
@@ -134,15 +137,16 @@ function Invitations({ invitations }: { invitations: readonly OrgInvitationView[
  * it opens nothing, and leave.
  */
 function RestrictedOrgRow({ org }: { org: OrgSummary }) {
+    const t = useTranslations("accountOrgs");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState("");
 
     const leave = async () => {
         const ok = await confirm({
-            title: `Leave ${org.name}?`,
-            description: "You lose whatever it granted you. Somebody there can invite you again.",
-            confirmLabel: "Leave",
+            title: t("list.restricted.leaveTitle", { org: org.name }),
+            description: t("list.restricted.leaveBody"),
+            confirmLabel: t("form.leave"),
             danger: true
         });
         if (!ok) return;
@@ -162,11 +166,11 @@ function RestrictedOrgRow({ org }: { org: OrgSummary }) {
                     <Badge variant="neutral">{org.roleName}</Badge>
                 </span>
                 <span className="text-muted-foreground block truncate text-xs">
-                    You reach only what somebody there granted to you directly.
+                    {t("list.restricted.hint")}
                 </span>
             </span>
             <Button size="xs" variant="ghost" onClick={() => void leave()}>
-                Leave
+                {t("form.leave")}
             </Button>
             {error ? (
                 <p role="alert" className="text-danger w-full text-xs">
@@ -196,6 +200,8 @@ export function OrganizationsView({
      *  builds a plan around a size they cannot reach. */
     memberLimit: number;
 }) {
+    const t = useTranslations("accountOrgs");
+    const tv = useTranslations("validation");
     const router = useRouter();
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
@@ -206,7 +212,8 @@ export function OrganizationsView({
     const [saving, setSaving] = useState(false);
 
     const parsed = core.organizationSchema.safeParse({ name, slug, description });
-    const issue = name || slug ? (parsed.success ? null : parsed.error.issues[0]?.message) : null;
+    const issue =
+        name || slug ? (parsed.success ? null : orgValidationMessage(t, tv, parsed.error.issues[0]?.message)) : null;
 
     const reset = () => {
         setName("");
@@ -238,13 +245,11 @@ export function OrganizationsView({
 
             <div className="flex items-center justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
-                    {orgs.length === 0
-                        ? "You are not part of any organization yet."
-                        : `${orgs.length} organization${orgs.length === 1 ? "" : "s"}`}
+                    {orgs.length === 0 ? t("list.none") : t("list.count", { count: orgs.length })}
                 </p>
                 {canCreate ? (
                     <Button size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New organization
+                        <Plus className="size-4" /> {t("list.new")}
                     </Button>
                 ) : (
                     <span className="text-muted-foreground text-xs">{blockedReason}</span>
@@ -255,12 +260,8 @@ export function OrganizationsView({
                 <Card>
                     <CardBody className="flex flex-col items-center gap-2 py-10 text-center">
                         <Building2 className="text-muted-foreground size-6" />
-                        <p className="text-sm">An organization owns spaces on behalf of a group.</p>
-                        <p className="text-muted-foreground max-w-sm text-xs">
-                            Put people on its roster, group them into teams, and give a team a
-                            space. Joining the team is then the only thing anybody has to do to
-                            reach the work.
-                        </p>
+                        <p className="text-sm">{t("list.emptyTitle")}</p>
+                        <p className="text-muted-foreground max-w-sm text-xs">{t("list.emptyBody")}</p>
                     </CardBody>
                 </Card>
             ) : (
@@ -301,12 +302,8 @@ export function OrganizationsView({
                                     <span className="flex items-center gap-1">
                                         <Users className="size-3.5 shrink-0" /> {org.memberCount}
                                     </span>
-                                    <span>
-                                        {org.teamCount} team{org.teamCount === 1 ? "" : "s"}
-                                    </span>
-                                    <span>
-                                        {org.spaceCount} space{org.spaceCount === 1 ? "" : "s"}
-                                    </span>
+                                    <span>{t("list.teams", { count: org.teamCount })}</span>
+                                    <span>{t("list.spaces", { count: org.spaceCount })}</span>
                                 </span>
                             </Link>
                             )}
@@ -324,21 +321,20 @@ export function OrganizationsView({
             >
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>New organization</DialogTitle>
+                        <DialogTitle>{t("list.create.title")}</DialogTitle>
                         <DialogDescription>
-                            You own it. Add people to its roster afterwards and put them on teams.
                             {memberLimit > 0
-                                ? ` This Polaris allows up to ${memberLimit} members.`
-                                : ""}
+                                ? t("list.create.bodyWithLimit", { limit: memberLimit })
+                                : t("list.create.body")}
                         </DialogDescription>
                     </DialogHeader>
                     <form className="flex flex-col gap-3" onSubmit={submit}>
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                            Name
+                            {t("form.name")}
                             <Input
                                 value={name}
                                 autoFocus
-                                placeholder="Acme Design"
+                                placeholder={t("list.create.namePlaceholder")}
                                 onChange={(event) => {
                                     setName(event.target.value);
                                     if (!slugTouched) setSlug(core.suggestSlug(event.target.value));
@@ -346,25 +342,25 @@ export function OrganizationsView({
                             />
                         </label>
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                            Handle
+                            {t("form.handle")}
                             <Input
                                 value={slug}
-                                placeholder="acme-design"
+                                placeholder={t("list.create.handlePlaceholder")}
                                 onChange={(event) => {
                                     setSlugTouched(true);
                                     setSlug(event.target.value);
                                 }}
                             />
                             <span className="text-muted-foreground text-xs">
-                                Used in links. Cannot be one an account already signs in with.
+                                {t("list.create.handleHint")}
                             </span>
                         </label>
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                            Description
+                            {t("form.description")}
                             <Textarea
                                 value={description}
                                 rows={2}
-                                placeholder="What this organization is for"
+                                placeholder={t("list.create.descriptionPlaceholder")}
                                 onChange={(event) => setDescription(event.target.value)}
                             />
                         </label>
@@ -382,10 +378,10 @@ export function OrganizationsView({
                                 variant="ghost"
                                 onClick={() => setCreating(false)}
                             >
-                                Cancel
+                                {t("form.cancel")}
                             </Button>
                             <Button type="submit" disabled={!parsed.success || saving}>
-                                Create
+                                {t("form.create")}
                             </Button>
                         </div>
                     </form>

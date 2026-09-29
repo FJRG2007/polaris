@@ -1,0 +1,72 @@
+{
+    "page": {
+        "title": "Security",
+        "intro": "How you prove it is you, and how long a session stays open."
+    },
+    "newDevice": {
+        "unrecognized": "This browser did not say what it is, so it counts as new. Security settings stay locked from here.",
+        "waiting": "This account gives a new device {grace, plural, one {# day} other {# days}} before it can change security settings. This one has {left, plural, one {# day} other {# days}} left."
+    },
+    "feedback": {
+        "saved": "Saved."
+    },
+    "status": {
+        "on": "On",
+        "off": "Off",
+        "set": "Set",
+        "notSet": "Not set"
+    },
+    "duration": {
+        "minutes": "{count, plural, one {# minute} other {# minutes}}",
+        "hours": "{count, plural, one {# hour} other {# hours}}",
+        "days": "{count, plural, one {# day} other {# days}}",
+        "noWait": "No wait",
+        "oneWeek": "1 week",
+        "twoWeeks": "2 weeks"
+    },
+    "view": {
+        "change": "Change",
+        "update": "Update",
+        "setUp": "Set up",
+        "turnOff": "Turn off",
+        "newDevice": {
+            "title": "This device is still new here",
+            "hint": "Use a device you have signed in from before, or wait it out. Signing out from here still works."
+        },
+        "password": {
+            "title": "Password",
+            "description": "Changing it signs out every other session.",
+            "forgot": "I forgot it"
+        },
+        "authenticator": {
+            "title": "Authenticator app",
+            "description": "A time-based code from your phone, asked for after your password."
+        },
+        "pin": {
+            "title": "Quick unlock PIN",
+            "description": "Reopens a locked dashboard, and confirms a sign-in you allow from here.",
+            "remove": "Remove quick unlock PIN",
+            "set": "Set PIN"
+        },
+        "questions": {
+            "title": "Security questions",
+            "description": "Used to set a new password when you have forgotten the current one.",
+            "remove": "Remove security questions"
+        },
+        "grace": {
+            "title": "New devices",
+            "description": "Make a browser you have not signed in from before wait before it can change anything on this page. It buys you time to notice if someone else signs in with your password.",
+            "label": "Wait before a new device can change security",
+            "hint": "A waiting device can still read this page and sign itself out. Devices you already use are not affected, and neither is the one you opened this account from."
+        },
+        "limits": {
+            "title": "Session limits",
+            "description": "When to lock the dashboard, and when to end the session outright.",
+            "idleLock": "Lock after inactivity",
+            "never": "Never",
+            "signOutAfter": "Sign out after",
+            "defaultMax": "After 30 days unused",
+            "hint": "Unlocking asks for your PIN, or your password when no PIN is set."
+        }
+    }
+}

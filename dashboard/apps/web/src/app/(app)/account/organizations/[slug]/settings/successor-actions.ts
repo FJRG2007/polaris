@@ -26,6 +26,7 @@ import { proveStepUp } from "@/lib/step-up";
 import { recordAudit } from "@/lib/audit-service";
 import { stepUpProofSchema } from "@polaris/core";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { getTranslations } from "@/lib/i18n/request";
 import { clearOrgSuccessor, setOrgSuccessor, SuccessorError } from "@/lib/successor-service";
 
 type ActionResult = { error?: string };
@@ -35,9 +36,12 @@ type ActionResult = { error?: string };
  *  asked for again to undo it a second later. */
 const PURPOSE = "organization-successor";
 
+/** Stands in for the words until the reply is translated: the schema has no reader. */
+const SAY_WHO = "errors.sayWho";
+
 const setSchema = z.object({
     orgId: z.string().uuid(),
-    identifier: z.string().trim().min(1, "Say who").max(320),
+    identifier: z.string().trim().min(1, SAY_WHO).max(320),
     proof: stepUpProofSchema
 });
 
@@ -55,9 +59,10 @@ async function ownerOnly(userId: string, orgId: string): Promise<string | null> 
         where: { id: orgId },
         select: { ownerId: true }
     });
-    if (!org) return "That organization no longer exists";
+    const t = await getTranslations("accountOrgs");
+    if (!org) return t("errors.orgGone");
     if (org.ownerId !== userId) {
-        return "Only the owner can name who takes this organization over";
+        return t("errors.ownerOnly");
     }
     return null;
 }
@@ -68,7 +73,11 @@ export async function setOrgSuccessorAction(input: unknown): Promise<ActionResul
     if (blocked) return { error: blocked };
 
     const parsed = setSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) {
+        const t = await getTranslations("accountOrgs");
+        const message = parsed.error.issues[0]?.message;
+        return { error: message === SAY_WHO ? t("errors.sayWho") : (message ?? t("errors.checkForm")) };
+    }
 
     const refused = await ownerOnly(user.id, parsed.data.orgId);
     if (refused) return { error: refused };
@@ -90,7 +99,7 @@ export async function setOrgSuccessorAction(input: unknown): Promise<ActionResul
     } catch (caught) {
         if (caught instanceof SuccessorError) return { error: caught.message };
         console.error("successor: could not name one for an organization:", caught);
-        return { error: "Could not name that successor." };
+        return { error: (await getTranslations("accountOrgs"))("errors.nameSuccessor") };
     }
 }
 
@@ -100,7 +109,7 @@ export async function clearOrgSuccessorAction(input: unknown): Promise<ActionRes
     if (blocked) return { error: blocked };
 
     const parsed = clearSchema.safeParse(input);
-    if (!parsed.success) return { error: "Check the form." };
+    if (!parsed.success) return { error: (await getTranslations("accountOrgs"))("errors.checkForm") };
 
     const refused = await ownerOnly(user.id, parsed.data.orgId);
     if (refused) return { error: refused };

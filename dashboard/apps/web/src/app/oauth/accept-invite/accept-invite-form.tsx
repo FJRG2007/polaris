@@ -15,13 +15,24 @@ import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { acceptInviteAction } from "./actions";
 import { useZodForm } from "@/lib/use-zod-form";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import { PasswordState } from "@/components/password-state";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { acceptInviteSchema, normalizePersonName } from "@polaris/core";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
+
+/** The address and the organization, as they stand out in the sentence. */
+function emphasis(chunks: ReactNode[]) {
+    return (
+        <span key={String(chunks[0])} className="font-medium text-foreground">
+            {chunks}
+        </span>
+    );
+}
 
 export function AcceptInviteForm({
     token,
@@ -40,6 +51,8 @@ export function AcceptInviteForm({
     orgName?: string | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("auth");
+    const tv = useTranslations("validation");
     const form = useZodForm(acceptInviteSchema);
     const [values, setValues] = useState({ name: "", username: "", password: "" });
     const [oneTimePassword, setOneTimePassword] = useState("");
@@ -52,7 +65,8 @@ export function AcceptInviteForm({
     // passwordMatchesIdentity over these and asks the breach corpus; claimInviteSchema
     // refuses both again on the server, which is the copy that decides.
     const identity = [values.name, values.username, email];
-    const passwordError = usePasswordSafety(values.password, identity);
+    const passwordError = validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
+    const fieldError = (field: "name" | "username" | "password") => validationMessage(tv, form.error(field));
 
     function update(field: "name" | "username" | "password", value: string) {
         const next = { ...values, [field]: value };
@@ -79,7 +93,7 @@ export function AcceptInviteForm({
         });
         if (result.error || !result.email) {
             setPending(false);
-            setError(result.error ?? "Could not accept the invite");
+            setError(result.error ?? t("invite.errors.failed"));
             return;
         }
         await signIn.email({ email: result.email, password: parsed.password });
@@ -115,23 +129,17 @@ export function AcceptInviteForm({
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Accept your invite</CardTitle>
+                    <CardTitle>{t("invite.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <p className="mb-3 text-sm text-muted-foreground">
-                        Joining as <span className="font-medium text-foreground">{email}</span>
-                        {orgName ? (
-                            <>
-                                {" "}
-                                and becoming part of{" "}
-                                <span className="font-medium text-foreground">{orgName}</span>
-                            </>
-                        ) : null}
-                        .
+                        {orgName
+                            ? t.rich("invite.joiningAsOrg", { email, org: orgName, strong: emphasis })
+                            : t.rich("invite.joiningAs", { email, strong: emphasis })}
                     </p>
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
-                            <label className="text-sm">Your name</label>
+                            <label className="text-sm">{t("invite.name")}</label>
                             <Input
                                 autoComplete="name"
                                 autoCapitalize="words"
@@ -149,24 +157,24 @@ export function AcceptInviteForm({
                                 }}
                                 aria-invalid={Boolean(form.error("name"))}
                             />
-                            {form.error("name") ? <p className="text-xs text-danger">{form.error("name")}</p> : null}
+                            {fieldError("name") ? <p className="text-xs text-danger">{fieldError("name")}</p> : null}
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-sm">Username</label>
+                            <label className="text-sm">{t("invite.username")}</label>
                             <Input
                                 autoComplete="username"
-                                placeholder="ada"
+                                placeholder={t("invite.usernamePlaceholder")}
                                 value={values.username}
                                 onChange={(event) => update("username", event.target.value)}
                                 onBlur={() => form.markTouched("username")}
                                 aria-invalid={Boolean(form.error("username"))}
                             />
-                            {form.error("username") ? (
-                                <p className="text-xs text-danger">{form.error("username")}</p>
+                            {fieldError("username") ? (
+                                <p className="text-xs text-danger">{fieldError("username")}</p>
                             ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-sm">Password</label>
+                            <label className="text-sm">{t("invite.password")}</label>
                             {/* Checked against the breach corpus as it is typed and
                                 against the account's own identity, by
                                 usePasswordSafety above; both are refused again on
@@ -174,14 +182,14 @@ export function AcceptInviteForm({
                             <Input
                                 type="password"
                                 autoComplete="new-password"
-                                placeholder="10+ characters"
+                                placeholder={t("invite.passwordPlaceholder")}
                                 value={values.password}
                                 onChange={(event) => update("password", event.target.value)}
                                 onBlur={() => form.markTouched("password")}
                                 aria-invalid={Boolean(form.error("password") ?? passwordError)}
                             />
-                            {form.error("password") ?? passwordError ? (
-                                <p className="text-xs text-danger">{form.error("password") ?? passwordError}</p>
+                            {fieldError("password") ?? passwordError ? (
+                                <p className="text-xs text-danger">{fieldError("password") ?? passwordError}</p>
                             ) : null}
                             {/* And what is true about it either way. The refusal
                                 above only appears once the password is long
@@ -191,7 +199,7 @@ export function AcceptInviteForm({
                         </div>
                         {needsPassword ? (
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm">One-time password</label>
+                                <label className="text-sm">{t("invite.oneTimePassword")}</label>
                                 <Input
                                     type="password"
                                     autoComplete="off"
@@ -199,7 +207,7 @@ export function AcceptInviteForm({
                                     onChange={(event) => setOneTimePassword(event.target.value)}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Whoever invited you sent this separately from the invite itself.
+                                    {t("invite.oneTimePasswordHint")}
                                 </p>
                             </div>
                         ) : null}
@@ -218,7 +226,7 @@ export function AcceptInviteForm({
                                 (needsPassword && oneTimePassword === "")
                             }
                         >
-                            {pending ? "Joining..." : "Join Polaris"}
+                            {pending ? t("invite.joining") : t("invite.join")}
                         </Button>
                     </form>
                 </CardBody>
