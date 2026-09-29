@@ -17,6 +17,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** A stored window, as the screens read it. */
 export interface PresenceScheduleView extends core.PresenceScheduleRule {}
@@ -63,7 +64,7 @@ const ORDER = [{ startMinute: "asc" as const }, { createdAt: "asc" as const }];
  *  gets the same answer either way. */
 const LOOKS_LIKE_AN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const GONE = { error: "That schedule is gone." };
+const GONE = { error: (await readerWords("api"))("refusals.presence.gone") };
 
 /** Every window this account keeps, the switched-off ones included - this is the
  *  screen that edits them, and one that hid what it had turned off would look
@@ -132,7 +133,7 @@ export async function createSchedule(
 ): Promise<{ error?: string }> {
     const held = await prisma.presenceSchedule.count({ where: { userId } });
     if (held >= core.MAX_PRESENCE_SCHEDULES) {
-        return { error: `You can keep ${core.MAX_PRESENCE_SCHEDULES} schedules. Delete one first.` };
+        return { error: (await readerWords("api"))("refusals.presence.limit", { count: core.MAX_PRESENCE_SCHEDULES }) };
     }
     await prisma.presenceSchedule.create({ data: { userId, ...input } });
     return {};

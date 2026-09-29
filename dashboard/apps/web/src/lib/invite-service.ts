@@ -49,6 +49,7 @@ import {
     type InviteMethod,
     type InviteRefusal
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** Seven days, the invite lifetime. */
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -216,7 +217,7 @@ export async function createInvite(
     // Roles are rows an operator can add to, so an unknown name is a mistake to
     // report rather than an invite that quietly hands out nothing.
     const role = await prisma.role.findUnique({ where: { name: input.role }, select: { id: true } });
-    if (!role) return { id: "", error: "That role no longer exists." };
+    if (!role) return { id: "", error: (await readerWords("api"))("refusals.invites.roleGone") };
     const token = generateToken();
     // Only the groups the inviting administrator owns; a foreign id is dropped
     // rather than rejected, the same way every other rule editor treats one.
@@ -478,7 +479,7 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
             password: input.password
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not accept the invite" };
+        return { error: caught instanceof Error ? caught.message : (await readerWords("auth"))("invite.errors.failed") };
     }
 
     if (invite.roleId) {
@@ -619,7 +620,7 @@ export async function resendInvite(
         },
         select: { id: true, email: true }
     });
-    if (!invite) return { error: "That invitation is no longer waiting." };
+    if (!invite) return { error: (await readerWords("api"))("refusals.invites.notWaiting") };
 
     const token = generateToken();
     await prisma.invite.update({

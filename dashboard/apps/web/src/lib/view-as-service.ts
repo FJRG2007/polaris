@@ -23,6 +23,7 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { ALL_PERMISSIONS, expandPermissions, PERMISSIONS, type Permission } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
  * How long a view lasts before it lapses on its own. Long enough to work through
@@ -141,15 +142,15 @@ export async function viewAsUser(
     actor: { id: string; sessionId: string },
     targetId: string
 ): Promise<{ error?: string }> {
-    if (targetId === actor.id) return { error: "That is already your account." };
+    if (targetId === actor.id) return { error: (await readerWords("api"))("refusals.viewAs.alreadyYou") };
     const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, email: true } });
-    if (!target) return { error: "User not found." };
+    if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
 
     const started = await prisma.sessionState.updateMany({
         where: { sessionId: actor.sessionId },
         data: { viewAsUserId: target.id, viewAsRoleId: null, viewAsAt: new Date() }
     });
-    if (started.count === 0) return { error: "This session cannot open another account." };
+    if (started.count === 0) return { error: (await readerWords("api"))("refusals.viewAs.cannotOpen") };
 
     await recordAudit({
         actorId: actor.id,
@@ -168,13 +169,13 @@ export async function viewAsRole(
     roleId: string
 ): Promise<{ error?: string }> {
     const role = await prisma.role.findUnique({ where: { id: roleId }, select: { id: true, name: true } });
-    if (!role) return { error: "Unknown role." };
+    if (!role) return { error: (await readerWords("admin"))("roles.errors.unknownRole") };
 
     const started = await prisma.sessionState.updateMany({
         where: { sessionId: actor.sessionId },
         data: { viewAsRoleId: role.id, viewAsUserId: null, viewAsAt: new Date() }
     });
-    if (started.count === 0) return { error: "This session cannot preview a role." };
+    if (started.count === 0) return { error: (await readerWords("api"))("refusals.viewAs.cannotPreview") };
 
     await recordAudit({
         actorId: actor.id,

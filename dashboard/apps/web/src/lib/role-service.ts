@@ -27,6 +27,7 @@ import {
     type CreateRoleInput,
     type Permission
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** One role, as the editor reads it. */
 export interface RoleView {
@@ -93,7 +94,7 @@ export async function listRoleOptions(): Promise<RoleOption[]> {
 export async function createRole(actorId: string, input: CreateRoleInput): Promise<{ id?: string; error?: string }> {
     const name = input.name.trim().toLowerCase();
     if (await prisma.role.findUnique({ where: { name }, select: { id: true } })) {
-        return { error: "A role with that name already exists." };
+        return { error: (await readerWords("api"))("refusals.roles.nameTaken") };
     }
     const permissions = expandPermissions(input.permissions);
     const role = await prisma.role.create({
@@ -118,8 +119,8 @@ export async function setRolePermissions(
     permissions: Permission[]
 ): Promise<{ error?: string }> {
     const role = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
-    if (!role) return { error: "Unknown role." };
-    if (role.name === UNEDITABLE_ROLE) return { error: "The administrator role always holds everything." };
+    if (!role) return { error: (await readerWords("admin"))("roles.errors.unknownRole") };
+    if (role.name === UNEDITABLE_ROLE) return { error: (await readerWords("api"))("refusals.roles.adminHoldsAll") };
 
     const expanded = expandPermissions(permissions);
     await prisma.role.update({ where: { id: roleId }, data: { permissions: JSON.stringify(expanded) } });
@@ -143,14 +144,13 @@ export async function deleteRole(actorId: string, roleId: string): Promise<{ err
         where: { id: roleId },
         select: { name: true, isSystem: true, _count: { select: { users: true } } }
     });
-    if (!role) return { error: "Unknown role." };
-    if (role.isSystem || SYSTEM_ROLES.includes(role.name)) return { error: "Built-in roles cannot be deleted." };
+    if (!role) return { error: (await readerWords("admin"))("roles.errors.unknownRole") };
+    if (role.isSystem || SYSTEM_ROLES.includes(role.name)) return { error: (await readerWords("api"))("refusals.roles.builtIn") };
     if (role._count.users > 0) {
-        const people = role._count.users === 1 ? "1 person still holds" : `${role._count.users} people still hold`;
-        return { error: `${people} this role. Move them to another one first.` };
+        return { error: (await readerWords("api"))("refusals.roles.stillHeld", { count: role._count.users }) };
     }
     const pending = await prisma.invite.count({ where: { roleId, acceptedAt: null } });
-    if (pending > 0) return { error: "An open invite still hands out this role. Revoke it first." };
+    if (pending > 0) return { error: (await readerWords("api"))("refusals.roles.openInvite") };
 
     await prisma.role.delete({ where: { id: roleId } });
     await recordAudit({

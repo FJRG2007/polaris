@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import { getSetting, setSetting } from "./setting-store";
 import { sendThroughChannel } from "./mail-service";
 import type { EmailMessage } from "./mail/types";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 const CHANNEL_KEY = "auth.mail.channel";
 
@@ -53,7 +54,7 @@ export async function setAuthMailChannel(channelId: string | null): Promise<{ er
         where: { id: channelId, platform: EMAIL_PLATFORM },
         select: { id: true }
     });
-    if (!channel) return { error: "That email channel no longer exists." };
+    if (!channel) return { error: (await readerWords("api"))("refusals.mail.channelGone") };
     await setSetting(CHANNEL_KEY, channel.id);
     return {};
 }
@@ -65,6 +66,6 @@ export async function setAuthMailChannel(channelId: string | null): Promise<{ er
  */
 export async function sendAuthEmail(message: EmailMessage): Promise<{ error?: string }> {
     const { channelId } = await getAuthMailStatus();
-    if (!channelId) return { error: "Polaris has no email channel configured to send from." };
+    if (!channelId) return { error: (await readerWords("api"))("refusals.mail.noChannel") };
     return sendThroughChannel(channelId, message);
 }

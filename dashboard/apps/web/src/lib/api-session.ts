@@ -24,16 +24,17 @@
 import { NextResponse } from "next/server";
 import type { Permission } from "@polaris/core";
 import { guardedUser, sessionCan, type SessionUser } from "@/lib/session";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** No session at all, or one a guard has ended. Deliberately says nothing about
  *  which: a caller that is signed out gets the same answer either way. */
-function unauthorized(): NextResponse {
-    return NextResponse.json({ error: "Sign in to continue" }, { status: 401 });
+async function unauthorized(): Promise<NextResponse> {
+    return NextResponse.json({ error: (await readerWords("api"))("errors.signIn") }, { status: 401 });
 }
 
 /** Somebody real, who may not have this. */
-function forbidden(): NextResponse {
-    return NextResponse.json({ error: "You do not have access to that" }, { status: 403 });
+async function forbidden(): Promise<NextResponse> {
+    return NextResponse.json({ error: (await readerWords("api"))("refusals.session.noAccess") }, { status: 403 });
 }
 
 /**
@@ -47,7 +48,7 @@ function forbidden(): NextResponse {
 export type ApiCaller = SessionUser | NextResponse;
 
 export async function apiUser(): Promise<ApiCaller> {
-    return (await guardedUser()) ?? unauthorized();
+    return (await guardedUser()) ?? (await unauthorized());
 }
 
 export async function apiAdmin(): Promise<ApiCaller> {

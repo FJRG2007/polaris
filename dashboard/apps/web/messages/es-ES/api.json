@@ -89,5 +89,68 @@
         "fileOpenFailed": "No se pudo abrir ese archivo.",
         "rangeBackwards": "El inicio del rango es posterior a su final.",
         "fileLargerThan": "Ese archivo supera los {megabytes} MB."
+    },
+    "refusals": {
+        "session": {
+            "noAccess": "No tienes acceso a eso"
+        },
+        "apps": {
+            "notAnApp": "Eso no es una app.",
+            "appMissing": "Esta versión de Polaris no tiene esa app."
+        },
+        "mail": {
+            "channelGone": "Ese canal de correo ya no existe.",
+            "noChannel": "Polaris no tiene ningún canal de correo configurado para enviar."
+        },
+        "email": {
+            "notYours": "Esa dirección no está en tu cuenta.",
+            "alreadyVerified": "Esa dirección ya está verificada."
+        },
+        "invites": {
+            "roleGone": "Ese rol ya no existe.",
+            "notWaiting": "Esa invitación ya no está pendiente."
+        },
+        "presence": {
+            "gone": "Esa programación ya no existe.",
+            "limit": "Puedes tener {count} programaciones. Elimina una primero."
+        },
+        "qrSignIn": {
+            "tooManyCodes": "Demasiados códigos desde aquí. Inicia sesión con tu contraseña.",
+            "codeInvalid": "Ese código ya no es válido. Pide uno nuevo en la pantalla de inicio de sesión.",
+            "pinFirst": "Configura un PIN de desbloqueo rápido en Cuenta > Seguridad antes de permitir un inicio de sesión así."
+        },
+        "roles": {
+            "nameTaken": "Ya existe un rol con ese nombre.",
+            "adminHoldsAll": "El rol de administrador siempre lo tiene todo.",
+            "builtIn": "Los roles integrados no se pueden eliminar.",
+            "openInvite": "Una invitación abierta aún concede este rol. Revócala primero.",
+            "stillHeld": "{count, plural, one {1 persona aún tiene} other {# personas aún tienen}} este rol. Pásalas a otro primero."
+        },
+        "enrollment": {
+            "tooManyCodes": "Se han pedido demasiados códigos. Espera unos minutos y vuelve a intentarlo.",
+            "noAddress": "Esta cuenta no tiene ninguna dirección a la que enviar un código.",
+            "wrongPassword": "Esa contraseña no es correcta. Pide un código nuevo y vuelve a intentarlo."
+        },
+        "twoFactor": {
+            "methodUnusable": "Ese método ha dejado de poder usarse.",
+            "tooManyCodes": "Se han pedido demasiados códigos. Espera antes de pedir otro.",
+            "noWay": "Esta cuenta no tiene ninguna forma de recibir un código.",
+            "noWhatsApp": "No hay ningún canal de WhatsApp por el que enviar.",
+            "bridgeRefused": "El puente de mensajería rechazó el mensaje."
+        },
+        "users": {
+            "banSelf": "No puedes vetarte a ti mismo.",
+            "lastAdmin": "Es el último administrador.",
+            "notALength": "Eso no es una duración.",
+            "ownAdmin": "No puedes quitarte tu propio acceso de administrador.",
+            "noNumber": "Esta cuenta no tiene ningún número que verificar.",
+            "sessionEnded": "Esa sesión ya ha terminado.",
+            "deleteSelf": "No puedes eliminar tu propia cuenta."
+        },
+        "viewAs": {
+            "alreadyYou": "Esa ya es tu cuenta.",
+            "cannotOpen": "Esta sesión no puede abrir otra cuenta.",
+            "cannotPreview": "Esta sesión no puede previsualizar un rol."
+        }
     }
 }

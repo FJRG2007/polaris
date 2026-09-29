@@ -1376,6 +1376,23 @@
         "game-servers/src/screens/installed/event-options-xp-boost.tsx",
         "game-servers/src/screens/installed/events-actions.ts",
         "game-servers/src/screens/installed/game-console.tsx",
-        "game-servers/src/screens/installed/minecraft-events.tsx"
+        "game-servers/src/screens/installed/minecraft-events.tsx",
+        "web/src/lib/api-key-auth.ts",
+        "web/src/lib/api-session.ts",
+        "web/src/lib/app-bundles/actions.ts",
+        "web/src/lib/app-bundles/lifecycle.ts",
+        "web/src/lib/auth-mail.ts",
+        "web/src/lib/email-verification-service.ts",
+        "web/src/lib/extension/sessions.ts",
+        "web/src/lib/invite-service.ts",
+        "web/src/lib/presence-schedule-service.ts",
+        "web/src/lib/qr-sign-in-service.ts",
+        "web/src/lib/role-service.ts",
+        "web/src/lib/second-factor-enrollment.ts",
+        "web/src/lib/session-directory.ts",
+        "web/src/lib/step-up.ts",
+        "web/src/lib/two-factor-delivery.ts",
+        "web/src/lib/user-admin-service.ts",
+        "web/src/lib/view-as-service.ts"
     ]
 }

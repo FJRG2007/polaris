@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import { sendAuthEmail } from "./auth-mail";
 import { appBaseUrl } from "./domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How long a verification link stays good. Long enough to survive a mail queue
  *  and a night's sleep, short enough that an old message is not a live key. */
@@ -64,9 +65,9 @@ export async function requestEmailVerification(
         prisma.userEmail.findFirst({ where: { userId, email: address }, select: { verifiedAt: true } })
     ]);
     const isPrimary = user?.email.toLowerCase() === address;
-    if (!isPrimary && !alternate) return { error: "That address is not on your account." };
+    if (!isPrimary && !alternate) return { error: (await readerWords("api"))("refusals.email.notYours") };
     if (isPrimary ? user?.emailVerified : alternate?.verifiedAt !== null) {
-        return { error: "That address is already verified." };
+        return { error: (await readerWords("api"))("refusals.email.alreadyVerified") };
     }
 
     const token = generateToken();

@@ -19,6 +19,7 @@ import { findApp } from "@/lib/apps/catalog";
 import { BundleUnavailable, removeBundle } from "./store";
 import { loadBundle, loadedBundle, unloadBundle } from "./loader";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How long boot waits for the bundles before it serves without them. */
 const BOOT_WAIT_MS = 60_000;
@@ -110,7 +111,7 @@ export async function appInstalled(id: string): Promise<void> {
 
 /** Try again to bring an installed app whose code is not here. */
 export async function retryApp(id: string): Promise<{ error?: string }> {
-    if (!knownApps().includes(id)) return { error: "This version of Polaris does not have that app." };
+    if (!knownApps().includes(id)) return { error: (await readerWords("api"))("refusals.apps.appMissing") };
     try {
         await bring(id);
         return {};

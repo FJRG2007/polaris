@@ -27,6 +27,7 @@ import {
     type StepUpProofInput,
     type TwoFactorDeliveryMethod
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** Wrong proofs one account may offer, and over what span. Tighter than a
  *  sign-in: nobody reaches this screen by accident, and the person holding the
@@ -91,12 +92,12 @@ export async function sendStepUpCode(
 ): Promise<{ error?: string }> {
     const { choices } = await stepUpOptions(userId);
     if (!choices.some((choice) => choice.proof === method)) {
-        return { error: "That is not a way this account can confirm." };
+        return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
 
     const throttle = await rateLimit(`step-up-send:${userId}`, PROOF_LIMIT, PROOF_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many codes asked for. Try again in ${minutes(throttle.retryAfterMs)}.` };
+        return { error: (await readerWords("accountSecurity"))("errors.tooManyCodes", { minutes: minutes(throttle.retryAfterMs) }) };
     }
 
     const code = await issueStepUpCode(auth, userId, purpose);
@@ -141,12 +142,12 @@ export async function proveStepUp(
 ): Promise<{ error?: string }> {
     const throttle = await rateLimit(`step-up:${userId}`, PROOF_LIMIT, PROOF_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many attempts. Try again in ${minutes(throttle.retryAfterMs)}.` };
+        return { error: (await readerWords("accountSecurity"))("errors.tooManyAttempts", { minutes: minutes(throttle.retryAfterMs) }) };
     }
 
     const { choices } = await stepUpOptions(userId);
     if (!choices.some((choice) => choice.proof === proof.proof)) {
-        return { error: "That is not a way this account can confirm." };
+        return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
 
     const result = await check(userId, purpose, proof);
@@ -162,17 +163,16 @@ async function check(userId: string, purpose: string, proof: StepUpProofInput): 
     if (proof.proof === "password") {
         return (await verifyAccountPassword(auth, userId, proof.password))
             ? {}
-            : { error: "That password is not right." };
+            : { error: (await readerWords("accountSecurity"))("known.wrongStepUpPassword") };
     }
     if (proof.proof === "totp") {
         return (await verifyTotpForSession(auth, await headers(), proof.code))
             ? {}
-            : { error: "That code is not right." };
+            : { error: (await readerWords("accountSecurity"))("known.wrongCode") };
     }
     return verifyStepUpCode(auth, userId, purpose, proof.code);
 }
 
-function minutes(ms: number): string {
-    const count = Math.max(1, Math.ceil(ms / 60000));
-    return `${count} minute${count === 1 ? "" : "s"}`;
+function minutes(ms: number): number {
+    return Math.max(1, Math.ceil(ms / 60000));
 }

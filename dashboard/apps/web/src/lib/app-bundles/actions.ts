@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { retryApp } from "./lifecycle";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 const AppId = z.string().regex(/^[a-z0-9-]{1,64}$/);
 
@@ -14,6 +15,6 @@ const AppId = z.string().regex(/^[a-z0-9-]{1,64}$/);
 export async function retryAppAction(id: string): Promise<{ error?: string }> {
     await requireUser();
     const parsed = AppId.safeParse(id);
-    if (!parsed.success) return { error: "That is not an app." };
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.apps.notAnApp") };
     return retryApp(parsed.data);
 }

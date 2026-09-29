@@ -38,6 +38,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { addressPinned, describeClient, isHandheld, type AddressPinScope } from "@polaris/core";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** What the extension is handed when it asks. */
 export interface OpenedConnection {
@@ -207,7 +208,7 @@ export async function answerExtensionConnection(input: {
         }
     });
     if (answered.count === 0) {
-        return { error: "Nothing is waiting on that code. Ask the extension for a new one." };
+        return { error: (await readerWords("account"))("extension.errors.nothingWaiting") };
     }
     return {};
 }

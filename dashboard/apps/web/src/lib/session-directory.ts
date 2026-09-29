@@ -51,6 +51,7 @@ import {
     verifyQuickPin,
     type TrustedDeviceView
 } from "@polaris/auth";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
  * The device that answered for a session, as its row shows it.
@@ -583,11 +584,11 @@ export async function decideLoginApproval(
             userAgentPlatform: true
         }
     });
-    if (!state) return { error: "That sign-in is no longer waiting." };
+    if (!state) return { error: (await readerWords("accountSecurity"))("known.signInNotWaiting") };
 
     if (approve) {
         if (!(await verifyQuickPin(auth, userId, String(pin ?? "")))) {
-            return { error: "That PIN is not right." };
+            return { error: (await readerWords("accountSecurity"))("known.wrongPin") };
         }
         await prisma.sessionState.update({
             where: { sessionId },

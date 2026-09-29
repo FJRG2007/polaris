@@ -30,6 +30,7 @@ import {
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How many codes one account may ask for, and over what span. Loose enough for
  *  a message that never arrived, tight enough that the mailbox is not a target. */
@@ -215,7 +216,7 @@ export async function deliverCode(
     message: CodeMessage
 ): Promise<{ error?: string }> {
     const { destination, blocker } = await resolveDestination(userId, method);
-    if (!destination) return { error: blocker ?? "That method stopped being usable." };
+    if (!destination) return { error: blocker ?? (await readerWords("api"))("refusals.twoFactor.methodUnusable") };
     return method === "email"
         ? sendAuthEmail({ to: destination.address, subject: message.subject, text: message.text, html: message.html })
         : sendByWhatsApp(destination, message.text);
@@ -255,7 +256,7 @@ export async function sendTwoFactorCode(input: {
 }): Promise<{ error?: string }> {
     const { userId, code } = input;
     const throttle = await rateLimit(`2fa-code:${userId}`, SEND_LIMIT, SEND_WINDOW_MS);
-    if (!throttle.ok) return { error: "Too many codes asked for. Wait before asking for another." };
+    if (!throttle.ok) return { error: (await readerWords("api"))("refusals.twoFactor.tooManyCodes") };
 
     const [settings, statuses] = await Promise.all([
         getUserSecurity(userId),
@@ -266,13 +267,13 @@ export async function sendTwoFactorCode(input: {
     const preferred = usable.find((status) => status.method === settings.twoFactorPreferred);
     const chosen = (asked ?? preferred ?? usable[0])?.method;
     if (chosen === undefined || chosen === "totp") {
-        return { error: "This account has no way to be sent a code." };
+        return { error: (await readerWords("api"))("refusals.twoFactor.noWay") };
     }
 
     const { destination } = await resolveDestination(userId, chosen);
     // Re-resolved rather than carried over from the status above, so the send
     // uses the real address instead of the masked one shown on screen.
-    if (!destination) return { error: "That method stopped being usable." };
+    if (!destination) return { error: (await readerWords("api"))("refusals.twoFactor.methodUnusable") };
 
     const { text, html } = messageBody(code);
     const result =
@@ -299,7 +300,7 @@ export async function sendTwoFactorCode(input: {
  * minute it was good for is a code sitting in a database for no reason.
  */
 async function sendByWhatsApp(destination: Destination, text: string): Promise<{ error?: string }> {
-    if (!destination.channelId) return { error: "No WhatsApp channel to send through." };
+    if (!destination.channelId) return { error: (await readerWords("api"))("refusals.twoFactor.noWhatsApp") };
     try {
         await bridgeSend(destination.channelId, {
             peerId: normalizePeerId("whatsapp", destination.address),
@@ -307,6 +308,6 @@ async function sendByWhatsApp(destination: Destination, text: string): Promise<{
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The messaging bridge refused the message." };
+        return { error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.twoFactor.bridgeRefused") };
     }
 }

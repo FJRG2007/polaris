@@ -51,6 +51,7 @@ import {
     openDeviceCode,
     verifyQuickPin
 } from "@polaris/auth";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How many codes one address may open before it is asked to slow down. Loose
  *  enough for a household behind one address reloading the sign-in screen,
@@ -105,7 +106,7 @@ export interface QrSignInRequest {
 export async function openSignInCode(): Promise<{ code?: QrSignInCode; error?: string }> {
     const ip = await clientIp();
     const throttle = await rateLimit(`qr-signin:${ip ?? "unknown"}`, OPEN_LIMIT, OPEN_WINDOW_MS);
-    if (!throttle.ok) return { error: "Too many codes from here. Sign in with your password." };
+    if (!throttle.ok) return { error: (await readerWords("api"))("refusals.qrSignIn.tooManyCodes") };
 
     // A code nobody came back for is dead weight the moment it expires, and codes
     // are opened far more often than they are answered. Clearing them here keeps
@@ -307,22 +308,26 @@ export async function decideSignInCode(
     decision: QrSignInDecision
 ): Promise<{ error?: string }> {
     const request = await describeSignInCode(decision.userCode, userId);
-    if (!request) return { error: "That code is no longer valid. Ask for a new one on the sign-in screen." };
+    if (!request) return { error: (await readerWords("api"))("refusals.qrSignIn.codeInvalid") };
 
     if (decision.approve) {
         const throttle = await rateLimit(`qr-approval:${userId}`, APPROVAL_LIMIT, APPROVAL_WINDOW_MS);
         if (!throttle.ok) {
-            return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+            return {
+                error: (await readerWords("accountSecurity"))("errors.tooManyAttempts", {
+                    minutes: Math.ceil(throttle.retryAfterMs / 60000)
+                })
+            };
         }
         if (!(await getUserSecurity(userId)).hasPin) {
-            return { error: "Set a quick unlock PIN in Account > Security before allowing a sign-in this way." };
+            return { error: (await readerWords("api"))("refusals.qrSignIn.pinFirst") };
         }
-        if (!(await verifyQuickPin(auth, userId, decision.pin))) return { error: "That PIN is not right." };
+        if (!(await verifyQuickPin(auth, userId, decision.pin))) return { error: (await readerWords("accountSecurity"))("known.wrongPin") };
     }
 
     const store = await headers();
     if (!(await claimDeviceCode(auth, decision.userCode, store))) {
-        return { error: "That code is no longer valid. Ask for a new one on the sign-in screen." };
+        return { error: (await readerWords("api"))("refusals.qrSignIn.codeInvalid") };
     }
     // What this device is, from the request that is answering: the scan happens
     // here and the session it lets in is written on another device's next request,

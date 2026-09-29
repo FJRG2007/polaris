@@ -22,6 +22,7 @@ import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** One person, as the directory lists them. */
 export interface DirectoryUser {
@@ -207,13 +208,13 @@ export async function banUser(
     /** How long it lasts. Absent, or zero, is a ban with no end. */
     minutes?: number
 ): Promise<{ error?: string }> {
-    if (userId === actorId) return { error: "You can't ban yourself." };
+    if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.banSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!target) return { error: "User not found." };
-    if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
+    if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
+    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     const length = Math.trunc(minutes ?? 0);
-    if (length < 0 || length > MAX_SUSPENSION_MINUTES) return { error: "That is not a length." };
+    if (length < 0 || length > MAX_SUSPENSION_MINUTES) return { error: (await readerWords("api"))("refusals.users.notALength") };
     // Both from one instant: taken separately, a suspension's length is off by
     // however long the two calls were apart, which is the sort of thing that is
     // fine until somebody is comparing the two columns.
@@ -285,8 +286,8 @@ export async function setAdminAccess(
     isAdmin: boolean
 ): Promise<{ error?: string }> {
     if (!isAdmin) {
-        if (userId === actorId) return { error: "You can't remove your own administrator access." };
-        if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
+        if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.ownAdmin") };
+        if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
     }
     await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
     await recordAudit({
@@ -329,7 +330,7 @@ export async function setContactVerified(
             where: { userId },
             select: { phone: true }
         });
-        if (!phone) return { error: "This account has no number to verify." };
+        if (!phone) return { error: (await readerWords("api"))("refusals.users.noNumber") };
         await prisma.userPhone.update({
             where: { userId },
             // The code goes with it either way. One that is still outstanding
@@ -359,7 +360,7 @@ export async function setUserRole(
     roleName: string
 ): Promise<{ error?: string }> {
     const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
-    if (!role) return { error: "Unknown role." };
+    if (!role) return { error: (await readerWords("admin"))("roles.errors.unknownRole") };
     await prisma.$transaction([
         prisma.userRole.deleteMany({ where: { userId } }),
         prisma.userRole.create({ data: { userId, roleId: role.id } })
@@ -451,7 +452,7 @@ export async function revokeSessionForUser(
     sessionId: string
 ): Promise<{ error?: string }> {
     const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
-    if (result.count === 0) return { error: "That session has already ended." };
+    if (result.count === 0) return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
     await recordAudit({
         actorId,
         action: "user.session.revoke",
@@ -474,10 +475,10 @@ export async function revokeSessionForUser(
  * out of - your own account, and the last administrator.
  */
 export async function deleteUser(actorId: string, userId: string): Promise<{ error?: string }> {
-    if (userId === actorId) return { error: "You can't delete your own account." };
+    if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.deleteSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (!target) return { error: "User not found." };
-    if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
+    if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
+    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     // Their face and their banner, before the rows that say where those are
     // cascade away with the account. A cascade takes rows, not bytes, so without

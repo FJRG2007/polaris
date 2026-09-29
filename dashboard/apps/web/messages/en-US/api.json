@@ -89,5 +89,68 @@
         "fileOpenFailed": "That file could not be opened.",
         "rangeBackwards": "The start of the range is after its end.",
         "fileLargerThan": "That file is larger than {megabytes} MB."
+    },
+    "refusals": {
+        "session": {
+            "noAccess": "You do not have access to that"
+        },
+        "apps": {
+            "notAnApp": "That is not an app.",
+            "appMissing": "This version of Polaris does not have that app."
+        },
+        "mail": {
+            "channelGone": "That email channel no longer exists.",
+            "noChannel": "Polaris has no email channel configured to send from."
+        },
+        "email": {
+            "notYours": "That address is not on your account.",
+            "alreadyVerified": "That address is already verified."
+        },
+        "invites": {
+            "roleGone": "That role no longer exists.",
+            "notWaiting": "That invitation is no longer waiting."
+        },
+        "presence": {
+            "gone": "That schedule is gone.",
+            "limit": "You can keep {count} schedules. Delete one first."
+        },
+        "qrSignIn": {
+            "tooManyCodes": "Too many codes from here. Sign in with your password.",
+            "codeInvalid": "That code is no longer valid. Ask for a new one on the sign-in screen.",
+            "pinFirst": "Set a quick unlock PIN in Account > Security before allowing a sign-in this way."
+        },
+        "roles": {
+            "nameTaken": "A role with that name already exists.",
+            "adminHoldsAll": "The administrator role always holds everything.",
+            "builtIn": "Built-in roles cannot be deleted.",
+            "openInvite": "An open invite still hands out this role. Revoke it first.",
+            "stillHeld": "{count, plural, one {1 person still holds} other {# people still hold}} this role. Move them to another one first."
+        },
+        "enrollment": {
+            "tooManyCodes": "Too many codes asked for. Wait a few minutes and try again.",
+            "noAddress": "This account has no address to send a code to.",
+            "wrongPassword": "That password is not right. Ask for a new code and try again."
+        },
+        "twoFactor": {
+            "methodUnusable": "That method stopped being usable.",
+            "tooManyCodes": "Too many codes asked for. Wait before asking for another.",
+            "noWay": "This account has no way to be sent a code.",
+            "noWhatsApp": "No WhatsApp channel to send through.",
+            "bridgeRefused": "The messaging bridge refused the message."
+        },
+        "users": {
+            "banSelf": "You can't ban yourself.",
+            "lastAdmin": "This is the last administrator.",
+            "notALength": "That is not a length.",
+            "ownAdmin": "You can't remove your own administrator access.",
+            "noNumber": "This account has no number to verify.",
+            "sessionEnded": "That session has already ended.",
+            "deleteSelf": "You can't delete your own account."
+        },
+        "viewAs": {
+            "alreadyYou": "That is already your account.",
+            "cannotOpen": "This session cannot open another account.",
+            "cannotPreview": "This session cannot preview a role."
+        }
     }
 }

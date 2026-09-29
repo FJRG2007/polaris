@@ -14,6 +14,7 @@ import { touchApiKey, verifyApiKey } from "@polaris/auth";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export interface ApiKeyPrincipal {
     keyId: string;
@@ -75,9 +76,9 @@ export async function requireApiKey(
     required?: Permission
 ): Promise<ApiKeyPrincipal | Response> {
     const principal = await authenticateApiKey(request);
-    if (!principal) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!principal) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (required && !principal.scopes.includes(required)) {
-        return Response.json({ error: "Forbidden", requiredScope: required }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden"), requiredScope: required }, { status: 403 });
     }
     return principal;
 }

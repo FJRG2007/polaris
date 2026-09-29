@@ -31,6 +31,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { hashSecret, setTotpUnclaimed, verifySecret } from "@polaris/auth";
 import { TWO_FACTOR_CODE_ATTEMPTS, TWO_FACTOR_CODE_TTL_MINUTES } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** Where one account's pending enrollment code lives. */
 function codeKey(userId: string): string {
@@ -56,10 +57,10 @@ function newCode(): string {
  */
 export async function sendEnrollmentCode(userId: string): Promise<{ error?: string; sentTo?: string }> {
     const throttle = await rateLimit(`2fa-enroll-send:${userId}`, SEND_LIMIT, SEND_WINDOW_MS);
-    if (!throttle.ok) return { error: "Too many codes asked for. Wait a few minutes and try again." };
+    if (!throttle.ok) return { error: (await readerWords("api"))("refusals.enrollment.tooManyCodes") };
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (!user?.email) return { error: "This account has no address to send a code to." };
+    if (!user?.email) return { error: (await readerWords("api"))("refusals.enrollment.noAddress") };
 
     const code = newCode();
     const expiresAt = new Date(Date.now() + TWO_FACTOR_CODE_TTL_MINUTES * 60_000);
@@ -94,18 +95,18 @@ export async function sendEnrollmentCode(userId: string): Promise<{ error?: stri
  */
 async function spendEnrollmentCode(userId: string, code: string): Promise<{ error?: string }> {
     const tries = await rateLimit(`2fa-enroll-try:${userId}`, TWO_FACTOR_CODE_ATTEMPTS, TWO_FACTOR_CODE_TTL_MINUTES * 60_000);
-    if (!tries.ok) return { error: "Too many wrong tries. Ask for a new code." };
+    if (!tries.ok) return { error: (await readerWords("accountSecurity"))("known.tooManyWrongTries") };
 
     const row = await prisma.verification.findFirst({
         where: { identifier: codeKey(userId) },
         orderBy: { createdAt: "desc" }
     });
-    if (!row) return { error: "Ask for a code first." };
+    if (!row) return { error: (await readerWords("accountSecurity"))("known.askForCodeFirst") };
     if (row.expiresAt.getTime() < Date.now()) {
         await prisma.verification.deleteMany({ where: { identifier: codeKey(userId) } });
-        return { error: "That code has expired. Ask for a new one." };
+        return { error: (await readerWords("accountSecurity"))("known.codeExpired") };
     }
-    if (!(await verifySecret(auth, row.value, code.trim()))) return { error: "That code is not right." };
+    if (!(await verifySecret(auth, row.value, code.trim()))) return { error: (await readerWords("accountSecurity"))("known.wrongCode") };
 
     await prisma.verification.deleteMany({ where: { identifier: codeKey(userId) } });
     return {};
@@ -155,7 +156,7 @@ export async function armFactorByEmail(
         // better-auth answers the same way for a wrong password and for an account
         // it will not arm, and the code has already been spent either way - so the
         // person asks for a fresh one, which is the honest state to be in.
-        return { error: "That password is not right. Ask for a new code and try again." };
+        return { error: (await readerWords("api"))("refusals.enrollment.wrongPassword") };
     }
 
     await prisma.$transaction([
