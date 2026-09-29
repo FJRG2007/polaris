@@ -34,10 +34,15 @@ export type IntegrationCategory =
  *  first because it is the one group that is about refusing things rather than
  *  reaching them. */
 export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; hint: string }> = [
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { name: "Security", hint: "What checks a file, an address or a visitor before Polaris trusts it." },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { name: "OAuth apps", hint: "Applications you register with a provider so people here can link that account or sign in with it." },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { name: "Networking", hint: "How a deployment is reached from outside: names, records and tunnels." },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { name: "Games", hint: "The stores and accounts a game server needs to install, update and let people in." },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { name: "Chat", hint: "What conversations and calls here can reach." }
 ];
 
@@ -111,14 +116,17 @@ export type ScanAction = "block" | "quarantine" | "notify";
 export const SCAN_ACTIONS: ReadonlyArray<{ value: ScanAction; label: string; help: string }> = [
     {
         value: "block",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         label: "Block the upload",
         help: "Reject the file and remove it. The uploader is told it was rejected."
     },
     {
         value: "quarantine",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         label: "Quarantine the file",
         help: "Keep the file but move it out of the destination into a quarantine folder."
     },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "notify", label: "Keep and notify only", help: "Store the file and just alert you." }
 ];
 
@@ -157,10 +165,15 @@ export interface DymoConfig {
 
 /** The IP rules an operator can toggle. Some are Dymo premium features. */
 export const DYMO_IP_RULES: ReadonlyArray<{ value: string; label: string; premium?: boolean }> = [
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "FRAUD", label: "Fraudulent / malicious" },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "PROXY", label: "Proxy" },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "VPN", label: "VPN" },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "TOR_NETWORK", label: "Tor exit node", premium: true },
+    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     { value: "HIGH_RISK_SCORE", label: "High risk score", premium: true }
 ];
 
@@ -220,9 +233,11 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Security",
         summary: "Scan uploaded files against 70+ antivirus engines.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Automatically scans files uploaded to your drop points with the VirusTotal Public API and alerts you when something is flagged. Choose whether a detection blocks, quarantines, or just notifies.",
         docsUrl: "https://docs.virustotal.com/reference/overview",
         setupLinks: [
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             { label: "Get your API key", url: "https://www.virustotal.com/gui/my-apikey" }
         ],
         requiresApiKey: true,
@@ -236,8 +251,10 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Security",
         summary: "Verify a visitor's IP and block fraud, proxies and VPNs.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "When someone opens a share link or a drop point, Polaris checks their IP with the Dymo API and blocks access if it matches the conditions you choose (fraudulent, proxy, VPN, ...). Fails open on an API error so a hiccup never locks out your visitors.",
         docsUrl: "https://docs.tpeoficial.com/docs/dymo-api/private/ip-validation",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         setupLinks: [{ label: "Create an API key", url: "https://tpe.li/new-api-key" }],
         requiresApiKey: true,
         apiKeyLabel: "API key"
@@ -248,9 +265,11 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Security",
         summary: "Block addresses already known for scanning or attacks.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "The firewall asks Criminal IP about addresses it sees in your traffic and blocks the ones that match the conditions you choose. Lookups happen in the background, never while a request is waiting, and the answer is cached - so a slow or unreachable provider can never slow down or open up your site.",
         docsUrl: "https://www.criminalip.io/developer/api/get-ip-summary",
         setupLinks: [
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             { label: "Get your API key", url: "https://www.criminalip.io/mypage/information" }
         ],
         requiresApiKey: true,
@@ -263,6 +282,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "OAuth apps",
         summary: "Let people connect their GitHub, sign in with it, and deploy their repositories.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Create a GitHub App in one click and Polaris can build private repositories, register self-hosted runners, and give everyone here a Connect button for their own GitHub account. Each person then sees their own repositories and nobody else's, and can sign in with the account they linked if you allow it.",
         docsUrl: "https://docs.github.com/apps/creating-github-apps",
         requiresApiKey: true,
@@ -277,44 +297,52 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary:
             "Let people connect their Google account, sign in with it, and show their calendar.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Their events then appear in the Tasks calendar, read-only, and they can sign in with the account they linked if you allow it. Polaris never holds a credential that reaches everybody's calendar - only the access each person granted.",
         docsUrl: "https://developers.google.com/identity/protocols/oauth2",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Fill in the consent screen",
                 url: "https://console.cloud.google.com/auth/branding",
                 help: "Google refuses to create a client until this exists. Audience: External, unless everybody here is in the same Workspace. Name the app exactly Polaris - verification compares it against the name on the home page - and give it these three URLs and the logo.",
                 values: ["homeUrl", "privacyUrl", "termsUrl", "logoUrl"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Add the authorized domain",
                 url: "https://console.cloud.google.com/auth/branding",
                 help: "Same page, under Authorized domains. Every URL above has to sit on it, and Google rejects an IP address outright - this needs a domain name.",
                 values: ["domain"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Prove you own the domain",
                 url: "https://search.google.com/search-console",
                 help: "Verification refuses a home page that is 'not registered to you'. Add the domain in Search Console, signed in as the account that owns this Cloud project, and complete the DNS check it gives you.",
                 values: ["domain"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an OAuth client",
                 url: "https://console.cloud.google.com/auth/clients/create",
                 help: "Application type: Web application. Google has no way to pre-fill the form, so paste this into Authorized redirect URIs.",
                 values: ["redirectUri"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Enable the Calendar API",
                 url: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
                 help: "On the same project. Without it the client authorizes fine and every calendar comes back empty."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Publish the app",
                 url: "https://console.cloud.google.com/auth/audience",
                 help: "A new client is in Testing, where only the accounts listed as test users may authorize and everybody else is refused with access_denied. Publishing lifts that. Until you are ready to, add each person as a test user instead."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Submit it for verification",
                 url: "https://console.cloud.google.com/auth/verification",
                 help: "The last step, and the only one that removes the 'Google hasn't verified this app' warning. Reading a calendar is a sensitive scope, so Google wants the pages above, the domain proved, a reason for the scope, and a video of somebody connecting an account. Published but unverified works - everyone just has to click through the warning first."
@@ -331,15 +359,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "OAuth apps",
         summary: "Let people connect their Microsoft account and keep backups in their OneDrive.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Register an Entra application and everyone here gets a Connect button for their own Microsoft account. Their OneDrive can then be chosen as a backup destination, and Polaris only ever touches the folder it creates there. Polaris holds no credential that reaches anybody's files - only the access each person granted.",
         docsUrl: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Register an application",
                 url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade",
                 help: "Supported account types: any organizational directory and personal Microsoft accounts. Paste the redirect URI below into the Web platform."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Add the Files.ReadWrite permission",
                 url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
                 help: "Delegated, on the same application. Without it the account links fine and every upload is refused."
@@ -355,15 +386,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "OAuth apps",
         summary: "Let people connect their Dropbox and keep backups in it.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Create a Dropbox app and everyone here gets a Connect button for their own account. Their Dropbox can then be chosen as a backup destination. An app scoped to its own folder is the one to create: everything Polaris writes then lives in one folder, and nothing else in anybody's Dropbox is reachable from here.",
         docsUrl: "https://www.dropbox.com/developers/reference/getting-started",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an app",
                 url: "https://www.dropbox.com/developers/apps/create",
                 help: "Scoped access, app folder. Paste the redirect URI below into the app's OAuth 2 redirect URIs."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Grant the file scopes",
                 url: "https://www.dropbox.com/developers/apps",
                 help: "On the app's Permissions tab: account_info.read, files.metadata.read/write and files.content.read/write. Submit them before linking, or the token comes back without them."
@@ -379,10 +413,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Games",
         summary: "Let people link their Steam account, so game servers can recognize them.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Steam needs nothing registered: it signs people in over OpenID, so the Connect button on everybody's account works the moment this is switched on. A Web API key is optional and buys one thing - the name and avatar beside a linked account, instead of a seventeen-digit number. An ARK server closed by Steam id can then be opened to somebody by their Polaris name.",
         docsUrl: "https://partner.steamgames.com/doc/features/auth",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Get a Web API key",
                 url: "https://steamcommunity.com/dev/apikey",
                 help: "Optional. Only used to read the display name and avatar of an account somebody has linked."
@@ -398,38 +434,45 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Games",
         summary: "Let people link their Epic account, so game servers can recognize them.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organisation authorize.",
         docsUrl: "https://dev.epicgames.com/docs/epic-account-services/getting-started",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create a product",
                 url: "https://dev.epicgames.com/portal",
                 help: "Everything else hangs off a product, so it is the first thing to make. The organization it belongs to is created with your account."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create a client, and register the redirect URI on it",
                 url: "https://dev.epicgames.com/portal",
                 help: "Product settings -> Clients -> New client. Policy type Custom with 'User required' ticked, which is what a client that signs a person in needs; leave every feature disabled, since Polaris only reads who authorized. Paste this into its redirect URLs.",
                 values: ["redirectUri"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create the application and link the client to it",
                 url: "https://dev.epicgames.com/portal",
                 help: "Product settings -> Epic Account Services. Brand settings take the name, the 128x128 logo and these URLs; Permissions needs only Basic Profile, which is always on; Linked clients has to name the client you just made, or the two never meet.",
                 values: ["homeUrl", "privacyUrl", "logoUrl"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Verify your domain",
                 url: "https://dev.epicgames.com/docs/epic-online-services/accounts-and-social/eos-epic-account-services/brand-review/domain-verification",
                 help: "Organization settings -> the domain, then the TXT record Epic gives you at your DNS host. Despite the name, the value is public once it is in DNS - it proves the domain is yours and nothing else. The site it points at has to be reachable without signing in and name your organisation and product; the home page above does.",
                 values: ["domain"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Save the draft, then submit it for review",
                 url: "https://dev.epicgames.com/docs/epic-account-services/brand-review/brand-review-process",
                 help: "Until it passes, only accounts in your own organization can authorize - everybody else is turned away, and your own sees an unverified warning it can click through. That is enough to finish this setup and prove it works; the review is what opens it to everyone else."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Copy the client id and secret",
                 url: "https://dev.epicgames.com/portal",
                 help: "Product settings -> SDK download and credentials, which lists every client. The secret is shown when the client is created; if it was not kept, make a new client rather than guessing."
@@ -446,15 +489,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary:
             "Let people link their Minecraft account, so a server can be opened to them by name.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "A separate Entra application from the Microsoft one: this asks only for Xbox sign-in, and Microsoft gates the Minecraft API behind an application it has approved. Once it is connected, linking an account hands Polaris the username as Mojang spells it - which is exactly what a server's player list is keyed by.",
         docsUrl: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Register an application",
                 url: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade",
                 help: "Personal Microsoft accounts only. Paste the redirect URI below into the Web platform."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Apply for the Minecraft API",
                 url: "https://help.minecraft.net/hc/en-us/articles/16254801392141",
                 help: "Microsoft approves each application before it may read a Minecraft profile. Without it, linking gets as far as Xbox and stops."
@@ -470,21 +516,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Chat",
         summary: "Let people link their Discord account, so game servers can recognize them.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by, and records it against their Polaris account instead of leaving it to be read out over chat. It also reads their address and the servers they are in, which is what the consent screen will say. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
         docsUrl: "https://discord.com/developers/docs/topics/oauth2",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an application",
                 url: "https://discord.com/developers/applications",
                 help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Register the redirect URI on it",
                 url: "https://discord.com/developers/applications",
                 help: "The application -> OAuth2 -> Redirects. Discord matches this string exactly and accepts no wildcard, so paste it whole.",
                 values: ["redirectUri"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Copy the client id and secret",
                 url: "https://discord.com/developers/applications",
                 help: "Both on the OAuth2 tab. Reset Secret shows the value once; if it was not kept, reset it again rather than guessing."
@@ -500,21 +550,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Chat",
         summary: "Let people show what they are listening to, and listen along with each other.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Create an app in Spotify's developer dashboard and everyone here gets a Connect button for their own Spotify. Beside their name, people who share it then see the song they are playing, and can press Listen along to hear it on their own Spotify. Spotify only lets an app control playback for a Premium account, so Listen along says so to anybody without one; showing the song works for everybody. Spotify also requires a secure (https) address for this Polaris, and keeps an app in development mode unless it is approved: in that mode the app's owner needs Premium and only the accounts added under User Management - five at most - can link.",
         docsUrl: "https://developer.spotify.com/documentation/web-api/concepts/apps",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an app",
                 url: "https://developer.spotify.com/dashboard/create",
                 help: "Any name and description. Paste the redirect URI below into Redirect URIs, and tick Web API where it asks which APIs the app uses.",
                 values: ["redirectUri", "homeUrl"]
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Add the people who will link",
                 url: "https://developer.spotify.com/dashboard",
                 help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. In development mode nobody else can link, and they are told so by Spotify rather than by Polaris."
             },
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Copy the client id and secret",
                 url: "https://developer.spotify.com/dashboard",
                 help: "The app -> Settings -> Basic Information. View client secret shows it."
@@ -530,10 +584,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Chat",
         summary: "Use a licensed noise filter in calls instead of the free one.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Calls already remove background noise with two free models that run in the browser and cost nothing. This is for an operator who has licensed a better one - Krisp being the one people ask for, since it is what Discord runs. Krisp does not publish its browser SDK for anyone to install, so what goes here is your own build of it: the address it is served from and the token it authenticates with. Both reach the browser, because that is where a filter on a microphone runs, and only ever a browser sitting in a call.",
         docsUrl: "https://krisp.ai/developers/",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Get the SDK and a license",
                 url: "https://krisp.ai/developers/",
                 help: "Krisp licenses per seat and hands over a build to host yourself. Any filter published as a module with the same shape works here - it does not have to be theirs."
@@ -549,10 +605,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Chat",
         summary: "Search GIFs and stickers from the chat composer.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the pictures each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
         docsUrl: "https://developers.google.com/tenor/guides/quickstart",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an API key",
                 url: "https://console.cloud.google.com/apis/credentials",
                 help: "Tenor is a Google API, so the key is an ordinary Google Cloud API key. Enable the Tenor API on the project first."
@@ -568,10 +626,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Chat",
         summary: "Search GIFs and stickers from the chat composer.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "The same search as Tenor, out of a Giphy account instead. Connect either one - the picker does not say which answered, and if both are connected Giphy does. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Giphy for anything and nobody is told who read what.",
         docsUrl: "https://developers.giphy.com/docs/api",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an API key",
                 url: "https://developers.giphy.com/dashboard/",
                 help: "An API key from a Giphy app. The free tier is rate-limited per day, which is ordinarily far more than a chat uses."
@@ -587,6 +647,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Networking",
         summary: "Create your DNS records and expose apps with no port-forwarding.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Connect an API token and Polaris writes your zones' DNS records and gives each app its own tunnel, so nothing is typed into a DNS panel and no ports are opened. One token can do both, or connect DNS and tunnels separately. A connector token can also be pasted here to run a single server-wide tunnel instead.",
         docsUrl: "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/",
         requiresApiKey: true,
@@ -600,10 +661,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Networking",
         summary: "Expose deployed apps through an ngrok tunnel, no port-forwarding.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Runs an ngrok agent from this server that forwards inbound traffic to Polaris. Good for quick public access; a reserved domain (ngrok paid) is recommended for a stable URL.",
         docsUrl: "https://ngrok.com/docs/agent/",
         setupLinks: [
             {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Get your authtoken",
                 url: "https://dashboard.ngrok.com/get-started/your-authtoken"
             }
@@ -617,8 +680,10 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Networking",
         summary: "Free dynamic DNS - keep a subdomain pointed at your changing IP.",
         description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
             "Points a free <name>.duckdns.org subdomain at this server's public IP and keeps it updated as your ISP address changes, so a home box stays reachable. DuckDNS also resolves *.<name>.duckdns.org, so it works as a wildcard base for app subdomains.",
         docsUrl: "https://www.duckdns.org/spec.jsp",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         setupLinks: [{ label: "Get your token", url: "https://www.duckdns.org/" }],
         requiresApiKey: true,
         apiKeyLabel: "Token",
@@ -634,14 +699,17 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on Claude models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your Anthropic account so agents can run on Claude. Polaris hands the key to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere at once. Usage is billed by Anthropic directly.",
         docsUrl: "https://docs.claude.com/en/api/overview",
         setupLinks: [
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             { label: "Create an API key", url: "https://console.anthropic.com/settings/keys" }
         ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "Starts with sk-ant-. Needs no particular scope.",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Claude (Anthropic)", slug: "anthropic/claude-opus" }
     },
     {
@@ -650,12 +718,15 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on GPT models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your OpenAI account so agents can run on GPT models. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by OpenAI directly.",
         docsUrl: "https://platform.openai.com/docs/api-reference",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://platform.openai.com/api-keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "A project key works. Give it access to the models you want agents to use.",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "GPT (OpenAI)", slug: "openai/gpt-luna" }
     },
     {
@@ -664,12 +735,15 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on Gemini models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects Google AI Studio so agents can run on Gemini. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by Google directly.",
         docsUrl: "https://ai.google.dev/gemini-api/docs",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://aistudio.google.com/apikey" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "From AI Studio, not a Google Cloud service account.",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" },
         freeTier: { kind: "free", note: "AI Studio keys carry a free tier, with per-model daily limits." }
     },
@@ -679,11 +753,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on Grok models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your xAI account so agents can run on Grok. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by xAI directly.",
         docsUrl: "https://docs.x.ai/",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://console.x.ai/" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Grok (xAI)", slug: "xai/grok" }
     },
     {
@@ -692,11 +769,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on DeepSeek models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your DeepSeek account so agents can run on its coding and reasoning models, which cost a fraction of the frontier ones. The key is held here and handed to a run over an authenticated call, never copied into your repositories.",
         docsUrl: "https://api-docs.deepseek.com/",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://platform.deepseek.com/api_keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "DeepSeek Pro", slug: "deepseek/deepseek-pro" },
         freeTier: { kind: "trial", note: "A block of tokens on signup, with no card." }
     },
@@ -706,13 +786,16 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents on Kimi models.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your Moonshot AI account so agents can run on Kimi. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by Moonshot directly.",
         docsUrl: "https://platform.moonshot.ai/docs",
         setupLinks: [
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             { label: "Create an API key", url: "https://platform.moonshot.ai/console/api-keys" }
         ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Kimi K3 (Moonshot AI)", slug: "moonshotai/kimi-k3" }
     },
     {
@@ -721,11 +804,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Open models, answered in a fraction of the time.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your Groq account so agents can run on the open models it serves (GPT OSS, Qwen, Llama) at speeds no other provider matches. Good for the runs where waiting costs more than the tokens do. Usage is billed by Groq directly.",
         docsUrl: "https://console.groq.com/docs/overview",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://console.groq.com/keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "GPT OSS 120B (Groq)", slug: "groq/openai/gpt-oss-120b" },
         freeTier: { kind: "free", note: "A free tier with no card, capped per minute rather than metered." }
     },
@@ -735,11 +821,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Open models on wafer-scale hardware.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Connects your Cerebras account so agents can run on the open models it serves (GLM, GPT OSS, Gemma). Like Groq, it trades the frontier models for speed. Usage is billed by Cerebras directly.",
         docsUrl: "https://inference-docs.cerebras.ai/",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://cloud.cerebras.ai/platform/" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "GLM 4.7 (Cerebras)", slug: "cerebras/zai-glm-4.7" },
         freeTier: { kind: "free", note: "A daily token allowance with no card." }
     },
@@ -749,12 +838,15 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "One key for models from many providers.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Routes agent runs through OpenRouter, which serves models from several providers behind one credential. Useful when you want a model Polaris has no direct integration for, or one key instead of several. Usage is billed by OpenRouter directly.",
         docsUrl: "https://openrouter.ai/docs",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         setupLinks: [{ label: "Create an API key", url: "https://openrouter.ai/settings/keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling.",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "MiniMax M2.5 (OpenRouter)", slug: "openrouter/minimax-m2.5" },
         freeTier: { kind: "free", note: "The models suffixed :free cost nothing per token, within a request limit." }
     },
@@ -764,12 +856,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Models",
         summary: "Run agents through an OpenAI-compatible gateway.",
         description:
+            // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
             "Points agent runs at an OpenAI-compatible endpoint instead of a provider key, so a run reuses whatever coding-agent subscription is already behind it rather than metering a second one. The endpoint has to be reachable from wherever runs happen: a loopback address works for runs on this box and not for runs on GitHub-hosted machines.",
         docsUrl: "https://github.com/FJRG2007/enigma",
         requiresApiKey: true,
         apiKeyLabel: "Token",
         apiKeyHelp:
             "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
+        // i18n-ignore an AI provider's catalogue entry, said as it is (see model-providers)
         defaultModel: { label: "Your gateway's model", slug: "openai-compatible/byok" }
     },
 

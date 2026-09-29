@@ -1456,6 +1456,8 @@
         "extension/src/lib/messages.ts",
         "extension/src/lib/words.ts",
         "extension/src/lib/locale-store.ts",
-        "web/src/app/api/extension/session/route.ts"
+        "web/src/app/api/extension/session/route.ts",
+        "web/src/lib/integrations/registry.ts",
+        "web/src/lib/integrations/registry-words.ts"
     ]
 }

@@ -32,6 +32,7 @@ import {
     connectionLimit,
     connectionSignInAllowed
 } from "@/lib/connections/store";
+import { integrationWords } from "@/lib/integrations/registry-words";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,8 @@ export default async function IntegrationsPage() {
 
     const cards: IntegrationCard[] = SERVICE_INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
+        // The service's own copy, in the reader's words.
+        const words = integrationWords(t, entry);
         // Set only for the services somebody can link an account of; the rest
         // have nothing to sign in with, so the switch is left out entirely.
         const connection = findConnectionProvider(entry.slug);
@@ -160,10 +163,10 @@ export default async function IntegrationsPage() {
             slug: entry.slug,
             name: entry.name,
             category: entry.category,
-            summary: entry.summary,
-            description: entry.description,
+            summary: words.summary,
+            description: words.description,
             docsUrl: entry.docsUrl,
-            setupLinks: entry.setupLinks,
+            setupLinks: words.setupLinks,
             // Per provider, because each one returns to its own path.
             setupValues: setupValuesFor(entry.slug, common, {
                 oauthApp: OAUTH_APP_SLUGS.includes(entry.slug),
@@ -180,8 +183,8 @@ export default async function IntegrationsPage() {
             // leaves the switch out rather than drawing one that decides nothing.
             emailTrusted: emailTrust.get(entry.slug),
             requiresApiKey: entry.requiresApiKey,
-            apiKeyLabel: entry.apiKeyLabel,
-            apiKeyHelp: entry.apiKeyHelp,
+            apiKeyLabel: words.apiKeyLabel,
+            apiKeyHelp: words.apiKeyHelp,
             enabled: isDuck ? duckConfigured : (state?.enabled ?? false),
             hasSecret: isDuck ? domains.hasDuckdnsToken : (state?.hasSecret ?? false),
             duckdnsSubdomain: isDuck ? domains.duckdnsSubdomain : undefined,

@@ -1400,7 +1400,14 @@
             "verify": "Verificar la IP al acceder",
             "verifyHint": "Comprueba la IP cuando alguien abre un enlace compartido o un punto de entrega, y bloquea las que coincidan con tus reglas.",
             "block": "Bloquear IP que sean",
-            "premium": "{label} (premium)"
+            "premium": "{label} (premium)",
+            "rules": {
+                "FRAUD": "Fraudulenta / maliciosa",
+                "PROXY": "Proxy",
+                "VPN": "VPN",
+                "TOR_NETWORK": "Salida de Tor",
+                "HIGH_RISK_SCORE": "Riesgo alto"
+            }
         },
         "runners": {
             "ready": "Esta conexión también puede registrar runners autoalojados.",
@@ -1428,7 +1435,21 @@
         "virusTotal": {
             "scan": "Analizar subidas a buzones",
             "scanHint": "Cada archivo subido a un punto de entrega se analiza antes de aceptarlo.",
-            "whenFlagged": "Cuando se marca un archivo"
+            "whenFlagged": "Cuando se marca un archivo",
+            "actions": {
+                "block": {
+                    "label": "Bloquear la subida",
+                    "help": "Rechaza el archivo y lo elimina. A quien lo subió se le dice que se rechazó."
+                },
+                "quarantine": {
+                    "label": "Poner en cuarentena",
+                    "help": "Conserva el archivo pero lo saca del destino a una carpeta de cuarentena."
+                },
+                "notify": {
+                    "label": "Conservar y solo avisar",
+                    "help": "Guarda el archivo y solo te avisa."
+                }
+            }
         },
         "errors": {
             "unknownService": "Servicio no válido",
@@ -1465,6 +1486,299 @@
         "tunnelHint": {
             "ngrok": "Eso no es un authtoken de ngrok. Copia el valor completo del panel de ngrok.",
             "cloudflare": "Eso no es un token de túnel de Cloudflare. Copia el token del comando de instalación del conector."
+        },
+        "categories": {
+            "security": {
+                "name": "Seguridad",
+                "hint": "Lo que revisa un archivo, una dirección o un visitante antes de que Polaris confíe en él."
+            },
+            "oauthApps": {
+                "name": "Apps OAuth",
+                "hint": "Aplicaciones que registras en un proveedor para que la gente de aquí pueda vincular esa cuenta o iniciar sesión con ella."
+            },
+            "networking": {
+                "name": "Red",
+                "hint": "Cómo se llega a un despliegue desde fuera: nombres, registros y túneles."
+            },
+            "games": {
+                "name": "Juegos",
+                "hint": "Las tiendas y cuentas que necesita un servidor de juegos para instalarse, actualizarse y dejar entrar a la gente."
+            },
+            "chat": {
+                "name": "Chat",
+                "hint": "A qué pueden llegar las conversaciones y las llamadas de aquí."
+            }
+        },
+        "catalog": {
+            "virustotal": {
+                "summary": "Analiza los archivos subidos con más de 70 motores antivirus.",
+                "description": "Analiza automáticamente los archivos subidos a tus puntos de entrega con la API pública de VirusTotal y te avisa cuando se marca algo. Elige si una detección bloquea, pone en cuarentena o solo avisa.",
+                "apiKeyLabel": "Clave API pública",
+                "apiKeyHelp": "Está en tu perfil de VirusTotal -> API key. La API pública gratuita permite unas 4 consultas por minuto.",
+                "links": {
+                    "0": {
+                        "label": "Obtener tu clave API"
+                    }
+                }
+            },
+            "dymo": {
+                "summary": "Verifica la IP de un visitante y bloquea el fraude, los proxies y las VPN.",
+                "description": "Cuando alguien abre un enlace compartido o un punto de entrega, Polaris comprueba su IP con la API de Dymo y bloquea el acceso si coincide con las condiciones que elijas (fraudulenta, proxy, VPN...). Si la API falla, deja pasar, para que un tropiezo nunca deje fuera a tus visitantes.",
+                "apiKeyLabel": "Clave API",
+                "links": {
+                    "0": {
+                        "label": "Crear una clave API"
+                    }
+                }
+            },
+            "criminalip": {
+                "summary": "Bloquea direcciones ya conocidas por escanear o atacar.",
+                "description": "El firewall pregunta a Criminal IP por las direcciones que ve en tu tráfico y bloquea las que coinciden con las condiciones que elijas. Las consultas se hacen en segundo plano, nunca mientras espera una petición, y la respuesta se guarda en caché: así un proveedor lento o inaccesible nunca puede ralentizar ni abrir tu sitio.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "Está en la página My Information, en API Key.",
+                "links": {
+                    "0": {
+                        "label": "Obtener tu clave API"
+                    }
+                }
+            },
+            "github": {
+                "summary": "Deja que la gente conecte su GitHub, inicie sesión con él y despliegue sus repositorios.",
+                "description": "Crea una GitHub App con un clic y Polaris podrá compilar repositorios privados, registrar runners autoalojados y dar a todos aquí un botón Conectar para su propia cuenta de GitHub. Cada persona ve entonces sus propios repositorios y los de nadie más, y puede iniciar sesión con la cuenta que vinculó si lo permites.",
+                "apiKeyLabel": "Token de acceso personal",
+                "apiKeyHelp": "Un token de acceso detallado sobre los repositorios que quieres desplegar, con Contents: Read y Deployments: Read and write (o un token clásico con el ámbito 'repo')."
+            },
+            "google": {
+                "summary": "Deja que la gente conecte su cuenta de Google, inicie sesión con ella y muestre su calendario.",
+                "description": "Conecta un cliente OAuth de Google Cloud y todos aquí tendrán un botón Conectar para su propia cuenta de Google. Sus eventos aparecen entonces en el calendario de Tareas, de solo lectura, y pueden iniciar sesión con la cuenta que vincularon si lo permites. Polaris nunca guarda una credencial que llegue al calendario de todos: solo el acceso que concedió cada persona.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "Se muestra una vez al crear el cliente, y se puede descargar desde el cliente después.",
+                "links": {
+                    "0": {
+                        "label": "Rellenar la pantalla de consentimiento",
+                        "help": "Google no deja crear un cliente hasta que exista. Audience: External, salvo que todos aquí estéis en el mismo Workspace. Llama a la app exactamente Polaris (la verificación lo compara con el nombre de la página de inicio) y dale estas tres URL y el logo."
+                    },
+                    "1": {
+                        "label": "Añadir el dominio autorizado",
+                        "help": "En la misma página, en Authorized domains. Todas las URL de arriba tienen que estar en él, y Google rechaza directamente una dirección IP: hace falta un nombre de dominio."
+                    },
+                    "2": {
+                        "label": "Demostrar que el dominio es tuyo",
+                        "help": "La verificación rechaza una página de inicio que 'no está registrada a tu nombre'. Añade el dominio en Search Console, con la cuenta propietaria de este proyecto de Cloud, y completa la comprobación DNS que te dé."
+                    },
+                    "3": {
+                        "label": "Crear un cliente OAuth",
+                        "help": "Tipo de aplicación: Web application. Google no permite rellenar el formulario de antemano, así que pega esto en Authorized redirect URIs."
+                    },
+                    "4": {
+                        "label": "Activar la API de Calendar",
+                        "help": "En el mismo proyecto. Sin ella, el cliente autoriza bien y todos los calendarios vuelven vacíos."
+                    },
+                    "5": {
+                        "label": "Publicar la app",
+                        "help": "Un cliente nuevo está en Testing, donde solo pueden autorizar las cuentas de la lista de usuarios de prueba y el resto recibe access_denied. Publicarla lo quita. Hasta que estés listo, añade a cada persona como usuario de prueba."
+                    },
+                    "6": {
+                        "label": "Enviarla a verificación",
+                        "help": "El último paso, y el único que quita el aviso 'Google no ha verificado esta app'. Leer un calendario es un ámbito sensible, así que Google pide las páginas de arriba, el dominio demostrado, un motivo para el ámbito y un vídeo de alguien conectando una cuenta. Publicada pero sin verificar funciona: solo que todos tienen que pasar antes por el aviso."
+                    }
+                }
+            },
+            "microsoft": {
+                "summary": "Deja que la gente conecte su cuenta de Microsoft y guarde copias de seguridad en su OneDrive.",
+                "description": "Registra una aplicación de Entra y todos aquí tendrán un botón Conectar para su propia cuenta de Microsoft. Su OneDrive podrá elegirse entonces como destino de copias de seguridad, y Polaris solo toca la carpeta que crea allí. Polaris no guarda ninguna credencial que llegue a los archivos de nadie: solo el acceso que concedió cada persona.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "El valor del secreto, no su id. Se muestra una vez al crearlo.",
+                "links": {
+                    "0": {
+                        "label": "Registrar una aplicación",
+                        "help": "Tipos de cuenta admitidos: cualquier directorio organizativo y cuentas personales de Microsoft. Pega el URI de redirección de abajo en la plataforma Web."
+                    },
+                    "1": {
+                        "label": "Añadir el permiso Files.ReadWrite",
+                        "help": "Delegado, en la misma aplicación. Sin él, la cuenta se vincula bien y se rechaza cada subida."
+                    }
+                }
+            },
+            "dropbox": {
+                "summary": "Deja que la gente conecte su Dropbox y guarde copias de seguridad en él.",
+                "description": "Crea una app de Dropbox y todos aquí tendrán un botón Conectar para su propia cuenta. Su Dropbox podrá elegirse entonces como destino de copias de seguridad. La app que hay que crear es una limitada a su propia carpeta: así todo lo que escribe Polaris vive en una carpeta, y nada más del Dropbox de nadie es accesible desde aquí.",
+                "apiKeyLabel": "Secreto de la app",
+                "apiKeyHelp": "Aparece en la pestaña Settings de la app, junto a la app key.",
+                "links": {
+                    "0": {
+                        "label": "Crear una app",
+                        "help": "Scoped access, app folder. Pega el URI de redirección de abajo en los OAuth 2 redirect URIs de la app."
+                    },
+                    "1": {
+                        "label": "Conceder los ámbitos de archivos",
+                        "help": "En la pestaña Permissions de la app: account_info.read, files.metadata.read/write y files.content.read/write. Envíalos antes de vincular, o el token volverá sin ellos."
+                    }
+                }
+            },
+            "steam": {
+                "summary": "Deja que la gente vincule su cuenta de Steam, para que los servidores de juegos la reconozcan.",
+                "description": "Steam no necesita registrar nada: inicia sesión con OpenID, así que el botón Conectar de la cuenta de todos funciona en cuanto se activa esto. Una clave de Web API es opcional y sirve para una cosa: el nombre y el avatar junto a una cuenta vinculada, en vez de un número de diecisiete cifras. Un servidor de ARK cerrado por id de Steam podrá entonces abrirse a alguien por su nombre en Polaris.",
+                "apiKeyLabel": "Clave Web API",
+                "apiKeyHelp": "Opcional. Sin ella, una cuenta vinculada muestra su id de Steam en vez de su nombre.",
+                "links": {
+                    "0": {
+                        "label": "Obtener clave Web API",
+                        "help": "Opcional. Solo se usa para leer el nombre visible y el avatar de una cuenta que alguien ha vinculado."
+                    }
+                }
+            },
+            "epic": {
+                "summary": "Deja que la gente vincule su cuenta de Epic, para que los servidores de juegos la reconozcan.",
+                "description": "Registra un producto en el portal de desarrolladores de Epic y todos aquí tendrán un botón Conectar para su propia cuenta de Epic. Polaris lee el id de la cuenta y el nombre visible, que es lo que necesita un servidor para distinguir a un jugador de otro. Los juegos comprados en la Epic Store no llevan ningún id de Steam, así que para esos jugadores este es el único id que hay. Es la configuración más larga de esta pantalla: Epic pide una aplicación, un dominio verificado y una revisión de marca antes de dejar autorizar a nadie de fuera de tu organización.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "Se muestra una vez al crear el cliente, junto a su id.",
+                "links": {
+                    "0": {
+                        "label": "Crear un producto",
+                        "help": "Todo lo demás cuelga de un producto, así que es lo primero que hay que crear. La organización a la que pertenece se crea con tu cuenta."
+                    },
+                    "1": {
+                        "label": "Crear un cliente y registrar en él el URI de redirección",
+                        "help": "Product settings -> Clients -> New client. Tipo de política Custom con 'User required' marcado, que es lo que necesita un cliente que inicia la sesión de una persona; deja todas las funciones desactivadas, porque Polaris solo lee quién autorizó. Pega esto en sus redirect URLs."
+                    },
+                    "2": {
+                        "label": "Crear la aplicación y vincularle el cliente",
+                        "help": "Product settings -> Epic Account Services. Brand settings pide el nombre, el logo de 128x128 y estas URL; Permissions solo necesita Basic Profile, que siempre está activado; Linked clients tiene que nombrar el cliente que acabas de crear, o los dos nunca se encuentran."
+                    },
+                    "3": {
+                        "label": "Verificar tu dominio",
+                        "help": "Organization settings -> el dominio, y luego el registro TXT que te da Epic en tu proveedor de DNS. Pese al nombre, el valor es público una vez está en el DNS: solo demuestra que el dominio es tuyo. El sitio al que apunta tiene que poder abrirse sin iniciar sesión y nombrar tu organización y tu producto; la página de inicio de arriba lo hace."
+                    },
+                    "4": {
+                        "label": "Guardar el borrador y enviarlo a revisión",
+                        "help": "Hasta que la pase, solo pueden autorizar las cuentas de tu propia organización: al resto se le rechaza, y la tuya ve un aviso de no verificada que puede saltarse. Basta para terminar esta configuración y comprobar que funciona; la revisión es lo que lo abre a todos los demás."
+                    },
+                    "5": {
+                        "label": "Copiar el id y el secreto del cliente",
+                        "help": "Product settings -> SDK download and credentials, que lista todos los clientes. El secreto se muestra al crear el cliente; si no se guardó, crea un cliente nuevo en vez de adivinarlo."
+                    }
+                }
+            },
+            "minecraft": {
+                "summary": "Deja que la gente vincule su cuenta de Minecraft, para que un servidor pueda abrirse a ella por su nombre.",
+                "description": "Una aplicación de Entra distinta de la de Microsoft: esta solo pide el inicio de sesión de Xbox, y Microsoft protege la API de Minecraft tras una aplicación que haya aprobado. Una vez conectada, vincular una cuenta le da a Polaris el nombre de usuario tal como lo escribe Mojang, que es justo por lo que se ordena la lista de jugadores de un servidor.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "El valor del secreto, no su id. Se muestra una vez al crearlo.",
+                "links": {
+                    "0": {
+                        "label": "Registrar una aplicación",
+                        "help": "Solo cuentas personales de Microsoft. Pega el URI de redirección de abajo en la plataforma Web."
+                    },
+                    "1": {
+                        "label": "Solicitar la API de Minecraft",
+                        "help": "Microsoft aprueba cada aplicación antes de que pueda leer un perfil de Minecraft. Sin eso, la vinculación llega hasta Xbox y se para."
+                    }
+                }
+            },
+            "discord": {
+                "summary": "Deja que la gente vincule su cuenta de Discord, para que los servidores de juegos la reconozcan.",
+                "description": "Registra una aplicación en el portal de desarrolladores de Discord y todos aquí tendrán un botón Conectar para su propia cuenta de Discord. Polaris lee el id de la cuenta y el nombre que usa, que es por lo que se abre la puerta de un servidor de FiveM, y lo guarda con su cuenta de Polaris en vez de dejar que se lea en voz alta por el chat. También lee su dirección y los servidores en los que está, que es lo que dirá la pantalla de consentimiento. Es la configuración más corta de esta pantalla: una aplicación, un URI de redirección y el secreto. Iniciar sesión con una cuenta de Discord es un interruptor aparte, más abajo, y empieza desactivado.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "El client secret de la pestaña OAuth2, que se muestra una vez al restablecerlo.",
+                "links": {
+                    "0": {
+                        "label": "Crear una aplicación",
+                        "help": "New Application, y luego un nombre. Nada más de la primera pantalla importa aquí: Polaris no usa un bot, y un bot conectado para la bandeja de entrada es una aplicación distinta de esta."
+                    },
+                    "1": {
+                        "label": "Registrar en ella el URI de redirección",
+                        "help": "La aplicación -> OAuth2 -> Redirects. Discord compara esta cadena exactamente y no acepta comodines, así que pégala entera."
+                    },
+                    "2": {
+                        "label": "Copiar el id y el secreto del cliente",
+                        "help": "Los dos en la pestaña OAuth2. Reset Secret muestra el valor una vez; si no se guardó, restablécelo otra vez en vez de adivinarlo."
+                    }
+                }
+            },
+            "spotify": {
+                "summary": "Deja que la gente muestre lo que está escuchando y escuche a la vez con otros.",
+                "description": "Crea una app en el panel de desarrolladores de Spotify y todos aquí tendrán un botón Conectar para su propio Spotify. Junto a su nombre, quienes lo compartan verán la canción que suena, y podrán pulsar Escuchar a la vez para oírla en su propio Spotify. Spotify solo deja que una app controle la reproducción de una cuenta Premium, así que Escuchar a la vez lo dice a quien no la tenga; mostrar la canción funciona para todos. Spotify también exige una dirección segura (https) para este Polaris, y deja una app en modo de desarrollo salvo que se apruebe: en ese modo el propietario de la app necesita Premium y solo pueden vincular las cuentas añadidas en User Management, cinco como mucho.",
+                "apiKeyLabel": "Secreto del cliente",
+                "apiKeyHelp": "En la página Basic Information de la app, en View client secret.",
+                "links": {
+                    "0": {
+                        "label": "Crear una app",
+                        "help": "Cualquier nombre y descripción. Pega el URI de redirección de abajo en Redirect URIs, y marca Web API donde pregunta qué API usa la app."
+                    },
+                    "1": {
+                        "label": "Añadir a quienes vayan a vincular",
+                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En modo de desarrollo nadie más puede vincular, y quien lo intente lo sabrá por Spotify, no por Polaris."
+                    },
+                    "2": {
+                        "label": "Copiar el id y el secreto del cliente",
+                        "help": "La app -> Settings -> Basic Information. View client secret lo muestra."
+                    }
+                }
+            },
+            "krisp": {
+                "summary": "Usa en las llamadas un filtro de ruido con licencia en vez del gratuito.",
+                "description": "Las llamadas ya eliminan el ruido de fondo con dos modelos gratuitos que se ejecutan en el navegador y no cuestan nada. Esto es para quien administra y tiene licencia de uno mejor: Krisp es el que pide la gente, porque es el que usa Discord. Krisp no publica su SDK para navegador para que cualquiera lo instale, así que lo que va aquí es tu propia compilación: la dirección desde la que se sirve y el token con el que se autentica. Ambos llegan al navegador, porque es donde se ejecuta un filtro sobre un micrófono, y solo a un navegador que esté en una llamada.",
+                "apiKeyLabel": "Token",
+                "apiKeyHelp": "Aquello con lo que se autentique el filtro. Déjalo vacío si el tuyo no necesita nada.",
+                "links": {
+                    "0": {
+                        "label": "Obtener el SDK y una licencia",
+                        "help": "Krisp da licencias por puesto y entrega una compilación para que la alojes tú. Cualquier filtro publicado como módulo con la misma forma funciona aquí: no tiene por qué ser el suyo."
+                    }
+                }
+            },
+            "tenor": {
+                "summary": "Busca GIF y stickers desde el editor del chat.",
+                "description": "Añade una búsqueda de GIF y stickers al selector de Chat. Sin ella el selector sigue funcionando (emoji, las imágenes que ha guardado cada persona y cualquier cosa enviada pegando su dirección) y solo falta la pestaña de búsqueda. Un GIF elegido se descarga una vez y se guarda aquí como cualquier otro adjunto, así que una conversación nunca le pide nada a Tenor y nadie sabe quién leyó qué.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "Una clave de API de Google Cloud con la API de Tenor activada en su proyecto.",
+                "links": {
+                    "0": {
+                        "label": "Crear una clave API",
+                        "help": "Tenor es una API de Google, así que la clave es una clave de API normal de Google Cloud. Activa primero la API de Tenor en el proyecto."
+                    }
+                }
+            },
+            "giphy": {
+                "summary": "Busca GIF y stickers desde el editor del chat.",
+                "description": "La misma búsqueda que Tenor, desde una cuenta de Giphy. Conecta cualquiera de los dos: el selector no dice cuál respondió, y si los dos están conectados responde Giphy. Un GIF elegido se descarga una vez y se guarda aquí como cualquier otro adjunto, así que una conversación nunca le pide nada a Giphy y nadie sabe quién leyó qué.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "La clave de API de tu app de Giphy, no la clave del SDK de un ejemplo de cliente.",
+                "links": {
+                    "0": {
+                        "label": "Crear una clave API",
+                        "help": "Una clave de API de una app de Giphy. El plan gratuito tiene un límite diario, que normalmente es mucho más de lo que usa un chat."
+                    }
+                }
+            },
+            "cloudflare": {
+                "summary": "Crea tus registros DNS y publica apps sin reenviar puertos.",
+                "description": "Conecta un token de API y Polaris escribe los registros DNS de tus zonas y le da a cada app su propio túnel, así que no se escribe nada en un panel de DNS ni se abre ningún puerto. Un token puede hacer las dos cosas, o conecta el DNS y los túneles por separado. También se puede pegar aquí un token de conector para ejecutar un único túnel para todo el servidor.",
+                "apiKeyLabel": "Token del túnel",
+                "apiKeyHelp": "El token que aparece al crear un túnel (Zero Trust -> Networks -> Tunnels -> Install connector)."
+            },
+            "ngrok": {
+                "summary": "Publica las apps desplegadas mediante un túnel de ngrok, sin reenviar puertos.",
+                "description": "Ejecuta un agente de ngrok desde este servidor que reenvía el tráfico entrante a Polaris. Bien para un acceso público rápido; para una URL estable se recomienda un dominio reservado (ngrok de pago).",
+                "apiKeyLabel": "Authtoken",
+                "links": {
+                    "0": {
+                        "label": "Obtener tu authtoken"
+                    }
+                }
+            },
+            "duckdns": {
+                "summary": "DNS dinámico gratuito: mantén un subdominio apuntando a tu IP cambiante.",
+                "description": "Apunta un subdominio gratuito '<nombre>'.duckdns.org a la IP pública de este servidor y lo mantiene al día cuando cambia la dirección de tu proveedor, para que una máquina en casa siga siendo accesible. DuckDNS también resuelve *.'<nombre>'.duckdns.org, así que sirve como base comodín para los subdominios de las apps.",
+                "apiKeyLabel": "Token",
+                "apiKeyHelp": "Aparece arriba en la página una vez que inicias sesión.",
+                "links": {
+                    "0": {
+                        "label": "Obtener tu token"
+                    }
+                }
+            }
         }
     },
     "integrationsModels": {

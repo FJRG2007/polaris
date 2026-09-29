@@ -77,6 +77,7 @@ import {
     SegmentedControl,
     DialogDescription
 } from "@polaris/ui";
+import { categoryWords, dymoRule } from "@/lib/integrations/registry-words";
 
 /** What every configure dialog takes: the card it is for, and how to close it. */
 export interface IntegrationDialogProps {
@@ -227,14 +228,14 @@ export function IntegrationsView({
     const sections = useMemo(() => {
         if (needle)
             return [{ name: null as string | null, hint: null as string | null, cards: matches }];
-        return INTEGRATION_CATEGORIES.map(({ name, hint }) => ({
-            name: name as string | null,
-            hint: hint as string | null,
+        return INTEGRATION_CATEGORIES.map((category) => ({
+            name: categoryWords(t, category).name as string | null,
+            hint: categoryWords(t, category).hint as string | null,
             cards: matches
-                .filter((card) => card.category === name)
+                .filter((card) => card.category === category.name)
                 .sort((left, right) => Number(isConnected(right)) - Number(isConnected(left)))
         })).filter((section) => section.cards.length > 0);
-    }, [matches, needle]);
+    }, [matches, needle, t]);
 
     const connected = cards.filter(isConnected).length;
 
@@ -2018,8 +2019,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                     )}
                                 >
                                     {rule.premium
-                                        ? t("integrations.dymo.premium", { label: rule.label })
-                                        : rule.label}
+                                        ? t("integrations.dymo.premium", { label: dymoRule(t, rule) })
+                                        : dymoRule(t, rule)}
                                 </button>
                             ))}
                         </div>
@@ -2548,9 +2549,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                         ) : null}
                                     </span>
                                     <span>
-                                        <span className="font-medium">{action.label}</span>
+                                        <span className="font-medium">
+                                            {t(`integrations.virusTotal.actions.${action.value}.label`)}
+                                        </span>
                                         <span className="block text-xs text-muted-foreground">
-                                            {action.help}
+                                            {t(`integrations.virusTotal.actions.${action.value}.help`)}
                                         </span>
                                     </span>
                                 </button>
