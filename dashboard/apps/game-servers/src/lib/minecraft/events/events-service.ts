@@ -2923,6 +2923,30 @@ async function cleanUpLater(
     }).catch(() => undefined);
 }
 
+/** The call-off, told to everybody in their own language. */
+async function sayCalledOff(
+    ownerId: string,
+    installedAppId: string,
+    run: stored.EventRun
+): Promise<void> {
+    await withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return;
+        const row = await readRow(installedAppId);
+        const home = await speechService.homeLanguage(
+            ownerId,
+            row ? catalog.chosenLanguage(row.config) : null
+        );
+        homes.set(installedAppId, home);
+        await speechService.hear(installedAppId, server, home);
+        const every = speech.EVERY;
+        await server.sayAll([
+            commands.say(
+                messages.tag(every) + messages.cancelledLine(run.preset.name, every, "Called off")
+            )
+        ]);
+    }).catch(() => undefined);
+}
+
 /**
  * A run whose end was begun and never written down - Polaris stopped while it
  * handed the prizes out, or the last save failed. Not played again, which could
@@ -2934,6 +2958,8 @@ async function abandon(
     run: stored.EventRun
 ): Promise<void> {
     await cleanUpLater(ownerId, installedAppId, run);
+    // One called off before Polaris stopped is still called off, and said so.
+    if (run.cancelled) await sayCalledOff(ownerId, installedAppId, run);
     releaseSidebar(ownerId, installedAppId);
     const now = Date.now();
     const entry: stored.EventHistoryEntry = {
@@ -2942,8 +2968,8 @@ async function abandon(
         kind: run.preset.kind,
         name: run.preset.name,
         trigger: run.trigger,
-        outcome: "failed",
-        note: "Stopped while its results were handed out",
+        outcome: run.cancelled ? "cancelled" : "failed",
+        note: run.cancelled ? "Called off" : "Stopped while its results were handed out",
         startedAt: run.startsAt,
         endedAt: now,
         participants: run.participants.length,

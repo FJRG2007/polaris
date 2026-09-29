@@ -2033,6 +2033,37 @@ describe("when things go wrong", () => {
         expect(state().run).toBeNull();
         expect(events.runningEvents()).not.toContain(SERVER);
     });
+
+    it("stays called off, and says so, when Polaris stopped while calling it off", async () => {
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "stopped",
+                trigger: "manual",
+                startedBy: null,
+                preset: rush,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 50_000,
+                endsAt: now + 120_000,
+                participants: ["Ana"],
+                finishing: true,
+                cancelled: true
+            }
+        };
+        await events.sweepEvents();
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({
+            id: "stopped",
+            outcome: "cancelled",
+            note: "Called off"
+        });
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("was called off"))
+        ).toBe(true);
+    });
 });
 
 describe("the least to be ranked", () => {
