@@ -40,6 +40,7 @@ import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "
 import {
     ChatAccessError,
     ChatRuleError,
+    channelAccess,
     reachableChannelIds,
     requireChannel,
     requirePostable,
@@ -1071,6 +1072,30 @@ async function markDelivered(actor: ChatActor, channel: ChannelAccess): Promise<
  * announced when the mark actually moved - every early return above this is a
  * read that changed nothing - and only to the screens `readAudience` names.
  */
+/**
+ * Catch up on whole conversations from the list, up to the newest message each
+ * holds in the channel itself - a thread reply is unread inside its thread and
+ * is left there, the same line the badge draws.
+ *
+ * One the reader cannot open is skipped rather than refused: a heading can hold
+ * a private channel they are not in, and "mark all read" is not a question
+ * about it.
+ */
+export async function markChannelsRead(
+    actor: ChatActor,
+    input: core.ChatMarkChannelsReadInput
+): Promise<void> {
+    for (const channelId of new Set(input.channelIds)) {
+        if (!(await channelAccess(actor, channelId))) continue;
+        const newest = await prisma.chatMessage.findFirst({
+            where: { channelId, parentId: null },
+            orderBy: { createdAt: "desc" },
+            select: { id: true }
+        });
+        if (newest) await markRead(actor, { channelId, messageId: newest.id });
+    }
+}
+
 export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput): Promise<void> {
     const channel = await requireChannel(actor, input.channelId);
     const message = await prisma.chatMessage.findFirst({

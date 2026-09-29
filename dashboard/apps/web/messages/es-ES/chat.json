@@ -1,6 +1,12 @@
 {
     "errors": {
-        "notInConversation": "No estás en esa conversación"
+        "notInConversation": "No estás en esa conversación",
+        "channelMenu": {
+            "notAChannel": "Solo se puede duplicar un canal de un espacio",
+            "nameTaken": "Ya hay un canal con ese nombre",
+            "duplicateFailed": "No se ha podido duplicar el canal",
+            "markReadFailed": "No se han podido marcar como leídas"
+        }
     },
     "media": {
         "refused": {
@@ -72,5 +78,26 @@
                 "note": "Tu micrófono está cerrado salvo mientras mantienes pulsada una tecla."
             }
         }
+    },
+    "channelMenu": {
+        "markRead": "Marcar leído",
+        "invite": "Invitar gente",
+        "copyId": "Copiar ID",
+        "duplicate": "Duplicar canal",
+        "create": "Crear canal",
+        "delete": "Eliminar canal",
+        "deleteTitle": "Eliminar este canal",
+        "deleteHint": "Todos sus mensajes se borran con él. Si lo archivas, siguen legibles.",
+        "duplicateTitle": "Duplicar canal",
+        "duplicateHint": "Una copia de #{name} con sus ajustes, personas y reglas de acceso. Sin sus mensajes.",
+        "copyName": "Nombre de la copia",
+        "duplicateConfirm": "Duplicar",
+        "expand": "Desplegar categoría",
+        "collapse": "Plegar categoría",
+        "collapseAll": "Plegar todas",
+        "expandAll": "Desplegar todas",
+        "editCategory": "Editar categoría",
+        "categoryName": "Nombre",
+        "deleteCategory": "Eliminar categoría"
     }
 }

@@ -355,6 +355,17 @@ export const chatChannelUpdateSchema = z.object({
 export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;
 
 /**
+ * A copy of a channel: its kind, topic, heading, private flag, slow mode, voice
+ * limit, members and access rules, under a name of its own. Never its messages.
+ */
+export const chatChannelDuplicateSchema = z.object({
+    channelId: z.string().uuid(),
+    name: channelName
+});
+
+export type ChatChannelDuplicateInput = z.infer<typeof chatChannelDuplicateSchema>;
+
+/**
  * Opening a direct message.
  *
  * The caller is never in this list - they are the session - so one id is a
@@ -634,6 +645,17 @@ export const chatMarkReadSchema = z.object({
 });
 
 export type ChatMarkReadInput = z.infer<typeof chatMarkReadSchema>;
+
+/**
+ * Catching up on whole conversations from the list - one row, or every channel
+ * under a heading - where there is no message on screen to mark up to, so the
+ * server marks up to the newest one each holds.
+ */
+export const chatMarkChannelsReadSchema = z.object({
+    channelIds: z.array(z.string().uuid()).min(1).max(MAX_CHAT_RECEIPTS)
+});
+
+export type ChatMarkChannelsReadInput = z.infer<typeof chatMarkChannelsReadSchema>;
 
 /**
  * Putting a conversation back to unread.

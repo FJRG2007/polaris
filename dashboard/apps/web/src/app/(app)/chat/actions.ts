@@ -26,7 +26,7 @@ import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
-import { getLocale } from "@/lib/i18n/request";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
@@ -575,6 +575,20 @@ export async function markReadAction(input: unknown): Promise<{ error?: string }
 }
 
 /**
+ * Catch up on whole conversations from the list: one row, or every channel under
+ * a heading. Reported, unlike the scroll above, because it is a menu item.
+ */
+export async function markChannelsReadAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatMarkChannelsReadSchema.safeParse(input);
+    if (!parsed.success) {
+        const t = await getTranslations("chat");
+        return { error: t("errors.channelMenu.markReadFailed") };
+    }
+    return guard(() => messages.markChannelsRead(me, parsed.data));
+}
+
+/**
  * Put one back to unread.
  *
  * Reported rather than swallowed, unlike the read above it: catching up is a
@@ -836,6 +850,22 @@ export async function createChannelAction(
         return { error: parsed.error.issues[0]?.message ?? "That channel could not be made" };
 
     const result = await guard(() => chat.createChannel(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+/** A copy of a channel under a new name - see `duplicateChannel` for what comes along. */
+export async function duplicateChannelAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatChannelDuplicateSchema.safeParse(input);
+    if (!parsed.success) {
+        const t = await getTranslations("chat");
+        return { error: parsed.error.issues[0]?.message ?? t("errors.channelMenu.duplicateFailed") };
+    }
+
+    const result = await guard(() => chat.duplicateChannel(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : { id: result.value };
 }

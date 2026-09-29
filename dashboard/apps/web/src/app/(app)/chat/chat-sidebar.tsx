@@ -51,12 +51,20 @@ import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
+import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
+import { InviteDialog } from "./invite-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import {
     Ban,
+    CheckCheck,
     ChevronDown,
+    ChevronsDownUp,
+    ChevronsUpDown,
+    Copy,
+    Fingerprint,
     FolderPlus,
     Hash,
     Link2,
@@ -74,6 +82,7 @@ import {
     ShieldOff,
     Star,
     Trash2,
+    UserPlus,
     Video,
     Volume2,
     X
@@ -81,6 +90,7 @@ import {
 import {
     Button,
     cn,
+    ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
@@ -112,6 +122,9 @@ const CONTEXT_PARTS: MenuParts = {
     SubContent: ContextMenuSubContent
 };
 
+/** What an administrator's right-click on a channel asks the rail to open. */
+type ChannelManage = "edit" | "duplicate" | "create" | "delete";
+
 /** How often the rail asks who is sitting in the voice rooms. Often enough that
  *  somebody walking in appears while you are looking at it, rarely enough that a
  *  rail left open all day is not a request every second. */
@@ -136,6 +149,10 @@ export function ChatSidebar() {
     const [categoryName, setCategoryName] = useState("");
     const [error, setError] = useState("");
     const [managing, setManaging] = useState<ChatChannelView | null>(null);
+    const [duplicating, setDuplicating] = useState<ChatChannelView | null>(null);
+    const [deleting, setDeleting] = useState<ChatChannelView | null>(null);
+    const [deleteError, setDeleteError] = useState("");
+    const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
     const [inRoom, setInRoom] = useState<Record<string, VoicePresence[]>>({});
 
     const space = useMemo(
@@ -212,6 +229,21 @@ export function ChatSidebar() {
     }, [readPresence, voiceIds.length]);
 
     const manages = space !== null && space.access !== "member";
+    const t = useTranslations("chat");
+    const tc = useTranslations("common");
+    const router = useRouter();
+
+    const manage = useCallback(
+        (channel: ChatChannelView, action: ChannelManage) => {
+            if (action === "edit") setManaging(channel);
+            else if (action === "duplicate") setDuplicating(channel);
+            else if (action === "delete") {
+                setDeleteError("");
+                setDeleting(channel);
+            } else if (space) setNewChannelIn({ space, categoryId: channel.categoryId });
+        },
+        [space]
+    );
 
     /**
      * A drag ended.
@@ -483,7 +515,7 @@ export function ChatSidebar() {
                                 onModerated={readPresence}
                                 drag={drag}
                                 manages={manages}
-                                onManage={setManaging}
+                                onManage={manage}
                             />
                         </div>
 
@@ -516,6 +548,65 @@ export function ChatSidebar() {
                                     }
                                     area={manages ? drag.areaProps(category.id) : undefined}
                                     into={drag.dropInto?.categoryId === category.id}
+                                    menu={
+                                        <CategoryMenuItems
+                                            folded={folded.includes(category.id)}
+                                            unread={inSpace.some(
+                                                (channel) =>
+                                                    channel.categoryId === category.id &&
+                                                    channel.unread > 0
+                                            )}
+                                            onMarkRead={async () => {
+                                                const ids = inSpace
+                                                    .filter(
+                                                        (channel) =>
+                                                            channel.categoryId === category.id &&
+                                                            channel.unread > 0
+                                                    )
+                                                    .map((channel) => channel.id);
+                                                const result = await actions.markChannelsReadAction({
+                                                    channelIds: ids
+                                                });
+                                                setError(result.error ?? "");
+                                                refresh();
+                                            }}
+                                            onToggle={() => toggle(category.id)}
+                                            onFoldAll={(fold) =>
+                                                setFolded(
+                                                    fold
+                                                        ? categories
+                                                              .filter(
+                                                                  (entry) => entry.spaceId === space.id
+                                                              )
+                                                              .map((entry) => entry.id)
+                                                        : []
+                                                )
+                                            }
+                                            manage={
+                                                manages
+                                                    ? {
+                                                          onCreate: () =>
+                                                              setNewChannelIn({
+                                                                  space,
+                                                                  categoryId: category.id
+                                                              }),
+                                                          onRename: () =>
+                                                              setRenaming({
+                                                                  id: category.id,
+                                                                  name: category.name
+                                                              }),
+                                                          onDelete: async () => {
+                                                              const result =
+                                                                  await actions.deleteCategoryAction(
+                                                                      category.id
+                                                                  );
+                                                              setError(result.error ?? "");
+                                                          }
+                                                      }
+                                                    : null
+                                            }
+                                        />
+                                    }
                                     action={
                                         manages ? (
                                             <DropdownMenu>
@@ -568,7 +659,7 @@ export function ChatSidebar() {
                                         onModerated={readPresence}
                                         drag={drag}
                                         manages={manages}
-                                        onManage={setManaging}
+                                        onManage={manage}
                                         empty="Nothing here yet."
                                     />
                                 </Section>
@@ -587,6 +678,70 @@ export function ChatSidebar() {
                 channel={managing}
                 onOpenChange={(next) => !next && setManaging(null)}
             />
+            <DuplicateChannelDialog
+                channel={duplicating}
+                onOpenChange={(next) => !next && setDuplicating(null)}
+            />
+            <ConfirmDeleteDialog
+                open={deleting !== null}
+                onOpenChange={(next) => !next && setDeleting(null)}
+                name={deleting?.name ?? ""}
+                kind="channel"
+                title={t("channelMenu.deleteTitle")}
+                description={t("channelMenu.deleteHint")}
+                confirmLabel={t("channelMenu.delete")}
+                error={deleteError}
+                onConfirm={async () => {
+                    if (!deleting) return;
+                    const gone = deleting;
+                    const result = await runAction(
+                        () => actions.deleteChannelAction(gone.id),
+                        setDeleteError
+                    );
+                    if (!result || result.error) {
+                        if (result?.error) setDeleteError(result.error);
+                        return;
+                    }
+                    setDeleting(null);
+                    refresh();
+                    // Only when it is the room on screen: deleting another one
+                    // from the list must not throw the reader out of this one.
+                    if (open === gone.id) router.push("/chat");
+                }}
+            />
+            <Dialog open={renaming !== null} onOpenChange={(next) => !next && setRenaming(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("channelMenu.editCategory")}</DialogTitle>
+                    </DialogHeader>
+                    <Input
+                        value={renaming?.name ?? ""}
+                        autoFocus
+                        aria-label={t("channelMenu.categoryName")}
+                        maxLength={core.MAX_CHAT_CATEGORY_NAME}
+                        onChange={(event) =>
+                            setRenaming((current) =>
+                                current ? { ...current, name: event.target.value } : current
+                            )
+                        }
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") void rename();
+                        }}
+                    />
+                    <DialogFooter>
+                        <Button variant="ghost" size="sm" onClick={() => setRenaming(null)}>
+                            {tc("actions.cancel")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            disabled={!renaming?.name.trim()}
+                            onClick={() => void rename()}
+                        >
+                            {tc("actions.save")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <NewDirectDialog open={newDirect} onOpenChange={setNewDirect} />
             <NewChannelDialog
@@ -634,6 +789,18 @@ export function ChatSidebar() {
         </div>
     );
 
+    async function rename(): Promise<void> {
+        if (!renaming?.name.trim()) return;
+        const result = await actions.renameCategoryAction({
+            categoryId: renaming.id,
+            name: renaming.name
+        });
+        setError(result.error ?? "");
+        if (result.error) return;
+        setRenaming(null);
+        refresh();
+    }
+
     function toggle(id: string): void {
         setFolded((current) =>
             current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]
@@ -661,7 +828,7 @@ function ChannelRows({
     /** Absent in the direct-message list, which has no order to arrange. */
     drag?: ReturnType<typeof useRailDrag>;
     manages?: boolean;
-    onManage?: (channel: ChatChannelView) => void;
+    onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
     empty?: string;
 }) {
     // Dropping into the group rather than between two of its rows is the
@@ -787,6 +954,7 @@ function Section({
     dropping = null,
     area,
     into = false,
+    menu,
     children
 }: {
     label: string;
@@ -804,17 +972,12 @@ function Section({
     area?: Record<string, unknown>;
     /** Whether a channel is being held over it right now. */
     into?: boolean;
+    /** What a right-click on the heading offers. */
+    menu?: React.ReactNode;
     children: React.ReactNode;
 }) {
-    return (
-        <div
-            {...area}
-            className={cn(
-                "mb-3 rounded-md ring-1 ring-inset transition-colors duration-fast",
-                into ? "bg-primary/5 ring-primary/40" : "ring-transparent"
-            )}
-        >
-            <div {...handle} className="group relative flex items-center gap-1 px-1">
+    const heading = (
+            <div {...handle} className="group relative flex items-center gap-1 rounded px-1 data-[state=open]:bg-card-hover">
                 <DropLine shown={dropping === "before"} where="top" />
                 <DropLine shown={dropping === "after"} where="bottom" />
                 <button
@@ -835,6 +998,23 @@ function Section({
                 </button>
                 {action}
             </div>
+    );
+    return (
+        <div
+            {...area}
+            className={cn(
+                "mb-3 rounded-md ring-1 ring-inset transition-colors duration-fast",
+                into ? "bg-primary/5 ring-primary/40" : "ring-transparent"
+            )}
+        >
+            {menu ? (
+                <ContextMenu>
+                    <ContextMenuTrigger asChild>{heading}</ContextMenuTrigger>
+                    <ContextMenuContent className="w-52">{menu}</ContextMenuContent>
+                </ContextMenu>
+            ) : (
+                heading
+            )}
             {!folded && <div className="mt-0.5 flex flex-col gap-px">{children}</div>}
         </div>
     );
@@ -940,7 +1120,7 @@ function Row({
     channel?: ChatChannelView;
     /** Present for somebody who administers the space, so the menu can offer
      *  what only they may do. */
-    onManage?: (channel: ChatChannelView) => void;
+    onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
     /**
      * Drawn large on a phone, the way a messenger lists its conversations: a
      * bigger face, a bigger name, and when the last message was. On a phone the
@@ -1087,15 +1267,23 @@ function RowMenu({
     children
 }: {
     channel: ChatChannelView;
-    onManage?: (channel: ChatChannelView) => void;
+    onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
     children: React.ReactNode;
 }) {
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, refresh } = useChat();
+    const { blocked, refresh, spaces } = useChat();
+    const t = useTranslations("chat");
     const [naming, setNaming] = useState(false);
     const [leaving, setLeaving] = useState(false);
+    const [inviting, setInviting] = useState(false);
+    // The space a channel lives in, and whether this reader may bring people
+    // into it: the same rule the space's own menu in the server rail uses.
+    const space = channel.spaceId
+        ? (spaces.find((entry) => entry.id === channel.spaceId) ?? null)
+        : null;
+    const mayInvite = space !== null && (space.access !== "member" || space.visibility !== "private");
     const [error, setError] = useState("");
     // A one-to-one conversation, which is the only kind where there is one
     // person to have a name for. A group is called what the group is called.
@@ -1141,7 +1329,7 @@ function RowMenu({
                     {/* Only where there is something to put back. A conversation
                     already carrying a badge has nothing to mark, and an item
                     that does nothing is worse than one that is not drawn. */}
-                    {channel.unread === 0 && (
+                    {channel.unread === 0 ? (
                         <ContextMenuItem
                             onSelect={async () => {
                                 await actions.markUnreadAction({ channelId: channel.id });
@@ -1151,12 +1339,36 @@ function RowMenu({
                             <Mail className="size-3.5" />
                             Mark as unread
                         </ContextMenuItem>
+                    ) : (
+                        <ContextMenuItem
+                            onSelect={async () => {
+                                await actions.markChannelsReadAction({ channelIds: [channel.id] });
+                                refresh();
+                            }}
+                        >
+                            <CheckCheck className="size-3.5" />
+                            {t("channelMenu.markRead")}
+                        </ContextMenuItem>
+                    )}
+                    {/* An invitation into the space the channel is in: a
+                        channel has no door of its own, and the person arriving
+                        sees what any member of the space sees. */}
+                    {mayInvite && (
+                        <ContextMenuItem onSelect={() => setInviting(true)}>
+                            <UserPlus className="size-3.5" />
+                            {t("channelMenu.invite")}
+                        </ContextMenuItem>
                     )}
                     <ContextMenuItem
                         onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                     >
                         <Link2 className="size-3.5" />
                         Copy link
+                    </ContextMenuItem>
+                    {/* What a bot, an integration or an API call names it by. */}
+                    <ContextMenuItem onSelect={() => void copyText(channel.id)}>
+                        <Fingerprint className="size-3.5" />
+                        {t("channelMenu.copyId")}
                     </ContextMenuItem>
                     <MuteOptions
                         channel={channel}
@@ -1259,9 +1471,29 @@ function RowMenu({
                     {onManage && channel.spaceId && (
                         <>
                             <ContextMenuSeparator />
-                            <ContextMenuItem onSelect={() => onManage(channel)}>
+                            <ContextMenuItem onSelect={() => onManage(channel, "edit")}>
                                 <Settings2 className="size-3.5" />
                                 Edit channel
+                            </ContextMenuItem>
+                            {/* The settings, people and access rules, under a
+                                new name. Never the messages. */}
+                            <ContextMenuItem onSelect={() => onManage(channel, "duplicate")}>
+                                <Copy className="size-3.5" />
+                                {t("channelMenu.duplicate")}
+                            </ContextMenuItem>
+                            {/* Under the same heading as this one, which is
+                                what reaching for it from this row means. */}
+                            <ContextMenuItem onSelect={() => onManage(channel, "create")}>
+                                <Plus className="size-3.5" />
+                                {t("channelMenu.create")}
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                                variant="danger"
+                                onSelect={() => onManage(channel, "delete")}
+                            >
+                                <Trash2 className="size-3.5" />
+                                {t("channelMenu.delete")}
                             </ContextMenuItem>
                         </>
                     )}
@@ -1275,6 +1507,14 @@ function RowMenu({
                 person={person}
                 onSaved={refresh}
             />
+            {/* Mounted only while asked for: one per row, closed, would be a
+                dialog per channel down the whole rail. */}
+            {inviting && mayInvite && (
+                <InviteDialog
+                    space={space}
+                    onOpenChange={(next: boolean) => !next && setInviting(false)}
+                />
+            )}
             {group && (
                 <LeaveDialog
                     open={leaving}
@@ -1303,6 +1543,72 @@ function RowMenu({
                         if (here.startsWith(`/chat/c/${channel.id}`)) router.push("/chat");
                     }}
                 />
+            )}
+        </>
+    );
+}
+
+/**
+ * Right-click a heading.
+ *
+ * Reading and folding are anybody's, since they only change this reader's view.
+ * Making, renaming and deleting are the space administrator's. Deleting a
+ * heading keeps its channels: they move up to the ones under no heading.
+ */
+function CategoryMenuItems({
+    folded,
+    unread,
+    onMarkRead,
+    onToggle,
+    onFoldAll,
+    manage
+}: {
+    folded: boolean;
+    /** Whether anything under it is unread, so "mark as read" has a point. */
+    unread: boolean;
+    onMarkRead: () => void;
+    onToggle: () => void;
+    onFoldAll: (fold: boolean) => void;
+    manage: { onCreate: () => void; onRename: () => void; onDelete: () => void } | null;
+}) {
+    const t = useTranslations("chat");
+    return (
+        <>
+            {unread && (
+                <ContextMenuItem onSelect={onMarkRead}>
+                    <CheckCheck className="size-3.5" />
+                    {t("channelMenu.markRead")}
+                </ContextMenuItem>
+            )}
+            <ContextMenuItem onSelect={onToggle}>
+                <ChevronDown className={cn("size-3.5", folded && "-rotate-90")} />
+                {folded ? t("channelMenu.expand") : t("channelMenu.collapse")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onFoldAll(true)}>
+                <ChevronsDownUp className="size-3.5" />
+                {t("channelMenu.collapseAll")}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onFoldAll(false)}>
+                <ChevronsUpDown className="size-3.5" />
+                {t("channelMenu.expandAll")}
+            </ContextMenuItem>
+            {manage && (
+                <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onSelect={manage.onCreate}>
+                        <Plus className="size-3.5" />
+                        {t("channelMenu.create")}
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={manage.onRename}>
+                        <Pencil className="size-3.5" />
+                        {t("channelMenu.editCategory")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="danger" onSelect={manage.onDelete}>
+                        <Trash2 className="size-3.5" />
+                        {t("channelMenu.deleteCategory")}
+                    </ContextMenuItem>
+                </>
             )}
         </>
     );

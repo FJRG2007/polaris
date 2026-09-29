@@ -1,6 +1,12 @@
 {
     "errors": {
-        "notInConversation": "You are not in that conversation"
+        "notInConversation": "You are not in that conversation",
+        "channelMenu": {
+            "notAChannel": "Only a channel in a space can be duplicated",
+            "nameTaken": "A channel with that name is already here",
+            "duplicateFailed": "That channel could not be duplicated",
+            "markReadFailed": "Those conversations could not be marked as read"
+        }
     },
     "media": {
         "refused": {
@@ -72,5 +78,26 @@
                 "note": "Your microphone is closed except while you hold a key."
             }
         }
+    },
+    "channelMenu": {
+        "markRead": "Mark as read",
+        "invite": "Invite people",
+        "copyId": "Copy ID",
+        "duplicate": "Duplicate channel",
+        "create": "Create channel",
+        "delete": "Delete channel",
+        "deleteTitle": "Delete this channel",
+        "deleteHint": "Every message in it goes with it. Archiving keeps them readable instead.",
+        "duplicateTitle": "Duplicate channel",
+        "duplicateHint": "A copy of #{name} with its settings, people and access rules. Not its messages.",
+        "copyName": "Name of the copy",
+        "duplicateConfirm": "Duplicate",
+        "expand": "Expand category",
+        "collapse": "Collapse category",
+        "collapseAll": "Collapse all categories",
+        "expandAll": "Expand all categories",
+        "editCategory": "Edit category",
+        "categoryName": "Category name",
+        "deleteCategory": "Delete category"
     }
 }

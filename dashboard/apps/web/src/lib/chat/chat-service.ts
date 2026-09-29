@@ -969,6 +969,105 @@ export async function createChannel(
 }
 
 /**
+ * A copy of a channel, placed straight under it.
+ *
+ * What makes it the same room is copied: kind, topic, heading, private flag,
+ * slow mode, voice limit, and who may reach it - the people of a private one
+ * and the access rules on it. What happened in it is not: no messages, no
+ * pins, no read marks, and nobody's mute or notification choice.
+ */
+export async function duplicateChannel(
+    actor: ChatActor,
+    input: core.ChatChannelDuplicateInput
+): Promise<string> {
+    const access = await requireChannel(actor, input.channelId);
+    if (!access.spaceId) throw new ChatAccessError({ key: "errors.channelMenu.notAChannel" });
+    await requireSpace(actor, access.spaceId, "admin");
+
+    const source = await prisma.chatChannel.findUniqueOrThrow({
+        where: { id: input.channelId },
+        select: {
+            spaceId: true,
+            categoryId: true,
+            kind: true,
+            topic: true,
+            private: true,
+            slowmode: true,
+            userLimit: true,
+            order: true,
+            members: { select: { userId: true, role: true } }
+        }
+    });
+    const spaceId = access.spaceId;
+    const clash = await prisma.chatChannel.findFirst({
+        where: { spaceId, name: input.name },
+        select: { id: true }
+    });
+    if (clash) throw new ChatAccessError({ key: "errors.channelMenu.nameTaken" });
+
+    // Between the original and whatever follows it under the same heading, so
+    // the copy appears where it was asked for rather than at the bottom.
+    const next = await prisma.chatChannel.findFirst({
+        where: { spaceId, categoryId: source.categoryId, order: { gt: source.order } },
+        orderBy: { order: "asc" },
+        select: { order: true }
+    });
+    const order = next ? (source.order + next.order) / 2 : source.order + 1024;
+
+    // The members of a private channel are who may see it, so they come along.
+    // In an open one a member row is only somebody's read mark and settings,
+    // which belong to the old room.
+    const members = source.private
+        ? source.members.some((member) => member.userId === actor.id)
+            ? source.members
+            : [...source.members, { userId: actor.id, role: "admin" }]
+        : [];
+
+    const id = await prisma.$transaction(async (tx) => {
+        const channel = await tx.chatChannel.create({
+            data: {
+                spaceId,
+                categoryId: source.categoryId,
+                name: input.name,
+                topic: source.topic,
+                private: source.private,
+                kind: source.kind,
+                slowmode: source.slowmode,
+                userLimit: source.userLimit,
+                order,
+                createdById: actor.id,
+                ...(members.length > 0
+                    ? {
+                          members: {
+                              create: members.map((member) => ({
+                                  userId: member.userId,
+                                  role: member.role
+                              }))
+                          }
+                      }
+                    : {})
+            },
+            select: { id: true }
+        });
+        const grants = await tx.accessGrant.findMany({
+            where: { subjectType: "chat.channel", subjectId: input.channelId }
+        });
+        if (grants.length > 0) {
+            await tx.accessGrant.createMany({
+                data: grants.map(({ id: _id, createdAt: _at, updatedAt: _up, uses: _uses, lastUsedAt: _last, ...grant }) => ({
+                    ...grant,
+                    subjectId: channel.id,
+                    grantedById: actor.id
+                }))
+            });
+        }
+        return channel.id;
+    });
+    publishChatChange({ channelId: id, kind: "channels", actorId: actor.id });
+    return id;
+}
+
+/**
  * Put the channels under one heading in the order somebody dragged them into.
  *
  * The whole list is rewritten rather than the one that moved. It is a handful of
