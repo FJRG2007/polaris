@@ -15,6 +15,7 @@
  */
 
 import * as actions from "./ark-actions";
+import { useGameText } from "../game-text";
 import { isSteamId } from "../../lib/ark/access";
 import { Loader2, Plus, UserSearch, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
@@ -84,6 +85,7 @@ export function ArkPlayerDialog({
         error?: string;
     }>;
 }) {
+    const t = useGameText("ark");
     /** The Polaris account the player follows, or would. */
     const [account, setAccount] = useState<{ userId: string; name: string } | null>(
         player?.userId
@@ -131,13 +133,13 @@ export function ArkPlayerDialog({
 
     return (
         <PlayerFormDialog
-            title={editing ? `Edit ${player.label}` : "Add a player"}
+            title={editing ? t("playerDialogs.editNamed", { name: player.label }) : t("playerDialogs.addAPlayer")}
             description={
                 editing
-                    ? "The name is yours to change. The Steam id is what the server was told, so it stays."
-                    : "The server is told as soon as it answers. Adding somebody while it is still installing is fine."
+                    ? t("playerDialogs.theNameIsYoursTo")
+                    : t("playerDialogs.theServerIsToldAs")
             }
-            confirmLabel={editing ? "Save" : "Add player"}
+            confirmLabel={editing ? t("playerDialogs.save") : t("playerDialogs.addPlayer")}
             ready={isSteamId(trimmed)}
             pending={pending}
             error={error}
@@ -158,9 +160,9 @@ export function ArkPlayerDialog({
         >
             {!editing && onLookUp && (
                 <PlayerFormField
-                    label="Somebody with a Polaris account"
+                    label={t("playerDialogs.somebodyWithAPolarisAccount")}
                     error={lookUpError}
-                    hint="If they have linked Steam, their id and the name they play under fill themselves in."
+                    hint={t("playerDialogs.ifTheyHaveLinkedSteam")}
                 >
                     <div className="flex items-center gap-1">
                         <AccountInput
@@ -173,8 +175,8 @@ export function ArkPlayerDialog({
                             // button beside it are for.
                             onPick={(account) => lookUp(account.username || account.email)}
                             onEnter={() => lookUp(person)}
-                            placeholder="pau, or pau@example.com"
-                            aria-label="Polaris username or email address"
+                            placeholder={t("playerDialogs.pauOrPauExampleCom")}
+                            aria-label={t("playerDialogs.polarisUsernameOrEmailAddress")}
                         />
                         <Button
                             type="button"
@@ -182,8 +184,8 @@ export function ArkPlayerDialog({
                             variant="ghost"
                             onClick={() => lookUp(person)}
                             disabled={looking || person.trim().length === 0}
-                            aria-label="Find their Steam account"
-                            title="Find their Steam account"
+                            aria-label={t("playerDialogs.findTheirSteamAccount")}
+                            title={t("playerDialogs.findTheirSteamAccount")}
                         >
                             {looking ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -196,7 +198,7 @@ export function ArkPlayerDialog({
             )}
 
             <PlayerFormField
-                label="Steam id"
+                label={t("playerDialogs.steamId")}
                 error={invalid ? STEAM_ID_HINT : null}
                 hint={editing ? undefined : STEAM_ID_HINT}
             >
@@ -207,20 +209,19 @@ export function ArkPlayerDialog({
                     inputMode="numeric"
                     className="font-mono"
                     disabled={editing}
-                    aria-label="Steam id"
+                    aria-label={t("playerDialogs.steamId")}
                 />
             </PlayerFormField>
             {account && (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                     <div className="min-w-0">
-                        <p className="text-sm">Only while {account.name} is signed in to Polaris</p>
+                        <p className="text-sm">{t("playerDialogs.onlyWhile", { name: account.name })}</p>
                         <p className="text-xs text-muted-foreground">
-                            ARK does not say where a player connects from, so this checks the
-                            account instead: when it is signed in nowhere, the server refuses them.
+                            {t("playerDialogs.arkDoesNotSayWhere")}
                         </p>
                     </div>
                     <Switch
-                        aria-label={`Only while ${account.name} is signed in to Polaris`}
+                        aria-label={t("playerDialogs.onlyWhile", { name: account.name })}
                         checked={follow}
                         onChange={setFollow}
                     />
@@ -228,16 +229,16 @@ export function ArkPlayerDialog({
             )}
 
             <PlayerFormField
-                label="Name"
-                hint="The name they play under on Steam. Only Polaris sees it - the server shows whoever is on."
+                label={t("playerDialogs.name")}
+                hint={t("playerDialogs.theNameTheyPlayUnder")}
             >
                 <Input
                     autoFocus={editing}
                     value={label}
                     onChange={(event) => setLabel(event.target.value)}
-                    placeholder="Their Steam name"
+                    placeholder={t("playerDialogs.theirSteamName")}
                     maxLength={48}
-                    aria-label="Name"
+                    aria-label={t("playerDialogs.name")}
                 />
             </PlayerFormField>
         </PlayerFormDialog>
@@ -259,27 +260,28 @@ export function ArkMessageDialog({
     onClose: () => void;
     onSend: (message: string) => void;
 }) {
+    const t = useGameText("ark");
     const [message, setMessage] = useState("");
 
     return (
         <PlayerFormDialog
-            title={`Message ${name}`}
-            description="Appears in their chat, and nobody else's."
-            confirmLabel="Send"
+            title={t("playerDialogs.messageNamed", { name })}
+            description={t("playerDialogs.appearsInTheirChatAnd")}
+            confirmLabel={t("playerDialogs.send")}
             ready={message.trim().length > 0}
             pending={pending}
             error={error}
             onClose={onClose}
             onConfirm={() => onSend(message.trim())}
         >
-            <PlayerFormField label="Message">
+            <PlayerFormField label={t("playerDialogs.message")}>
                 <Input
                     autoFocus
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
-                    placeholder="Careful, a raid is coming"
+                    placeholder={t("playerDialogs.carefulARaidIsComing")}
                     maxLength={200}
-                    aria-label="Message"
+                    aria-label={t("playerDialogs.message")}
                 />
             </PlayerFormField>
         </PlayerFormDialog>
@@ -320,6 +322,7 @@ export function ArkGiveDialog({
     onClose: () => void;
     onGive: (lines: readonly ArkGiveLine[]) => void;
 }) {
+    const t = useGameText("ark");
     const [picked, setPicked] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [quantity, setQuantity] = useState(1);
@@ -383,10 +386,10 @@ export function ArkGiveDialog({
 
     return (
         <PlayerFormDialog
-            title={`Give ${name} something`}
-            description="Goes straight into their inventory. They have to have played on this server before."
+            title={t("playerDialogs.giveSomething", { name })}
+            description={t("playerDialogs.goesStraightIntoTheirInventory")}
             confirmLabel={
-                sending.length > 1 ? `Give them ${sending.length} things` : "Give it to them"
+                sending.length > 1 ? t("playerDialogs.giveThings", { count: sending.length }) : t("playerDialogs.giveItToThem")
             }
             ready={sending.length > 0}
             pending={pending}
@@ -403,10 +406,10 @@ export function ArkGiveDialog({
             />
 
             <PlayerFormField
-                label="How many"
+                label={t("playerDialogs.howMany")}
                 hint={
                     (!blueprint && split) ||
-                    "Straight into their inventory, wherever they are standing."
+                    t("playerDialogs.straightIntoTheirInventoryWherever")
                 }
             >
                 <Input
@@ -414,7 +417,7 @@ export function ArkGiveDialog({
                     min={1}
                     max={MAX_ARK_GIVE}
                     value={quantity}
-                    aria-label="How many"
+                    aria-label={t("playerDialogs.howMany")}
                     className="w-24"
                     onChange={(event) =>
                         setQuantity(
@@ -427,15 +430,15 @@ export function ArkGiveDialog({
             {gear && (
                 <>
                     <PlayerFormField
-                        label="Quality"
-                        hint="0 is what a survivor crafts with no skill. Higher is better gear, the way a drop from a red crate is."
+                        label={t("playerDialogs.quality")}
+                        hint={t("playerDialogs.0IsWhatASurvivor")}
                     >
                         <Input
                             type="number"
                             min={0}
                             max={MAX_ARK_QUALITY}
                             value={quality}
-                            aria-label="Quality"
+                            aria-label={t("playerDialogs.quality")}
                             className="w-24"
                             onChange={(event) =>
                                 setQuality(
@@ -449,15 +452,15 @@ export function ArkGiveDialog({
                     </PlayerFormField>
                     <label className="flex items-center justify-between gap-3 text-sm">
                         <span>
-                            The blueprint instead
+                            {t("playerDialogs.theBlueprintInstead")}
                             <span className="block text-xs text-muted-foreground">
-                                They craft it themselves, with the materials it costs.
+                                {t("playerDialogs.theyCraftItThemselvesWith")}
                             </span>
                         </span>
                         <Switch
                             checked={blueprint}
                             onChange={setBlueprint}
-                            aria-label="The blueprint instead"
+                            aria-label={t("playerDialogs.theBlueprintInstead")}
                         />
                     </label>
                 </>
@@ -475,12 +478,11 @@ export function ArkGiveDialog({
                     onClick={addAnother}
                 >
                     <Plus className="size-4" />
-                    Add another
+                    {t("playerDialogs.addAnother")}
                 </Button>
                 {full && (
                     <p className="text-xs text-muted-foreground">
-                        {MAX_ARK_GIVE_ITEMS} things is as much as one give carries. Send these and
-                        open it again.
+                        {t("playerDialogs.giveFull", { count: MAX_ARK_GIVE_ITEMS })}
                     </p>
                 )}
                 {queued.length > 0 && (
@@ -496,8 +498,8 @@ export function ArkGiveDialog({
                                 <button
                                     type="button"
                                     disabled={pending}
-                                    title={`Take ${describe(line)} off the list`}
-                                    aria-label={`Take ${describe(line)} off the list`}
+                                    title={t("playerDialogs.takeOff", { name: describe(line) })}
+                                    aria-label={t("playerDialogs.takeOff", { name: describe(line) })}
                                     className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
                                     onClick={() =>
                                         setQueued((was) => was.filter((_, at) => at !== index))
@@ -535,13 +537,14 @@ export function ArkExperienceDialog({
     onClose: () => void;
     onGive: (amount: number) => void;
 }) {
+    const t = useGameText("ark");
     const [amount, setAmount] = useState(1000);
 
     return (
         <PlayerFormDialog
-            title={`Give ${name} experience`}
-            description="Goes to their survivor, not to their tribe."
-            confirmLabel="Give it"
+            title={t("playerDialogs.giveExperience", { name })}
+            description={t("playerDialogs.goesToTheirSurvivorNot")}
+            confirmLabel={t("playerDialogs.giveIt")}
             ready={amount >= 1}
             pending={pending}
             error={error}
@@ -549,8 +552,8 @@ export function ArkExperienceDialog({
             onConfirm={() => onGive(amount)}
         >
             <PlayerFormField
-                label="How much"
-                hint="ARK can only hand experience over: it has no command that takes it away or sets a level."
+                label={t("playerDialogs.howMuch")}
+                hint={t("playerDialogs.arkCanOnlyHandExperience")}
             >
                 <Input
                     autoFocus
@@ -558,7 +561,7 @@ export function ArkExperienceDialog({
                     min={1}
                     max={MAX_ARK_EXPERIENCE}
                     value={amount}
-                    aria-label="How much"
+                    aria-label={t("playerDialogs.howMuch")}
                     className="w-32"
                     onChange={(event) =>
                         setAmount(
@@ -597,6 +600,7 @@ export function ArkHistoryDialog({
     steamId: string;
     onClose: () => void;
 }) {
+    const t = useGameText("ark");
     const [record, setRecord] = useState<PlayerRecord | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -616,15 +620,15 @@ export function ArkHistoryDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{player} on this server</DialogTitle>
+                    <DialogTitle>{t("playerDialogs.onThisServer", { name: player })}</DialogTitle>
                     <DialogDescription>
-                        Counted from the moment Polaris started watching this server.
+                        {t("playerDialogs.countedFromTheMomentPolaris")}
                     </DialogDescription>
                 </DialogHeader>
                 <PlayerRecordPanel record={record} loading={loading} />
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Close
+                        {t("playerDialogs.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

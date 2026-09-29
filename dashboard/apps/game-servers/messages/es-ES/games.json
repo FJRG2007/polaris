@@ -223,5 +223,8 @@
         "unknown": "Cargando",
         "upSince": "desde",
         "lastUp": "visto"
+    },
+    "timeout": {
+        "left": "{unit, select, now {termina ya} m {quedan {count} min} h {quedan {count} h} other {quedan {count} d}}"
     }
 }

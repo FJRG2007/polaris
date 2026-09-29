@@ -223,5 +223,8 @@
         "unknown": "Loading",
         "upSince": "up since",
         "lastUp": "last up"
+    },
+    "timeout": {
+        "left": "{unit, select, now {lifting now} m {{count}m left} h {{count}h left} other {{count}d left}}"
     }
 }

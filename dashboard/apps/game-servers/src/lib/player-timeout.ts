@@ -62,9 +62,17 @@ export function timeoutFor(timeouts: readonly PlayerTimeout[], player: string): 
 /** How much of a timeout is left, in the same shape as how long ago. Shared so a
  *  badge reads identically whichever game drew it. */
 export function timeoutRemaining(iso: string, now = Date.now()): string {
+    const left = timeoutLeft(iso, now);
+    if (left.unit === "now") return "lifting now";
+    return `${left.count}${left.unit} left`;
+}
+
+/** The same, as a unit and a count, for a screen that says it in its reader's
+ *  language. */
+export function timeoutLeft(iso: string, now = Date.now()): { unit: "now" | "m" | "h" | "d"; count: number } {
     const minutes = Math.max(0, Math.round((Date.parse(iso) - now) / 60_000));
-    if (minutes < 1) return "lifting now";
-    if (minutes < 60) return `${minutes}m left`;
+    if (minutes < 1) return { unit: "now", count: 0 };
+    if (minutes < 60) return { unit: "m", count: minutes };
     const hours = Math.round(minutes / 60);
-    return hours < 24 ? `${hours}h left` : `${Math.round(hours / 24)}d left`;
+    return hours < 24 ? { unit: "h", count: hours } : { unit: "d", count: Math.round(hours / 24) };
 }

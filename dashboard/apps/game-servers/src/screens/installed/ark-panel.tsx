@@ -19,6 +19,7 @@
  */
 
 import Link from "next/link";
+import { timeoutText, useGameText } from "../game-text";
 import { ArkMods } from "./ark-mods";
 import { ArkRules } from "./ark-rules";
 import * as actions from "./ark-actions";
@@ -41,8 +42,8 @@ import type { ArkAccessView, ArkStatus } from "../../lib/ark/service";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "../../lib/player-timeout";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { timeoutFor, type PlayerTimeout } from "../../lib/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "../../lib/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "../../lib/ark/access";
 import {
@@ -177,6 +178,7 @@ export function ArkPanel({
     held: readonly Permission[];
     onStatus?: (label: string | null) => void;
 }) {
+    const t = useGameText("ark");
     const router = useRouter();
     const pathname = usePathname();
     const tab = useMemo(() => {
@@ -366,7 +368,7 @@ export function ArkPanel({
                     applicationId={applicationId}
                     running={isRunning}
                     logName="ark"
-                    hint="ListPlayers, or Broadcast Server restarting in 5"
+                    hint={t("panel.consoleHint")}
                     game="ark"
                     players={(status?.players ?? []).map((player) => player.name)}
                 />
@@ -420,7 +422,7 @@ export function ArkPanel({
                 ) : (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            Usage is measured once the server has deployed.
+                            {t("panel.usageIsMeasuredOnceThe")}
                         </CardBody>
                     </Card>
                 ))}
@@ -507,6 +509,7 @@ function ConnectCard({
     canSaveWorld: boolean;
     onOpenAccess: () => void;
 }) {
+    const t = useGameText("ark");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
     const map = settings.find((setting) => setting.key === "SERVER_MAP")?.value ?? "";
@@ -528,8 +531,7 @@ function ConnectCard({
                             <Skeleton className="h-7 w-56" />
                         ) : (
                             <span className="text-sm text-muted-foreground">
-                                Not published yet - the address appears once the server has
-                                deployed.
+                                {t("panel.notPublishedYetTheAddress")}
                             </span>
                         )
                     ) : (
@@ -540,12 +542,12 @@ function ConnectCard({
                                 answered with "server not found", which names neither
                                 the port nor the mistake. */}
                             <JoinAddress
-                                title="Add in Steam, or the in-game browser"
+                                title={t("panel.addInSteamOrThe")}
                                 value={withPort(address, status?.queryPort ?? ports.query)}
                                 detail="Steam, View, Servers, Favorites, +. It appears in ARK under Favorites."
                             />
                             <JoinAddress
-                                title="Or connect straight to it"
+                                title={t("panel.orConnectStraightToIt")}
                                 value={`open ${withPort(address, status?.gamePort ?? ports.game)}`}
                                 detail="In a loaded single-player world, press Tab and type this. ARK has no console on its menu."
                             />
@@ -573,9 +575,9 @@ function ConnectCard({
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                title="Browse this server's files in Drive"
+                                title={t("panel.browseThisServerSFiles")}
                             >
-                                <FolderOpen className="size-4" /> Files
+                                <FolderOpen className="size-4" /> {t("panel.files")}
                             </Button>
                         </Link>
                     )}
@@ -585,14 +587,14 @@ function ConnectCard({
                             variant="secondary"
                             onClick={() => void saveWorld()}
                             disabled={saving || !(status?.answering ?? false)}
-                            title="Write the world to disk now"
+                            title={t("panel.writeTheWorldToDisk")}
                         >
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
                                 <Save className="size-4" />
                             )}
-                            Save world
+                            {t("panel.saveWorld")}
                         </Button>
                     )}
                 </div>
@@ -607,19 +609,16 @@ function ConnectCard({
                         <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                             <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
                             <div className="flex flex-col items-start gap-1 text-xs">
-                                <p className="font-medium text-foreground">Nobody can join yet</p>
+                                <p className="font-medium text-foreground">{t("panel.nobodyCanJoinYet")}</p>
                                 <p className="text-muted-foreground">
-                                    This server only lets in players it has been told about, and it
-                                    has not been told about anybody yet - it is still installing.
-                                    Polaris hands the list over as soon as the server answers;
-                                    nothing else is needed.
+                                    {t("panel.thisServerOnlyLetsIn")}
                                 </p>
                                 <button
                                     type="button"
                                     onClick={onOpenAccess}
                                     className="text-primary hover:underline"
                                 >
-                                    See who is on the list
+                                    {t("panel.seeWhoIsOnThe")}
                                 </button>
                             </div>
                         </div>
@@ -643,7 +642,7 @@ function ConnectCard({
                                     href="/admin/domains#game-ports"
                                     className="w-fit text-primary hover:underline"
                                 >
-                                    Open the router walkthrough
+                                    {t("panel.openTheRouterWalkthrough")}
                                 </Link>
                             )}
                         </div>
@@ -665,6 +664,7 @@ function withPort(address: string, port: number | null): string {
 /** One address, what it is for, and a button that copies it - which is the only
  *  thing anybody actually does with it. */
 function JoinAddress({ title, value, detail }: { title: string; value: string; detail: string }) {
+    const t = useGameText("ark");
     return (
         <div className="flex min-w-0 flex-col">
             <span className="text-xs text-muted-foreground">{title}</span>
@@ -672,7 +672,7 @@ function JoinAddress({ title, value, detail }: { title: string; value: string; d
                 <code className="truncate font-mono text-base" title={value}>
                     {value}
                 </code>
-                <CopyButton value={value} label={`Copy: ${title}`} />
+                <CopyButton value={value} label={t("panel.copyNamed", { name: title })} />
             </div>
             <span className="text-xs text-muted-foreground">{detail}</span>
         </div>
@@ -736,13 +736,14 @@ function statusLabel(status: ArkStatus | null, running: boolean): string | null 
 }
 
 function StatusBadge({ status, running }: { status: ArkStatus | null; running: boolean }) {
+    const t = useGameText("ark");
     const label = statusLabel(status, running);
     if (label === null) return <Skeleton className="h-6 w-20" />;
-    if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
-    if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
+    if (label === "Crash loop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
+    if (label === "Not running") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
     if (label === "Starting")
-        return <Badge className="border-warning-edge text-warning">Starting</Badge>;
-    if (label === "Stopped") return <Badge>Stopped</Badge>;
+        return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
+    if (label === "Stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return (
         <Badge className="border-success-edge text-success">
             {status?.players.length} / {status?.max ?? "?"} online
@@ -769,6 +770,7 @@ function OverviewTab({
     status: ArkStatus | null;
     settings: InstalledAppSetting[];
 }) {
+    const t = useGameText("ark");
     const shown = useMemo(
         () =>
             settings.filter((setting) =>
@@ -787,16 +789,16 @@ function OverviewTab({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm font-medium">Playing now</p>
+                    <p className="text-sm font-medium">{t("panel.playingNow")}</p>
                     {status === null ? (
                         <Skeleton className="h-8 w-full" />
                     ) : !status.answering ? (
                         <p className="text-sm text-muted-foreground">
-                            {status.message ?? "The server is not answering."}
+                            {status.message ?? t("panel.theServerIsNotAnswering")}
                         </p>
                     ) : status.players.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            Nobody is playing right now.
+                            {t("panel.nobodyIsPlayingRightNow")}
                         </p>
                     ) : (
                         <div className="flex flex-wrap gap-1">
@@ -816,17 +818,17 @@ function OverviewTab({
 
             <Card>
                 <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">Machine</p>
+                    <p className="text-sm font-medium">{t("panel.machine")}</p>
                     {status === null ? (
                         <Skeleton className="h-10 w-full" />
                     ) : status.cpuPercent === null && status.memUsedBytes === null ? (
                         <p className="text-sm text-muted-foreground">
-                            Usage is measured on servers Polaris runs itself.
+                            {t("panel.usageIsMeasuredOnServers")}
                         </p>
                     ) : (
                         <dl className="flex flex-col gap-1 text-sm">
                             <div className="flex items-baseline justify-between gap-3">
-                                <dt className="text-muted-foreground">Processor</dt>
+                                <dt className="text-muted-foreground">{t("panel.processor")}</dt>
                                 <dd>
                                     {status.cpuPercent === null
                                         ? "-"
@@ -834,7 +836,7 @@ function OverviewTab({
                                 </dd>
                             </div>
                             <div className="flex items-baseline justify-between gap-3">
-                                <dt className="text-muted-foreground">Memory</dt>
+                                <dt className="text-muted-foreground">{t("panel.memory")}</dt>
                                 <dd>
                                     {status.memUsedBytes === null
                                         ? "-"
@@ -848,7 +850,7 @@ function OverviewTab({
 
             <Card>
                 <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">World</p>
+                    <p className="text-sm font-medium">{t("panel.world")}</p>
                     <dl className="flex flex-col gap-1 text-sm">
                         {shown.map((setting) => {
                             const value =
@@ -924,6 +926,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: ArkAccessView) => void;
 }) {
+    const t = useGameText("ark");
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
     const [error, setError] = useState<string | null>(null);
@@ -1099,12 +1102,10 @@ function PlayersTab({
                     <CardBody className="flex flex-col gap-1">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />
-                            Nobody can join yet
+                            {t("panel.nobodyCanJoinYet")}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            This server only lets in players it has been told about, and the list is
-                            empty. Add yourself first: your Steam id is the number at the end of
-                            your Steam profile URL.
+                            {t("panel.thisServerOnlyLetsIn2")}
                         </p>
                     </CardBody>
                 </Card>
@@ -1117,11 +1118,11 @@ function PlayersTab({
                 border inside the first. */}
             <PlayersTable
                 columns={[
-                    { label: "Player" },
-                    { label: "Level" },
-                    { label: "Steam id", className: "hidden md:table-cell" },
-                    { label: "Status" },
-                    { label: "May join" }
+                    { label: t("panel.player") },
+                    { label: t("panel.level") },
+                    { label: t("panel.steamId"), className: "hidden md:table-cell" },
+                    { label: t("panel.status") },
+                    { label: t("panel.mayJoin") }
                 ]}
                 search={query}
                 onSearch={setQuery}
@@ -1203,7 +1204,7 @@ function PlayersTab({
                         onRemove={() =>
                             void confirm({
                                 ...playerConfirm.remove(entry.name),
-                                confirmLabel: "Remove",
+                                confirmLabel: t("panel.remove"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed)
@@ -1219,10 +1220,10 @@ function PlayersTab({
                         onExperience={() => open("experience", entry)}
                         onKill={() =>
                             void confirm({
-                                title: `Kill ${entry.name}?`,
+                                title: t("panel.killTitle", { name: entry.name }),
                                 description:
-                                    "Their survivor dies where they are standing and drops everything they were carrying. The body can be looted by anybody who reaches it first.",
-                                confirmLabel: "Kill them",
+                                    t("panel.theirSurvivorDiesWhereThey"),
+                                confirmLabel: t("panel.killThem"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
@@ -1241,10 +1242,10 @@ function PlayersTab({
                         }
                         onStrip={() =>
                             void confirm({
-                                title: `Empty ${entry.name}'s inventory?`,
+                                title: t("panel.emptyTitle", { name: entry.name }),
                                 description:
-                                    "Everything they are carrying, wearing and holding in a slot is destroyed rather than dropped. There is no undo.",
-                                confirmLabel: "Empty it",
+                                    t("panel.everythingTheyAreCarryingWearing"),
+                                confirmLabel: t("panel.emptyIt"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
@@ -1265,7 +1266,7 @@ function PlayersTab({
                         onKick={() =>
                             void confirm({
                                 ...playerConfirm.kick(entry.name),
-                                confirmLabel: "Kick",
+                                confirmLabel: t("panel.kick"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
@@ -1284,7 +1285,7 @@ function PlayersTab({
                         onBan={() =>
                             void confirm({
                                 ...playerConfirm.ban(entry.name),
-                                confirmLabel: "Ban",
+                                confirmLabel: t("panel.ban"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed) {
@@ -1315,25 +1316,26 @@ function PlayersTab({
             />
 
             <p className="text-xs text-muted-foreground">
-                Enforcing the list takes effect the next time the server starts, and is on top of
-                the join password. Adding and removing somebody reaches a running server at once.
+                {t("panel.enforcingTheListTakesEffect")}
             </p>
 
             <p className="text-xs text-muted-foreground">
-                An operator runs admin commands in game without typing the admin password. ARK reads
-                that list only when it starts, so somebody made an operator now becomes one at the
-                next restart. Levels come from each survivor&apos;s own file, so somebody who has
-                never played here has none - and neither has anybody the server has no file for,
-                which is what a dash in that column means. When they were last on is Polaris&apos;
-                own record: ARK can say who is connected this second and nothing about a minute ago,
-                so it starts from the day Polaris first watched this server.
+                {t("panel.anOperatorRunsAdminCommands")}
             </p>
 
             <p className="text-xs text-muted-foreground">
-                Teleporting to a player is not possible from here: ARK moves players relative to an
-                admin&apos;s own character, and Polaris talks to the server without one. In game,
-                press Tab and use <code className="font-mono">enablecheats</code>, then{" "}
-                <code className="font-mono">cheat TeleportToPlayer</code>.
+                {t.rich<ReactNode>("panel.teleportHelp", {
+                    cheats: (chunks) => (
+                        <code key="cheats" className="font-mono">
+                            {chunks}
+                        </code>
+                    ),
+                    teleport: (chunks) => (
+                        <code key="teleport" className="font-mono">
+                            {chunks}
+                        </code>
+                    )
+                })}
             </p>
 
             {acting?.dialog === "history" && target && (
@@ -1485,6 +1487,7 @@ function PlayersTab({
  * the rows underneath it.
  */
 function Broadcast({ installedAppId, answering }: { installedAppId: string; answering: boolean }) {
+    const t = useGameText("ark");
     const [message, setMessage] = useState("");
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1516,8 +1519,8 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
                         event.preventDefault();
                         if (message.trim().length > 0 && answering) send();
                     }}
-                    placeholder="Say something to everyone: restarting in 5 minutes"
-                    aria-label="Say something to everyone playing"
+                    placeholder={t("panel.saySomethingToEveryoneRestarting")}
+                    aria-label={t("panel.saySomethingToEveryonePlaying")}
                     disabled={!answering}
                 />
                 <Button
@@ -1529,13 +1532,13 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
                     ) : (
                         <Megaphone className="size-4" />
                     )}
-                    Send
+                    {t("panel.send")}
                 </Button>
             </div>
             <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
                 {error ??
                     note ??
-                    (answering ? "Appears in everyone's chat." : "The server is not answering.")}
+                    (answering ? t("panel.appearsInEveryoneSChat") : t("panel.theServerIsNotAnswering"))}
             </span>
         </div>
     );
@@ -1614,6 +1617,8 @@ function ArkPlayerRow({
     onUnban: () => void;
     onTimeout: () => void;
 }) {
+    const tGames = useGameText("games");
+    const t = useGameText("ark");
     // Every verb that reaches the game needs a server that is answering. Editing
     // the list is Polaris' own and does not.
     const live = answering && !pending;
@@ -1811,7 +1816,7 @@ function ArkPlayerRow({
                         because it is the same thing: somebody who may do anything
                         on this server. */}
                     {admin && (
-                        <Crown className="size-3.5 text-warning" role="img" aria-label="Admin" />
+                        <Crown className="size-3.5 text-warning" role="img" aria-label={t("panel.admin")} />
                     )}
                     {entry.name}
                 </p>
@@ -1820,7 +1825,7 @@ function ArkPlayerRow({
                     and it is not always the same one. */}
                 {profile?.characterName && profile.characterName !== entry.name && (
                     <span className="block truncate text-xs text-muted-foreground">
-                        Plays as {profile.characterName}
+                        {t("panel.playsAs", { name: profile.characterName })}
                     </span>
                 )}
                 <span className="block truncate text-xs text-muted-foreground md:hidden">
@@ -1834,7 +1839,7 @@ function ArkPlayerRow({
                 {profile?.level == null ? (
                     <span
                         className="text-muted-foreground"
-                        title="Read from the survivor's own file: a server that is off cannot be asked, and somebody who has never played here has no file yet."
+                        title={t("panel.readFromTheSurvivorS")}
                     >
                         -
                     </span>
@@ -1845,7 +1850,7 @@ function ArkPlayerRow({
             <td className="hidden px-3 py-2 md:table-cell">
                 <div className="flex items-center gap-1">
                     <code className="font-mono text-xs text-muted-foreground">{entry.steamId}</code>
-                    <CopyButton value={entry.steamId} label={`the Steam id of ${entry.name}`} />
+                    <CopyButton value={entry.steamId} label={t("panel.steamIdOf", { name: entry.name })} />
                 </div>
             </td>
             {/* Badge and a smaller line under it, the shape the Minecraft table
@@ -1870,9 +1875,11 @@ function ArkPlayerRow({
                     {line?.kind === "added" ? (
                         <span
                             className="text-xs text-muted-foreground"
-                            title="Polaris has not watched them play here yet."
+                            title={t("panel.polarisHasNotWatchedThem")}
                         >
-                            Added <RelativeTime iso={line.iso} />
+                            {t.rich<ReactNode>("panel.addedAt", {
+                                time: () => <RelativeTime key="time" iso={line.iso} />
+                            })}
                         </span>
                     ) : (
                         line && (
@@ -1880,10 +1887,11 @@ function ArkPlayerRow({
                                 type="button"
                                 onClick={onHistory}
                                 className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                                title={`When ${entry.name} joined and left`}
+                                title={t("panel.historyOf", { name: entry.name })}
                             >
-                                {line.kind === "since" ? "Playing since " : "Last on "}
-                                <RelativeTime iso={line.iso} />
+                                {t.rich<ReactNode>(line.kind === "since" ? "panel.playingSince" : "panel.lastOn", {
+                                    time: () => <RelativeTime key="time" iso={line.iso} />
+                                })}
                             </button>
                         )
                     )}
@@ -1893,24 +1901,24 @@ function ArkPlayerRow({
                 <div className="flex flex-wrap items-center gap-1">
                     {entry.userId && (
                         <Badge
-                            title={`Let in only while ${linkedName ?? "their Polaris account"} is signed in to Polaris`}
+                            title={t("panel.linkedHint", { name: linkedName ?? t("panel.theirAccount") })}
                         >
-                            linked
+                            {t("panel.linked")}
                         </Badge>
                     )}
                     {entry.held && (
                         <Badge
                             variant="warning"
-                            title={`${linkedName ?? "Their Polaris account"} is not signed in anywhere, so the server refuses them.`}
+                            title={t("panel.signedOutHint", { name: linkedName ?? t("panel.theirAccountCapital") })}
                         >
-                            signed out
+                            {t("panel.signedOut")}
                         </Badge>
                     )}
                     {entry.standing === "allowed" && !entry.held && (
                         <Badge variant="primary">{playerStanding.allowed}</Badge>
                     )}
                     {entry.standing === "waiting" && (
-                        <Badge title="Recorded here. The server is told as soon as it answers.">
+                        <Badge title={t("panel.recordedHereTheServerIs")}>
                             <Clock className="size-3" /> {playerStanding.waiting}
                         </Badge>
                     )}
@@ -1918,7 +1926,7 @@ function ArkPlayerRow({
                         <Badge variant="warning">{playerStanding.notAllowed}</Badge>
                     )}
                     {admin && (
-                        <Badge title="May run admin commands in game without the password. In force from the server's next start.">
+                        <Badge title={t("panel.mayRunAdminCommandsIn")}>
                             {playerStanding.operator}
                         </Badge>
                     )}
@@ -1928,10 +1936,10 @@ function ArkPlayerRow({
                     {timeout && (
                         <Badge
                             variant="danger"
-                            title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
+                            title={t("panel.lifts", { date: new Date(timeout.until).toLocaleString() })}
                         >
                             <Timer className="size-3" />
-                            timed out, {timeoutRemaining(timeout.until)}
+                            {t("panel.timedOut", { left: timeoutText(tGames, timeout.until) })}
                         </Badge>
                     )}
                 </div>
@@ -1975,6 +1983,7 @@ function ClosedServerCard({
     canManage: boolean;
     onChanged: () => void;
 }) {
+    const t = useGameText("ark");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -1993,15 +2002,13 @@ function ClosedServerCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm font-medium">What the server records</p>
+                <p className="text-sm font-medium">{t("panel.whatTheServerRecords")}</p>
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                     <span className="flex flex-col gap-0.5 text-sm">
-                        <span className="font-medium">Record what happens in the game</span>
+                        <span className="font-medium">{t("panel.recordWhatHappensInThe")}</span>
                         <span className="text-xs text-muted-foreground">
-                            The chat, and the admin commands somebody ran. ARK keeps none of it
-                            otherwise, so a command the server declined leaves nothing to read.
-                            Under Files, in server/ShooterGame/Saved/Logs.
+                            {t("panel.theChatAndTheAdmin")}
                         </span>
                     </span>
                     <Switch
@@ -2010,7 +2017,7 @@ function ClosedServerCard({
                             run(() => actions.setArkGameLogAction(installedAppId, on))
                         }
                         disabled={!canManage || pending || access === null}
-                        aria-label="Record what happens in the game"
+                        aria-label={t("panel.recordWhatHappensInThe")}
                     />
                 </label>
             </CardBody>
@@ -2025,6 +2032,7 @@ function PasswordCard({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const t = useGameText("ark");
     const [shown, setShown] = useState<{
         joinPassword: string | null;
         adminPassword: string | null;
@@ -2050,12 +2058,9 @@ function PasswordCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm font-medium">Passwords</p>
+                <p className="text-sm font-medium">{t("panel.passwords")}</p>
                 <p className="text-sm text-muted-foreground">
-                    The join password is what players type to get in. The admin password is what you
-                    type after enablecheats in game, and Polaris minted it when the server was
-                    created - it is not a default anybody else knows. ARK takes neither of them
-                    longer than 32 characters.
+                    {t("panel.theJoinPasswordIsWhat")}
                 </p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
@@ -2063,25 +2068,25 @@ function PasswordCard({
                 {shown ? (
                     <dl className="flex flex-col gap-2 text-sm">
                         <div className="flex items-center justify-between gap-2">
-                            <dt className="text-muted-foreground">Join password</dt>
+                            <dt className="text-muted-foreground">{t("panel.joinPassword")}</dt>
                             <dd className="flex items-center gap-1">
                                 <code className="font-mono">{shown.joinPassword ?? "-"}</code>
                                 {shown.joinPassword && (
                                     <CopyButton
                                         value={shown.joinPassword}
-                                        label="the join password"
+                                        label={t("panel.theJoinPassword")}
                                     />
                                 )}
                             </dd>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            <dt className="text-muted-foreground">Admin password</dt>
+                            <dt className="text-muted-foreground">{t("panel.adminPassword")}</dt>
                             <dd className="flex items-center gap-1">
                                 <code className="font-mono">{shown.adminPassword ?? "-"}</code>
                                 {shown.adminPassword && (
                                     <CopyButton
                                         value={shown.adminPassword}
-                                        label="the admin password"
+                                        label={t("panel.theAdminPassword")}
                                     />
                                 )}
                             </dd>
@@ -2100,14 +2105,14 @@ function PasswordCard({
                         ) : (
                             <Eye className="size-4" />
                         )}
-                        Show the passwords
+                        {t("panel.showThePasswords")}
                     </Button>
                 )}
 
                 {canManage && (
                     <>
                         <ChangePassword
-                            label="New join password"
+                            label={t("panel.newJoinPassword")}
                             help="Players type this. Applied the next time the server starts."
                             save={(value) =>
                                 actions.setArkJoinPasswordAction(installedAppId, value)
@@ -2115,7 +2120,7 @@ function PasswordCard({
                             onSaved={() => setShown(null)}
                         />
                         <ChangePassword
-                            label="New admin password"
+                            label={t("panel.newAdminPassword")}
                             help="Typed after enablecheats in game. Applied the next time the server starts."
                             save={(value) =>
                                 actions.setArkAdminPasswordAction(installedAppId, value)
@@ -2143,6 +2148,7 @@ function ChangePassword({
     save: (value: string) => Promise<{ error?: string }>;
     onSaved: () => void;
 }) {
+    const t = useGameText("ark");
     const [value, setValue] = useState("");
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -2177,7 +2183,7 @@ function ChangePassword({
                         value={value}
                         onChange={(event) => setValue(event.target.value)}
                         className="font-mono"
-                        placeholder="8 to 32 letters and digits"
+                        placeholder={t("panel.8To32LettersAnd")}
                         aria-label={label}
                     />
                     <Button
@@ -2190,15 +2196,15 @@ function ChangePassword({
                                 )
                             )
                         }
-                        aria-label={`Generate a password for ${label.toLowerCase()}`}
-                        title="Generate one"
+                        aria-label={t("panel.generateFor", { name: label.toLowerCase() })}
+                        title={t("panel.generateOne")}
                     >
                         <RefreshCw className="size-4" />
                     </Button>
                 </div>
                 <Button onClick={submit} disabled={pending || !isJoinPassword(value)}>
                     {pending && <Loader2 className="size-4 animate-spin" />}
-                    Change
+                    {t("panel.change")}
                 </Button>
             </div>
             <span
