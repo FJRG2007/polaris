@@ -77,5 +77,130 @@
         "open": "Open Polaris",
         "signIn": "Sign in",
         "unavailable": "Link unavailable"
+    },
+    "ui": {
+        "cancel": "Cancel",
+        "deleteTitle": "Delete {kind}",
+        "deleteConfirm": "Delete {kind}",
+        "deleteQuestion": "Delete {name}?",
+        "typeToConfirm": "Type {name} to confirm.",
+        "copy": "Copy",
+        "copyNamed": "Copy {label}"
+    },
+    "bell": {
+        "label": "{unread, plural, =0 {Notifications} other {Notifications (# unread)}}",
+        "title": "{unread, plural, =0 {Notifications. Press twice to open them.} other {Notifications (# unread). Press twice to open them.}}",
+        "heading": "Notifications",
+        "markAllRead": "Mark all read",
+        "empty": "You're all caught up.",
+        "actionNeeded": "Action needed",
+        "markReadNamed": "Mark \"{title}\" as read",
+        "markRead": "Mark as read",
+        "viewAll": "View all"
+    },
+    "audience": {
+        "admins": "Admins",
+        "adminsHint": "Sent to every administrator",
+        "everyone": "You and others",
+        "everyoneHint": "Sent to more than one person",
+        "groupNamedHint": "Sent to the {label} group",
+        "group": "A group",
+        "groupHint": "Sent to a group you belong to",
+        "you": "You",
+        "youHint": "Sent only to you"
+    },
+    "search": {
+        "commands": "Commands",
+        "recent": "Recent",
+        "buttonTitle": "Search ({hint})",
+        "label": "Search Polaris",
+        "button": "Search",
+        "everything": "Search everything again",
+        "stop": "Stop searching {scope}",
+        "placeholder": "Search, or type / for commands",
+        "what": "What to find",
+        "all": "All",
+        "results": "Search results",
+        "noScopeMatch": "No {scope} match \"{query}\".",
+        "nothingIn": "Nothing in {scope} yet.",
+        "noMatch": "Nothing matches \"{query}\".",
+        "clear": "Clear",
+        "hintMove": "Up and down to move, Enter to open",
+        "hintClear": "Backspace clears the command",
+        "hintType": "Type / for commands, @ for people",
+        "scopeRow": "Search {scope}",
+        "forget": "Remove from recent searches",
+        "forgetNamed": "Remove {label} from recent searches",
+        "failed": "That search could not be run. Try again in a moment.",
+        "scopes": {
+            "projects": {
+                "label": "Projects",
+                "placeholder": "Search deploy projects"
+            },
+            "services": {
+                "label": "Services",
+                "placeholder": "Search services"
+            },
+            "databases": {
+                "label": "Databases",
+                "placeholder": "Search managed databases"
+            },
+            "servers": {
+                "label": "Servers",
+                "placeholder": "Search servers"
+            },
+            "runners": {
+                "label": "Runners",
+                "placeholder": "Search runner pools"
+            },
+            "apps": {
+                "label": "Installed apps",
+                "placeholder": "Search installed apps"
+            },
+            "tasks": {
+                "label": "Tasks",
+                "placeholder": "Search tasks by name or number"
+            },
+            "docs": {
+                "label": "Pages",
+                "placeholder": "Search pages"
+            },
+            "notes": {
+                "label": "Notes",
+                "placeholder": "Search your notes"
+            },
+            "users": {
+                "label": "People",
+                "placeholder": "Search people"
+            },
+            "chat": {
+                "label": "Chat",
+                "placeholder": "Find people, conversations, channels and messages"
+            },
+            "contacts": {
+                "label": "People",
+                "placeholder": "Find somebody to message"
+            },
+            "chats": {
+                "label": "Conversations",
+                "placeholder": "Find a direct message or a group"
+            },
+            "channels": {
+                "label": "Channels",
+                "placeholder": "Find a channel in your spaces"
+            },
+            "messages": {
+                "label": "Messages",
+                "placeholder": "Find something that was said"
+            }
+        },
+        "hits": {
+            "message": "Message",
+            "direct": "Direct message",
+            "group": "Group",
+            "voice": "Voice",
+            "attachment": "Attachment",
+            "saidIn": "{author} in {channel}"
+        }
     }
 }

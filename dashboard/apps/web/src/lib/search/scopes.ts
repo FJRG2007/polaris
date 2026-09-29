@@ -12,6 +12,7 @@
  */
 
 import type { SearchResourceKind } from "@/lib/search/entries";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { SEARCH_SCOPES, type SearchScope } from "@polaris/core";
 import {
     AtSign,
@@ -34,13 +35,9 @@ import {
 
 export interface SearchScopeDefinition {
     readonly id: SearchScope;
-    /** Heading the matches are listed under, and what the chip says. */
-    readonly label: string;
     /** Everything that activates it, first one being the canonical spelling. */
     readonly keywords: readonly string[];
     readonly icon: LucideIcon;
-    /** Shown in the field once the command is on. */
-    readonly placeholder: string;
     /** For a locally answered scope, the resource kind it narrows the index to.
      *  Absent means the scope is a query against the database. */
     readonly resourceKind?: SearchResourceKind;
@@ -51,115 +48,85 @@ export interface SearchScopeDefinition {
 export const SEARCH_SCOPE_LIST: readonly SearchScopeDefinition[] = [
     {
         id: "projects",
-        label: "Projects",
         keywords: ["projects", "project"],
         icon: Boxes,
-        placeholder: "Search deploy projects",
         resourceKind: "project"
     },
     {
         id: "services",
-        label: "Services",
         keywords: ["services", "service", "svc"],
         icon: Rocket,
-        placeholder: "Search services",
         resourceKind: "service"
     },
     {
         id: "databases",
-        label: "Databases",
         keywords: ["databases", "database", "db"],
         icon: Database,
-        placeholder: "Search managed databases",
         resourceKind: "database"
     },
     {
         id: "servers",
-        label: "Servers",
         keywords: ["servers", "server", "hosts", "host"],
         icon: Server,
-        placeholder: "Search servers",
         resourceKind: "server"
     },
     {
         id: "runners",
-        label: "Runners",
         keywords: ["runners", "runner", "pools"],
         icon: Workflow,
-        placeholder: "Search runner pools",
         resourceKind: "runner"
     },
     {
         id: "apps",
-        label: "Installed apps",
         keywords: ["apps", "app", "installed"],
         icon: LayoutGrid,
-        placeholder: "Search installed apps",
         resourceKind: "installed"
     },
     {
         id: "tasks",
-        label: "Tasks",
         keywords: ["tasks", "task", "issues", "issue"],
-        icon: CheckSquare,
-        placeholder: "Search tasks by name or number"
+        icon: CheckSquare
     },
     {
         id: "docs",
-        label: "Pages",
         keywords: ["docs", "doc", "pages", "page"],
-        icon: FileText,
-        placeholder: "Search pages"
+        icon: FileText
     },
     {
         id: "notes",
-        label: "Notes",
         keywords: ["notes", "note"],
-        icon: StickyNote,
-        placeholder: "Search your notes"
+        icon: StickyNote
     },
     {
         id: "users",
-        label: "People",
         keywords: ["users", "user", "people", "person"],
         icon: AtSign,
-        placeholder: "Search people",
         sigil: "@"
     },
     {
         id: "chat",
-        label: "Chat",
         keywords: ["chat"],
-        icon: MessagesSquare,
-        placeholder: "Find people, conversations, channels and messages"
+        icon: MessagesSquare
     },
     {
         id: "contacts",
-        label: "People",
         keywords: ["contacts", "contact", "dm"],
-        icon: UserRound,
-        placeholder: "Find somebody to message"
+        icon: UserRound
     },
     {
         id: "chats",
-        label: "Conversations",
         keywords: ["chats", "conversations", "conversation"],
-        icon: MessageCircle,
-        placeholder: "Find a direct message or a group"
+        icon: MessageCircle
     },
     {
         id: "channels",
-        label: "Channels",
         keywords: ["channels", "channel"],
-        icon: Hash,
-        placeholder: "Find a channel in your spaces"
+        icon: Hash
     },
     {
         id: "messages",
-        label: "Messages",
         keywords: ["messages", "message", "msg"],
-        icon: TextQuote,
-        placeholder: "Find something that was said"
+        icon: TextQuote
     }
 ];
 
@@ -182,4 +149,15 @@ for (const id of SEARCH_SCOPES) {
 export function searchScope(id: SearchScope): SearchScopeDefinition {
     // Every id in the type is in the map, which the loop above guarantees.
     return BY_ID.get(id)!;
+}
+
+/**
+ * A scope's words in the reader's language: the heading its matches are listed
+ * under (and what the chip says), and what the field shows once it is on.
+ */
+export function scopeWords(
+    t: NamespaceTranslator<"components">,
+    id: SearchScope
+): { label: string; placeholder: string } {
+    return { label: t(`search.scopes.${id}.label`), placeholder: t(`search.scopes.${id}.placeholder`) };
 }

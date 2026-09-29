@@ -24,6 +24,7 @@ import deploy from "./deploy.json";
 import system from "./system.json";
 import account from "./account.json";
 import catalog from "./catalog.json";
+import notices from "./notices.json";
 import analytics from "./analytics.json";
 import installed from "./installed.json";
 import reference from "./reference.json";
@@ -79,6 +80,7 @@ export default {
     mailSettings,
     marketplace,
     nav,
+    notices,
     publicPages,
     reference,
     system,

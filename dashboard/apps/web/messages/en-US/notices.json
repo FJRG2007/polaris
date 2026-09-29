@@ -1,0 +1,30 @@
+{
+    "session": {
+        "opened": "Your account was signed in to",
+        "closed": "{count, plural, one {A session was signed out} other {# sessions were signed out}}"
+    },
+    "breach": {
+        "signedOut": "{reason} It has been signed out.",
+        "reasons": {
+            "client": "It was used from a different browser and system than the one it was opened in.",
+            "address": "It was used from a different network address than the one it was opened at."
+        },
+        "device": "Your device",
+        "whoever": "Whoever used it:",
+        "address": "Address",
+        "notRecorded": "not recorded",
+        "location": "Location",
+        "network": "Network",
+        "browser": "Browser and system",
+        "userAgent": "User agent",
+        "localTime": "Their local time",
+        "seenAt": "Seen here at",
+        "advice": "Everything above is what the address and the browser said about themselves. Change your password if you did not recognise any of it.",
+        "title": "A session of yours was used by somebody else"
+    },
+    "test": {
+        "gone": "That destination is switched off or no longer exists.",
+        "title": "Polaris test alert",
+        "body": "If you are reading this, alerts sent here will arrive."
+    }
+}

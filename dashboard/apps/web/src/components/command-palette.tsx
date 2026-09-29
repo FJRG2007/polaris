@@ -28,7 +28,9 @@ import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
 import { Dialog, DialogContent, DialogTitle, Input, SegmentedControl, cn } from "@polaris/ui";
-import { CHAT_SCOPE_FILTERS, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { CHAT_SCOPE_FILTERS, scopeWords, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
 import {
     navigationEntries,
@@ -134,6 +136,8 @@ export function CommandPalette({
 }) {
     const router = useRouter();
     const pathname = usePathname();
+    const t = useTranslations("components");
+    const navLabel = useNavLabel();
     const [open, setOpen] = useState(false);
     /** The scope the panel is to open on, when whatever opened it asked for one. */
     const presetRef = useRef<core.SearchScope | null>(null);
@@ -327,7 +331,7 @@ export function CommandPalette({
                         if (caught instanceof DOMException && caught.name === "AbortError") return;
                         console.error(caught);
                         setHits([]);
-                        setFailure("That search could not be run. Try again in a moment.");
+                        setFailure(t("search.failed"));
                     })
                     .finally(() => {
                         if (!controller.signal.aborted) setSearching(false);
@@ -403,7 +407,7 @@ export function CommandPalette({
         const commands: Row[] = suggestions.map((definition) => ({
             kind: "command",
             id: `command:${definition.id}`,
-            group: "Commands",
+            group: t("search.commands"),
             scope: definition
         }));
 
@@ -420,7 +424,7 @@ export function CommandPalette({
                     found.push({
                         kind: "hit",
                         id: `hit:${hit.scope}:${hit.id}`,
-                        group: mixed ? searchScope(hit.scope).label : scope.label,
+                        group: scopeWords(t, mixed ? hit.scope : scope.id).label,
                         hit
                     });
                 }
@@ -436,7 +440,7 @@ export function CommandPalette({
                     found.push({
                         kind: "entry",
                         id: `entry:${entry.id}`,
-                        group: scope ? scope.label : entry.group,
+                        group: scope ? scopeWords(t, scope.id).label : navLabel(entry.group),
                         entry
                     });
                 }
@@ -455,12 +459,12 @@ export function CommandPalette({
             .map((entry) => ({
                 kind: "recent",
                 id: `recent:${core.recentSearchKey(entry)}`,
-                group: "Recent",
+                group: t("search.recent"),
                 entry
             }));
 
         return [...remembered, ...commands, ...found];
-    }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation]);
+    }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation, t, navLabel]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
@@ -567,8 +571,8 @@ export function CommandPalette({
                     presetRef.current = null;
                     setOpen(true);
                 }}
-                title={`Search (${hint})`}
-                aria-label="Search Polaris"
+                title={t("search.buttonTitle", { hint })}
+                aria-label={t("search.label")}
                 aria-keyshortcuts="Control+K Meta+K"
                 // Below lg the header is already carrying the switcher and a page's
                 // own controls, so the field collapses to its icon rather than
@@ -576,7 +580,9 @@ export function CommandPalette({
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:w-full lg:max-w-sm lg:justify-start lg:gap-2 lg:px-3"
             >
                 <Search className="size-4 shrink-0" aria-hidden="true" />
-                <span className="hidden flex-1 truncate text-left text-sm lg:block">Search</span>
+                <span className="hidden flex-1 truncate text-left text-sm lg:block">
+                    {t("search.button")}
+                </span>
                 <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none lg:block">
                     {hint}
                 </kbd>
@@ -584,7 +590,7 @@ export function CommandPalette({
 
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent showClose={false} className="max-w-xl overflow-hidden p-0">
-                    <DialogTitle className="sr-only">Search Polaris</DialogTitle>
+                    <DialogTitle className="sr-only">{t("search.label")}</DialogTitle>
                     <div className="flex items-center gap-2 border-b border-border px-3">
                         <Search
                             className="size-4 shrink-0 text-muted-foreground"
@@ -593,12 +599,12 @@ export function CommandPalette({
                         {scope && ScopeIcon ? (
                             <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted py-1 pl-2 pr-1 text-xs font-medium">
                                 <ScopeIcon className="size-3.5" aria-hidden="true" />
-                                {scope.label}
+                                {scopeWords(t, scope.id).label}
                                 <button
                                     type="button"
                                     onClick={clearScope}
-                                    title="Search everything again"
-                                    aria-label={`Stop searching ${scope.label}`}
+                                    title={t("search.everything")}
+                                    aria-label={t("search.stop", { scope: scopeWords(t, scope.id).label })}
                                     className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                 >
                                     <X className="size-3" aria-hidden="true" />
@@ -613,13 +619,13 @@ export function CommandPalette({
                             onChange={(event) => onFieldChange(event.target.value)}
                             onKeyDown={onFieldKeyDown}
                             placeholder={
-                                scope ? scope.placeholder : "Search, or type / for commands"
+                                scope ? scopeWords(t, scope.id).placeholder : t("search.placeholder")
                             }
                             enterKeyHint="go"
                             autoCapitalize="none"
                             autoCorrect="off"
                             spellCheck={false}
-                            aria-label={scope ? scope.placeholder : "Search Polaris"}
+                            aria-label={scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
                             // The arrow keys move a highlight through the list
                             // while the caret stays here, so the field has to be
                             // the thing that says which row is current: without
@@ -648,7 +654,7 @@ export function CommandPalette({
                         <div className="border-b border-border px-3 py-2">
                             <SegmentedControl
                                 size="sm"
-                                aria-label="What to find"
+                                aria-label={t("search.what")}
                                 value={scope.id}
                                 onValueChange={(id) => {
                                     setScope(searchScope(id));
@@ -657,7 +663,7 @@ export function CommandPalette({
                                 }}
                                 options={CHAT_SCOPE_FILTERS.map((filter) => ({
                                     value: filter.id,
-                                    label: filter.id === "chat" ? "All" : filter.label
+                                    label: filter.id === "chat" ? t("search.all") : scopeWords(t, filter.id).label
                                 }))}
                             />
                         </div>
@@ -667,7 +673,7 @@ export function CommandPalette({
                         ref={listRef}
                         id="polaris-search-results"
                         role="listbox"
-                        aria-label="Search results"
+                        aria-label={t("search.results")}
                         className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-2"
                     >
                         {/* A column read by scanning it for one match, which is
@@ -686,9 +692,14 @@ export function CommandPalette({
                                 <p className="px-2 py-10 text-center text-sm text-muted-foreground">
                                     {scope
                                         ? trimmed
-                                            ? `No ${scope.label.toLowerCase()} match "${trimmed}".`
-                                            : `Nothing in ${scope.label.toLowerCase()} yet.`
-                                        : `Nothing matches "${trimmed}".`}
+                                            ? t("search.noScopeMatch", {
+                                                  scope: scopeWords(t, scope.id).label.toLowerCase(),
+                                                  query: trimmed
+                                              })
+                                            : t("search.nothingIn", {
+                                                  scope: scopeWords(t, scope.id).label.toLowerCase()
+                                              })
+                                        : t("search.noMatch", { query: trimmed })}
                                 </p>
                             ) : (
                                 groups.map((group) => (
@@ -707,13 +718,13 @@ export function CommandPalette({
                                             >
                                                 {group.label}
                                             </p>
-                                            {group.label === "Recent" && !trimmed ? (
+                                            {group.label === t("search.recent") && !trimmed ? (
                                                 <button
                                                     type="button"
                                                     onClick={forgetAll}
                                                     className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
                                                 >
-                                                    Clear
+                                                    {t("search.clear")}
                                                 </button>
                                             ) : null}
                                         </div>
@@ -753,7 +764,7 @@ export function CommandPalette({
                                                         entry={row.entry}
                                                         scopeLabel={
                                                             row.entry.scope
-                                                                ? searchScope(row.entry.scope).label
+                                                                ? scopeWords(t, row.entry.scope).label
                                                                 : null
                                                         }
                                                         selected={selected}
@@ -783,12 +794,10 @@ export function CommandPalette({
 
                     <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">
                         <span className={cn(scope && "hidden sm:inline")}>
-                            Up and down to move, Enter to open
+                            {t("search.hintMove")}
                         </span>
                         <span>
-                            {scope
-                                ? "Backspace clears the command"
-                                : "Type / for commands, @ for people"}
+                            {scope ? t("search.hintClear") : t("search.hintType")}
                         </span>
                     </div>
                 </DialogContent>

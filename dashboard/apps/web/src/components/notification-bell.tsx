@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Bell, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RelativeTime } from "@/components/relative-time";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { NotificationFace } from "@/components/notifications/notification-face";
@@ -36,6 +37,7 @@ const PREVIEW_COUNT = 8;
 
 export function NotificationBell() {
     const { items, unread, markAllRead, markRead } = useNotificationFeed();
+    const t = useTranslations("components");
     const badge = badgeLabel(unread);
     const [open, setOpen] = useState(false);
     const router = useRouter();
@@ -48,12 +50,8 @@ export function NotificationBell() {
         <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
             <DropdownMenuTrigger
                 className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
-                aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
-                title={
-                    unread > 0
-                        ? `Notifications (${unread} unread). Press twice to open them.`
-                        : "Notifications. Press twice to open them."
-                }
+                aria-label={t("bell.label", { unread })}
+                title={t("bell.title", { unread })}
                 // Straight to the full list, as your own face goes straight to
                 // your own account. The dropdown previews eight; anybody pressing
                 // twice wants the page, and going through a menu to press the
@@ -74,7 +72,7 @@ export function NotificationBell() {
                 and scrolls, while the heading and "View all" stay on screen. */}
             <DropdownMenuContent align="end" className="flex w-80 flex-col">
                 <div className="flex items-center justify-between px-2 py-1.5">
-                    <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                    <DropdownMenuLabel className="p-0">{t("bell.heading")}</DropdownMenuLabel>
                     {unread > 0 ? (
                         <button
                             type="button"
@@ -84,19 +82,19 @@ export function NotificationBell() {
                             }}
                             className="text-xs text-primary hover:underline"
                         >
-                            Mark all read
+                            {t("bell.markAllRead")}
                         </button>
                     ) : null}
                 </div>
                 <DropdownMenuSeparator />
                 {items.length === 0 ? (
                     <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                        You&apos;re all caught up.
+                        {t("bell.empty")}
                     </p>
                 ) : (
                     <div className="max-h-80 min-h-0 overflow-auto overscroll-contain">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
-                            const audience = describeAudience(item.audience, item.audienceLabel);
+                            const audience = describeAudience(item.audience, item.audienceLabel, t);
                             return (
                                 <div key={item.id} className="flex items-start">
                                     <DropdownMenuItem
@@ -135,7 +133,7 @@ export function NotificationBell() {
                                                     </span>
                                                     {item.actionRequired ? (
                                                         <span className="shrink-0 text-warning">
-                                                            Action needed
+                                                            {t("bell.actionNeeded")}
                                                         </span>
                                                     ) : null}
                                                 </span>
@@ -144,8 +142,8 @@ export function NotificationBell() {
                                     </DropdownMenuItem>
                                     {!item.read ? (
                                         <DropdownMenuItem
-                                            aria-label={`Mark "${item.title}" as read`}
-                                            title="Mark as read"
+                                            aria-label={t("bell.markReadNamed", { title: item.title })}
+                                            title={t("bell.markRead")}
                                             // The menu stays open: this is a
                                             // control over the list itself, and
                                             // closing after each one would make
@@ -175,7 +173,7 @@ export function NotificationBell() {
                         href="/account/notifications"
                         className="justify-center text-sm text-muted-foreground"
                     >
-                        View all
+                        {t("bell.viewAll")}
                     </Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>

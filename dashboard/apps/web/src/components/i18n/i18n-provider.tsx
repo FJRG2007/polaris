@@ -18,7 +18,8 @@
 import { useRouter } from "next/navigation";
 import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { UiStringsProvider, type UiStrings } from "@polaris/ui";
+import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale, type Namespaces } from "@polaris/core";
 
 interface I18nState {
@@ -40,7 +41,31 @@ export function I18nProvider({
     children: ReactNode;
 }) {
     const value = useMemo(() => ({ locale, messages }), [locale, messages]);
-    return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+    return (
+        <I18nContext.Provider value={value}>
+            <UiWords>{children}</UiWords>
+        </I18nContext.Provider>
+    );
+}
+
+/** The words `@polaris/ui` draws on its own - a dialog's Cancel, a copy button's
+ *  name - from the `components` catalog every page is handed. */
+function UiWords({ children }: { children: ReactNode }) {
+    const t = useTranslations("components");
+    const strings = useMemo<UiStrings>(() => {
+        const parts = (said: (string | ReactNode)[]) =>
+            said.map((part, index) => <Fragment key={index}>{part}</Fragment>);
+        return {
+            cancel: t("ui.cancel"),
+            deleteTitle: (kind) => t("ui.deleteTitle", { kind }),
+            deleteConfirm: (kind) => t("ui.deleteConfirm", { kind }),
+            deleteQuestion: (name) => parts(t.rich("ui.deleteQuestion", { name })),
+            typeToConfirm: (name) => parts(t.rich("ui.typeToConfirm", { name })),
+            copy: t("ui.copy"),
+            copyNamed: (label) => t("ui.copyNamed", { label })
+        };
+    }, [t]);
+    return <UiStringsProvider strings={strings}>{children}</UiStringsProvider>;
 }
 
 /**

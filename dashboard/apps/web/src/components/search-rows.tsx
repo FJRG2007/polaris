@@ -20,7 +20,8 @@ import { Clock, CornerDownLeft, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
-import { searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { scopeWords, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** What every row is given, whatever it draws inside. */
 export interface RowProps {
@@ -94,12 +95,14 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
 /** A command, offered while its word is being typed. */
 export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDefinition }) {
     const Icon = scope.icon;
+    const t = useTranslations("components");
+    const words = scopeWords(t, scope.id);
     return (
-        <Row {...row} label={`Search ${scope.label}`}>
+        <Row {...row} label={t("search.scopeRow", { scope: words.label })}>
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm" title={scope.placeholder}>
-                    {scope.placeholder}
+                <span className="block truncate text-sm" title={words.placeholder}>
+                    {words.placeholder}
                 </span>
             </span>
             <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none text-muted-foreground">
@@ -187,6 +190,7 @@ export function RecentRow({
     scopeLabel: string | null;
     onForget: () => void;
 }) {
+    const t = useTranslations("components");
     return (
         <Row {...row} label={entry.label}>
             {entry.kind === "result" ? (
@@ -207,8 +211,8 @@ export function RecentRow({
             ) : null}
             <button
                 type="button"
-                title="Remove from recent searches"
-                aria-label={`Remove ${entry.label} from recent searches`}
+                title={t("search.forget")}
+                aria-label={t("search.forgetNamed", { label: entry.label })}
                 onClick={(event) => {
                     // The row underneath opens what it names; this only forgets it.
                     event.stopPropagation();

@@ -325,7 +325,8 @@ function NotificationRow({
     onRemove: () => void;
 }) {
     const t = useTranslations("accountNotifications");
-    const audience = describeAudience(row.audience, row.audienceLabel);
+    const words = useTranslations("components");
+    const audience = describeAudience(row.audience, row.audienceLabel, words);
     const label = eventLabel(t, row.type);
 
     return (

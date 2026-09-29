@@ -19,6 +19,7 @@ import { sendSms } from "./sms-service";
 import { sendWebhook } from "./webhook-sender";
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
+import { wordsFor } from "./notice-words";
 import { getNotificationPreferences } from "./preferences";
 import { createNotification, type NotificationAudience } from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
@@ -285,10 +286,11 @@ export async function notify(input: NotifyInput): Promise<void> {
  */
 export async function testDestination(userId: string, destinationId: string): Promise<{ error?: string }> {
     const destination = await resolveDestination(userId, destinationId);
-    if (!destination) return { error: "That destination is switched off or no longer exists." };
+    const t = await wordsFor(userId, "notices");
+    if (!destination) return { error: t("test.gone") };
 
-    const title = "Polaris test alert";
-    const body = "If you are reading this, alerts sent here will arrive.";
+    const title = t("test.title");
+    const body = t("test.body");
     const result =
         destination.kind === "sms"
             ? await sendSms(userId, destination.target, `${title}: ${body}`)

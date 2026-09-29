@@ -11,6 +11,7 @@
 import { Avatar } from "@/components/avatar";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const presence = vi.hoisted(() => ({ value: { status: "online", inCall: "call-1" } as unknown }));
 
@@ -27,27 +28,27 @@ afterEach(() => {
 
 describe("a face outside a call", () => {
     it("still says its owner is on a call", () => {
-        render(<Avatar person={PERSON} size={40} />);
+        render(<Avatar person={PERSON} size={40} />, { wrapper: MessagesWrapper });
         expect(screen.getByLabelText("On a call you can join")).toBeTruthy();
     });
 });
 
 describe("a face inside a call", () => {
     it("says nothing when they can be heard", () => {
-        render(<Avatar person={PERSON} size={40} callBadge={null} />);
+        render(<Avatar person={PERSON} size={40} callBadge={null} />, { wrapper: MessagesWrapper });
         expect(screen.queryByLabelText("On a call you can join")).toBeNull();
         expect(screen.queryByLabelText("Microphone off")).toBeNull();
         expect(screen.queryByLabelText("Not listening")).toBeNull();
     });
 
     it("says their microphone is off", () => {
-        render(<Avatar person={PERSON} size={40} callBadge="muted" />);
+        render(<Avatar person={PERSON} size={40} callBadge="muted" />, { wrapper: MessagesWrapper });
         expect(screen.getByLabelText("Microphone off")).toBeTruthy();
         expect(screen.queryByLabelText("On a call you can join")).toBeNull();
     });
 
     it("says they are not listening, in place of the microphone", () => {
-        render(<Avatar person={PERSON} size={40} callBadge="deafened" />);
+        render(<Avatar person={PERSON} size={40} callBadge="deafened" />, { wrapper: MessagesWrapper });
         expect(screen.getByLabelText("Not listening")).toBeTruthy();
         expect(screen.queryByLabelText("Microphone off")).toBeNull();
     });

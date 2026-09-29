@@ -32,6 +32,7 @@ import { Button } from "./button";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./dialog";
+import { useUiStrings, type UiStrings } from "../lib/ui-strings";
 
 export interface ConfirmDeleteDialogProps {
     open: boolean;
@@ -65,6 +66,8 @@ export interface ConfirmDeleteDialogProps {
     error?: string | null;
     pending?: boolean;
     onConfirm: () => void;
+    /** Its own words, over the ones the page provides (`UiStringsProvider`). */
+    strings?: Partial<UiStrings>;
 }
 
 export function ConfirmDeleteDialog({
@@ -82,8 +85,10 @@ export function ConfirmDeleteDialog({
     confirmDisabled = false,
     error,
     pending = false,
-    onConfirm
+    onConfirm,
+    strings
 }: ConfirmDeleteDialogProps) {
+    const words = { ...useUiStrings(), ...strings };
     const [typed, setTyped] = useState("");
     const fieldId = useId();
 
@@ -103,7 +108,7 @@ export function ConfirmDeleteDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <TriangleAlert className="size-4 text-danger" />
-                        {title ?? `Delete ${kind}`}
+                        {title ?? words.deleteTitle(kind)}
                     </DialogTitle>
                     {description ? <DialogDescription>{description}</DialogDescription> : null}
                 </DialogHeader>
@@ -117,16 +122,12 @@ export function ConfirmDeleteDialog({
                         </p>
                     ) : !requireTyping ? (
                         <p className="text-sm text-muted-foreground">
-                            {question ?? (
-                                <>
-                                    Delete <span className="font-medium text-foreground">{name}</span>?
-                                </>
-                            )}
+                            {question ?? words.deleteQuestion(<span className="font-medium text-foreground">{name}</span>)}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1.5" htmlFor={fieldId}>
                             <span className="text-xs text-muted-foreground">
-                                Type <span className="font-medium text-foreground">{name}</span> to confirm.
+                                {words.typeToConfirm(<span className="font-medium text-foreground">{name}</span>)}
                             </span>
                             <Input
                                 id={fieldId}
@@ -146,11 +147,11 @@ export function ConfirmDeleteDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
-                            Cancel
+                            {words.cancel}
                         </Button>
                         <Button variant="danger" onClick={onConfirm} disabled={!ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            {confirmLabel ?? `Delete ${kind}`}
+                            {confirmLabel ?? words.deleteConfirm(kind)}
                         </Button>
                     </div>
                 </div>

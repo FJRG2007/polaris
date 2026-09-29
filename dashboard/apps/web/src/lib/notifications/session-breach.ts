@@ -20,7 +20,8 @@
 import { notify } from "./dispatch";
 import { resolveGeo } from "@/lib/geo-service";
 import { describeClient } from "@polaris/core";
-import { BREACH_REASONS, type BindingBreach } from "@polaris/core";
+import type { BindingBreach } from "@polaris/core";
+import { wordsFor } from "./notice-words";
 
 const SESSIONS_HREF = "/account/sessions";
 
@@ -82,21 +83,23 @@ export async function notifySessionCompromised(input: {
         const geo = report.ip ? await resolveGeo(report.ip).catch(() => null) : null;
 
         const place = [geo?.city, geo?.region, geo?.country].filter(Boolean).join(", ");
+        // In the words of the account it happened to, not of the request that noticed.
+        const t = await wordsFor(input.userId, "notices");
         const body = [
-            `${BREACH_REASONS[report.breach]} It has been signed out.`,
+            t("breach.signedOut", { reason: t(`breach.reasons.${report.breach}`) }),
             "",
-            line("Your device", report.device),
+            line(t("breach.device"), report.device),
             "",
-            "Whoever used it:",
-            line("Address", report.ip ?? "not recorded"),
-            line("Location", place || null),
-            line("Network", geo?.network),
-            line("Browser and system", client.label === "Unknown device" ? null : client.label),
-            line("User agent", report.userAgent),
-            line("Their local time", localTime(report.at, geo?.timeZone ?? null)),
-            line("Seen here at", report.at.toISOString()),
+            t("breach.whoever"),
+            line(t("breach.address"), report.ip ?? t("breach.notRecorded")),
+            line(t("breach.location"), place || null),
+            line(t("breach.network"), geo?.network),
+            line(t("breach.browser"), client.label === "Unknown device" ? null : client.label),
+            line(t("breach.userAgent"), report.userAgent),
+            line(t("breach.localTime"), localTime(report.at, geo?.timeZone ?? null)),
+            line(t("breach.seenAt"), report.at.toISOString()),
             "",
-            "Everything above is what the address and the browser said about themselves. Change your password if you did not recognise any of it."
+            t("breach.advice")
         ]
             .filter((entry) => entry !== null)
             .join("\n");
@@ -104,7 +107,7 @@ export async function notifySessionCompromised(input: {
         await notify({
             userId: input.userId,
             event: "account.session.compromised",
-            title: "A session of yours was used by somebody else",
+            title: t("breach.title"),
             body,
             href: SESSIONS_HREF,
             actionRequired: true,

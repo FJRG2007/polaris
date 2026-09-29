@@ -26,26 +26,6 @@ export const NOTICE_KINDS = ["calls", "messages", "mail", "alerts"] as const;
 
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
 
-/** What each one is called, and what it actually covers. */
-export const NOTICE_LABEL: Record<NoticeKind, { title: string; hint: string }> = {
-    calls: {
-        title: "Calls",
-        hint: "Somebody calling you. The one that rings."
-    },
-    messages: {
-        title: "Chat messages",
-        hint: "A message in a conversation you follow, while you are on another tab."
-    },
-    mail: {
-        title: "Mail",
-        hint: "Something arriving in a mailbox you read here."
-    },
-    alerts: {
-        title: "Everything else",
-        hint: "A finished build, a server that stopped, anything the bell would carry."
-    }
-};
-
 const KEY = "polaris.notices";
 
 /** Raised at the window when a switch moves, so a card and a live connection in

@@ -99,8 +99,7 @@ const requested = new Set<string>();
 export function preloadAvatars(people: readonly AvatarPerson[]): void {
     if (typeof window === "undefined") return;
     for (const person of people) {
-        const t = useTranslations("components");
-    const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
+        const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
         if (!source || requested.has(source)) continue;
         requested.add(source);
         const picture = new window.Image();
@@ -191,6 +190,7 @@ export function Avatar({
      */
     status?: boolean;
 }) {
+    const t = useTranslations("components");
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
     // Nothing is asked when the caller has already answered - and a guest has no
     // id to ask about in the first place.

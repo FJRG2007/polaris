@@ -14,6 +14,8 @@
  */
 
 import * as core from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { searchMessages } from "@/lib/chat/search";
 import { searchForConversation } from "@/lib/chat/access";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -44,34 +46,35 @@ export async function chatLookup(
     query: string
 ): Promise<ChatHit[]> {
     const term = query.trim();
+    const t = await readerWords("components");
     // Read once however many kinds ask for it.
     let held: Promise<ChatChannelView[]> | null = null;
     const rail = () => (held ??= listChannels(actor));
 
-    if (scope === "contacts") return people(actor, term, ONE_KIND);
-    if (scope === "messages") return messages(actor, term, ONE_KIND);
-    if (scope === "chats") return conversations(rail, term, ONE_KIND);
-    if (scope === "channels") return channels(actor, rail, term, ONE_KIND);
+    if (scope === "contacts") return people(actor, term, ONE_KIND, t);
+    if (scope === "messages") return messages(actor, term, ONE_KIND, t);
+    if (scope === "chats") return conversations(rail, term, ONE_KIND, t);
+    if (scope === "channels") return channels(actor, rail, term, ONE_KIND, t);
 
     // All four. With nothing typed only the recent conversations are worth
     // listing: every person and every message is not an answer to anything.
-    if (!term) return conversations(rail, term, ONE_KIND);
+    if (!term) return conversations(rail, term, ONE_KIND, t);
     const [found, chats, rooms, said] = await Promise.all([
-        people(actor, term, EACH_KIND),
-        conversations(rail, term, EACH_KIND),
-        channels(actor, rail, term, EACH_KIND),
-        messages(actor, term, EACH_KIND)
+        people(actor, term, EACH_KIND, t),
+        conversations(rail, term, EACH_KIND, t),
+        channels(actor, rail, term, EACH_KIND, t),
+        messages(actor, term, EACH_KIND, t)
     ]);
     return [...found, ...chats, ...rooms, ...said];
 }
 
-async function people(actor: { id: string }, term: string, limit: number): Promise<ChatHit[]> {
+async function people(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
     const { people: found } = await searchForConversation(actor, term, limit);
     return found.map((person) => ({
         id: person.id,
         scope: "contacts",
         label: person.name,
-        detail: "Message",
+        detail: t("search.hits.message"),
         href: directHref(person.id)
     }));
 }
@@ -89,8 +92,9 @@ function byRecent(left: ChatChannelView, right: ChatChannelView): number {
 }
 
 type Rail = () => Promise<ChatChannelView[]>;
+type Words = NamespaceTranslator<"components">;
 
-async function conversations(rail: Rail, term: string, limit: number): Promise<ChatHit[]> {
+async function conversations(rail: Rail, term: string, limit: number, t: Words): Promise<ChatHit[]> {
     const needle = term.toLowerCase();
     return (await rail())
         .filter(
@@ -105,8 +109,8 @@ async function conversations(rail: Rail, term: string, limit: number): Promise<C
             label:
                 channel.name ||
                 channel.others.map((other) => other.name).join(", ") ||
-                "Direct message",
-            detail: channel.kind === "group" ? "Group" : "Direct message",
+                t("search.hits.direct"),
+            detail: channel.kind === "group" ? t("search.hits.group") : t("search.hits.direct"),
             href: `/chat/c/${channel.id}`
         }));
 }
@@ -115,7 +119,8 @@ async function channels(
     actor: { id: string },
     rail: Rail,
     term: string,
-    limit: number
+    limit: number,
+    t: Words
 ): Promise<ChatHit[]> {
     // Every channel in every space is not an answer to an empty box.
     if (!term) return [];
@@ -132,7 +137,7 @@ async function channels(
             scope: "channels",
             label: channel.name,
             detail: [
-                channel.kind === "voice" ? "Voice" : null,
+                channel.kind === "voice" ? t("search.hits.voice") : null,
                 spaceNames.get(channel.spaceId!) ?? null
             ]
                 .filter(Boolean)
@@ -141,14 +146,17 @@ async function channels(
         }));
 }
 
-async function messages(actor: { id: string }, term: string, limit: number): Promise<ChatHit[]> {
+async function messages(actor: { id: string }, term: string, limit: number, t: Words): Promise<ChatHit[]> {
     if (!term) return [];
     const hits = await searchMessages(actor, core.chatSearchSchema.parse({ term }));
     return hits.slice(0, limit).map((hit) => ({
         id: hit.message.id,
         scope: "messages",
-        label: plainExcerpt(hit.message.body, 120) || "Attachment",
-        detail: [hit.message.authorName, hit.channelName].filter(Boolean).join(" in "),
+        label: plainExcerpt(hit.message.body, 120) || t("search.hits.attachment"),
+        detail:
+            hit.message.authorName && hit.channelName
+                ? t("search.hits.saidIn", { author: hit.message.authorName, channel: hit.channelName })
+                : hit.message.authorName || hit.channelName || "",
         href: `/chat/c/${hit.channelId}/${hit.message.id}`
     }));
 }

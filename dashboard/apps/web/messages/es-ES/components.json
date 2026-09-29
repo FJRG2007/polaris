@@ -1,6 +1,6 @@
 {
     "actions": {
-        "ok": "Aceptar",
+        "ok": "Vale",
         "confirm": "Confirmar",
         "tryAgain": "Reintentar",
         "dismiss": "Descartar",
@@ -9,13 +9,13 @@
     "activity": {
         "heading": {
             "spotify": "Escuchando Spotify",
-            "minecraft": "Jugando en un servidor de aquÃ­",
+            "minecraft": "Jugando en un servidor local",
             "playing": "Jugando"
         },
         "by": "de {artist}",
         "on": "en {album}",
         "elapsed": "{time} transcurrido",
-        "trackPosition": "PosiciÃ³n de la canciÃ³n"
+        "trackPosition": "Posición"
     },
     "activityTable": {
         "when": "CuÃ¡ndo",
@@ -35,8 +35,8 @@
     "avatar": {
         "openPhoto": "Abrir la foto de {name}",
         "notListening": "No escucha",
-        "microphoneOff": "MicrÃ³fono desactivado",
-        "onCall": "En una llamada a la que puedes unirte"
+        "microphoneOff": "Sin micrófono",
+        "onCall": "En una llamada abierta"
     },
     "denied": {
         "notice": "Esa pÃ¡gina no estÃ¡ abierta para tu rol. Tu acceso empieza aquÃ­."
@@ -45,15 +45,15 @@
         "invalid": "Esto no es un JSON vÃ¡lido."
     },
     "linkPassword": {
-        "title": "Se necesita contraseÃ±a",
+        "title": "Contraseña necesaria",
         "description": "Este enlace estÃ¡ protegido. Escribe su contraseÃ±a para continuar.",
         "label": "ContraseÃ±a",
         "cooldown": "Demasiados intentos. Vuelve a intentarlo en {seconds} s.",
         "checking": "Comprobando...",
-        "unlock": "Desbloquear"
+        "unlock": "Abrir"
     },
     "messageToasts": {
-        "markRead": "Marcar como leÃ­do",
+        "markRead": "Marcar leído",
         "notSent": "No se ha podido enviar",
         "replyNotSent": "Tu respuesta no se ha enviado",
         "inChannel": "{author} en {channel}",
@@ -71,11 +71,136 @@
         "upload": "Subir"
     },
     "errors": {
-        "unreachable": "No se ha podido contactar con el servidor"
+        "unreachable": "Servidor inaccesible"
     },
     "publicShell": {
         "open": "Abrir Polaris",
-        "signIn": "Iniciar sesiÃ³n",
+        "signIn": "Entrar",
         "unavailable": "Enlace no disponible"
+    },
+    "ui": {
+        "cancel": "Cancelar",
+        "deleteTitle": "{kind, select, other {Eliminar}}",
+        "deleteConfirm": "{kind, select, other {Eliminar}}",
+        "deleteQuestion": "¿Eliminar {name}?",
+        "typeToConfirm": "Escribe {name} para confirmar.",
+        "copy": "Copiar",
+        "copyNamed": "Copiar {label}"
+    },
+    "bell": {
+        "label": "{unread, plural, =0 {Notificaciones} one {Notificaciones (# sin leer)} other {Notificaciones (# sin leer)}}",
+        "title": "{unread, plural, =0 {Notificaciones. Pulsa dos veces para abrirlas.} other {Notificaciones (# sin leer). Pulsa dos veces para abrirlas.}}",
+        "heading": "Notificaciones",
+        "markAllRead": "Todo leído",
+        "empty": "Estás al día.",
+        "actionNeeded": "Requiere acción",
+        "markReadNamed": "Marcar \"{title}\" como leída",
+        "markRead": "Marcar leída",
+        "viewAll": "Ver todas"
+    },
+    "audience": {
+        "admins": "Administración",
+        "adminsHint": "Enviada a cada administrador",
+        "everyone": "Tú y otros",
+        "everyoneHint": "Enviada a más de una persona",
+        "groupNamedHint": "Enviada al grupo {label}",
+        "group": "Un grupo",
+        "groupHint": "Enviada a un grupo al que perteneces",
+        "you": "Tú",
+        "youHint": "Enviada solo a ti"
+    },
+    "search": {
+        "commands": "Comandos",
+        "recent": "Recientes",
+        "buttonTitle": "Buscar ({hint})",
+        "label": "Buscar en Polaris",
+        "button": "Buscar",
+        "everything": "Volver a buscar en todo",
+        "stop": "Dejar de buscar en {scope}",
+        "placeholder": "Busca, o escribe / para comandos",
+        "what": "Qué buscar",
+        "all": "Todo",
+        "results": "Resultados",
+        "noScopeMatch": "Nada en {scope} coincide con \"{query}\".",
+        "nothingIn": "Todavía no hay nada en {scope}.",
+        "noMatch": "Nada coincide con \"{query}\".",
+        "clear": "Borrar",
+        "hintMove": "Arriba y abajo para moverte, Intro para abrir",
+        "hintClear": "Retroceso borra el comando",
+        "hintType": "Escribe / para comandos, @ para personas",
+        "scopeRow": "Buscar en {scope}",
+        "forget": "Quitar de las búsquedas recientes",
+        "forgetNamed": "Quitar {label} de las búsquedas recientes",
+        "failed": "No se pudo hacer esa búsqueda. Inténtalo de nuevo en un momento.",
+        "scopes": {
+            "projects": {
+                "label": "Proyectos",
+                "placeholder": "Buscar proyectos"
+            },
+            "services": {
+                "label": "Servicios",
+                "placeholder": "Buscar servicios"
+            },
+            "databases": {
+                "label": "Bases de datos",
+                "placeholder": "Buscar bases de datos"
+            },
+            "servers": {
+                "label": "Servidores",
+                "placeholder": "Buscar servidores"
+            },
+            "runners": {
+                "label": "Runners",
+                "placeholder": "Buscar grupos de runners"
+            },
+            "apps": {
+                "label": "Apps instaladas",
+                "placeholder": "Buscar apps instaladas"
+            },
+            "tasks": {
+                "label": "Tareas",
+                "placeholder": "Buscar tareas por nombre o número"
+            },
+            "docs": {
+                "label": "Páginas",
+                "placeholder": "Buscar páginas"
+            },
+            "notes": {
+                "label": "Notas",
+                "placeholder": "Buscar en tus notas"
+            },
+            "users": {
+                "label": "Personas",
+                "placeholder": "Buscar personas"
+            },
+            "chat": {
+                "label": "Chat",
+                "placeholder": "Buscar personas, conversaciones, canales y mensajes"
+            },
+            "contacts": {
+                "label": "Personas",
+                "placeholder": "Buscar a quién escribir"
+            },
+            "chats": {
+                "label": "Conversaciones",
+                "placeholder": "Buscar un mensaje directo o un grupo"
+            },
+            "channels": {
+                "label": "Canales",
+                "placeholder": "Buscar un canal en tus espacios"
+            },
+            "messages": {
+                "label": "Mensajes",
+                "placeholder": "Buscar algo que se dijo"
+            }
+        },
+        "hits": {
+            "message": "Escribir",
+            "direct": "Mensaje directo",
+            "group": "Grupo",
+            "voice": "Voz",
+            "attachment": "Adjunto",
+            "saidIn": "{author} en {channel}"
+        }
     }
 }

@@ -5,6 +5,7 @@
 
 import { AlertTriangle, CheckCheck, Info, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { NotificationAudience, NotificationLevel } from "@/lib/notification-service";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** Icon and accent color for a notification's severity. */
 export function levelStyle(level: NotificationLevel, type: string): { Icon: LucideIcon; color: string } {
@@ -20,14 +21,15 @@ export function levelStyle(level: NotificationLevel, type: string): { Icon: Luci
  */
 export function describeAudience(
     audience: NotificationAudience,
-    label: string | null
+    label: string | null,
+    t: NamespaceTranslator<"components">
 ): { text: string; hint: string } {
-    if (audience === "admins") return { text: "Admins", hint: "Sent to every administrator" };
-    if (audience === "everyone") return { text: "You and others", hint: "Sent to more than one person" };
+    if (audience === "admins") return { text: t("audience.admins"), hint: t("audience.adminsHint") };
+    if (audience === "everyone") return { text: t("audience.everyone"), hint: t("audience.everyoneHint") };
     if (audience === "group") {
         return label
-            ? { text: label, hint: `Sent to the ${label} group` }
-            : { text: "A group", hint: "Sent to a group you belong to" };
+            ? { text: label, hint: t("audience.groupNamedHint", { label }) }
+            : { text: t("audience.group"), hint: t("audience.groupHint") };
     }
-    return { text: "You", hint: "Sent only to you" };
+    return { text: t("audience.you"), hint: t("audience.youHint") };
 }

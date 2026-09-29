@@ -9,6 +9,7 @@ import { openSearch } from "@/lib/search/open-search";
 import { CommandPalette } from "@/components/command-palette";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const push = vi.fn();
 let pathname = "/chat";
@@ -91,7 +92,7 @@ function lookups(): string[] {
 
 describe("opened from Chat", () => {
     it("is narrowed to Chat, groups each kind, and filters without losing the words", async () => {
-        render(<CommandPalette appIds={[]} />);
+        render(<CommandPalette appIds={[]} />, { wrapper: MessagesWrapper });
         act(() => openSearch("chat"));
 
         const field = await screen.findByRole("combobox");
@@ -114,7 +115,7 @@ describe("opened from Chat", () => {
     });
 
     it("is Chat's switcher on Ctrl+K inside Chat, and the whole search elsewhere", async () => {
-        render(<CommandPalette appIds={[]} />);
+        render(<CommandPalette appIds={[]} />, { wrapper: MessagesWrapper });
         fireEvent.keyDown(window, { key: "k", ctrlKey: true });
         await screen.findByRole("combobox");
         expect(screen.getByRole("radiogroup", { name: "What to find" })).toBeTruthy();
@@ -123,14 +124,14 @@ describe("opened from Chat", () => {
 
         pathname = "/tasks";
         cleanup();
-        render(<CommandPalette appIds={[]} />);
+        render(<CommandPalette appIds={[]} />, { wrapper: MessagesWrapper });
         fireEvent.keyDown(window, { key: "k", ctrlKey: true });
         await screen.findByRole("combobox");
         expect(screen.queryByRole("radiogroup", { name: "What to find" })).toBeNull();
     });
 
     it("ignores a request for a scope that does not exist", async () => {
-        render(<CommandPalette appIds={[]} />);
+        render(<CommandPalette appIds={[]} />, { wrapper: MessagesWrapper });
         act(() => {
             window.dispatchEvent(
                 new CustomEvent("polaris:open-search", { detail: { scope: "everything" } })
