@@ -27,7 +27,12 @@ export function versionText(version: catalog.Version | undefined): string | null
 }
 
 /** A target in its unit, formatted for the reader. */
-export function targetText(t: ChallengesT, template: catalog.Template, value: number, language: PanelLanguage): string {
+export function targetText(
+    t: ChallengesT,
+    template: catalog.Template,
+    value: number,
+    language: PanelLanguage
+): string {
     const shown = catalog.formatNumber(catalog.inUnit(template, value), language);
     return t(`unit.${template.unit}`, { value: shown });
 }
@@ -53,14 +58,16 @@ export function ChallengeExplained({
         const value = catalog.baseTarget(template, "daily", tier);
         return t("catalogue.targetAt", {
             tier: tierName(t, "daily", tier),
-            value: value === null ? t("catalogue.noTarget") : targetText(t, template, value, language)
+            value:
+                value === null ? t("catalogue.noTarget") : targetText(t, template, value, language)
         });
     });
     const weekly = catalog.DIFFICULTIES.map((tier) => {
         const value = catalog.baseTarget(template, "weekly", tier);
         return t("catalogue.targetAt", {
             tier: tierName(t, "weekly", tier),
-            value: value === null ? t("catalogue.noTarget") : targetText(t, template, value, language)
+            value:
+                value === null ? t("catalogue.noTarget") : targetText(t, template, value, language)
         });
     });
     const card = catalog.baseTarget(template, "card", "hard");
@@ -82,26 +89,44 @@ export function ChallengeExplained({
             </p>
             {template.layers.includes("daily") && (
                 <p className="text-muted-foreground">
-                    {t("catalogue.targetsIn", { layer: t("layer.daily"), targets: targets.join(" - ") })}
+                    {t("catalogue.targetsIn", {
+                        layer: t("layer.daily"),
+                        targets: targets.join(" - ")
+                    })}
                 </p>
             )}
             {template.layers.includes("weekly") && (
                 <p className="text-muted-foreground">
-                    {t("catalogue.targetsIn", { layer: t("layer.weekly"), targets: weekly.join(" - ") })}
+                    {t("catalogue.targetsIn", {
+                        layer: t("layer.weekly"),
+                        targets: weekly.join(" - ")
+                    })}
                 </p>
             )}
             {card !== null && (
                 <p className="text-muted-foreground">
-                    {t("catalogue.targetsIn", { layer: t("layer.card"), targets: targetText(t, template, card, language) })}
+                    {t("catalogue.targetsIn", {
+                        layer: t("layer.card"),
+                        targets: targetText(t, template, card, language)
+                    })}
                 </p>
             )}
             {community !== null && (
                 <p className="text-muted-foreground">
-                    {t("catalogue.targetsIn", { layer: t("layer.community"), targets: t("catalogue.perPlayer", { value: targetText(t, template, community, language) }) })}
+                    {t("catalogue.targetsIn", {
+                        layer: t("layer.community"),
+                        targets: t("catalogue.perPlayer", {
+                            value: targetText(t, template, community, language)
+                        })
+                    })}
                 </p>
             )}
-            {version && <p className="text-muted-foreground">{t("catalogue.needs", { version })}</p>}
-            {template.uncertain && <p className="text-muted-foreground">{t("catalogue.uncertain")}</p>}
+            {version && (
+                <p className="text-muted-foreground">{t("catalogue.needs", { version })}</p>
+            )}
+            {template.uncertain && (
+                <p className="text-muted-foreground">{t("catalogue.uncertain")}</p>
+            )}
         </div>
     );
 }
@@ -135,7 +160,9 @@ export function PayoutEditor({
                             max={10000}
                             disabled={locked}
                             value={Number.isFinite(value.points) ? value.points : ""}
-                            onChange={(event) => onChange({ ...value, points: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, points: numberOf(event.target.value) })
+                            }
                         />
                     </label>
                 )}
@@ -147,11 +174,18 @@ export function PayoutEditor({
                         max={100}
                         disabled={locked}
                         value={Number.isFinite(value.levels) ? value.levels : ""}
-                        onChange={(event) => onChange({ ...value, levels: numberOf(event.target.value) })}
+                        onChange={(event) =>
+                            onChange({ ...value, levels: numberOf(event.target.value) })
+                        }
                     />
                 </label>
             </div>
-            <ItemsEditor items={value.items} onChange={(items) => onChange({ ...value, items })} t={t} locked={locked} />
+            <ItemsEditor
+                items={value.items}
+                onChange={(items) => onChange({ ...value, items })}
+                t={t}
+                locked={locked}
+            />
         </div>
     );
 }
@@ -178,7 +212,11 @@ export function ItemsEditor({
                         aria-label={t("rewards.item")}
                         disabled={locked}
                         onChange={(event) =>
-                            onChange(items.map((one, at) => (at === index ? { ...one, id: event.target.value } : one)))
+                            onChange(
+                                items.map((one, at) =>
+                                    at === index ? { ...one, id: event.target.value } : one
+                                )
+                            )
                         }
                     />
                     <ui.Input
@@ -190,7 +228,13 @@ export function ItemsEditor({
                         disabled={locked}
                         value={Number.isFinite(item.count) ? item.count : ""}
                         onChange={(event) =>
-                            onChange(items.map((one, at) => (at === index ? { ...one, count: numberOf(event.target.value) } : one)))
+                            onChange(
+                                items.map((one, at) =>
+                                    at === index
+                                        ? { ...one, count: numberOf(event.target.value) }
+                                        : one
+                                )
+                            )
                         }
                     />
                     <ui.Button
@@ -222,12 +266,28 @@ export function ItemsEditor({
 }
 
 /** A progress bar for a challenge in a table. */
-export function Progress({ value, max, done, voided }: { value: number; max: number; done: boolean; voided?: boolean }) {
+export function Progress({
+    value,
+    max,
+    done,
+    voided
+}: {
+    value: number;
+    max: number;
+    done: boolean;
+    voided?: boolean;
+}) {
     const share = max > 0 ? Math.min(1, value / max) : 0;
     return (
-        <span className="inline-block h-1.5 w-12 overflow-hidden rounded-full bg-muted align-middle" aria-hidden="true">
+        <span
+            className="inline-block h-1.5 w-12 overflow-hidden rounded-full bg-muted align-middle"
+            aria-hidden="true"
+        >
             <span
-                className={ui.cn("block h-full rounded-full", voided ? "bg-danger" : done ? "bg-success" : "bg-primary")}
+                className={ui.cn(
+                    "block h-full rounded-full",
+                    voided ? "bg-danger" : done ? "bg-success" : "bg-primary"
+                )}
                 style={{ width: `${Math.round((voided ? 1 : share) * 100)}%` }}
             />
         </span>
@@ -236,10 +296,20 @@ export function Progress({ value, max, done, voided }: { value: number; max: num
 
 function instanceTitle(instance: InstanceView, language: PanelLanguage): string {
     const template = catalog.templateOf(instance.template);
-    return template ? catalog.titleOf(template, instance.variant, instance.target, language) : instance.template;
+    return template
+        ? catalog.titleOf(template, instance.variant, instance.target, language)
+        : instance.template;
 }
 
-function InstanceBars({ instances, t, language }: { instances: readonly InstanceView[]; t: ChallengesT; language: PanelLanguage }) {
+function InstanceBars({
+    instances,
+    t,
+    language
+}: {
+    instances: readonly InstanceView[];
+    t: ChallengesT;
+    language: PanelLanguage;
+}) {
     if (instances.length === 0) return <span className="text-foreground-subtle">-</span>;
     return (
         <span className="flex items-center gap-1">
@@ -247,12 +317,21 @@ function InstanceBars({ instances, t, language }: { instances: readonly Instance
                 const template = catalog.templateOf(instance.template);
                 const label = t("players.progress", {
                     title: instanceTitle(instance, language),
-                    progress: template ? targetText(t, template, instance.progress, language) : instance.progress,
-                    target: template ? targetText(t, template, instance.target, language) : instance.target
+                    progress: template
+                        ? targetText(t, template, instance.progress, language)
+                        : instance.progress,
+                    target: template
+                        ? targetText(t, template, instance.target, language)
+                        : instance.target
                 });
                 return (
                     <span key={index} title={label} aria-label={label}>
-                        <Progress value={instance.progress} max={instance.target} done={instance.done} voided={instance.voided} />
+                        <Progress
+                            value={instance.progress}
+                            max={instance.target}
+                            done={instance.done}
+                            voided={instance.voided}
+                        />
                     </span>
                 );
             })}
@@ -277,7 +356,8 @@ export function PlayersTable({
     dateTime: (at: number) => string;
 }) {
     const [open, setOpen] = useState<string | null>(null);
-    if (rows.length === 0) return <p className="text-sm text-muted-foreground">{t("players.none")}</p>;
+    if (rows.length === 0)
+        return <p className="text-sm text-muted-foreground">{t("players.none")}</p>;
     return (
         <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
@@ -302,7 +382,9 @@ export function PlayersTable({
                             language={language}
                             locked={locked}
                             open={open === row.name}
-                            onToggle={() => setOpen((current) => (current === row.name ? null : row.name))}
+                            onToggle={() =>
+                                setOpen((current) => (current === row.name ? null : row.name))
+                            }
                             onReset={() => onReset(row.name)}
                             dateTime={dateTime}
                         />
@@ -343,24 +425,42 @@ function PlayerLine({
                         aria-expanded={open}
                         onClick={onToggle}
                     >
-                        {open ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
-                        <span className="truncate" title={row.name}>{row.name}</span>
+                        {open ? (
+                            <ChevronDown className="size-3.5 shrink-0" />
+                        ) : (
+                            <ChevronRight className="size-3.5 shrink-0" />
+                        )}
+                        <span className="truncate" title={row.name}>
+                            {row.name}
+                        </span>
                     </button>
-                    {row.titles.length > 0 && <p className="text-xs text-muted-foreground">{row.titles[row.titles.length - 1]}</p>}
+                    {row.titles.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            {row.titles[row.titles.length - 1]}
+                        </p>
+                    )}
                 </td>
                 <td className="py-1.5 pr-3">
                     <InstanceBars instances={row.daily} t={t} language={language} />
-                    {row.backlog.length > 0 && <span className="text-xs text-muted-foreground">{t("players.backlog", { count: row.backlog.length })}</span>}
+                    {row.backlog.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                            {t("players.backlog", { count: row.backlog.length })}
+                        </span>
+                    )}
                 </td>
                 <td className="py-1.5 pr-3">
                     <InstanceBars instances={row.weekly} t={t} language={language} />
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums">{t("players.cardDone", { done: row.cardDone, total: 9 })}</td>
+                <td className="py-1.5 pr-3 tabular-nums">
+                    {t("players.cardDone", { done: row.cardDone, total: 9 })}
+                </td>
                 <td className="py-1.5 pr-3 tabular-nums">
                     {t("season.tierPoints", { tier: row.tier, points: row.points })}
                 </td>
                 <td className="py-1.5 pr-3 tabular-nums">{row.streak}</td>
-                <td className="py-1.5 pr-3 text-xs text-muted-foreground">{row.lastSeenAt ? dateTime(row.lastSeenAt) : t("players.never")}</td>
+                <td className="py-1.5 pr-3 text-xs text-muted-foreground">
+                    {row.lastSeenAt ? dateTime(row.lastSeenAt) : t("players.never")}
+                </td>
                 <td className="py-1.5 text-right">
                     <ui.Button
                         variant="ghost"
@@ -381,21 +481,48 @@ function PlayerLine({
                             {all.map((instance, index) => {
                                 const template = catalog.templateOf(instance.template);
                                 return (
-                                    <li key={index} className="flex items-center justify-between gap-3">
-                                        <span className="min-w-0 truncate">{instanceTitle(instance, language)}</span>
+                                    <li
+                                        key={index}
+                                        className="flex items-center justify-between gap-3"
+                                    >
+                                        <span className="min-w-0 truncate">
+                                            {instanceTitle(instance, language)}
+                                        </span>
                                         <span className="flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
-                                            <Progress value={instance.progress} max={instance.target} done={instance.done} voided={instance.voided} />
+                                            <Progress
+                                                value={instance.progress}
+                                                max={instance.target}
+                                                done={instance.done}
+                                                voided={instance.voided}
+                                            />
                                             {template
                                                 ? t("goals.progress", {
-                                                      total: targetText(t, template, instance.progress, language),
-                                                      target: targetText(t, template, instance.target, language)
+                                                      total: targetText(
+                                                          t,
+                                                          template,
+                                                          instance.progress,
+                                                          language
+                                                      ),
+                                                      target: targetText(
+                                                          t,
+                                                          template,
+                                                          instance.target,
+                                                          language
+                                                      )
                                                   })
-                                                : t("goals.progress", { total: instance.progress, target: instance.target })}
+                                                : t("goals.progress", {
+                                                      total: instance.progress,
+                                                      target: instance.target
+                                                  })}
                                         </span>
                                     </li>
                                 );
                             })}
-                            {all.length === 0 && <li className="text-muted-foreground">{t("players.nothingDealt")}</li>}
+                            {all.length === 0 && (
+                                <li className="text-muted-foreground">
+                                    {t("players.nothingDealt")}
+                                </li>
+                            )}
                         </ul>
                     </td>
                 </tr>
@@ -436,7 +563,9 @@ export function CatalogueCard({
                 </div>
                 <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                     {catalog.CATEGORIES.map((category) => {
-                        const templates = catalog.TEMPLATES.filter((one) => one.category === category);
+                        const templates = catalog.TEMPLATES.filter(
+                            (one) => one.category === category
+                        );
                         const state = settings.categories[category];
                         const open = openCategory === category;
                         return (
@@ -448,9 +577,17 @@ export function CatalogueCard({
                                         aria-expanded={open}
                                         onClick={() => setOpenCategory(open ? null : category)}
                                     >
-                                        {open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
-                                        <span className="truncate">{catalog.CATEGORY_LABELS[category][language]}</span>
-                                        <span className="text-xs font-normal text-muted-foreground">{t("catalogue.count", { count: templates.length })}</span>
+                                        {open ? (
+                                            <ChevronDown className="size-4 shrink-0" />
+                                        ) : (
+                                            <ChevronRight className="size-4 shrink-0" />
+                                        )}
+                                        <span className="truncate">
+                                            {catalog.CATEGORY_LABELS[category][language]}
+                                        </span>
+                                        <span className="text-xs font-normal text-muted-foreground">
+                                            {t("catalogue.count", { count: templates.length })}
+                                        </span>
                                     </button>
                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                         {t("catalogue.weight")}
@@ -461,11 +598,19 @@ export function CatalogueCard({
                                             max={5}
                                             step={0.5}
                                             disabled={locked}
-                                            value={Number.isFinite(state.weight) ? state.weight : ""}
+                                            value={
+                                                Number.isFinite(state.weight) ? state.weight : ""
+                                            }
                                             onChange={(event) =>
                                                 onChange({
                                                     ...settings,
-                                                    categories: { ...settings.categories, [category]: { ...state, weight: numberOf(event.target.value) } }
+                                                    categories: {
+                                                        ...settings.categories,
+                                                        [category]: {
+                                                            ...state,
+                                                            weight: numberOf(event.target.value)
+                                                        }
+                                                    }
                                                 })
                                             }
                                         />
@@ -475,7 +620,13 @@ export function CatalogueCard({
                                         disabled={locked}
                                         aria-label={catalog.CATEGORY_LABELS[category][language]}
                                         onChange={(enabled) =>
-                                            onChange({ ...settings, categories: { ...settings.categories, [category]: { ...state, enabled } } })
+                                            onChange({
+                                                ...settings,
+                                                categories: {
+                                                    ...settings.categories,
+                                                    [category]: { ...state, enabled }
+                                                }
+                                            })
                                         }
                                     />
                                 </div>
@@ -486,25 +637,41 @@ export function CatalogueCard({
                                                 template,
                                                 template.variants?.[0]?.key ?? null,
                                                 catalog.baseTarget(template, "daily", "medium") ??
-                                                    catalog.baseTarget(template, "weekly", "easy") ??
+                                                    catalog.baseTarget(
+                                                        template,
+                                                        "weekly",
+                                                        "easy"
+                                                    ) ??
                                                     catalog.baseTarget(template, "card", "hard") ??
                                                     1,
                                                 language
                                             );
                                             const on = !settings.disabled.includes(template.id);
                                             return (
-                                                <li key={template.id} className="flex flex-col rounded-md px-2 py-1 hover:bg-muted/40">
+                                                <li
+                                                    key={template.id}
+                                                    className="flex flex-col rounded-md px-2 py-1 hover:bg-muted/40"
+                                                >
                                                     <div className="flex items-center gap-2">
-                                                        <span className="w-9 shrink-0 font-mono text-xs text-foreground-subtle">{template.id}</span>
-                                                        <span className="min-w-0 flex-1 truncate text-sm" title={title}>
+                                                        <span className="w-9 shrink-0 font-mono text-xs text-foreground-subtle">
+                                                            {template.id}
+                                                        </span>
+                                                        <span
+                                                            className="min-w-0 flex-1 truncate text-sm"
+                                                            title={title}
+                                                        >
                                                             {title}
                                                         </span>
                                                         <ui.Button
                                                             variant="ghost"
                                                             size="icon-sm"
-                                                            aria-label={t("catalogue.what", { title })}
+                                                            aria-label={t("catalogue.what", {
+                                                                title
+                                                            })}
                                                             title={t("catalogue.what", { title })}
-                                                            aria-expanded={explained.has(template.id)}
+                                                            aria-expanded={explained.has(
+                                                                template.id
+                                                            )}
                                                             onClick={() => toggle(template.id)}
                                                         >
                                                             <Info className="size-4" />
@@ -517,14 +684,25 @@ export function CatalogueCard({
                                                                 onChange({
                                                                     ...settings,
                                                                     disabled: enabled
-                                                                        ? settings.disabled.filter((one) => one !== template.id)
-                                                                        : [...settings.disabled, template.id]
+                                                                        ? settings.disabled.filter(
+                                                                              (one) =>
+                                                                                  one !==
+                                                                                  template.id
+                                                                          )
+                                                                        : [
+                                                                              ...settings.disabled,
+                                                                              template.id
+                                                                          ]
                                                                 })
                                                             }
                                                         />
                                                     </div>
                                                     {explained.has(template.id) && (
-                                                        <ChallengeExplained template={template} t={t} language={language} />
+                                                        <ChallengeExplained
+                                                            template={template}
+                                                            t={t}
+                                                            language={language}
+                                                        />
                                                     )}
                                                 </li>
                                             );
@@ -539,7 +717,9 @@ export function CatalogueCard({
                     <p className="text-sm font-medium">{t("catalogue.meta")}</p>
                     {catalog.META_RULES.map((rule) => (
                         <p key={rule.id} className="text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">{t("catalogue.metaRule", { title: rule.title[language] })} </span>
+                            <span className="font-medium text-foreground">
+                                {t("catalogue.metaRule", { title: rule.title[language] })}{" "}
+                            </span>
                             {rule.how[language]}
                         </p>
                     ))}

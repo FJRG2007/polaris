@@ -47,8 +47,14 @@ export const LABELS = {
     goal: t("[Community]", "[Comunidad]"),
     list: t("[Challenges]", "[Retos]"),
     untrack: t("[Stop tracking]", "[Dejar de seguir]"),
-    trackHover: t("Show it on a bar at the top of your screen", "Mostrarlo en una barra arriba de tu pantalla"),
-    rerollHover: t("Swap it for another of the same difficulty", "Cambiarlo por otro de la misma dificultad"),
+    trackHover: t(
+        "Show it on a bar at the top of your screen",
+        "Mostrarlo en una barra arriba de tu pantalla"
+    ),
+    rerollHover: t(
+        "Swap it for another of the same difficulty",
+        "Cambiarlo por otro de la misma dificultad"
+    ),
     listHover: t("Your challenges", "Tus retos"),
     seasonHover: t("Your season pass", "Tu pase de temporada"),
     bingoHover: t("This month's card", "El cartón de este mes"),
@@ -57,7 +63,11 @@ export const LABELS = {
     voided: t("lost to Anti X-Ray", "perdido por el Anti X-Ray")
 } as const;
 
-export function header(layer: "daily" | "weekly" | "backlog", left: number | null, language: Language): string {
+export function header(
+    layer: "daily" | "weekly" | "backlog",
+    left: number | null,
+    language: Language
+): string {
     const name = pick(LABELS[layer], language);
     if (left === null) return `${tag(language)}&e${name}`;
     const when = duration(left, language);
@@ -70,14 +80,23 @@ export function bar(progress: number, target: number, width = 10): string {
     return `&8[&a${"|".repeat(filled)}&7${".".repeat(width - filled)}&8]`;
 }
 
-export function tierLabel(layer: "daily" | "weekly" | "card", tier: catalog.Difficulty, language: Language): string {
+export function tierLabel(
+    layer: "daily" | "weekly" | "card",
+    tier: catalog.Difficulty,
+    language: Language
+): string {
     const labels = layer === "weekly" ? catalog.WEEKLY_LABELS : catalog.DIFFICULTY_LABELS;
     const colour = tier === "easy" ? "&a" : tier === "medium" ? "&e" : "&c";
     return `${colour}${pick(labels[tier], language)}`;
 }
 
 /** `12/32`, in the template's unit. */
-export function figures(template: catalog.Template, progress: number, target: number, language: Language): string {
+export function figures(
+    template: catalog.Template,
+    progress: number,
+    target: number,
+    language: Language
+): string {
     return `${catalog.formatNumber(catalog.inUnit(template, progress), language)}/${catalog.formatNumber(
         catalog.inUnit(template, target),
         language
@@ -136,13 +155,20 @@ export function rewardText(
     const parts: string[] = [];
     if (payout.points && payout.points > 0) parts.push(`+${payout.points} pts`);
     if (payout.levels > 0)
-        parts.push(language === "es" ? `${payout.levels} ${payout.levels === 1 ? "nivel" : "niveles"}` : `${payout.levels} ${payout.levels === 1 ? "level" : "levels"}`);
-    for (const item of payout.items) parts.push(`${item.count} ${item.id.replace(/^[a-z0-9_.-]+:/, "").replace(/_/g, " ")}`);
+        parts.push(
+            language === "es"
+                ? `${payout.levels} ${payout.levels === 1 ? "nivel" : "niveles"}`
+                : `${payout.levels} ${payout.levels === 1 ? "level" : "levels"}`
+        );
+    for (const item of payout.items)
+        parts.push(`${item.count} ${item.id.replace(/^[a-z0-9_.-]+:/, "").replace(/_/g, " ")}`);
     return parts.join(", ");
 }
 
 export function rerolled(title: string, language: Language): string {
-    return language === "es" ? `${tag(language)}&7Cambiado por: &f${title}` : `${tag(language)}&7Swapped for: &f${title}`;
+    return language === "es"
+        ? `${tag(language)}&7Cambiado por: &f${title}`
+        : `${tag(language)}&7Swapped for: &f${title}`;
 }
 
 export function noReroll(language: Language): string {
@@ -152,11 +178,15 @@ export function noReroll(language: Language): string {
 }
 
 export function tracking(title: string, language: Language): string {
-    return language === "es" ? `${tag(language)}&7Siguiendo: &f${title}` : `${tag(language)}&7Tracking: &f${title}`;
+    return language === "es"
+        ? `${tag(language)}&7Siguiendo: &f${title}`
+        : `${tag(language)}&7Tracking: &f${title}`;
 }
 
 export function untracked(language: Language): string {
-    return language === "es" ? `${tag(language)}&7Ya no sigues ningún reto.` : `${tag(language)}&7Not tracking a challenge any more.`;
+    return language === "es"
+        ? `${tag(language)}&7Ya no sigues ningún reto.`
+        : `${tag(language)}&7Not tracking a challenge any more.`;
 }
 
 export function sweepLine(layer: "daily" | "weekly", reward: string, language: Language): string {
@@ -206,7 +236,15 @@ export function capLine(language: Language): string {
 }
 
 export function seasonLines(
-    input: { number: number; tier: number; tiers: number; points: number; perTier: number; daysLeft: number; next: string },
+    input: {
+        number: number;
+        tier: number;
+        tiers: number;
+        points: number;
+        perTier: number;
+        daysLeft: number;
+        next: string;
+    },
     language: Language
 ): string[] {
     const toNext = input.perTier - (input.points % input.perTier);
@@ -244,7 +282,9 @@ export function noGoal(language: Language): string {
 
 export function goalBar(title: string, tier: number, language: Language): string {
     const roman = ["", " I", " II", " III", " IV", " V"][tier] ?? "";
-    return language === "es" ? `&dComunidad:&f ${title}${roman ? ` &7- nivel${roman}` : ""}` : `&dCommunity:&f ${title}${roman ? ` &7- tier${roman}` : ""}`;
+    return language === "es"
+        ? `&dComunidad:&f ${title}${roman ? ` &7- nivel${roman}` : ""}`
+        : `&dCommunity:&f ${title}${roman ? ` &7- tier${roman}` : ""}`;
 }
 
 export function goalTierLine(title: string, tier: number, language: Language): string {
@@ -266,7 +306,11 @@ export function rewardWaiting(language: Language): string {
         : `${tag(language)}&7Whatever did not arrive comes the next time you join.`;
 }
 
-export function seasonEnded(number: number, champions: readonly string[], language: Language): string {
+export function seasonEnded(
+    number: number,
+    champions: readonly string[],
+    language: Language
+): string {
     const names = champions.join(", ");
     return language === "es"
         ? `${tag(language)}&bTermina la temporada ${number}.${names ? ` &6Campeones: &f${names}` : ""}`

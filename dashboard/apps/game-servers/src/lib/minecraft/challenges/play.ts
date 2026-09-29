@@ -35,26 +35,42 @@ export interface Context {
 export type Effect =
     | { readonly kind: "tell"; readonly line: string }
     | { readonly kind: "title"; readonly title: string; readonly subtitle: string }
-    | { readonly kind: "pay"; readonly payout: Pick<Payout, "levels" | "items">; readonly label: string };
+    | {
+          readonly kind: "pay";
+          readonly payout: Pick<Payout, "levels" | "items">;
+          readonly label: string;
+      };
 
 export const LAYER_KEYS = ["daily", "weekly", "card"] as const;
 export type LayerName = (typeof LAYER_KEYS)[number];
 
 /** What one finished challenge pays. */
-export function payoutFor(settings: ChallengeSettings, layer: LayerName, tier: catalog.Difficulty): Payout {
+export function payoutFor(
+    settings: ChallengeSettings,
+    layer: LayerName,
+    tier: catalog.Difficulty
+): Payout {
     if (layer === "card") return settings.rewards.square;
     return settings.rewards[layer][tier];
 }
 
-const merge = (left: Pick<Payout, "levels" | "items">, right: Pick<Payout, "levels" | "items">) => ({
+const merge = (
+    left: Pick<Payout, "levels" | "items">,
+    right: Pick<Payout, "levels" | "items">
+) => ({
     levels: left.levels + right.levels,
     items: [...left.items, ...right.items]
 });
 
 /** The title a challenge reads as, target and variant written in. */
-export function titleOf(instance: Pick<Instance, "template" | "variant" | "target">, language: catalog.Language): string {
+export function titleOf(
+    instance: Pick<Instance, "template" | "variant" | "target">,
+    language: catalog.Language
+): string {
     const template = catalog.templateOf(instance.template);
-    return template ? catalog.titleOf(template, instance.variant, instance.target, language) : instance.template;
+    return template
+        ? catalog.titleOf(template, instance.variant, instance.target, language)
+        : instance.template;
 }
 
 /**
@@ -88,9 +104,16 @@ export function settle(
         }
         for (const tier of earned.tiers) {
             const reward = season.tierReward(tier, settings);
-            effects.push({ kind: "tell", line: messages.tierLine(tier, messages.rewardText(reward, language), language) });
+            effects.push({
+                kind: "tell",
+                line: messages.tierLine(tier, messages.rewardText(reward, language), language)
+            });
             if (reward.levels > 0 || reward.items.length > 0)
-                effects.push({ kind: "pay", payout: reward, label: `${messages.tag(language).trim()} ${tier}` });
+                effects.push({
+                    kind: "pay",
+                    payout: reward,
+                    label: `${messages.tag(language).trim()} ${tier}`
+                });
         }
         return earned.granted;
     };
@@ -107,24 +130,39 @@ export function settle(
         let bonus = 0;
         if (season.isComeback(book, now) && settings.rewards.comeback > 0) {
             bonus += settings.rewards.comeback;
-            effects.push({ kind: "tell", line: messages.comebackLine(settings.rewards.comeback, language) });
+            effects.push({
+                kind: "tell",
+                line: messages.comebackLine(settings.rewards.comeback, language)
+            });
         }
         book = { ...book, lastDoneAt: now };
         const granted = earn(payout.points + bonus) - bonus;
         const shown = { ...payout, points: Math.max(0, granted) };
-        effects.push({ kind: "title", title: messages.completedTitle(language), subtitle: `&f${label}` });
+        effects.push({
+            kind: "title",
+            title: messages.completedTitle(language),
+            subtitle: `&f${label}`
+        });
         effects.push({
             kind: "tell",
             line: messages.completedLine(label, messages.rewardText(shown, language), language)
         });
-        if (payout.levels > 0 || payout.items.length > 0) effects.push({ kind: "pay", payout, label });
+        if (payout.levels > 0 || payout.items.length > 0)
+            effects.push({ kind: "pay", payout, label });
         if (layer === "daily" || layer === "backlog") {
-            const { streak, milestone } = season.streakAfter(book.streak, context.day, context.clock);
+            const { streak, milestone } = season.streakAfter(
+                book.streak,
+                context.day,
+                context.clock
+            );
             book = { ...book, streak };
             if (milestone !== null) {
                 const extra = season.milestoneBonus(milestone, settings);
                 earn(extra);
-                effects.push({ kind: "tell", line: messages.streakLine(milestone, extra, language) });
+                effects.push({
+                    kind: "tell",
+                    line: messages.streakLine(milestone, extra, language)
+                });
             }
         }
         return { ...instance, paid: true };
@@ -141,14 +179,25 @@ export function settle(
         });
         if (!changed) continue;
         let updated: PlayerLayer = { ...held, instances };
-        if (layer !== "card" && !held.swept && instances.length >= 3 && instances.every((one) => one.doneAt !== null)) {
-            const sweep = layer === "daily" ? settings.rewards.dailySweep : settings.rewards.weeklySweep;
+        if (
+            layer !== "card" &&
+            !held.swept &&
+            instances.length >= 3 &&
+            instances.every((one) => one.doneAt !== null)
+        ) {
+            const sweep =
+                layer === "daily" ? settings.rewards.dailySweep : settings.rewards.weeklySweep;
             const granted = earn(sweep.points);
             effects.push({
                 kind: "tell",
-                line: messages.sweepLine(layer, messages.rewardText({ ...sweep, points: granted }, language), language)
+                line: messages.sweepLine(
+                    layer,
+                    messages.rewardText({ ...sweep, points: granted }, language),
+                    language
+                )
             });
-            if (sweep.levels > 0 || sweep.items.length > 0) effects.push({ kind: "pay", payout: sweep, label: layer });
+            if (sweep.levels > 0 || sweep.items.length > 0)
+                effects.push({ kind: "pay", payout: sweep, label: layer });
             updated = { ...updated, swept: true };
         }
         if (layer === "card") {
@@ -164,9 +213,14 @@ export function settle(
                 }
                 effects.push({
                     kind: "tell",
-                    line: messages.lineLine(lines.length, messages.rewardText({ ...pay, points: granted }, language), language)
+                    line: messages.lineLine(
+                        lines.length,
+                        messages.rewardText({ ...pay, points: granted }, language),
+                        language
+                    )
                 });
-                if (pay.levels > 0 || pay.items.length > 0) effects.push({ kind: "pay", payout: pay, label: "bingo" });
+                if (pay.levels > 0 || pay.items.length > 0)
+                    effects.push({ kind: "pay", payout: pay, label: "bingo" });
                 updated = { ...updated, lines: [...held.lines, ...lines] };
             }
             if (!held.full && done.length === 9 && done.every(Boolean)) {
@@ -174,9 +228,13 @@ export function settle(
                 const granted = earn(reward.points);
                 effects.push({
                     kind: "tell",
-                    line: messages.fullCardLine(messages.rewardText({ ...reward, points: granted }, language), language)
+                    line: messages.fullCardLine(
+                        messages.rewardText({ ...reward, points: granted }, language),
+                        language
+                    )
                 });
-                if (reward.levels > 0 || reward.items.length > 0) effects.push({ kind: "pay", payout: reward, label: "bingo" });
+                if (reward.levels > 0 || reward.items.length > 0)
+                    effects.push({ kind: "pay", payout: reward, label: "bingo" });
                 updated = { ...updated, full: true };
             }
         }
@@ -204,10 +262,24 @@ export const BACKLOG_MAX = 3;
  * what they had got to; anything older than three days, or past three in all,
  * is let go.
  */
-export function toBacklog(record: PlayerRecord, ended: PlayerLayer, endedDay: string, today: string, dayNumber: (key: string) => number): PlayerRecord {
+export function toBacklog(
+    record: PlayerRecord,
+    ended: PlayerLayer,
+    endedDay: string,
+    today: string,
+    dayNumber: (key: string) => number
+): PlayerRecord {
     const identity = (one: Instance) => `${one.day ?? endedDay}|${one.template}|${one.dealtAt}`;
     const held = new Set(record.backlog.map(identity));
-    const carried = (one: Instance): Instance => ({ ...one, carry: one.progress, base: {}, last: {}, raw: 0, offset: 0, readAt: null });
+    const carried = (one: Instance): Instance => ({
+        ...one,
+        carry: one.progress,
+        base: {},
+        last: {},
+        raw: 0,
+        offset: 0,
+        readAt: null
+    });
     const left = ended.instances
         .filter((one) => one.doneAt === null && !one.voided && !held.has(identity(one)))
         .map((one) => carried({ ...one, day: one.day ?? endedDay }));
@@ -230,7 +302,8 @@ export function lookup(record: PlayerRecord, ref: string | null): Instance | nul
     const index = Number(raw);
     if (layer === "backlog") return record.backlog[index] ?? null;
     if (layer === "goal") return record.community[raw ?? ""] ?? null;
-    if (layer === "daily" || layer === "weekly" || layer === "card") return record[layer]?.instances[index] ?? null;
+    if (layer === "daily" || layer === "weekly" || layer === "card")
+        return record[layer]?.instances[index] ?? null;
     return null;
 }
 
@@ -286,7 +359,9 @@ export function menu(
                 const ref = refOf(layer, index);
                 pieces.push(
                     commands.button(
-                        tracked === ref ? messages.LABELS.tracking[language] : messages.LABELS.track[language],
+                        tracked === ref
+                            ? messages.LABELS.tracking[language]
+                            : messages.LABELS.track[language],
                         messages.LABELS.trackHover[language],
                         commands.PRESS.track + slot,
                         tracked === ref ? "gold" : "aqua",
@@ -312,14 +387,31 @@ export function menu(
     if (settings.layers.daily)
         section("daily", record.daily?.instances ?? [], input.dayLeft, 0, input.rerollsLeft.daily);
     if (settings.layers.weekly)
-        section("weekly", record.weekly?.instances ?? [], input.weekLeft, 3, input.rerollsLeft.weekly);
+        section(
+            "weekly",
+            record.weekly?.instances ?? [],
+            input.weekLeft,
+            3,
+            input.rerollsLeft.weekly
+        );
     if (settings.layers.daily)
-        section("backlog", record.backlog.filter((one) => one.doneAt === null), null, null, 0);
+        section(
+            "backlog",
+            record.backlog.filter((one) => one.doneAt === null),
+            null,
+            null,
+            0
+        );
     const streak = season.streakNow(ledger.streak, context.day, context.clock);
     lines.push(
         commands.tell(
             player,
-            messages.footer(streak, season.tierOf(ledger.points, settings), Math.floor(ledger.points), language)
+            messages.footer(
+                streak,
+                season.tierOf(ledger.points, settings),
+                Math.floor(ledger.points),
+                language
+            )
         )
     );
     const buttons: unknown[] = [];
@@ -327,11 +419,30 @@ export function menu(
         if (buttons.length > 0) buttons.push(" ");
         buttons.push(commands.button(label, hover, value, "aqua", spelling));
     };
-    if (settings.layers.season) add(messages.LABELS.season[language], messages.LABELS.seasonHover[language], commands.PRESS.season);
-    if (settings.layers.card) add(messages.LABELS.bingo[language], messages.LABELS.bingoHover[language], commands.PRESS.card);
+    if (settings.layers.season)
+        add(
+            messages.LABELS.season[language],
+            messages.LABELS.seasonHover[language],
+            commands.PRESS.season
+        );
+    if (settings.layers.card)
+        add(
+            messages.LABELS.bingo[language],
+            messages.LABELS.bingoHover[language],
+            commands.PRESS.card
+        );
     if (settings.layers.community && input.goals.length > 0)
-        add(messages.LABELS.goal[language], messages.LABELS.goalHover[language], commands.PRESS.goal);
-    if (tracked) add(messages.LABELS.untrack[language], messages.LABELS.untrack[language], commands.PRESS.untrack);
+        add(
+            messages.LABELS.goal[language],
+            messages.LABELS.goalHover[language],
+            commands.PRESS.goal
+        );
+    if (tracked)
+        add(
+            messages.LABELS.untrack[language],
+            messages.LABELS.untrack[language],
+            commands.PRESS.untrack
+        );
     if (buttons.length > 0) lines.push(...commands.fitted(player, buttons));
     return lines;
 }
@@ -360,17 +471,29 @@ export function seasonMenu(player: string, ledger: Ledger, context: Context): st
             language
         )
         .map((one) => commands.tell(player, one));
-    if (ledger.titles.length > 0) lines.push(commands.tell(player, `&6${ledger.titles.join(", ")}`));
+    if (ledger.titles.length > 0)
+        lines.push(commands.tell(player, `&6${ledger.titles.join(", ")}`));
     lines.push(
         ...commands.fitted(player, [
-            commands.button(messages.LABELS.list[language], messages.LABELS.listHover[language], commands.PRESS.list, "aqua", context.spelling)
+            commands.button(
+                messages.LABELS.list[language],
+                messages.LABELS.listHover[language],
+                commands.PRESS.list,
+                "aqua",
+                context.spelling
+            )
         ])
     );
     return lines;
 }
 
 /** The month's card as three rows of three squares, each clickable to track. */
-export function cardMenu(player: string, record: PlayerRecord, context: Context, left: number): string[] {
+export function cardMenu(
+    player: string,
+    record: PlayerRecord,
+    context: Context,
+    left: number
+): string[] {
     const { language, spelling } = context;
     const squares = record.card?.instances ?? [];
     if (squares.length === 0) return [commands.tell(player, messages.nothingYet(language))];
@@ -412,17 +535,29 @@ export function cardMenu(player: string, record: PlayerRecord, context: Context,
 }
 
 /** The community goals running now, and the player's part in each. */
-export function goalMenu(player: string, record: PlayerRecord, goals: readonly GoalState[], context: Context): string[] {
+export function goalMenu(
+    player: string,
+    record: PlayerRecord,
+    goals: readonly GoalState[],
+    context: Context
+): string[] {
     const { language, now } = context;
-    const running = goals.filter((goal) => !goal.finished && goal.startedAt <= now && now < goal.endsAt);
+    const running = goals.filter(
+        (goal) => !goal.finished && goal.startedAt <= now && now < goal.endsAt
+    );
     if (running.length === 0) return [commands.tell(player, messages.noGoal(language))];
     return running.flatMap((goal, index) => {
         const total = Object.values(goal.shares).reduce((sum, one) => sum + one.value, 0);
         const mine = record.community[goal.id]?.progress ?? 0;
         const share = total > 0 ? (mine / total) * 100 : 0;
-        const title = titleOf({ template: goal.template, variant: goal.variant, target: goal.target }, language);
+        const title = titleOf(
+            { template: goal.template, variant: goal.variant, target: goal.target },
+            language
+        );
         return commands.fitted(player, [
-            ...commands.parts(messages.goalLine(title, total, goal.target, share, goal.endsAt - now, language)),
+            ...commands.parts(
+                messages.goalLine(title, total, goal.target, share, goal.endsAt - now, language)
+            ),
             " ",
             commands.button(
                 messages.LABELS.track[language],

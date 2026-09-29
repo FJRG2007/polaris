@@ -78,25 +78,38 @@ class FakeServer {
         }
         if (command === "scoreboard objectives list") {
             const names = [...this.objectives.keys()];
-            return names.length === 0 ? "There are no objectives" : `There are ${names.length} objective(s): ${names.map((one) => `[${one}]`).join(", ")}`;
+            return names.length === 0
+                ? "There are no objectives"
+                : `There are ${names.length} objective(s): ${names.map((one) => `[${one}]`).join(", ")}`;
         }
         if ((match = /^scoreboard players list (\S+)$/.exec(command))) {
             const held = [...(this.scores.get(match[1]!) ?? new Map()).entries()];
             if (held.length === 0) return `${match[1]} has no scores to show`;
             return `${match[1]} has ${held.length} score(s):${held.map(([objective, value]) => `[${objective}]: ${value}`).join("")}`;
         }
-        if ((match = /^execute as @a\[scores=\{(\S+)=1\.\.\}\] run scoreboard players get @s \S+$/.exec(command))) {
+        if (
+            (match =
+                /^execute as @a\[scores=\{(\S+)=1\.\.\}\] run scoreboard players get @s \S+$/.exec(
+                    command
+                ))
+        ) {
             const objective = match[1]!;
             return this.online
                 .filter((one) => (this.scores.get(one.name)?.get(objective) ?? 0) >= 1)
-                .map((one) => `${this.displays.get(one.name) ?? one.name} has ${this.scores.get(one.name)!.get(objective)} [${objective}]`)
+                .map(
+                    (one) =>
+                        `${this.displays.get(one.name) ?? one.name} has ${this.scores.get(one.name)!.get(objective)} [${objective}]`
+                )
                 .join("");
         }
         if ((match = /^execute as @a run scoreboard players get @s (\S+)$/.exec(command))) {
             const objective = match[1]!;
             return this.online
                 .filter((one) => this.scores.get(one.name)?.has(objective))
-                .map((one) => `${one.name} has ${this.scores.get(one.name)!.get(objective)} [${objective}]`)
+                .map(
+                    (one) =>
+                        `${one.name} has ${this.scores.get(one.name)!.get(objective)} [${objective}]`
+                )
                 .join("");
         }
         if ((match = /^scoreboard players set (\S+) (\S+) (-?\d+)$/.exec(command))) {
@@ -107,14 +120,26 @@ class FakeServer {
         if (command === "list uuids")
             return `There are ${this.online.length} of a max of 20 players online: ${this.online.map((one) => `${one.name} (00000000-0000-0000-0000-000000000000)`).join(", ")}`;
         if (command === "execute as @a run data get entity @s Pos")
-            return this.online.map((one) => `${one.name} has the following entity data: [${one.x}.5d, ${one.y}.0d, ${one.z}.5d]`).join("");
+            return this.online
+                .map(
+                    (one) =>
+                        `${one.name} has the following entity data: [${one.x}.5d, ${one.y}.0d, ${one.z}.5d]`
+                )
+                .join("");
         if (command === "execute as @a run data get entity @s Rotation")
-            return this.online.map((one) => `${one.name} has the following entity data: [${one.yaw}.0f, 0.0f]`).join("");
+            return this.online
+                .map((one) => `${one.name} has the following entity data: [${one.yaw}.0f, 0.0f]`)
+                .join("");
         if (command === "execute as @a run data get entity @s Dimension")
-            return this.online.map((one) => `${one.name} has the following entity data: "minecraft:overworld"`).join("");
-        if ((match = /^give (\S+) (\S+) (\d+)$/.exec(command))) return `Gave ${match[3]} [${match[2]}] to ${match[1]}`;
-        if ((match = /^xp add (\S+) (\d+) levels$/.exec(command))) return `Gave ${match[2]} experience levels to ${match[1]}`;
-        if ((match = /^clear (\S+) \S+ 0$/.exec(command))) return `No items were found on player ${match[1]}`;
+            return this.online
+                .map((one) => `${one.name} has the following entity data: "minecraft:overworld"`)
+                .join("");
+        if ((match = /^give (\S+) (\S+) (\d+)$/.exec(command)))
+            return `Gave ${match[3]} [${match[2]}] to ${match[1]}`;
+        if ((match = /^xp add (\S+) (\d+) levels$/.exec(command)))
+            return `Gave ${match[2]} experience levels to ${match[1]}`;
+        if ((match = /^clear (\S+) \S+ 0$/.exec(command)))
+            return `No items were found on player ${match[1]}`;
         if (command.startsWith("execute if entity")) return "Test failed";
         return "";
     }
@@ -128,7 +153,8 @@ const server = {
     running: true,
     run: async (argv: readonly string[]) => {
         const line = argv.join(" ");
-        if (line.includes("Starting minecraft server version")) return { code: 0, output: "Starting minecraft server version 1.21.4\n" };
+        if (line.includes("Starting minecraft server version"))
+            return { code: 0, output: "Starting minecraft server version 1.21.4\n" };
         if (line.startsWith("stat")) return { code: 0, output: "0\n" };
         if (line.includes("server.properties")) return { code: 0, output: "level-name=world\n" };
         return { code: 1, output: "No such file or directory" };
@@ -152,9 +178,21 @@ const links = new Map<string, string>();
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findUnique: async () => ({ ownerId: "owner", name: "S", catalogId: "minecraft", status: "running", config: JSON.stringify(config) }),
+            findUnique: async () => ({
+                ownerId: "owner",
+                name: "S",
+                catalogId: "minecraft",
+                status: "running",
+                config: JSON.stringify(config)
+            }),
             findMany: async () => [{ id: "srv", ownerId: "owner", config: JSON.stringify(config) }],
-            updateMany: async ({ where, data }: { where: { config: string }; data: { config: string } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { config: string };
+                data: { config: string };
+            }) => {
                 if (where.config !== JSON.stringify(config)) return { count: 0 };
                 config = JSON.parse(data.config) as Record<string, unknown>;
                 return { count: 1 };
@@ -162,42 +200,79 @@ vi.mock("@polaris/db", () => ({
         },
         minecraftChallengePlayer: {
             findMany: async ({ where }: { where: { player?: { in: string[] } } }) =>
-                [...players.values()].filter((one) => !where.player || where.player.in.includes(one.player)),
-            upsert: async ({ create, update }: { create: { player: string; playerName: string; data: string }; update: { playerName: string; data: string } }) => {
-                players.set(create.player, { player: create.player, ...(players.has(create.player) ? update : create) });
+                [...players.values()].filter(
+                    (one) => !where.player || where.player.in.includes(one.player)
+                ),
+            upsert: async ({
+                create,
+                update
+            }: {
+                create: { player: string; playerName: string; data: string };
+                update: { playerName: string; data: string };
+            }) => {
+                players.set(create.player, {
+                    player: create.player,
+                    ...(players.has(create.player) ? update : create)
+                });
             },
-            deleteMany: async ({ where }: { where: { player: string } }) => void players.delete(where.player)
+            deleteMany: async ({ where }: { where: { player: string } }) =>
+                void players.delete(where.player)
         },
         minecraftChallengeLedger: {
-            findUnique: async ({ where }: { where: { scope_holder: { scope: string; holder: string } } }) =>
-                ledgers.get(`${where.scope_holder.scope}|${where.scope_holder.holder}`) ?? null,
+            findUnique: async ({
+                where
+            }: {
+                where: { scope_holder: { scope: string; holder: string } };
+            }) => ledgers.get(`${where.scope_holder.scope}|${where.scope_holder.holder}`) ?? null,
             findMany: async ({ where }: { where: { scope: string | { in: string[] } } }) =>
-                [...ledgers.values()].filter((one) => (typeof where.scope === "string" ? one.scope === where.scope : where.scope.in.includes(one.scope))),
+                [...ledgers.values()].filter((one) =>
+                    typeof where.scope === "string"
+                        ? one.scope === where.scope
+                        : where.scope.in.includes(one.scope)
+                ),
             create: async ({ data }: { data: { scope: string; holder: string; data: string } }) => {
                 const key = `${data.scope}|${data.holder}`;
                 if (ledgers.has(key)) throw new Error("Unique constraint failed");
                 ledgers.set(key, data);
             },
-            updateMany: async ({ where, data }: { where: { scope: string; holder: string; data: string }; data: { data: string } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { scope: string; holder: string; data: string };
+                data: { data: string };
+            }) => {
                 const key = `${where.scope}|${where.holder}`;
                 if (ledgers.get(key)?.data !== where.data) return { count: 0 };
                 ledgers.set(key, { scope: where.scope, holder: where.holder, data: data.data });
                 return { count: 1 };
             }
         },
-        gamePlayerLink: { findMany: async () => [...links.entries()].map(([player, userId]) => ({ player, userId })) },
+        gamePlayerLink: {
+            findMany: async () =>
+                [...links.entries()].map(([player, userId]) => ({ player, userId }))
+        },
         minecraftAnticheatFlag: { groupBy: async () => [] }
     }
 }));
 
 vi.mock("@polaris/app-host", () => ({
-    host: { appsInstallConfig: { readInstallConfig: (raw: string | null) => (raw ? (JSON.parse(raw) as Record<string, unknown>) : {}) } }
+    host: {
+        appsInstallConfig: {
+            readInstallConfig: (raw: string | null) =>
+                raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        }
+    }
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: () => "java",
     openServerContainer: async () => ({ server, close: async () => undefined }),
-    withServerContainer: async (_o: string, _i: string, work: (s: typeof server) => Promise<unknown>) => work(server)
+    withServerContainer: async (
+        _o: string,
+        _i: string,
+        work: (s: typeof server) => Promise<unknown>
+    ) => work(server)
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () => ({
@@ -205,13 +280,16 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () =
     releaseSidebar: () => undefined
 }));
 
-const service = await import("@polaris-app/game-servers/src/lib/minecraft/challenges/challenges-service");
+const service = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/challenges/challenges-service"
+);
 const stored = await import("@polaris-app/game-servers/src/lib/minecraft/challenges/state");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { forgetActivity } = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 const START = Date.parse("2026-09-29T12:00:00Z");
-const record = (name: string) => stored.readPlayer(players.get(name.toLowerCase())!.data, name, Date.now());
+const record = (name: string) =>
+    stored.readPlayer(players.get(name.toLowerCase())!.data, name, Date.now());
 const state = () => stored.readServerState(config);
 const PUMPKIN = "minecraft.mined:minecraft.pumpkin";
 const PLACED = "minecraft.used:minecraft.pumpkin";
@@ -249,7 +327,15 @@ function knownPool(): void {
 beforeEach(async () => {
     vi.useFakeTimers({ now: START });
     fake = new FakeServer();
-    config = { challenges: { enabled: true, timezone: "UTC", language: "en", eligibility: { minMinutes: 0 }, antiExploit: { afkMinutes: 1 } } };
+    config = {
+        challenges: {
+            enabled: true,
+            timezone: "UTC",
+            language: "en",
+            eligibility: { minMinutes: 0 },
+            antiExploit: { afkMinutes: 1 }
+        }
+    };
     players.clear();
     ledgers.clear();
     links.clear();
@@ -298,7 +384,11 @@ describe("challenges on a server", () => {
         knownPool();
         await step(1);
         await step(16, ["Alba"]);
-        expect(record("Alba").daily!.instances.map((one) => one.template)).toEqual(["F4", "F1", "C2"]);
+        expect(record("Alba").daily!.instances.map((one) => one.template)).toEqual([
+            "F4",
+            "F1",
+            "C2"
+        ]);
         // Placed and broken three times over.
         fake.add("Alba", PLACED, 3);
         fake.add("Alba", PUMPKIN, 3);
@@ -349,7 +439,9 @@ describe("challenges on a server", () => {
         fake.set("Alba", "pc_menu", 20);
         await service.runTick("srv", Date.now(), false);
         expect(record("Alba").tracked).toBe("daily:0");
-        expect(fake.heard.some((line) => line.startsWith("bossbar set polaris:pc_alba players Alba"))).toBe(true);
+        expect(
+            fake.heard.some((line) => line.startsWith("bossbar set polaris:pc_alba players Alba"))
+        ).toBe(true);
         // Bone meal was used before the swap: it does not count for the new one.
         fake.add("Alba", "minecraft.used:minecraft.bone_meal", 4);
         fake.set("Alba", "pc_menu", 11);
@@ -378,8 +470,12 @@ describe("challenges on a server", () => {
         fake.set(".Bo", "pc_menu", 1);
         fake.heard.length = 0;
         await service.runTick("srv", Date.now(), false);
-        expect(fake.heard.some((line) => line.startsWith("tellraw Alba ") && line.includes("Harvest"))).toBe(true);
-        expect(fake.heard.some((line) => line.startsWith("tellraw .Bo ") && line.includes("Harvest"))).toBe(true);
+        expect(
+            fake.heard.some((line) => line.startsWith("tellraw Alba ") && line.includes("Harvest"))
+        ).toBe(true);
+        expect(
+            fake.heard.some((line) => line.startsWith("tellraw .Bo ") && line.includes("Harvest"))
+        ).toBe(true);
         expect(fake.heard.some((line) => /^tellraw (Bo|AFK|VIP)/.test(line))).toBe(false);
         expect(fake.scores.get("Alba")!.get("pc_menu")).toBe(0);
         expect(fake.scores.get(".Bo")!.get("pc_menu")).toBe(0);
@@ -404,7 +500,11 @@ describe("challenges on a server", () => {
         const bruno = record("Bruno");
         expect(bruno.daily!.instances[0]!.doneAt).not.toBeNull();
         expect(bruno.backlog.map((one) => one.template)).toEqual(["F1", "C2"]);
-        expect(readEventState(config).pending.some((one) => one.player === "Bruno" && one.reward.levels === 1)).toBe(true);
+        expect(
+            readEventState(config).pending.some(
+                (one) => one.player === "Bruno" && one.reward.levels === 1
+            )
+        ).toBe(true);
         // Yesterday's objectives were made again: everybody counts from 0.
         expect(fake.scores.get("Bruno")?.get("pc_d0")).toBeUndefined();
         expect(state().outcomes.some((one) => one.template === "F4" && one.done === 1)).toBe(true);
@@ -427,7 +527,12 @@ describe("challenges on a server", () => {
         expect(alba.daily!.key).toBe("2026-09-30");
         expect(alba.backlog).toHaveLength(2);
         expect(new Set(alba.backlog.map((one) => one.template)).size).toBe(2);
-        expect(alba.backlog.every((one) => one.day === "2026-09-29" && one.dealtAt >= Date.parse("2026-09-30T00:00:00Z"))).toBe(true);
+        expect(
+            alba.backlog.every(
+                (one) =>
+                    one.day === "2026-09-29" && one.dealtAt >= Date.parse("2026-09-30T00:00:00Z")
+            )
+        ).toBe(true);
     });
 
     it("never sends anything that breaks, places, removes or takes", async () => {
@@ -440,7 +545,9 @@ describe("challenges on a server", () => {
         vi.setSystemTime(Date.parse("2026-09-30T00:00:30Z"));
         await service.runTick("srv", Date.now(), true);
         for (const line of fake.heard) {
-            expect(line).not.toMatch(/^(setblock|fill |kill |summon |item replace|data (merge|modify|remove)|xp set|tp |teleport )/);
+            expect(line).not.toMatch(
+                /^(setblock|fill |kill |summon |item replace|data (merge|modify|remove)|xp set|tp |teleport )/
+            );
             expect(line).not.toMatch(/^clear \S+( \S+( [1-9]\d*)?)?$/);
             expect(line).not.toMatch(/objectives remove (?!pc_)/);
             expect(Buffer.byteLength(line)).toBeLessThanOrEqual(1014);
@@ -467,31 +574,61 @@ describe("challenges on a server", () => {
         players.clear();
         await step(1);
         await step(16, ["Alba"]);
-        expect(record("Alba").weekly!.instances.map((one) => one.template)).toEqual(["S2", "S3", "F1"]);
-        await service.creditEventResults("srv", { participants: 1, ranked: ["Alba"], podium: ["Alba"], rounds: {} });
+        expect(record("Alba").weekly!.instances.map((one) => one.template)).toEqual([
+            "S2",
+            "S3",
+            "F1"
+        ]);
+        await service.creditEventResults("srv", {
+            participants: 1,
+            ranked: ["Alba"],
+            podium: ["Alba"],
+            rounds: {}
+        });
         expect(record("Alba").weekly!.instances[0]!.raw).toBe(0);
-        await service.creditEventResults("srv", { participants: 3, ranked: ["Alba"], podium: ["Alba"], rounds: {} });
+        await service.creditEventResults("srv", {
+            participants: 3,
+            ranked: ["Alba"],
+            podium: ["Alba"],
+            rounds: {}
+        });
         await step(16, ["Alba"]);
         expect(record("Alba").weekly!.instances[0]!.doneAt).not.toBeNull();
         expect(record("Alba").weekly!.instances[1]!.doneAt).not.toBeNull();
     });
 
     it("counts a shared season from the day the group already counts from", async () => {
-        config = { ...config, challenges: { ...(config.challenges as object), shared: { enabled: true, group: "Hub" } } };
-        ledgers.set("group:owner:hub|season", { scope: "group:owner:hub", holder: "season", data: JSON.stringify({ start: "2026-09-01" }) });
+        config = {
+            ...config,
+            challenges: {
+                ...(config.challenges as object),
+                shared: { enabled: true, group: "Hub" }
+            }
+        };
+        ledgers.set("group:owner:hub|season", {
+            scope: "group:owner:hub",
+            holder: "season",
+            data: JSON.stringify({ start: "2026-09-01" })
+        });
         links.set("alba", "u1");
         knownPool();
         await step(1);
         await step(16, ["Alba"]);
         fake.add("Alba", PUMPKIN, 3);
         await step(16, ["Alba"]);
-        const ledger = JSON.parse(ledgers.get("group:owner:hub|user:u1")!.data) as { season: string; points: number };
+        const ledger = JSON.parse(ledgers.get("group:owner:hub|user:u1")!.data) as {
+            season: string;
+            points: number;
+        };
         expect(ledger.season).toBe("2026-09-01#1");
         expect(ledger.points).toBe(10);
     });
 
     it("takes down a week's objectives and a tracked bar when switched off with no day running", async () => {
-        config = { ...config, challenges: { ...(config.challenges as object), layers: { daily: false, card: false } } };
+        config = {
+            ...config,
+            challenges: { ...(config.challenges as object), layers: { daily: false, card: false } }
+        };
         await step(1);
         await step(16, ["Alba"]);
         expect(state().daily).toBeNull();

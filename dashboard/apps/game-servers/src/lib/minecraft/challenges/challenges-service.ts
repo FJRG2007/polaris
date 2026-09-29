@@ -48,7 +48,12 @@ import * as replies from "../events/replies";
 import { readEventState } from "../events/state";
 import { readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import { editionOf, openServerContainer, withServerContainer, type ServerContainer } from "../service";
+import {
+    editionOf,
+    openServerContainer,
+    withServerContainer,
+    type ServerContainer
+} from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -109,14 +114,21 @@ async function readRow(installedAppId: string): Promise<Row | null> {
         select: { ownerId: true, catalogId: true, status: true, config: true }
     });
     if (!row || row.status === "removed" || !row.catalogId.startsWith("minecraft")) return null;
-    return { ownerId: row.ownerId, catalogId: row.catalogId, config: readInstallConfig(row.config) };
+    return {
+        ownerId: row.ownerId,
+        catalogId: row.catalogId,
+        config: readInstallConfig(row.config)
+    };
 }
 
 /** The settings, with the events' time zone and language as the defaults. */
 export function settingsOf(config: Record<string, unknown>): settingsModule.ChallengeSettings {
     const timezone = readSchedule(config).timezone;
     const events = readEventsConfig(config, timezone).settings;
-    return settingsModule.readSettings(config, { timezone: events.timezone, language: events.language });
+    return settingsModule.readSettings(config, {
+        timezone: events.timezone,
+        language: events.language
+    });
 }
 
 function clockOf(settings: settingsModule.ChallengeSettings): period.Clock {
@@ -146,9 +158,13 @@ export async function updateState(
 }
 
 /** Save what the screen set up. Checked again here: this is the one that decides. */
-export async function saveSettings(installedAppId: string, input: unknown): Promise<settingsModule.ChallengeSettings> {
+export async function saveSettings(
+    installedAppId: string,
+    input: unknown
+): Promise<settingsModule.ChallengeSettings> {
     const parsed = settingsModule.settingsSchema.safeParse(input);
-    if (!parsed.success) throw new ChallengeRefusal(parsed.error.issues[0]?.message ?? "errors.checkSettings");
+    if (!parsed.success)
+        throw new ChallengeRefusal(parsed.error.issues[0]?.message ?? "errors.checkSettings");
     for (let attempt = 0; attempt < WRITE_TRIES; attempt += 1) {
         const row = await prisma.installedApp.findUnique({
             where: { id: installedAppId },
@@ -158,11 +174,16 @@ export async function saveSettings(installedAppId: string, input: unknown): Prom
         const config = readInstallConfig(row.config);
         const written = await prisma.installedApp.updateMany({
             where: { id: installedAppId, config: row.config },
-            data: { config: JSON.stringify({ ...config, [settingsModule.CHALLENGES_KEY]: parsed.data }) }
+            data: {
+                config: JSON.stringify({ ...config, [settingsModule.CHALLENGES_KEY]: parsed.data })
+            }
         });
         if (written.count > 0) {
             if (parsed.data.enabled)
-                await updateState(installedAppId, (state) => ({ ...state, since: state.since ?? Date.now() }));
+                await updateState(installedAppId, (state) => ({
+                    ...state,
+                    since: state.since ?? Date.now()
+                }));
             return parsed.data;
         }
     }
@@ -175,15 +196,27 @@ interface Stored {
     readonly fresh: boolean;
 }
 
-async function loadPlayers(installedAppId: string, names: readonly string[] | null, now: number): Promise<Map<string, Stored>> {
+async function loadPlayers(
+    installedAppId: string,
+    names: readonly string[] | null,
+    now: number
+): Promise<Map<string, Stored>> {
     const rows = await prisma.minecraftChallengePlayer.findMany({
-        where: names === null ? { installedAppId } : { installedAppId, player: { in: names.map((name) => name.toLowerCase()) } },
+        where:
+            names === null
+                ? { installedAppId }
+                : { installedAppId, player: { in: names.map((name) => name.toLowerCase()) } },
         select: { player: true, playerName: true, data: true }
     });
     const found = new Map<string, Stored>();
-    for (const row of rows) found.set(row.player, { record: stored.readPlayer(row.data, row.playerName, now), fresh: false });
+    for (const row of rows)
+        found.set(row.player, {
+            record: stored.readPlayer(row.data, row.playerName, now),
+            fresh: false
+        });
     for (const name of names ?? []) {
-        if (!found.has(name.toLowerCase())) found.set(name.toLowerCase(), { record: stored.newPlayer(name, now), fresh: true });
+        if (!found.has(name.toLowerCase()))
+            found.set(name.toLowerCase(), { record: stored.newPlayer(name, now), fresh: true });
     }
     return found;
 }
@@ -205,11 +238,17 @@ interface Holder {
 
 /** The scope of a season shared with other servers, or null when this one keeps its own. */
 function sharedScope(settings: settingsModule.ChallengeSettings, ownerId: string): string | null {
-    return settings.shared.enabled && settings.shared.group ? `group:${ownerId}:${settings.shared.group.toLowerCase()}` : null;
+    return settings.shared.enabled && settings.shared.group
+        ? `group:${ownerId}:${settings.shared.group.toLowerCase()}`
+        : null;
 }
 
 /** Every scope whose ledgers play this server's season: its own, and a shared one. */
-function scopesOf(settings: settingsModule.ChallengeSettings, ownerId: string, installedAppId: string): string[] {
+function scopesOf(
+    settings: settingsModule.ChallengeSettings,
+    ownerId: string,
+    installedAppId: string
+): string[] {
     const shared = sharedScope(settings, ownerId);
     return shared ? [`server:${installedAppId}`, shared] : [`server:${installedAppId}`];
 }
@@ -247,19 +286,29 @@ async function changeLedger<T>(
 ): Promise<T | null> {
     const where = { scope: holder.scope, holder: holder.holder };
     for (let attempt = 0; attempt < 5; attempt += 1) {
-        const row = await prisma.minecraftChallengeLedger.findUnique({ where: { scope_holder: where }, select: { data: true } });
+        const row = await prisma.minecraftChallengeLedger.findUnique({
+            where: { scope_holder: where },
+            select: { data: true }
+        });
         const changed = change(stored.readLedger(row?.data ?? null, seasonKey));
         if (!changed) return null;
         const data = JSON.stringify(changed.ledger);
         const written = row
-            ? (await prisma.minecraftChallengeLedger.updateMany({ where: { ...where, data: row.data }, data: { data } })).count === 1
+            ? (
+                  await prisma.minecraftChallengeLedger.updateMany({
+                      where: { ...where, data: row.data },
+                      data: { data }
+                  })
+              ).count === 1
             : await prisma.minecraftChallengeLedger.create({ data: { ...where, data } }).then(
                   () => true,
                   () => false
               );
         if (written) return changed.value;
     }
-    throw new Error(`the season ledger ${holder.scope} ${holder.holder} kept changing under a write`);
+    throw new Error(
+        `the season ledger ${holder.scope} ${holder.holder} kept changing under a write`
+    );
 }
 
 /** The row in a shared scope that holds the day its seasons count from. */
@@ -284,7 +333,10 @@ async function linksOf(installedAppId: string): Promise<Map<string, string>> {
 }
 
 /** Everybody's ledger in a scope this season, for the median and the champions. */
-async function ledgersIn(scope: string, seasonKey: string): Promise<{ holder: string; ledger: stored.Ledger }[]> {
+async function ledgersIn(
+    scope: string,
+    seasonKey: string
+): Promise<{ holder: string; ledger: stored.Ledger }[]> {
     const rows = await prisma.minecraftChallengeLedger
         .findMany({ where: { scope }, select: { holder: true, data: true } })
         .catch(() => []);
@@ -315,7 +367,11 @@ async function uuidsOf(server: ServerContainer): Promise<Map<string, string>> {
     const found = new Map<string, string>();
     try {
         for (const entry of JSON.parse(text ?? "[]") as { name?: string; uuid?: string }[]) {
-            if (typeof entry.name === "string" && typeof entry.uuid === "string" && /^[0-9a-f-]{36}$/i.test(entry.uuid))
+            if (
+                typeof entry.name === "string" &&
+                typeof entry.uuid === "string" &&
+                /^[0-9a-f-]{36}$/i.test(entry.uuid)
+            )
                 found.set(entry.name.toLowerCase(), entry.uuid);
         }
     } catch {
@@ -419,13 +475,24 @@ function anyApplied(state: stored.ServerState): boolean {
 
 /** Challenges switched off: their objectives and bars taken down. Nothing of a
  *  player's is touched; what they were owed stays owed. */
-async function switchOff(installedAppId: string, server: ServerContainer, row: Row | null): Promise<void> {
+async function switchOff(
+    installedAppId: string,
+    server: ServerContainer,
+    row: Row | null
+): Promise<void> {
     if (!row) return;
     const state = stored.readServerState(row.config);
     if (!anyApplied(state)) return;
-    const names = [state.daily, state.weekly, state.card, state.community].flatMap((one) => (one ? Object.values(one.objectives) : []));
-    const tracking = [...(await loadPlayers(installedAppId, null, Date.now())).values()].filter((held) => held.record.tracked !== null);
-    const bars = new Set([...(loops.get(installedAppId)?.bars ?? []), ...tracking.map((held) => commands.trackedBar(held.record.name))]);
+    const names = [state.daily, state.weekly, state.card, state.community].flatMap((one) =>
+        one ? Object.values(one.objectives) : []
+    );
+    const tracking = [...(await loadPlayers(installedAppId, null, Date.now())).values()].filter(
+        (held) => held.record.tracked !== null
+    );
+    const bars = new Set([
+        ...(loops.get(installedAppId)?.bars ?? []),
+        ...tracking.map((held) => commands.trackedBar(held.record.name))
+    ]);
     await server.sayAll(commands.teardown(names, [...bars])).catch(() => undefined);
     await updateState(installedAppId, (current) => ({
         ...current,
@@ -473,7 +540,11 @@ async function firstDayOf(
     const scope = sharedScope(settings, ownerId);
     if (!scope) return own;
     const where = { scope_holder: { scope, holder: SEASON_ANCHOR } };
-    const read = async () => anchorOf((await prisma.minecraftChallengeLedger.findUnique({ where, select: { data: true } }))?.data);
+    const read = async () =>
+        anchorOf(
+            (await prisma.minecraftChallengeLedger.findUnique({ where, select: { data: true } }))
+                ?.data
+        );
     const found = await read();
     if (found) return found;
     const created = await prisma.minecraftChallengeLedger
@@ -496,9 +567,18 @@ async function contextFor(
     if (loop.version === undefined) loop.version = await versionOf(server);
     const state = stored.readServerState(row.config);
     const clock = clockOf(settings);
-    const seasonNow = period.seasonOf(clock, now, await firstDayOf(settings, row.ownerId, state, clock, now), settings.season.weeks);
+    const seasonNow = period.seasonOf(
+        clock,
+        now,
+        await firstDayOf(settings, row.ownerId, state, clock, now),
+        settings.season.weeks
+    );
     const links = await linksOf(installedAppId);
-    const held = await Promise.all(scopesOf(settings, row.ownerId, installedAppId).map((scope) => ledgersIn(scope, seasonNow.key)));
+    const held = await Promise.all(
+        scopesOf(settings, row.ownerId, installedAppId).map((scope) =>
+            ledgersIn(scope, seasonNow.key)
+        )
+    );
     const tiers = held.flat().map((one) => season.tierOf(one.ledger.points, settings));
     const version = loop.version;
     return {
@@ -533,19 +613,31 @@ async function contextFor(
 function caughtBy(config: Record<string, unknown>): Map<string, number[]> {
     const found = new Map<string, number[]>();
     for (const [key, evidence] of Object.entries(readXray(config).evidence)) {
-        found.set(key, evidence.hits.map((hit) => hit.at));
+        found.set(
+            key,
+            evidence.hits.map((hit) => hit.at)
+        );
     }
     return found;
 }
 
-async function readAll(installedAppId: string, loop: Loop, server: ServerContainer, now: number): Promise<void> {
+async function readAll(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<void> {
     const row = await readRow(installedAppId);
     if (!row) return;
     const settings = settingsOf(row.config);
     if (!settings.enabled) return;
     const sweep = await contextFor(installedAppId, loop, server, row, settings, now);
     if (sweep.state.version !== (loop.version ?? null)) {
-        sweep.state = (await updateState(installedAppId, (state) => ({ ...state, version: loop.version ?? null }))) ?? sweep.state;
+        sweep.state =
+            (await updateState(installedAppId, (state) => ({
+                ...state,
+                version: loop.version ?? null
+            }))) ?? sweep.state;
     }
     // Who is on first: a period closing now pays them in person, not into the queue.
     const seen = await playing.lookIfDue(installedAppId, server);
@@ -562,7 +654,12 @@ async function readAll(installedAppId: string, loop: Loop, server: ServerContain
         const held = players.get(one.name.toLowerCase());
         if (!held) continue;
         await readPlayer(live, held, one, { slow, files }).catch((error: unknown) =>
-            console.warn("polaris: reading a player's challenges failed", installedAppId, one.name, String(error))
+            console.warn(
+                "polaris: reading a player's challenges failed",
+                installedAppId,
+                one.name,
+                String(error)
+            )
         );
     }
     await welcome(live);
@@ -575,8 +672,10 @@ async function readAll(installedAppId: string, loop: Loop, server: ServerContain
 type Layer = "daily" | "weekly" | "card";
 
 function keyFor(layer: Layer, clock: period.Clock, now: number): { key: string; endsAt: number } {
-    if (layer === "daily") return { key: period.dayKey(clock, now), endsAt: period.dayEndsAt(clock, now) };
-    if (layer === "weekly") return { key: period.weekKey(clock, now), endsAt: period.weekEndsAt(clock, now) };
+    if (layer === "daily")
+        return { key: period.dayKey(clock, now), endsAt: period.dayEndsAt(clock, now) };
+    if (layer === "weekly")
+        return { key: period.weekKey(clock, now), endsAt: period.weekEndsAt(clock, now) };
     return { key: period.monthKey(clock, now), endsAt: period.monthEndsAt(clock, now) };
 }
 
@@ -596,18 +695,19 @@ async function rotate(sweep: Sweep): Promise<void> {
         if (!settings.layers[layer]) {
             if (current) {
                 await closePeriod(sweep, layer, current);
-                await sweep.server.sayAll(commands.removeObjectives(Object.values(current.objectives)));
-                sweep.state = (await updateState(installedAppId, (state) => ({ ...state, [layer]: null }))) ?? sweep.state;
+                await sweep.server.sayAll(
+                    commands.removeObjectives(Object.values(current.objectives))
+                );
+                sweep.state =
+                    (await updateState(installedAppId, (state) => ({ ...state, [layer]: null }))) ??
+                    sweep.state;
             }
             continue;
         }
         const { key, endsAt } = keyFor(layer, clock, now);
         if (current?.key === key && current.applied) continue;
         if (current && current.key !== key) await closePeriod(sweep, layer, current);
-        const pool =
-            current?.key === key
-                ? current.pool
-                : drawFor(sweep, layer, key);
+        const pool = current?.key === key ? current.pool : drawFor(sweep, layer, key);
         const next = await applyPeriod(sweep, layer, key, now, endsAt, pool, current);
         sweep.state =
             (await updateState(installedAppId, (state) => ({
@@ -618,7 +718,10 @@ async function rotate(sweep: Sweep): Promise<void> {
                         ? state.recent
                         : {
                               ...state.recent,
-                              [layer]: [next.pool.map((entry) => entry.template), ...state.recent[layer]].slice(0, layer === "daily" ? 3 : 2)
+                              [layer]: [
+                                  next.pool.map((entry) => entry.template),
+                                  ...state.recent[layer]
+                              ].slice(0, layer === "daily" ? 3 : 2)
                           }
             }))) ?? sweep.state;
     }
@@ -626,7 +729,11 @@ async function rotate(sweep: Sweep): Promise<void> {
 }
 
 /** The pool for a new period, drawn from what this server may deal. */
-export function drawFor(sweep: Pick<Sweep, "settings" | "state" | "installedAppId" | "loop">, layer: Layer, key: string): stored.PoolEntry[] {
+export function drawFor(
+    sweep: Pick<Sweep, "settings" | "state" | "installedAppId" | "loop">,
+    layer: Layer,
+    key: string
+): stored.PoolEntry[] {
     const input: draw.DrawInput = {
         settings: sweep.settings,
         version: sweep.loop.version ?? sweep.state.version,
@@ -659,7 +766,10 @@ async function applyPeriod(
     const objectives = draw.objectivesFor(layer, criteria);
     const names = new Set(Object.values(objectives));
     const stale = Object.values(before?.objectives ?? {}).filter((name) => !names.has(name));
-    await sweep.server.sayAll([...commands.removeObjectives(stale), ...commands.addObjectives(objectives)]);
+    await sweep.server.sayAll([
+        ...commands.removeObjectives(stale),
+        ...commands.addObjectives(objectives)
+    ]);
     const made = progress.readObjectives(await sweep.server.say([commands.LIST_OBJECTIVES]));
     const refused = Object.entries(objectives)
         .filter(([, name]) => !made.has(name))
@@ -678,7 +788,9 @@ async function applyPeriod(
         startedAt: before?.key === key ? before.startedAt : now,
         endsAt,
         pool: kept,
-        objectives: Object.fromEntries(Object.entries(objectives).filter(([criterion]) => !refused.includes(criterion))),
+        objectives: Object.fromEntries(
+            Object.entries(objectives).filter(([criterion]) => !refused.includes(criterion))
+        ),
         refused,
         applied: true
     };
@@ -686,10 +798,18 @@ async function applyPeriod(
 
 /** The statistics that make a check go up. */
 function positivesOf(check: catalog.Check): string[] {
-    if (check.kind === "sum") return check.parts.filter((part) => part.sign > 0).map((part) => part.criterion);
-    if (check.kind === "distinct") return check.groups.flatMap((group) => group.filter((part) => part.sign > 0).map((part) => part.criterion));
+    if (check.kind === "sum")
+        return check.parts.filter((part) => part.sign > 0).map((part) => part.criterion);
+    if (check.kind === "distinct")
+        return check.groups.flatMap((group) =>
+            group.filter((part) => part.sign > 0).map((part) => part.criterion)
+        );
     if (check.kind === "survive") return check.parts.map((part) => part.criterion);
-    if (check.kind === "held") return catalog.heldParts(check.items).filter((part) => part.sign > 0).map((part) => part.criterion);
+    if (check.kind === "held")
+        return catalog
+            .heldParts(check.items)
+            .filter((part) => part.sign > 0)
+            .map((part) => part.criterion);
     return [];
 }
 
@@ -700,7 +820,10 @@ function positivesOf(check: catalog.Check): string[] {
  */
 async function closePeriod(current: Sweep, layer: Layer, ended: stored.Period): Promise<void> {
     // A daily finished at the last read counts for the day it was done on.
-    const sweep: Sweep = layer === "daily" ? { ...current, context: { ...current.context, day: ended.key } } : current;
+    const sweep: Sweep =
+        layer === "daily"
+            ? { ...current, context: { ...current.context, day: ended.key } }
+            : current;
     const players = await loadPlayers(sweep.installedAppId, null, sweep.now);
     const counts = new Map<string, { tier: catalog.Difficulty; dealt: number; done: number }>();
     for (const held of players.values()) {
@@ -710,18 +833,36 @@ async function closePeriod(current: Sweep, layer: Layer, ended: stored.Period): 
         const online = sweep.seen.has(name.toLowerCase());
         let record = held.record;
         if (commands.PLAYER_NAME.test(name)) {
-            const scores = progress.readList(await sweep.server.say([commands.listScores(name)]).catch(() => ""));
-            const instances = layered.instances.map((instance) => creditStats(sweep, name, instance, ended, scores, true));
+            const scores = progress.readList(
+                await sweep.server.say([commands.listScores(name)]).catch(() => "")
+            );
+            const instances = layered.instances.map((instance) =>
+                creditStats(sweep, name, instance, ended, scores, true)
+            );
             record = { ...record, [layer]: { ...layered, instances } };
             record = await settleAndCarry(sweep, record, online);
         }
         for (const instance of record[layer]?.instances ?? []) {
-            const tally = counts.get(instance.template) ?? { tier: instance.tier, dealt: 0, done: 0 };
-            counts.set(instance.template, { ...tally, dealt: tally.dealt + 1, done: tally.done + (instance.doneAt !== null ? 1 : 0) });
+            const tally = counts.get(instance.template) ?? {
+                tier: instance.tier,
+                dealt: 0,
+                done: 0
+            };
+            counts.set(instance.template, {
+                ...tally,
+                dealt: tally.dealt + 1,
+                done: tally.done + (instance.doneAt !== null ? 1 : 0)
+            });
         }
         if (layer === "daily") {
             const today = period.dayKey(sweep.clock, sweep.now);
-            record = play.toBacklog(record, record.daily ?? layered, ended.key, today, period.dayNumber);
+            record = play.toBacklog(
+                record,
+                record.daily ?? layered,
+                ended.key,
+                today,
+                period.dayNumber
+            );
         }
         await savePlayer(sweep.installedAppId, record);
     }
@@ -736,7 +877,8 @@ async function closePeriod(current: Sweep, layer: Layer, ended: stored.Period): 
     current.state =
         (await updateState(sweep.installedAppId, (state) => {
             const pace = { ...state.pace };
-            for (const one of outcomes) pace[one.template] = draw.nextPace(pace[one.template] ?? 1, one.dealt, one.done);
+            for (const one of outcomes)
+                pace[one.template] = draw.nextPace(pace[one.template] ?? 1, one.dealt, one.done);
             return {
                 ...state,
                 pace,
@@ -752,33 +894,64 @@ async function endSeason(sweep: Sweep): Promise<void> {
     if (before !== null && sweep.settings.layers.season) {
         const scopes = scopesOf(sweep.settings, sweep.ownerId, sweep.installedAppId);
         const rows = await prisma.minecraftChallengeLedger
-            .findMany({ where: { scope: { in: scopes } }, select: { scope: true, holder: true, data: true } })
+            .findMany({
+                where: { scope: { in: scopes } },
+                select: { scope: true, holder: true, data: true }
+            })
             .catch(() => []);
         const ended = rows
-            .map((row) => ({ scope: row.scope, holder: row.holder, ledger: stored.readLedger(row.data, before) }))
+            .map((row) => ({
+                scope: row.scope,
+                holder: row.holder,
+                ledger: stored.readLedger(row.data, before)
+            }))
             .filter((one) => one.ledger.season === before && one.ledger.points > 0);
-        const top = Math.max(0, ...ended.map((one) => season.tierOf(one.ledger.points, sweep.settings)));
-        const champions = top > 0 ? ended.filter((one) => season.tierOf(one.ledger.points, sweep.settings) === top) : [];
+        const top = Math.max(
+            0,
+            ...ended.map((one) => season.tierOf(one.ledger.points, sweep.settings))
+        );
+        const champions =
+            top > 0
+                ? ended.filter((one) => season.tierOf(one.ledger.points, sweep.settings) === top)
+                : [];
         const number = Number(before.split("#")[1] ?? 0);
         const names = champions.map((one) => one.holder.replace(/^(player|user):/, ""));
         const title = messages.championTitle(number, sweep.settings.language);
         // Every server of a shared season ends it: the first one crowns.
         for (const one of champions) {
             await changeLedger({ scope: one.scope, holder: one.holder }, before, (ledger) =>
-                ledger.points <= 0 || ledger.crowned ? null : { ledger: { ...ledger, crowned: true, titles: [...ledger.titles, title].slice(-10) }, value: true }
+                ledger.points <= 0 || ledger.crowned
+                    ? null
+                    : {
+                          ledger: {
+                              ...ledger,
+                              crowned: true,
+                              titles: [...ledger.titles, title].slice(-10)
+                          },
+                          value: true
+                      }
             );
         }
         const shown = await namesFor(sweep.installedAppId, names);
-        await sweep.server.sayAll([`tellraw @a ${commandsText(messages.seasonEnded(number, shown, sweep.settings.language))}`]);
+        await sweep.server.sayAll([
+            `tellraw @a ${commandsText(messages.seasonEnded(number, shown, sweep.settings.language))}`
+        ]);
         sweep.state =
             (await updateState(sweep.installedAppId, (state) => ({
                 ...state,
                 season: sweep.season.key,
-                seasons: [{ key: before, endedAt: sweep.now, champions: shown }, ...state.seasons].slice(0, 20)
+                seasons: [
+                    { key: before, endedAt: sweep.now, champions: shown },
+                    ...state.seasons
+                ].slice(0, 20)
             }))) ?? sweep.state;
         return;
     }
-    sweep.state = (await updateState(sweep.installedAppId, (state) => ({ ...state, season: sweep.season.key }))) ?? sweep.state;
+    sweep.state =
+        (await updateState(sweep.installedAppId, (state) => ({
+            ...state,
+            season: sweep.season.key
+        }))) ?? sweep.state;
 }
 
 function commandsText(line: string): string {
@@ -820,7 +993,10 @@ async function rotateCommunity(sweep: Sweep): Promise<void> {
             if (goals.some((one) => one.id === goal.id)) continue;
             // From the reset of its first day to the reset after its last.
             const startsAt = period.dayStartsAt(clock, goal.start);
-            const endsAt = period.dayStartsAt(clock, period.keyOfDay(period.dayNumber(goal.start) + goal.days));
+            const endsAt = period.dayStartsAt(
+                clock,
+                period.keyOfDay(period.dayNumber(goal.start) + goal.days)
+            );
             if (endsAt <= now) continue;
             goals.push(
                 stored.goalStateSchema.parse({
@@ -837,7 +1013,12 @@ async function rotateCommunity(sweep: Sweep): Promise<void> {
         if (settings.community.auto && running(goals, now).length === 0) {
             const active = playing.seenOn(sweep.installedAppId);
             const count = active ? [...active.values()].length : 2;
-            const drawn = draw.autoGoal(settings, sweep.loop.version ?? null, count, `${sweep.installedAppId}:${period.weekKey(clock, now)}`);
+            const drawn = draw.autoGoal(
+                settings,
+                sweep.loop.version ?? null,
+                count,
+                `${sweep.installedAppId}:${period.weekKey(clock, now)}`
+            );
             if (drawn) {
                 goals.push(
                     stored.goalStateSchema.parse({
@@ -856,44 +1037,85 @@ async function rotateCommunity(sweep: Sweep): Promise<void> {
         }
     }
     // A goal the operator took out of the list stops; one that ran out is finished below.
-    goals = goals.filter((goal) => goal.auto || goal.finished || settings.community.goals.some((one) => one.id === goal.id));
+    goals = goals.filter(
+        (goal) =>
+            goal.auto || goal.finished || settings.community.goals.some((one) => one.id === goal.id)
+    );
     const live = settings.layers.community ? running(goals, now) : [];
-    const key = live.map((goal) => goal.id).sort().join(",");
+    const key = live
+        .map((goal) => goal.id)
+        .sort()
+        .join(",");
     const current = sweep.state.community;
-    const ended = goals.filter((goal) => !goal.finished && (goal.endsAt <= now || !live.includes(goal)) && goal.startedAt <= now);
+    const ended = goals.filter(
+        (goal) =>
+            !goal.finished && (goal.endsAt <= now || !live.includes(goal)) && goal.startedAt <= now
+    );
     if (ended.length > 0 && current) {
         for (const goal of ended) await finishGoal(sweep, goal, current);
         goals = goals.map((goal) => (ended.includes(goal) ? { ...goal, finished: true } : goal));
         await sweep.server.sayAll([commands.barRemove(commands.GOAL_BAR)]);
     }
-    goals = goals.filter((goal) => !goal.finished || now - goal.endsAt < 30 * 86_400_000).slice(-20);
+    goals = goals
+        .filter((goal) => !goal.finished || now - goal.endsAt < 30 * 86_400_000)
+        .slice(-20);
     let community = current;
     if (!current || current.key !== key || !current.applied) {
         if (live.length === 0) {
-            if (current) await sweep.server.sayAll(commands.removeObjectives(Object.values(current.objectives)));
+            if (current)
+                await sweep.server.sayAll(
+                    commands.removeObjectives(Object.values(current.objectives))
+                );
             community = null;
         } else {
-            const pool = live.map((goal) => ({ template: goal.template, variant: goal.variant, tier: "hard" as const, target: goal.target }));
-            community = await applyPeriod(sweep, "community", key, now, Math.min(...live.map((goal) => goal.endsAt)), pool, current);
+            const pool = live.map((goal) => ({
+                template: goal.template,
+                variant: goal.variant,
+                tier: "hard" as const,
+                target: goal.target
+            }));
+            community = await applyPeriod(
+                sweep,
+                "community",
+                key,
+                now,
+                Math.min(...live.map((goal) => goal.endsAt)),
+                pool,
+                current
+            );
         }
     }
-    if (JSON.stringify(goals) === JSON.stringify(sweep.state.goals) && JSON.stringify(community) === JSON.stringify(sweep.state.community))
+    if (
+        JSON.stringify(goals) === JSON.stringify(sweep.state.goals) &&
+        JSON.stringify(community) === JSON.stringify(sweep.state.community)
+    )
         return;
-    sweep.state = (await updateState(sweep.installedAppId, (state) => ({ ...state, goals, community }))) ?? sweep.state;
+    sweep.state =
+        (await updateState(sweep.installedAppId, (state) => ({ ...state, goals, community }))) ??
+        sweep.state;
 }
 
 /** A goal that ended: everybody who took part read once more, and the tiers
  *  reached since the last look paid. */
-async function finishGoal(sweep: Sweep, goal: stored.GoalState, community: stored.Period): Promise<void> {
+async function finishGoal(
+    sweep: Sweep,
+    goal: stored.GoalState,
+    community: stored.Period
+): Promise<void> {
     const players = await loadPlayers(sweep.installedAppId, null, sweep.now);
     const shares = { ...goal.shares };
     for (const held of players.values()) {
         const mine = held.record.community[goal.id];
         if (!mine) continue;
-        const scores = progress.readList(await sweep.server.say([commands.listScores(held.record.name)]).catch(() => ""));
+        const scores = progress.readList(
+            await sweep.server.say([commands.listScores(held.record.name)]).catch(() => "")
+        );
         const next = creditStats(sweep, held.record.name, mine, community, scores, true);
         shares[held.record.name.toLowerCase()] = { name: held.record.name, value: next.progress };
-        await savePlayer(sweep.installedAppId, { ...held.record, community: { ...held.record.community, [goal.id]: next } });
+        await savePlayer(sweep.installedAppId, {
+            ...held.record,
+            community: { ...held.record.community, [goal.id]: next }
+        });
     }
     await payGoalTiers(sweep, { ...goal, shares });
 }
@@ -904,13 +1126,20 @@ async function runGoals(sweep: Sweep): Promise<void> {
     const first = live[0];
     if (!first || !sweep.settings.layers.community) return;
     const total = Object.values(first.shares).reduce((sum, one) => sum + one.value, 0);
-    const title = play.titleOf({ template: first.template, variant: first.variant, target: first.target }, sweep.settings.language);
+    const title = play.titleOf(
+        { template: first.template, variant: first.variant, target: first.target },
+        sweep.settings.language
+    );
     if (sweep.eventOn) await sweep.server.sayAll(commands.barHide(commands.GOAL_BAR));
     else
         await sweep.server.sayAll(
             commands.barShow(
                 commands.GOAL_BAR,
-                messages.goalBar(title, play.goalTier(total, first.target), sweep.settings.language),
+                messages.goalBar(
+                    title,
+                    play.goalTier(total, first.target),
+                    sweep.settings.language
+                ),
                 total,
                 first.target,
                 "@a",
@@ -923,11 +1152,16 @@ async function runGoals(sweep: Sweep): Promise<void> {
 async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void> {
     const total = Object.values(goal.shares).reduce((sum, one) => sum + one.value, 0);
     const tier = play.goalTier(total, goal.target);
-    const title = play.titleOf({ template: goal.template, variant: goal.variant, target: goal.target }, sweep.settings.language);
+    const title = play.titleOf(
+        { template: goal.template, variant: goal.variant, target: goal.target },
+        sweep.settings.language
+    );
     const paid = { ...goal.paid };
     const lines: string[] = [];
     for (let reached = goal.tier + 1; reached <= tier; reached += 1)
-        lines.push(`tellraw @a ${commandsText(messages.goalTierLine(title, reached, sweep.settings.language))}`);
+        lines.push(
+            `tellraw @a ${commandsText(messages.goalTierLine(title, reached, sweep.settings.language))}`
+        );
     if (lines.length > 0) await sweep.server.sayAll(lines);
     for (let reached = 1; reached <= tier; reached += 1) {
         const reward = goal.rewards[reached - 1];
@@ -938,19 +1172,44 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
             paid[key] = reached;
             const online = sweep.seen.has(key);
             const effects: play.Effect[] = [];
-            const holder = holderOf(sweep.settings, sweep.ownerId, sweep.installedAppId, name, sweep.links);
+            const holder = holderOf(
+                sweep.settings,
+                sweep.ownerId,
+                sweep.installedAppId,
+                name,
+                sweep.links
+            );
             if (reward.points > 0 && sweep.settings.layers.season) {
                 const earned = await changeLedger(holder, sweep.season.key, (ledger) => {
-                    const added = season.addPoints(ledger, reward.points, sweep.context.day, sweep.settings, false);
+                    const added = season.addPoints(
+                        ledger,
+                        reward.points,
+                        sweep.context.day,
+                        sweep.settings,
+                        false
+                    );
                     return { ledger: added.ledger, value: added };
                 });
                 for (const one of earned?.tiers ?? []) {
                     const tierReward = season.tierReward(one, sweep.settings);
-                    effects.push({ kind: "tell", line: messages.tierLine(one, messages.rewardText(tierReward, sweep.settings.language), sweep.settings.language) });
+                    effects.push({
+                        kind: "tell",
+                        line: messages.tierLine(
+                            one,
+                            messages.rewardText(tierReward, sweep.settings.language),
+                            sweep.settings.language
+                        )
+                    });
                     effects.push({ kind: "pay", payout: tierReward, label: `tier ${one}` });
                 }
             }
-            effects.push({ kind: "tell", line: messages.goalRewardLine(messages.rewardText(reward, sweep.settings.language), sweep.settings.language) });
+            effects.push({
+                kind: "tell",
+                line: messages.goalRewardLine(
+                    messages.rewardText(reward, sweep.settings.language),
+                    sweep.settings.language
+                )
+            });
             effects.push({ kind: "pay", payout: reward, label: title });
             await carry(sweep, name, online, effects);
         }
@@ -964,7 +1223,11 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
     sweep.state =
         (await updateState(sweep.installedAppId, (state) => ({
             ...state,
-            goals: state.goals.map((one) => (one.id === goal.id ? { ...one, shares: goal.shares, tier: Math.max(one.tier, tier), paid } : one))
+            goals: state.goals.map((one) =>
+                one.id === goal.id
+                    ? { ...one, shares: goal.shares, tier: Math.max(one.tier, tier), paid }
+                    : one
+            )
         }))) ?? sweep.state;
 }
 
@@ -1016,7 +1279,8 @@ function creditStats(
 
 /** The x-ray rule: a mining challenge dealt before an Anti X-Ray hit is lost. */
 function xrayVoid(sweep: Sweep, name: string, instance: stored.Instance): stored.Instance {
-    if (!sweep.settings.antiExploit.xray || instance.doneAt !== null || instance.voided) return instance;
+    if (!sweep.settings.antiExploit.xray || instance.doneAt !== null || instance.voided)
+        return instance;
     const template = templateOrNull(instance);
     if (!template || template.category !== "mining") return instance;
     const hits = sweep.caught.get(name.toLowerCase()) ?? [];
@@ -1039,7 +1303,11 @@ async function readPlayer(sweep: Sweep, held: Stored, seen: plan.Seen, pace: Pac
     let record: stored.PlayerRecord = {
         ...held.record,
         name,
-        minutes: held.record.minutes + (now - held.record.lastSeenAt <= 3 * READ_MS ? (now - held.record.lastSeenAt) / 60_000 : 0),
+        minutes:
+            held.record.minutes +
+            (now - held.record.lastSeenAt <= 3 * READ_MS
+                ? (now - held.record.lastSeenAt) / 60_000
+                : 0),
         lastSeenAt: now
     };
     const justJoined = !sweep.loop.online.has(name.toLowerCase());
@@ -1083,7 +1351,10 @@ async function readPlayer(sweep: Sweep, held: Stored, seen: plan.Seen, pace: Pac
 /** Each challenge's progress before a read, to tell what moved. */
 function snapshot(record: stored.PlayerRecord): Map<string, number> {
     const found = new Map<string, number>();
-    for (const layer of play.LAYER_KEYS) record[layer]?.instances.forEach((one, index) => found.set(play.refOf(layer, index), one.progress));
+    for (const layer of play.LAYER_KEYS)
+        record[layer]?.instances.forEach((one, index) =>
+            found.set(play.refOf(layer, index), one.progress)
+        );
     record.backlog.forEach((one, index) => found.set(play.refOf("backlog", index), one.progress));
     return found;
 }
@@ -1117,9 +1388,14 @@ async function creditOther(
             if (!pace.slow) return instance;
             let count = 0;
             for (const item of check.items) {
-                const obtained = progress.partsSince(catalog.heldParts([item]), values, instance.base);
+                const obtained = progress.partsSince(
+                    catalog.heldParts([item]),
+                    values,
+                    instance.base
+                );
                 if (obtained < 1) continue;
-                if (progress.readHeld(await sweep.server.say([commands.heldCount(name, item)])) > 0) count += 1;
+                if (progress.readHeld(await sweep.server.say([commands.heldCount(name, item)])) > 0)
+                    count += 1;
             }
             return look(count);
         }
@@ -1129,7 +1405,8 @@ async function creditOther(
             let count = 0;
             for (const id of check.ids) {
                 if (had.includes(id)) continue;
-                if (progress.passed(await sweep.server.say([commands.hasAdvancement(name, id)]))) count += 1;
+                if (progress.passed(await sweep.server.say([commands.hasAdvancement(name, id)])))
+                    count += 1;
             }
             return look(count);
         }
@@ -1138,7 +1415,11 @@ async function creditOther(
             if (!pace.files) return instance;
             const file = await advancementsOf(sweep, name);
             if (file === null) return instance;
-            const earned = progress.earnedSince(file, instance.dealtAt, check.kind === "criteria" ? check.ids : null);
+            const earned = progress.earnedSince(
+                file,
+                instance.dealtAt,
+                check.kind === "criteria" ? check.ids : null
+            );
             return look(earned.length);
         }
         case "polaris":
@@ -1160,17 +1441,23 @@ function creditMeasure(
     const seconds = Math.max(1, (sweep.now - (instance.readAt ?? instance.dealtAt)) / 1000);
     switch (check.measure) {
         case "nether-distance":
-            return look(instance.raw + progress.netherStep(instance.at, where, seconds), { at: where });
+            return look(instance.raw + progress.netherStep(instance.at, where, seconds), {
+                at: where
+            });
         case "villages": {
-            const rose = check.parts ? progress.partsSince(check.parts, values, instance.last) > 0 : false;
+            const rose = check.parts
+                ? progress.partsSince(check.parts, values, instance.last) > 0
+                : false;
             const cell = progress.cellOf(where.x, where.z, where.dimension);
-            const cells = rose && !instance.cells.includes(cell) ? [...instance.cells, cell] : instance.cells;
+            const cells =
+                rose && !instance.cells.includes(cell) ? [...instance.cells, cell] : instance.cells;
             return look(cells.length, { cells });
         }
         case "together": {
             const me = seen;
             const active = (one: plan.Seen) =>
-                one.movedAt !== null && sweep.now - one.movedAt <= sweep.settings.antiExploit.afkMinutes * 60_000;
+                one.movedAt !== null &&
+                sweep.now - one.movedAt <= sweep.settings.antiExploit.afkMinutes * 60_000;
             const near = [...sweep.seen.values()].some(
                 (other) =>
                     other.name !== me.name &&
@@ -1178,7 +1465,10 @@ function creditMeasure(
                     (other.dimension ?? "") === (me.dimension ?? "") &&
                     Math.hypot(other.x - me.x, other.z - me.z) <= 64
             );
-            const minutes = active(me) && near && instance.readAt !== null ? Math.min(seconds, (READ_MS * 2) / 1000) / 60 : 0;
+            const minutes =
+                active(me) && near && instance.readAt !== null
+                    ? Math.min(seconds, (READ_MS * 2) / 1000) / 60
+                    : 0;
             return look(instance.raw + minutes);
         }
         case "community-share": {
@@ -1199,10 +1489,13 @@ function creditMeasure(
 async function advancementsOf(sweep: Sweep, name: string): Promise<string | null> {
     const loop = sweep.loop;
     loop.level ??= await levelOf(sweep.server);
-    if (!loop.uuids || !loop.uuids.has(name.toLowerCase())) loop.uuids = await uuidsOf(sweep.server);
+    if (!loop.uuids || !loop.uuids.has(name.toLowerCase()))
+        loop.uuids = await uuidsOf(sweep.server);
     const uuid = loop.uuids.get(name.toLowerCase());
     if (!uuid) return null;
-    return readContainerFile(sweep.server, `/data/${loop.level}/advancements/${uuid}.json`).catch(() => null);
+    return readContainerFile(sweep.server, `/data/${loop.level}/advancements/${uuid}.json`).catch(
+        () => null
+    );
 }
 
 /** A community goal's part for a player: dealt the first time they are seen
@@ -1220,14 +1513,25 @@ async function creditCommunity(
         const values = progress.valuesOf(scores, layer.objectives);
         const mine =
             community[goal.id] ??
-            progress.dealt({ template: goal.template, variant: goal.variant, tier: "hard", target: goal.target }, values, sweep.now);
+            progress.dealt(
+                {
+                    template: goal.template,
+                    variant: goal.variant,
+                    tier: "hard",
+                    target: goal.target
+                },
+                values,
+                sweep.now
+            );
         let next = creditStats(sweep, sweep.player, mine, layer, scores, false);
         next = xrayVoid(sweep, record.name, next);
         community[goal.id] = next;
         goal.shares[record.name.toLowerCase()] = { name: record.name, value: next.progress };
     }
     // Parts of goals that are over are let go.
-    for (const id of Object.keys(community)) if (!sweep.state.goals.some((goal) => goal.id === id && !goal.finished)) delete community[id];
+    for (const id of Object.keys(community))
+        if (!sweep.state.goals.some((goal) => goal.id === id && !goal.finished))
+            delete community[id];
     return { ...record, community };
 }
 
@@ -1249,16 +1553,30 @@ async function dealMissing(
         const current = sweep.state[layer];
         if (!current || !current.applied || !sweep.settings.layers[layer]) continue;
         if (next[layer]?.key === current.key) continue;
-        if (layer === "daily" && next.daily) next = play.toBacklog(next, next.daily, next.daily.key, today, period.dayNumber);
+        if (layer === "daily" && next.daily)
+            next = play.toBacklog(next, next.daily, next.daily.key, today, period.dayNumber);
         // What was tracked belonged to the period that ended.
         const stale = layer === "daily" ? ["daily:", "backlog:"] : [`${layer}:`];
-        if (stale.some((prefix) => next.tracked?.startsWith(prefix))) next = { ...next, tracked: null };
+        if (stale.some((prefix) => next.tracked?.startsWith(prefix)))
+            next = { ...next, tracked: null };
         const values = progress.valuesOf(scores, current.objectives);
         const entries = draw.deal(layer, current.pool, next.name, current.key);
         const instances: stored.Instance[] = [];
-        for (const entry of entries) instances.push(await withFallback(sweep, layer, entry, values));
-        next = { ...next, [layer]: { key: current.key, instances, rerolls: 0, swept: false, lines: [], full: false } };
-        if (layer === "daily") next = { ...next, backlog: redeal(next, current, values, sweep.now) };
+        for (const entry of entries)
+            instances.push(await withFallback(sweep, layer, entry, values));
+        next = {
+            ...next,
+            [layer]: {
+                key: current.key,
+                instances,
+                rerolls: 0,
+                swept: false,
+                lines: [],
+                full: false
+            }
+        };
+        if (layer === "daily")
+            next = { ...next, backlog: redeal(next, current, values, sweep.now) };
     }
     return next;
 }
@@ -1278,9 +1596,18 @@ async function withFallback(
     const fallback = template?.fallback ? catalog.templateOf(template.fallback) : null;
     const replaced = () => {
         const tier = entry.tier;
-        const base = fallback ? (catalog.baseTarget(fallback, layer, tier) ?? catalog.baseTarget(fallback, layer, "hard") ?? 1) : 1;
+        const base = fallback
+            ? (catalog.baseTarget(fallback, layer, tier) ??
+              catalog.baseTarget(fallback, layer, "hard") ??
+              1)
+            : 1;
         return progress.dealt(
-            { template: fallback!.id, variant: fallback!.variants?.[0]?.key ?? null, tier, target: Math.max(1, Math.round(base * sweep.settings.multiplier)) },
+            {
+                template: fallback!.id,
+                variant: fallback!.variants?.[0]?.key ?? null,
+                tier,
+                target: Math.max(1, Math.round(base * sweep.settings.multiplier))
+            },
             values,
             sweep.now
         );
@@ -1288,7 +1615,10 @@ async function withFallback(
     if (check?.kind === "advancement") {
         const had: string[] = [];
         for (const id of check.ids) {
-            if (progress.passed(await sweep.server.say([commands.hasAdvancement(sweep.player, id)]))) had.push(id);
+            if (
+                progress.passed(await sweep.server.say([commands.hasAdvancement(sweep.player, id)]))
+            )
+                had.push(id);
         }
         if (fallback && had.length >= check.ids.length) return replaced();
         return progress.dealt(entry, values, sweep.now, { had });
@@ -1315,7 +1645,12 @@ function advancementDone(file: string, id: string): boolean {
  * with what it had got to; any other becomes a challenge of the same tier from
  * today's pool, from nothing. One that finds no home is let go.
  */
-function redeal(record: stored.PlayerRecord, today: stored.Period, values: Readonly<Record<string, number>>, now: number): stored.Instance[] {
+function redeal(
+    record: stored.PlayerRecord,
+    today: stored.Period,
+    values: Readonly<Record<string, number>>,
+    now: number
+): stored.Instance[] {
     const holding = new Set((record.daily?.instances ?? []).map((one) => one.template));
     const kept: stored.Instance[] = [];
     for (const one of record.backlog) {
@@ -1328,11 +1663,21 @@ function redeal(record: stored.PlayerRecord, today: stored.Period, values: Reado
         }
         const same = today.pool.find((entry) => entry.template === one.template);
         if (same && !holding.has(one.template)) {
-            kept.push({ ...one, base: { ...values }, last: { ...values }, raw: 0, offset: 0, dealtAt: now, readAt: now });
+            kept.push({
+                ...one,
+                base: { ...values },
+                last: { ...values },
+                raw: 0,
+                offset: 0,
+                dealtAt: now,
+                readAt: now
+            });
             holding.add(one.template);
             continue;
         }
-        const other = today.pool.find((entry) => entry.tier === one.tier && !holding.has(entry.template));
+        const other = today.pool.find(
+            (entry) => entry.tier === one.tier && !holding.has(entry.template)
+        );
         if (!other) continue;
         kept.push({ ...progress.dealt(other, values, now, { day: one.day }), readAt: now });
         holding.add(other.template);
@@ -1342,8 +1687,18 @@ function redeal(record: stored.PlayerRecord, today: stored.Period, values: Reado
 
 // ------------------------------------------------------------------ paying
 
-async function settleAndCarry(sweep: Sweep, record: stored.PlayerRecord, online: boolean): Promise<stored.PlayerRecord> {
-    const holder = holderOf(sweep.settings, sweep.ownerId, sweep.installedAppId, record.name, sweep.links);
+async function settleAndCarry(
+    sweep: Sweep,
+    record: stored.PlayerRecord,
+    online: boolean
+): Promise<stored.PlayerRecord> {
+    const holder = holderOf(
+        sweep.settings,
+        sweep.ownerId,
+        sweep.installedAppId,
+        record.name,
+        sweep.links
+    );
     const keys = {
         daily: sweep.state.daily?.key ?? null,
         weekly: sweep.state.weekly?.key ?? null,
@@ -1368,14 +1723,23 @@ async function settleAndCarry(sweep: Sweep, record: stored.PlayerRecord, online:
 
 /** Effects carried out for one player: said and shown if they are on, rewards
  *  given - or kept for their next visit when they are not, or did not arrive. */
-async function carry(sweep: Sweep, name: string, online: boolean, effects: readonly play.Effect[]): Promise<void> {
+async function carry(
+    sweep: Sweep,
+    name: string,
+    online: boolean,
+    effects: readonly play.Effect[]
+): Promise<void> {
     if (!commands.PLAYER_NAME.test(name)) return;
     const language = sweep.settings.language;
     const said: string[] = [];
-    const owed: { items: { id: string; count: number }[]; levels: number } = { items: [], levels: 0 };
+    const owed: { items: { id: string; count: number }[]; levels: number } = {
+        items: [],
+        levels: 0
+    };
     for (const effect of effects) {
         if (effect.kind === "tell" && online) said.push(commands.tell(name, effect.line));
-        if (effect.kind === "title" && online) said.push(...commands.completion(name, effect.title, effect.subtitle));
+        if (effect.kind === "title" && online)
+            said.push(...commands.completion(name, effect.title, effect.subtitle));
         if (effect.kind !== "pay") continue;
         if (!online) {
             owed.items.push(...effect.payout.items);
@@ -1384,9 +1748,11 @@ async function carry(sweep: Sweep, name: string, online: boolean, effects: reado
         }
         const lines = commands.giveLines(name, effect.payout);
         for (const [index, line] of lines.items.entries()) {
-            if (!commands.arrived(await sweep.server.say([line]))) owed.items.push(effect.payout.items[index]!);
+            if (!commands.arrived(await sweep.server.say([line])))
+                owed.items.push(effect.payout.items[index]!);
         }
-        if (lines.levels && !commands.arrived(await sweep.server.say([lines.levels]))) owed.levels += effect.payout.levels;
+        if (lines.levels && !commands.arrived(await sweep.server.say([lines.levels])))
+            owed.levels += effect.payout.levels;
     }
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;
@@ -1411,7 +1777,10 @@ async function owe(
     // Split into rewards of at most six items, which is what the queue holds.
     const chunks: { items: { id: string; count: number }[]; levels: number }[] = [];
     for (let index = 0; index < Math.max(1, reward.items.length); index += 6) {
-        chunks.push({ items: reward.items.slice(index, index + 6), levels: index === 0 ? reward.levels : 0 });
+        chunks.push({
+            items: reward.items.slice(index, index + 6),
+            levels: index === 0 ? reward.levels : 0
+        });
     }
     await updateEventState(installedAppId, (state) => ({
         ...state,
@@ -1433,7 +1802,12 @@ async function owe(
 
 // ------------------------------------------------------------------ showing progress
 
-async function showProgress(sweep: Sweep, record: stored.PlayerRecord, before: Map<string, number>, justJoined: boolean): Promise<void> {
+async function showProgress(
+    sweep: Sweep,
+    record: stored.PlayerRecord,
+    before: Map<string, number>,
+    justJoined: boolean
+): Promise<void> {
     const { settings, now } = sweep;
     const language = settings.language;
     const name = record.name;
@@ -1453,7 +1827,10 @@ async function showProgress(sweep: Sweep, record: stored.PlayerRecord, before: M
             lines.push(
                 ...commands.barShow(
                     bar,
-                    messages.trackedName(catalog.titleOf(template, tracked.variant, tracked.target, language), messages.figures(template, tracked.progress, tracked.target, language)),
+                    messages.trackedName(
+                        catalog.titleOf(template, tracked.variant, tracked.target, language),
+                        messages.figures(template, tracked.progress, tracked.target, language)
+                    ),
                     tracked.progress,
                     tracked.target,
                     name,
@@ -1473,7 +1850,10 @@ async function showProgress(sweep: Sweep, record: stored.PlayerRecord, before: M
         for (const [ref, was] of before) {
             const instance = play.lookup(record, ref);
             if (!instance || instance.doneAt !== null || instance.progress <= was) continue;
-            const gain = ref === record.tracked ? Number.POSITIVE_INFINITY : (instance.progress - was) / Math.max(1, instance.target);
+            const gain =
+                ref === record.tracked
+                    ? Number.POSITIVE_INFINITY
+                    : (instance.progress - was) / Math.max(1, instance.target);
             if (!best || gain > best.gain) best = { instance, gain };
         }
         const template = best ? templateOrNull(best.instance) : null;
@@ -1482,8 +1862,18 @@ async function showProgress(sweep: Sweep, record: stored.PlayerRecord, before: M
                 commands.actionBar(
                     name,
                     messages.actionBar(
-                        catalog.titleOf(template, best.instance.variant, best.instance.target, language),
-                        messages.figures(template, best.instance.progress, best.instance.target, language)
+                        catalog.titleOf(
+                            template,
+                            best.instance.variant,
+                            best.instance.target,
+                            language
+                        ),
+                        messages.figures(
+                            template,
+                            best.instance.progress,
+                            best.instance.target,
+                            language
+                        )
                     )
                 )
             );
@@ -1491,11 +1881,19 @@ async function showProgress(sweep: Sweep, record: stored.PlayerRecord, before: M
         }
     }
     if (justJoined && settings.display.joinMessage && settings.layers.daily) {
-        const left = (record.daily?.instances ?? []).filter((one) => one.doneAt === null && !one.voided).length;
+        const left = (record.daily?.instances ?? []).filter(
+            (one) => one.doneAt === null && !one.voided
+        ).length;
         lines.push(
             ...commands.fitted(name, [
                 ...commands.parts(`${messages.joinLine(left, language)} `),
-                commands.button(messages.MENU_BUTTON[language], messages.LABELS.listHover[language], commands.PRESS.list, "gold", sweep.context.spelling)
+                commands.button(
+                    messages.MENU_BUTTON[language],
+                    messages.LABELS.listHover[language],
+                    commands.PRESS.list,
+                    "gold",
+                    sweep.context.spelling
+                )
             ])
         );
     }
@@ -1536,10 +1934,16 @@ async function handlePresses(
         await server.sayAll(commands.pressHandled(name));
         const held = players.get(name.toLowerCase());
         if (!held || !commands.PLAYER_NAME.test(name)) continue;
-        const lines = await answer(live, { ...held.record, name }, value).catch((error: unknown) => {
-            console.warn("polaris: answering a challenges button failed", installedAppId, String(error));
-            return [] as string[];
-        });
+        const lines = await answer(live, { ...held.record, name }, value).catch(
+            (error: unknown) => {
+                console.warn(
+                    "polaris: answering a challenges button failed",
+                    installedAppId,
+                    String(error)
+                );
+                return [] as string[];
+            }
+        );
         if (lines.length > 0) await server.sayAll(lines);
     }
 }
@@ -1566,16 +1970,22 @@ async function answer(sweep: Sweep, record: stored.PlayerRecord, value: number):
             goals: running(sweep.state.goals, now)
         });
     if (value === commands.PRESS.list) {
-        if (!record.daily && !record.weekly) return [commands.tell(name, messages.nothingYet(language))];
+        if (!record.daily && !record.weekly)
+            return [commands.tell(name, messages.nothingYet(language))];
         return list();
     }
     if (value === commands.PRESS.season) return play.seasonMenu(name, ledger, context);
-    if (value === commands.PRESS.card) return play.cardMenu(name, record, context, period.monthEndsAt(sweep.clock, now) - now);
-    if (value === commands.PRESS.goal) return play.goalMenu(name, record, sweep.state.goals, context);
+    if (value === commands.PRESS.card)
+        return play.cardMenu(name, record, context, period.monthEndsAt(sweep.clock, now) - now);
+    if (value === commands.PRESS.goal)
+        return play.goalMenu(name, record, sweep.state.goals, context);
     if (value === commands.PRESS.untrack) {
         await savePlayer(sweep.installedAppId, { ...record, tracked: null });
         sweep.loop.bars.delete(commands.trackedBar(name));
-        return [commands.barRemove(commands.trackedBar(name)), commands.tell(name, messages.untracked(language))];
+        return [
+            commands.barRemove(commands.trackedBar(name)),
+            commands.tell(name, messages.untracked(language))
+        ];
     }
     if (value >= commands.PRESS.reroll && value < commands.PRESS.reroll + 6) {
         const slot = value - commands.PRESS.reroll;
@@ -1586,13 +1996,19 @@ async function answer(sweep: Sweep, record: stored.PlayerRecord, value: number):
         value >= commands.PRESS.track && value < commands.PRESS.track + 9
             ? (() => {
                   const slot = value - commands.PRESS.track;
-                  return slot < 3 ? play.refOf("daily", slot) : slot < 6 ? play.refOf("weekly", slot - 3) : play.refOf("backlog", slot - 6);
+                  return slot < 3
+                      ? play.refOf("daily", slot)
+                      : slot < 6
+                        ? play.refOf("weekly", slot - 3)
+                        : play.refOf("backlog", slot - 6);
               })()
             : value >= commands.PRESS.trackSquare && value < commands.PRESS.trackSquare + 9
               ? play.refOf("card", value - commands.PRESS.trackSquare)
               : value >= commands.PRESS.trackGoal && value < commands.PRESS.trackGoal + 5
                 ? (() => {
-                      const goal = running(sweep.state.goals, now)[value - commands.PRESS.trackGoal];
+                      const goal = running(sweep.state.goals, now)[
+                          value - commands.PRESS.trackGoal
+                      ];
                       return goal ? `goal:${goal.id}` : null;
                   })()
                 : null;
@@ -1607,7 +2023,10 @@ async function answer(sweep: Sweep, record: stored.PlayerRecord, value: number):
         return [
             ...commands.barShow(
                 commands.trackedBar(name),
-                messages.trackedName(title, messages.figures(template, instance.progress, instance.target, language)),
+                messages.trackedName(
+                    title,
+                    messages.figures(template, instance.progress, instance.target, language)
+                ),
                 instance.progress,
                 instance.target,
                 name,
@@ -1621,7 +2040,12 @@ async function answer(sweep: Sweep, record: stored.PlayerRecord, value: number):
 
 /** A challenge swapped for another of the same tier from the pool, counting
  *  from the player's scores as they are now - never a free completion. */
-async function reroll(sweep: Sweep, record: stored.PlayerRecord, layer: "daily" | "weekly", index: number): Promise<string[]> {
+async function reroll(
+    sweep: Sweep,
+    record: stored.PlayerRecord,
+    layer: "daily" | "weekly",
+    index: number
+): Promise<string[]> {
     const { settings, now } = sweep;
     const language = settings.language;
     const name = record.name;
@@ -1629,16 +2053,34 @@ async function reroll(sweep: Sweep, record: stored.PlayerRecord, layer: "daily" 
     const current = sweep.state[layer];
     const instance = layered?.instances[index];
     const allowed = layer === "daily" ? settings.rerolls.daily : settings.rerolls.weekly;
-    if (!layered || !current || layered.key !== current.key || !instance || instance.doneAt !== null || layered.rerolls >= allowed)
+    if (
+        !layered ||
+        !current ||
+        layered.key !== current.key ||
+        !instance ||
+        instance.doneAt !== null ||
+        layered.rerolls >= allowed
+    )
         return [commands.tell(name, messages.noReroll(language))];
-    const entry = draw.reroll(current.pool, instance, layered.instances, `${name.toLowerCase()}:${current.key}:${layer}:${layered.rerolls}`);
+    const entry = draw.reroll(
+        current.pool,
+        instance,
+        layered.instances,
+        `${name.toLowerCase()}:${current.key}:${layer}:${layered.rerolls}`
+    );
     if (!entry) return [commands.tell(name, messages.noReroll(language))];
     const scores = progress.readList(await sweep.server.say([commands.listScores(name)]));
     const values = progress.valuesOf(scores, current.objectives);
     const fresh = await withFallback({ ...sweep, player: name }, layer, entry, values);
-    const instances = layered.instances.map((one, at) => (at === index ? { ...fresh, readAt: now } : one));
+    const instances = layered.instances.map((one, at) =>
+        at === index ? { ...fresh, readAt: now } : one
+    );
     const tracked = record.tracked === play.refOf(layer, index) ? null : record.tracked;
-    const next = { ...record, tracked, [layer]: { ...layered, instances, rerolls: layered.rerolls + 1 } };
+    const next = {
+        ...record,
+        tracked,
+        [layer]: { ...layered, instances, rerolls: layered.rerolls + 1 }
+    };
     await savePlayer(sweep.installedAppId, next);
     return [commands.tell(name, messages.rerolled(play.titleOf(fresh, language), language))];
 }
@@ -1653,7 +2095,10 @@ async function noteNewcomer(sweep: Sweep, name: string): Promise<void> {
     loop.uuids = await uuidsOf(sweep.server);
     const uuid = loop.uuids.get(name.toLowerCase());
     if (!uuid) return;
-    const stats = await readContainerFile(sweep.server, `/data/${loop.level}/stats/${uuid}.json`).catch(() => "");
+    const stats = await readContainerFile(
+        sweep.server,
+        `/data/${loop.level}/stats/${uuid}.json`
+    ).catch(() => "");
     if (stats !== null) return;
     loop.newcomers.push({ name, at: sweep.now, greeters: [] });
 }
@@ -1679,7 +2124,8 @@ async function welcome(sweep: Sweep): Promise<void> {
     for (const newcomer of loop.newcomers) {
         for (const speaker of said) {
             if (speaker.toLowerCase() === newcomer.name.toLowerCase()) continue;
-            if (newcomer.greeters.length >= 3 || newcomer.greeters.includes(speaker.toLowerCase())) continue;
+            if (newcomer.greeters.length >= 3 || newcomer.greeters.includes(speaker.toLowerCase()))
+                continue;
             newcomer.greeters.push(speaker.toLowerCase());
             credited.add(`${speaker.toLowerCase()}|${newcomer.name.toLowerCase()}`);
         }
@@ -1688,24 +2134,39 @@ async function welcome(sweep: Sweep): Promise<void> {
         const [speaker, newcomer] = pair.split("|") as [string, string];
         const held = (await loadPlayers(sweep.installedAppId, [speaker], sweep.now)).get(speaker);
         if (!held || held.fresh || held.record.greeted.includes(newcomer)) continue;
-        const record = bump({ ...held.record, greeted: [...held.record.greeted, newcomer].slice(-50) }, "welcome", 1);
+        const record = bump(
+            { ...held.record, greeted: [...held.record.greeted, newcomer].slice(-50) },
+            "welcome",
+            1
+        );
         await savePlayer(sweep.installedAppId, record);
     }
 }
 
 /** One more of something Polaris counts, on every challenge of the player's
  *  that measures it this period. */
-function bump(record: stored.PlayerRecord, measure: catalog.Measure, by: number): stored.PlayerRecord {
+function bump(
+    record: stored.PlayerRecord,
+    measure: catalog.Measure,
+    by: number
+): stored.PlayerRecord {
     const raise = (instance: stored.Instance) => {
         const template = catalog.templateOf(instance.template);
         const check = template ? catalog.checkOf(template, instance.variant) : null;
-        if (!check || check.kind !== "polaris" || check.measure !== measure || instance.doneAt !== null) return instance;
+        if (
+            !check ||
+            check.kind !== "polaris" ||
+            check.measure !== measure ||
+            instance.doneAt !== null
+        )
+            return instance;
         return { ...instance, raw: instance.raw + by };
     };
     let next = record;
     for (const layer of play.LAYER_KEYS) {
         const layered = next[layer];
-        if (layered) next = { ...next, [layer]: { ...layered, instances: layered.instances.map(raise) } };
+        if (layered)
+            next = { ...next, [layer]: { ...layered, instances: layered.instances.map(raise) } };
     }
     return { ...next, backlog: next.backlog.map(raise) };
 }
@@ -1727,24 +2188,32 @@ export type EventResult = z.infer<typeof eventResultSchema>;
  * won. Only events at least two people played count, so nobody earns it alone.
  * Counted into the stored progress; the next read hands out what it finishes.
  */
-export async function creditEventResults(installedAppId: string, input: EventResult): Promise<void> {
+export async function creditEventResults(
+    installedAppId: string,
+    input: EventResult
+): Promise<void> {
     const parsed = eventResultSchema.safeParse(input);
     if (!parsed.success || parsed.data.participants < 2) return;
     const result = parsed.data;
     const row = await readRow(installedAppId);
     if (!row || !settingsOf(row.config).enabled) return;
     await inTurn(installedAppId, async () => {
-        const names = [...new Set([...result.ranked, ...result.podium, ...Object.keys(result.rounds)])].filter((name) =>
-            commands.PLAYER_NAME.test(name)
-        );
+        const names = [
+            ...new Set([...result.ranked, ...result.podium, ...Object.keys(result.rounds)])
+        ].filter((name) => commands.PLAYER_NAME.test(name));
         const players = await loadPlayers(installedAppId, names, Date.now());
         for (const name of names) {
             const held = players.get(name.toLowerCase());
             if (!held || held.fresh) continue;
             let record = held.record;
-            if (result.ranked.some((one) => one.toLowerCase() === name.toLowerCase())) record = bump(record, "events-ranked", 1);
-            if (result.podium.some((one) => one.toLowerCase() === name.toLowerCase())) record = bump(record, "events-podium", 1);
-            const rounds = Object.entries(result.rounds).find(([one]) => one.toLowerCase() === name.toLowerCase())?.[1] ?? 0;
+            if (result.ranked.some((one) => one.toLowerCase() === name.toLowerCase()))
+                record = bump(record, "events-ranked", 1);
+            if (result.podium.some((one) => one.toLowerCase() === name.toLowerCase()))
+                record = bump(record, "events-podium", 1);
+            const rounds =
+                Object.entries(result.rounds).find(
+                    ([one]) => one.toLowerCase() === name.toLowerCase()
+                )?.[1] ?? 0;
             if (rounds > 0) record = bump(record, "chat-games", rounds);
             if (record !== held.record) await savePlayer(installedAppId, record);
         }
@@ -1759,7 +2228,9 @@ export async function creditEventResults(installedAppId: string, input: EventRes
  * in the loop, so a server whose loop is between two looks still gets its new
  * day on the minute.
  */
-export async function sweepChallenges(now = Date.now()): Promise<{ running: number; rotated: number }> {
+export async function sweepChallenges(
+    now = Date.now()
+): Promise<{ running: number; rotated: number }> {
     const rows = await prisma.installedApp.findMany({
         where: { status: { not: "removed" }, catalogId: "minecraft" },
         select: { id: true, ownerId: true, config: true }
@@ -1773,13 +2244,24 @@ export async function sweepChallenges(now = Date.now()): Promise<{ running: numb
             if (loops.has(row.id)) await stopLoop(row.id);
             if (anyApplied(stored.readServerState(config))) {
                 await withServerContainer(row.ownerId, row.id, async (server) => {
-                    if (server.running) await inTurn(row.id, () => switchOff(row.id, server, { ownerId: row.ownerId, catalogId: "minecraft", config }));
+                    if (server.running)
+                        await inTurn(row.id, () =>
+                            switchOff(row.id, server, {
+                                ownerId: row.ownerId,
+                                catalogId: "minecraft",
+                                config
+                            })
+                        );
                 }).catch(() => undefined);
             }
             continue;
         }
         try {
-            const due = await withServerContainer(row.ownerId, row.id, async (server) => server.running);
+            const due = await withServerContainer(
+                row.ownerId,
+                row.id,
+                async (server) => server.running
+            );
             if (!due) {
                 if (loops.has(row.id)) await stopLoop(row.id);
                 continue;
@@ -1790,10 +2272,28 @@ export async function sweepChallenges(now = Date.now()): Promise<{ running: numb
                 if (!loop.link) loop.link = await openServerContainer(row.ownerId, row.id);
                 const fresh = await readRow(row.id);
                 if (!fresh) return;
-                const sweep = await contextFor(row.id, loop, loop.link.server, fresh, settingsOf(fresh.config), now);
-                const before = JSON.stringify([sweep.state.daily?.key, sweep.state.weekly?.key, sweep.state.card?.key]);
+                const sweep = await contextFor(
+                    row.id,
+                    loop,
+                    loop.link.server,
+                    fresh,
+                    settingsOf(fresh.config),
+                    now
+                );
+                const before = JSON.stringify([
+                    sweep.state.daily?.key,
+                    sweep.state.weekly?.key,
+                    sweep.state.card?.key
+                ]);
                 await rotate({ ...sweep, seen: playing.seenOn(row.id) ?? new Map() });
-                if (JSON.stringify([sweep.state.daily?.key, sweep.state.weekly?.key, sweep.state.card?.key]) !== before) rotated += 1;
+                if (
+                    JSON.stringify([
+                        sweep.state.daily?.key,
+                        sweep.state.weekly?.key,
+                        sweep.state.card?.key
+                    ]) !== before
+                )
+                    rotated += 1;
             });
         } catch (error) {
             console.warn("polaris: challenges sweep failed", row.id, String(error));
@@ -1844,7 +2344,12 @@ export interface ChallengesView {
     readonly weekly: PoolView | null;
     readonly card: PoolView | null;
     readonly tomorrow: readonly stored.PoolEntry[];
-    readonly season: { readonly number: number; readonly startDay: string; readonly endDay: string; readonly daysLeft: number };
+    readonly season: {
+        readonly number: number;
+        readonly startDay: string;
+        readonly endDay: string;
+        readonly daysLeft: number;
+    };
     readonly goals: readonly (stored.GoalState & { readonly total: number })[];
     readonly players: readonly PlayerRow[];
     readonly pace: Readonly<Record<string, number>>;
@@ -1871,28 +2376,57 @@ export async function challengesView(installedAppId: string): Promise<Challenges
     const state = stored.readServerState(row.config);
     const now = Date.now();
     const clock = clockOf(settings);
-    const seasonNow = period.seasonOf(clock, now, await firstDayOf(settings, row.ownerId, state, clock, now), settings.season.weeks);
+    const seasonNow = period.seasonOf(
+        clock,
+        now,
+        await firstDayOf(settings, row.ownerId, state, clock, now),
+        settings.season.weeks
+    );
     const rows = await prisma.minecraftChallengePlayer
-        .findMany({ where: { installedAppId }, select: { player: true, playerName: true, data: true }, orderBy: { updatedAt: "desc" }, take: 200 })
+        .findMany({
+            where: { installedAppId },
+            select: { player: true, playerName: true, data: true },
+            orderBy: { updatedAt: "desc" },
+            take: 200
+        })
         .catch(() => []);
     const records = rows.map((one) => stored.readPlayer(one.data, one.playerName, now));
     const links = await linksOf(installedAppId);
     // One query per scope (this server's, and a shared season's), not one per player.
-    const holders = new Map(records.map((record) => [record.name.toLowerCase(), holderOf(settings, row.ownerId, installedAppId, record.name, links)]));
+    const holders = new Map(
+        records.map((record) => [
+            record.name.toLowerCase(),
+            holderOf(settings, row.ownerId, installedAppId, record.name, links)
+        ])
+    );
     const byScope = new Map<string, Set<string>>();
-    for (const holder of holders.values()) byScope.set(holder.scope, (byScope.get(holder.scope) ?? new Set()).add(holder.holder));
+    for (const holder of holders.values())
+        byScope.set(holder.scope, (byScope.get(holder.scope) ?? new Set()).add(holder.holder));
     const found = new Map<string, string>();
     for (const [scope, wanted] of byScope) {
         const rows = await prisma.minecraftChallengeLedger
-            .findMany({ where: { scope, holder: { in: [...wanted] } }, select: { holder: true, data: true } })
+            .findMany({
+                where: { scope, holder: { in: [...wanted] } },
+                select: { holder: true, data: true }
+            })
             .catch(() => []);
-        for (const one of rows) found.set(`${scope}
-${one.holder}`, one.data);
+        for (const one of rows)
+            found.set(
+                `${scope}
+${one.holder}`,
+                one.data
+            );
     }
     const ledgers = new Map<string, stored.Ledger>();
     for (const [name, holder] of holders) {
-        ledgers.set(name, stored.readLedger(found.get(`${holder.scope}
-${holder.holder}`) ?? null, seasonNow.key));
+        ledgers.set(
+            name,
+            stored.readLedger(
+                found.get(`${holder.scope}
+${holder.holder}`) ?? null,
+                seasonNow.key
+            )
+        );
     }
     const poolView = (layer: Layer): PoolView | null => {
         const current = state[layer];
@@ -1903,9 +2437,15 @@ ${holder.holder}`) ?? null, seasonNow.key));
             refused: current.refused,
             entries: current.pool.map((entry) => {
                 const holding = records.flatMap((record) =>
-                    record[layer]?.key === current.key ? record[layer]!.instances.filter((one) => one.template === entry.template) : []
+                    record[layer]?.key === current.key
+                        ? record[layer]!.instances.filter((one) => one.template === entry.template)
+                        : []
                 );
-                return { ...entry, dealt: holding.length, done: holding.filter((one) => one.doneAt !== null).length };
+                return {
+                    ...entry,
+                    dealt: holding.length,
+                    done: holding.filter((one) => one.doneAt !== null).length
+                };
             })
         };
     };
@@ -1913,7 +2453,16 @@ ${holder.holder}`) ?? null, seasonNow.key));
     const tomorrow = drawFor(
         {
             settings,
-            state: { ...state, recent: { ...state.recent, daily: [state.daily?.pool.map((one) => one.template) ?? [], ...state.recent.daily].slice(0, 3) } },
+            state: {
+                ...state,
+                recent: {
+                    ...state.recent,
+                    daily: [
+                        state.daily?.pool.map((one) => one.template) ?? [],
+                        ...state.recent.daily
+                    ].slice(0, 3)
+                }
+            },
             installedAppId,
             loop: { version: state.version } as Loop
         },
@@ -1929,21 +2478,39 @@ ${holder.holder}`) ?? null, seasonNow.key));
         weekly: poolView("weekly"),
         card: poolView("card"),
         tomorrow,
-        season: { number: seasonNow.number, startDay: seasonNow.startDay, endDay: seasonNow.endDay, daysLeft: seasonNow.daysLeft },
+        season: {
+            number: seasonNow.number,
+            startDay: seasonNow.startDay,
+            endDay: seasonNow.endDay,
+            daysLeft: seasonNow.daysLeft
+        },
         goals: state.goals
             .filter((goal) => !goal.finished || now - goal.endsAt < 7 * 86_400_000)
-            .map((goal) => ({ ...goal, total: Object.values(goal.shares).reduce((sum, one) => sum + one.value, 0) })),
+            .map((goal) => ({
+                ...goal,
+                total: Object.values(goal.shares).reduce((sum, one) => sum + one.value, 0)
+            })),
         players: records.map((record) => {
-            const ledger = ledgers.get(record.name.toLowerCase()) ?? stored.readLedger(null, seasonNow.key);
+            const ledger =
+                ledgers.get(record.name.toLowerCase()) ?? stored.readLedger(null, seasonNow.key);
             const day = period.dayKey(clock, now);
             return {
                 name: record.name,
                 lastSeenAt: record.lastSeenAt,
                 minutes: Math.floor(record.minutes),
-                daily: record.daily?.key === state.daily?.key ? (record.daily?.instances ?? []).map(view) : [],
-                weekly: record.weekly?.key === state.weekly?.key ? (record.weekly?.instances ?? []).map(view) : [],
+                daily:
+                    record.daily?.key === state.daily?.key
+                        ? (record.daily?.instances ?? []).map(view)
+                        : [],
+                weekly:
+                    record.weekly?.key === state.weekly?.key
+                        ? (record.weekly?.instances ?? []).map(view)
+                        : [],
                 backlog: record.backlog.filter((one) => one.doneAt === null).map(view),
-                cardDone: record.card?.key === state.card?.key ? (record.card?.instances ?? []).filter((one) => one.doneAt !== null).length : 0,
+                cardDone:
+                    record.card?.key === state.card?.key
+                        ? (record.card?.instances ?? []).filter((one) => one.doneAt !== null).length
+                        : 0,
                 lines: record.card?.key === state.card?.key ? (record.card?.lines.length ?? 0) : 0,
                 points: Math.floor(ledger.points),
                 tier: season.tierOf(ledger.points, settings),
@@ -1962,7 +2529,9 @@ ${holder.holder}`) ?? null, seasonNow.key));
  *  season points stay, and nothing is taken from them in the game. */
 export async function resetPlayer(installedAppId: string, player: string): Promise<void> {
     await inTurn(installedAppId, async () => {
-        await prisma.minecraftChallengePlayer.deleteMany({ where: { installedAppId, player: player.toLowerCase() } });
+        await prisma.minecraftChallengePlayer.deleteMany({
+            where: { installedAppId, player: player.toLowerCase() }
+        });
     });
 }
 
@@ -1972,7 +2541,11 @@ export async function stopAllLoops(): Promise<void> {
 }
 
 /** For a test: a loop's work done now, rather than on its timer. */
-export async function runTick(installedAppId: string, now = Date.now(), read = true): Promise<void> {
+export async function runTick(
+    installedAppId: string,
+    now = Date.now(),
+    read = true
+): Promise<void> {
     const loop = loops.get(installedAppId);
     if (!loop) return;
     // The loop's own timer may be halfway through a tick: this one waits for it.

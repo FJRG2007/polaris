@@ -27,7 +27,8 @@ const value = (values: Values, criterion: string) => values[criterion] ?? 0;
 /** A signed sum of parts, counted from where they stood when it was dealt. */
 export function partsSince(parts: readonly catalog.Part[], values: Values, base: Values): number {
     return parts.reduce(
-        (total, part) => total + part.sign * (value(values, part.criterion) - value(base, part.criterion)),
+        (total, part) =>
+            total + part.sign * (value(values, part.criterion) - value(base, part.criterion)),
         0
     );
 }
@@ -46,8 +47,14 @@ export function measure(check: catalog.Check, values: Values, base: Values): num
             return check.groups.filter((group) => partsSince(group, values, base) >= 1).length;
         case "survive": {
             // Counts from the last death; one after it was dealt starts over.
-            const now = check.parts.reduce((total, part) => total + value(values, part.criterion), 0);
-            const then = check.parts.reduce((total, part) => total + value(base, part.criterion), 0);
+            const now = check.parts.reduce(
+                (total, part) => total + value(values, part.criterion),
+                0
+            );
+            const then = check.parts.reduce(
+                (total, part) => total + value(base, part.criterion),
+                0
+            );
             return now >= then ? now - then : now;
         }
         default:
@@ -56,12 +63,19 @@ export function measure(check: catalog.Check, values: Values, base: Values): num
 }
 
 /** Whether what a check requires on the side has been met. */
-export function requirementMet(check: catalog.Check, values: Values, base: Values, target: number): boolean {
-    if (check.kind === "survive") return partsSince(check.requires.parts, values, base) >= check.requires.atLeast;
+export function requirementMet(
+    check: catalog.Check,
+    values: Values,
+    base: Values,
+    target: number
+): boolean {
+    if (check.kind === "survive")
+        return partsSince(check.requires.parts, values, base) >= check.requires.atLeast;
     if (check.kind !== "sum" || !check.requires) return true;
     const reached = partsSince(check.requires.parts, values, base);
     if (check.requires.atLeast !== undefined && reached < check.requires.atLeast) return false;
-    if (check.requires.share !== undefined && reached < Math.ceil(target * check.requires.share)) return false;
+    if (check.requires.share !== undefined && reached < Math.ceil(target * check.requires.share))
+        return false;
     return true;
 }
 
@@ -92,7 +106,12 @@ export interface Look {
  * what fell taken off, and done when the credited progress reaches the target.
  * A finished or voided one never moves again.
  */
-export function credit(instance: Instance, template: catalog.Template, raw: number, look: Look): Instance {
+export function credit(
+    instance: Instance,
+    template: catalog.Template,
+    raw: number,
+    look: Look
+): Instance {
     if (instance.doneAt !== null || instance.voided) return instance;
     const survive = template.check?.kind === "survive";
     let offset = instance.offset;
@@ -185,11 +204,16 @@ export function readList(output: string): Record<string, number> {
 export function readObjectives(output: string): Set<string> {
     // eslint-disable-next-line no-control-regex
     const clean = output.replace(/\u001b\[[0-9;]*m/g, "");
-    return new Set([...clean.matchAll(/\[(pc_[a-z0-9_]{1,13})\]/g)].map((match) => match[1] as string));
+    return new Set(
+        [...clean.matchAll(/\[(pc_[a-z0-9_]{1,13})\]/g)].map((match) => match[1] as string)
+    );
 }
 
 /** Values by criterion from a player's scores, through a period's objectives. */
-export function valuesOf(scores: Readonly<Record<string, number>>, objectives: Readonly<Record<string, string>>): Record<string, number> {
+export function valuesOf(
+    scores: Readonly<Record<string, number>>,
+    objectives: Readonly<Record<string, string>>
+): Record<string, number> {
     const values: Record<string, number> = {};
     for (const [criterion, objective] of Object.entries(objectives)) {
         if (scores[objective] !== undefined) values[criterion] = scores[objective] as number;
@@ -250,7 +274,8 @@ export function earnedSince(file: string, since: number, ids: readonly string[] 
         const criteria = (entry as { criteria?: Record<string, string> }).criteria ?? {};
         const times = Object.entries(criteria).map(([name, when]) => [name, stamp(when)] as const);
         if (ids === null) {
-            if (short.startsWith("recipes/") || (entry as { done?: boolean }).done !== true) continue;
+            if (short.startsWith("recipes/") || (entry as { done?: boolean }).done !== true)
+                continue;
             const last = Math.max(...times.map(([, when]) => when));
             if (last >= since) earned.push(short);
             continue;
@@ -263,7 +288,9 @@ export function earnedSince(file: string, since: number, ids: readonly string[] 
 
 /** `2024-01-01 12:00:00 +0000` as an instant; 0 when unreadable. */
 export function stamp(text: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) ([+-])(\d{2})(\d{2})$/.exec(text.trim());
+    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) ([+-])(\d{2})(\d{2})$/.exec(
+        text.trim()
+    );
     if (!match) return 0;
     const [, y, mo, d, h, mi, s, sign, oh, om] = match;
     const utc = Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
@@ -282,7 +309,12 @@ export function netherStep(
     after: { x: number; z: number; dimension: string },
     seconds: number
 ): number {
-    if (!before || before.dimension !== after.dimension || after.dimension !== "minecraft:the_nether") return 0;
+    if (
+        !before ||
+        before.dimension !== after.dimension ||
+        after.dimension !== "minecraft:the_nether"
+    )
+        return 0;
     const distance = Math.hypot(after.x - before.x, after.z - before.z);
     return distance > WALK_SPEED_CAP * Math.max(1, seconds) ? 0 : distance;
 }

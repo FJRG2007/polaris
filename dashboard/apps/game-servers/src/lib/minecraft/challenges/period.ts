@@ -137,7 +137,9 @@ export function weekEndsAt(clock: Clock, now: number): number {
 export function monthEndsAt(clock: Clock, now: number): number {
     const today = dayKey(clock, now);
     const [year, month] = today.split("-").map(Number) as [number, number];
-    const next = Math.round(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1) / DAY_MS);
+    const next = Math.round(
+        Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1) / DAY_MS
+    );
     return dayStartsAt(clock, keyOfDay(next));
 }
 

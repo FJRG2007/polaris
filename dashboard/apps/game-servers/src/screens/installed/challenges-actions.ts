@@ -38,9 +38,12 @@ async function failure(caught: unknown, fallback: ChallengesKey): Promise<Answer
     if (isFrameworkSignal(caught)) throw caught;
     const t = await translator();
     if (caught instanceof challenges.ChallengeRefusal) {
-        return { error: caught.key.startsWith("errors.") ? t(caught.key as ChallengesKey) : t(fallback) };
+        return {
+            error: caught.key.startsWith("errors.") ? t(caught.key as ChallengesKey) : t(fallback)
+        };
     }
-    if (caught instanceof Error && caught.message === "Server not found") return { error: t("errors.notHere") };
+    if (caught instanceof Error && caught.message === "Server not found")
+        return { error: t("errors.notHere") };
     console.warn("polaris: challenges action failed", String(caught));
     return { error: t(fallback) };
 }
@@ -78,10 +81,15 @@ export async function saveChallengesAction(input: z.input<typeof saveSchema>): P
 
 const resetSchema = z.object({
     installedAppId: serverId,
-    player: z.string().trim().regex(/^[A-Za-z0-9_.]{1,16}$/)
+    player: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9_.]{1,16}$/)
 });
 
-export async function resetChallengePlayerAction(input: z.input<typeof resetSchema>): Promise<Answer> {
+export async function resetChallengePlayerAction(
+    input: z.input<typeof resetSchema>
+): Promise<Answer> {
     const parsed = resetSchema.safeParse(input);
     if (!parsed.success) return { error: (await translator())("errors.playerNotHere") };
     try {

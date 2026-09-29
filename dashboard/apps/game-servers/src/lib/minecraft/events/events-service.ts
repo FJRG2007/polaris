@@ -2561,7 +2561,11 @@ async function finish(
      *  to undo once this is over. */
     let arenaLeftover: stored.ArenaLeftover | null | undefined;
     /** What it came to for the challenges (`challenges/challenges-service.ts`). */
-    let forChallenges: { ranked: string[]; podium: string[]; rounds: Record<string, number> } | null = null;
+    let forChallenges: {
+        ranked: string[];
+        podium: string[];
+        rounds: Record<string, number>;
+    } | null = null;
 
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
@@ -2765,7 +2769,11 @@ async function finish(
         void import("../challenges/challenges-service")
             .then((challenges) => challenges.creditEventResults(installedAppId, result))
             .catch((error: unknown) =>
-                console.warn("polaris: counting an event for challenges failed", installedAppId, String(error))
+                console.warn(
+                    "polaris: counting an event for challenges failed",
+                    installedAppId,
+                    String(error)
+                )
             );
     }
 }

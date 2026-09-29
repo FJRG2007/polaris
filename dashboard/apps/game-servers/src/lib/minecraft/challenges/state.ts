@@ -169,10 +169,7 @@ export const instanceSchema = z.object({
     had: z.array(z.string()).nullable().default(null),
     /** What Polaris measures itself: villages rung, where they were last. */
     cells: z.array(z.string()).default([]),
-    at: z
-        .object({ x: z.number(), z: z.number(), dimension: z.string() })
-        .nullable()
-        .default(null),
+    at: z.object({ x: z.number(), z: z.number(), dimension: z.string() }).nullable().default(null),
     /** The day a backlog challenge was first dealt. */
     day: z.string().nullable().default(null)
 });

@@ -23,13 +23,23 @@ export function languageOf(locale: string): PanelLanguage {
 /** The tab's translator, the page's locale and the catalogue's language. */
 export function useChallengesText(): { t: ChallengesT; locale: string; language: PanelLanguage } {
     const locale = hostUi.i18nProvider.useLocale();
-    return { t: gameCatalogs.translator(locale, "challenges"), locale, language: languageOf(locale) };
+    return {
+        t: gameCatalogs.translator(locale, "challenges"),
+        locale,
+        language: languageOf(locale)
+    };
 }
 
 /** A difficulty's name: the weekly three are one step up (medium, hard, elite). */
 export function tierName(t: ChallengesT, layer: catalog.Layer, tier: catalog.Difficulty): string {
     if (layer !== "weekly") return t(`tier.${tier}`);
-    return t(tier === "easy" ? "tier.weeklyEasy" : tier === "medium" ? "tier.weeklyMedium" : "tier.weeklyHard");
+    return t(
+        tier === "easy"
+            ? "tier.weeklyEasy"
+            : tier === "medium"
+              ? "tier.weeklyMedium"
+              : "tier.weeklyHard"
+    );
 }
 
 /** How long until something, the way the tab says it. */

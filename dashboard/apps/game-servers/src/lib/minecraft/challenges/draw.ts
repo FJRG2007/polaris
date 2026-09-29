@@ -49,7 +49,11 @@ export function dice(seed: string): () => number {
 }
 
 /** One of the choices, by weight; null when there is none. */
-export function pick<T>(choices: readonly T[], weight: (one: T) => number, roll: () => number): T | null {
+export function pick<T>(
+    choices: readonly T[],
+    weight: (one: T) => number,
+    roll: () => number
+): T | null {
     const total = choices.reduce((sum, one) => sum + Math.max(0, weight(one)), 0);
     if (choices.length === 0) return null;
     if (total <= 0) return choices[Math.floor(roll() * choices.length)] ?? null;
@@ -106,7 +110,9 @@ export interface DrawInput {
 }
 
 /** How many each layer draws of each tier. */
-export const POOL_SHAPE: Readonly<Record<"daily" | "weekly" | "card", Readonly<Record<catalog.Difficulty, number>>>> = {
+export const POOL_SHAPE: Readonly<
+    Record<"daily" | "weekly" | "card", Readonly<Record<catalog.Difficulty, number>>>
+> = {
     daily: { easy: 3, medium: 3, hard: 3 },
     weekly: { easy: 2, medium: 2, hard: 2 },
     card: { easy: 3, medium: 3, hard: 3 }
@@ -151,7 +157,9 @@ export function eligible(
 export function criteriaOfEntry(template: catalog.Template, variant: string | null): string[] {
     const own = catalog.criteriaOf(catalog.checkOf(template, variant));
     const fallback = template.fallback ? catalog.templateOf(template.fallback) : null;
-    const theirs = fallback ? catalog.criteriaOf(catalog.checkOf(fallback, fallback.variants?.[0]?.key ?? null)) : [];
+    const theirs = fallback
+        ? catalog.criteriaOf(catalog.checkOf(fallback, fallback.variants?.[0]?.key ?? null))
+        : [];
     return [...new Set([...own, ...theirs])];
 }
 
@@ -179,11 +187,14 @@ export function drawPool(layer: "daily" | "weekly" | "card", input: DrawInput): 
                     !groups.has(template.group)
             );
             const fits = (template: catalog.Template, variant: string | null) => {
-                const needed = criteriaOfEntry(template, variant).filter((one) => !criteria.has(one));
+                const needed = criteriaOfEntry(template, variant).filter(
+                    (one) => !criteria.has(one)
+                );
                 return criteria.size + needed.length <= input.budget;
             };
             const rounds: ((template: catalog.Template) => boolean)[] = [
-                (template) => !recent.has(template.id) && (perCategory.get(template.category) ?? 0) < 2,
+                (template) =>
+                    !recent.has(template.id) && (perCategory.get(template.category) ?? 0) < 2,
                 (template) => (perCategory.get(template.category) ?? 0) < 2,
                 () => true
             ];
@@ -201,7 +212,9 @@ export function drawPool(layer: "daily" | "weekly" | "card", input: DrawInput): 
                     if (template.variants && variant === null) continue;
                     if (!fits(template, variant)) continue;
                     const baseTarget = catalog.baseTarget(template, layer, tier) as number;
-                    const scale = (input.settings.pace ? (input.pace[template.id] ?? 1) : 1) * input.settings.multiplier;
+                    const scale =
+                        (input.settings.pace ? (input.pace[template.id] ?? 1) : 1) *
+                        input.settings.multiplier;
                     entry = {
                         template: template.id,
                         variant,
@@ -240,8 +253,13 @@ export const LAYER_LETTER: Readonly<Record<catalog.Layer, string>> = {
     community: "c"
 };
 
-export function objectivesFor(layer: catalog.Layer, criteria: readonly string[]): Record<string, string> {
-    return Object.fromEntries(criteria.map((criterion, index) => [criterion, `pc_${LAYER_LETTER[layer]}${index}`]));
+export function objectivesFor(
+    layer: catalog.Layer,
+    criteria: readonly string[]
+): Record<string, string> {
+    return Object.fromEntries(
+        criteria.map((criterion, index) => [criterion, `pc_${LAYER_LETTER[layer]}${index}`])
+    );
 }
 
 // ------------------------------------------------------------------ dealing
@@ -314,11 +332,29 @@ export function layCard(pool: readonly PoolEntry[]): PoolEntry[] {
     const by = (tier: catalog.Difficulty) => pool.filter((entry) => entry.tier === tier);
     const [easy, medium, hard] = [by("easy"), by("medium"), by("hard")];
     // A Latin square: each row and column has one of each, and no diagonal is all hard.
-    const order: catalog.Difficulty[] = ["easy", "medium", "hard", "hard", "easy", "medium", "medium", "hard", "easy"];
-    const queues: Record<catalog.Difficulty, PoolEntry[]> = { easy: [...easy], medium: [...medium], hard: [...hard] };
+    const order: catalog.Difficulty[] = [
+        "easy",
+        "medium",
+        "hard",
+        "hard",
+        "easy",
+        "medium",
+        "medium",
+        "hard",
+        "easy"
+    ];
+    const queues: Record<catalog.Difficulty, PoolEntry[]> = {
+        easy: [...easy],
+        medium: [...medium],
+        hard: [...hard]
+    };
     const laid: PoolEntry[] = [];
     for (const tier of order) {
-        const next = queues[tier].shift() ?? queues.medium.shift() ?? queues.easy.shift() ?? queues.hard.shift();
+        const next =
+            queues[tier].shift() ??
+            queues.medium.shift() ??
+            queues.easy.shift() ??
+            queues.hard.shift();
         if (next) laid.push(next);
     }
     return laid;

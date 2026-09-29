@@ -17,13 +17,21 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         confirmDialog: { useConfirm: () => [async () => true, null] },
         i18nProvider: { useLocale: () => locale },
-        displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() }) },
+        displayFormat: {
+            useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
+        },
         liveRead: { useKeptSnapshot: () => undefined },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined }
+        snapshotCache: {
+            readSnapshot: () => null,
+            writeSnapshot: () => undefined,
+            dropSnapshots: () => undefined
+        }
     }
 }));
 
-const settingsModule = await import("@polaris-app/game-servers/src/lib/minecraft/challenges/settings");
+const settingsModule = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/challenges/settings"
+);
 const settings = settingsModule.settingsSchema.parse({ enabled: true });
 const now = Date.now();
 const view = {
@@ -49,7 +57,17 @@ const view = {
             name: "Alba",
             lastSeenAt: now,
             minutes: 90,
-            daily: [{ template: "F4", variant: null, tier: "easy", target: 16, progress: 16, done: true, voided: false }],
+            daily: [
+                {
+                    template: "F4",
+                    variant: null,
+                    tier: "easy",
+                    target: 16,
+                    progress: 16,
+                    done: true,
+                    voided: false
+                }
+            ],
             weekly: [],
             backlog: [],
             cardDone: 2,
@@ -78,7 +96,9 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/challenges-actions", ()
     resetChallengePlayerAction: async () => ({ view })
 }));
 
-const { MinecraftChallenges } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-challenges");
+const { MinecraftChallenges } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-challenges"
+);
 const ID = "00000000-0000-4000-8000-000000000001";
 
 afterEach(() => {
@@ -102,7 +122,9 @@ describe("the Challenges tab", () => {
     it("shows today's draw and explains a challenge from its row", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         answerRead({ view });
-        await waitFor(() => expect(screen.getByText("Harvest 16 pumpkins and melons")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Harvest 16 pumpkins and melons")).toBeTruthy()
+        );
         expect(screen.getByText("Hunt 60 spiders")).toBeTruthy();
         expect(screen.getByText("1 of 2")).toBeTruthy();
         fireEvent.click(screen.getByLabelText("What Harvest 16 pumpkins and melons is"));
@@ -143,7 +165,9 @@ describe("the Challenges tab", () => {
         answerRead({ view });
         await waitFor(() => expect(screen.getByText("Retos")).toBeTruthy());
         expect(screen.getByText("Temporada y bingo")).toBeTruthy();
-        await waitFor(() => expect(screen.getByText("Cosecha 16 calabazas y sandías")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Cosecha 16 calabazas y sandías")).toBeTruthy()
+        );
         expect(screen.getByText("Versión del servidor: 1.21.4")).toBeTruthy();
         expect(screen.getByText("1 de 2")).toBeTruthy();
         expect(screen.getAllByText("lunes").length).toBeGreaterThan(0);
@@ -152,7 +176,9 @@ describe("the Challenges tab", () => {
     it("says why a Bedrock server cannot run them, and changes nothing there", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         answerRead({ view: { ...view, refusal: "bedrock" } });
-        await waitFor(() => expect(screen.getByText(/Bedrock has no scoreboard statistics/)).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText(/Bedrock has no scoreboard statistics/)).toBeTruthy()
+        );
         expect((screen.getByLabelText("Challenges on") as HTMLButtonElement).disabled).toBe(true);
     });
 
@@ -165,13 +191,17 @@ describe("the Challenges tab", () => {
         const save = screen.getByText("Save").closest("button") as HTMLButtonElement;
         expect(save.disabled).toBe(true);
         fireEvent.change(zone, { target: { value: "Europe/Madrid" } });
-        await waitFor(() => expect(screen.queryByText(/That time zone is not one Polaris knows/)).toBeNull());
+        await waitFor(() =>
+            expect(screen.queryByText(/That time zone is not one Polaris knows/)).toBeNull()
+        );
     });
 
     it("lets somebody without the console look but not change anything", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage={false} />);
         answerRead({ view });
-        await waitFor(() => expect(screen.getByText(/changing them needs the console permission/)).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText(/changing them needs the console permission/)).toBeTruthy()
+        );
         expect((screen.getByLabelText("Challenges on") as HTMLButtonElement).disabled).toBe(true);
     });
 });

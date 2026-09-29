@@ -41,7 +41,9 @@ export function medianTier(tiers: readonly number[]): number {
     const sorted = tiers.filter((tier) => tier > 0).sort((left, right) => left - right);
     if (sorted.length === 0) return 0;
     const middle = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 1 ? (sorted[middle] as number) : ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2;
+    return sorted.length % 2 === 1
+        ? (sorted[middle] as number)
+        : ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2;
 }
 
 export interface Earned {
@@ -72,7 +74,13 @@ export function addPoints(
     const tiers: number[] = [];
     for (let tier = ledger.paid + 1; tier <= reached; tier += 1) tiers.push(tier);
     return {
-        ledger: { ...ledger, points, day, dayPoints: spent + granted, paid: Math.max(ledger.paid, reached) },
+        ledger: {
+            ...ledger,
+            points,
+            day,
+            dayPoints: spent + granted,
+            paid: Math.max(ledger.paid, reached)
+        },
         granted,
         tiers
     };
@@ -105,7 +113,11 @@ type Streak = Ledger["streak"];
  * forgiven one per week by the freeze; if any is not, the streak falls back to
  * its last milestone before counting today.
  */
-export function streakAfter(streak: Streak, today: string, clock: period.Clock): { streak: Streak; milestone: number | null } {
+export function streakAfter(
+    streak: Streak,
+    today: string,
+    clock: period.Clock
+): { streak: Streak; milestone: number | null } {
     if (streak.lastDay === today) return { streak, milestone: null };
     let count: number;
     let freezeWeek = streak.freezeWeek;
@@ -114,14 +126,19 @@ export function streakAfter(streak: Streak, today: string, clock: period.Clock):
         const gap = period.dayNumber(today) - period.dayNumber(streak.lastDay) - 1;
         let kept = gap >= 0;
         for (let missed = 1; missed <= gap && kept; missed += 1) {
-            const week = period.weekOfDay(clock, period.keyOfDay(period.dayNumber(streak.lastDay) + missed));
+            const week = period.weekOfDay(
+                clock,
+                period.keyOfDay(period.dayNumber(streak.lastDay) + missed)
+            );
             if (freezeWeek === week) kept = false;
             else freezeWeek = week;
         }
         if (!kept) freezeWeek = streak.freezeWeek;
         count = kept ? streak.count + 1 : milestoneFloor(streak.count) + 1;
     }
-    const milestone = (catalog.STREAK_MILESTONES as readonly number[]).includes(count) ? count : null;
+    const milestone = (catalog.STREAK_MILESTONES as readonly number[]).includes(count)
+        ? count
+        : null;
     return {
         streak: { count, best: Math.max(streak.best, count), lastDay: today, freezeWeek },
         milestone

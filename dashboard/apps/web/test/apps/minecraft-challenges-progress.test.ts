@@ -33,34 +33,68 @@ describe("counting net of the tricks", () => {
         expect(progress.measure(check, { [MINED_PUMPKIN]: 4, [USED_PUMPKIN]: 3 }, {})).toBe(1);
         // Seen in two halves across two reads: placed, then broken.
         let instance = deal("F4", 3);
-        instance = progress.credit(instance, template("F4"), progress.measure(check, { [USED_PUMPKIN]: 1 }, {})!, look());
-        instance = progress.credit(instance, template("F4"), progress.measure(check, { [USED_PUMPKIN]: 1, [MINED_PUMPKIN]: 1 }, {})!, look());
+        instance = progress.credit(
+            instance,
+            template("F4"),
+            progress.measure(check, { [USED_PUMPKIN]: 1 }, {})!,
+            look()
+        );
+        instance = progress.credit(
+            instance,
+            template("F4"),
+            progress.measure(check, { [USED_PUMPKIN]: 1, [MINED_PUMPKIN]: 1 }, {})!,
+            look()
+        );
         expect(instance.progress).toBe(0);
     });
 
     it("counts wheat thrown and picked back up as nothing", () => {
         const check = catalog.checkOf(template("F1"), null);
-        const values = { "minecraft.picked_up:minecraft.wheat": 10, "minecraft.dropped:minecraft.wheat": 10 };
+        const values = {
+            "minecraft.picked_up:minecraft.wheat": 10,
+            "minecraft.dropped:minecraft.wheat": 10
+        };
         expect(progress.measure(check, values, {})).toBe(0);
-        expect(progress.measure(check, { ...values, "minecraft.picked_up:minecraft.wheat": 15 }, {})).toBe(5);
+        expect(
+            progress.measure(check, { ...values, "minecraft.picked_up:minecraft.wheat": 15 }, {})
+        ).toBe(5);
     });
 
     it("counts from where each statistic stood when the challenge was dealt", () => {
         const check = catalog.checkOf(template("F1"), null);
-        expect(progress.measure(check, { "minecraft.picked_up:minecraft.wheat": 30 }, { "minecraft.picked_up:minecraft.wheat": 25 })).toBe(5);
+        expect(
+            progress.measure(
+                check,
+                { "minecraft.picked_up:minecraft.wheat": 30 },
+                { "minecraft.picked_up:minecraft.wheat": 25 }
+            )
+        ).toBe(5);
     });
 
     it("never counts more ingots than raw iron was gathered", () => {
         const check = catalog.checkOf(template("Cr2"), null);
         const blockOfIron = { "minecraft.crafted:minecraft.iron_ingot": 9 };
         expect(progress.measure(check, blockOfIron, {})).toBe(0);
-        expect(progress.measure(check, { ...blockOfIron, "minecraft.picked_up:minecraft.raw_iron": 4 }, {})).toBe(4);
+        expect(
+            progress.measure(
+                check,
+                { ...blockOfIron, "minecraft.picked_up:minecraft.raw_iron": 4 },
+                {}
+            )
+        ).toBe(4);
     });
 
     it("counts distinct kinds, each once", () => {
         const check = catalog.checkOf(template("C3"), null);
         expect(
-            progress.measure(check, { "minecraft.killed:minecraft.zombie": 40, "minecraft.killed:minecraft.skeleton": 1 }, {})
+            progress.measure(
+                check,
+                {
+                    "minecraft.killed:minecraft.zombie": 40,
+                    "minecraft.killed:minecraft.skeleton": 1
+                },
+                {}
+            )
         ).toBe(2);
     });
 
@@ -69,21 +103,45 @@ describe("counting net of the tricks", () => {
         const check = catalog.checkOf(deathless, null);
         const time = "minecraft.custom:minecraft.time_since_death";
         let instance = deal("C9", 72_000);
-        instance = progress.credit(instance, deathless, progress.measure(check, { [time]: 40_000 }, {})!, look());
+        instance = progress.credit(
+            instance,
+            deathless,
+            progress.measure(check, { [time]: 40_000 }, {})!,
+            look()
+        );
         expect(instance.progress).toBe(40_000);
-        instance = progress.credit(instance, deathless, progress.measure(check, { [time]: 300 }, {})!, look());
+        instance = progress.credit(
+            instance,
+            deathless,
+            progress.measure(check, { [time]: 300 }, {})!,
+            look()
+        );
         expect(instance.progress).toBe(300);
         // Without the walking, the hour does not complete.
         const walked = { [time]: 72_000, "minecraft.custom:minecraft.walk_one_cm": 10_000 };
         expect(progress.requirementMet(check, walked, {}, 72_000)).toBe(false);
-        expect(progress.requirementMet(check, { ...walked, "minecraft.custom:minecraft.walk_one_cm": 60_000 }, {}, 72_000)).toBe(true);
+        expect(
+            progress.requirementMet(
+                check,
+                { ...walked, "minecraft.custom:minecraft.walk_one_cm": 60_000 },
+                {},
+                72_000
+            )
+        ).toBe(true);
     });
 
     it("asks half a cod target to be real catches", () => {
         const check = catalog.checkOf(template("Fi4"), null);
         const cod = { "minecraft.picked_up:minecraft.cod": 10 };
         expect(progress.requirementMet(check, cod, {}, 10)).toBe(false);
-        expect(progress.requirementMet(check, { ...cod, "minecraft.custom:minecraft.fish_caught": 5 }, {}, 10)).toBe(true);
+        expect(
+            progress.requirementMet(
+                check,
+                { ...cod, "minecraft.custom:minecraft.fish_caught": 5 },
+                {},
+                10
+            )
+        ).toBe(true);
     });
 });
 
@@ -98,7 +156,12 @@ describe("crediting", () => {
         instance = progress.credit(instance, hunt, 5, look({ now: NOW + 60_000 }));
         expect(instance.progress).toBe(2);
         // With the rule off, standing still counts.
-        const off = progress.credit(deal("C2", 10, "zombie"), hunt, 3, look({ active: false, afk: false }));
+        const off = progress.credit(
+            deal("C2", 10, "zombie"),
+            hunt,
+            3,
+            look({ active: false, afk: false })
+        );
         expect(off.progress).toBe(3);
     });
 
@@ -108,7 +171,12 @@ describe("crediting", () => {
         // Dealt a minute before: at most one minute of sprinting.
         expect(instance.progress).toBe(36_000);
         expect(instance.offset).toBe(500_000 - 36_000);
-        const uncapped = progress.credit(deal("E1", 10_000_000), walker, 500_000, look({ caps: false }));
+        const uncapped = progress.credit(
+            deal("E1", 10_000_000),
+            walker,
+            500_000,
+            look({ caps: false })
+        );
         expect(uncapped.progress).toBe(500_000);
     });
 
@@ -117,7 +185,9 @@ describe("crediting", () => {
         const check = catalog.checkOf(treasure, null);
         const values = { "minecraft.picked_up:minecraft.name_tag": 1 };
         expect(progress.gateRose(check, values, {})).toBe(false);
-        expect(progress.gateRose(check, { ...values, "minecraft.custom:minecraft.fish_caught": 1 }, {})).toBe(true);
+        expect(
+            progress.gateRose(check, { ...values, "minecraft.custom:minecraft.fish_caught": 1 }, {})
+        ).toBe(true);
         const fromChest = progress.credit(deal("Fi2", 1), treasure, 1, look({ gate: false }));
         expect(fromChest.doneAt).toBeNull();
         const fished = progress.credit(deal("Fi2", 1), treasure, 1, look({ gate: true }));
@@ -132,7 +202,12 @@ describe("crediting", () => {
     });
 
     it("holds a finished one back until what it requires on the side is met", () => {
-        const wool = progress.credit(deal("T6", 16), template("T6"), 20, look({ requirement: false }));
+        const wool = progress.credit(
+            deal("T6", 16),
+            template("T6"),
+            20,
+            look({ requirement: false })
+        );
         expect(wool.doneAt).toBeNull();
         expect(wool.progress).toBe(16);
     });
@@ -153,11 +228,15 @@ describe("crediting", () => {
 
 describe("reading what the server answers", () => {
     it("reads a player's scores glued together, as vanilla sends them", () => {
-        expect(progress.readList("Alba has 3 score(s):[pc_d0]: 5[pc_d12]: -2[pc_menu]: 0")).toEqual({ pc_d0: 5, pc_d12: -2, pc_menu: 0 });
+        expect(progress.readList("Alba has 3 score(s):[pc_d0]: 5[pc_d12]: -2[pc_menu]: 0")).toEqual(
+            { pc_d0: 5, pc_d12: -2, pc_menu: 0 }
+        );
     });
 
     it("reads them a line each, as NeoForge sends them, and with the console's colour codes", () => {
-        expect(progress.readList("Alba has 2 score(s):\n[pc_d1]: 7\n[pc_d0]: 5\n\u001b[0m\n")).toEqual({ pc_d1: 7, pc_d0: 5 });
+        expect(
+            progress.readList("Alba has 2 score(s):\n[pc_d1]: 7\n[pc_d0]: 5\n\u001b[0m\n")
+        ).toEqual({ pc_d1: 7, pc_d0: 5 });
     });
 
     it("reads 1.16's wording, and nothing from a player with no scores", () => {
@@ -167,17 +246,25 @@ describe("reading what the server answers", () => {
     });
 
     it("leaves out everything that is not Polaris's own", () => {
-        expect(progress.readList("Alba has 2 score(s):[deaths]: 4[pe_hit]: 9[pc_w3]: 1")).toEqual({ pc_w3: 1 });
+        expect(progress.readList("Alba has 2 score(s):[deaths]: 4[pe_hit]: 9[pc_w3]: 1")).toEqual({
+            pc_w3: 1
+        });
     });
 
     it("reads the objectives that exist, glued or not", () => {
-        const made = progress.readObjectives("There are 3 objective(s): [pc_menu], [pc_d0], [pe_hit]");
+        const made = progress.readObjectives(
+            "There are 3 objective(s): [pc_menu], [pc_d0], [pe_hit]"
+        );
         expect([...made]).toEqual(["pc_menu", "pc_d0"]);
-        expect(progress.readObjectives("There are 2 objectives: [pc_d1], [pc_menu]\n").has("pc_d1")).toBe(true);
+        expect(
+            progress.readObjectives("There are 2 objectives: [pc_d1], [pc_menu]\n").has("pc_d1")
+        ).toBe(true);
     });
 
     it("reads button presses glued together, whatever the bracket shows", () => {
-        const presses = progress.readPresses("Alba has 11 [pc_menu]Bruno has 1 [Retos del servidor]");
+        const presses = progress.readPresses(
+            "Alba has 11 [pc_menu]Bruno has 1 [Retos del servidor]"
+        );
         expect([...presses]).toEqual([
             ["Alba", 11],
             ["Bruno", 1]
@@ -190,7 +277,9 @@ describe("reading what the server answers", () => {
         // A team's prefix and suffix, a Floodgate player, glued with no line break.
         const said = "[VIP] Alba [AFK] has 11 [pc_menu].Bo has 1 [pc_menu]";
         const read = replies.canonicalReplies(said, null);
-        const text = read.needsRoster ? replies.canonicalReplies(said, ["Alba", ".Bo"]).text : read.text;
+        const text = read.needsRoster
+            ? replies.canonicalReplies(said, ["Alba", ".Bo"]).text
+            : read.text;
         expect([...progress.readPresses(text)]).toEqual([
             ["Alba", 11],
             [".Bo", 1]
@@ -211,7 +300,10 @@ describe("reading what the server answers", () => {
 
     it("maps a player's scores to statistics through a period's objectives", () => {
         const objectives = { [MINED_PUMPKIN]: "pc_d0", [USED_PUMPKIN]: "pc_d2" };
-        expect(progress.valuesOf({ pc_d0: 4, pc_d2: 1, pc_d9: 8 }, objectives)).toEqual({ [MINED_PUMPKIN]: 4, [USED_PUMPKIN]: 1 });
+        expect(progress.valuesOf({ pc_d0: 4, pc_d2: 1, pc_d9: 8 }, objectives)).toEqual({
+            [MINED_PUMPKIN]: 4,
+            [USED_PUMPKIN]: 1
+        });
     });
 });
 
@@ -221,14 +313,22 @@ describe("the advancements file", () => {
             criteria: { apple: "2026-09-01 10:00:00 +0000", bread: "2026-09-29 11:00:00 +0200" },
             done: false
         },
-        "minecraft:story/mine_stone": { criteria: { get_stone: "2026-09-29 12:30:00 +0000" }, done: true },
-        "minecraft:recipes/misc/bread": { criteria: { has: "2026-09-29 12:30:00 +0000" }, done: true },
+        "minecraft:story/mine_stone": {
+            criteria: { get_stone: "2026-09-29 12:30:00 +0000" },
+            done: true
+        },
+        "minecraft:recipes/misc/bread": {
+            criteria: { has: "2026-09-29 12:30:00 +0000" },
+            done: true
+        },
         DataVersion: 4189
     });
     const since = Date.parse("2026-09-29T08:00:00Z");
 
     it("counts criteria earned after the period began, zones included", () => {
-        expect(progress.earnedSince(file, since, ["husbandry/balanced_diet"])).toEqual(["husbandry/balanced_diet:bread"]);
+        expect(progress.earnedSince(file, since, ["husbandry/balanced_diet"])).toEqual([
+            "husbandry/balanced_diet:bread"
+        ]);
     });
 
     it("counts advancements completed since, leaving recipes out", () => {
@@ -237,7 +337,9 @@ describe("the advancements file", () => {
     });
 
     it("reads the game's timestamps", () => {
-        expect(progress.stamp("2026-09-29 11:00:00 +0200")).toBe(Date.parse("2026-09-29T09:00:00Z"));
+        expect(progress.stamp("2026-09-29 11:00:00 +0200")).toBe(
+            Date.parse("2026-09-29T09:00:00Z")
+        );
         expect(progress.stamp("nonsense")).toBe(0);
     });
 });
@@ -245,9 +347,27 @@ describe("the advancements file", () => {
 describe("what Polaris measures itself", () => {
     it("counts ground covered in the Nether, not portals or pearls", () => {
         const nether = "minecraft:the_nether";
-        expect(progress.netherStep({ x: 0, z: 0, dimension: nether }, { x: 30, z: 40, dimension: nether }, 20)).toBe(50);
-        expect(progress.netherStep({ x: 0, z: 0, dimension: nether }, { x: 800, z: 0, dimension: nether }, 20)).toBe(0);
-        expect(progress.netherStep({ x: 0, z: 0, dimension: "minecraft:overworld" }, { x: 30, z: 0, dimension: nether }, 20)).toBe(0);
+        expect(
+            progress.netherStep(
+                { x: 0, z: 0, dimension: nether },
+                { x: 30, z: 40, dimension: nether },
+                20
+            )
+        ).toBe(50);
+        expect(
+            progress.netherStep(
+                { x: 0, z: 0, dimension: nether },
+                { x: 800, z: 0, dimension: nether },
+                20
+            )
+        ).toBe(0);
+        expect(
+            progress.netherStep(
+                { x: 0, z: 0, dimension: "minecraft:overworld" },
+                { x: 30, z: 0, dimension: nether },
+                20
+            )
+        ).toBe(0);
         expect(progress.netherStep(null, { x: 30, z: 0, dimension: nether }, 20)).toBe(0);
     });
 

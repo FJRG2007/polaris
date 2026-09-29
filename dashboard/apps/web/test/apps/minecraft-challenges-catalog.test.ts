@@ -43,7 +43,10 @@ describe("the challenge catalogue", () => {
         expect(new Set(catalog.TEMPLATES.map((one) => one.category)).size).toBe(11);
         expect(catalog.CATEGORIES).toHaveLength(11);
         const perCategory = Object.fromEntries(
-            catalog.CATEGORIES.map((category) => [category, catalog.TEMPLATES.filter((one) => one.category === category).length])
+            catalog.CATEGORIES.map((category) => [
+                category,
+                catalog.TEMPLATES.filter((one) => one.category === category).length
+            ])
         );
         expect(perCategory).toEqual({
             mining: 10,
@@ -65,10 +68,14 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             for (const language of ["en", "es"] as const) {
                 for (const text of [template.title, template.how, template.exploit]) {
-                    expect(text[language].trim().length, `${template.id} ${language}`).toBeGreaterThan(3);
+                    expect(
+                        text[language].trim().length,
+                        `${template.id} ${language}`
+                    ).toBeGreaterThan(3);
                     expect(text[language]).not.toMatch(/[{}]/);
                 }
-                for (const variant of template.variants ?? []) expect(variant.label[language].length).toBeGreaterThan(0);
+                for (const variant of template.variants ?? [])
+                    expect(variant.label[language].length).toBeGreaterThan(0);
             }
         }
     });
@@ -77,17 +84,25 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             expect(template.layers.length, template.id).toBeGreaterThan(0);
             for (const layer of template.layers) {
-                const tiers = layer === "daily" && template.easyOnly ? (["easy"] as const) : catalog.DIFFICULTIES;
+                const tiers =
+                    layer === "daily" && template.easyOnly
+                        ? (["easy"] as const)
+                        : catalog.DIFFICULTIES;
                 for (const tier of tiers) {
                     const target = catalog.baseTarget(template, layer, tier);
                     expect(target, `${template.id} ${layer} ${tier}`).not.toBeNull();
                     expect(target!).toBeGreaterThan(0);
                 }
             }
-            expect(template.check !== undefined || (template.variants?.length ?? 0) > 0, template.id).toBe(true);
+            expect(
+                template.check !== undefined || (template.variants?.length ?? 0) > 0,
+                template.id
+            ).toBe(true);
         }
         // Once-per-world advancements belong on the card, never on a daily.
-        for (const template of catalog.TEMPLATES.filter((one) => checks(one).some((check) => check.kind === "advancement"))) {
+        for (const template of catalog.TEMPLATES.filter((one) =>
+            checks(one).some((check) => check.kind === "advancement")
+        )) {
             expect(template.layers, template.id).not.toContain("daily");
         }
     });
@@ -96,7 +111,9 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             for (const check of checks(template)) {
                 for (const criterion of catalog.criteriaOf(check)) {
-                    expect(criterion).toMatch(/^minecraft\.(mined|used|killed|picked_up|dropped|crafted|broken|custom):minecraft\.[a-z0-9_]+$/);
+                    expect(criterion).toMatch(
+                        /^minecraft\.(mined|used|killed|picked_up|dropped|crafted|broken|custom):minecraft\.[a-z0-9_]+$/
+                    );
                 }
             }
         }
@@ -106,12 +123,16 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             for (const check of checks(template)) {
                 const counted = parts(check);
-                for (const part of counted.filter((one) => one.sign > 0 && one.criterion.startsWith("minecraft.mined:"))) {
+                for (const part of counted.filter(
+                    (one) => one.sign > 0 && one.criterion.startsWith("minecraft.mined:")
+                )) {
                     const id = part.criterion.split(":")[1];
                     // Amethyst clusters and chorus plants regrow; everything else is placeable.
                     if (id === "minecraft.chorus_plant") continue;
                     expect(
-                        counted.some((one) => one.sign < 0 && one.criterion === `minecraft.used:${id}`),
+                        counted.some(
+                            (one) => one.sign < 0 && one.criterion === `minecraft.used:${id}`
+                        ),
                         `${template.id} mines ${id} without taking placed ones off`
                     ).toBe(true);
                 }
@@ -123,10 +144,14 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             for (const check of checks(template)) {
                 const counted = parts(check);
-                for (const part of counted.filter((one) => one.sign > 0 && one.criterion.startsWith("minecraft.picked_up:"))) {
+                for (const part of counted.filter(
+                    (one) => one.sign > 0 && one.criterion.startsWith("minecraft.picked_up:")
+                )) {
                     const id = part.criterion.split(":")[1];
                     expect(
-                        counted.some((one) => one.sign < 0 && one.criterion === `minecraft.dropped:${id}`),
+                        counted.some(
+                            (one) => one.sign < 0 && one.criterion === `minecraft.dropped:${id}`
+                        ),
                         `${template.id} picks up ${id} without dropping`
                     ).toBe(true);
                 }
@@ -138,27 +163,47 @@ describe("the challenge catalogue", () => {
         for (const template of catalog.TEMPLATES) {
             for (const check of checks(template)) {
                 if (check.kind !== "sum") continue;
-                for (const part of check.parts.filter((one) => one.criterion.startsWith("minecraft.crafted:"))) {
+                for (const part of check.parts.filter((one) =>
+                    one.criterion.startsWith("minecraft.crafted:")
+                )) {
                     const id = part.criterion.split("minecraft.crafted:minecraft.")[1]!;
-                    if (REVERSIBLE.includes(id)) expect(check.capBy, `${template.id} crafts ${id}`).toBeDefined();
+                    if (REVERSIBLE.includes(id))
+                        expect(check.capBy, `${template.id} crafts ${id}`).toBeDefined();
                 }
             }
         }
-        expect(catalog.TEMPLATES.find((one) => one.id === "Cr2")?.check).toMatchObject({ capBy: expect.any(Array) });
+        expect(catalog.TEMPLATES.find((one) => one.id === "Cr2")?.check).toMatchObject({
+            capBy: expect.any(Array)
+        });
     });
 
     it("never counts cobblestone or stone, which generators make endlessly", () => {
         for (const template of catalog.TEMPLATES.filter((one) => one.category === "mining")) {
             for (const check of checks(template)) {
                 for (const criterion of catalog.criteriaOf(check)) {
-                    expect(criterion).not.toMatch(/minecraft\.mined:minecraft\.(stone|cobblestone)$/);
+                    expect(criterion).not.toMatch(
+                        /minecraft\.mined:minecraft\.(stone|cobblestone)$/
+                    );
                 }
             }
         }
     });
 
     it("caps what farms produce per minute", () => {
-        for (const id of ["C1", "C2", "C5", "C7", "C11", "Fi1", "E1", "E3", "T1", "N1", "N6", "F3"]) {
+        for (const id of [
+            "C1",
+            "C2",
+            "C5",
+            "C7",
+            "C11",
+            "Fi1",
+            "E1",
+            "E3",
+            "T1",
+            "N1",
+            "N6",
+            "F3"
+        ]) {
             expect(catalog.templateOf(id)?.perMinute, id).toBeGreaterThan(0);
         }
     });
@@ -186,7 +231,9 @@ describe("the challenge catalogue", () => {
         expect(catalog.titleOf(walk, null, 200_000, "es")).toBe("Camina 2.000 bloques");
         const hunt = catalog.templateOf("C2")!;
         expect(catalog.titleOf(hunt, "spider", 25, "es")).toBe("Caza 25 arañas");
-        expect(catalog.titleOf(catalog.templateOf("C9")!, null, 216_000, "en")).toBe("Play 3 hours without dying");
+        expect(catalog.titleOf(catalog.templateOf("C9")!, null, 216_000, "en")).toBe(
+            "Play 3 hours without dying"
+        );
         expect(catalog.shapeOf(catalog.templateOf("M1")!, "en")).toBe("Mine x ore blocks");
     });
 

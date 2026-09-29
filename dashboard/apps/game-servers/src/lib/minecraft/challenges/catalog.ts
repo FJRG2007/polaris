@@ -189,7 +189,10 @@ const killed = (ids: readonly string[]) => each("killed", ids);
 const crafted = (ids: readonly string[]) => each("crafted", ids);
 const custom = (ids: readonly string[]) => each("custom", ids);
 /** Picked up, minus dropped: what was gathered, not thrown and taken back. */
-const gathered = (ids: readonly string[]) => [...each("picked_up", ids), ...each("dropped", ids, -1)];
+const gathered = (ids: readonly string[]) => [
+    ...each("picked_up", ids),
+    ...each("dropped", ids, -1)
+];
 /** Mined, minus placed: what was dug, not put down and dug again. */
 const dug = (ids: readonly string[]) => [...mined(ids), ...placed(ids)];
 /** Placed, minus mined: what stayed put. */
@@ -253,7 +256,17 @@ const COLORS = [
     "red",
     "black"
 ];
-const TOOLS = ["pickaxe", "axe", "shovel", "hoe", "sword", "helmet", "chestplate", "leggings", "boots"];
+const TOOLS = [
+    "pickaxe",
+    "axe",
+    "shovel",
+    "hoe",
+    "sword",
+    "helmet",
+    "chestplate",
+    "leggings",
+    "boots"
+];
 const SHERDS = [
     "angler",
     "archer",
@@ -380,7 +393,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "mining",
         group: "ores",
         title: t("Mine %n ancient debris", "Pica %n escombros ancestrales"),
-        how: t("Ancient debris mined, minus placed.", "Escombros ancestrales picados, menos los colocados."),
+        how: t(
+            "Ancient debris mined, minus placed.",
+            "Escombros ancestrales picados, menos los colocados."
+        ),
         exploit: t(
             "Placed debris is taken off. Anti X-Ray catches void the day's mining.",
             "Los escombros colocados se restan. Quien caiga en el Anti X-Ray pierde la minería del día."
@@ -395,7 +411,10 @@ export const TEMPLATES: readonly Template[] = [
         id: "M4",
         category: "mining",
         group: "deep",
-        title: t("Tunnel through %n deepslate and tuff", "Excava %n bloques de pizarra profunda y toba"),
+        title: t(
+            "Tunnel through %n deepslate and tuff",
+            "Excava %n bloques de pizarra profunda y toba"
+        ),
         how: t(
             "Deepslate and tuff mined, minus placed. Not stone or cobblestone, which generators make endlessly.",
             "Pizarra profunda y toba picadas, menos las colocadas. Ni piedra ni roca, que los generadores fabrican sin fin."
@@ -416,7 +435,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "mining",
         group: "ores",
         title: t("Mine %n emerald ore", "Pica %n menas de esmeralda"),
-        how: t("Emerald ore of both kinds mined, minus placed.", "Mena de esmeralda de los dos tipos picada, menos la colocada."),
+        how: t(
+            "Emerald ore of both kinds mined, minus placed.",
+            "Mena de esmeralda de los dos tipos picada, menos la colocada."
+        ),
         exploit: t(
             "Placed emerald ore is taken off. Anti X-Ray catches void the day's mining.",
             "La mena de esmeralda colocada se resta. Quien caiga en el Anti X-Ray pierde la minería del día."
@@ -446,7 +468,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "mining",
         group: "amethyst",
         title: t("Harvest %n amethyst clusters", "Recoge %n racimos de amatista"),
-        how: t("Amethyst clusters mined, minus placed.", "Racimos de amatista picados, menos los colocados."),
+        how: t(
+            "Amethyst clusters mined, minus placed.",
+            "Racimos de amatista picados, menos los colocados."
+        ),
         exploit: t(
             "Clusters regrow on their own, which is fair farming; placed clusters are taken off.",
             "Los racimos vuelven a crecer solos, lo que es un cultivo justo; los racimos colocados se restan."
@@ -481,7 +506,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "mining",
         group: "ores",
         title: t("Mine %n copper ore", "Pica %n menas de cobre"),
-        how: t("Copper ore of both kinds mined, minus placed.", "Mena de cobre de los dos tipos picada, menos la colocada."),
+        how: t(
+            "Copper ore of both kinds mined, minus placed.",
+            "Mena de cobre de los dos tipos picada, menos la colocada."
+        ),
         exploit: t(
             "Placed copper ore is taken off. Anti X-Ray catches void the day's mining.",
             "La mena de cobre colocada se resta. Quien caiga en el Anti X-Ray pierde la minería del día."
@@ -497,7 +525,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "mining",
         group: "quartz",
         title: t("Mine %n nether quartz ore", "Pica %n menas de cuarzo del Nether"),
-        how: t("Nether quartz ore mined, minus placed.", "Mena de cuarzo del Nether picada, menos la colocada."),
+        how: t(
+            "Nether quartz ore mined, minus placed.",
+            "Mena de cuarzo del Nether picada, menos la colocada."
+        ),
         exploit: t(
             "Placed quartz ore is taken off. Anti X-Ray catches void the day's mining.",
             "La mena de cuarzo colocada se resta. Quien caiga en el Anti X-Ray pierde la minería del día."
@@ -531,17 +562,35 @@ export const TEMPLATES: readonly Template[] = [
         category: "combat",
         group: "kills",
         title: t("Hunt %n %v", "Caza %n %v"),
-        how: t("One kind of mob killed, drawn each time.", "Un tipo de mob eliminado, sorteado cada vez."),
+        how: t(
+            "One kind of mob killed, drawn each time.",
+            "Un tipo de mob eliminado, sorteado cada vez."
+        ),
         exploit: t(
             "Kinds with common farms come up less often; kills while standing still are not credited.",
             "Los tipos con granjas habituales salen menos; las muertes sin moverse no cuentan."
         ),
         variants: [
-            { key: "zombie", label: t("zombies", "zombis"), check: sum(killed(["zombie"])), weight: 0.5 },
-            { key: "skeleton", label: t("skeletons", "esqueletos"), check: sum(killed(["skeleton"])), weight: 0.5 },
+            {
+                key: "zombie",
+                label: t("zombies", "zombis"),
+                check: sum(killed(["zombie"])),
+                weight: 0.5
+            },
+            {
+                key: "skeleton",
+                label: t("skeletons", "esqueletos"),
+                check: sum(killed(["skeleton"])),
+                weight: 0.5
+            },
             { key: "creeper", label: t("creepers", "creepers"), check: sum(killed(["creeper"])) },
             { key: "spider", label: t("spiders", "arañas"), check: sum(killed(["spider"])) },
-            { key: "enderman", label: t("endermen", "endermans"), check: sum(killed(["enderman"])), weight: 0.5 },
+            {
+                key: "enderman",
+                label: t("endermen", "endermans"),
+                check: sum(killed(["enderman"])),
+                weight: 0.5
+            },
             { key: "drowned", label: t("drowned", "ahogados"), check: sum(killed(["drowned"])) },
             { key: "witch", label: t("witches", "brujas"), check: sum(killed(["witch"])) },
             { key: "phantom", label: t("phantoms", "phantoms"), check: sum(killed(["phantom"])) },
@@ -592,7 +641,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "combat",
         group: "illagers",
         title: t("Defeat %n illagers", "Derrota a %n illagers"),
-        how: t("Pillagers, vindicators, evokers and ravagers killed.", "Saqueadores, vindicadores, invocadores y devastadores eliminados."),
+        how: t(
+            "Pillagers, vindicators, evokers and ravagers killed.",
+            "Saqueadores, vindicadores, invocadores y devastadores eliminados."
+        ),
         exploit: t(
             "Kills while standing still at a raid farm are not credited.",
             "Las muertes sin moverse en una granja de asaltos no cuentan."
@@ -608,7 +660,10 @@ export const TEMPLATES: readonly Template[] = [
         id: "C6",
         category: "combat",
         group: "shield",
-        title: t("Block %n hearts of damage with a shield", "Bloquea %n corazones de daño con un escudo"),
+        title: t(
+            "Block %n hearts of damage with a shield",
+            "Bloquea %n corazones de daño con un escudo"
+        ),
         how: t("Damage blocked with a shield.", "Daño bloqueado con un escudo."),
         exploit: t(
             "Standing still next to a mob to soak hits is not credited.",
@@ -641,7 +696,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "combat",
         group: "boss",
         title: t("Defeat a boss", "Derrota a un jefe"),
-        how: t("A wither, an elder guardian or a warden killed.", "Un wither, un guardián anciano o un warden eliminados."),
+        how: t(
+            "A wither, an elder guardian or a warden killed.",
+            "Un wither, un guardián anciano o un warden eliminados."
+        ),
         exploit: t(
             "Wither farms exist, so it is on the season card only, once.",
             "Existen granjas de wither, así que solo está en el cartón de temporada, una vez."
@@ -677,7 +735,10 @@ export const TEMPLATES: readonly Template[] = [
         id: "C10",
         category: "combat",
         group: "sniper",
-        title: t("Earn Sniper Duel or Arbalistic", "Consigue Duelo de francotiradores o Ballestería"),
+        title: t(
+            "Earn Sniper Duel or Arbalistic",
+            "Consigue Duelo de francotiradores o Ballestería"
+        ),
         how: t(
             "The Sniper Duel or Arbalistic advancement earned since the card was dealt.",
             "El progreso Duelo de francotiradores o Ballestería conseguido desde que se repartió el cartón."
@@ -694,7 +755,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "combat",
         group: "ender",
         title: t("Slay %n End creatures", "Acaba con %n criaturas del End"),
-        how: t("Endermen, endermites and shulkers killed.", "Endermans, endermites y shulkers eliminados."),
+        how: t(
+            "Endermen, endermites and shulkers killed.",
+            "Endermans, endermites y shulkers eliminados."
+        ),
         exploit: t(
             "Kills while standing still at an enderman farm are not credited, at most 15 a minute.",
             "Las muertes sin moverse en una granja de endermans no cuentan, como mucho 15 por minuto."
@@ -728,7 +792,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "farming",
         group: "roots",
         title: t("Harvest %n root vegetables", "Cosecha %n hortalizas"),
-        how: t("Carrots, potatoes and beetroots picked up, minus dropped.", "Zanahorias, patatas y remolachas recogidas, menos las tiradas."),
+        how: t(
+            "Carrots, potatoes and beetroots picked up, minus dropped.",
+            "Zanahorias, patatas y remolachas recogidas, menos las tiradas."
+        ),
         exploit: t(
             "Dropping and picking up again nets zero; a chest's stock never counts.",
             "Tirar y volver a coger suma cero; el contenido de un cofre nunca cuenta."
@@ -743,14 +810,26 @@ export const TEMPLATES: readonly Template[] = [
         category: "farming",
         group: "tall-crops",
         title: t("Gather %n %v", "Recoge %n de %v"),
-        how: t("One crop picked up, minus dropped, drawn each time.", "Un cultivo recogido, menos lo tirado, sorteado cada vez."),
+        how: t(
+            "One crop picked up, minus dropped, drawn each time.",
+            "Un cultivo recogido, menos lo tirado, sorteado cada vez."
+        ),
         exploit: t(
             "Collecting from an automatic farm while standing still is not credited, at most 64 a minute.",
             "Recoger de una granja automática sin moverse no cuenta, como mucho 64 por minuto."
         ),
         variants: [
-            { key: "sugar_cane", label: t("sugar cane", "caña de azúcar"), check: sum(gathered(["sugar_cane"])) },
-            { key: "bamboo", label: t("bamboo", "bambú"), check: sum(gathered(["bamboo"])), minVersion: [1, 14] },
+            {
+                key: "sugar_cane",
+                label: t("sugar cane", "caña de azúcar"),
+                check: sum(gathered(["sugar_cane"]))
+            },
+            {
+                key: "bamboo",
+                label: t("bamboo", "bambú"),
+                check: sum(gathered(["bamboo"])),
+                minVersion: [1, 14]
+            },
             { key: "kelp", label: t("kelp", "algas"), check: sum(gathered(["kelp"])) }
         ],
         targets: { easy: 64, medium: 256, hard: 640 },
@@ -763,7 +842,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "farming",
         group: "gourds",
         title: t("Harvest %n pumpkins and melons", "Cosecha %n calabazas y sandías"),
-        how: t("Pumpkins and melons mined, minus placed.", "Calabazas y sandías rotas, menos las colocadas."),
+        how: t(
+            "Pumpkins and melons mined, minus placed.",
+            "Calabazas y sandías rotas, menos las colocadas."
+        ),
         exploit: t(
             "Placing a pumpkin and breaking it again nets zero.",
             "Colocar una calabaza y volver a romperla suma cero."
@@ -779,7 +861,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "bone-meal",
         title: t("Use %n bone meal", "Usa %n polvos de hueso"),
         how: t("Bone meal used.", "Polvo de hueso usado."),
-        exploit: t("Bone meal is spent each time, so there is nothing to loop.", "El polvo de hueso se gasta cada vez, así que no hay bucle."),
+        exploit: t(
+            "Bone meal is spent each time, so there is nothing to loop.",
+            "El polvo de hueso se gasta cada vez, así que no hay bucle."
+        ),
         check: sum(used(["bone_meal"])),
         targets: { easy: 32, medium: 96, hard: 256 },
         layers: ["daily", "weekly", "card"],
@@ -794,7 +879,10 @@ export const TEMPLATES: readonly Template[] = [
             "Cooked meat and fish, baked potatoes and bread taken out of a furnace or crafted.",
             "Carne y pescado cocinados, patatas asadas y pan sacados del horno o fabricados."
         ),
-        exploit: t("None of these can be turned back into what they were made from.", "Ninguno de ellos se puede volver a convertir en lo que era."),
+        exploit: t(
+            "None of these can be turned back into what they were made from.",
+            "Ninguno de ellos se puede volver a convertir en lo que era."
+        ),
         check: sum(
             crafted([
                 "cooked_beef",
@@ -921,11 +1009,22 @@ export const TEMPLATES: readonly Template[] = [
         category: "fishing",
         group: "tropical",
         title: t("Catch %n %v", "Pesca %n %v"),
-        how: t("One kind of fish picked up, minus dropped.", "Un tipo de pez recogido, menos los tirados."),
+        how: t(
+            "One kind of fish picked up, minus dropped.",
+            "Un tipo de pez recogido, menos los tirados."
+        ),
         exploit: t("Dropping and picking up again nets zero.", "Tirar y volver a coger suma cero."),
         variants: [
-            { key: "pufferfish", label: t("pufferfish", "peces globo"), check: sum(gathered(["pufferfish"])) },
-            { key: "tropical_fish", label: t("tropical fish", "peces tropicales"), check: sum(gathered(["tropical_fish"])) }
+            {
+                key: "pufferfish",
+                label: t("pufferfish", "peces globo"),
+                check: sum(gathered(["pufferfish"]))
+            },
+            {
+                key: "tropical_fish",
+                label: t("tropical fish", "peces tropicales"),
+                check: sum(gathered(["tropical_fish"]))
+            }
         ],
         targets: { easy: 2, medium: 5, hard: 12 },
         layers: ["daily", "weekly", "card"],
@@ -964,7 +1063,10 @@ export const TEMPLATES: readonly Template[] = [
             "Pesca táctica o El depredador más mono conseguido desde que se repartió el cartón."
         ),
         exploit: t("Advancements are once per world.", "Los progresos son una vez por mundo."),
-        check: { kind: "advancement", ids: ["husbandry/tactical_fishing", "husbandry/axolotl_in_a_bucket"] },
+        check: {
+            kind: "advancement",
+            ids: ["husbandry/tactical_fishing", "husbandry/axolotl_in_a_bucket"]
+        },
         card: 1,
         fallback: "Fi1",
         layers: ["card"],
@@ -977,7 +1079,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "exploration",
         group: "walk",
         title: t("Walk %n blocks", "Camina %n bloques"),
-        how: t("Distance walked, sprinted and sneaked.", "Distancia recorrida andando, corriendo y agachado."),
+        how: t(
+            "Distance walked, sprinted and sneaked.",
+            "Distancia recorrida andando, corriendo y agachado."
+        ),
         exploit: t(
             "Walking into a wall covers no distance; more than sprint speed in a minute is not credited.",
             "Andar contra una pared no recorre nada; más de la velocidad de carrera en un minuto no cuenta."
@@ -995,7 +1100,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "fly",
         title: t("Glide %n blocks with an elytra", "Planea %n bloques con élitros"),
         how: t("Distance flown with an elytra.", "Distancia volada con élitros."),
-        exploit: t("Rockets cost gunpowder, so flying is effort.", "Los cohetes cuestan pólvora, así que volar es esfuerzo."),
+        exploit: t(
+            "Rockets cost gunpowder, so flying is effort.",
+            "Los cohetes cuestan pólvora, así que volar es esfuerzo."
+        ),
         check: sum(custom(["aviate_one_cm"])),
         targets: { easy: 300_000, medium: 1_200_000, hard: 4_000_000 },
         layers: ["daily", "weekly", "card"],
@@ -1006,7 +1114,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "exploration",
         group: "ride",
         title: t("Travel %n blocks by %v", "Recorre %n bloques en %v"),
-        how: t("Distance ridden on one kind of mount, drawn each time.", "Distancia recorrida en un tipo de montura, sorteado cada vez."),
+        how: t(
+            "Distance ridden on one kind of mount, drawn each time.",
+            "Distancia recorrida en un tipo de montura, sorteado cada vez."
+        ),
         exploit: t(
             "Minecarts are left out (loops); at most 1,200 blocks a minute count.",
             "Las vagonetas no cuentan (circuitos); como mucho cuentan 1.200 bloques por minuto."
@@ -1014,7 +1125,12 @@ export const TEMPLATES: readonly Template[] = [
         variants: [
             { key: "horse", label: t("horse", "caballo"), check: sum(custom(["horse_one_cm"])) },
             { key: "boat", label: t("boat", "barca"), check: sum(custom(["boat_one_cm"])) },
-            { key: "strider", label: t("strider", "strider"), check: sum(custom(["strider_one_cm"])), minVersion: [1, 16] },
+            {
+                key: "strider",
+                label: t("strider", "strider"),
+                check: sum(custom(["strider_one_cm"])),
+                minVersion: [1, 16]
+            },
             {
                 key: "happy_ghast",
                 label: t("happy ghast", "ghast feliz"),
@@ -1033,7 +1149,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "swim",
         title: t("Swim %n blocks", "Nada %n bloques"),
         how: t("Distance swum.", "Distancia nadada."),
-        exploit: t("Bubble columns do not add swimming distance.", "Las columnas de burbujas no suman distancia nadada."),
+        exploit: t(
+            "Bubble columns do not add swimming distance.",
+            "Las columnas de burbujas no suman distancia nadada."
+        ),
         check: sum(custom(["swim_one_cm"])),
         targets: { easy: 30_000, medium: 100_000, hard: 300_000 },
         perMinute: 30_000,
@@ -1093,7 +1212,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "exploration",
         group: "sherds",
         title: t("Dig up %n pottery sherds", "Desentierra %n fragmentos de cerámica"),
-        how: t("Pottery sherds picked up, minus dropped.", "Fragmentos de cerámica recogidos, menos los tirados."),
+        how: t(
+            "Pottery sherds picked up, minus dropped.",
+            "Fragmentos de cerámica recogidos, menos los tirados."
+        ),
         exploit: t(
             "Brushing drops sherds to be picked up; taking them from a chest does not count.",
             "Cepillar suelta fragmentos que se recogen; sacarlos de un cofre no cuenta."
@@ -1109,8 +1231,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "exploration",
         group: "climb",
         title: t("Climb %n blocks", "Trepa %n bloques"),
-        how: t("Distance climbed on ladders and vines.", "Distancia trepada por escaleras y enredaderas."),
-        exploit: t("Climbing needs input; standing still is not credited.", "Trepar requiere pulsar teclas; quedarse quieto no cuenta."),
+        how: t(
+            "Distance climbed on ladders and vines.",
+            "Distancia trepada por escaleras y enredaderas."
+        ),
+        exploit: t(
+            "Climbing needs input; standing still is not credited.",
+            "Trepar requiere pulsar teclas; quedarse quieto no cuenta."
+        ),
         check: sum(custom(["climb_one_cm"])),
         targets: { easy: 10_000, medium: 30_000, hard: 100_000 },
         perMinute: 15_000,
@@ -1145,7 +1273,10 @@ export const TEMPLATES: readonly Template[] = [
             "Bells rung, counting each village (a 200-block area) once.",
             "Campanas tocadas, contando cada aldea (una zona de 200 bloques) una vez."
         ),
-        exploit: t("Ringing one bell over and over counts once.", "Tocar la misma campana una y otra vez cuenta una vez."),
+        exploit: t(
+            "Ringing one bell over and over counts once.",
+            "Tocar la misma campana una y otra vez cuenta una vez."
+        ),
         check: { kind: "polaris", measure: "villages", parts: custom(["bell_ring"]) },
         targets: { easy: 2, medium: 5, hard: 10 },
         layers: ["daily", "weekly", "card"],
@@ -1159,7 +1290,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "crafting",
         group: "enchant",
         title: t("Enchant %n items", "Encanta %n objetos"),
-        how: t("Items enchanted at an enchanting table.", "Objetos encantados en una mesa de encantamientos."),
+        how: t(
+            "Items enchanted at an enchanting table.",
+            "Objetos encantados en una mesa de encantamientos."
+        ),
         exploit: t("Each costs lapis and levels.", "Cada uno cuesta lapislázuli y niveles."),
         check: sum(custom(["enchant_item"])),
         targets: { easy: 2, medium: 6, hard: 15 },
@@ -1193,10 +1327,21 @@ export const TEMPLATES: readonly Template[] = [
         id: "Cr3",
         category: "crafting",
         group: "toolsmith",
-        title: t("Forge %n iron or diamond tools and armour", "Forja %n herramientas o piezas de armadura de hierro o diamante"),
-        how: t("Iron and diamond tools, weapons and armour crafted.", "Herramientas, armas y armaduras de hierro y diamante fabricadas."),
-        exploit: t("Each costs its material; smelting it back gives far less.", "Cada una cuesta su material; fundirla devuelve mucho menos."),
-        check: sum(crafted([...TOOLS.map((one) => `iron_${one}`), ...TOOLS.map((one) => `diamond_${one}`)])),
+        title: t(
+            "Forge %n iron or diamond tools and armour",
+            "Forja %n herramientas o piezas de armadura de hierro o diamante"
+        ),
+        how: t(
+            "Iron and diamond tools, weapons and armour crafted.",
+            "Herramientas, armas y armaduras de hierro y diamante fabricadas."
+        ),
+        exploit: t(
+            "Each costs its material; smelting it back gives far less.",
+            "Cada una cuesta su material; fundirla devuelve mucho menos."
+        ),
+        check: sum(
+            crafted([...TOOLS.map((one) => `iron_${one}`), ...TOOLS.map((one) => `diamond_${one}`)])
+        ),
         targets: { easy: 2, medium: 5, hard: 10 },
         layers: ["daily", "weekly", "card"],
         unit: "count"
@@ -1206,7 +1351,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "crafting",
         group: "potions",
         title: t("Drink %n potions", "Bebe %n pociones"),
-        how: t("Potions drunk. Water bottles count too.", "Pociones bebidas. Las botellas de agua también cuentan."),
+        how: t(
+            "Potions drunk. Water bottles count too.",
+            "Pociones bebidas. Las botellas de agua también cuentan."
+        ),
         exploit: t(
             "There is no brewing statistic and water bottles count, so it is weekly only and rare.",
             "No hay estadística de destilar y las botellas de agua cuentan, así que es solo semanal y sale poco."
@@ -1242,7 +1390,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "crafting",
         group: "maps",
         title: t("Fill in %n maps", "Rellena %n mapas"),
-        how: t("Empty maps used, which is starting a map.", "Mapas vacíos usados, que es empezar un mapa."),
+        how: t(
+            "Empty maps used, which is starting a map.",
+            "Mapas vacíos usados, que es empezar un mapa."
+        ),
         exploit: t("Each map costs paper and a compass.", "Cada mapa cuesta papel y una brújula."),
         check: sum(used(["map"])),
         targets: { easy: 1, medium: 3, hard: 6 },
@@ -1284,7 +1435,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "books",
         title: t("Craft %n books and bookshelves", "Fabrica %n libros y librerías"),
         how: t("Books and bookshelves crafted.", "Libros y librerías fabricados."),
-        exploit: t("Each costs leather or books; none can be undone.", "Cada uno cuesta cuero o libros; ninguno se puede deshacer."),
+        exploit: t(
+            "Each costs leather or books; none can be undone.",
+            "Cada uno cuesta cuero o libros; ninguno se puede deshacer."
+        ),
         check: sum(crafted(["book", "bookshelf"])),
         targets: { easy: 3, medium: 9, hard: 30 },
         layers: ["daily", "weekly", "card"],
@@ -1315,7 +1469,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "trade",
         title: t("Trade %n times with villagers", "Comercia %n veces con aldeanos"),
         how: t("Trades made with villagers.", "Tratos hechos con aldeanos."),
-        exploit: t("Each trade is a click, and at most 10 a minute count.", "Cada trato es un clic, y como mucho cuentan 10 por minuto."),
+        exploit: t(
+            "Each trade is a click, and at most 10 a minute count.",
+            "Cada trato es un clic, y como mucho cuentan 10 por minuto."
+        ),
         check: sum(custom(["traded_with_villager"])),
         targets: { easy: 5, medium: 20, hard: 60 },
         perMinute: 10,
@@ -1372,7 +1529,10 @@ export const TEMPLATES: readonly Template[] = [
             "Each counts once per world. A player who has them all gets Breeder instead.",
             "Cada uno cuenta una vez por mundo. Quien ya los tiene todos recibe Criador en su lugar."
         ),
-        check: { kind: "criteria", ids: ["husbandry/tame_an_animal", "husbandry/complete_catalogue"] },
+        check: {
+            kind: "criteria",
+            ids: ["husbandry/tame_an_animal", "husbandry/complete_catalogue"]
+        },
         weekly: [1, 2, 4],
         card: 2,
         fallback: "T2",
@@ -1385,7 +1545,10 @@ export const TEMPLATES: readonly Template[] = [
         group: "raid",
         title: t("Be the hero of a village", "Sé el héroe de una aldea"),
         how: t("A raid won.", "Un asalto ganado."),
-        exploit: t("Raid farms exist, so it is weekly only, once.", "Existen granjas de asaltos, así que es solo semanal, una vez."),
+        exploit: t(
+            "Raid farms exist, so it is weekly only, once.",
+            "Existen granjas de asaltos, así que es solo semanal, una vez."
+        ),
         check: sum(custom(["raid_win"])),
         weekly: [1, 1, 1],
         layers: ["weekly"],
@@ -1453,8 +1616,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "nether",
         group: "skulls",
         title: t("Collect %n wither skeleton skulls", "Consigue %n cráneos de esqueleto wither"),
-        how: t("Wither skeleton skulls picked up, minus dropped.", "Cráneos de esqueleto wither recogidos, menos los tirados."),
-        exploit: t("A rare drop; dropping and picking up nets zero. Weekly only.", "Un botín raro; tirar y volver a coger suma cero. Solo semanal."),
+        how: t(
+            "Wither skeleton skulls picked up, minus dropped.",
+            "Cráneos de esqueleto wither recogidos, menos los tirados."
+        ),
+        exploit: t(
+            "A rare drop; dropping and picking up nets zero. Weekly only.",
+            "Un botín raro; tirar y volver a coger suma cero. Solo semanal."
+        ),
         check: sum(gathered(["wither_skeleton_skull"])),
         weekly: [1, 2, 3],
         card: 1,
@@ -1492,7 +1661,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "nether",
         group: "pearls",
         title: t("Collect %n ender pearls", "Consigue %n perlas de ender"),
-        how: t("Ender pearls picked up, minus dropped.", "Perlas de ender recogidas, menos las tiradas."),
+        how: t(
+            "Ender pearls picked up, minus dropped.",
+            "Perlas de ender recogidas, menos las tiradas."
+        ),
         exploit: t(
             "Dropping and picking up nets zero; pearls from piglins or endermen are the same effort.",
             "Tirar y volver a coger suma cero; las perlas de piglins o endermans son el mismo esfuerzo."
@@ -1509,8 +1681,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "nether",
         group: "ender",
         title: t("Clean up %n shulkers", "Limpia %n shulkers"),
-        how: t("Shulkers killed, and shulker shells picked up minus dropped.", "Shulkers eliminados, y caparazones de shulker recogidos menos los tirados."),
-        exploit: t("Shulker farms: at most 10 a minute count.", "Granjas de shulkers: como mucho cuentan 10 por minuto."),
+        how: t(
+            "Shulkers killed, and shulker shells picked up minus dropped.",
+            "Shulkers eliminados, y caparazones de shulker recogidos menos los tirados."
+        ),
+        exploit: t(
+            "Shulker farms: at most 10 a minute count.",
+            "Granjas de shulkers: como mucho cuentan 10 por minuto."
+        ),
         check: sum([...killed(["shulker"]), ...gathered(["shulker_shell"])]),
         targets: { easy: 4, medium: 10, hard: 24 },
         perMinute: 10,
@@ -1522,8 +1700,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "nether",
         group: "chorus",
         title: t("Harvest %n chorus", "Recoge %n de coro"),
-        how: t("Chorus plants and flowers mined, minus flowers placed.", "Plantas y flores de coro rotas, menos las flores colocadas."),
-        exploit: t("Placing a chorus flower and breaking it again nets zero.", "Colocar una flor de coro y volver a romperla suma cero."),
+        how: t(
+            "Chorus plants and flowers mined, minus flowers placed.",
+            "Plantas y flores de coro rotas, menos las flores colocadas."
+        ),
+        exploit: t(
+            "Placing a chorus flower and breaking it again nets zero.",
+            "Colocar una flor de coro y volver a romperla suma cero."
+        ),
         check: sum([...mined(["chorus_flower", "chorus_plant"]), ...placed(["chorus_flower"])]),
         targets: { easy: 16, medium: 48, hard: 128 },
         layers: ["daily", "weekly", "card"],
@@ -1593,7 +1777,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "building",
         group: "glass",
         title: t("Place %n glass", "Coloca %n de cristal"),
-        how: t("Glass of any colour placed, minus the same broken.", "Cristal de cualquier color colocado, menos el mismo roto."),
+        how: t(
+            "Glass of any colour placed, minus the same broken.",
+            "Cristal de cualquier color colocado, menos el mismo roto."
+        ),
         exploit: t("Placing and breaking again nets zero.", "Colocar y volver a romper suma cero."),
         check: sum(built(["glass", ...COLORS.map((color) => `${color}_stained_glass`)])),
         targets: { easy: 32, medium: 128, hard: 512 },
@@ -1605,8 +1792,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "building",
         group: "saplings",
         title: t("Plant %n saplings", "Planta %n brotes"),
-        how: t("Saplings planted, minus saplings broken.", "Brotes plantados, menos los brotes rotos."),
-        exploit: t("Breaking a sapling gives it back; planting it again nets zero.", "Romper un brote lo devuelve; volver a plantarlo suma cero."),
+        how: t(
+            "Saplings planted, minus saplings broken.",
+            "Brotes plantados, menos los brotes rotos."
+        ),
+        exploit: t(
+            "Breaking a sapling gives it back; planting it again nets zero.",
+            "Romper un brote lo devuelve; volver a plantarlo suma cero."
+        ),
         check: sum(built(SAPLINGS)),
         targets: { easy: 8, medium: 24, hard: 64 },
         layers: ["daily", "weekly", "card"],
@@ -1617,12 +1810,18 @@ export const TEMPLATES: readonly Template[] = [
         category: "building",
         group: "light",
         title: t("Light up %n spots", "Ilumina %n sitios"),
-        how: t("Torches and lanterns placed, minus the same broken.", "Antorchas y faroles colocados, menos los mismos rotos."),
+        how: t(
+            "Torches and lanterns placed, minus the same broken.",
+            "Antorchas y faroles colocados, menos los mismos rotos."
+        ),
         exploit: t(
             "A torch on a wall is broken as a wall torch, which is taken off too: placing and breaking nets zero.",
             "Una antorcha en la pared se rompe como antorcha de pared, que también se resta: colocar y romper suma cero."
         ),
-        check: sum([...used(["torch", "lantern"]), ...each("mined", ["torch", "wall_torch", "lantern"], -1)]),
+        check: sum([
+            ...used(["torch", "lantern"]),
+            ...each("mined", ["torch", "wall_torch", "lantern"], -1)
+        ]),
         targets: { easy: 16, medium: 64, hard: 192 },
         layers: ["daily", "weekly", "card"],
         unit: "count"
@@ -1634,7 +1833,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "social",
         group: "community",
         title: t("Give %n% to the community goal", "Aporta el %n% al objetivo de la comunidad"),
-        how: t("Your share of the community goal running now.", "Tu parte del objetivo de la comunidad en curso."),
+        how: t(
+            "Your share of the community goal running now.",
+            "Tu parte del objetivo de la comunidad en curso."
+        ),
         exploit: t(
             "The goal's own rules apply, standing still included; only dealt while a goal runs.",
             "Se aplican las reglas del propio objetivo, quedarse quieto incluido; solo sale mientras hay un objetivo."
@@ -1668,7 +1870,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "social",
         group: "events",
         title: t("Reach the podium in %n events", "Sube al podio en %n eventos"),
-        how: t("Polaris events you finished in the top three of.", "Eventos de Polaris en los que acabaste entre los tres primeros."),
+        how: t(
+            "Polaris events you finished in the top three of.",
+            "Eventos de Polaris en los que acabaste entre los tres primeros."
+        ),
         exploit: t(
             "Only events with at least two players count, so nobody wins alone.",
             "Solo cuentan eventos con al menos dos jugadores, así que nadie gana solo."
@@ -1702,7 +1907,10 @@ export const TEMPLATES: readonly Template[] = [
         category: "social",
         group: "chat-games",
         title: t("Win %n trivia rounds", "Gana %n rondas de trivia"),
-        how: t("Rounds of a trivia event you answered first.", "Rondas de un evento de trivia que respondiste primero."),
+        how: t(
+            "Rounds of a trivia event you answered first.",
+            "Rondas de un evento de trivia que respondiste primero."
+        ),
         exploit: t("Each round has one winner.", "Cada ronda tiene un solo ganador."),
         check: { kind: "polaris", measure: "chat-games" },
         targets: { easy: 1, medium: 3, hard: 6 },
@@ -1743,15 +1951,52 @@ export const TEMPLATES: readonly Template[] = [
             "Lo sacado de un cofre no cuenta; pasárselo a otro es tirarlo, y eso se resta."
         ),
         variants: [
-            { key: "cake", label: t("a cake", "una tarta"), check: { kind: "held", items: ["cake"] } },
-            { key: "compass", label: t("a compass", "una brújula"), check: { kind: "held", items: ["compass"] } },
-            { key: "golden_carrot", label: t("a golden carrot", "una zanahoria dorada"), check: { kind: "held", items: ["golden_carrot"] } },
-            { key: "ender_eye", label: t("an eye of ender", "un ojo de ender"), check: { kind: "held", items: ["ender_eye"] } },
-            { key: "blaze_powder", label: t("blaze powder", "polvo de blaze"), check: { kind: "held", items: ["blaze_powder"] } },
-            { key: "crossbow", label: t("a crossbow", "una ballesta"), check: { kind: "held", items: ["crossbow"] }, minVersion: [1, 14] },
-            { key: "shield", label: t("a shield", "un escudo"), check: { kind: "held", items: ["shield"] } },
-            { key: "clock", label: t("a clock", "un reloj"), check: { kind: "held", items: ["clock"] } },
-            { key: "jukebox", label: t("a jukebox", "una gramola"), check: { kind: "held", items: ["jukebox"] } }
+            {
+                key: "cake",
+                label: t("a cake", "una tarta"),
+                check: { kind: "held", items: ["cake"] }
+            },
+            {
+                key: "compass",
+                label: t("a compass", "una brújula"),
+                check: { kind: "held", items: ["compass"] }
+            },
+            {
+                key: "golden_carrot",
+                label: t("a golden carrot", "una zanahoria dorada"),
+                check: { kind: "held", items: ["golden_carrot"] }
+            },
+            {
+                key: "ender_eye",
+                label: t("an eye of ender", "un ojo de ender"),
+                check: { kind: "held", items: ["ender_eye"] }
+            },
+            {
+                key: "blaze_powder",
+                label: t("blaze powder", "polvo de blaze"),
+                check: { kind: "held", items: ["blaze_powder"] }
+            },
+            {
+                key: "crossbow",
+                label: t("a crossbow", "una ballesta"),
+                check: { kind: "held", items: ["crossbow"] },
+                minVersion: [1, 14]
+            },
+            {
+                key: "shield",
+                label: t("a shield", "un escudo"),
+                check: { kind: "held", items: ["shield"] }
+            },
+            {
+                key: "clock",
+                label: t("a clock", "un reloj"),
+                check: { kind: "held", items: ["clock"] }
+            },
+            {
+                key: "jukebox",
+                label: t("a jukebox", "una gramola"),
+                check: { kind: "held", items: ["jukebox"] }
+            }
         ],
         card: 1,
         layers: ["card"],
@@ -1779,8 +2024,14 @@ export const TEMPLATES: readonly Template[] = [
         category: "collection",
         group: "discs",
         title: t("Collect %n music discs", "Colecciona %n discos"),
-        how: t("Different music discs picked up, minus dropped.", "Discos distintos recogidos, menos los tirados."),
-        exploit: t("Each disc counts once, and a dropped one comes off.", "Cada disco cuenta una vez, y uno tirado se resta."),
+        how: t(
+            "Different music discs picked up, minus dropped.",
+            "Discos distintos recogidos, menos los tirados."
+        ),
+        exploit: t(
+            "Each disc counts once, and a dropped one comes off.",
+            "Cada disco cuenta una vez, y uno tirado se resta."
+        ),
         check: { kind: "distinct", groups: DISCS.map((disc) => gathered([disc])) },
         weekly: [1, 3, 6],
         card: 3,
@@ -1824,7 +2075,10 @@ export const META_RULES = [
     {
         id: "X3",
         title: t("Weekly sweep", "Pleno semanal"),
-        how: t("All three weeklies done in one week.", "Los tres retos semanales hechos en una semana.")
+        how: t(
+            "All three weeklies done in one week.",
+            "Los tres retos semanales hechos en una semana."
+        )
     },
     {
         id: "X4",
@@ -1854,7 +2108,12 @@ export function checkOf(template: Template, variant: string | null): Check {
 export function criteriaOf(check: Check): string[] {
     const parts: Part[] = [];
     if (check.kind === "sum") {
-        parts.push(...check.parts, ...(check.capBy ?? []), ...(check.gate ?? []), ...(check.requires?.parts ?? []));
+        parts.push(
+            ...check.parts,
+            ...(check.capBy ?? []),
+            ...(check.gate ?? []),
+            ...(check.requires?.parts ?? [])
+        );
     } else if (check.kind === "distinct") {
         for (const group of check.groups) parts.push(...group);
     } else if (check.kind === "survive") {
@@ -1922,7 +2181,9 @@ export function titleOf(
 ): string {
     const label = template.variants?.find((one) => one.key === variant)?.label[language] ?? "";
     const shown = inUnit(template, target);
-    return template.title[language].replace("%n", formatNumber(shown, language)).replace("%v", label);
+    return template.title[language]
+        .replace("%n", formatNumber(shown, language))
+        .replace("%v", label);
 }
 
 /** A template's title with the figure left open, for choosing one: `Mine x ore blocks`. */

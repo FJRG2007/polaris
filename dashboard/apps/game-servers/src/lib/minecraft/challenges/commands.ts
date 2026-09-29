@@ -42,7 +42,10 @@ export const PRESS = {
  *  `click_event` from it. Unknown: both, each version ignoring the other's. */
 export type Spelling = "legacy" | "modern" | "both";
 
-export function spellingFor(version: string | null, atLeast: (wanted: readonly number[]) => boolean): Spelling {
+export function spellingFor(
+    version: string | null,
+    atLeast: (wanted: readonly number[]) => boolean
+): Spelling {
     if (version === null) return "both";
     return atLeast([1, 21, 5]) ? "modern" : "legacy";
 }
@@ -137,12 +140,18 @@ export function listScores(player: string): string {
 
 /** The menu's trigger, and everybody allowed to press it - again after each
  *  press, since the game takes the permission away each time. */
-export const MENU_SETUP = [`scoreboard objectives add ${MENU} trigger`, `scoreboard players enable @a ${MENU}`];
+export const MENU_SETUP = [
+    `scoreboard objectives add ${MENU} trigger`,
+    `scoreboard players enable @a ${MENU}`
+];
 
 export const READ_PRESSES = `execute as @a[scores={${MENU}=1..}] run scoreboard players get @s ${MENU}`;
 
 export function pressHandled(player: string): string[] {
-    return [`scoreboard players set ${player} ${MENU} 0`, `scoreboard players enable ${player} ${MENU}`];
+    return [
+        `scoreboard players set ${player} ${MENU} 0`,
+        `scoreboard players enable ${player} ${MENU}`
+    ];
 }
 
 // ------------------------------------------------------------------ reading
@@ -177,7 +186,14 @@ export function trackedBar(player: string): string {
     return `polaris:pc_${player.toLowerCase()}`;
 }
 
-export function barShow(id: string, name: string, value: number, max: number, players: string, color: string): string[] {
+export function barShow(
+    id: string,
+    name: string,
+    value: number,
+    max: number,
+    players: string,
+    color: string
+): string[] {
     const top = Math.max(1, Math.round(max));
     return [
         `bossbar add ${id} ${text(name)}`,
