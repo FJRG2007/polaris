@@ -18,10 +18,10 @@
  */
 
 import * as actions from "./minecraft-actions";
+import { timeoutText, useGameText } from "../game-text";
 import { forgetLoginAction } from "./minecraft-login-actions";
 import type { PlayerSeen } from "../../lib/games-activity";
 import type { MinecraftModeration } from "./minecraft-actions";
-import { ACCESS_REACH_NOTE } from "../../lib/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PlayerSessionEvent } from "../../lib/minecraft/sessions";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
@@ -30,8 +30,9 @@ import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
-import { describeQueued, waitingOn, type QueuedAction } from "../../lib/minecraft/queue";
-import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "../../lib/player-timeout";
+import type { QueuedAction } from "../../lib/minecraft/queue";
+import { describeQueuedText, waitingOnText } from "./queue-text";
+import { timeoutFor, type PlayerTimeout } from "../../lib/player-timeout";
 import type {
     MinecraftFirewall,
     MinecraftRoster,
@@ -156,6 +157,7 @@ export function MinecraftPlayers({
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState("");
@@ -312,7 +314,15 @@ export function MinecraftPlayers({
         title: string,
         description: string
     ): Promise<void> {
-        if (!(await confirm({ title, description, confirmLabel: "Confirm", danger: true }))) return;
+        if (
+            !(await confirm({
+                title,
+                description,
+                confirmLabel: t("playersTab.confirm"),
+                danger: true
+            }))
+        )
+            return;
         moderate(input);
     }
 
@@ -320,9 +330,9 @@ export function MinecraftPlayers({
      *  next join. Nothing restarts: the mod asks on every join. */
     async function resetPassword(player: string): Promise<void> {
         const agreed = await confirm({
-            title: `Reset ${player}'s password?`,
-            description: `${player} sets a new one the next time they join.`,
-            confirmLabel: "Reset password",
+            title: t("playersTab.resetTitle", { name: player }),
+            description: t("playersTab.resetBody", { name: player }),
+            confirmLabel: t("playersTab.resetPassword"),
             danger: true
         });
         if (!agreed) return;
@@ -417,13 +427,12 @@ export function MinecraftPlayers({
                     <CardBody className="flex flex-col gap-1">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />
-                            Nobody can join yet
+                            {t("playersTab.nobodyCanJoinYet")}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            The server is closed until somebody is registered. Add yourself first:
-                            your {edition === "bedrock" ? "gamertag" : "Minecraft username"}, and
-                            the address you play from - the locate button fills in the one you are
-                            on now.
+                            {edition === "bedrock"
+                                ? t("playersTab.closedHintBedrock")
+                                : t("playersTab.closedHintJava")}
                         </p>
                     </CardBody>
                 </Card>
@@ -440,7 +449,7 @@ export function MinecraftPlayers({
                     <CardBody className="flex flex-col gap-2">
                         <p className="flex items-center gap-2 text-sm font-medium">
                             <Users className="size-4 text-warning" />
-                            Turned away recently
+                            {t("playersTab.turnedAwayRecently")}
                         </p>
                         {(access?.refusals ?? []).map((refusal) => {
                             const from = refusal.address;
@@ -452,8 +461,8 @@ export function MinecraftPlayers({
                                     <span className="font-medium">{refusal.player}</span>
                                     <span className="text-muted-foreground">
                                         {from
-                                            ? `arrived from ${from}`
-                                            : "arrived from an address the log did not carry"}
+                                            ? t("playersTab.arrivedFrom", { address: from })
+                                            : t("playersTab.arrivedFromAnAddressThe")}
                                         {" - "}
                                         {format.dateTime(refusal.at)}
                                     </span>
@@ -473,16 +482,14 @@ export function MinecraftPlayers({
                                                 )
                                             }
                                         >
-                                            Allow this address too
+                                            {t("playersTab.allowThisAddressToo")}
                                         </Button>
                                     )}
                                 </div>
                             );
                         })}
                         <p className="text-xs text-muted-foreground">
-                            A home connection is given a new address by its provider every so often,
-                            and the player is thrown out when it happens. Allowing the new one keeps
-                            the old one as well.
+                            {t("playersTab.aHomeConnectionIsGiven")}
                         </p>
                     </CardBody>
                 </Card>
@@ -492,15 +499,16 @@ export function MinecraftPlayers({
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <p className="text-sm font-medium">Who can join</p>
+                            <p className="text-sm font-medium">{t("playersTab.whoCanJoin")}</p>
                             <p className="text-xs text-muted-foreground">
-                                A player is let in when the username is on this list and they arrive
-                                from the address registered to it. {ACCESS_REACH_NOTE}
+                                {t("playersTab.whoCanJoinHint")} {t("access.reachNote")}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
-                                {access?.bindAddresses ? "Address checked" : "Address not checked"}
+                                {access?.bindAddresses
+                                    ? t("playersTab.addressChecked")
+                                    : t("playersTab.addressNotChecked")}
                             </span>
                             <Switch
                                 checked={access?.bindAddresses ?? true}
@@ -510,14 +518,13 @@ export function MinecraftPlayers({
                                     )
                                 }
                                 disabled={pending || access === null || !access.addressesAvailable}
-                                aria-label="Check each player's address when they join"
+                                aria-label={t("playersTab.checkEachPlayerSAddress")}
                             />
                         </div>
                     </div>
                     {access && !access.addressesAvailable && (
                         <p className="text-xs text-muted-foreground">
-                            Bedrock does not record where a player connected from, so only the names
-                            here are enforced.
+                            {t("playersTab.bedrockDoesNotRecordWhere")}
                         </p>
                     )}
                 </CardBody>
@@ -527,10 +534,9 @@ export function MinecraftPlayers({
                 <Card>
                     <CardBody className="flex flex-col gap-2">
                         <div>
-                            <p className="text-sm font-medium">Waiting to happen</p>
+                            <p className="text-sm font-medium">{t("playersTab.waitingToHappen")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Decided while the server or the player was away. Each one runs by
-                                itself as soon as it can, and lapses if it never can.
+                                {t("playersTab.decidedWhileTheServerOr")}
                             </p>
                         </div>
                         <ul className="flex flex-col divide-y divide-border/60">
@@ -541,19 +547,27 @@ export function MinecraftPlayers({
                                 >
                                     <div className="min-w-0">
                                         <p className="truncate text-sm">
-                                            {entry.username}: {describeQueued(entry)}
+                                            {entry.username}: {describeQueuedText(t, entry)}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {entry.lastError ?? waitingOn(entry)} - lapses{" "}
-                                            {new Date(entry.expiresAt).toLocaleDateString()}
+                                            {t("playersTab.lapses", {
+                                                reason: entry.lastError ?? waitingOnText(t, entry),
+                                                date: new Date(entry.expiresAt).toLocaleDateString()
+                                            })}
                                         </p>
                                     </div>
                                     <Button
                                         size="icon"
                                         variant="ghost"
                                         disabled={pending}
-                                        aria-label={`Cancel ${describeQueued(entry)} for ${entry.username}`}
-                                        title={`Cancel ${describeQueued(entry)} for ${entry.username}`}
+                                        aria-label={t("playersTab.cancelFor", {
+                                            what: describeQueuedText(t, entry),
+                                            name: entry.username
+                                        })}
+                                        title={t("playersTab.cancelFor", {
+                                            what: describeQueuedText(t, entry),
+                                            name: entry.username
+                                        })}
                                         onClick={() =>
                                             startTransition(async () => {
                                                 const result =
@@ -580,14 +594,14 @@ export function MinecraftPlayers({
 
             <PlayersTable
                 columns={[
-                    { label: "Player" },
+                    { label: t("playersTab.player") },
                     // Left out entirely on Bedrock rather than drawn empty: it has
                     // no way to be asked what level somebody is on, and a column of
                     // dashes reads as a server where nobody has levelled.
-                    ...(bedrock ? [] : [{ label: "Level" }]),
-                    { label: "Status" },
-                    { label: "Standing" },
-                    { label: "Address", className: "hidden md:table-cell" }
+                    ...(bedrock ? [] : [{ label: t("playersTab.level") }]),
+                    { label: t("playersTab.status") },
+                    { label: t("playersTab.standing") },
+                    { label: t("playersTab.address"), className: "hidden md:table-cell" }
                 ]}
                 search={query}
                 onSearch={setQuery}
@@ -616,8 +630,13 @@ export function MinecraftPlayers({
                             the wrong thing about it. */}
                         {rosterAsOf ? (
                             <span className="text-xs text-muted-foreground">
-                                As Polaris last read it,{" "}
-                                {relativeTime(rosterAsOf, format, "at an unknown time")}
+                                {t("playersTab.asRead", {
+                                    when: relativeTime(
+                                        rosterAsOf,
+                                        format,
+                                        t("playersTab.unknownTime")
+                                    )
+                                })}
                             </span>
                         ) : null}
                         <Button
@@ -671,7 +690,7 @@ export function MinecraftPlayers({
                         onRevoke={() =>
                             void confirm({
                                 ...playerConfirm.remove(player.name),
-                                confirmLabel: "Remove",
+                                confirmLabel: t("playersTab.remove"),
                                 danger: true
                             }).then((agreed) => {
                                 if (agreed)
@@ -711,11 +730,11 @@ export function MinecraftPlayers({
                     }}
                     onUnlink={(username) => {
                         void confirm({
-                            title: `Unlink ${username}?`,
+                            title: t("playersTab.unlinkTitle", { name: username }),
                             description: target?.addresses.length
-                                ? `${username} stops following a Polaris account. The addresses that came from its sign-ins go with it, which takes ${username} off the list.`
-                                : `${username} stops following a Polaris account and comes off the list.`,
-                            confirmLabel: "Unlink",
+                                ? t("playersTab.unlinkBodyAddresses", { name: username })
+                                : t("playersTab.unlinkBody", { name: username }),
+                            confirmLabel: t("playersTab.unlink"),
                             danger: true
                         }).then((agreed) => {
                             if (!agreed) return;
@@ -897,6 +916,8 @@ function PlayerRow({
     onResetPassword?: () => void;
     onRevoke: () => void;
 }) {
+    const t = useGameText("minecraft");
+    const tGames = useGameText("games");
     const { name } = player;
     // Every verb below is an RCON command, so none of them exist while the server
     // is not answering. Registering and unregistering are Polaris' own and do.
@@ -956,7 +977,10 @@ function PlayerRow({
                         {level === null && lastLevel !== null ? (
                             <span
                                 className="text-muted-foreground"
-                                title={`Level ${lastLevel.level} when last seen, ${format.dateTime(lastLevel.at)}`}
+                                title={t("playersTab.lastLevel", {
+                                    level: lastLevel.level,
+                                    date: format.dateTime(lastLevel.at)
+                                })}
                             >
                                 {lastLevel.level}
                             </span>
@@ -965,8 +989,8 @@ function PlayerRow({
                                 className="text-muted-foreground"
                                 title={
                                     player.online
-                                        ? "The server has not answered for this player yet."
-                                        : "Only players who are on the server report a level."
+                                        ? t("playersTab.theServerHasNotAnswered")
+                                        : t("playersTab.onlyPlayersWhoAreOn")
                                 }
                             >
                                 -
@@ -992,9 +1016,9 @@ function PlayerRow({
                     <div className="flex flex-wrap items-center gap-1">
                         {player.linkedTo && (
                             <Badge
-                                title={`Joins from wherever ${player.linkedTo.name} is signed in to Polaris`}
+                                title={t("playersTab.linkedHint", { name: player.linkedTo.name })}
                             >
-                                linked
+                                {t("playersTab.linked")}
                             </Badge>
                         )}
                         {player.addresses.length > 0 && (
@@ -1010,24 +1034,34 @@ function PlayerRow({
                                     variant="success"
                                     title={
                                         player.password.lastLoginAt
-                                            ? `Last logged in ${new Date(player.password.lastLoginAt).toLocaleString()}`
-                                            : "Has not logged in since registering"
+                                            ? t("playersTab.lastLogin", {
+                                                  date: new Date(
+                                                      player.password.lastLoginAt
+                                                  ).toLocaleString()
+                                              })
+                                            : t("playersTab.hasNotLoggedInSince")
                                     }
                                 >
                                     <KeyRound className="size-3" />
-                                    password set
+                                    {t("playersTab.passwordSet")}
                                 </Badge>
                             ) : (
-                                <Badge title="Sets one on their next join">no password yet</Badge>
+                                <Badge title={t("playersTab.setsOneOnTheirNext")}>
+                                    {t("playersTab.noPasswordYet")}
+                                </Badge>
                             ))}
                         {player.banned &&
                             (timeout ? (
                                 <Badge
                                     variant="danger"
-                                    title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
+                                    title={t("playersTab.lifts", {
+                                        date: new Date(timeout.until).toLocaleString()
+                                    })}
                                 >
                                     <Timer className="size-3" />
-                                    timed out, {timeoutRemaining(timeout.until)}
+                                    {t("playersTab.timedOut", {
+                                        left: timeoutText(tGames, timeout.until)
+                                    })}
                                 </Badge>
                             ) : (
                                 <Badge variant="danger">
@@ -1045,7 +1079,7 @@ function PlayerRow({
                         below, because the row is where somebody wonders why their
                         last action appears to have done nothing. */}
                         {waiting > 0 && (
-                            <Badge title="Waiting to reach them">
+                            <Badge title={t("playersTab.waitingToReachThem")}>
                                 <Clock className="size-3" />
                                 {waiting} waiting
                             </Badge>
@@ -1111,12 +1145,16 @@ function StatusCell({
     now: number;
     onOpen: (dialog: PlayerDialog) => void;
 }) {
+    const t = useGameText("minecraft");
     const format = useDisplayFormat();
     const away = player.presence === "playing" && idleSince !== null;
     const badge = away ? (
         <Badge
             variant="warning"
-            title={`${player.name} has not moved or turned for ${Math.floor((now - idleSince) / 60_000)} minutes`}
+            title={t("playersTab.idle", {
+                name: player.name,
+                minutes: Math.floor((now - idleSince) / 60_000)
+            })}
         >
             {playerPresence.afk}
         </Badge>
@@ -1138,10 +1176,11 @@ function StatusCell({
                     type="button"
                     onClick={() => onOpen("history")}
                     className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                    title={`When ${player.name} joined and left`}
+                    title={t("playersTab.historyOf", { name: player.name })}
                 >
-                    {player.presence === "playing" ? "since " : "Last on "}
-                    {relativeTime(player.lastSeen, format, "time not logged")}
+                    {t(player.presence === "playing" ? "playersTab.since" : "playersTab.lastOn", {
+                        when: relativeTime(player.lastSeen, format, t("players.timeNotLogged"))
+                    })}
                 </button>
             )}
         </div>
@@ -1458,6 +1497,7 @@ export function FirewallSection({
     onError: (message: string | null) => void;
     onChanged: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
     const [applied, setApplied] = useState<string | null>(null);
     const outstanding = firewall
@@ -1488,7 +1528,7 @@ export function FirewallSection({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">
-                        Firewall{" "}
+                        {t("playersTab.firewall")}{" "}
                         <span className="text-muted-foreground">
                             {firewall.blocked.length || ""}
                         </span>
@@ -1501,20 +1541,16 @@ export function FirewallSection({
                     >
                         <ShieldBan className="size-4" />
                         {outstanding.length === 0
-                            ? "All applied"
-                            : `Ban ${outstanding.length} here`}
+                            ? t("playersTab.allApplied")
+                            : t("playersTab.banHere", { count: outstanding.length })}
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Addresses the Polaris firewall blocks. A game server refuses them only once they
-                    are on its own ban list.
+                    {t("playersTab.addressesThePolarisFirewallBlocks")}
                 </p>
                 {firewall.ranges.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        {firewall.ranges.length}{" "}
-                        {firewall.ranges.length === 1 ? "range is" : "ranges are"} blocked in the
-                        firewall. Minecraft bans single addresses only, so those are not applied
-                        here.
+                        {t("playersTab.rangesBlocked", { count: firewall.ranges.length })}
                     </p>
                 )}
                 {applied && <p className="text-xs text-muted-foreground">{applied}</p>}

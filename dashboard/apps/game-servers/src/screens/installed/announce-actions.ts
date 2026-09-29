@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { sendAnnouncement } from "../../lib/minecraft/service";
@@ -41,7 +41,11 @@ export async function sendAnnouncementAction(
 ): Promise<{ sent?: number; kept?: boolean; error?: string }> {
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheAnnouncement") };
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheAnnouncement")
+        };
     try {
         const { user, access } = await requireGameServer(
             "games.console",
@@ -79,7 +83,12 @@ export async function sendAnnouncementAction(
         });
         return { sent, kept };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotTake") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.theServerDidNotTake")
+        };
     }
 }
 
@@ -110,7 +119,12 @@ export async function saveAnnouncementTemplateAction(
     input: z.input<typeof saveSchema>
 ): Promise<{ templates?: AnnouncementTemplate[]; id?: string; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheTemplate") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheTemplate")
+        };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const id = parsed.data.id ?? randomUUID();
@@ -130,7 +144,10 @@ export async function saveAnnouncementTemplateAction(
         return { templates, id };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatTemplateCouldNotBe")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatTemplateCouldNotBe")
         };
     }
 }
@@ -142,7 +159,8 @@ export async function deleteAnnouncementTemplateAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), id: z.string().min(1).max(64) })
         .safeParse({ installedAppId, id });
-    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatTemplateCouldNotBe2") };
+    if (!parsed.success)
+        return { error: (await gameWords("games"))("errors.thatTemplateCouldNotBe2") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const templates = await deleteTemplate(parsed.data.installedAppId, parsed.data.id);
@@ -156,7 +174,10 @@ export async function deleteAnnouncementTemplateAction(
         return { templates };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatTemplateCouldNotBe2")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatTemplateCouldNotBe2")
         };
     }
 }

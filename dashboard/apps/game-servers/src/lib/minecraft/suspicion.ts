@@ -16,6 +16,8 @@
  * Pure: the screen and the tests read the same answer.
  */
 
+import type { Translator } from "@polaris/core";
+import { gameCatalogs, type GameKey } from "../../../messages";
 import { CONFIRM_HITS, type MiningFigures } from "./xray";
 
 export type Likelihood = "unlikely" | "possible" | "likely" | "confirmed";
@@ -25,14 +27,58 @@ export interface Score {
     readonly level: Likelihood;
     /** Why, one line per signal, strongest first. Empty for a clean player. */
     readonly reasons: readonly string[];
+    /** The same reasons as data, in the same order, for a screen to put in its
+     *  reader's language; `reasons` is their English, for logs and alerts. */
+    readonly why: readonly ScoreReason[];
 }
 
-export const LIKELIHOOD_LABEL: Readonly<Record<Likelihood, string>> = {
-    unlikely: "Unlikely",
-    possible: "Possible",
-    likely: "Likely",
-    confirmed: "Confirmed"
-};
+/** One signal behind a score. */
+export type ScoreReason =
+    | { readonly kind: "hits"; readonly count: number }
+    | { readonly kind: "oneHit" }
+    | { readonly kind: "rate"; readonly ore: "diamond" | "debris"; readonly per: number }
+    | { readonly kind: "flights"; readonly count: number }
+    | { readonly kind: "teleports"; readonly count: number }
+    | { readonly kind: "engine"; readonly check: string; readonly alerts: number };
+
+/** The words a score's reasons are written in. */
+export type SuspicionText = Translator<GameKey<"minecraft">>;
+
+const ENGLISH: SuspicionText = gameCatalogs.translator("en-US", "minecraft");
+
+/** A reason in the reader's language; English when no reader is given, for
+ *  logs and the tests. */
+export function reasonLine(reason: ScoreReason, t: SuspicionText = ENGLISH): string {
+    switch (reason.kind) {
+        case "hits":
+            return t("xray.reasons.hits", { count: reason.count });
+        case "oneHit":
+            return t("xray.reasons.oneHit");
+        case "rate":
+            return t(
+                reason.ore === "diamond" ? "xray.reasons.rateDiamond" : "xray.reasons.rateDebris",
+                {
+                    per: reason.per
+                }
+            );
+        case "flights":
+            return t("xray.reasons.flights", { count: reason.count });
+        case "teleports":
+            return t("xray.reasons.teleports", { count: reason.count });
+        case "engine": {
+            const label = engineCheckLabel(reason.check, t);
+            return t("xray.reasons.engine", {
+                label: `${label[0]!.toUpperCase()}${label.slice(1)}`,
+                check: reason.check,
+                count: reason.alerts
+            });
+        }
+    }
+}
+
+function scored(value: number, why: readonly ScoreReason[]): Score {
+    return { value, level: levelOf(value), reasons: why.map((reason) => reasonLine(reason)), why };
+}
 
 export function levelOf(value: number): Likelihood {
     if (value >= 90) return "confirmed";
@@ -65,19 +111,19 @@ function rateWeight(perOre: number | null, fast: number, quick: number): number 
 const ONE_HIT = 45;
 
 export function xrayScore(hits: number, mining: MiningFigures | null): Score {
-    const reasons: string[] = [];
-    if (hits >= CONFIRM_HITS) reasons.push(`Dug straight to ${hits} ores hidden in solid rock`);
-    else if (hits === 1) reasons.push("Dug to 1 ore hidden in solid rock - one can be chance");
+    const why: ScoreReason[] = [];
+    if (hits >= CONFIRM_HITS) why.push({ kind: "hits", count: hits });
+    else if (hits === 1) why.push({ kind: "oneHit" });
 
     const diamonds = mining ? rockPerOre(mining.diamonds, mining.deepRock) : null;
     const debris = mining ? rockPerOre(mining.debris, mining.netherRock) : null;
     const mined = Math.max(rateWeight(diamonds, 25, 50), rateWeight(debris, 40, 80));
     if (mined > 0) {
-        const which =
+        why.push(
             rateWeight(diamonds, 25, 50) >= rateWeight(debris, 40, 80)
-                ? `1 diamond per ${Math.round(diamonds!)} deepslate`
-                : `1 ancient debris per ${Math.round(debris!)} nether rock`;
-        reasons.push(`Mines ${which} - fast, though exploring caves does that too`);
+                ? { kind: "rate", ore: "diamond", per: Math.round(diamonds!) }
+                : { kind: "rate", ore: "debris", per: Math.round(debris!) }
+        );
     }
 
     const value =
@@ -86,70 +132,74 @@ export function xrayScore(hits: number, mining: MiningFigures | null): Score {
             : hits === 1
               ? Math.min(89, ONE_HIT + mined)
               : Math.min(19, mined);
-    return { value, level: levelOf(value), reasons };
+    return scored(value, why);
 }
 
 /** Movement never reaches "Confirmed": see the top of this file. */
 export const MOVEMENT_MAX = 85;
 
 export function movementScore(flights: number, teleports: number): Score {
-    const reasons: string[] = [];
-    if (flights > 0)
-        reasons.push(
-            `Hovered in the air ${flights === 1 ? "once" : `${flights} times`} without being allowed to fly`
-        );
-    if (teleports > 0)
-        reasons.push(
-            `Moved further than anybody can ${teleports === 1 ? "once" : `${teleports} times`}, with no command explaining it`
-        );
+    const why: ScoreReason[] = [];
+    if (flights > 0) why.push({ kind: "flights", count: flights });
+    if (teleports > 0) why.push({ kind: "teleports", count: teleports });
     const fly = flights === 0 ? 0 : flights === 1 ? 40 : flights === 2 ? 65 : 80;
     const jump = teleports === 0 ? 0 : teleports === 1 ? 25 : teleports === 2 ? 40 : 55;
     const value = Math.min(MOVEMENT_MAX, Math.max(fly, jump) + Math.round(Math.min(fly, jump) / 3));
-    return { value, level: levelOf(value), reasons };
+    return scored(value, why);
 }
 
-/** What the engine's checks catch, in words, by a part of the check's name (the
- *  engine names variants with a letter, "BadPacketsA", and kinds with a word in
- *  front, "FarPlace"). Tried in order, so the more specific come first. */
-const ENGINE_CHECKS: readonly { readonly part: string; readonly label: string }[] = [
-    { part: "XRayProbe", label: "dug at buried ore it could not see" },
-    { part: "Simulation", label: "moved in a way the game does not allow" },
-    { part: "Reach", label: "hit from further away than anybody can" },
-    { part: "Hitboxes", label: "hit something the cursor was not on" },
-    { part: "Aim", label: "aimed like a machine" },
-    { part: "Autoclicker", label: "clicked faster than a hand" },
-    { part: "Killaura", label: "attacked several targets at once" },
-    { part: "GroundSpoof", label: "claimed to stand on nothing" },
-    { part: "NoFall", label: "took no fall damage" },
-    { part: "Timer", label: "sped up the game clock" },
-    { part: "NoSlow", label: "did not slow down using an item" },
-    { part: "Sprint", label: "sprinted when it could not" },
-    { part: "AntiKB", label: "ignored knockback" },
-    { part: "Knockback", label: "ignored knockback" },
-    { part: "Explosion", label: "ignored an explosion" },
-    { part: "Elytra", label: "flew an elytra impossibly" },
-    { part: "Vehicle", label: "steered a mount impossibly" },
-    { part: "Phase", label: "went through a block" },
-    { part: "Baritone", label: "moved like a pathing bot" },
-    { part: "MultiActions", label: "did things at once the game does not allow" },
-    { part: "FarPlace", label: "placed a block it could not reach" },
-    { part: "Place", label: "placed a block in a way the game does not allow" },
-    { part: "FastBreak", label: "broke blocks faster than anybody can" },
-    { part: "FarBreak", label: "broke a block it could not reach" },
-    { part: "Break", label: "broke a block in a way the game does not allow" },
-    { part: "Interact", label: "interacted with what it could not see" },
-    { part: "BadPackets", label: "sent impossible packets" },
-    { part: "PacketOrder", label: "sent packets out of order" },
-    { part: "TransactionOrder", label: "sent packets out of order" },
-    { part: "Post", label: "sent packets out of order" },
-    { part: "Crash", label: "sent packets that crash servers" },
-    { part: "Exploit", label: "tried a known exploit" },
-    { part: "Chat", label: "sent chat packets the game would not send" }
-];
+/** The parts of the engine's check names there are words for, under
+ *  `xray.checks` in the catalogs (the engine names variants with a letter,
+ *  "BadPacketsA", and kinds with a word in front, "FarPlace"). Tried in order,
+ *  so the more specific come first. */
+const ENGINE_CHECKS = [
+    "XRayProbe",
+    "Simulation",
+    "Reach",
+    "Hitboxes",
+    "Aim",
+    "Autoclicker",
+    "Killaura",
+    "GroundSpoof",
+    "NoFall",
+    "Timer",
+    "NoSlow",
+    "Sprint",
+    "AntiKB",
+    "Knockback",
+    "Explosion",
+    "Elytra",
+    "Vehicle",
+    "Phase",
+    "Baritone",
+    "MultiActions",
+    "FarPlace",
+    "Place",
+    "FastBreak",
+    "FarBreak",
+    "Break",
+    "Interact",
+    "BadPackets",
+    "PacketOrder",
+    "TransactionOrder",
+    "Post",
+    "Crash",
+    "Exploit",
+    "Chat"
+] as const;
+
+/** A named part of the engine's checks, which a catalog keys its words by. */
+export type EngineCheckPart = (typeof ENGINE_CHECKS)[number];
+
+/** Which listed part a check's name falls under, or null for one not listed. */
+export function engineCheckPart(check: string): EngineCheckPart | null {
+    return ENGINE_CHECKS.find((part) => check.includes(part)) ?? null;
+}
 
 /** A check's name in words, or the name itself for one not listed. */
-export function engineCheckLabel(check: string): string {
-    return ENGINE_CHECKS.find((one) => check.includes(one.part))?.label ?? check;
+export function engineCheckLabel(check: string, t: SuspicionText = ENGLISH): string {
+    const part = engineCheckPart(check);
+    return part ? t(`xray.checks.${part}`) : check;
 }
 
 /** The score an alert count reaches: one could be a glitch the engine did not
@@ -167,20 +217,17 @@ export function engineScore(
     checks: readonly { readonly check: string; readonly alerts: number }[]
 ): Score {
     const alerts = checks.reduce((sum, one) => sum + one.alerts, 0);
-    if (alerts === 0) return { value: 0, level: "unlikely", reasons: [] };
+    if (alerts === 0) return scored(0, []);
     // Different checks failing is stronger than one check failing more: a
     // glitch the engine does not model trips the same check again.
     const distinct = new Set(checks.filter((one) => one.alerts > 0).map((one) => one.check)).size;
     const value = Math.min(98, alertsWeight(alerts) + Math.min(6, (distinct - 1) * 2));
-    const reasons = [...checks]
+    const why = [...checks]
         .filter((one) => one.alerts > 0)
         .sort((left, right) => right.alerts - left.alerts)
         .slice(0, 3)
-        .map(
-            (one) =>
-                `${engineCheckLabel(one.check)[0]!.toUpperCase()}${engineCheckLabel(one.check).slice(1)} - ${one.check}, ${one.alerts === 1 ? "once" : `${one.alerts} times`}`
-        );
-    return { value, level: levelOf(value), reasons };
+        .map((one): ScoreReason => ({ kind: "engine", check: one.check, alerts: one.alerts }));
+    return scored(value, why);
 }
 
 /** One player as the screen lists them: every score and what they rest on. */

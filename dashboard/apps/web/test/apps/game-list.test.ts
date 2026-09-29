@@ -170,7 +170,7 @@ describe("ordering", () => {
 describe("the line under the badge", () => {
     it("says how long a server that is answering has been up", () => {
         const up = server("a", { facts: facts({ onlineSince: "2026-08-13T09:00:00.000Z" }) });
-        expect(uptimeLine(up)).toEqual({ prefix: "up since", at: "2026-08-13T09:00:00.000Z" });
+        expect(uptimeLine(up)).toEqual({ prefix: "status.upSince", at: "2026-08-13T09:00:00.000Z" });
     });
 
     it("says when a stopped server was last up", () => {
@@ -178,7 +178,7 @@ describe("the line under the badge", () => {
             facts: facts({ running: false, lastOnlineAt: "2026-08-10T09:00:00.000Z" }),
             live: live({ answering: false })
         });
-        expect(uptimeLine(off)).toEqual({ prefix: "last up", at: "2026-08-10T09:00:00.000Z" });
+        expect(uptimeLine(off)).toEqual({ prefix: "status.lastUp", at: "2026-08-10T09:00:00.000Z" });
     });
 
     it("never says a server that is answering was last up at some point", () => {

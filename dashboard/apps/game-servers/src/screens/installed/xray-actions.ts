@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { editionOf, onlinePlayers } from "../../lib/minecraft/service";
@@ -132,7 +132,12 @@ export async function readXrayAction(
         const { access } = await requireGameServer("games.moderate", parsed.data);
         return { view: await viewOf(access.ownerId, parsed.data, true) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeRead")
+        };
     }
 }
 
@@ -142,7 +147,12 @@ export async function saveXraySettingsAction(
     input: z.input<typeof saveSchema>
 ): Promise<{ view?: XrayView; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheSettings") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheSettings")
+        };
     const { installedAppId, settings } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
@@ -171,7 +181,12 @@ export async function saveXraySettingsAction(
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeSaved")
+        };
     }
 }
 
@@ -207,6 +222,11 @@ export async function clearXrayPlayerAction(
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeCleared") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeCleared")
+        };
     }
 }

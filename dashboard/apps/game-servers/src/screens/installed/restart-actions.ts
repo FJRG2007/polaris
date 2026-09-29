@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { MAX_RESTART_REASON, type PendingRestart } from "../../lib/games-restart";
 import {
@@ -58,7 +58,7 @@ export async function scheduleGameRestartAction(input: {
     reason?: string;
 }): Promise<{ pending?: PendingRestart; error?: string }> {
     const parsed = bookSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheTimeAndTry") };
+    if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheTimeAndTry") };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const pending = await requestRestart(parsed.data.installedAppId, {

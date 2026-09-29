@@ -435,7 +435,9 @@ export function GamesView({
                                 }
                             >
                                 <Archive className="size-4" />
-                                {archivedCount > 0 ? t("list.archivedCount", { count: archivedCount }) : t("list.archived")}
+                                {archivedCount > 0
+                                    ? t("list.archivedCount", { count: archivedCount })
+                                    : t("list.archived")}
                             </Button>
                         )}
                     </div>
@@ -596,7 +598,10 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader title={t("list.gameServers")} description={t("list.runGameServersOnYour")} />
+            <PageHeader
+                title={t("list.gameServers")}
+                description={t("list.runGameServersOnYour")}
+            />
             <Card>
                 <CardBody className="flex flex-col gap-4 py-8">
                     <div className="flex flex-col gap-1">
@@ -796,7 +801,10 @@ function ServerRow({
                                     )}
                                 />
                             </IconButton>
-                            <IconLink label={t("list.openNamed", { name: server.name })} href={href}>
+                            <IconLink
+                                label={t("list.openNamed", { name: server.name })}
+                                href={href}
+                            >
                                 <ExternalLink className="size-4" />
                             </IconLink>
                             {files && (
@@ -814,7 +822,11 @@ function ServerRow({
                             )}
                             {canManage && (
                                 <IconButton
-                                    label={running ? t("list.stopNamed", { name: server.name }) : t("list.startNamed", { name: server.name })}
+                                    label={
+                                        running
+                                            ? t("list.stopNamed", { name: server.name })
+                                            : t("list.startNamed", { name: server.name })
+                                    }
                                     disabled={pending || !known || !server.applicationId}
                                     onClick={() =>
                                         onRun(() => setGameServerRunningAction(server.id, !running))
@@ -862,7 +874,9 @@ function ServerRow({
                         // tooltip nobody can reach.
                         <ContextMenuItem disabled>
                             <FolderOpen className="size-4" /> {t("list.files")}
-                            <span className="ml-auto pl-3 text-xs">{t("list.filesNeedDeploy")}</span>
+                            <span className="ml-auto pl-3 text-xs">
+                                {t("list.filesNeedDeploy")}
+                            </span>
                         </ContextMenuItem>
                     ))}
                 {known && address && (

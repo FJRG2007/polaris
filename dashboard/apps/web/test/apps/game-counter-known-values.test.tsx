@@ -10,8 +10,19 @@
  * at its widest; the panel, the announcement and the counter all use it.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: {
+        i18nProvider: { useLocale: () => "en-US" },
+        confirmDialog: { useConfirm: () => [async () => true, null] },
+        liveRead: { useKeptSnapshot: () => undefined },
+        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+        structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
+        copyButton: { CopyButton: () => null }
+    }
+}));
 
 const { visibleLength } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
 const { sidebarProblems, DEFAULT_SIDEBAR, plainLine, SIDEBAR_TITLE_MAX } =

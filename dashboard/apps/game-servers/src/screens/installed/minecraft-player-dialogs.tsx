@@ -102,7 +102,11 @@ export function ExperienceDialog({
             title={t("players.experienceOf", { name: player })}
             description={t("players.appliedToThePlayerStanding")}
             confirmLabel={
-                mode === "set" ? t("players.setIt") : mode === "remove" ? t("players.takeItAway") : t("players.giveIt")
+                mode === "set"
+                    ? t("players.setIt")
+                    : mode === "remove"
+                      ? t("players.takeItAway")
+                      : t("players.giveIt")
             }
             ready={amount >= 0}
             pending={pending}
@@ -547,9 +551,7 @@ export function HistoryDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>{t("players.onThisServer", { name: player })}</DialogTitle>
-                    <DialogDescription>
-                        {t("players.whatPolarisHasWatchedAnd")}
-                    </DialogDescription>
+                    <DialogDescription>{t("players.whatPolarisHasWatchedAnd")}</DialogDescription>
                 </DialogHeader>
 
                 <PlayerRecordPanel
@@ -576,7 +578,9 @@ export function HistoryDialog({
                                             : "text-muted-foreground"
                                     }
                                 >
-                                    {event.kind === "join" ? t("players.joined") : t("players.left")}
+                                    {event.kind === "join"
+                                        ? t("players.joined")
+                                        : t("players.left")}
                                 </span>
                                 <span className="flex items-center gap-3 text-xs text-muted-foreground">
                                     {event.address && (
@@ -827,18 +831,34 @@ export function PlayerAccessDialog({
 
     return (
         <PlayerFormDialog
-            title={editing ? t("players.editNamed", { name: player.username }) : t("players.addAPlayer")}
+            title={
+                editing
+                    ? t("players.editNamed", { name: player.username })
+                    : t("players.addAPlayer")
+            }
             description={
                 following
-                    ? t("players.followsDescription", { player: player?.username ?? "", account: linkedTo?.name ?? "" })
+                    ? t("players.followsDescription", {
+                          player: player?.username ?? "",
+                          account: linkedTo?.name ?? ""
+                      })
                     : linkedTo
-                      ? t("players.linkedDescription", { player: player?.username ?? "", account: linkedTo.name })
+                      ? t("players.linkedDescription", {
+                            player: player?.username ?? "",
+                            account: linkedTo.name
+                        })
                       : editing
                         ? t("players.addAnotherAddressTheyPlay")
                         : t("players.aPlayerIsLetIn")
             }
             confirmLabel={
-                following || invited ? t("players.done") : linking ? t("players.link") : editing ? t("players.save") : t("players.addPlayer")
+                following || invited
+                    ? t("players.done")
+                    : linking
+                      ? t("players.link")
+                      : editing
+                        ? t("players.save")
+                        : t("players.addPlayer")
             }
             ready={ready || invited !== null}
             pending={pending || inviting}
@@ -872,7 +892,11 @@ export function PlayerAccessDialog({
         >
             {!linkedTo && onLookUp && (
                 <PlayerFormField
-                    label={editing ? t("players.theirPolarisAccount") : t("players.somebodyWithAPolarisAccount")}
+                    label={
+                        editing
+                            ? t("players.theirPolarisAccount")
+                            : t("players.somebodyWithAPolarisAccount")
+                    }
                     error={lookUpError}
                     hint={
                         editing
@@ -939,7 +963,10 @@ export function PlayerAccessDialog({
                         <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
                             <span>
                                 {invited.sendError
-                                    ? t("players.inviteFailed", { email: invited.email, reason: invited.sendError })
+                                    ? t("players.inviteFailed", {
+                                          email: invited.email,
+                                          reason: invited.sendError
+                                      })
                                     : invited.url
                                       ? t("players.inviteLink", { email: invited.email, name })
                                       : t("players.invited", { email: invited.email, name })}
@@ -949,7 +976,10 @@ export function PlayerAccessDialog({
                                     <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
                                         {invited.url}
                                     </code>
-                                    <CopyButton value={invited.url} label={t("players.theInviteLink")} />
+                                    <CopyButton
+                                        value={invited.url}
+                                        label={t("players.theInviteLink")}
+                                    />
                                 </span>
                             )}
                         </div>
@@ -985,7 +1015,9 @@ export function PlayerAccessDialog({
                             variant={follow ? "ghost" : "secondary"}
                             onClick={() => setFollow(false)}
                         >
-                            {editing && hasAddresses ? t("players.keepTheseAddresses") : t("players.aFixedAddress")}
+                            {editing && hasAddresses
+                                ? t("players.keepTheseAddresses")
+                                : t("players.aFixedAddress")}
                         </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -1010,7 +1042,9 @@ export function PlayerAccessDialog({
                 <Input
                     value={editing ? player.username : username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={edition === "bedrock" ? t("players.gamertag") : t("players.username")}
+                    placeholder={
+                        edition === "bedrock" ? t("players.gamertag") : t("players.username")
+                    }
                     disabled={editing}
                     aria-label={t("players.player")}
                 />
@@ -1023,7 +1057,10 @@ export function PlayerAccessDialog({
                             ? t("players.linkedTo", { name: linkedTo.name })
                             : player?.addresses.length
                               ? t("players.followsSignIns", { name: linkedTo.name })
-                              : t("players.notSignedIn", { account: linkedTo.name, player: player?.username ?? "" })}
+                              : t("players.notSignedIn", {
+                                    account: linkedTo.name,
+                                    player: player?.username ?? ""
+                                })}
                     </span>
                     {onUnlink && player && (
                         <Button
@@ -1056,7 +1093,10 @@ export function PlayerAccessDialog({
                                     <button
                                         type="button"
                                         disabled={pending}
-                                        aria-label={t("players.removeAddressFrom", { address: held, name: player.username })}
+                                        aria-label={t("players.removeAddressFrom", {
+                                            address: held,
+                                            name: player.username
+                                        })}
                                         title={t("players.removeNamed", { name: held })}
                                         className="text-muted-foreground hover:text-danger disabled:opacity-50"
                                         onClick={() => onRemoveAddress(held)}
@@ -1072,7 +1112,9 @@ export function PlayerAccessDialog({
 
             {!following && !(linking && followsNow) && (
                 <PlayerFormField
-                    label={editing ? t("players.anotherAddress") : t("players.addressTheyConnectFrom")}
+                    label={
+                        editing ? t("players.anotherAddress") : t("players.addressTheyConnectFrom")
+                    }
                     error={addressInvalid ? t("players.thatIsNotAnAddress") : null}
                     hint={
                         detectFailed
@@ -1111,7 +1153,9 @@ export function PlayerAccessDialog({
                     field is the wrong address for everybody but themselves. */}
                     {offer.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1 pt-1">
-                            <span className="text-xs text-muted-foreground">{t("players.theySignInFrom")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("players.theySignInFrom")}
+                            </span>
                             {offer.map((known) => (
                                 <button
                                     key={known}
@@ -1128,10 +1172,7 @@ export function PlayerAccessDialog({
             )}
 
             {!following && !(linking && followsNow) && (
-                <PlayerFormField
-                    label={t("players.note")}
-                    hint={t("players.whoThisIsForWhoever")}
-                >
+                <PlayerFormField label={t("players.note")} hint={t("players.whoThisIsForWhoever")}>
                     <Input
                         value={note}
                         onChange={(event) => setNote(event.target.value)}

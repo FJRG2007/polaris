@@ -26,6 +26,11 @@ export async function hytaleFilesAction(
         const { access } = await requireGameServer("games.read", installedAppId);
         return { files: await readHytaleFiles(access.ownerId, installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatServerDidNotAnswer") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatServerDidNotAnswer")
+        };
     }
 }

@@ -133,11 +133,13 @@ export function ArkPlayerDialog({
 
     return (
         <PlayerFormDialog
-            title={editing ? t("playerDialogs.editNamed", { name: player.label }) : t("playerDialogs.addAPlayer")}
-            description={
+            title={
                 editing
-                    ? t("playerDialogs.theNameIsYoursTo")
-                    : t("playerDialogs.theServerIsToldAs")
+                    ? t("playerDialogs.editNamed", { name: player.label })
+                    : t("playerDialogs.addAPlayer")
+            }
+            description={
+                editing ? t("playerDialogs.theNameIsYoursTo") : t("playerDialogs.theServerIsToldAs")
             }
             confirmLabel={editing ? t("playerDialogs.save") : t("playerDialogs.addPlayer")}
             ready={isSteamId(trimmed)}
@@ -215,7 +217,9 @@ export function ArkPlayerDialog({
             {account && (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                     <div className="min-w-0">
-                        <p className="text-sm">{t("playerDialogs.onlyWhile", { name: account.name })}</p>
+                        <p className="text-sm">
+                            {t("playerDialogs.onlyWhile", { name: account.name })}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                             {t("playerDialogs.arkDoesNotSayWhere")}
                         </p>
@@ -389,7 +393,9 @@ export function ArkGiveDialog({
             title={t("playerDialogs.giveSomething", { name })}
             description={t("playerDialogs.goesStraightIntoTheirInventory")}
             confirmLabel={
-                sending.length > 1 ? t("playerDialogs.giveThings", { count: sending.length }) : t("playerDialogs.giveItToThem")
+                sending.length > 1
+                    ? t("playerDialogs.giveThings", { count: sending.length })
+                    : t("playerDialogs.giveItToThem")
             }
             ready={sending.length > 0}
             pending={pending}
@@ -408,8 +414,7 @@ export function ArkGiveDialog({
             <PlayerFormField
                 label={t("playerDialogs.howMany")}
                 hint={
-                    (!blueprint && split) ||
-                    t("playerDialogs.straightIntoTheirInventoryWherever")
+                    (!blueprint && split) || t("playerDialogs.straightIntoTheirInventoryWherever")
                 }
             >
                 <Input
@@ -499,7 +504,9 @@ export function ArkGiveDialog({
                                     type="button"
                                     disabled={pending}
                                     title={t("playerDialogs.takeOff", { name: describe(line) })}
-                                    aria-label={t("playerDialogs.takeOff", { name: describe(line) })}
+                                    aria-label={t("playerDialogs.takeOff", {
+                                        name: describe(line)
+                                    })}
                                     className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
                                     onClick={() =>
                                         setQueued((was) => was.filter((_, at) => at !== index))

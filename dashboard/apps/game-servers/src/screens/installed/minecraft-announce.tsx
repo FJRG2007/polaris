@@ -416,7 +416,11 @@ export function MinecraftAnnounce({
                                         {" - "}
                                         {live.pinned.endsAt === null
                                             ? t("announce.untilItIsTakenDown2")
-                                            : t("announce.until", { date: new Date(live.pinned.endsAt).toLocaleString() })}
+                                            : t("announce.until", {
+                                                  date: new Date(
+                                                      live.pinned.endsAt
+                                                  ).toLocaleString()
+                                              })}
                                     </span>
                                 </span>
                                 <Button
@@ -471,8 +475,12 @@ export function MinecraftAnnounce({
                                             <DropdownMenuTrigger asChild>
                                                 <button
                                                     type="button"
-                                                    aria-label={t("announce.moreFor", { name: template.name })}
-                                                    title={t("announce.moreFor", { name: template.name })}
+                                                    aria-label={t("announce.moreFor", {
+                                                        name: template.name
+                                                    })}
+                                                    title={t("announce.moreFor", {
+                                                        name: template.name
+                                                    })}
                                                     disabled={!templatesHeard}
                                                     className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                                 >
@@ -488,13 +496,15 @@ export function MinecraftAnnounce({
                                                         })
                                                     }
                                                 >
-                                                    <Save className="size-4" /> {t("announce.overwrite")}
+                                                    <Save className="size-4" />{" "}
+                                                    {t("announce.overwrite")}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-danger"
                                                     onSelect={() => void forget(template)}
                                                 >
-                                                    <Trash2 className="size-4" /> {t("announce.delete")}
+                                                    <Trash2 className="size-4" />{" "}
+                                                    {t("announce.delete")}
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -530,7 +540,10 @@ export function MinecraftAnnounce({
                                 placeholder={t("announce.serverRestart")}
                             />
                         </Section>
-                        <Section title={t("announce.subtitle")} hint={t("announce.smallerUnderTheTitle")}>
+                        <Section
+                            title={t("announce.subtitle")}
+                            hint={t("announce.smallerUnderTheTitle")}
+                        >
                             <FormattedTextField
                                 value={draft.subtitle}
                                 onChange={(subtitle) => set({ subtitle })}
@@ -549,7 +562,10 @@ export function MinecraftAnnounce({
                                 placeholder={t("announce.backInAMinuteDon")}
                             />
                         </Section>
-                        <Section title={t("announce.actionBar")} hint={t("announce.oneLineJustAboveThe")}>
+                        <Section
+                            title={t("announce.actionBar")}
+                            hint={t("announce.oneLineJustAboveThe")}
+                        >
                             <FormattedTextField
                                 value={draft.actionbar}
                                 onChange={(actionbar) => set({ actionbar })}
@@ -568,7 +584,10 @@ export function MinecraftAnnounce({
                                 placeholder={t("announce.checkYourInventoryForA")}
                             />
                         </Section>
-                        <Section title={t("announce.chat")} hint={t("announce.chatLines", { count: CHAT_MAX_LINES })}>
+                        <Section
+                            title={t("announce.chat")}
+                            hint={t("announce.chatLines", { count: CHAT_MAX_LINES })}
+                        >
                             <FormattedTextField
                                 value={draft.chat}
                                 onChange={(chat) => set({ chat })}
@@ -749,7 +768,9 @@ export function MinecraftAnnounce({
                                     }
                                 >
                                     <Save className="size-4" />{" "}
-                                    {from ? t("announce.saveTemplate") : t("announce.saveAsTemplate")}
+                                    {from
+                                        ? t("announce.saveTemplate")
+                                        : t("announce.saveAsTemplate")}
                                 </Button>
                                 <Button
                                     disabled={
@@ -793,7 +814,10 @@ export function MinecraftAnnounce({
                                             >
                                                 {line}
                                             </code>
-                                            <CopyButton value={line} label={t("announce.thisCommand")} />
+                                            <CopyButton
+                                                value={line}
+                                                label={t("announce.thisCommand")}
+                                            />
                                         </span>
                                     ))
                                 )}
@@ -815,7 +839,9 @@ export function MinecraftAnnounce({
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>
-                                {naming.id ? t("announce.saveTheTemplate") : t("announce.saveAsATemplate")}
+                                {naming.id
+                                    ? t("announce.saveTheTemplate")
+                                    : t("announce.saveAsATemplate")}
                             </DialogTitle>
                             <DialogDescription>
                                 {t("announce.everybodyWhoRunsThisServer")}

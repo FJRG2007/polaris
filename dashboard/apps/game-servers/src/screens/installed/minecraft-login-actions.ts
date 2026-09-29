@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { PLAYER_NAME } from "../../lib/minecraft/polaris-login";
 import * as service from "../../lib/minecraft/polaris-login-service";
@@ -38,7 +38,8 @@ export async function loginStateAction(
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        if (!applicationId)
+            return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.loginState(parsed.data, applicationId, access.ownerId) };
     } catch (caught) {
         return { error: failure(caught, "Could not read the login state") };
@@ -60,7 +61,8 @@ export async function setLoginAction(input: {
             parsed.data.installedAppId
         );
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
+        if (!applicationId)
+            throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         await service.setLogin(
             parsed.data.installedAppId,
             applicationId,
@@ -92,11 +94,21 @@ export async function forgetLoginAction(input: {
     player: string;
 }): Promise<{ error?: string }> {
     const parsed = forgetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheName") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheName")
+        };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const removed = await service.forgetPlayer(parsed.data.installedAppId, parsed.data.player);
-        if (!removed) return { error: (await gameWords("games"))("errors.noLoginPassword", { name: parsed.data.player }) };
+        if (!removed)
+            return {
+                error: (await gameWords("games"))("errors.noLoginPassword", {
+                    name: parsed.data.player
+                })
+            };
         await recordAudit({
             actorId: user.id,
             action: "minecraft.login.forget",

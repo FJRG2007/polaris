@@ -103,7 +103,12 @@ export async function GET(
         return NextResponse.json({ status, reach, access, seen, address: facts?.address ?? null });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadTheServer") },
+            {
+                error:
+                    caught instanceof Error
+                        ? caught.message
+                        : (await gameWords("games"))("errors.couldNotReadTheServer")
+            },
             { status: 400 }
         );
     }

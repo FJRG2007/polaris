@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -72,7 +72,12 @@ export async function readChatLinkAction(
         const { user } = await requireGameServer("games.manage", parsed.data);
         return { state: await stateOf(parsed.data, user.id) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeRead")
+        };
     }
 }
 
@@ -86,7 +91,12 @@ export async function saveChatLinkAction(
     input: z.input<typeof saveInput>
 ): Promise<{ state?: ChatLinkState; error?: string }> {
     const parsed = saveInput.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheLink") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheLink")
+        };
     const { installedAppId, link } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
@@ -120,6 +130,11 @@ export async function saveChatLinkAction(
         });
         return { state: await stateOf(installedAppId, user.id) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeSaved")
+        };
     }
 }

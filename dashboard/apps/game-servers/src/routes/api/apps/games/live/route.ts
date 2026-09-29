@@ -36,7 +36,10 @@ export async function GET(): Promise<Response> {
     } catch (caught) {
         return NextResponse.json(
             {
-                error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadYourGame")
+                error:
+                    caught instanceof Error
+                        ? caught.message
+                        : (await gameWords("games"))("errors.couldNotReadYourGame")
             },
             { status: 400 }
         );

@@ -245,7 +245,9 @@ function WorldsCard({
                                     </>
                                 ) : (
                                     <span className="text-muted-foreground">
-                                        {view.edition === "bedrock" ? t("world.random") : t("world.notReadYet")}
+                                        {view.edition === "bedrock"
+                                            ? t("world.random")
+                                            : t("world.notReadYet")}
                                     </span>
                                 )}
                             </dd>
@@ -448,7 +450,9 @@ function NewWorldDialog({
                             className="mt-0.5"
                         />
                         <span className="flex flex-col gap-0.5">
-                            <span className="font-medium">{t("world.keepWhatPlayersAreCarrying")}</span>
+                            <span className="font-medium">
+                                {t("world.keepWhatPlayersAreCarrying")}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                                 {carriesPlayers
                                     ? t("world.inventoriesEnderChestsStatsAnd")
@@ -573,9 +577,7 @@ export function GameServerBackups({
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("world.aCopyOfTheWorld")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("world.aCopyOfTheWorld")}</p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
                 {note && <p className="text-xs text-muted-foreground">{note}</p>}
@@ -814,7 +816,9 @@ function BackupScheduleCard({
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     {view.nextBackupAt
-                                        ? t("world.nextDue", { date: new Date(view.nextBackupAt).toLocaleString() })
+                                        ? t("world.nextDue", {
+                                              date: new Date(view.nextBackupAt).toLocaleString()
+                                          })
                                         : t("world.copiesAreTakenOnlyWhen")}
                                 </span>
                             </label>
@@ -849,7 +853,9 @@ function BackupScheduleCard({
                             />
                             <span className="text-xs text-muted-foreground">
                                 {view.backups.length > 0
-                                    ? t("world.budgetHintUsed", { size: formatBytes(view.backupBytes) })
+                                    ? t("world.budgetHintUsed", {
+                                          size: formatBytes(view.backupBytes)
+                                      })
                                     : t("world.budgetHint")}
                             </span>
                         </label>
@@ -861,7 +867,9 @@ function BackupScheduleCard({
                                 className="mt-0.5"
                             />
                             <span className="flex flex-col gap-0.5">
-                                <span className="font-medium">{t("world.copyTheWorldBeforeStopping")}</span>
+                                <span className="font-medium">
+                                    {t("world.copyTheWorldBeforeStopping")}
+                                </span>
                                 <span className="text-xs text-muted-foreground">
                                     {t("world.takenAfterTheServerSaves")}
                                 </span>

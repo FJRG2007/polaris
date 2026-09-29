@@ -200,7 +200,10 @@ export async function GET(
 
     const parsed = searchSchema.safeParse(asked);
     if (!parsed.success || !isCategoryFor(parsed.data.loader, parsed.data.category)) {
-        return NextResponse.json({ error: (await gameWords("games"))("errors.searchForAModOr") }, { status: 400 });
+        return NextResponse.json(
+            { error: (await gameWords("games"))("errors.searchForAModOr") },
+            { status: 400 }
+        );
     }
     return NextResponse.json({
         projects: await searchModrinth(parsed.data.query, parsed.data.loader, {

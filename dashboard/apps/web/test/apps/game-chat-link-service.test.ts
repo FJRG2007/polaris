@@ -55,6 +55,7 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@polaris/app-host", () => ({
     host: {
+        i18nRequest: { getLocale: async () => "en-US" },
         appsInstallConfig: {
             readInstallConfig: (raw: string | null) => JSON.parse(raw ?? "{}"),
             patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {

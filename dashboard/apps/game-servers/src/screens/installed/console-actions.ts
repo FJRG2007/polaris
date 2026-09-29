@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import {
     deleteConsoleCommand,
@@ -62,7 +62,7 @@ export async function saveConsoleCommandAction(
     input: SaveConsoleCommandInput
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheCommandAndTry") };
+    if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheCommandAndTry") };
     const entry = normalizeSavedCommand({
         id: parsed.data.id ?? randomUUID(),
         label: parsed.data.label ?? null,

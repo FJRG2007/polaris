@@ -49,7 +49,7 @@ const figures = (diamonds: number, deepRock: number, debris = 0, netherRock = 0)
 
 describe("the X-Ray score", () => {
     it("is Unlikely for a clean player", () => {
-        expect(xrayScore(0, null)).toEqual({ value: 0, level: "unlikely", reasons: [] });
+        expect(xrayScore(0, null)).toEqual({ value: 0, level: "unlikely", reasons: [], why: [] });
     });
 
     it("never goes past Unlikely on the mining rate alone, however fast", () => {
@@ -99,7 +99,7 @@ describe("the movement score", () => {
     it("reads one flight as possible and a teleport as weaker than a flight", () => {
         expect(movementScore(1, 0).level).toBe("possible");
         expect(movementScore(0, 1).value).toBeLessThan(movementScore(1, 0).value);
-        expect(movementScore(0, 0)).toEqual({ value: 0, level: "unlikely", reasons: [] });
+        expect(movementScore(0, 0)).toEqual({ value: 0, level: "unlikely", reasons: [], why: [] });
     });
 });
 

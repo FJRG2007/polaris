@@ -30,7 +30,8 @@ export async function anticheatStateAction(
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        if (!applicationId)
+            return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.anticheatState(applicationId, access.ownerId) };
     } catch (caught) {
         return { error: failure(caught, "Could not read the anti-cheat") };
@@ -52,7 +53,8 @@ export async function setAnticheatAction(input: {
             parsed.data.installedAppId
         );
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
+        if (!applicationId)
+            throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         await service.setAnticheat(
             parsed.data.installedAppId,
             applicationId,

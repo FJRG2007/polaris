@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, issueText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { linkedChannels, readChatLink } from "../../lib/minecraft/chat-link";
@@ -74,7 +74,12 @@ export async function readLiveDisplayAction(
         await requireGameServer("games.console", parsed.data);
         return { state: await stateOf(parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeRead")
+        };
     }
 }
 
@@ -95,7 +100,12 @@ export async function stopPinnedAction(
         });
         return { ok: true };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotTake") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.theServerDidNotTake")
+        };
     }
 }
 
@@ -109,7 +119,12 @@ export async function saveLiveDisplayAction(
     input: z.input<typeof sidebarInput>
 ): Promise<{ state?: LiveDisplayState; error?: string }> {
     const parsed = sidebarInput.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkThePanel") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkThePanel")
+        };
     const { installedAppId, sidebar } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
@@ -129,6 +144,11 @@ export async function saveLiveDisplayAction(
         });
         return { state: await stateOf(installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.thatCouldNotBeSaved")
+        };
     }
 }

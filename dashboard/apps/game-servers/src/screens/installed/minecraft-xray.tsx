@@ -17,7 +17,9 @@
  */
 
 import { Eraser, Loader2 } from "lucide-react";
+import type { GameKey } from "../../../messages";
 import { hostUi } from "@polaris/app-host/client";
+import { useGameText, type GameText } from "../game-text";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { useEffect, useMemo, useRef, useState, useTransition, type ComponentProps } from "react";
 import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -30,9 +32,9 @@ import {
     type XraySettings
 } from "../../lib/minecraft/xray";
 import {
-    LIKELIHOOD_LABEL,
     buildSuspects,
     rockPerOre,
+    reasonLine,
     type Likelihood,
     type Score,
     type Suspect,
@@ -55,10 +57,10 @@ const { mergeUnchanged } = hostUi.structuralMerge;
 /** How old a kept reading may be and still paint first on a revisit. */
 const KEPT_XRAY_MS = 24 * 3_600_000;
 
-const ACTIONS: readonly { readonly value: XrayAction; readonly label: string }[] = [
-    { value: "notify", label: "Tell me, and do nothing else" },
-    { value: "warn", label: "Tell me and warn the player" },
-    { value: "warn-and-ban", label: "Tell me, warn, and ban if it goes on" }
+const ACTIONS: readonly { readonly value: XrayAction; readonly label: GameKey<"minecraft"> }[] = [
+    { value: "notify", label: "xray.actions.notify" },
+    { value: "warn", label: "xray.actions.warn" },
+    { value: "warn-and-ban", label: "xray.actions.ban" }
 ];
 
 const TONE: Readonly<Record<Likelihood, "neutral" | "warning" | "danger">> = {
@@ -69,17 +71,24 @@ const TONE: Readonly<Record<Likelihood, "neutral" | "warning" | "danger">> = {
 };
 
 const FILTERS = [
-    { value: "", label: "Every player" },
-    { value: "suspicious", label: "Possible or worse" },
-    { value: "xray", label: "X-Ray evidence" },
-    { value: "movement", label: "Flying or teleporting" },
-    { value: "engine", label: "Caught by the anti-cheat" }
-] as const;
+    { value: "", label: "xray.filters.all" },
+    { value: "suspicious", label: "xray.filters.suspicious" },
+    { value: "xray", label: "xray.filters.xray" },
+    { value: "movement", label: "xray.filters.movement" },
+    { value: "engine", label: "xray.filters.engine" }
+] as const satisfies readonly { value: string; label: GameKey<"minecraft"> }[];
 
-const KIND_LABEL: Readonly<Record<SuspectIncident["kind"], string>> = {
-    honeypot: "Dug to a hidden ore",
-    flying: "Hovered in the air",
-    teleport: "Teleported"
+const KIND_LABEL: Readonly<Record<SuspectIncident["kind"], GameKey<"minecraft">>> = {
+    honeypot: "xray.kinds.honeypot",
+    flying: "xray.kinds.flying",
+    teleport: "xray.kinds.teleport"
+};
+
+const LIKELIHOOD_KEYS: Readonly<Record<Likelihood, GameKey<"minecraft">>> = {
+    unlikely: "xray.likelihood.unlikely",
+    possible: "xray.likelihood.possible",
+    likely: "xray.likelihood.likely",
+    confirmed: "xray.likelihood.confirmed"
 };
 
 /** `overworld 12 -40 88`, the way a player would type it into /tp. */
@@ -88,22 +97,24 @@ function placeOf(incident: { dimension: string; x: number; y: number; z: number 
 }
 
 /** One diamond per how many blocks of deepslate, or a dash with too little to say. */
-function rateOf(suspect: Suspect): string {
+function rateOf(t: GameText<"minecraft">, suspect: Suspect): string {
     const figures = suspect.mining;
     if (!figures) return "-";
     const diamonds = rockPerOre(figures.diamonds, figures.deepRock);
-    if (diamonds !== null) return `1 diamond per ${Math.round(diamonds)}`;
+    if (diamonds !== null) return t("xray.diamondRate", { count: Math.round(diamonds) });
     const debris = rockPerOre(figures.debris, figures.netherRock);
-    if (debris !== null) return `1 debris per ${Math.round(debris)}`;
+    if (debris !== null) return t("xray.debrisRate", { count: Math.round(debris) });
     return "-";
 }
 
 /** A score, its word, and the first reason under it; every reason on hover. */
 function ScoreCell({ score }: { score: Score }) {
+    const t = useGameText("minecraft");
+    const reasons = score.why.map((reason) => reasonLine(reason, t));
     return (
-        <div className="flex min-w-0 flex-col gap-1" title={score.reasons.join("\n") || undefined}>
+        <div className="flex min-w-0 flex-col gap-1" title={reasons.join("\n") || undefined}>
             <span className="flex items-center gap-2">
-                <Badge variant={TONE[score.level]}>{LIKELIHOOD_LABEL[score.level]}</Badge>
+                <Badge variant={TONE[score.level]}>{t(LIKELIHOOD_KEYS[score.level])}</Badge>
                 <span className="text-xs tabular-nums text-muted-foreground">{score.value}%</span>
             </span>
             <span className="h-1 w-24 overflow-hidden rounded-full bg-muted" aria-hidden="true">
@@ -119,8 +130,8 @@ function ScoreCell({ score }: { score: Score }) {
                     style={{ width: `${Math.max(score.value, 2)}%` }}
                 />
             </span>
-            {score.reasons[0] && (
-                <span className="truncate text-xs text-muted-foreground">{score.reasons[0]}</span>
+            {reasons[0] && (
+                <span className="truncate text-xs text-muted-foreground">{reasons[0]}</span>
             )}
         </div>
     );
@@ -153,6 +164,7 @@ export function MinecraftXray({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const t = useGameText("minecraft");
     const display = useDisplayFormat();
     const [view, setView] = useState<XrayView | null>(null);
     const [draft, setDraft] = useState<XraySettings>(DEFAULT_XRAY_SETTINGS);
@@ -271,9 +283,9 @@ export function MinecraftXray({
 
     async function clear(player: string): Promise<void> {
         const agreed = await confirm({
-            title: `Clear ${player}?`,
-            description: "Everything recorded against them is forgotten, as if it never happened.",
-            confirmLabel: "Clear"
+            title: t("xray.clearTitle", { name: player }),
+            description: t("xray.everythingRecordedAgainstThemIs"),
+            confirmLabel: t("xray.clear")
         });
         if (!agreed) return;
         startTransition(async () => {
@@ -300,12 +312,9 @@ export function MinecraftXray({
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-sm font-medium">Anti X-Ray</p>
+                            <p className="text-sm font-medium">{t("xray.antiXRay")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Polaris hides single diamonds and ancient debris fully enclosed in
-                                rock around the players. Nobody can see them without X-Ray, so
-                                digging straight to {CONFIRM_HITS} of them confirms it. One on its
-                                own could be chance.
+                                {t("xray.intro", { count: CONFIRM_HITS })}
                             </p>
                         </div>
                         <LoadedSwitch
@@ -313,7 +322,7 @@ export function MinecraftXray({
                             checked={draft.enabled}
                             disabled={!editable || view?.refusal != null}
                             onChange={(enabled) => change({ enabled })}
-                            aria-label="Hide honeypots"
+                            aria-label={t("xray.hideHoneypots")}
                         />
                     </div>
                     {view?.refusal && (
@@ -327,7 +336,7 @@ export function MinecraftXray({
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">
-                                        Honeypots around each player
+                                        {t("xray.honeypotsAroundEachPlayer")}
                                     </span>
                                     <Input
                                         type="number"
@@ -344,22 +353,24 @@ export function MinecraftXray({
                                         }
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Around every player, wherever they are. Between 4 and 40.
+                                        {t("xray.aroundEveryPlayerWhereverThey")}
                                     </span>
                                 </label>
                                 <label className="flex items-center justify-between gap-2 text-sm sm:mt-6">
-                                    <span>Ancient debris in the Nether too</span>
+                                    <span>{t("xray.ancientDebrisInTheNether")}</span>
                                     <Switch
                                         checked={draft.nether}
                                         disabled={!editable}
                                         onChange={(nether) => change({ nether })}
-                                        aria-label="Hide ancient debris in the Nether"
+                                        aria-label={t("xray.hideAncientDebrisInThe")}
                                     />
                                 </label>
                             </div>
 
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">When somebody is confirmed</span>
+                                <span className="font-medium">
+                                    {t("xray.whenSomebodyIsConfirmed")}
+                                </span>
                                 <Select
                                     value={draft.action}
                                     onValueChange={(value) =>
@@ -367,16 +378,16 @@ export function MinecraftXray({
                                     }
                                     options={ACTIONS.map((one) => ({
                                         value: one.value,
-                                        label: one.label
+                                        label: t(one.label)
                                     }))}
                                     disabled={!editable}
-                                    aria-label="What happens when somebody is confirmed"
+                                    aria-label={t("xray.whatHappensWhenSomebodyIs")}
                                 />
                             </label>
 
                             {draft.action !== "notify" && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Warning they see</span>
+                                    <span className="font-medium">{t("xray.warningTheySee")}</span>
                                     <Input
                                         value={draft.warning}
                                         maxLength={400}
@@ -386,7 +397,7 @@ export function MinecraftXray({
                                         }
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        In the chat, with a title. Colour codes such as &amp;c work.
+                                        {t("xray.inTheChatWithA")}
                                     </span>
                                 </label>
                             )}
@@ -395,7 +406,7 @@ export function MinecraftXray({
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
                                         <span className="font-medium">
-                                            Ban after this many honeypots
+                                            {t("xray.banAfterThisManyHoneypots")}
                                         </span>
                                         <Input
                                             type="number"
@@ -412,11 +423,11 @@ export function MinecraftXray({
                                             }
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            At least {BAN_HITS_MIN}, and only after the warning.
+                                            {t("xray.atLeast", { count: BAN_HITS_MIN })}
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">Ban for (hours)</span>
+                                        <span className="font-medium">{t("xray.banForHours")}</span>
                                         <Input
                                             type="number"
                                             min={1}
@@ -432,7 +443,7 @@ export function MinecraftXray({
                                             }
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            Up to a week.
+                                            {t("xray.upToAWeek")}
                                         </span>
                                     </label>
                                 </div>
@@ -442,13 +453,9 @@ export function MinecraftXray({
 
                     <div className="flex items-start justify-between gap-3 border-t border-border pt-4">
                         <div>
-                            <p className="text-sm font-medium">Flying and teleporting</p>
+                            <p className="text-sm font-medium">{t("xray.flyingAndTeleporting")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Flags a player seen hovering without being allowed to fly, or moving
-                                further in a few seconds than anybody can, when no operator
-                                teleported them. Operators, creative mode, elytras, vehicles and
-                                portals are left out. Never acted on automatically: an ender pearl
-                                stasis chamber can look like a teleport.
+                                {t("xray.flagsAPlayerSeenHovering")}
                             </p>
                         </div>
                         <LoadedSwitch
@@ -456,7 +463,7 @@ export function MinecraftXray({
                             checked={draft.movement}
                             disabled={!editable || view?.refusal != null}
                             onChange={(movement) => change({ movement })}
-                            aria-label="Watch for flying and teleporting"
+                            aria-label={t("xray.watchForFlyingAndTeleporting")}
                         />
                     </div>
                     {view?.teleportCheck && (
@@ -472,17 +479,20 @@ export function MinecraftXray({
                         <span className="text-xs text-muted-foreground">
                             {note ??
                                 (view?.settings.enabled
-                                    ? `${view.traps.overworld} diamonds and ${view.traps.nether} debris hidden right now. Changes apply without a restart.`
+                                    ? t("xray.hiddenNow", {
+                                          diamonds: view.traps.overworld,
+                                          debris: view.traps.nether
+                                      })
                                     : canManage
-                                      ? "Changes apply to the running server, with no restart."
-                                      : "Only somebody who manages this server can change it.")}
+                                      ? t("xray.changesApplyToTheRunning")
+                                      : t("xray.onlySomebodyWhoManagesThis"))}
                         </span>
                         <Button
                             disabled={!loaded || !editable || pending || !dirty || problem !== null}
                             onClick={save}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Save
+                            {t("xray.save")}
                         </Button>
                     </div>
                 </CardBody>
@@ -491,30 +501,25 @@ export function MinecraftXray({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <p className="text-sm font-medium">How likely each player is cheating</p>
+                        <p className="text-sm font-medium">{t("xray.howLikelyEachPlayerIs")}</p>
                         <p className="text-xs text-muted-foreground">
-                            From what was found in the last 14 days. Only honeypots can confirm
-                            X-Ray; the mining rate is context and on its own never goes past
-                            Unlikely. The anti-cheat column is Polaris anti-cheat&apos;s alerts,
-                            which count once a check has failed past its own threshold. Everybody
-                            online is listed. Mining counts are the game&apos;s own and arrive when
-                            the server saves, a few minutes behind.
+                            {t("xray.fromWhatWasFoundIn")}
                         </p>
                     </div>
                     <PlayersTable
                         columns={[
-                            { label: "Player" },
-                            { label: "X-Ray" },
-                            { label: "Flying and teleporting" },
-                            { label: "Anti-cheat" },
-                            { label: "Mining rate", className: "hidden lg:table-cell" },
-                            { label: "Last incident", className: "hidden md:table-cell" }
+                            { label: t("xray.player") },
+                            { label: t("xray.xRay") },
+                            { label: t("xray.flyingAndTeleporting") },
+                            { label: t("xray.antiCheat") },
+                            { label: t("xray.miningRate"), className: "hidden lg:table-cell" },
+                            { label: t("xray.lastIncident"), className: "hidden md:table-cell" }
                         ]}
                         minWidth="58rem"
                         search={search}
                         onSearch={setSearch}
                         filter={filter}
-                        filters={FILTERS}
+                        filters={FILTERS.map((one) => ({ value: one.value, label: t(one.label) }))}
                         onFilter={setFilter}
                         isEmpty={shown.length === 0}
                         empty={
@@ -537,7 +542,7 @@ export function MinecraftXray({
                                     </p>
                                     {(suspect.bannedAt || suspect.warnedAt) && (
                                         <p className="text-xs text-muted-foreground">
-                                            {suspect.bannedAt ? "Banned" : "Warned"}
+                                            {suspect.bannedAt ? t("xray.banned") : t("xray.warned")}
                                         </p>
                                     )}
                                 </td>
@@ -554,11 +559,16 @@ export function MinecraftXray({
                                     className="hidden px-3 py-2 align-top text-xs tabular-nums text-muted-foreground lg:table-cell"
                                     title={
                                         suspect.mining
-                                            ? `${suspect.mining.diamonds} diamonds, ${suspect.mining.deepRock} deepslate, ${suspect.mining.debris} debris, ${suspect.mining.netherRock} nether rock`
+                                            ? t("xray.miningFigures", {
+                                                  diamonds: suspect.mining.diamonds,
+                                                  deep: suspect.mining.deepRock,
+                                                  debris: suspect.mining.debris,
+                                                  nether: suspect.mining.netherRock
+                                              })
                                             : undefined
                                     }
                                 >
-                                    {rateOf(suspect)}
+                                    {rateOf(t, suspect)}
                                 </td>
                                 <td className="hidden px-3 py-2 align-top text-xs text-muted-foreground md:table-cell">
                                     {suspect.lastAt ? display.dateTime(suspect.lastAt) : "-"}
@@ -567,7 +577,7 @@ export function MinecraftXray({
                                     {(suspect.hits > 0 ||
                                         suspect.flights + suspect.teleports > 0) && (
                                         <PlayerIconAction
-                                            label={`Clear ${suspect.name}`}
+                                            label={t("xray.clearNamed", { name: suspect.name })}
                                             icon={<Eraser className="size-4" />}
                                             disabled={pending || !heard}
                                             onClick={() => void clear(suspect.name)}
@@ -583,17 +593,17 @@ export function MinecraftXray({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <p className="text-sm font-medium">Incidents</p>
+                        <p className="text-sm font-medium">{t("xray.incidents")}</p>
                         <p className="text-xs text-muted-foreground">
-                            Where and when, newest first, so you can go and look before deciding.
+                            {t("xray.whereAndWhenNewestFirst")}
                         </p>
                     </div>
                     <PlayersTable
                         columns={[
-                            { label: "When" },
-                            { label: "Player" },
-                            { label: "What" },
-                            { label: "Where", className: "hidden sm:table-cell" }
+                            { label: t("xray.when") },
+                            { label: t("xray.player") },
+                            { label: t("xray.what") },
+                            { label: t("xray.where"), className: "hidden sm:table-cell" }
                         ]}
                         minWidth="36rem"
                         isEmpty={incidents.length === 0}
@@ -614,10 +624,10 @@ export function MinecraftXray({
                                 </td>
                                 <td className="px-3 py-2 font-medium">{incident.name}</td>
                                 <td className="px-3 py-2">
-                                    {KIND_LABEL[incident.kind]}
+                                    {t(KIND_LABEL[incident.kind])}
                                     {incident.distance !== null && (
                                         <span className="text-muted-foreground">
-                                            {` - ${incident.distance} blocks`}
+                                            {t("xray.blocks", { count: incident.distance })}
                                         </span>
                                     )}
                                 </td>
