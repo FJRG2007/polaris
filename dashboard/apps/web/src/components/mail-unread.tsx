@@ -33,6 +33,8 @@ import {
     type ReactNode
 } from "react";
 import { useShelfSeed } from "@/components/shelf-scope";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface MailUnread {
     /** Unread messages across the open shelf's mailboxes - the ones Mail lists. */
@@ -146,7 +148,10 @@ function laterOf(left: string | null, right: string | null): string | null {
  * nobody reads. Nothing is stored and nothing reaches the bell: a message is
  * somebody waiting, not a record to clear.
  */
-async function announceArrivals(cursor: { current: string | null }): Promise<void> {
+async function announceArrivals(
+    cursor: { current: string | null },
+    t: NamespaceTranslator<"components">
+): Promise<void> {
     // The later of this tab's cursor and the one the device last announced up
     // to. The tab holding the live connection changes when that tab closes, and
     // the one taking over would otherwise announce again everything since it
@@ -169,8 +174,8 @@ async function announceArrivals(cursor: { current: string | null }): Promise<voi
     }
     if (answer.more > 0) {
         await notifyDesktop({
-            title: "New mail",
-            body: `${answer.more} more ${answer.more === 1 ? "message" : "messages"} in your inbox`,
+            title: t("mailUnread.title"),
+            body: t("mailUnread.more", { count: answer.more }),
             tag: "mail:more",
             href: "/mail"
         });
@@ -198,6 +203,11 @@ export function MailUnreadProvider({
     enabled: boolean;
     children: ReactNode;
 }) {
+    const t = useTranslations("components");
+    // A ref, since the stream below is subscribed once: the words are the
+    // ones of the moment mail arrives.
+    const words = useRef(t);
+    words.current = t;
     const scope = useSessionScope();
     // The open shelf's count, taken again from the server's seed on a switch.
     const [unread, setUnread] = useShelfSeed(initial);
@@ -272,7 +282,7 @@ export function MailUnreadProvider({
                 // that took the frame off the wire raises one - five open tabs
                 // are one notice. And only when nobody is looking at Polaris:
                 // the list is already on screen for somebody who is.
-                if (owner && !tabIsWatched()) void announceArrivals(cursor);
+                if (owner && !tabIsWatched()) void announceArrivals(cursor, words.current);
             }, SETTLE_MS);
         });
         return () => {

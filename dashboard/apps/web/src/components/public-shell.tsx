@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The frame every public link page is drawn in.
  *
@@ -11,6 +13,7 @@
 import Link from "next/link";
 import { ArrowUpRight, LogIn } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, cn, PolarisMark } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function PublicShell({
     children,
@@ -22,6 +25,7 @@ export function PublicShell({
     signedIn?: boolean;
     className?: string;
 }) {
+    const t = useTranslations("components");
     return (
         <div className={cn("mx-auto flex min-h-screen max-w-2xl flex-col gap-4 p-6", className)}>
             <header className="flex items-center justify-between gap-2">
@@ -32,7 +36,7 @@ export function PublicShell({
                 {signedIn === undefined ? null : signedIn ? (
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/home">
-                            Open Polaris
+                            {t("publicShell.open")}
                             <ArrowUpRight className="size-4" />
                         </Link>
                     </Button>
@@ -40,7 +44,7 @@ export function PublicShell({
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/oauth/login">
                             <LogIn className="size-4" />
-                            Sign in
+                            {t("publicShell.signIn")}
                         </Link>
                     </Button>
                 )}
@@ -58,17 +62,18 @@ export function PublicShell({
 export function LinkUnavailable({
     message,
     signedIn,
-    title = "Link unavailable"
+    title
 }: {
     message: string;
     signedIn?: boolean;
     title?: string;
 }) {
+    const t = useTranslations("components");
     return (
         <PublicShell signedIn={signedIn}>
             <Card>
                 <CardHeader>
-                    <CardTitle>{title}</CardTitle>
+                    <CardTitle>{title ?? t("publicShell.unavailable")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <p className="text-sm text-muted-foreground">{message}</p>

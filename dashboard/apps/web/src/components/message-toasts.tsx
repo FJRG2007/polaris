@@ -44,6 +44,8 @@ import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
 import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import {
@@ -71,11 +73,13 @@ const SETTLE_MS = 400;
 /** The tag of the notice announcing a conversation. */
 const TAG = "message:";
 
+type Translate = NamespaceTranslator<"components">;
+
 /** "Mark as read" on a message's notice: the conversation read up to it. */
-function markReadAction(channelId: string, messageId: string): NoticeAction {
+function markReadAction(t: Translate, channelId: string, messageId: string): NoticeAction {
     return {
         id: "read",
-        text: "Mark as read",
+        text: t("messageToasts.markRead"),
         request: {
             url: `/api/chat/channels/${encodeURIComponent(channelId)}/read`,
             body: { messageId }
@@ -86,12 +90,13 @@ function markReadAction(channelId: string, messageId: string): NoticeAction {
 /** Send an answer to a conversation from its notice. Answers why it did not go,
  *  or null when it did. */
 async function answer(
+    t: Translate,
     channelId: string,
     messageId: string | undefined,
     text: string
 ): Promise<string | null> {
     const result = await replyFromNoticeAction({ channelId, messageId, body: text }).catch(() => ({
-        error: "That could not be sent"
+        error: t("messageToasts.notSent")
     }));
     return result.error ?? null;
 }
@@ -100,12 +105,13 @@ async function answer(
  *  notice, since that is where somebody is looking: an answer that silently did
  *  not go is the worst way for this to fail. */
 async function answerFromDesktop(
+    t: Translate,
     channelId: string,
     messageId: string | undefined,
     text: string
 ): Promise<void> {
-    const refused = await answer(channelId, messageId, text);
-    if (refused) replyNotSent(channelId, refused);
+    const refused = await answer(t, channelId, messageId, text);
+    if (refused) replyNotSent(t, channelId, refused);
 }
 
 /** The newest message in a conversation, which is what its notice announced. */
@@ -114,9 +120,9 @@ async function newestAnnounced(channelId: string): Promise<string | undefined> {
     return toasts.find((one) => one.channelId === channelId)?.messageId;
 }
 
-function replyNotSent(channelId: string | null, why: string): void {
+function replyNotSent(t: Translate, channelId: string | null, why: string): void {
     void notifyDesktop({
-        title: "Your reply was not sent",
+        title: t("messageToasts.replyNotSent"),
         body: why,
         tag: `reply-failed:${channelId ?? "notice"}`,
         href: channelId ? `/chat/c/${channelId}` : "/chat"
@@ -133,6 +139,11 @@ export function MessageToasts() {
     // rebuilt on every navigation would tear the subscription down with it.
     const here = useRef(pathname);
     here.current = pathname;
+    const t = useTranslations("components");
+    // Read through a ref, like the toast's own calls below: the effects that
+    // answer notices are set up once, and must speak the language of now.
+    const words = useRef(t);
+    words.current = t;
     const raise = useRef(toast.show);
     raise.current = toast.show;
     const drop = useRef(toast.dismiss);
@@ -197,12 +208,13 @@ export function MessageToasts() {
             if (announced.current.get(message.channelId) === message.messageId) continue;
             announced.current.set(message.channelId, message.messageId);
 
+            const t = words.current;
             const who = message.inChannel
-                ? `${message.authorName} in ${message.conversation}`
+                ? t("messageToasts.inChannel", { author: message.authorName, channel: message.conversation })
                 : message.authorName;
             const replyTo = message.inChannel
-                ? `Message #${message.conversation}`
-                : `Reply to ${message.authorName}`;
+                ? t("messageToasts.messageChannel", { channel: message.conversation })
+                : t("messageToasts.replyTo", { author: message.authorName });
             if (alert.toast) {
                 const note: Toast = {
                     key: `${TAG}${message.channelId}`,
@@ -228,7 +240,7 @@ export function MessageToasts() {
                         send: async (text) => {
                             replying.current.add(message.channelId);
                             try {
-                                return await answer(message.channelId, message.messageId, text);
+                                return await answer(t, message.channelId, message.messageId, text);
                             } finally {
                                 replying.current.delete(message.channelId);
                             }
@@ -236,14 +248,14 @@ export function MessageToasts() {
                     },
                     actions: [
                         {
-                            label: "Mark as read",
+                            label: t("messageToasts.markRead"),
                             icon: <CheckCheck className="size-3.5" />,
                             run: async () =>
                                 (await runNoticeAction(
-                                    markReadAction(message.channelId, message.messageId)
+                                    markReadAction(t, message.channelId, message.messageId)
                                 ))
                                     ? null
-                                    : "That could not be marked as read"
+                                    : t("messageToasts.markReadFailed")
                         }
                     ]
                 };
@@ -278,9 +290,9 @@ export function MessageToasts() {
                             reply: {
                                 placeholder: replyTo,
                                 send: (text) =>
-                                    answerFromDesktop(message.channelId, message.messageId, text)
+                                    answerFromDesktop(t, message.channelId, message.messageId, text)
                             },
-                            actions: [markReadAction(message.channelId, message.messageId)]
+                            actions: [markReadAction(t, message.channelId, message.messageId)]
                         });
                     }
                 );
@@ -341,12 +353,12 @@ export function MessageToasts() {
         () =>
             answerUnclaimedReplies(async (tag, text) => {
                 if (!tag.startsWith(TAG)) {
-                    replyNotSent(null, "That notice can no longer be answered");
+                    replyNotSent(words.current, null, words.current("messageToasts.noticeGone"));
                     return;
                 }
                 const channelId = tag.slice(TAG.length);
                 const newest = await newestAnnounced(channelId);
-                await answerFromDesktop(channelId, newest, text);
+                await answerFromDesktop(words.current, channelId, newest, text);
             }),
         []
     );
@@ -358,7 +370,7 @@ export function MessageToasts() {
                 if (!tag.startsWith(TAG) || action !== "read") return;
                 const channelId = tag.slice(TAG.length);
                 const newest = await newestAnnounced(channelId);
-                if (newest) await runNoticeAction(markReadAction(channelId, newest));
+                if (newest) await runNoticeAction(markReadAction(words.current, channelId, newest));
             }),
         []
     );

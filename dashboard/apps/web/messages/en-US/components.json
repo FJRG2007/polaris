@@ -1,1 +1,81 @@
-{}
+{
+    "actions": {
+        "ok": "OK",
+        "confirm": "Confirm",
+        "tryAgain": "Try again",
+        "dismiss": "Dismiss",
+        "remove": "Remove"
+    },
+    "activity": {
+        "heading": {
+            "spotify": "Listening to Spotify",
+            "minecraft": "Playing on a server here",
+            "playing": "Playing"
+        },
+        "by": "by {artist}",
+        "on": "on {album}",
+        "elapsed": "{time} elapsed",
+        "trackPosition": "Track position"
+    },
+    "activityTable": {
+        "when": "When",
+        "action": "Action",
+        "details": "Details"
+    },
+    "appBundles": {
+        "partFailed": "Part of this page did not load. Reload the page to try again.",
+        "unavailable": "{name} is not available right now"
+    },
+    "presence": {
+        "online": "Online",
+        "idle": "Away",
+        "busy": "Do not disturb",
+        "offline": "Offline"
+    },
+    "avatar": {
+        "openPhoto": "Open {name}'s photo",
+        "notListening": "Not listening",
+        "microphoneOff": "Microphone off",
+        "onCall": "On a call you can join"
+    },
+    "denied": {
+        "notice": "That page is not open to your role. This is where your access starts."
+    },
+    "json": {
+        "invalid": "This is not valid JSON."
+    },
+    "linkPassword": {
+        "title": "Password required",
+        "description": "This link is protected. Enter its password to continue.",
+        "label": "Password",
+        "cooldown": "Too many attempts. Try again in {seconds}s.",
+        "checking": "Checking...",
+        "unlock": "Unlock"
+    },
+    "messageToasts": {
+        "markRead": "Mark as read",
+        "notSent": "That could not be sent",
+        "replyNotSent": "Your reply was not sent",
+        "inChannel": "{author} in {channel}",
+        "messageChannel": "Message #{channel}",
+        "replyTo": "Reply to {author}",
+        "markReadFailed": "That could not be marked as read",
+        "noticeGone": "That notice can no longer be answered"
+    },
+    "mailUnread": {
+        "title": "New mail",
+        "more": "{count} more {count, plural, one {message} other {messages}} in your inbox"
+    },
+    "picture": {
+        "saveFailed": "Could not save that",
+        "upload": "Upload"
+    },
+    "errors": {
+        "unreachable": "Could not reach the server"
+    },
+    "publicShell": {
+        "open": "Open Polaris",
+        "signIn": "Sign in",
+        "unavailable": "Link unavailable"
+    }
+}

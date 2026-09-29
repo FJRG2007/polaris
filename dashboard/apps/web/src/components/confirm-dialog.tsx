@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export interface ConfirmOptions {
@@ -23,6 +24,8 @@ export interface ConfirmOptions {
 }
 
 export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, ReactNode] {
+    const t = useTranslations("components");
+    const tc = useTranslations("common");
     const [options, setOptions] = useState<ConfirmOptions | null>(null);
     const resolver = useRef<((value: boolean) => void) | null>(null);
 
@@ -49,11 +52,11 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
                 <div className="flex justify-end gap-2">
                     {options?.alert ? null : (
                         <Button variant="ghost" onClick={() => settle(false)}>
-                            {options?.cancelLabel ?? "Cancel"}
+                            {options?.cancelLabel ?? tc("actions.cancel")}
                         </Button>
                     )}
                     <Button variant={options?.danger ? "danger" : "primary"} onClick={() => settle(true)}>
-                        {options?.confirmLabel ?? (options?.alert ? "OK" : "Confirm")}
+                        {options?.confirmLabel ?? (options?.alert ? t("actions.ok") : t("actions.confirm"))}
                     </Button>
                 </div>
             </DialogContent>

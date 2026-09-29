@@ -22,6 +22,8 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import type { ComponentType, ReactNode } from "react";
 import { useNow } from "@/components/presence";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useSessionScope } from "@/components/session-scope";
 import { ListenAlongButton } from "@/components/listen-along-button";
 import { Gamepad2, Pickaxe } from "lucide-react";
@@ -36,10 +38,10 @@ const SOURCE_ICONS: Record<core.ActivitySource, ComponentType<{ className?: stri
 };
 
 /** The small heading over a card. */
-function heading(activity: core.ActivityView): string {
-    if (activity.source === "spotify") return "Listening to Spotify";
-    if (activity.source === "minecraft") return "Playing on a server here";
-    return "Playing";
+function heading(activity: core.ActivityView, t: NamespaceTranslator<"components">): string {
+    if (activity.source === "spotify") return t("activity.heading.spotify");
+    if (activity.source === "minecraft") return t("activity.heading.minecraft");
+    return t("activity.heading.playing");
 }
 
 /**
@@ -124,6 +126,7 @@ export function ActivityCard({
     activity: core.ActivityView;
     actions?: ReactNode;
 }) {
+    const t = useTranslations("components");
     const Icon = SOURCE_ICONS[activity.source];
     return (
         <section
@@ -131,7 +134,7 @@ export function ActivityCard({
             className="w-full rounded-md bg-muted/40 px-3 py-2.5 text-left"
         >
             <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                {heading(activity)}
+                {heading(activity, t)}
             </p>
             <div className="mt-2 flex items-center gap-3">
                 <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
@@ -167,12 +170,12 @@ export function ActivityCard({
                     )}
                     {activity.details ? (
                         <span className="truncate text-muted-foreground" title={activity.details}>
-                            {activity.source === "spotify" ? `by ${activity.details}` : activity.details}
+                            {activity.source === "spotify" ? t("activity.by", { artist: activity.details }) : activity.details}
                         </span>
                     ) : null}
                     {activity.state ? (
                         <span className="truncate text-muted-foreground" title={activity.state}>
-                            {activity.source === "spotify" ? `on ${activity.state}` : activity.state}
+                            {activity.source === "spotify" ? t("activity.on", { album: activity.state }) : activity.state}
                         </span>
                     ) : null}
                     {activity.endsAt ? null : <Elapsed startedAt={activity.startedAt} />}
@@ -187,18 +190,20 @@ export function ActivityCard({
 /** How long a game has been going, counted here. Once a second, because it
  *  shows seconds; a card is only ever a few of these on a screen. */
 function Elapsed({ startedAt }: { startedAt: string }) {
+    const t = useTranslations("components");
     const now = useNow(1_000);
     const start = Date.parse(startedAt);
     if (!Number.isFinite(start)) return null;
     return (
         <span className="tabular-nums text-muted-foreground">
-            {core.formatElapsed(now - start)} elapsed
+            {t("activity.elapsed", { time: core.formatElapsed(now - start) })}
         </span>
     );
 }
 
 /** A track's position, as a bar with the two times under it. */
 function TrackBar({ activity }: { activity: core.ActivityView }) {
+    const t = useTranslations("components");
     const now = useNow(1_000);
     const progress = core.trackProgress(activity, now);
     if (!progress) return null;
@@ -208,7 +213,7 @@ function TrackBar({ activity }: { activity: core.ActivityView }) {
             <div
                 className="h-1 w-full overflow-hidden rounded-full bg-border"
                 role="progressbar"
-                aria-label="Track position"
+                aria-label={t("activity.trackPosition")}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(progress.totalMs / 1000)}
                 aria-valuenow={Math.round(progress.elapsedMs / 1000)}

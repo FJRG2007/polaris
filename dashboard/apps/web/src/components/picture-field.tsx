@@ -21,6 +21,7 @@ import { Button } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { CROP_ACCEPTED, ImageCropDialog, TILE_CROP, type CropShape } from "@/components/image-cropper";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function PictureField({
     endpoint,
@@ -42,6 +43,7 @@ export function PictureField({
      *  replaced. */
     onDone: () => void;
 }) {
+    const t = useTranslations("components");
     const input = useRef<HTMLInputElement>(null);
     const [chosen, setChosen] = useState<File | null>(null);
     const [busy, setBusy] = useState(false);
@@ -53,7 +55,7 @@ export function PictureField({
         try {
             const response = await work();
             if (!response.ok) {
-                setError((await response.text()) || "Could not save that");
+                setError((await response.text()) || t("picture.saveFailed"));
                 setBusy(false);
                 return;
             }
@@ -64,7 +66,7 @@ export function PictureField({
             setBusy(false);
             onDone();
         } catch {
-            setError("Could not reach the server");
+            setError(t("errors.unreachable"));
             setBusy(false);
         }
     };
@@ -98,7 +100,7 @@ export function PictureField({
                         ) : (
                             <Upload className="size-4" />
                         )}
-                        Upload
+                        {t("picture.upload")}
                     </Button>
                     <Button
                         size="sm"
@@ -107,7 +109,7 @@ export function PictureField({
                         onClick={() => void run(() => fetch(endpoint, { method: "DELETE" }))}
                     >
                         <Trash2 className="size-4" />
-                        Remove
+                        {t("actions.remove")}
                     </Button>
                 </div>
             </div>

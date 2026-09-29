@@ -15,8 +15,10 @@
 import { X } from "lucide-react";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 function Notice() {
+    const t = useTranslations("components");
     const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
@@ -38,12 +40,12 @@ function Notice() {
             className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-warning-edge bg-warning-soft p-3"
         >
             <p className="min-w-0 text-sm">
-                That page is not open to your role. This is where your access starts.
+                {t("denied.notice")}
             </p>
             <button
                 type="button"
-                aria-label="Dismiss"
-                title="Dismiss"
+                aria-label={t("actions.dismiss")}
+                title={t("actions.dismiss")}
                 className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                 onClick={dismiss}
             >

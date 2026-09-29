@@ -10,8 +10,10 @@ import { useRouter } from "next/navigation";
 import { PackageX, RotateCw } from "lucide-react";
 import { Button, EmptyState } from "@polaris/ui";
 import { retryAppAction } from "@/lib/app-bundles/actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AppUnavailable({ app, name, reason }: { app: string; name: string; reason: string }) {
+    const t = useTranslations("components");
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
@@ -26,12 +28,12 @@ export function AppUnavailable({ app, name, reason }: { app: string; name: strin
     return (
         <EmptyState
             icon={<PackageX />}
-            title={`${name} is not available right now`}
+            title={t("appBundles.unavailable", { name })}
             description={error ?? reason}
             action={
                 <Button onClick={retry} disabled={pending}>
                     <RotateCw className={pending ? "animate-spin" : undefined} />
-                    Try again
+                    {t("actions.tryAgain")}
                 </Button>
             }
         />

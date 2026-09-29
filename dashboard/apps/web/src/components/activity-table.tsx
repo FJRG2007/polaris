@@ -15,6 +15,7 @@
 import { Badge, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { ActivityDetails } from "@/components/activity-details";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Rows sketched while the first answer is in flight; about a screenful. */
 const SKELETON_ROWS = 12;
@@ -53,6 +54,7 @@ export function ActivityTable({
     contextLabel: string;
     emptyLabel: string;
 }) {
+    const t = useTranslations("components");
     const format = useDisplayFormat();
 
     return (
@@ -60,7 +62,7 @@ export function ActivityTable({
             <table className="w-full text-sm">
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                     <tr>
-                        <th className="px-3 py-2 font-medium">When</th>
+                        <th className="px-3 py-2 font-medium">{t("activityTable.when")}</th>
                         {/* Folded into the action cell until there is room for it:
                             what happened is what the row is for, and it must never
                             be the column left hanging off the edge.
@@ -74,8 +76,8 @@ export function ActivityTable({
                             would otherwise set a floor under this column that no amount
                             of truncating gets below, spilling the table sideways.
                             Capped, it takes whatever is left instead. */}
-                        <th className="w-full max-w-0 px-3 py-2 font-medium">Action</th>
-                        <th className="hidden px-3 py-2 font-medium xl:table-cell">Details</th>
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">{t("activityTable.action")}</th>
+                        <th className="hidden px-3 py-2 font-medium xl:table-cell">{t("activityTable.details")}</th>
                     </tr>
                 </thead>
                 <tbody>

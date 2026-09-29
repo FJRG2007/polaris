@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { StepUpProofInput } from "@polaris/core";
 import { StepUpFields } from "@/components/step-up-fields";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { proveStepUpAction } from "@/app/(app)/account/step-up-actions";
 import {
     Button,
@@ -45,6 +46,8 @@ export function StepUpDialog({
     onOpenChange: (open: boolean) => void;
     onProved: () => void | Promise<void>;
 }) {
+    const t = useTranslations("components");
+    const tc = useTranslations("common");
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -87,11 +90,11 @@ export function StepUpDialog({
                 ) : null}
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button disabled={busy || proof === null} onClick={() => void confirm()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Confirm
+                        {t("actions.confirm")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

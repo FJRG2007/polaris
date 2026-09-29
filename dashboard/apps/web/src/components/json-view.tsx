@@ -18,6 +18,7 @@ import { useState } from "react";
 import { cn } from "@polaris/ui";
 import { CopyButton } from "@/components/copy-button";
 import { useHighlighter } from "@/lib/code-highlight";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Metrics both layers of the editor must agree on, to the pixel. */
 const CODE_LAYER = "col-start-1 row-start-1 whitespace-pre p-3 font-mono text-xs leading-relaxed";
@@ -116,6 +117,7 @@ export function JsonEditor({
     disabled?: boolean;
     className?: string;
 }) {
+    const t = useTranslations("components");
     const [touched, setTouched] = useState(false);
     const invalid = touched && !isValidJson(value);
 
@@ -152,7 +154,7 @@ export function JsonEditor({
                     />
                 </div>
             </div>
-            {invalid ? <p className="text-xs text-danger">This is not valid JSON.</p> : null}
+            {invalid ? <p className="text-xs text-danger">{t("json.invalid")}</p> : null}
         </div>
     );
 }

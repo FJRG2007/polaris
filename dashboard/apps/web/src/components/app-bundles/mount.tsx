@@ -16,6 +16,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type State = { component?: ComponentType<Record<string, unknown>>; failed?: boolean };
 
@@ -28,6 +29,7 @@ export function AppBundleMount({
     name: string;
     props: Record<string, unknown>;
 }) {
+    const t = useTranslations("components");
     const router = useRouter();
     const [state, setState] = useState<State>({});
 
@@ -55,7 +57,7 @@ export function AppBundleMount({
     if (state.failed) {
         return (
             <p role="alert" className="text-sm text-muted-foreground">
-                Part of this page did not load. Reload the page to try again.
+                {t("appBundles.partFailed")}
             </p>
         );
     }

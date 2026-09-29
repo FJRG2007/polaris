@@ -17,14 +17,15 @@ import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { clearAttempts, cooldownRemaining, recordFailure } from "@/lib/attempt-throttle";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
 export function LinkPasswordForm({
     token,
     unlock,
-    title = "Password required",
-    description = "This link is protected. Enter its password to continue.",
-    label = "Password"
+    title,
+    description,
+    label
 }: {
     token: string;
     /** The server action that checks it and sets the unlock cookie. */
@@ -33,7 +34,11 @@ export function LinkPasswordForm({
     description?: string;
     label?: string;
 }) {
+    const t = useTranslations("components");
     const router = useRouter();
+    title ??= t("linkPassword.title");
+    description ??= t("linkPassword.description");
+    label ??= t("linkPassword.label");
     const [secret, setSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -43,7 +48,7 @@ export function LinkPasswordForm({
         setError(null);
         const wait = cooldownRemaining(token);
         if (wait > 0) {
-            setError(`Too many attempts. Try again in ${wait}s.`);
+            setError(t("linkPassword.cooldown", { seconds: wait }));
             return;
         }
         startTransition(async () => {
@@ -62,7 +67,7 @@ export function LinkPasswordForm({
         <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <PolarisMark className="size-6" />
-                <span className="text-sm font-medium">Polaris</span>
+                <span className="text-sm font-medium">{"Polaris" /* i18n-ignore: the product name */}</span>
             </div>
             <Card>
                 <CardHeader>
@@ -85,7 +90,7 @@ export function LinkPasswordForm({
                         />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending || !secret}>
-                            {pending ? "Checking..." : "Unlock"}
+                            {pending ? t("linkPassword.checking") : t("linkPassword.unlock")}
                         </Button>
                     </form>
                 </CardBody>

@@ -28,7 +28,8 @@ import { usePhotoOpenable } from "@/components/photo-access";
 import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
-import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { decorationOf, type Presence } from "@polaris/core";
 
 /**
  * The box the decoration paints in: the face, plus its band on every side.
@@ -98,7 +99,8 @@ const requested = new Set<string>();
 export function preloadAvatars(people: readonly AvatarPerson[]): void {
     if (typeof window === "undefined") return;
     for (const person of people) {
-        const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
+        const t = useTranslations("components");
+    const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
         if (!source || requested.has(source)) continue;
         requested.add(source);
         const picture = new window.Image();
@@ -302,7 +304,7 @@ export function Avatar({
     const pressable = opens ? (
         <button
             type="button"
-            aria-label={`Open ${person.name}'s photo`}
+            aria-label={t("avatar.openPhoto", { name: person.name })}
             className={cn("inline-flex shrink-0 cursor-zoom-in", shape)}
             onClick={(event) => {
                 // The face often sits inside a row that opens something of its
@@ -362,7 +364,7 @@ export function Avatar({
     // cannot - see `callBadge`.
     if (inRoom && callBadge && size >= PRESENCE_FLOOR) {
         const Icon = callBadge === "deafened" ? HeadphoneOff : MicOff;
-        const words = callBadge === "deafened" ? "Not listening" : "Microphone off";
+        const words = callBadge === "deafened" ? t("avatar.notListening") : t("avatar.microphoneOff");
         return (
             <span className="relative inline-flex h-fit shrink-0 align-middle">
                 {shown}
@@ -410,8 +412,8 @@ export function Avatar({
                 // call is by definition here, and two marks on one face is a
                 // face nobody reads.
                 <span
-                    aria-label="On a call you can join"
-                    title="On a call you can join"
+                    aria-label={t("avatar.onCall")}
+                    title={t("avatar.onCall")}
                     className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-background ring-1 ring-background"
                     style={{ width: dotSize(size) + 3, height: dotSize(size) + 3 }}
                 >
@@ -419,8 +421,8 @@ export function Avatar({
                 </span>
             ) : (
                 <span
-                    aria-label={PRESENCE_WORDS[where.status]}
-                    title={PRESENCE_WORDS[where.status]}
+                    aria-label={t(`presence.${where.status}`)}
+                    title={t(`presence.${where.status}`)}
                     className={cn(
                         "absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-background",
                         PRESENCE_COLOURS[where.status]

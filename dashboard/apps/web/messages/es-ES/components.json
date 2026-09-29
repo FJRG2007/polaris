@@ -1,1 +1,81 @@
-{}
+{
+    "actions": {
+        "ok": "Aceptar",
+        "confirm": "Confirmar",
+        "tryAgain": "Reintentar",
+        "dismiss": "Descartar",
+        "remove": "Quitar"
+    },
+    "activity": {
+        "heading": {
+            "spotify": "Escuchando Spotify",
+            "minecraft": "Jugando en un servidor de aquÃ­",
+            "playing": "Jugando"
+        },
+        "by": "de {artist}",
+        "on": "en {album}",
+        "elapsed": "{time} transcurrido",
+        "trackPosition": "PosiciÃ³n de la canciÃ³n"
+    },
+    "activityTable": {
+        "when": "CuÃ¡ndo",
+        "action": "AcciÃ³n",
+        "details": "Detalles"
+    },
+    "appBundles": {
+        "partFailed": "Una parte de esta pÃ¡gina no se ha cargado. Recarga la pÃ¡gina para volver a intentarlo.",
+        "unavailable": "{name} no estÃ¡ disponible ahora mismo"
+    },
+    "presence": {
+        "online": "En lÃ­nea",
+        "idle": "Ausente",
+        "busy": "No molestar",
+        "offline": "Desconectado"
+    },
+    "avatar": {
+        "openPhoto": "Abrir la foto de {name}",
+        "notListening": "No escucha",
+        "microphoneOff": "MicrÃ³fono desactivado",
+        "onCall": "En una llamada a la que puedes unirte"
+    },
+    "denied": {
+        "notice": "Esa pÃ¡gina no estÃ¡ abierta para tu rol. Tu acceso empieza aquÃ­."
+    },
+    "json": {
+        "invalid": "Esto no es un JSON vÃ¡lido."
+    },
+    "linkPassword": {
+        "title": "Se necesita contraseÃ±a",
+        "description": "Este enlace estÃ¡ protegido. Escribe su contraseÃ±a para continuar.",
+        "label": "ContraseÃ±a",
+        "cooldown": "Demasiados intentos. Vuelve a intentarlo en {seconds} s.",
+        "checking": "Comprobando...",
+        "unlock": "Desbloquear"
+    },
+    "messageToasts": {
+        "markRead": "Marcar como leÃ­do",
+        "notSent": "No se ha podido enviar",
+        "replyNotSent": "Tu respuesta no se ha enviado",
+        "inChannel": "{author} en {channel}",
+        "messageChannel": "Mensaje en #{channel}",
+        "replyTo": "Responder a {author}",
+        "markReadFailed": "No se ha podido marcar como leÃ­do",
+        "noticeGone": "Ya no se puede responder a ese aviso"
+    },
+    "mailUnread": {
+        "title": "Correo nuevo",
+        "more": "{count, plural, one {# mensaje mÃ¡s} other {# mensajes mÃ¡s}} en tu bandeja de entrada"
+    },
+    "picture": {
+        "saveFailed": "No se ha podido guardar",
+        "upload": "Subir"
+    },
+    "errors": {
+        "unreachable": "No se ha podido contactar con el servidor"
+    },
+    "publicShell": {
+        "open": "Abrir Polaris",
+        "signIn": "Iniciar sesiÃ³n",
+        "unavailable": "Enlace no disponible"
+    }
+}
