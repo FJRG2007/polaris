@@ -507,6 +507,32 @@ describe("where an event may go", () => {
         expect(commands.readHomes("Found no elements matching SpawnX", "", "")).toEqual([]);
     });
 
+    it("counts only the homes in the Overworld, from either era's answer", () => {
+        expect(
+            commands.readHomes(
+                "Ana has the following entity data: 120\nBen has the following entity data: -40",
+                "Ana has the following entity data: -7\nBen has the following entity data: 900",
+                "Cam has the following entity data: [I; 5, 64, -3]Dee has the following entity data: [I; 8, 64, 9]",
+                'Ana has the following entity data: "minecraft:the_nether"\nBen has the following entity data: "minecraft:overworld"',
+                'Cam has the following entity data: "minecraft:the_nether"'
+            )
+        ).toEqual([
+            { x: -40, z: 900 },
+            { x: 8, z: 9 }
+        ]);
+    });
+
+    it("reads a player's world as a name, or as the number it was before 1.16", () => {
+        const worlds = commands.readDimensions(
+            'Ana has the following entity data: "minecraft:the_end"\nBen has the following entity data: -1\nCy has the following entity data: 0'
+        );
+        expect([...worlds]).toEqual([
+            ["Ana", "minecraft:the_end"],
+            ["Ben", "minecraft:the_nether"],
+            ["Cy", "minecraft:overworld"]
+        ]);
+    });
+
     it("keeps clear of every home, going further out when it has to", () => {
         const home = [{ x: 0, z: 0 }];
         let turn = 0;

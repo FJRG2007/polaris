@@ -1119,10 +1119,16 @@ async function findPlace(
         if (!centre) return "failed";
         let point: { x: number; z: number } | null = centre;
         if (!chosen) {
-            const [spawnX, spawnZ, respawn] = await Promise.all(
+            const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
                 commands.HOMES.map((line) => server.say([line]).catch(() => ""))
             );
-            const homes = commands.readHomes(spawnX ?? "", spawnZ ?? "", respawn ?? "");
+            const homes = commands.readHomes(
+                spawnX ?? "",
+                spawnZ ?? "",
+                respawn ?? "",
+                spawnWorld ?? "",
+                respawnWorld ?? ""
+            );
             point = commands.clearPoint(centre, distance, homes, Math.random, clearance);
         }
         if (!point) {

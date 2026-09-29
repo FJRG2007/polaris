@@ -51,6 +51,8 @@ interface World {
     unsureGround: number;
     /** Where players online sleep: `Name: [x, z]`. */
     homes: Record<string, [number, number]>;
+    /** The world each of those homes is in; the Overworld when not said. */
+    homeWorlds: Record<string, string>;
     /** The marker lands where it was spread, and chests are tracked by where
      *  they are - for the events that put down more than one. */
     markFollows: boolean;
@@ -126,6 +128,7 @@ const world: World = {
     refusedGround: [],
     unsureGround: 0,
     homes: {},
+    homeWorlds: {},
     markFollows: false,
     markAt: [300, 0],
     chests: [],
@@ -178,6 +181,12 @@ function fillAnswer(line: string): string | null {
     return `Successfully filled ${volume} block(s)`;
 }
 
+/** A player's `Dimension` as the game writes it: a number up to 1.15, a name from 1.16. */
+function dimension(id: string): string {
+    if (events.atLeast(world.version, [1, 16])) return `"${id}"`;
+    return String({ "minecraft:the_nether": -1, "minecraft:the_end": 1 }[id] ?? 0);
+}
+
 function answer(line: string): string {
     world.sent.push(line);
     const filled = fillAnswer(line);
@@ -211,7 +220,7 @@ function answer(line: string): string {
     }
     if (line === "execute as @a[tag=pe_in] run data get entity @s Dimension") {
         return inArena
-            .map((name) => `${name} has the following entity data: "minecraft:overworld"`)
+            .map((name) => `${name} has the following entity data: ${dimension("minecraft:overworld")}`)
             .join("\n");
     }
     const air = /^execute in minecraft:overworld if block (-?\d+ -?\d+ -?\d+) minecraft:air$/.exec(
@@ -321,6 +330,14 @@ function answer(line: string): string {
             .map(([name, home]) => `${name} has the following entity data: ${home[axis]}`)
             .join("\n");
     }
+    if (line === "execute as @a run data get entity @s SpawnDimension") {
+        return Object.keys(world.homes)
+            .map(
+                (name) =>
+                    `${name} has the following entity data: "${world.homeWorlds[name] ?? "minecraft:overworld"}"`
+            )
+            .join("\n");
+    }
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     // Seconds as a whole number up to 1.19.3; a time from 1.19.4, where a bare
     // number is ticks and `s` makes it seconds.
@@ -361,7 +378,7 @@ function answer(line: string): string {
         return world.online
             .map(
                 (name) =>
-                    `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`
+                    `${name} has the following entity data: ${dimension(world.dims[name] ?? "minecraft:overworld")}`
             )
             .join("\n");
     }
@@ -661,6 +678,7 @@ beforeEach(() => {
     world.refusedGround = [];
     world.unsureGround = 0;
     world.homes = {};
+    world.homeWorlds = {};
     world.markFollows = false;
     world.markAt = [300, 0];
     world.chests = [];
@@ -1453,6 +1471,33 @@ describe("the others", () => {
         expect(
             world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))
         ).toBe(true);
+    });
+
+    it("does not keep away from a player's anchor in the Nether", async () => {
+        // Everybody stands at the origin, over their homes; every bearing is the
+        // same one, so without the homes the first point tried is the one used.
+        vi.spyOn(Math, "random").mockReturnValue(0);
+        world.at = { Ana: [0, 64, 0], Ben: [0, 64, 0] };
+        world.homes = { Ana: [0, 0], Ben: [0, 0] };
+        world.homeWorlds = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(8_100);
+        vi.mocked(Math.random).mockRestore();
+        const first = world.sent
+            .find((line) => /run forceload add -?\d+ -?\d+$/.test(line))
+            ?.split(" ")
+            .slice(-2)
+            .map(Number) as [number, number] | undefined;
+        expect(first).toBeDefined();
+        expect(Math.hypot(...first!)).toBeLessThan(48);
     });
 
     it("looks past a player's bed for somewhere to put it", async () => {
@@ -3001,6 +3046,33 @@ describe("a parkour race", () => {
         ).toBe(false);
         expect(world.sent.some((line) => / tp (Ana|Ben) /.test(line))).toBe(false);
         keptTheRules();
+    });
+});
+
+describe("a parkour race on a server before 1.16", () => {
+    it("admits whoever joins, the world they are in read as a number", async () => {
+        world.version = "1.15.2";
+        world.online = ["Ana", "Ben"];
+        setUp([
+            {
+                ...catalog.newPreset("parkour", "race"),
+                minutes: 5,
+                options: {
+                    place: { mode: "players" as const },
+                    jumps: 12,
+                    difficulty: "medium" as const,
+                    height: 30
+                }
+            }
+        ]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana", "Ben"]);
+        expect(state().run?.stage?.saved.every((one) => one.dimension === "minecraft:overworld")).toBe(
+            true
+        );
     });
 });
 

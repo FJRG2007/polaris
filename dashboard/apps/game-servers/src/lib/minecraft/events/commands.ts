@@ -400,11 +400,20 @@ export const IN_OVERWORLD =
 /** Which world everybody is in: `Alice has the following entity data: "minecraft:the_nether"`. */
 export const DIMENSIONS = "execute as @a run data get entity @s Dimension";
 
+/** Up to 1.15 a player's world is a number: -1 the Nether, 0 the Overworld, 1 the End. */
+const NUMBERED_WORLDS: Readonly<Record<string, string>> = {
+    "-1": "minecraft:the_nether",
+    "0": "minecraft:overworld",
+    "1": "minecraft:the_end"
+};
+
 export function readDimensions(output: string): Map<string, string> {
     const found = new Map<string, string>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: "([a-z0-9_:./-]+)"/g;
+    const pattern =
+        /([A-Za-z0-9_]{1,16}) has the following entity data: (?:"([a-z0-9_:./-]+)"|(-?\d+)(?![\d.]))/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
-        found.set(match[1] as string, match[2] as string);
+        const world = match[2] ?? NUMBERED_WORLDS[match[3] as string];
+        if (world) found.set(match[1] as string, world);
     }
     return found;
 }
@@ -533,21 +542,31 @@ export function spreadWorked(output: string): boolean {
 
 /**
  * Where each player online would respawn - their bed or anchor, which is where
- * they live. Written two ways over the game's life: `SpawnX`/`SpawnZ` up to
- * 1.21.4, a `respawn` compound from 1.21.5. Both are asked; whichever the
- * server does not have answers with an error that reads as nothing.
+ * they live. Written two ways over the game's life: `SpawnX`/`SpawnZ` with a
+ * `SpawnDimension` up to 1.21.4, a `respawn` compound from 1.21.5. Both are
+ * asked; whichever the server does not have answers with an error that reads
+ * as nothing. The world is asked too: an anchor in the Nether is no home at the
+ * same x and z in the Overworld, where every event is played.
  */
 export const HOMES = [
     "execute as @a run data get entity @s SpawnX",
     "execute as @a run data get entity @s SpawnZ",
-    "execute as @a run data get entity @s respawn.pos"
+    "execute as @a run data get entity @s respawn.pos",
+    "execute as @a run data get entity @s SpawnDimension",
+    "execute as @a run data get entity @s respawn.dimension"
 ] as const;
 
-/** The homes out of the answers to `HOMES`, in the same order. */
+/**
+ * The homes out of the answers to `HOMES`, in the same order. A home whose
+ * world is not said is in the Overworld: before 1.16 there was nowhere else to
+ * sleep, and from 1.21.5 the game leaves the Overworld out as the default.
+ */
 export function readHomes(
     spawnX: string,
     spawnZ: string,
-    respawn: string
+    respawn: string,
+    spawnDimension = "",
+    respawnDimension = ""
 ): { x: number; z: number }[] {
     const each = (output: string) => {
         const found = new Map<string, number>();
@@ -557,16 +576,22 @@ export function readHomes(
         }
         return found;
     };
+    const overworld = (worlds: ReadonlyMap<string, string>, name: string) =>
+        (worlds.get(name) ?? "minecraft:overworld") === "minecraft:overworld";
+    const legacyWorlds = readDimensions(spawnDimension);
+    const modernWorlds = readDimensions(respawnDimension);
     const xs = each(spawnX);
     const zs = each(spawnZ);
     const homes: { x: number; z: number }[] = [];
     for (const [name, x] of xs) {
         const z = zs.get(name);
-        if (z !== undefined) homes.push({ x, z });
+        if (z !== undefined && overworld(legacyWorlds, name)) homes.push({ x, z });
     }
-    const modern = /has the following entity data: \[I;\s*(-?\d+),\s*-?\d+,\s*(-?\d+)\]/g;
+    const modern =
+        /([A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*-?\d+,\s*(-?\d+)\]/g;
     for (const match of stripFormatting(respawn).matchAll(modern)) {
-        homes.push({ x: Number(match[1]), z: Number(match[2]) });
+        if (overworld(modernWorlds, match[1] as string))
+            homes.push({ x: Number(match[2]), z: Number(match[3]) });
     }
     return homes;
 }
