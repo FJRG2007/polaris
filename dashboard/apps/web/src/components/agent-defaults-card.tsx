@@ -22,17 +22,15 @@ import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
 import { ModelFallbackList } from "@/components/model-fallback-list";
 import { ModelPicker, type PickerModel } from "@/components/model-picker";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentWord } from "@/lib/agents/words";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import {
     AGENT_EFFORTS,
     AGENT_EXECUTIONS,
-    AGENT_EXECUTION_LABELS,
     AGENT_GATE_MODES,
-    AGENT_GATE_MODE_LABELS,
-    AGENT_GATE_MODE_NOTES,
     AGENT_PUSH_POLICIES,
-    AGENT_PUSH_POLICY_LABELS,
     AGENT_SHELL_POLICIES,
-    AGENT_SHELL_POLICY_LABELS,
     type AgentDefaultsInput,
     type AgentEffort,
     type AgentExecution,
@@ -112,6 +110,8 @@ export function AgentDefaultsCard({
     onRemoved,
     onError
 }: AgentDefaultsCardProps) {
+    // Drawn only on the Agents screens, which load the `agents` catalog.
+    const t = useTranslations("agents");
     const [pending, startTransition] = useTransition();
     const [saved, setSaved] = useState(false);
 
@@ -168,31 +168,28 @@ export function AgentDefaultsCard({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Remove the settings for ${title}`}
-                            title="Remove these settings"
+                            aria-label={t("defaultsCard.removeNamed", { title })}
+                            title={t("defaultsCard.remove")}
                             onClick={onRemoved}
                         >
                             <Trash2 className="size-4 shrink-0" />
                         </Button>
                     ) : (
-                        <Badge variant="neutral">Everything below inherits this</Badge>
+                        <Badge variant="neutral">{t("defaultsCard.inheritsThis")}</Badge>
                     )}
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                    Anything left on Inherit comes from {inheritedFrom}. A repository can still
-                    override any of it.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("defaultsCard.intro", { from: inheritedFrom })}</p>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Public repositories">
+                    <Field label={t("defaultsCard.publicRepos")}>
                         <BoolSelect
                             value={tier.publicRepos}
                             inherited={inherited.publicRepos}
                             onChange={(next) => set("publicRepos", next)}
                         />
                     </Field>
-                    <Field label="Private repositories">
+                    <Field label={t("defaultsCard.privateRepos")}>
                         <BoolSelect
                             value={tier.privateRepos}
                             inherited={inherited.privateRepos}
@@ -200,8 +197,8 @@ export function AgentDefaultsCard({
                         />
                     </Field>
                     <Field
-                        label="Pull requests"
-                        hint="Whether a pull request can start a run. A direct mention is answered either way."
+                        label={t("settingsFields.pullRequests")}
+                        hint={t("defaultsCard.pullRequestsHint")}
                     >
                         <BoolSelect
                             value={tier.pullRequests}
@@ -209,7 +206,7 @@ export function AgentDefaultsCard({
                             onChange={(next) => set("pullRequests", next)}
                         />
                     </Field>
-                    <Field label="Issues">
+                    <Field label={t("settingsFields.issues")}>
                         <BoolSelect
                             value={tier.issues}
                             inherited={inherited.issues}
@@ -219,8 +216,8 @@ export function AgentDefaultsCard({
                 </div>
 
                 <Field
-                    label="Quality gate"
-                    hint={AGENT_GATE_MODE_NOTES[tier.gate ?? inherited.gate]}
+                    label={t("settingsFields.gate")}
+                    hint={agentWord(t, "gateModeNote", tier.gate ?? inherited.gate)}
                 >
                     <Select
                         value={tier.gate ?? INHERIT}
@@ -230,11 +227,11 @@ export function AgentDefaultsCard({
                         options={[
                             {
                                 value: INHERIT,
-                                label: `Inherit (${AGENT_GATE_MODE_LABELS[inherited.gate]})`
+                                label: t("settingsFields.inherit", { value: agentWord(t, "gateMode", inherited.gate) })
                             },
                             ...AGENT_GATE_MODES.map((value) => ({
                                 value,
-                                label: AGENT_GATE_MODE_LABELS[value]
+                                label: agentWord(t, "gateMode", value)
                             }))
                         ]}
                     />
@@ -246,8 +243,8 @@ export function AgentDefaultsCard({
                         two are what an operator changes when they are debugging
                         Enigma itself or want a session to start faster. */}
                     <Field
-                        label="Enigma"
-                        hint="Installs your policies, conventions and guardrails into every agent before it starts."
+                        label="Enigma" // i18n-ignore a product's name
+                        hint={t("defaultsCard.enigmaHint")}
                     >
                         <Select
                             value={enigmaChoice(tier.enigma.enabled)}
@@ -255,15 +252,15 @@ export function AgentDefaultsCard({
                                 setEnigma("enabled", next === INHERIT ? null : next === "on")
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
-                                { value: "on", label: "On" },
-                                { value: "off", label: "Off" }
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
+                                { value: "on", label: t("settingsFields.on") },
+                                { value: "off", label: t("settingsFields.off") }
                             ]}
                         />
                     </Field>
                     <Field
-                        label="How much of it"
-                        hint={core.ENIGMA_SCOPE_NOTES[tier.enigma.scope ?? "all"]}
+                        label={t("defaultsCard.howMuch")}
+                        hint={t(`defaultsCard.scopeNotes.${tier.enigma.scope ?? "all"}` as NamespaceKey<"agents">)}
                     >
                         <Select
                             value={tier.enigma.scope ?? INHERIT}
@@ -274,10 +271,10 @@ export function AgentDefaultsCard({
                                 )
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...core.ENIGMA_SCOPES.map((value) => ({
                                     value,
-                                    label: core.ENIGMA_SCOPE_LABELS[value]
+                                    label: t(`defaultsCard.scopes.${value}` as NamespaceKey<"agents">)
                                 }))
                             ]}
                         />
@@ -285,34 +282,30 @@ export function AgentDefaultsCard({
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Runs on">
+                    <Field label={t("repos.runsOn")}>
                         <Select
                             value={tier.execution ?? INHERIT}
                             onValueChange={(next) =>
                                 set("execution", next === INHERIT ? null : (next as AgentExecution))
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...AGENT_EXECUTIONS.map((value) => ({
                                     value,
-                                    label: AGENT_EXECUTION_LABELS[value]
+                                    label: agentWord(t, "execution", value)
                                 }))
                             ]}
                         />
                     </Field>
                     {tier.execution === "runners" ? (
                         <Field
-                            label="Runner pool"
-                            hint={
-                                pools.length === 0
-                                    ? "You have no pools yet. Create one under Apps > Runners."
-                                    : undefined
-                            }
+                            label={t("repoDialog.pool")}
+                            hint={pools.length === 0 ? t("defaultsCard.noPools") : undefined}
                         >
                             <Select
                                 value={tier.poolId ?? ""}
                                 onValueChange={(next) => set("poolId", next || null)}
-                                placeholder="Pick a runner pool"
+                                placeholder={t("text.pickPool")}
                                 options={pools.map((pool) => ({
                                     value: pool.id,
                                     label: pool.name
@@ -321,24 +314,20 @@ export function AgentDefaultsCard({
                         </Field>
                     ) : null}
                     <Field
-                        label="Model"
-                        hint={
-                            providers.length === 0
-                                ? "Connect a model provider under Integrations first."
-                                : undefined
-                        }
+                        label={t("repos.model")}
+                        hint={providers.length === 0 ? t("repoDialog.connectProvider") : undefined}
                     >
                         <ModelPicker
                             value={tier.model}
                             onChange={(next) => set("model", next)}
                             load={loadModels}
-                            inheritLabel={`Inherit (${inheritedFrom})`}
+                            inheritLabel={t("settingsFields.inherit", { value: inheritedFrom })}
                         />
                     </Field>
                     <Field
                         wide
-                        label="If that provider refuses"
-                        hint="Tried in order when a run is turned away for the account's rate limit, an empty balance, a rejected key, or a window it did not fit in. Drag to reorder."
+                        label={t("defaultsCard.fallback")}
+                        hint={t("defaultsCard.fallbackHint")}
                     >
                         <ModelFallbackList
                             value={tier.fallback}
@@ -346,44 +335,44 @@ export function AgentDefaultsCard({
                             loadModels={loadModels}
                         />
                     </Field>
-                    <Field label="Reasoning effort">
+                    <Field label={t("repoDialog.effort")}>
                         <Select
                             value={tier.effort ?? INHERIT}
                             onValueChange={(next) =>
                                 set("effort", next === INHERIT ? null : (next as AgentEffort))
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...AGENT_EFFORTS.map((value) => ({ value, label: value }))
                             ]}
                         />
                     </Field>
-                    <Field label="Git access">
+                    <Field label={t("repoDialog.git")}>
                         <Select
                             value={tier.push ?? INHERIT}
                             onValueChange={(next) =>
                                 set("push", next === INHERIT ? null : (next as AgentPushPolicy))
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...AGENT_PUSH_POLICIES.map((value) => ({
                                     value,
-                                    label: AGENT_PUSH_POLICY_LABELS[value]
+                                    label: agentWord(t, "pushPolicy", value)
                                 }))
                             ]}
                         />
                     </Field>
-                    <Field label="Shell">
+                    <Field label={t("repoDialog.shell")}>
                         <Select
                             value={tier.shell ?? INHERIT}
                             onValueChange={(next) =>
                                 set("shell", next === INHERIT ? null : (next as AgentShellPolicy))
                             }
                             options={[
-                                { value: INHERIT, label: "Inherit" },
+                                { value: INHERIT, label: t("defaultsCard.inherit") },
                                 ...AGENT_SHELL_POLICIES.map((value) => ({
                                     value,
-                                    label: AGENT_SHELL_POLICY_LABELS[value]
+                                    label: agentWord(t, "shellPolicy", value)
                                 }))
                             ]}
                         />
@@ -391,9 +380,9 @@ export function AgentDefaultsCard({
                 </div>
 
                 <div className="flex items-center justify-end gap-3">
-                    {saved ? <span className="text-xs text-success">Saved</span> : null}
+                    {saved ? <span className="text-xs text-success">{t("defaultsCard.saved")}</span> : null}
                     <Button size="sm" onClick={save} disabled={pending}>
-                        {pending ? "Saving..." : "Save"}
+                        {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </div>
             </CardBody>
@@ -432,14 +421,16 @@ function BoolSelect({
     inherited: boolean;
     onChange: (next: boolean | null) => void;
 }) {
+    const t = useTranslations("agents");
+    const yesNo = (on: boolean) => (on ? t("settingsFields.on") : t("settingsFields.off"));
     return (
         <Select
             value={value === null ? INHERIT : String(value)}
             onValueChange={(next) => onChange(next === INHERIT ? null : next === "true")}
             options={[
-                { value: INHERIT, label: `Inherit (${inherited ? "On" : "Off"})` },
-                { value: "true", label: "On" },
-                { value: "false", label: "Off" }
+                { value: INHERIT, label: t("settingsFields.inherit", { value: yesNo(inherited) }) },
+                { value: "true", label: t("settingsFields.on") },
+                { value: "false", label: t("settingsFields.off") }
             ]}
         />
     );

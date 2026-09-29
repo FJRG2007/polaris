@@ -4,7 +4,7 @@
  * The senders (`sms-service`, `webhook-sender`) and the dispatcher answer in
  * English: they run inside the notification pass, where there is nobody to ask
  * for a language, and what they answer is stored on the destination and the
- * delivery log. This matches that English back to its key in the `notices`
+ * delivery log. This matches that English back to its key in the `components`
  * catalog when somebody reads it, exactly or by its shape for one that carries
  * a status. Anything else - Twilio's own explanation, a newer sender - passes
  * through.
@@ -12,8 +12,8 @@
 
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
-type Words = NamespaceTranslator<"notices">;
-type Key = NamespaceKey<"notices">;
+type Words = NamespaceTranslator<"components">;
+type Key = NamespaceKey<"components">;
 
 const EXACT: Readonly<Record<string, Key>> = {
     "No working SMS sender is configured.": "delivery.noSmsSender",

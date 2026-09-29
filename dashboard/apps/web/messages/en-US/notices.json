@@ -90,32 +90,7 @@
         "upManyBody": "{names}."
     },
     "delivery": {
-        "openInPolaris": "Open in Polaris",
-        "noSmsSender": "No working SMS sender is configured.",
-        "smsSettings": "The SMS sender's settings are no longer valid.",
-        "smsNoCredential": "The SMS sender has no credential stored.",
-        "smsCredentialUnreadable": "The SMS sender's credential cannot be read. Re-enter it.",
-        "twilioTimeout": "Twilio did not answer in time.",
-        "twilioUnreachable": "Twilio could not be reached.",
-        "twilioCheckUnreachable": "Twilio could not be reached to check the credential.",
-        "twilioRejected": "Twilio rejected that account SID and auth token.",
-        "twilioRefused": "Twilio refused the message (HTTP {status}).",
-        "twilioAnswered": "Twilio answered HTTP {status}.",
-        "senderName": "Give the sender a name.",
-        "senderGone": "That sender no longer exists.",
-        "tokenUnreadable": "The stored auth token cannot be read. Enter it again.",
-        "tokenMissing": "Enter the auth token for this provider.",
-        "senderNotStored": "Could not store the sender.",
-        "telegramUrl": "That is not a Telegram sendMessage URL with a chat_id.",
-        "endpointUnreachable": "The endpoint could not be reached.",
-        "endpointGone": "The endpoint is gone (404). It was probably deleted.",
-        "endpointUnauthorized": "The endpoint refused the message (unauthorized).",
-        "endpointRateLimited": "The endpoint is rate limiting Polaris (429).",
-        "endpointAnswered": "The endpoint answered HTTP {status}.",
-        "destinationOff": "The destination is switched off, deleted, or its target cannot be read.",
-        "noAddress": "No confirmed address on the account.",
-        "markedRead": "Marked read: you had the page it points at open.",
-        "eventOff": "Turned off for this event."
+        "openInPolaris": "Open in Polaris"
     },
     "dropPoint": {
         "received": "A file arrived at \"{title}\""

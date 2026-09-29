@@ -23,6 +23,7 @@ import { GitHubMark } from "@/components/brand-icons";
 import { externalGitUrl } from "@/lib/repo-reference";
 import { Globe, Loader2, Lock, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** A repository, as every picker row renders one. */
 export interface PickerRepo {
@@ -78,11 +79,13 @@ export function RepoPicker({
     onPick,
     onPickUrl,
     selected = [],
-    placeholder = "Search repositories, or paste a repo URL",
+    placeholder: placeholderGiven,
     autoFocus = false,
     maxHeightClass = "max-h-56"
 }: RepoPickerProps) {
     const cached = listCache.get(cacheKey);
+    const t = useTranslations("components");
+    const placeholder = placeholderGiven ?? t("repoPicker.placeholder");
     const [loading, setLoading] = useState(cached === undefined);
     const [connected, setConnected] = useState(cached?.connected ?? false);
     const [repos, setRepos] = useState<PickerRepo[]>(cached?.repos ?? []);
@@ -185,7 +188,7 @@ export function RepoPicker({
                         autoCorrect="off"
                         spellCheck={false}
                         inputMode="url"
-                        aria-label="Repository"
+                        aria-label={t("repoPicker.repository")}
                         className="pl-8 pr-8"
                     />
                     {searching && (
@@ -197,8 +200,8 @@ export function RepoPicker({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        title="Refresh repositories"
-                        aria-label="Refresh repositories"
+                        title={t("repoPicker.refresh")}
+                        aria-label={t("repoPicker.refresh")}
                         disabled={loading}
                         onClick={() => load(true)}
                     >
@@ -216,25 +219,25 @@ export function RepoPicker({
                     >
                         <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         <span className="min-w-0 flex-1 truncate" title={external}>{external}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">Use this URL</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{t("repoPicker.useUrl")}</span>
                     </button>
                 ) : loading && repos.length === 0 ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Loading repositories...
+                        <Loader2 className="size-4 animate-spin" /> {t("repoPicker.loading")}
                     </div>
                 ) : empty ? (
                     <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                         {searching
-                            ? "Searching GitHub..."
+                            ? t("repoPicker.searching")
                             : trimmed
-                              ? "No repository matches."
-                              : "Type a repository name, or paste its URL."}
+                              ? t("repoPicker.noMatch")
+                              : t("repoPicker.typeName")}
                     </p>
                 ) : (
                     <>
                         {mine.length > 0 && (
                             <RepoGroup
-                                label={connected ? "Your repositories" : "Repositories"}
+                                label={connected ? t("repoPicker.yours") : t("repoPicker.repositories")}
                                 repos={mine}
                                 selected={selected}
                                 onPick={onPick}
@@ -242,7 +245,7 @@ export function RepoPicker({
                         )}
                         {discovered.length > 0 && (
                             <RepoGroup
-                                label="Public on GitHub"
+                                label={t("repoPicker.public")}
                                 repos={discovered}
                                 selected={selected}
                                 onPick={onPick}

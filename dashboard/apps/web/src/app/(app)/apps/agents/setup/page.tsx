@@ -5,6 +5,7 @@ import { getGithubStatus } from "@/lib/github-service";
 import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function AgentSetupPage() {
         listAgentRepos(user.id)
     ]);
 
+    const t = await getTranslations("agents");
     const appReady = github?.method === "app";
     const modelReady = providers.length > 0;
     const repoReady = repos.length > 0;
@@ -32,30 +34,30 @@ export default async function AgentSetupPage() {
     return (
         <>
             <PageHeader
-                title="Set up"
-                description="Three things have to be true before an agent can run. This is where they are."
+                title={t("overview.setUp")}
+                description={t("setup.description")}
             />
             <div className="space-y-3">
                 <Step
                     done={appReady}
-                    title="Connect a GitHub App"
-                    body="An App lets the agent comment, review and open pull requests as itself, and lets Polaris hear about issues and pull requests. A personal access token cannot do either. An administrator creates one in a click."
+                    title={t("setup.app.title")}
+                    body={t("setup.app.body")}
                     href="/admin/integrations"
-                    action="Open Integrations"
+                    action={t("setup.app.action")}
                 />
                 <Step
                     done={modelReady}
-                    title="Connect a model provider"
-                    body="Your own key with Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it takes effect everywhere."
+                    title={t("setup.model.title")}
+                    body={t("setup.model.body")}
                     href="/account/ai-keys"
-                    action="Add a provider key"
+                    action={t("setup.model.action")}
                 />
                 <Step
                     done={repoReady}
-                    title="Add a repository"
-                    body="Pick where its runs should happen. Polaris recommends the cheapest option that fits: hosted runners for a public repository, your own hardware for a private one."
+                    title={t("repos.add")}
+                    body={t("setup.repo.body")}
                     href="/apps/agents/repos"
-                    action="Add a repository"
+                    action={t("repos.add")}
                 />
             </div>
 
@@ -63,12 +65,16 @@ export default async function AgentSetupPage() {
                 <Card className="mt-4">
                     <CardBody className="space-y-2 py-6">
                         <p className="text-sm">
-                            Everything is in place. Open an issue in one of your repositories and mention{" "}
-                            <code className="rounded bg-white/5 px-1">@{github?.login ?? "the app"}</code> to try it.
+                            {t.rich("setup.ready", {
+                                app: `@${github?.login ?? t("setup.theApp")}`,
+                                code: (chunks) => (
+                                    <code key="app" className="rounded bg-white/5 px-1">
+                                        {chunks}
+                                    </code>
+                                )
+                            })}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                            To have it act without being asked, add a rule under Automations.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("setup.readyHint")}</p>
                     </CardBody>
                 </Card>
             ) : null}

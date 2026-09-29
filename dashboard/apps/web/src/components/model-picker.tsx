@@ -22,6 +22,7 @@ import Fuse from "fuse.js";
 import { Button, Input } from "@polaris/ui";
 import { Check, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** One model as a row renders it. Mirrors `CatalogModel`, minus what no screen
  *  reads, so the payload crossing the wire stays small. */
@@ -68,10 +69,15 @@ export function ModelPicker({
     value,
     onChange,
     load,
-    inheritLabel = "Inherit",
-    placeholder = "Search models",
+    inheritLabel: inheritGiven,
+    placeholder: placeholderGiven,
     disabled = false
 }: ModelPickerProps) {
+    const t = useTranslations("components");
+    // Left out, each falls back to the reader's word for it; null still removes
+    // the empty choice.
+    const inheritLabel = inheritGiven === undefined ? t("modelPicker.inherit") : inheritGiven;
+    const placeholder = placeholderGiven ?? t("modelPicker.search");
     const [models, setModels] = useState<PickerModel[]>(cached ?? []);
     const [loading, setLoading] = useState(cached === null);
     const [query, setQuery] = useState("");
@@ -192,7 +198,7 @@ export function ModelPicker({
                         {offerTyped ? (
                             <Row
                                 label={typed}
-                                detail="Use as typed"
+                                detail={t("modelPicker.asTyped")}
                                 selected={value === typed}
                                 onSelect={() => pick(typed)}
                             />
@@ -216,9 +222,7 @@ export function ModelPicker({
 
                         {!loading && results.length === 0 && !offerTyped ? (
                             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-                                {models.length === 0
-                                    ? "No models yet. Connect a provider, or refresh the catalog under Admin > Agents."
-                                    : "Nothing matches. Type a full specifier to use it anyway."}
+                                {models.length === 0 ? t("modelPicker.noModels") : t("modelPicker.noMatch")}
                             </p>
                         ) : null}
                     </div>

@@ -34,6 +34,7 @@ import {
     type AgentShellPolicy,
     type ExecutionAdvice
 } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /**
  * Turning the agent on for a repository.
@@ -44,6 +45,8 @@ import {
  * and asking for any of that before knowing would mean asking twice.
  */
 export function AddRepoDialog({ onClose }: { onClose: () => void }) {
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const [repo, setRepo] = useState<PickerRepo | null>(null);
     const [providers, setProviders] = useState<string[]>([]);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
@@ -141,12 +144,12 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a repository</DialogTitle>
+                    <DialogTitle>{t("repos.add")}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Repository</label>
+                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
                         {repo ? (
                             <div className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2">
                                 <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
@@ -165,7 +168,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     size="sm"
                                     onClick={() => setRepo(null)}
                                 >
-                                    Change
+                                    {t("repoDialog.change")}
                                 </Button>
                             </div>
                         ) : (
@@ -181,9 +184,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                     {excluded ? (
                         <p className="text-xs text-warning">
-                            {repo?.private ? "Private" : "Public"} repositories are turned off for
-                            this account. Turn them back on under Agents settings, or the agent will
-                            never run here.
+                            {repo?.private ? t("repoDialog.privateOff") : t("repoDialog.publicOff")}
                         </p>
                     ) : null}
 
@@ -200,7 +201,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                             />
 
                             <div className="space-y-1">
-                                <label className="text-sm font-medium">Model</label>
+                                <label className="text-sm font-medium">{t("repos.model")}</label>
                                 <ModelPicker
                                     value={model || null}
                                     onChange={(next) => setModel(next ?? "")}
@@ -208,19 +209,17 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     inheritLabel={null}
                                     placeholder={
                                         providers.length === 0
-                                            ? "No provider connected"
-                                            : "Pick a model"
+                                            ? t("repoDialog.noProvider")
+                                            : t("text.pickModel")
                                     }
                                 />
                                 {providers.length === 0 ? (
-                                    <p className="text-xs text-warning">
-                                        Connect a model provider under Integrations first.
-                                    </p>
+                                    <p className="text-xs text-warning">{t("repoDialog.connectProvider")}</p>
                                 ) : null}
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-sm font-medium">Reasoning effort</label>
+                                <label className="text-sm font-medium">{t("repoDialog.effort")}</label>
                                 <Select
                                     value={effort}
                                     onValueChange={setEffort}
@@ -241,11 +240,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                 onGate={setGate}
                             />
 
-                            <p className="text-xs text-muted-foreground">
-                                The agent starts on feature branches only and cannot push to the
-                                default branch. Change that, and the rules that start it, from the
-                                repository&apos;s settings afterwards.
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("repoDialog.startsRestricted")}</p>
                         </>
                     ) : null}
 
@@ -254,10 +249,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button onClick={save} disabled={!repo || !model || loading || pending}>
-                        {pending ? "Adding..." : "Add"}
+                        {pending ? t("repoDialog.adding") : t("repoDialog.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

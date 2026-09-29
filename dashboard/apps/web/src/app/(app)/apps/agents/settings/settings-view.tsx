@@ -19,6 +19,7 @@ import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { resolveAgentPolicy, type AgentPolicy } from "@polaris/core";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 import { AgentDefaultsCard, emptyTier } from "@/components/agent-defaults-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** This person's catch-all tier. */
 const GENERAL = "";
@@ -54,6 +55,8 @@ export function SettingsView({
         // saved: it is where everything below it inherits from.
         return [stored.get(GENERAL) ?? emptyTier(GENERAL), ...tiers.filter((tier) => tier.scope !== GENERAL)];
     });
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -77,10 +80,10 @@ export function SettingsView({
                 <AgentDefaultsCard
                     key={row.scope}
                     tier={row}
-                    title={row.scope === GENERAL ? "All your repositories" : row.scope}
+                    title={row.scope === GENERAL ? t("settings.all") : row.scope}
                     inherited={row.scope === GENERAL ? fromPlatform : fromGeneral}
                     inheritedFrom={
-                        row.scope === GENERAL ? "the deployment's defaults" : "your settings for all repositories"
+                        row.scope === GENERAL ? t("settings.fromDeployment") : t("settings.fromAll")
                     }
                     pools={pools}
                     providers={providers}
@@ -99,11 +102,9 @@ export function SettingsView({
             {adding ? (
                 <Card>
                     <CardBody className="space-y-3">
-                        <p className="text-sm font-medium">Settings for one account</p>
+                        <p className="text-sm font-medium">{t("settings.oneAccount")}</p>
                         {addable.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Every account you have repositories in already has its own settings.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("settings.allHaveOwn")}</p>
                         ) : (
                             <Select
                                 value=""
@@ -111,13 +112,13 @@ export function SettingsView({
                                     setRows((current) => [...current, emptyTier(scope)]);
                                     setAdding(false);
                                 }}
-                                placeholder="Pick an account"
+                                placeholder={t("settings.pickAccount")}
                                 options={addable.map((owner) => ({ value: owner, label: owner }))}
                             />
                         )}
                         <div className="flex justify-end">
                             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
-                                Cancel
+                                {tcommon("actions.cancel")}
                             </Button>
                         </div>
                     </CardBody>
@@ -125,7 +126,7 @@ export function SettingsView({
             ) : (
                 <Button variant="ghost" size="sm" onClick={() => setAdding(true)} disabled={addable.length === 0}>
                     <Plus className="size-4 shrink-0" />
-                    Settings for one account
+                    {t("settings.oneAccount")}
                 </Button>
             )}
         </div>

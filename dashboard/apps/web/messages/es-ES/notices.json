@@ -90,32 +90,7 @@
         "upManyBody": "{names}."
     },
     "delivery": {
-        "openInPolaris": "Abrir en Polaris",
-        "noSmsSender": "No hay ningún remitente de SMS que funcione.",
-        "smsSettings": "Los ajustes del remitente de SMS ya no son válidos.",
-        "smsNoCredential": "El remitente de SMS no tiene ninguna credencial guardada.",
-        "smsCredentialUnreadable": "No se puede leer la credencial del remitente de SMS. Vuelve a introducirla.",
-        "twilioTimeout": "Twilio no respondió a tiempo.",
-        "twilioUnreachable": "No se pudo contactar con Twilio.",
-        "twilioCheckUnreachable": "No se pudo contactar con Twilio para comprobar la credencial.",
-        "twilioRejected": "Twilio rechazó ese SID de cuenta y ese token de autenticación.",
-        "twilioRefused": "Twilio rechazó el mensaje (HTTP {status}).",
-        "twilioAnswered": "Twilio respondió HTTP {status}.",
-        "senderName": "Ponle un nombre al remitente.",
-        "senderGone": "Ese remitente ya no existe.",
-        "tokenUnreadable": "No se puede leer el token de autenticación guardado. Vuelve a introducirlo.",
-        "tokenMissing": "Introduce el token de autenticación de este proveedor.",
-        "senderNotStored": "No se pudo guardar el remitente.",
-        "telegramUrl": "Eso no es una URL sendMessage de Telegram con un chat_id.",
-        "endpointUnreachable": "No se pudo contactar con el endpoint.",
-        "endpointGone": "El endpoint ya no existe (404). Probablemente se borró.",
-        "endpointUnauthorized": "El endpoint rechazó el mensaje (no autorizado).",
-        "endpointRateLimited": "El endpoint está limitando las peticiones de Polaris (429).",
-        "endpointAnswered": "El endpoint respondió HTTP {status}.",
-        "destinationOff": "El destino está desactivado, eliminado o no se puede leer su dirección.",
-        "noAddress": "La cuenta no tiene ninguna dirección confirmada.",
-        "markedRead": "Marcada como leída: tenías abierta la página a la que apunta.",
-        "eventOff": "Desactivada para este evento."
+        "openInPolaris": "Abrir en Polaris"
     },
     "dropPoint": {
         "received": "Ha llegado un archivo a «{title}»"

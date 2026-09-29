@@ -21,6 +21,19 @@ import { useDisplayFormat } from "@/components/display-format";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
+import { formatBytes } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** The charts the catalog has words for: `metrics.labels.<key>`. */
+const LABEL_KEYS: Readonly<Record<string, NamespaceKey<"components">>> = {
+    cpu: "metrics.labels.cpu",
+    mem: "metrics.labels.mem",
+    disk: "metrics.labels.disk",
+    net: "metrics.labels.netOut",
+    "net-in": "metrics.labels.netIn",
+    players: "metrics.labels.players"
+};
 import {
     LIVE_INTERVAL_MS,
     RANGE_ORDER,
@@ -72,6 +85,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
      *  polling; without one, or while it is down, they poll as before. */
     live?: string;
 }) {
+    const t = useTranslations("components");
     const display = useDisplayFormat();
     const [window, setWindow] = useState<Window>({ kind: "preset", preset: "1d" });
     const [customOpen, setCustomOpen] = useState(false);
@@ -265,12 +279,14 @@ export function MetricsHistory<T extends { t: number } = Point>({
                         window.kind === "custom" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                 >
-                    Custom
+                    {t("metrics.custom")}
                 </button>
                 {!loading && (
                     <span className="ml-auto text-xs text-muted-foreground">
                         {points && points.length > 0
-                            ? `${points.length} points${pushed && window.kind === "preset" ? " - live" : ""}`
+                            ? t(pushed && window.kind === "preset" ? "metrics.pointsLive" : "metrics.points", {
+                                  count: points.length
+                              })
                             : ""}
                     </span>
                 )}
@@ -280,7 +296,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
             {customOpen && (
                 <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-3">
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        From
+                        {t("auditFeed.from")}
                         <input
                             type="datetime-local"
                             value={customFrom}
@@ -289,7 +305,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        To
+                        {t("auditFeed.to")}
                         <input
                             type="datetime-local"
                             value={customTo}
@@ -298,7 +314,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                         />
                     </label>
                     <Button variant="outline" onClick={applyCustom}>
-                        Apply
+                        {t("metrics.apply")}
                     </Button>
                 </div>
             )}
@@ -309,17 +325,29 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     const chart = (
                         <TimeSeriesChart
                             key={metric.key}
-                            label={metric.label}
-                            points={(points ?? []).map<TimePoint>((point) => ({
-                                t: point.t,
-                                v: metric.value(point),
-                                note: metric.describe?.(point) ?? undefined
-                            }))}
+                            label={LABEL_KEYS[metric.key] ? t(LABEL_KEYS[metric.key]!) : metric.label}
+                            points={(points ?? []).map<TimePoint>((point) => {
+                                const part = metric.share?.(point) ?? null;
+                                return {
+                                    t: point.t,
+                                    v: metric.value(point),
+                                    note: part
+                                        ? t("metrics.shareOf", {
+                                              share: percent(part.share),
+                                              total: formatBytes(part.total)
+                                          })
+                                        : (metric.describe?.(point) ?? undefined)
+                                };
+                            })}
                             from={from}
                             to={to}
                             max={metric.max}
                             tone={metric.tone}
-                            format={metric.format}
+                            format={
+                                metric.key === "players"
+                                    ? (value: number) => t("metrics.players", { count: Math.round(value) })
+                                    : metric.format
+                            }
                             formatTime={stampOf}
                             summary={metric.summary}
                             // Joined to the strip below rather than floated above

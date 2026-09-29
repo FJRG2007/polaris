@@ -34,6 +34,9 @@ export interface MetricSpec<T = ConsumptionPoint> {
     /** The same reading in its own units, shown beside a percentage on hover, e.g.
      *  "6.7 GB / 16 GB" - a percentage alone hides how much that actually is. */
     describe?: (point: T) => string | null;
+    /** The same as `describe`, as parts, so a screen can say "x of y" in the
+     *  reader's words. Where it is set, it is what is shown. */
+    share?: (point: T) => { share: number; total: number } | null;
     /** Fixed Y ceiling (e.g. 100 for a percentage). */
     max?: number;
     /** How the header number summarizes the window (default "last"): "sum" for a
@@ -85,7 +88,7 @@ export function formatRate(value: number): string {
 export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[] = [
     {
         key: "players",
-        label: "Players",
+        label: "Players", // i18n-ignore said as components.metrics.labels.players where drawn
         value: (point) => point.players,
         format: (value) => (value === 1 ? "1 player" : `${Math.round(value)} players`),
         tone: "primary",
@@ -115,11 +118,16 @@ export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[]
  * a zero: a service with no volume is not a service storing nothing.
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
+    // i18n-ignore every label here is said through components.metrics.labels where drawn
     { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
     {
         key: "mem",
-        label: "Memory",
+        label: "Memory", // i18n-ignore
         value: (point) => point.memUsedBytes,
+        share: (point) => {
+            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
+            return share === null || point.memTotalBytes === null ? null : { share, total: point.memTotalBytes };
+        },
         describe: (point) => {
             const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
             return share === null || point.memTotalBytes === null
@@ -131,8 +139,12 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
     },
     {
         key: "disk",
-        label: "Storage",
+        label: "Storage", // i18n-ignore
         value: (point) => point.diskUsedBytes,
+        share: (point) => {
+            const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
+            return share === null || point.diskTotalBytes === null ? null : { share, total: point.diskTotalBytes };
+        },
         describe: (point) => {
             const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
             return share === null || point.diskTotalBytes === null
@@ -148,7 +160,7 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         // being pulled from - a download mirror, a game world being fetched - is
         // watched for, and neither is readable as a number on hover.
         key: "net",
-        label: "Bandwidth out",
+        label: "Bandwidth out", // i18n-ignore
         value: (point) => point.netTxBytesPerSecond,
         format: formatRate,
         tone: "primary",
@@ -156,7 +168,7 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
     },
     {
         key: "net-in",
-        label: "Bandwidth in",
+        label: "Bandwidth in", // i18n-ignore
         value: (point) => point.netRxBytesPerSecond,
         format: formatRate,
         tone: "success",

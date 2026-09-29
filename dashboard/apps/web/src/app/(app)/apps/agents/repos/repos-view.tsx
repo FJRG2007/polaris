@@ -9,12 +9,9 @@ import { removeRepoAction, setRepoEnabledAction } from "../actions";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
-import {
-    AGENT_EXECUTION_LABELS,
-    AGENT_EXECUTION_NOTES,
-    AGENT_WORKFLOW_PATH,
-    needsWorkflowFile
-} from "@polaris/core";
+import { AGENT_WORKFLOW_PATH, needsWorkflowFile } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentText, agentWord } from "@/lib/agents/words";
 
 /**
  * The repositories the agent is on.
@@ -25,6 +22,7 @@ import {
  * is edited.
  */
 export function ReposView({ repos, providers }: { repos: AgentRepoView[]; providers: string[] }) {
+    const t = useTranslations("agents");
     const [adding, setAdding] = useState(false);
     const [editing, setEditing] = useState<AgentRepoView | null>(null);
     const [removing, setRemoving] = useState<AgentRepoView | null>(null);
@@ -44,14 +42,14 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" />
-                    Add a repository
+                    {t("repos.add")}
                 </Button>
             </div>
 
             {repos.length === 0 ? (
                 <Card>
                     <CardBody className="py-10 text-sm text-muted-foreground">
-                        No repositories yet. Add one and the agent starts answering when it is mentioned there.
+                        {t("repos.none")}
                     </CardBody>
                 </Card>
             ) : (
@@ -60,9 +58,9 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
-                                    <th className="w-full max-w-0 px-4 py-2 font-medium">Repository</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Runs on</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">Model</th>
+                                    <th className="w-full max-w-0 px-4 py-2 font-medium">{t("sessions.form.repository")}</th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">{t("repos.runsOn")}</th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">{t("repos.model")}</th>
                                     <th className="px-4 py-2" />
                                 </tr>
                             </thead>
@@ -81,17 +79,17 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                 </a>
                                                 {repo.isPrivate ? (
                                                     <Badge variant="neutral" className="ml-2">
-                                                        Private
+                                                        {t("repos.private")}
                                                     </Badge>
                                                 ) : null}
                                             </div>
-                                            {repo.error ? <p className="mt-1 text-xs text-danger">{repo.error}</p> : null}
+                                            {repo.error ? <p className="mt-1 text-xs text-danger">{agentText(t, repo.error)}</p> : null}
                                         </td>
                                         <td
                                             className="whitespace-nowrap px-4 py-3 text-muted-foreground"
-                                            title={AGENT_EXECUTION_NOTES[repo.execution]}
+                                            title={agentWord(t, "executionNote", repo.execution)}
                                         >
-                                            {AGENT_EXECUTION_LABELS[repo.execution]}
+                                            {agentWord(t, "execution", repo.execution)}
                                             {repo.poolName ? (
                                                 <span className="ml-1 text-xs">({repo.poolName})</span>
                                             ) : null}
@@ -107,8 +105,8 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     className="mt-0.5 flex items-center gap-1 text-xs hover:underline"
                                                     title={
                                                         repo.workflowInstalledAt
-                                                            ? "Polaris keeps this workflow file up to date. Open it on GitHub."
-                                                            : "Polaris has not been able to write the workflow file yet."
+                                                            ? t("repos.workflowKept")
+                                                            : t("repos.workflowMissing")
                                                     }
                                                 >
                                                     {repo.workflowInstalledAt ? (
@@ -116,7 +114,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     ) : (
                                                         <TriangleAlert className="size-3 shrink-0 text-warning" />
                                                     )}
-                                                    Workflow
+                                                    {t("repos.workflow")}
                                                 </a>
                                             ) : null}
                                         </td>
@@ -126,13 +124,13 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                 <Switch
                                                     checked={repo.enabled}
                                                     onChange={(next: boolean) => toggle(repo, next)}
-                                                    aria-label={repo.enabled ? "Turn the agent off" : "Turn the agent on"}
+                                                    aria-label={repo.enabled ? t("repos.turnOff") : t("repos.turnOn")}
                                                 />
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label="Settings"
-                                                    title="Settings"
+                                                    aria-label={t("repos.settings")}
+                                                    title={t("repos.settings")}
                                                     onClick={() => setEditing(repo)}
                                                 >
                                                     <Settings2 className="size-4 shrink-0" />
@@ -140,8 +138,8 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label="Remove"
-                                                    title="Remove"
+                                                    aria-label={t("repos.remove")}
+                                                    title={t("repos.remove")}
                                                     onClick={() => setRemoving(repo)}
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
@@ -158,11 +156,13 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
 
             {providers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                    No model provider is connected yet, so runs will fail asking for a key.{" "}
-                    <Link href="/account/ai-keys" className="underline">
-                        Add one
-                    </Link>
-                    .
+                    {t.rich("repos.noProvider", {
+                        link: (chunks) => (
+                            <Link href="/account/ai-keys" className="underline">
+                                {chunks}
+                            </Link>
+                        )
+                    })}
                 </p>
             ) : null}
 
@@ -173,10 +173,10 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                     open
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.repoFullName}
-                    kind="repository"
+                    kind={t("repos.kind")}
                     requireTyping={false}
-                    description="The agent stops working there, and its rules and run history go with it. The workflow file, if one was installed, stays in the repository until you delete it."
-                    confirmLabel="Remove"
+                    description={t("repos.removeBody")}
+                    confirmLabel={t("repos.remove")}
                     onConfirm={async () => {
                         await runAction(() => removeRepoAction({ repoId: removing.id }), setError);
                         setRemoving(null);

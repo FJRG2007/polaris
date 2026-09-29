@@ -3,12 +3,14 @@ import { prisma } from "@polaris/db";
 import { requirePermission } from "@/lib/session";
 import { AutomationsView } from "./automations-view";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentAutomationsPage() {
     const user = await requirePermission("agents.read");
     const repos = await listAgentRepos(user.id);
+    const t = await getTranslations("agents");
     const rules = await prisma.agentAutomation.findMany({
         where: { repo: { ownerId: user.id } },
         orderBy: { createdAt: "asc" },
@@ -26,8 +28,8 @@ export default async function AgentAutomationsPage() {
     return (
         <>
             <PageHeader
-                title="Automations"
-                description="What starts a run, besides somebody mentioning the app. A repository with no rules still answers a mention."
+                title={t("pages.automationsTitle")}
+                description={t("pages.automations")}
             />
             <AutomationsView
                 repos={repos.map((repo) => ({ id: repo.id, name: repo.repoFullName }))}

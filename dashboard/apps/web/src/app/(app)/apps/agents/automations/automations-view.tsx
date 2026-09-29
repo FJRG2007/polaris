@@ -8,12 +8,9 @@ import {
     removeAutomationAction,
     saveAutomationAction
 } from "../actions";
-import {
-    AGENT_TRIGGERS,
-    AGENT_TRIGGER_LABELS,
-    AGENT_TRIGGER_NOTES,
-    type AgentTrigger
-} from "@polaris/core";
+import { AGENT_TRIGGERS, type AgentTrigger } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentWord } from "@/lib/agents/words";
 import {
     Badge,
     Button,
@@ -66,6 +63,7 @@ export function AutomationsView({
     repos: Array<{ id: string; name: string }>;
     rules: Rule[];
 }) {
+    const t = useTranslations("agents");
     const [editing, setEditing] = useState<Rule | null>(null);
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -81,7 +79,7 @@ export function AutomationsView({
         return (
             <Card>
                 <CardBody className="py-10 text-sm text-muted-foreground">
-                    Add a repository first. Rules are per repository.
+                    {t("rules.noRepos")}
                 </CardBody>
             </Card>
         );
@@ -100,7 +98,7 @@ export function AutomationsView({
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" />
-                    Add a rule
+                    {t("rules.add")}
                 </Button>
             </div>
 
@@ -108,11 +106,7 @@ export function AutomationsView({
                 <CardBody className="p-0">
                     {rules.length === 0 ? (
                         <div className="space-y-3 px-4 py-10">
-                            <p className="text-sm text-muted-foreground">
-                                No rules yet, so these repositories only answer when the app is
-                                mentioned. A rule is what makes one act on its own - reply to a new
-                                issue, review a new pull request.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("rules.none")}</p>
                             {/* Repositories added from now on get these already. This is
                                 for the ones added before, and for anybody who cleared
                                 them and wants them back. */}
@@ -125,7 +119,7 @@ export function AutomationsView({
                                         disabled={pending}
                                         onClick={() => addDefaults(repo.id)}
                                     >
-                                        Add the usual rules to {repo.name}
+                                        {t("rules.addUsual", { name: repo.name })}
                                     </Button>
                                 ))}
                             </div>
@@ -143,11 +137,9 @@ export function AutomationsView({
                                             className="min-w-0 flex-1 text-left"
                                         >
                                             <p className="truncate text-sm">
-                                                {AGENT_TRIGGER_LABELS[
-                                                    rule.trigger as AgentTrigger
-                                                ] ?? rule.trigger}
+                                                {agentWord(t, "trigger", rule.trigger)}
                                                 <span className="ml-2 text-xs text-muted-foreground">
-                                                    {repo?.name ?? "unknown repository"}
+                                                    {repo?.name ?? t("rules.unknownRepo")}
                                                 </span>
                                             </p>
                                             {condition.labels.length > 0 ? (
@@ -166,13 +158,13 @@ export function AutomationsView({
                                             ) : null}
                                         </button>
                                         {!rule.enabled ? (
-                                            <Badge variant="neutral">Off</Badge>
+                                            <Badge variant="neutral">{t("overview.off")}</Badge>
                                         ) : null}
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            aria-label="Remove this rule"
-                                            title="Remove this rule"
+                                            aria-label={t("rules.remove")}
+                                            title={t("rules.remove")}
                                             onClick={() => remove(rule)}
                                         >
                                             <Trash2 className="size-4 shrink-0" />
@@ -208,6 +200,8 @@ function RuleDialog({
     rule: Rule | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const existing = rule
         ? parseCondition(rule.condition)
         : { labels: [], branches: [], authors: [] };
@@ -260,11 +254,11 @@ function RuleDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{rule ? "Edit rule" : "Add a rule"}</DialogTitle>
+                    <DialogTitle>{rule ? t("rules.edit") : t("rules.add")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Repository</label>
+                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
                         <Select
                             value={repoId}
                             onValueChange={setRepoId}
@@ -273,70 +267,61 @@ function RuleDialog({
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">When</label>
+                        <label className="text-sm font-medium">{t("rules.when")}</label>
                         <Select
                             value={trigger}
                             onValueChange={(next) => setTrigger(next as AgentTrigger)}
                             options={AGENT_TRIGGERS.filter(
                                 (value) => value !== "manual" && value !== "mention"
-                            ).map((value) => ({ value, label: AGENT_TRIGGER_LABELS[value] }))}
+                            ).map((value) => ({ value, label: agentWord(t, "trigger", value) }))}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            {AGENT_TRIGGER_NOTES[trigger]}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{agentWord(t, "triggerNote", trigger)}</p>
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Only these labels</label>
+                        <label className="text-sm font-medium">{t("rules.labels")}</label>
                         <Input
                             value={labels}
                             onChange={(event) => setLabels(event.target.value)}
-                            placeholder="bug, needs-triage"
+                            placeholder="bug, needs-triage" // i18n-ignore example label names
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Comma separated. Leave empty for any label.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("rules.labelsHint")}</p>
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Only these base branches</label>
+                        <label className="text-sm font-medium">{t("rules.branches")}</label>
                         <Input
                             value={branches}
                             onChange={(event) => setBranches(event.target.value)}
-                            placeholder="main"
+                            placeholder="main" // i18n-ignore a branch name
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Comma separated. Leave empty for any branch.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("rules.branchesHint")}</p>
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Instructions</label>
+                        <label className="text-sm font-medium">{t("rules.instructions")}</label>
                         <Textarea
                             rows={4}
                             value={instructions}
                             onChange={(event) => setInstructions(event.target.value)}
-                            placeholder="Review for correctness and security. Do not comment on formatting."
+                            placeholder={t("rules.instructionsPlaceholder")}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Given to the agent alongside what triggered the run. Yours, not the
-                            issue author&apos;s.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("rules.instructionsHint")}</p>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Rule is on" />
-                        <span className="text-sm">On</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("rules.isOn")} />
+                        <span className="text-sm">{t("rules.on")}</span>
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button onClick={save} disabled={!repoId || pending}>
-                        {pending ? "Saving..." : "Save"}
+                        {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

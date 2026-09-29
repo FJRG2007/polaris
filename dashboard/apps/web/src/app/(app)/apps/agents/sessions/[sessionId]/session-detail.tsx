@@ -26,6 +26,9 @@ import {
     sessionScreenAction,
     stopSessionAction
 } from "../actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { agentText, sessionStateWord } from "@/lib/agents/words";
 
 /** Fast while something is happening. A session that has finished polls nothing. */
 const REFRESH_MS = 3000;
@@ -42,20 +45,20 @@ const TONE: Record<core.AgentSessionState, string> = {
 /** How each event reads on the strip. Written as what happened rather than as the
  *  event's own name, because nobody outside this codebase knows what `tool.start`
  *  is and everybody knows what "ran" means. */
-const EVENT_LABELS: Record<string, string> = {
-    "session.start": "Started",
-    prompt: "Asked",
-    "tool.start": "Running",
-    "tool.end": "Done",
-    "tool.failed": "Failed",
-    permission: "Asking permission",
-    question: "Waiting for you",
-    "subagent.start": "Started a subagent",
-    "subagent.end": "Subagent finished",
-    compact: "Compacting its context",
-    "turn.end": "Finished a turn",
-    "session.end": "Ended",
-    error: "Error"
+const EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "session.start": "session.events.sessionStart",
+    prompt: "session.events.prompt",
+    "tool.start": "session.events.toolStart",
+    "tool.end": "session.events.toolEnd",
+    "tool.failed": "session.events.toolFailed",
+    permission: "session.events.permission",
+    question: "session.events.question",
+    "subagent.start": "session.events.subagentStart",
+    "subagent.end": "session.events.subagentEnd",
+    compact: "session.events.compact",
+    "turn.end": "session.events.turnEnd",
+    "session.end": "session.events.sessionEnd",
+    error: "session.events.error"
 };
 
 interface Props {
@@ -65,6 +68,7 @@ interface Props {
 }
 
 export function SessionDetail({ session, events, messages }: Props) {
+    const t = useTranslations("agents");
     const [text, setText] = useState("");
     /**
      * What has been typed and not yet come back from the server.
@@ -220,14 +224,14 @@ export function SessionDetail({ session, events, messages }: Props) {
             <div className="flex flex-wrap items-center gap-3">
                 <CircleDot className={`size-4 shrink-0 ${TONE[session.state]}`} />
                 <span className={`text-sm ${TONE[session.state]}`}>
-                    {core.sessionStateLabel(session.state, session.lastEventAt !== null)}
+                    {sessionStateWord(t, session.state, session.lastEventAt !== null)}
                 </span>
                 {session.detail ? (
                     <span
                         className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
-                        title={session.detail}
+                        title={agentText(t, session.detail)}
                     >
-                        {session.detail}
+                        {agentText(t, session.detail)}
                     </span>
                 ) : (
                     <span className="flex-1" />
@@ -236,7 +240,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                     {core.agentCliById(session.cli)?.label ?? session.command ?? session.cli}
                 </Badge>
                 <Badge variant="neutral" className="shrink-0">
-                    {session.place === "host" ? (session.hostName ?? "a server") : "this box"}
+                    {session.place === "host" ? (session.hostName ?? t("sessions.aServer")) : t("sessions.thisBox")}
                 </Badge>
                 {over ? null : (
                     <>
@@ -246,18 +250,18 @@ export function SessionDetail({ session, events, messages }: Props) {
                                 variant="ghost"
                                 onClick={() => setAttached((open) => !open)}
                             >
-                                {attached ? "Detach" : "Take the terminal"}
+                                {attached ? t("session.detach") : t("session.attach")}
                             </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" onClick={look} disabled={busy}>
-                            See its screen
+                            {t("session.look")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={interrupt} disabled={busy}>
-                            Interrupt
+                            {t("session.interrupt")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={stop} disabled={busy}>
                             <Square className="size-4 shrink-0" />
-                            Stop
+                            {t("sessions.stop")}
                         </Button>
                     </>
                 )}
@@ -268,7 +272,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                     <CardBody className="space-y-3">
                         <div className="flex items-center gap-2">
                             <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
-                            <p className="text-sm">Getting the machine ready.</p>
+                            <p className="text-sm">{t("session.gettingReady")}</p>
                         </div>
                         {/* The bar and the list say different things, and both
                             are wanted: the bar is "how much longer", the list is
@@ -303,7 +307,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                                                 : undefined
                                         }
                                     >
-                                        {step.label}
+                                        {agentText(t, step.label)}
                                     </span>
                                 </li>
                             ))}
@@ -311,10 +315,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                         {/* Said here rather than only in the terminal, because
                             this is the screen somebody is on while they wonder
                             whether it is always going to be this slow. */}
-                        <p className="text-muted-foreground text-xs">
-                            The installs happen once. This machine keeps its home, so your next
-                            session skips them and starts in seconds.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("session.installsOnce")}</p>
                     </CardBody>
                 </Card>
             ) : null}
@@ -322,7 +323,7 @@ export function SessionDetail({ session, events, messages }: Props) {
             {session.error ? (
                 <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                    <span>{session.error}</span>
+                    <span>{agentText(t, session.error)}</span>
                 </div>
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -330,7 +331,7 @@ export function SessionDetail({ session, events, messages }: Props) {
             {attached ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>The agent&apos;s terminal</CardTitle>
+                        <CardTitle>{t("session.terminal")}</CardTitle>
                     </CardHeader>
                     <CardBody>
                         {/* Attached, not a second shell beside it: this is the same
@@ -346,10 +347,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                             cannot see, with no word on whether it will ask again,
                             is the reason this looked broken. It will not: the
                             home this runs in is kept between sessions. */}
-                        <p className="text-muted-foreground mt-3 text-xs">
-                            If the agent asks you to sign in, do it here. This machine keeps its
-                            home between sessions, so it only asks once.
-                        </p>
+                        <p className="text-muted-foreground mt-3 text-xs">{t("session.signInHere")}</p>
                     </CardBody>
                 </Card>
             ) : null}
@@ -357,14 +355,14 @@ export function SessionDetail({ session, events, messages }: Props) {
             {screen !== null ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>What the agent&apos;s terminal shows</CardTitle>
+                        <CardTitle>{t("session.screen")}</CardTitle>
                     </CardHeader>
                     <CardBody>
                         <pre
                             ref={screenRef}
                             className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
                         >
-                            {screen || "Nothing on it yet."}
+                            {screen || t("session.screenEmpty")}
                         </pre>
                     </CardBody>
                 </Card>
@@ -373,26 +371,25 @@ export function SessionDetail({ session, events, messages }: Props) {
             <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Conversation</CardTitle>
+                        <CardTitle>{t("session.conversation")}</CardTitle>
                     </CardHeader>
                     <CardBody className="space-y-3">
                         {messages.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Nothing has been said yet. Whatever you send below goes straight
-                                into the agent.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("session.nothingSaid")}</p>
                         ) : (
                             messages.map((message, index) => (
                                 <div key={`${message.at}-${index}`} className="space-y-1">
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                         {message.role === "user"
-                                            ? "You"
+                                            ? t("session.you")
                                             : message.role === "agent"
-                                              ? "Agent"
-                                              : "Polaris"}
+                                              ? t("sessions.form.agent")
+                                              : "Polaris" /* i18n-ignore the product's name */}
                                     </p>
                                     <p className="whitespace-pre-wrap break-words text-sm">
-                                        {message.body}
+                                        {/* Only Polaris's own lines are its words to translate;
+                                            what a person or the agent said stays as said. */}
+                                        {message.role === "system" ? agentText(t, message.body) : message.body}
                                     </p>
                                 </div>
                             ))
@@ -404,7 +401,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                         {pending.map((one) => (
                             <div key={one.key} className="space-y-1 opacity-60">
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    You
+                                    {t("session.you")}
                                 </p>
                                 <p className="whitespace-pre-wrap break-words text-sm">
                                     {one.body}
@@ -417,23 +414,20 @@ export function SessionDetail({ session, events, messages }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Activity</CardTitle>
+                        <CardTitle>{t("session.activity")}</CardTitle>
                     </CardHeader>
                     <CardBody>
                         {events.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                The agent has not reported anything yet. It reports through its own
-                                hooks, which take effect once it has started.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("session.noEvents")}</p>
                         ) : (
                             <ul className="space-y-1.5">
                                 {events.slice(-40).map((event, index) => (
                                     <li key={`${event.at}-${index}`} className="text-xs">
                                         <span className="text-muted-foreground">
-                                            {EVENT_LABELS[event.kind] ?? event.kind}
+                                            {EVENT_KEYS[event.kind] ? t(EVENT_KEYS[event.kind]!) : event.kind}
                                         </span>
                                         {event.detail ? (
-                                            <span className="ml-1.5">{event.detail}</span>
+                                            <span className="ml-1.5">{agentText(t, event.detail)}</span>
                                         ) : null}
                                     </li>
                                 ))}
@@ -444,9 +438,7 @@ export function SessionDetail({ session, events, messages }: Props) {
             </div>
 
             {over ? (
-                <p className="text-sm text-muted-foreground">
-                    This session has ended. Its branch, {session.branch}, is still there.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("session.ended", { branch: session.branch })}</p>
             ) : (
                 <div className="space-y-2">
                     <Textarea
@@ -454,9 +446,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                         onChange={(event) => setText(event.target.value)}
                         rows={3}
                         placeholder={
-                            session.state === "waiting"
-                                ? "It is waiting on you. Answer it here."
-                                : "Send it the next thing."
+                            session.state === "waiting" ? t("session.answerHere") : t("session.sendNext")
                         }
                         onKeyDown={(event) => {
                             // Enter sends, Shift+Enter is a newline - the shape every
@@ -478,7 +468,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                             ) : (
                                 <Send className="size-4 shrink-0" />
                             )}
-                            Send
+                            {t("session.send")}
                         </Button>
                     </div>
                 </div>

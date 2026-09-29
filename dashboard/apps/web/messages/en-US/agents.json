@@ -1,1 +1,430 @@
-{}
+{
+    "labels": {
+        "execution": {
+            "actions": "GitHub Actions",
+            "runners": "Polaris runners",
+            "server": "Polaris server"
+        },
+        "executionNote": {
+            "actions": "Runs on a GitHub-hosted machine. Free on public repositories, billed per minute on private ones.",
+            "runners": "Runs on one of your enrolled servers through a runner pool. GitHub still schedules it, so a private repository still spends Actions minutes.",
+            "server": "Runs in a container on the Polaris box, without GitHub Actions. Nothing is metered and the repository needs no workflow file."
+        },
+        "trigger": {
+            "mention": "Mentioned",
+            "issueOpened": "Issue opened",
+            "issueLabeled": "Issue labelled",
+            "prOpened": "Pull request opened",
+            "prReviewRequested": "Review requested",
+            "prReviewSubmitted": "Review submitted",
+            "ciFailed": "Checks failed",
+            "manual": "Started by hand"
+        },
+        "triggerNote": {
+            "mention": "Somebody names the app in an issue, a pull request or a comment. Always on: it is how people ask for something specific.",
+            "issueOpened": "A new issue. Useful for triage, or for attempting a fix straight away.",
+            "issueLabeled": "A label is added to an issue. Pair it with a label so only the ones you mark are picked up.",
+            "prOpened": "A new pull request, for an automatic review.",
+            "prReviewRequested": "The app is asked for a review by name.",
+            "prReviewSubmitted": "Somebody reviewed a pull request, so their feedback can be addressed.",
+            "ciFailed": "A check run failed, so the logs can be read and a fix attempted.",
+            "manual": "Started from Polaris, with a prompt you write."
+        },
+        "runState": {
+            "queued": "Queued",
+            "running": "Running",
+            "succeeded": "Succeeded",
+            "failed": "Failed",
+            "cancelled": "Cancelled"
+        },
+        "pushPolicy": {
+            "disabled": "Read-only",
+            "restricted": "Feature branches only",
+            "enabled": "Full access"
+        },
+        "pushPolicyNote": {
+            "disabled": "The agent can read the repository and comment, and cannot push anything.",
+            "restricted": "The agent can push its own branches and open pull requests. It cannot push to the default branch, delete a branch, or push tags.",
+            "enabled": "The agent can push anywhere it has access to, including the default branch."
+        },
+        "shellPolicy": {
+            "disabled": "No shell",
+            "restricted": "Shell without secrets",
+            "enabled": "Full shell"
+        },
+        "shellPolicyNote": {
+            "disabled": "The agent cannot run commands. It can still read files and use its git and GitHub tools.",
+            "restricted": "The agent can run commands, with secrets filtered out of the environment they see.",
+            "enabled": "The agent can run commands with the job's full environment."
+        },
+        "gateMode": {
+            "off": "Off",
+            "checks": "Checks only",
+            "full": "Full gate"
+        },
+        "gateModeNote": {
+            "off": "The agent pushes as soon as it is done. Its skills and guardrails still apply.",
+            "checks": "Runs the commit guard, the convention guardrails and the unfinished-work check before the push. Seconds, no model calls.",
+            "full": "Adds the gate's review, test and document passes. Minutes rather than seconds, and the steps are reported on the run."
+        },
+        "sessionState": {
+            "starting": "Starting",
+            "working": "Working",
+            "waiting": "Needs you",
+            "idle": "Waiting for you",
+            "stopped": "Stopped",
+            "failed": "Failed"
+        },
+        "sessionPlace": {
+            "local": "This Polaris box",
+            "host": "An enrolled server"
+        }
+    },
+    "notice": {
+        "needsApp": "Agents need a GitHub App, which an administrator creates in one click under <link>Integrations</link>. A personal access token is not enough: the agent has to comment and open pull requests as itself.",
+        "missingPermission": "Runs are paused: the GitHub App is missing a permission that only an administrator can add. Nothing to do here - it starts working again on its own once they have.",
+        "notAsked": "The GitHub App does not ask for {permissions} yet, so nobody can grant it - there is no request for anyone to accept. GitHub only lets the App's owner change what it asks for, and only by hand.",
+        "setOn": "Set {permissions} on <link>{url}</link> and save. Each account it is installed on then gets a request to accept, which this screen will ask you for next.",
+        "clearsItself": "Polaris re-reads what GitHub granted every few minutes, so this clears on its own.",
+        "awaitingAdmin": "Runs are paused: GitHub is waiting for an administrator to accept a permission request. Nothing to do here - it starts working again on its own once they have.",
+        "holding": "GitHub is holding a permission request, and until its owner accepts it, runs on these accounts are refused. Only they can accept it - GitHub offers nobody else a way, so this is one of the few things Polaris cannot do for you.",
+        "notGranted": "<name>{login}</name> has not granted {permissions}.",
+        "acceptStep": "Press Review request, then Accept new permissions.",
+        "on": "On",
+        "openOnGithub": "Open it under Settings, Applications, on GitHub, then press Review request, then Accept new permissions.",
+        "noProvider": "No model provider is connected, so a run has nothing to think with. Add one under <link>AI provider keys</link>. The key stays here and is never copied into your repositories."
+    },
+    "overview": {
+        "repositories": "Repositories",
+        "off": "Off",
+        "problem": "Problem",
+        "recentRuns": "Recent runs",
+        "noRuns": "Nothing has run yet. Mention the app in an issue or a pull request, or start a run from a repository.",
+        "emptyTitle": "No repository has an agent on it yet.",
+        "emptyHint": "Pick one, choose where its runs should happen, and mention the app in an issue to try it.",
+        "setUp": "Set up"
+    },
+    "page": {
+        "title": "Agents",
+        "description": "Put a coding agent in your repositories. It reviews pull requests, answers issues, fixes failing checks, and opens pull requests when you ask it to."
+    },
+    "text": {
+        "pickRepository": "Pick a repository",
+        "notRepository": "Not a repository name",
+        "pickModel": "Pick a model",
+        "notModel": "Not a model name",
+        "pickPool": "Pick the runner pool this repository should use",
+        "sayWhat": "Say what the agent should do",
+        "pickProvider": "Pick a provider",
+        "pasteKey": "Paste the key",
+        "notUrl": "Not a URL",
+        "nameModel": "Name the model your endpoint serves",
+        "notDate": "Not a date",
+        "futureDate": "Pick a date in the future",
+        "pickSignIn": "Pick a sign-in",
+        "signInClosed": "That sign-in is no longer open.",
+        "typeSomething": "Type something",
+        "tooLongForCode": "That is longer than a code",
+        "limitStopped": "A usage limit stopped this run.",
+        "cancelled": "Cancelled from Polaris.",
+        "stoppedReporting": "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.",
+        "workflowWrite": "Could not write the workflow file",
+        "workflowUnregistered": "GitHub has not registered the workflow file yet. It was just written, so try again in a moment.",
+        "workflowMissing": "GitHub could not find the agent workflow in this repository.",
+        "noInstallationWorkflow": "Polaris has no GitHub App installation for {owner}, so it cannot write the workflow file.",
+        "noInstallationRun": "Polaris has no GitHub App installation for {owner}. An administrator connects one under Integrations.",
+        "noInstallationCheckout": "Polaris has no GitHub App installation for {owner}, so it cannot check the repository out.",
+        "githubStart": "GitHub returned {status} starting the workflow",
+        "githubRead": "GitHub returned {status} reading the repository",
+        "limit": "{whose, select, repo {This repository} account {This account} other {Repositories under {org}}} has used {used} of the {amount} {metric, select, tokens {tokens} other {runs}} allowed in {period, select, week {1 week} month {30 days} other {1 day}}. An administrator sets these under Admin > Agents.",
+        "sessionFailed": "Polaris could not start this session. Nothing was left running.",
+        "credentialsUnread": "Polaris could not read the stored credentials just now. Try again in a moment.",
+        "serverRefused": "The server refused to start the session.",
+        "instanceFull": "This Polaris is running as many agent sessions as it is set to allow. Try again when one finishes, or ask an administrator to raise the limit.",
+        "hostWorkspaceTaken": "That server already has a workspace session open, and a workspace is one directory. Stop that session and this will start.",
+        "sharedWorkspaceTaken": "Somebody already has a session open on the shared machine, and it has one workspace. Wait for that to finish, or open this one on your own machine.",
+        "ownWorkspaceTaken": "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.",
+        "noInstallationSession": "Polaris has no GitHub App installation for {owner}, so it cannot check the repository out. Connect it again under Agents settings.",
+        "accountFull": "You already have {count} sessions running, which is the most one account may have at once. Stop one and this will start.",
+        "unknownAgent": "Polaris no longer knows an agent called {cli}.",
+        "noTerminal": "its agent never opened a terminal to type into",
+        "unknownReason": "unknown",
+        "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below."
+    },
+    "errors": {
+        "checkSettings": "Check the settings",
+        "accessUnchecked": "Polaris could not check your GitHub access. Try again in a moment.",
+        "unreachableRepo": "That repository is not one your GitHub account can reach.",
+        "connectProvider": "Connect {provider} under Integrations before using this model.",
+        "connectProviderDefault": "Connect {provider} under Integrations before defaulting to this model.",
+        "privateOff": "Private repositories are turned off for this account. Change it under Agents settings.",
+        "publicOff": "Public repositories are turned off for this account. Change it under Agents settings.",
+        "enable": "Could not enable the repository",
+        "repoNotFound": "Repository not found",
+        "saveSettings": "Could not save the settings",
+        "checkRequest": "Check the request",
+        "checkRule": "Check the rule",
+        "notEnabled": "That repository is not enabled for agent runs",
+        "runNotFound": "Run not found",
+        "poolNotYours": "That runner pool is not one of yours.",
+        "hasRules": "That repository already has rules."
+    },
+    "sessions": {
+        "errors": {
+            "checkForm": "Check the form",
+            "repoNotConnected": "That repository is not connected to the Agents app.",
+            "noSharedMachine": "This Polaris does not offer a shared machine.",
+            "serverNotYours": "That server is not one of yours.",
+            "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI keys.",
+            "signInLocal": "Nothing here signs {agent} in, so it would start and sit at its own login prompt. Add {ways} under AI keys.",
+            "or": "or",
+            "taskUnreachable": "That task is not one you can reach.",
+            "saySomething": "Say something",
+            "gone": "That session no longer exists.",
+            "ended": "That session has ended.",
+            "noAnswer": "The machine running this session did not answer."
+        },
+        "taskNote": "Handed to an agent. It is working on `{branch}` in {repo}: [the session]({href}).",
+        "start": "Start a session",
+        "none": "No sessions yet",
+        "noneHint": "A session puts a coding agent in a branch of its own, on a machine you already have. You can watch it work, answer its questions, and send it the next thing.",
+        "workspace": "A workspace",
+        "aServer": "a server",
+        "thisBox": "this box",
+        "stop": "Stop",
+        "form": {
+            "title": "What is it working on",
+            "titlePlaceholder": "Fix the login redirect",
+            "repository": "Repository",
+            "noRepo": "No repository - just open the agent",
+            "workspaceHint": "It opens on a machine of your own with an empty directory and nothing checked out. The machine keeps its home, so what you install and sign in to stays there for next time.",
+            "noRepos": "Nothing is connected yet. Add one under <link>Repositories</link> to have an agent work in it.",
+            "agent": "Agent",
+            "command": "The command that starts it. It has to already be installed on the machine.",
+            "where": "Where it runs",
+            "shared": "Use the machine everybody shares",
+            "sharedOn": "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find. Sign it in with an API key or a team plan - a personal subscription used by several people is what gets suspended.",
+            "sharedOff": "It opens on a machine of your own, with your logins and your files. Nobody else reaches it.",
+            "whichServer": "Which server",
+            "pickServer": "Pick a server",
+            "branch": "Branch to start from. Leave it empty for the repository's default.",
+            "prompt": "What to start with. Leave it empty to open the agent and type into it yourself.",
+            "promptPlaceholder": "Read the failing test in auth.test.ts and fix what it is telling you.",
+            "unattended": "Let it work without asking",
+            "unattendedEnigma": "Enigma is on, so this is one of the things it settles: your own policies decide what the agent may run without asking, and Polaris does not add anything on top.",
+            "unattendedHost": "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it.",
+            "unattendedContainer": "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container.",
+            "enigma": "Work to your Enigma standards",
+            "enigmaHint": "Installs your policies, conventions and guardrails into the session before the agent starts. Its own settings come from this repository and from Agents settings.",
+            "submit": "Start"
+        }
+    },
+    "boot": {
+        "workspace": "Preparing your machine",
+        "fetch": "Fetching the repository",
+        "opening": "Opening your workspace",
+        "enigma": "Installing Enigma",
+        "agent": "Installing the agent",
+        "agentHere": "The agent is already here",
+        "start": "Starting the agent"
+    },
+    "session": {
+        "events": {
+            "sessionStart": "Started",
+            "prompt": "Asked",
+            "toolStart": "Running",
+            "toolEnd": "Done",
+            "toolFailed": "Failed",
+            "permission": "Asking permission",
+            "question": "Waiting for you",
+            "subagentStart": "Started a subagent",
+            "subagentEnd": "Subagent finished",
+            "compact": "Compacting its context",
+            "turnEnd": "Finished a turn",
+            "sessionEnd": "Ended",
+            "error": "Error"
+        },
+        "detach": "Detach",
+        "attach": "Take the terminal",
+        "look": "See its screen",
+        "interrupt": "Interrupt",
+        "gettingReady": "Getting the machine ready.",
+        "installsOnce": "The installs happen once. This machine keeps its home, so your next session skips them and starts in seconds.",
+        "terminal": "The agent's terminal",
+        "signInHere": "If the agent asks you to sign in, do it here. This machine keeps its home between sessions, so it only asks once.",
+        "screen": "What the agent's terminal shows",
+        "screenEmpty": "Nothing on it yet.",
+        "conversation": "Conversation",
+        "nothingSaid": "Nothing has been said yet. Whatever you send below goes straight into the agent.",
+        "you": "You",
+        "activity": "Activity",
+        "noEvents": "The agent has not reported anything yet. It reports through its own hooks, which take effect once it has started.",
+        "ended": "This session has ended. Its branch, {branch}, is still there.",
+        "answerHere": "It is waiting on you. Answer it here.",
+        "sendNext": "Send it the next thing.",
+        "send": "Send"
+    },
+    "rules": {
+        "noRepos": "Add a repository first. Rules are per repository.",
+        "add": "Add a rule",
+        "none": "No rules yet, so these repositories only answer when the app is mentioned. A rule is what makes one act on its own - reply to a new issue, review a new pull request.",
+        "addUsual": "Add the usual rules to {name}",
+        "unknownRepo": "unknown repository",
+        "remove": "Remove this rule",
+        "edit": "Edit rule",
+        "when": "When",
+        "labels": "Only these labels",
+        "labelsHint": "Comma separated. Leave empty for any label.",
+        "branches": "Only these base branches",
+        "branchesHint": "Comma separated. Leave empty for any branch.",
+        "instructions": "Instructions",
+        "instructionsPlaceholder": "Review for correctness and security. Do not comment on formatting.",
+        "instructionsHint": "Given to the agent alongside what triggered the run. Yours, not the issue author's.",
+        "isOn": "Rule is on",
+        "on": "On",
+        "saving": "Saving...",
+        "save": "Save"
+    },
+    "repos": {
+        "add": "Add a repository",
+        "none": "No repositories yet. Add one and the agent starts answering when it is mentioned there.",
+        "runsOn": "Runs on",
+        "model": "Model",
+        "private": "Private",
+        "workflowKept": "Polaris keeps this workflow file up to date. Open it on GitHub.",
+        "workflowMissing": "Polaris has not been able to write the workflow file yet.",
+        "workflow": "Workflow",
+        "turnOff": "Turn the agent off",
+        "turnOn": "Turn the agent on",
+        "settings": "Settings",
+        "remove": "Remove",
+        "noProvider": "No model provider is connected yet, so runs will fail asking for a key. <link>Add one</link>.",
+        "kind": "repository",
+        "removeBody": "The agent stops working there, and its rules and run history go with it. The workflow file, if one was installed, stays in the repository until you delete it."
+    },
+    "advice": {
+        "noPublicAddress": "A GitHub-hosted runner has to reach this Polaris instance, and it has no public address yet.",
+        "noContainers": "This Polaris instance cannot start containers, so it cannot run an agent itself.",
+        "noPool": "No runner pool covers this repository yet. Add one under Apps > Runners.",
+        "public": "This repository is public, so GitHub-hosted runners are free and nothing runs on your hardware.",
+        "pool": "A runner pool already covers this repository, so it runs on your own machine instead of a hosted one.",
+        "private": "This repository is private, and running it here spends no GitHub Actions minutes.",
+        "noAddress": "This instance has no public address, so the run happens here rather than on a hosted machine.",
+        "hostedPrivate": "Nothing here can run it, so it falls to GitHub-hosted runners. A private repository is billed per minute.",
+        "hostedFree": "GitHub-hosted runners are free for this repository.",
+        "nothing": "Nothing can run this repository yet. Fix one of the reasons below."
+    },
+    "repoDialog": {
+        "change": "Change",
+        "privateOff": "Private repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",
+        "publicOff": "Public repositories are turned off for this account. Turn them back on under Agents settings, or the agent will never run here.",
+        "noProvider": "No provider connected",
+        "connectProvider": "Connect a model provider under Integrations first.",
+        "effort": "Reasoning effort",
+        "startsRestricted": "The agent starts on feature branches only and cannot push to the default branch. Change that, and the rules that start it, from the repository's settings afterwards.",
+        "adding": "Adding...",
+        "add": "Add",
+        "suggests": "Polaris suggests {execution}: {reason}",
+        "pool": "Runner pool",
+        "notCovering": "{name} - does not cover this repository yet",
+        "widen": "Widen that pool's scope to include this repository under Apps > Runners, or its jobs will queue forever.",
+        "noPools": "You have no runner pools yet. Create one under Apps > Runners, then pick it here.",
+        "fix": {
+            "actions": "Give Polaris a public address under Settings > Domains.",
+            "runners": "Add a pool under Apps > Runners, or point an existing one at this repository.",
+            "server": "The container engine has to be reachable from Polaris; check Settings > System."
+        },
+        "git": "Git access",
+        "shell": "Shell",
+        "publicShell": "This repository is public, so anybody can open a pull request the agent then reads. A full shell hands whatever it runs the provider keys in its environment."
+    },
+    "settingsFields": {
+        "on": "On",
+        "off": "Off",
+        "inherit": "Inherit ({value})",
+        "pullRequests": "Pull requests",
+        "pullRequestsHint": "Whether a pull request can start a run. Somebody naming the app in a comment still gets an answer either way.",
+        "issues": "Issues",
+        "gate": "Quality gate"
+    },
+    "runs": {
+        "start": "Start a run",
+        "none": "Nothing has run yet. Mention the app in an issue or a pull request, add an automation, or start a run here.",
+        "startedBy": "Started by",
+        "ranOn": "Ran on",
+        "state": "State",
+        "openJob": "Open the job that ran this",
+        "stop": "Stop this run",
+        "gate": {
+            "verify": "Verification",
+            "review": "Review, tests and docs"
+        },
+        "what": "What should it do?",
+        "whatPlaceholder": "Add a regression test for the timezone bug in the report exporter, and open a pull request.",
+        "starting": "Starting..."
+    },
+    "settings": {
+        "all": "All your repositories",
+        "fromDeployment": "the deployment's defaults",
+        "fromAll": "your settings for all repositories",
+        "oneAccount": "Settings for one account",
+        "allHaveOwn": "Every account you have repositories in already has its own settings.",
+        "pickAccount": "Pick an account"
+    },
+    "pages": {
+        "repos": "Which repositories the agent works in, and where each one's runs happen. Polaris recommends the cheapest option that fits; the choice is yours.",
+        "runsTitle": "Runs",
+        "runs": "Every time an agent ran, what started it, and how it ended.",
+        "sessionsTitle": "Sessions",
+        "sessions": "Agents running right now, in a branch of their own. Watch one, answer it, or send it the next thing.",
+        "settingsTitle": "Settings",
+        "settings": "What your repositories inherit. Set it once here, narrow it per account, and override it on the repositories that need something different.",
+        "automationsTitle": "Automations",
+        "automations": "What starts a run, besides somebody mentioning the app. A repository with no rules still answers a mention.",
+        "sessionOn": "{repo} on {branch}",
+        "sessionWorkspace": "A workspace of your own, with nothing checked out"
+    },
+    "setup": {
+        "description": "Three things have to be true before an agent can run. This is where they are.",
+        "app": {
+            "title": "Connect a GitHub App",
+            "body": "An App lets the agent comment, review and open pull requests as itself, and lets Polaris hear about issues and pull requests. A personal access token cannot do either. An administrator creates one in a click.",
+            "action": "Open Integrations"
+        },
+        "model": {
+            "title": "Connect a model provider",
+            "body": "Your own key with Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it takes effect everywhere.",
+            "action": "Add a provider key"
+        },
+        "repo": {
+            "body": "Pick where its runs should happen. Polaris recommends the cheapest option that fits: hosted runners for a public repository, your own hardware for a private one."
+        },
+        "theApp": "the app",
+        "ready": "Everything is in place. Open an issue in one of your repositories and mention <code>{app}</code> to try it.",
+        "readyHint": "To have it act without being asked, add a rule under Automations."
+    },
+    "defaultsCard": {
+        "scopes": {
+            "all": "Everything",
+            "policies": "Policies only"
+        },
+        "scopeNotes": {
+            "all": "Skills, the operating contract, the slash commands and the post-edit guardrails.",
+            "policies": "The skills and the operating contract. Faster to install, and enough to change how the work is done."
+        },
+        "removeNamed": "Remove the settings for {title}",
+        "remove": "Remove these settings",
+        "inheritsThis": "Everything below inherits this",
+        "intro": "Anything left on Inherit comes from {from}. A repository can still override any of it.",
+        "publicRepos": "Public repositories",
+        "privateRepos": "Private repositories",
+        "pullRequestsHint": "Whether a pull request can start a run. A direct mention is answered either way.",
+        "enigmaHint": "Installs your policies, conventions and guardrails into every agent before it starts.",
+        "inherit": "Inherit",
+        "howMuch": "How much of it",
+        "noPools": "You have no pools yet. Create one under Apps > Runners.",
+        "fallback": "If that provider refuses",
+        "fallbackHint": "Tried in order when a run is turned away for the account's rate limit, an empty balance, a rejected key, or a window it did not fit in. Drag to reorder.",
+        "saved": "Saved"
+    }
+}

@@ -14,6 +14,8 @@ import { deliveryText, KNOWN_DELIVERY_SENTENCES } from "@/lib/notifications/deli
 
 const english = translatorFor("en-US", "notices");
 const spanish = translatorFor("es-ES", "notices");
+const englishWords = translatorFor("en-US", "components");
+const spanishWords = translatorFor("es-ES", "components");
 
 const LABELS = ["shop.example.com", "blog.example.com", "api.example.com", "docs.example.com"];
 
@@ -21,7 +23,7 @@ describe("the English the senders write", () => {
     it("comes back exactly as it went in", () => {
         const shaped = ["Twilio refused the message (HTTP 400).", "The endpoint answered HTTP 502."];
         for (const message of [...KNOWN_DELIVERY_SENTENCES, ...shaped]) {
-            expect(deliveryText(english, message)).toBe(message);
+            expect(deliveryText(englishWords, message)).toBe(message);
         }
     });
 
@@ -35,12 +37,12 @@ describe("the English the senders write", () => {
 
 describe("in Spanish", () => {
     it("reads why an alert did not go out", () => {
-        expect(deliveryText(spanish, "The endpoint is gone (404). It was probably deleted.")).toBe(
+        expect(deliveryText(spanishWords, "The endpoint is gone (404). It was probably deleted.")).toBe(
             "El endpoint ya no existe (404). Probablemente se borró."
         );
-        expect(deliveryText(spanish, "The endpoint answered HTTP 502.")).toBe("El endpoint respondió HTTP 502.");
+        expect(deliveryText(spanishWords, "The endpoint answered HTTP 502.")).toBe("El endpoint respondió HTTP 502.");
         // Twilio's own explanation stays as Twilio wrote it.
-        expect(deliveryText(spanish, "The 'To' number is not a valid phone number.")).toBe(
+        expect(deliveryText(spanishWords, "The 'To' number is not a valid phone number.")).toBe(
             "The 'To' number is not a valid phone number."
         );
     });

@@ -16,14 +16,12 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentWord } from "@/lib/agents/words";
 import {
     AGENT_EFFORTS,
     AGENT_PUSH_POLICIES,
-    AGENT_PUSH_POLICY_LABELS,
-    AGENT_PUSH_POLICY_NOTES,
     AGENT_SHELL_POLICIES,
-    AGENT_SHELL_POLICY_LABELS,
-    AGENT_SHELL_POLICY_NOTES,
     type AgentExecution,
     type AgentGateMode,
     type AgentPolicy,
@@ -34,6 +32,8 @@ import {
 
 /** Everything about one repository that is worth changing after it is added. */
 export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: () => void }) {
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const [execution, setExecution] = useState<AgentExecution>(repo.execution);
     const [poolId, setPoolId] = useState<string | null>(repo.poolId);
     const [model, setModel] = useState(repo.model);
@@ -110,12 +110,12 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     />
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Model</label>
+                        <label className="text-sm font-medium">{t("repos.model")}</label>
                         <Input value={model} onChange={(event) => setModel(event.target.value)} />
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Reasoning effort</label>
+                        <label className="text-sm font-medium">{t("repoDialog.effort")}</label>
                         <Select
                             value={effort}
                             onValueChange={setEffort}
@@ -124,39 +124,31 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Git access</label>
+                        <label className="text-sm font-medium">{t("repoDialog.git")}</label>
                         <Select
                             value={push}
                             onValueChange={(next) => setPush(next as AgentPushPolicy)}
                             options={AGENT_PUSH_POLICIES.map((value) => ({
                                 value,
-                                label: AGENT_PUSH_POLICY_LABELS[value]
+                                label: agentWord(t, "pushPolicy", value)
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            {AGENT_PUSH_POLICY_NOTES[push]}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{agentWord(t, "pushPolicyNote", push)}</p>
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Shell</label>
+                        <label className="text-sm font-medium">{t("repoDialog.shell")}</label>
                         <Select
                             value={shell}
                             onValueChange={(next) => setShell(next as AgentShellPolicy)}
                             options={AGENT_SHELL_POLICIES.map((value) => ({
                                 value,
-                                label: AGENT_SHELL_POLICY_LABELS[value]
+                                label: agentWord(t, "shellPolicy", value)
                             }))}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            {AGENT_SHELL_POLICY_NOTES[shell]}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{agentWord(t, "shellPolicyNote", shell)}</p>
                         {!repo.isPrivate && shell === "enabled" ? (
-                            <p className="text-xs text-warning">
-                                This repository is public, so anybody can open a pull request the
-                                agent then reads. A full shell hands whatever it runs the provider
-                                keys in its environment.
-                            </p>
+                            <p className="text-xs text-warning">{t("repoDialog.publicShell")}</p>
                         ) : null}
                     </div>
 
@@ -175,10 +167,10 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button onClick={save} disabled={pending}>
-                        {pending ? "Saving..." : "Save"}
+                        {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

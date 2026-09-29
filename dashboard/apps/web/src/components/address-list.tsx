@@ -21,27 +21,21 @@ import { CopyButton } from "@/components/copy-button";
 import type { CheckedAddress } from "@/lib/address-health";
 import { useDisplayFormat } from "@/components/display-format";
 import { removeAddressAction } from "@/app/(app)/admin/domains/actions";
-import { ExternalLink, Settings2, TriangleAlert, X } from "lucide-react";
-
 /** What each kind of address is, said once next to it. */
-const ADDRESS_KINDS: Record<CheckedAddress["kind"], string> = {
-    app: "configured at install",
-    local: "local network",
-    domain: "domain",
-    tunnel: "tunnel"
-};
-
 /** What removing an address actually costs, said before it happens. */
-const REMOVAL_DETAIL = {
-    tunnel: "Links already handed out on this URL stop working. The next tunnel is minted under a different name.",
-    domain: "Polaris stops answering on it. The domain itself is untouched, and configuring it again brings it back."
-} as const;
-
 /** Why an address is marked down, and how long ago that was found out. */
-function downDetail(health: CheckedAddress["health"], format: DisplayFormat): string {
+import { ExternalLink, Settings2, TriangleAlert, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
+type Words = NamespaceTranslator<"components">;
+
+function downDetail(health: CheckedAddress["health"], format: DisplayFormat, t: Words): string {
     const checked = health.checkedAt ? new Date(health.checkedAt) : null;
-    const when = checked && !Number.isNaN(checked.getTime()) ? `, checked ${format.dateTime(checked)}` : "";
-    return `${health.detail ?? "Nothing answered"}${when}`;
+    const detail = health.detail ?? t("addresses.nothingAnswered");
+    return checked && !Number.isNaN(checked.getTime())
+        ? t("addresses.checkedAt", { detail, when: format.dateTime(checked) })
+        : detail;
 }
 
 export function AddressList({
@@ -55,6 +49,7 @@ export function AddressList({
     /** Where a configured domain is edited, when that is somewhere other than here. */
     manageHref?: string;
 }) {
+    const t = useTranslations("components");
     const format = useDisplayFormat();
     const [removing, setRemoving] = useState<string | null>(null);
     // Kept against the host it happened to, so the failure is read inside the
@@ -71,14 +66,14 @@ export function AddressList({
             if (result.error) setError({ host, message: result.error });
             return !result.error;
         } catch {
-            setError({ host, message: "Could not change this deployment's addresses." });
+            setError({ host, message: t("addresses.changeFailed") });
             return false;
         } finally {
             setRemoving(null);
         }
     }
 
-    if (addresses.length === 0) return <p className="text-sm">No address is configured for this deployment.</p>;
+    if (addresses.length === 0) return <p className="text-sm">{t("addresses.none")}</p>;
 
     return (
         <div className="flex flex-col gap-1.5">
@@ -119,12 +114,13 @@ function AddressRow({
     error: string | null;
     onRemove: () => Promise<boolean>;
 }) {
+    const t = useTranslations("components");
     const [confirming, setConfirming] = useState(false);
     const tunnel = address.kind === "tunnel";
     const down = address.health.state === "down";
     const removable = address.kind === "domain" || tunnel;
     /** The same words on the control and on the dialog it opens. */
-    const action = tunnel ? "Close the tunnel" : "Stop using this domain";
+    const action = tunnel ? t("addresses.closeTunnel") : t("addresses.stopDomain");
 
     return (
         <div className="flex flex-col gap-1">
@@ -138,14 +134,14 @@ function AddressRow({
                     {address.url}
                 </a>
                 <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                <span className="shrink-0 text-xs text-muted-foreground">{ADDRESS_KINDS[address.kind]}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{t(`addresses.kinds.${address.kind}`)}</span>
                 {down ? (
                     <span
                         className="flex shrink-0 items-center gap-1 text-xs text-warning"
-                        title={downDetail(address.health, format)}
+                        title={downDetail(address.health, format, t)}
                     >
                         <TriangleAlert className="size-3" />
-                        not answering
+                        {t("addresses.notAnswering")}
                     </span>
                 ) : null}
                 <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -153,8 +149,8 @@ function AddressRow({
                     {manageHref && address.kind === "domain" ? (
                         <Link
                             href={manageHref}
-                            aria-label={`Manage ${address.host}`}
-                            title="Manage in Domains"
+                            aria-label={t("addresses.manageNamed", { host: address.host })}
+                            title={t("addresses.manage")}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <Settings2 className="size-3.5" />
@@ -164,7 +160,7 @@ function AddressRow({
                         <button
                             type="button"
                             onClick={() => setConfirming(true)}
-                            aria-label={`Stop using ${address.host}`}
+                            aria-label={t("addresses.stopNamed", { host: address.host })}
                             title={action}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                         >
@@ -174,10 +170,7 @@ function AddressRow({
                 </div>
             </div>
             {tunnel ? (
-                <p className="text-xs text-muted-foreground">
-                    Temporary: this URL is minted each time the tunnel starts and cannot be brought back once it stops.
-                    Configure a domain for an address that lasts.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("addresses.temporary")}</p>
             ) : null}
 
             {removable ? (
@@ -185,17 +178,19 @@ function AddressRow({
                     open={confirming}
                     onOpenChange={(open) => !removing && setConfirming(open)}
                     name={address.host}
-                    kind={tunnel ? "tunnel" : "domain"}
+                    kind={tunnel ? t("addresses.kinds.tunnel") : t("addresses.kinds.domain")}
                     requireTyping={false}
                     title={action}
-                    question={
-                        <>
-                            {tunnel ? "Close the tunnel on " : "Stop answering on "}
-                            <span className="font-medium text-foreground">{address.host}</span>?
-                        </>
-                    }
-                    description={REMOVAL_DETAIL[tunnel ? "tunnel" : "domain"]}
-                    confirmLabel={tunnel ? "Close tunnel" : "Stop using it"}
+                    question={t.rich(tunnel ? "addresses.closeQuestion" : "addresses.stopQuestion", {
+                        host: address.host,
+                        name: (chunks) => (
+                            <span key="host" className="font-medium text-foreground">
+                                {chunks}
+                            </span>
+                        )
+                    })}
+                    description={tunnel ? t("addresses.tunnelDetail") : t("addresses.domainDetail")}
+                    confirmLabel={tunnel ? t("addresses.closeConfirm") : t("addresses.stopConfirm")}
                     error={error}
                     pending={removing}
                     onConfirm={() => void onRemove().then((removed) => removed && setConfirming(false))}

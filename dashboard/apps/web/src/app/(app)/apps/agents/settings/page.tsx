@@ -4,6 +4,7 @@ import { SettingsView } from "./settings-view";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
 import { getPlatformAgentDefaults, listAgentDefaults, scopeOf } from "@/lib/agents/agent-defaults-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,14 @@ export default async function AgentSettingsPage() {
     // The accounts worth offering a tier for are the ones this person has
     // repositories in. Anything wider would be a list of every organization on
     // GitHub, most of which they will never add.
+    const t = await getTranslations("agents");
     const owners = [...new Set(repos.map((repo) => scopeOf(repo.repoFullName)))].filter(Boolean).sort();
 
     return (
         <>
             <PageHeader
-                title="Settings"
-                description="What your repositories inherit. Set it once here, narrow it per account, and override it on the repositories that need something different."
+                title={t("pages.settingsTitle")}
+                description={t("pages.settings")}
             />
             <SettingsView
                 tiers={tiers}

@@ -2,13 +2,10 @@
 
 import { Sparkles } from "lucide-react";
 import { Badge, Select } from "@polaris/ui";
-import {
-    AGENT_EXECUTIONS,
-    AGENT_EXECUTION_LABELS,
-    AGENT_EXECUTION_NOTES,
-    type AgentExecution,
-    type ExecutionAdvice
-} from "@polaris/core";
+import { AGENT_EXECUTIONS, type AgentExecution, type ExecutionAdvice } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentText, agentWord } from "@/lib/agents/words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /**
  * Where a repository's runs happen.
@@ -41,67 +38,66 @@ export function ExecutionPicker({
     onChange: (next: AgentExecution) => void;
     onPoolChange: (next: string | null) => void;
 }) {
+    const t = useTranslations("agents");
     const blocked = advice?.unavailable ?? {};
     const covering = new Set(pools.map((pool) => pool.id));
     const offered = allPools.length > 0 ? allPools : pools;
 
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium">Runs on</label>
+            <label className="text-sm font-medium">{t("repos.runsOn")}</label>
             <Select
                 value={value}
                 onValueChange={(next) => onChange(next as AgentExecution)}
                 options={AGENT_EXECUTIONS.map((execution) => ({
                     value: execution,
-                    label: AGENT_EXECUTION_LABELS[execution]
+                    label: agentWord(t, "execution", execution)
                 }))}
             />
-            <p className="text-xs text-muted-foreground">{AGENT_EXECUTION_NOTES[value]}</p>
+            <p className="text-xs text-muted-foreground">{agentWord(t, "executionNote", value)}</p>
 
             {advice && advice.execution === value ? (
                 <p className="flex items-start gap-1.5 text-xs text-success">
                     <Sparkles className="mt-0.5 size-3.5 shrink-0" />
-                    {advice.reason}
+                    {agentText(t, advice.reason)}
                 </p>
             ) : advice ? (
                 <p className="text-xs text-muted-foreground">
-                    Polaris suggests {AGENT_EXECUTION_LABELS[advice.execution]}: {advice.reason}
+                    {t("repoDialog.suggests", {
+                        execution: agentWord(t, "execution", advice.execution),
+                        reason: agentText(t, advice.reason)
+                    })}
                 </p>
             ) : null}
 
             {blocked[value] ? (
                 <p className="text-xs text-warning">
-                    {blocked[value]} {fix(value)}
+                    {agentText(t, blocked[value] ?? "")} {fix(value, t)}
                 </p>
             ) : null}
 
             {value === "runners" ? (
                 offered.length > 0 ? (
                     <div className="space-y-1 pt-2">
-                        <label className="text-sm font-medium">Runner pool</label>
+                        <label className="text-sm font-medium">{t("repoDialog.pool")}</label>
                         <Select
                             value={poolId ?? ""}
                             onValueChange={(next) => onPoolChange(next || null)}
-                            placeholder="Pick a runner pool"
+                            placeholder={t("text.pickPool")}
                             options={offered.map((pool) => ({
                                 value: pool.id,
                                 // A pool that does not serve this repository yet is
                                 // offered and labelled as such, rather than silently
                                 // producing a job nothing picks up.
-                                label: covering.has(pool.id) ? pool.name : `${pool.name} - does not cover this repository yet`
+                                label: covering.has(pool.id) ? pool.name : t("repoDialog.notCovering", { name: pool.name })
                             }))}
                         />
                         {poolId && !covering.has(poolId) ? (
-                            <p className="text-xs text-warning">
-                                Widen that pool&apos;s scope to include this repository under Apps &gt; Runners, or its
-                                jobs will queue forever.
-                            </p>
+                            <p className="text-xs text-warning">{t("repoDialog.widen")}</p>
                         ) : null}
                     </div>
                 ) : (
-                    <p className="text-xs text-warning">
-                        You have no runner pools yet. Create one under Apps &gt; Runners, then pick it here.
-                    </p>
+                    <p className="text-xs text-warning">{t("repoDialog.noPools")}</p>
                 )
             ) : null}
 
@@ -112,9 +108,9 @@ export function ExecutionPicker({
                 .map(([execution, reason]) => (
                     <p key={execution} className="text-xs text-muted-foreground">
                         <Badge variant="neutral" className="mr-1.5">
-                            {AGENT_EXECUTION_LABELS[execution as AgentExecution]}
+                            {agentWord(t, "execution", execution)}
                         </Badge>
-                        {reason} {fix(execution as AgentExecution)}
+                        {agentText(t, reason ?? "")} {fix(execution as AgentExecution, t)}
                     </p>
                 ))}
         </div>
@@ -123,13 +119,13 @@ export function ExecutionPicker({
 
 /** What to do about a blocked execution. Every blocker has a fix, and naming it
  *  is the difference between a warning and a dead end. */
-function fix(execution: AgentExecution): string {
+function fix(execution: AgentExecution, t: NamespaceTranslator<"agents">): string {
     switch (execution) {
         case "actions":
-            return "Give Polaris a public address under Settings > Domains.";
+            return t("repoDialog.fix.actions");
         case "runners":
-            return "Add a pool under Apps > Runners, or point an existing one at this repository.";
+            return t("repoDialog.fix.runners");
         case "server":
-            return "The container engine has to be reachable from Polaris; check Settings > System.";
+            return t("repoDialog.fix.server");
     }
 }

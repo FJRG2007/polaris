@@ -23,13 +23,14 @@ import { RelativeTime } from "@/components/relative-time";
 import type { CommentView } from "@/lib/comments/comments";
 import { RichText } from "@/components/rich-text/rich-text";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function Discussion({
     comments,
     currentUserId,
     canModerate = false,
     busy = false,
-    placeholder = "Leave a note",
+    placeholder: placeholderGiven,
     onPost,
     onDelete,
     className
@@ -46,6 +47,8 @@ export function Discussion({
     onDelete: (commentId: string) => Promise<void>;
     className?: string;
 }) {
+    const t = useTranslations("components");
+    const placeholder = placeholderGiven ?? t("discussion.placeholder");
     const [body, setBody] = useState("");
     /** Bumped after each send, which is what clears the editor: it holds its own
      *  document and does not empty itself because the string behind it did. */
@@ -65,8 +68,8 @@ export function Discussion({
                 <EmptyState
                     bare
                     icon={<MessageSquare />}
-                    title="Nothing said about this yet."
-                    description="Notes here are for whoever looks after it next, including you."
+                    title={t("discussion.none")}
+                    description={t("discussion.noneHint")}
                 />
             ) : (
                 <ol className="flex flex-col gap-4">
@@ -76,7 +79,7 @@ export function Discussion({
                                 <Avatar person={comment.author} size={26} />
                             ) : (
                                 <span className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] text-foreground-subtle">
-                                    AUT
+                                    {t("discussion.automatic")}
                                 </span>
                             )}
                             <div className="group min-w-0 flex-1">
@@ -84,7 +87,7 @@ export function Discussion({
                                     <span className="text-[0.8125rem] font-medium">
                                         <PersonName
                                             id={comment.author?.id}
-                                            name={comment.author?.name ?? "Polaris"}
+                                            name={comment.author?.name ?? "Polaris" /* i18n-ignore the product's name */}
                                         />
                                     </span>
                                     <span className="text-[0.6875rem] text-foreground-subtle">
@@ -93,8 +96,8 @@ export function Discussion({
                                     {canModerate || comment.author?.id === currentUserId ? (
                                         <button
                                             type="button"
-                                            title="Delete this note"
-                                            aria-label="Delete this note"
+                                            title={t("discussion.delete")}
+                                            aria-label={t("discussion.delete")}
                                             onClick={() => void onDelete(comment.id)}
                                             className="ml-auto text-foreground-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
                                         >
@@ -126,7 +129,7 @@ export function Discussion({
                     disabled={busy || !body.trim()}
                     onClick={() => void submit()}
                 >
-                    Post
+                    {t("discussion.post")}
                 </Button>
             </div>
         </div>

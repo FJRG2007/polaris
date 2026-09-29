@@ -14,6 +14,7 @@
 import type { SessionView } from "@/lib/agents/session-service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const sessionScreenAction = vi.fn(async () => ({ screen: "polaris: fetching FJRG2007/polaris" }));
 
@@ -73,7 +74,7 @@ afterEach(() => {
 
 describe("the boot progress card", () => {
     it("reads the session's own terminal and turns it into a bar and a step list", async () => {
-        render(<SessionDetail session={workspaceSession()} events={[]} messages={[]} />);
+        render(<SessionDetail session={workspaceSession()} events={[]} messages={[]} />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(screen.getByText("Getting the machine ready.")).toBeTruthy());
 
@@ -94,8 +95,7 @@ describe("the boot progress card", () => {
                 session={workspaceSession({ state: "working" })}
                 events={[]}
                 messages={[]}
-            />
-        );
+            />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(sessionScreenAction).not.toHaveBeenCalled());
         expect(screen.queryByText("Getting the machine ready.")).toBeNull();

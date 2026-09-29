@@ -22,6 +22,16 @@ import { AgentLogo } from "@/components/logos";
 import { Badge, Button, Input } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
+type Words = NamespaceTranslator<"components">;
+
+/** What a row is called: the catalogue's name, or the reader's words for the
+ *  entry that stands for a tool the catalogue does not know. */
+function labelOf(t: Words, option: AgentOption): string {
+    return option.key === CUSTOM_CHOICE.key ? t("agentSelect.custom") : option.label;
+}
 
 /** What a row can be told about signing in, and how loudly.
  *
@@ -30,7 +40,7 @@ import type { AgentOption } from "@/lib/agents/agent-readiness";
  *  checked - and a badge is exactly the shape people read as checked. */
 const READY_BADGE = {
     ready: null,
-    missing: { label: "Not linked", variant: "warning" as const },
+    missing: { label: "agentSelect.notLinked" as const, variant: "warning" as const },
     unknown: null
 };
 
@@ -39,7 +49,7 @@ const READY_BADGE = {
 export const CUSTOM_CHOICE: AgentOption = {
     key: "custom",
     cli: "custom",
-    label: "Something else",
+    label: "Something else", // i18n-ignore shown through labelOf in the reader's words
     vendor: "",
     docs: "",
     // Polaris knows nothing about a command somebody typed, including what signs
@@ -63,6 +73,7 @@ export function AgentSelect({
     onChange: (id: string) => void;
     disabled?: boolean;
 }) {
+    const t = useTranslations("components");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const box = useRef<HTMLDivElement>(null);
@@ -84,11 +95,11 @@ export function AgentSelect({
         // The vendor counts: people look for Codex by typing "openai" at least as
         // often as by typing its name, and for Droid by typing "factory".
         return options.filter((option) =>
-            [option.label, option.vendor, option.cli, option.account ?? ""].some((term) =>
+            [labelOf(t, option), option.vendor, option.cli, option.account ?? ""].some((term) =>
                 term.toLowerCase().includes(needle)
             )
         );
-    }, [options, query]);
+    }, [options, query, t]);
 
     const chosen = options.find((option) => option.key === value) ?? null;
 
@@ -103,13 +114,13 @@ export function AgentSelect({
                 className="border-border bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {chosen ? (
-                    <AgentLogo id={chosen.cli} label={chosen.label} className="size-4 shrink-0" />
+                    <AgentLogo id={chosen.cli} label={labelOf(t, chosen)} className="size-4 shrink-0" />
                 ) : null}
                 <span
                     className="min-w-0 flex-1 truncate text-left"
-                    title={chosen?.label ?? undefined}
+                    title={chosen ? labelOf(t, chosen) : undefined}
                 >
-                    {chosen?.label ?? "Pick an agent"}
+                    {chosen ? labelOf(t, chosen) : t("agentSelect.pick")}
                 </span>
                 {chosen?.account ? (
                     <span className="text-muted-foreground max-w-[12rem] shrink-0 truncate text-xs">
@@ -118,12 +129,12 @@ export function AgentSelect({
                 ) : null}
                 {chosen && chosen.mine === false ? (
                     <Badge variant="neutral" className="shrink-0">
-                        This Polaris
+                        {t("agentSelect.thisPolaris")}
                     </Badge>
                 ) : null}
                 {chosen && READY_BADGE[chosen.readiness] ? (
                     <Badge variant={READY_BADGE[chosen.readiness]!.variant} className="shrink-0">
-                        {READY_BADGE[chosen.readiness]!.label}
+                        {t(READY_BADGE[chosen.readiness]!.label)}
                     </Badge>
                 ) : null}
             </button>
@@ -136,7 +147,7 @@ export function AgentSelect({
                             autoFocus
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search agents"
+                            placeholder={t("agentSelect.search")}
                             bare
                             className="h-7"
                         />
@@ -168,11 +179,11 @@ export function AgentSelect({
                                     />
                                     <AgentLogo
                                         id={option.cli}
-                                        label={option.label}
+                                        label={labelOf(t, option)}
                                         className="size-4 shrink-0"
                                     />
-                                    <span className="min-w-0 flex-1 truncate" title={option.label}>
-                                        {option.label}
+                                    <span className="min-w-0 flex-1 truncate" title={labelOf(t, option)}>
+                                        {labelOf(t, option)}
                                     </span>
                                     {/* Whose account it would use, which is the
                                         question a list of agents was not
@@ -192,10 +203,10 @@ export function AgentSelect({
                                             className="text-muted-foreground max-w-[14rem] shrink-0 truncate text-xs"
                                             title={
                                                 option.machine
-                                                    ? "Polaris signs it in with nothing. Whatever this machine is already signed in to answers for it - which is what you get after signing in once in a session's own terminal."
+                                                    ? t("agentSelect.machineHint")
                                                     : option.mine
-                                                      ? `Your account: ${option.account}`
-                                                      : `Provided by this Polaris: ${option.account}`
+                                                      ? t("agentSelect.yourAccount", { account: option.account })
+                                                      : t("agentSelect.providedAccount", { account: option.account })
                                             }
                                         >
                                             {option.account}
@@ -207,12 +218,12 @@ export function AgentSelect({
                                     ) : null}
                                     {option.mine === false ? (
                                         <Badge variant="neutral" className="shrink-0">
-                                            This Polaris
+                                            {t("agentSelect.thisPolaris")}
                                         </Badge>
                                     ) : null}
                                     {badge ? (
                                         <Badge variant={badge.variant} className="shrink-0">
-                                            {badge.label}
+                                            {t(badge.label)}
                                         </Badge>
                                     ) : null}
                                 </Button>
@@ -220,7 +231,7 @@ export function AgentSelect({
                         })}
                         {results.length === 0 ? (
                             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-                                Nothing matches.
+                                {t("providerSelect.none")}
                             </p>
                         ) : null}
                     </div>
@@ -275,20 +286,20 @@ export function machineOf(value: string): boolean {
  * confidently wrong about somebody else's computer.
  */
 export function SignInNotice({ agent }: { agent: AgentOption }) {
+    const t = useTranslations("components");
     return (
         <div className="space-y-2 rounded-md border border-warning-edge bg-warning-soft p-3">
-            <p className="text-sm">Nothing here signs {agent.label} in.</p>
+            <p className="text-sm">{t("agentSelect.nothingSigns", { agent: labelOf(t, agent) })}</p>
+            <p className="text-xs text-muted-foreground">{t("agentSelect.loginPrompt")}</p>
             <p className="text-xs text-muted-foreground">
-                On this box it would start and sit at its own login prompt, where nobody would ever
-                answer it. Sign it in under AI keys - Polaris runs the sign-in for you and supplies
-                the machine - or run it on a server you have already signed it in on.
-            </p>
-            <p className="text-xs text-muted-foreground">
-                It takes{" "}
-                {agent.missing.map((credential) => credential.label.toLowerCase()).join(" or ")}.
+                {t("agentSelect.takes", {
+                    ways: agent.missing
+                        .map((credential) => credential.label.toLowerCase())
+                        .join(` ${t("agentSelect.or")} `)
+                })}
             </p>
             <Link href="/account/ai-keys" className="inline-block text-xs underline">
-                Sign in under AI keys
+                {t("agentSelect.signIn")}
             </Link>
         </div>
     );

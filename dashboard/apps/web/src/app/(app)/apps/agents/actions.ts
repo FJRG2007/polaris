@@ -26,6 +26,35 @@ import { stopServerRun } from "@/lib/agents/agent-server-executor";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
 import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { agentText, knownAgentText } from "@/lib/agents/words";
+
+type AgentsKey = NamespaceKey<"agents">;
+
+/** A reply in the reader's language. */
+async function say(key: AgentsKey, values?: Record<string, string | number>): Promise<string> {
+    return (await getTranslations("agents"))(key, values);
+}
+
+/** What went wrong, in the reader's words: a sentence the agent services wrote is
+ *  translated, anything else (GitHub's own answer) passes through. */
+async function failure(caught: unknown, fallback: AgentsKey): Promise<string> {
+    const t = await getTranslations("agents");
+    return caught instanceof Error ? agentText(t, caught.message) : t(fallback);
+}
+
+/** The first thing a schema refused, in the reader's words. A sentence the shared
+ *  schemas do not write is Zod's own English, so `fallback` stands in for it. */
+async function schemaSay(message: string | undefined, fallback: AgentsKey): Promise<string> {
+    const t = await getTranslations("agents");
+    return (message ? knownAgentText(t, message) : null) ?? t(fallback);
+}
+
+/** A warning from writing the workflow file, in the reader's words. */
+async function warningText(error: string | undefined): Promise<{ warning?: string }> {
+    return error ? { warning: agentText(await getTranslations("agents"), error) } : {};
+}
 import {
     listAgentDefaults,
     policyForNewRepo,
@@ -127,7 +156,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
 }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoFullName: repoFullNameSchema, isPrivate: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a repository" };
+    if (!parsed.success) return { error: await say("text.pickRepository") };
 
     const [pools, allPools, providers, policy] = await Promise.all([
         poolsServing(user.id, parsed.data.repoFullName),
@@ -165,7 +194,7 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     const parsed = enableAgentRepoSchema
         .extend({ isPrivate: z.boolean() })
         .safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     // The form's repository is a claim, not proof. Runs dispatch with the
     // instance's App installation token, which reaches every repository the App
@@ -175,15 +204,15 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     // account sees, and the visibility is taken from GitHub rather than from the
     // form for the same reason: it decides the default shell policy.
     const reachable = await listReposForUser(user.id).catch(() => null);
-    if (!reachable) return { error: "Polaris could not check your GitHub access. Try again in a moment." };
+    if (!reachable) return { error: await say("errors.accessUnchecked") };
     const match = reachable.find((repo) => repo.fullName.toLowerCase() === parsed.data.repoFullName.toLowerCase());
-    if (!match) return { error: "That repository is not one your GitHub account can reach." };
+    if (!match) return { error: await say("errors.unreachableRepo") };
 
     // A model whose provider is not connected produces a run that starts, asks for
     // a key, and fails. Refusing here costs a sentence instead of a failed run.
     const provider = providerForModel(parsed.data.config.model);
     if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
-        return { error: `Connect ${provider.name} under Integrations before using this model.` };
+        return { error: await say("errors.connectProvider", { provider: provider.name }) };
     }
 
     // The visibility comes from GitHub rather than from the form, so this is the
@@ -193,9 +222,7 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     const policy = await policyForNewRepo(user.id, match.fullName);
     if (!policyAllowsVisibility(policy, match.private)) {
         return {
-            error: match.private
-                ? "Private repositories are turned off for this account. Change it under Agents settings."
-                : "Public repositories are turned off for this account. Change it under Agents settings."
+            error: match.private ? await say("errors.privateOff") : await say("errors.publicOff")
         };
     }
 
@@ -214,7 +241,7 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
         // deleted stay deleted.
         if (saved.created) await seedDefaultAutomations(saved.id);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not enable the repository" };
+        return { error: await failure(caught, "errors.enable") };
     }
 
     // The workflow file goes in now, not at the first run: a repository somebody
@@ -233,22 +260,22 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     revalidatePath(`${AGENTS_PATH}/repos`);
     // A warning, not a refusal: the settings are saved and correct, the
     // repository just does not carry them yet. It is on the row as well.
-    return error ? { warning: error } : {};
+    return warningText(error);
 }
 
 export async function updateRepoConfigAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid(), config: agentRepoConfigSchema }).safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     const existing = await getAgentRepo(user.id, parsed.data.repoId);
-    if (!existing) return { error: "Repository not found" };
+    if (!existing) return { error: await say("errors.repoNotFound") };
 
     // Same refusal as the enable path: a model whose provider has no stored key
     // produces a run that starts, asks for one, and fails.
     const provider = providerForModel(parsed.data.config.model);
     if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
-        return { error: `Connect ${provider.name} under Integrations before using this model.` };
+        return { error: await say("errors.connectProvider", { provider: provider.name }) };
     }
 
     try {
@@ -259,7 +286,7 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
             config: parsed.data.config
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+        return { error: await failure(caught, "errors.saveSettings") };
     }
 
     // A change of execution changes the file, and a move to `server` means there
@@ -273,15 +300,15 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
     });
 
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return error ? { warning: error } : {};
+    return warningText(error);
 }
 
 export async function setRepoEnabledAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid(), enabled: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: "Check the request" };
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
     if (!(await setAgentRepoEnabled(user.id, parsed.data.repoId, parsed.data.enabled))) {
-        return { error: "Repository not found" };
+        return { error: await say("errors.repoNotFound") };
     }
 
     // Turning a repository off takes its workflow with it. Left behind, it is a
@@ -299,13 +326,13 @@ export async function setRepoEnabledAction(input: unknown): Promise<{ error?: st
         : {};
 
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return error ? { warning: error } : {};
+    return warningText(error);
 }
 
 export async function removeRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Check the request" };
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
 
     // Taken out before the row goes, because afterwards there is nothing left to
     // say which repository the file was in.
@@ -322,10 +349,10 @@ export async function removeRepoAction(input: unknown): Promise<{ error?: string
           ).error
         : undefined;
 
-    if (!(await removeAgentRepo(user.id, parsed.data.repoId))) return { error: "Repository not found" };
+    if (!(await removeAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
     revalidatePath(AGENTS_PATH);
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return warning ? { warning } : {};
+    return warningText(warning);
 }
 
 export async function saveAutomationAction(input: unknown): Promise<{ error?: string }> {
@@ -333,11 +360,11 @@ export async function saveAutomationAction(input: unknown): Promise<{ error?: st
     const parsed = z
         .object({ id: z.string().uuid().optional(), repoId: z.string().uuid(), automation: agentAutomationSchema })
         .safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the rule" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkRule") };
 
     // The repository has to be one this person owns; an id from the form is a
     // claim, not proof.
-    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: "Repository not found" };
+    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
 
     const data = {
         repoId: parsed.data.repoId,
@@ -359,7 +386,7 @@ export async function saveAutomationAction(input: unknown): Promise<{ error?: st
 export async function removeAutomationAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Check the request" };
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
     await prisma.agentAutomation.deleteMany({ where: { id: parsed.data.id, repo: { ownerId: user.id } } });
     revalidatePath(`${AGENTS_PATH}/automations`);
     return {};
@@ -369,12 +396,12 @@ export async function removeAutomationAction(input: unknown): Promise<{ error?: 
 export async function startRunAction(input: unknown): Promise<{ runId?: string; error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = manualAgentRunSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Say what the agent should do" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "text.sayWhat") };
 
     const repo = await prisma.agentRepo.findFirst({
         where: { ownerId: user.id, repoFullName: parsed.data.repoFullName, enabled: true }
     });
-    if (!repo) return { error: "That repository is not enabled for agent runs" };
+    if (!repo) return { error: await say("errors.notEnabled") };
 
     const result = await dispatchRun({
         repo,
@@ -385,21 +412,24 @@ export async function startRunAction(input: unknown): Promise<{ runId?: string; 
         startedById: user.id
     });
     revalidatePath(`${AGENTS_PATH}/runs`);
-    return result.error ? { runId: result.runId, error: result.error } : { runId: result.runId };
+    return result.error
+        ? { runId: result.runId, error: agentText(await getTranslations("agents"), result.error) }
+        : { runId: result.runId };
 }
 
 /** Stop a run that is still going. */
 export async function cancelRunAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ runId: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Check the request" };
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
 
     const run = await getAgentRun(user.id, parsed.data.runId);
-    if (!run) return { error: "Run not found" };
+    if (!run) return { error: await say("errors.runNotFound") };
 
     // Only the container is ours to stop. A GitHub-scheduled job is cancelled at
     // GitHub, and saying so is better than a button that appears to work.
     if (run.execution === "server") await stopServerRun(run.id);
+    // i18n-ignore stored on the run, and said in the reader's words by lib/agents/words
     await finishAgentRun(run.id, { state: "cancelled", error: "Cancelled from Polaris." });
     revalidatePath(`${AGENTS_PATH}/runs`);
     return {};
@@ -429,7 +459,7 @@ export async function listAgentDefaultsAction(): Promise<{ tiers: AgentDefaultsV
 export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = agentDefaultsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     // Same refusal as the repository paths: a model whose provider has no stored
     // key produces runs that start, ask for one, and fail - and here it would do
@@ -437,7 +467,7 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
     if (parsed.data.model) {
         const provider = providerForModel(parsed.data.model);
         if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
-            return { error: `Connect ${provider.name} under Integrations before defaulting to this model.` };
+            return { error: await say("errors.connectProviderDefault", { provider: provider.name }) };
         }
     }
 
@@ -448,13 +478,13 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
             where: { id: parsed.data.poolId, ownerId: user.id },
             select: { id: true }
         });
-        if (!pool) return { error: "That runner pool is not one of yours." };
+        if (!pool) return { error: await say("errors.poolNotYours") };
     }
 
     try {
         await saveAgentDefaults(user.id, parsed.data);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+        return { error: await failure(caught, "errors.saveSettings") };
     }
     revalidatePath(`${AGENTS_PATH}/settings`);
     revalidatePath(`${AGENTS_PATH}/repos`);
@@ -473,13 +503,13 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
 export async function addDefaultAutomationsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Check the request" };
-    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: "Repository not found" };
+    if (!parsed.success) return { error: await say("errors.checkRequest") };
+    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
 
     // Only onto an empty one. Running it twice would leave two rules for the same
     // event, which is two runs and two comments on one issue.
     const existing = await prisma.agentAutomation.count({ where: { repoId: parsed.data.repoId } });
-    if (existing > 0) return { error: "That repository already has rules." };
+    if (existing > 0) return { error: await say("errors.hasRules") };
 
     await seedDefaultAutomations(parsed.data.repoId);
     revalidatePath(`${AGENTS_PATH}/automations`);

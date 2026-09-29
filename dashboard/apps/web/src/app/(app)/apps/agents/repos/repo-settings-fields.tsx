@@ -11,10 +11,10 @@
  */
 
 import { Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentWord } from "@/lib/agents/words";
 import {
     AGENT_GATE_MODES,
-    AGENT_GATE_MODE_LABELS,
-    AGENT_GATE_MODE_NOTES,
     DEFAULT_AGENT_POLICY,
     type AgentGateMode,
     type AgentPolicy
@@ -24,7 +24,6 @@ import {
  *  of the settings, so it can never be mistaken for one. */
 const INHERIT = "__inherit__";
 
-const yesNo = (value: boolean) => (value ? "On" : "Off");
 
 export function RepoSettingsFields({
     policy,
@@ -45,51 +44,53 @@ export function RepoSettingsFields({
     onIssues: (next: boolean | null) => void;
     onGate: (next: AgentGateMode | null) => void;
 }) {
+    const t = useTranslations("agents");
     const resolved = policy ?? DEFAULT_AGENT_POLICY;
+    const yesNo = (value: boolean) => (value ? t("settingsFields.on") : t("settingsFields.off"));
 
     return (
         <div className="space-y-4">
             <div className="space-y-1">
-                <label className="text-sm font-medium">Pull requests</label>
+                <label className="text-sm font-medium">{t("settingsFields.pullRequests")}</label>
                 <Select
                     value={pullRequests === null ? INHERIT : String(pullRequests)}
                     onValueChange={(next) => onPullRequests(next === INHERIT ? null : next === "true")}
                     options={[
-                        { value: INHERIT, label: `Inherit (${yesNo(resolved.pullRequests)})` },
-                        { value: "true", label: "On" },
-                        { value: "false", label: "Off" }
+                        { value: INHERIT, label: t("settingsFields.inherit", { value: yesNo(resolved.pullRequests) }) },
+                        { value: "true", label: t("settingsFields.on") },
+                        { value: "false", label: t("settingsFields.off") }
                     ]}
                 />
-                <p className="text-xs text-muted-foreground">
-                    Whether a pull request can start a run. Somebody naming the app in a comment still gets an answer
-                    either way.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("settingsFields.pullRequestsHint")}</p>
             </div>
 
             <div className="space-y-1">
-                <label className="text-sm font-medium">Issues</label>
+                <label className="text-sm font-medium">{t("settingsFields.issues")}</label>
                 <Select
                     value={issues === null ? INHERIT : String(issues)}
                     onValueChange={(next) => onIssues(next === INHERIT ? null : next === "true")}
                     options={[
-                        { value: INHERIT, label: `Inherit (${yesNo(resolved.issues)})` },
-                        { value: "true", label: "On" },
-                        { value: "false", label: "Off" }
+                        { value: INHERIT, label: t("settingsFields.inherit", { value: yesNo(resolved.issues) }) },
+                        { value: "true", label: t("settingsFields.on") },
+                        { value: "false", label: t("settingsFields.off") }
                     ]}
                 />
             </div>
 
             <div className="space-y-1">
-                <label className="text-sm font-medium">Quality gate</label>
+                <label className="text-sm font-medium">{t("settingsFields.gate")}</label>
                 <Select
                     value={gate ?? INHERIT}
                     onValueChange={(next) => onGate(next === INHERIT ? null : (next as AgentGateMode))}
                     options={[
-                        { value: INHERIT, label: `Inherit (${AGENT_GATE_MODE_LABELS[resolved.gate]})` },
-                        ...AGENT_GATE_MODES.map((value) => ({ value, label: AGENT_GATE_MODE_LABELS[value] }))
+                        {
+                            value: INHERIT,
+                            label: t("settingsFields.inherit", { value: agentWord(t, "gateMode", resolved.gate) })
+                        },
+                        ...AGENT_GATE_MODES.map((value) => ({ value, label: agentWord(t, "gateMode", value) }))
                     ]}
                 />
-                <p className="text-xs text-muted-foreground">{AGENT_GATE_MODE_NOTES[gate ?? resolved.gate]}</p>
+                <p className="text-xs text-muted-foreground">{agentWord(t, "gateModeNote", gate ?? resolved.gate)}</p>
             </div>
         </div>
     );

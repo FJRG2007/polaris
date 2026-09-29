@@ -20,6 +20,8 @@ import { Button, Input, SegmentedControl, cn } from "@polaris/ui";
 import { Loader2, Pause, Play, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatStreamLog, mergeStreamLines, type StreamLine } from "@/lib/deploy/log-stream";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 type Mode = "live" | "history";
 
@@ -136,6 +138,7 @@ export function RuntimeLogs({
     /** Said beside the controls, for a caller that followed fewer than it lists. */
     followNote?: string;
 }) {
+    const t = useTranslations("components");
     const [mode, setMode] = useState<Mode>("live");
     const toggle = (
         <SegmentedControl
@@ -143,10 +146,10 @@ export function RuntimeLogs({
             value={mode}
             onValueChange={setMode}
             options={[
-                { value: "live", label: "Live" },
-                { value: "history", label: "History", title: "What was kept over the last week" }
+                { value: "live", label: t("runtimeLogs.live") },
+                { value: "history", label: t("runtimeLogs.history"), title: t("runtimeLogs.historyHint") }
             ]}
-            aria-label="Log mode"
+            aria-label={t("runtimeLogs.mode")}
             className="shrink-0"
         />
     );
@@ -170,6 +173,7 @@ function LiveLog({
     lead: ReactNode;
     note?: string;
 }) {
+    const t = useTranslations("components");
     const stream = useRuntimeLogStream(serviceIds);
     const labelled = useMemo(() => new Set(stream.lines.map((line) => `${line.serviceId}/${line.container}`)).size > 1, [stream.lines]);
     const log = useMemo(() => formatStreamLog(stream.lines, labelled), [stream.lines, labelled]);
@@ -184,7 +188,7 @@ function LiveLog({
                 // Holding still is the point of pausing: new output would not
                 // arrive anyway, and the reader is reading.
                 autoScroll={!stream.paused}
-                emptyText={emptyLiveText(stream.status)}
+                emptyText={emptyLiveText(stream.status, t)}
                 className={className}
                 header={
                     <>
@@ -198,7 +202,7 @@ function LiveLog({
                             className="shrink-0"
                         >
                             {stream.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
-                            {stream.paused ? "Resume" : "Pause"}
+                            {stream.paused ? t("runtimeLogs.resume") : t("runtimeLogs.pause")}
                         </Button>
                     </>
                 }
@@ -210,26 +214,27 @@ function LiveLog({
     );
 }
 
-function emptyLiveText(status: LiveStatus): string {
-    if (status === "connecting") return "Connecting...";
-    if (status === "failed") return "Could not follow the logs. Reload the page to try again.";
-    if (status === "paused") return "Paused.";
-    return "Nothing has been printed yet.";
+function emptyLiveText(status: LiveStatus, t: NamespaceTranslator<"components">): string {
+    if (status === "connecting") return t("runtimeLogs.connecting");
+    if (status === "failed") return t("runtimeLogs.failed");
+    if (status === "paused") return t("runtimeLogs.pausedLine");
+    return t("runtimeLogs.nothingYet");
 }
 
 function LiveBadge({ status, containers }: { status: LiveStatus; containers: number }) {
+    const t = useTranslations("components");
     const label =
         status === "live"
             ? containers > 1
-                ? `Live - ${containers} containers`
-                : "Live"
+                ? t("runtimeLogs.liveContainers", { count: containers })
+                : t("runtimeLogs.live")
             : status === "paused"
-              ? "Paused"
+              ? t("runtimeLogs.paused")
               : status === "ended"
-                ? "Output stopped - checking again shortly"
+                ? t("runtimeLogs.ended")
                 : status === "failed"
-                  ? "Disconnected"
-                  : "Connecting";
+                  ? t("runtimeLogs.disconnected")
+                  : t("runtimeLogs.connectingBadge");
     return (
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span
@@ -275,6 +280,7 @@ function HistoryLog({
     className?: string;
     lead: ReactNode;
 }) {
+    const t = useTranslations("components");
     const [typed, setTyped] = useState("");
     const [query, setQuery] = useState("");
     const [from, setFrom] = useState("");
@@ -312,7 +318,7 @@ function HistoryLog({
                 | { lines?: HistoryLine[]; next?: string | null; error?: string }
                 | null;
             if (!res.ok || !data?.lines) {
-                setError(data?.error ?? "Could not read the kept logs.");
+                setError(data?.error ?? t("runtimeLogs.readFailed"));
                 return null;
             }
             setError(null);
@@ -373,23 +379,23 @@ function HistoryLog({
     const start =
         lines === null || lines.length === 0 ? null : loading ? (
             <p className="flex items-center gap-2 px-3 py-1 text-[0.6875rem] text-zinc-500">
-                <Loader2 className="size-3 animate-spin" /> Loading older lines...
+                <Loader2 className="size-3 animate-spin" /> {t("runtimeLogs.loadingOlder")}
             </p>
         ) : next && full ? (
             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
-                Showing the latest {HISTORY_CAP} lines.{" "}
+                {t("runtimeLogs.showingLatest", { count: HISTORY_CAP })}{" "}
                 <button type="button" onClick={() => loadOlder(true)} className="text-zinc-300 underline-offset-2 hover:underline">
-                    Read further back
+                    {t("runtimeLogs.readBack")}
                 </button>
             </p>
         ) : next ? (
             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
                 <button type="button" onClick={() => loadOlder()} className="text-zinc-300 underline-offset-2 hover:underline">
-                    Load older lines
+                    {t("runtimeLogs.loadOlder")}
                 </button>
             </p>
         ) : (
-            <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">Nothing older is kept.</p>
+            <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">{t("runtimeLogs.nothingOlder")}</p>
         );
 
     return (
@@ -400,9 +406,9 @@ function HistoryLog({
                     <Input
                         value={typed}
                         onChange={(event) => setTyped(event.target.value)}
-                        placeholder="Search kept logs"
+                        placeholder={t("runtimeLogs.search")}
                         className="h-8 pl-8 font-mono text-xs"
-                        aria-label="Search kept logs"
+                        aria-label={t("runtimeLogs.search")}
                         maxLength={200}
                     />
                 </div>
@@ -412,16 +418,16 @@ function HistoryLog({
                     max={to || undefined}
                     onChange={(event) => setFrom(event.target.value)}
                     className="h-8 w-auto text-xs"
-                    aria-label="From"
+                    aria-label={t("auditFeed.from")}
                 />
-                <span className="text-muted-foreground">to</span>
+                <span className="text-muted-foreground">{t("runtimeLogs.to")}</span>
                 <Input
                     type="datetime-local"
                     value={to}
                     min={from || undefined}
                     onChange={(event) => setTo(event.target.value)}
                     className="h-8 w-auto text-xs"
-                    aria-label="To"
+                    aria-label={t("auditFeed.to")}
                 />
                 {filtered && (
                     <button
@@ -434,7 +440,7 @@ function HistoryLog({
                         }}
                         className="text-muted-foreground hover:text-foreground"
                     >
-                        Clear
+                        {t("auditFeed.clear")}
                     </button>
                 )}
             </div>
@@ -445,10 +451,10 @@ function HistoryLog({
                 withDates
                 emptyText={
                     lines === null
-                        ? "Loading..."
+                        ? t("userProfile.loading")
                         : filtered
-                          ? "No kept lines match."
-                          : "Nothing kept yet. Output is kept once a minute while a service runs."
+                          ? t("runtimeLogs.noMatch")
+                          : t("runtimeLogs.nothingKept")
                 }
                 className={className}
                 onReachStart={() => loadOlder()}
@@ -465,7 +471,7 @@ function HistoryLog({
                             className="shrink-0"
                         >
                             <RefreshCw className="size-4" />
-                            Newest
+                            {t("runtimeLogs.newest")}
                         </Button>
                     </>
                 }

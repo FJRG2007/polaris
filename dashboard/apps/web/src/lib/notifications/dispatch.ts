@@ -307,5 +307,5 @@ export async function testDestination(userId: string, destinationId: string): Pr
               });
 
     await recordDestinationResult(destination.id, result.error ?? null);
-    return result.error ? { error: deliveryText(t, result.error) } : result;
+    return result.error ? { error: deliveryText(await wordsFor(userId, "components"), result.error) } : result;
 }

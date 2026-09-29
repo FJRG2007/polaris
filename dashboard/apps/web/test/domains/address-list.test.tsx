@@ -14,6 +14,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { CheckedAddress } from "@/lib/address-health";
+import { withMessages } from "../setup/i18n";
 
 vi.mock("@/components/display-format", () => ({
     useDisplayFormat: () => ({ dateTime: (value: Date) => value.toISOString() })
@@ -39,7 +40,7 @@ function tunnel(): CheckedAddress {
 }
 
 function render(addresses: CheckedAddress[]): string {
-    return renderToStaticMarkup(<AddressList addresses={addresses} onChanged={() => {}} />);
+    return renderToStaticMarkup(withMessages(<AddressList addresses={addresses} onChanged={() => {}} />));
 }
 
 describe("the deployment's address list", () => {

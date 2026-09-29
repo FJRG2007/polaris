@@ -27,6 +27,9 @@ import {
     workspaceHolders,
     workspaceRefusal
 } from "@/lib/agents/session-capacity";
+import { getTranslations } from "@/lib/i18n/request";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { agentText, knownAgentText } from "@/lib/agents/words";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
 
@@ -97,7 +100,11 @@ export async function sessionDetailAction(sessionId: string): Promise<{
 export async function startSessionAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.startAgentSessionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    const t = await getTranslations("agents");
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return { error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm") };
+    }
     const value = parsed.data;
 
     // Only when one was named. A workspace checks nothing out, so there is no
@@ -108,7 +115,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
             where: { id: value.repoId, ownerId: user.id },
             select: { id: true }
         });
-        if (!repo) return { error: "That repository is not connected to the Agents app." };
+        if (!repo) return { error: t("sessions.errors.repoNotConnected") };
     }
 
     // The machine everybody shares only exists where an administrator said so.
@@ -116,7 +123,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     // opens a container holding other people's logins, so a client that asked
     // for it without the deployment offering it is refused rather than served.
     if (value.sharedHome && !(await sharedWorkspaceAllowed())) {
-        return { error: "This Polaris does not offer a shared machine." };
+        return { error: t("sessions.errors.noSharedMachine") };
     }
 
     // Which server a session may run on is settled here, once. The runtime reads
@@ -127,14 +134,14 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
             where: { id: value.hostId ?? "", ownerId: user.id },
             select: { id: true }
         });
-        if (!host) return { error: "That server is not one of yours." };
+        if (!host) return { error: t("sessions.errors.serverNotYours") };
     }
 
     // Before anything else, because it is the cheapest question and the one whose
     // answer does not change with the form: a box already running as many
     // containers as it is set to should not be asked to check credentials first.
     const refusal = capacityRefusal(await sessionCapacity(user.id));
-    if (refusal) return { error: refusal };
+    if (refusal) return { error: agentText(t, refusal) };
 
     // A workspace opens on a directory that outlives it, and every workspace
     // session on that machine opens on the same one. Two at once is two agents
@@ -149,7 +156,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
             hostId: value.place === "host" ? (value.hostId ?? null) : null
         };
         const taken = workspaceRefusal(claim, await workspaceHolders(claim));
-        if (taken) return { error: taken };
+        if (taken) return { error: agentText(t, taken) };
     }
 
     // Before a row exists, because a session that could never have signed in is
@@ -169,12 +176,12 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
                   (agent) => agent.id === value.cli && agent.readiness === "missing"
               );
     if (blocked) {
-        const ways = blocked.missing.map((credential) => credential.label).join(" or ");
+        const ways = blocked.missing.map((credential) => credential.label).join(` ${t("sessions.errors.or")} `);
         return {
             error:
                 value.place === "host"
-                    ? `Nothing here signs ${blocked.label} in. Either sign it in on that server yourself, or add ${ways} under AI keys.`
-                    : `Nothing here signs ${blocked.label} in, so it would start and sit at its own login prompt. Add ${ways} under AI keys.`
+                    ? t("sessions.errors.signInHost", { agent: blocked.label, ways })
+                    : t("sessions.errors.signInLocal", { agent: blocked.label, ways })
         };
     }
 
@@ -185,7 +192,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         try {
             await taskAccess.requireTask({ id: user.id, isAdmin: false }, value.taskId, "guest");
         } catch {
-            return { error: "That task is not one you can reach." };
+            return { error: t("sessions.errors.taskUnreachable") };
         }
     }
 
@@ -218,7 +225,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         await runtime.startSession(session, token);
     } catch (error) {
         revalidatePath(SESSIONS_PATH);
-        return { id: session.id, error: sessions.readableFailure(error, `starting ${session.id}`) };
+        return { id: session.id, error: agentText(t, sessions.readableFailure(error, `starting ${session.id}`)) };
     }
 
     if (value.prompt) {
@@ -256,9 +263,15 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
         // Asked again rather than assumed: the start settled it, and a comment on
         // somebody's board is not a write to make on the strength of that alone.
         await taskAccess.requireTask({ id: userId, isAdmin: false }, session.taskId, "guest");
+        // Written in the words of whoever handed it over: it is their comment.
+        const t = await wordsFor(userId, "agents");
         await addComment(userId, {
             taskId: session.taskId,
-            body: `Handed to an agent. It is working on \`${session.branch}\` in ${session.repoFullName}: [the session](/apps/agents/sessions/${session.id}).`,
+            body: t("sessions.taskNote", {
+                branch: session.branch ?? "",
+                repo: session.repoFullName ?? "",
+                href: `/apps/agents/sessions/${session.id}`
+            }),
             parentId: null,
             assignedToId: null
         });
@@ -270,17 +283,21 @@ async function noteOnTask(session: sessions.SessionView, userId: string): Promis
 export async function promptSessionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.agentSessionPromptSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Say something" };
+    const t = await getTranslations("agents");
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return { error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.saySomething") };
+    }
 
     const session = await sessions.getSession(parsed.data.sessionId, user.id);
-    if (!session) return { error: "That session no longer exists." };
-    if (core.isSessionOver(session.state)) return { error: "That session has ended." };
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
 
     await sessions.addSessionMessage(session.id, "user", parsed.data.text, user.id);
     try {
         await runtime.promptSession(session.id, parsed.data.text);
     } catch (error) {
-        return { error: sessions.readableFailure(error, `prompting ${session.id}`) };
+        return { error: agentText(t, sessions.readableFailure(error, `prompting ${session.id}`)) };
     }
     revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
@@ -288,12 +305,13 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
 
 export async function interruptSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
     const session = await sessions.getSession(sessionId, user.id);
-    if (!session) return { error: "That session no longer exists." };
+    if (!session) return { error: t("sessions.errors.gone") };
     try {
         await runtime.interruptSession(sessionId);
     } catch (error) {
-        return { error: sessions.readableFailure(error, `interrupting ${sessionId}`) };
+        return { error: agentText(t, sessions.readableFailure(error, `interrupting ${sessionId}`)) };
     }
     revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
@@ -302,7 +320,7 @@ export async function interruptSessionAction(sessionId: string): Promise<{ error
 export async function stopSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const session = await sessions.getSession(sessionId, user.id);
-    if (!session) return { error: "That session no longer exists." };
+    if (!session) return { error: (await getTranslations("agents"))("sessions.errors.gone") };
     await runtime.stopSession(sessionId);
     revalidatePath(SESSIONS_PATH);
     // And the session's own page, which is where the button was pressed. Only
@@ -318,12 +336,13 @@ export async function sessionScreenAction(
     sessionId: string
 ): Promise<{ screen?: string; error?: string }> {
     const user = await requirePermission("agents.read");
+    const t = await getTranslations("agents");
     const session = await sessions.getSession(sessionId, user.id);
-    if (!session) return { error: "That session no longer exists." };
+    if (!session) return { error: t("sessions.errors.gone") };
     if (core.isSessionOver(session.state)) return { screen: "" };
     try {
         return { screen: await runtime.captureSession(sessionId) };
     } catch {
-        return { error: "The machine running this session did not answer." };
+        return { error: t("sessions.errors.noAnswer") };
     }
 }

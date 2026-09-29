@@ -7,8 +7,10 @@ import { useEffect, useState, useTransition } from "react";
 import { cancelRunAction, startRunAction } from "../actions";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
 import { Check, ExternalLink, Loader2, Play, Square, TriangleAlert } from "lucide-react";
-import { GATE_STEP_LABELS, type GateStepReport } from "@/lib/agents/agent-gate";
-import { AGENT_EXECUTION_LABELS, AGENT_TRIGGER_LABELS, isTerminalRunState } from "@polaris/core";
+import type { GateStepReport } from "@/lib/agents/agent-gate";
+import { isTerminalRunState } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentText, agentWord } from "@/lib/agents/words";
 import {
     Button,
     Card,
@@ -36,6 +38,7 @@ import {
 const REFRESH_MS = 5000;
 
 export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[] }) {
+    const t = useTranslations("agents");
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -64,7 +67,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                 <div className="flex justify-end">
                     <Button size="sm" onClick={() => setStarting(true)}>
                         <Play className="size-4 shrink-0" />
-                        Start a run
+                        {t("runs.start")}
                     </Button>
                 </div>
             ) : null}
@@ -72,25 +75,22 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
             <Card>
                 <CardBody className="p-0">
                     {runs.length === 0 ? (
-                        <p className="px-4 py-10 text-sm text-muted-foreground">
-                            Nothing has run yet. Mention the app in an issue or a pull request, add
-                            an automation, or start a run here.
-                        </p>
+                        <p className="px-4 py-10 text-sm text-muted-foreground">{t("runs.none")}</p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
                                     <th className="w-full max-w-0 px-4 py-2 font-medium">
-                                        Repository
+                                        {t("sessions.form.repository")}
                                     </th>
                                     <th className="whitespace-nowrap px-4 py-2 font-medium">
-                                        Started by
+                                        {t("runs.startedBy")}
                                     </th>
                                     <th className="whitespace-nowrap px-4 py-2 font-medium">
-                                        Ran on
+                                        {t("runs.ranOn")}
                                     </th>
                                     <th className="whitespace-nowrap px-4 py-2 font-medium">
-                                        State
+                                        {t("runs.state")}
                                     </th>
                                     <th className="px-4 py-2" />
                                 </tr>
@@ -116,13 +116,13 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                             </div>
                                             {run.error ? (
                                                 <p className="mt-1 text-xs text-danger">
-                                                    {run.error}
+                                                    {agentText(t, run.error)}
                                                 </p>
                                             ) : null}
                                             <GateSteps steps={run.gateSteps} />
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                                            {AGENT_TRIGGER_LABELS[run.trigger]}
+                                            {agentWord(t, "trigger", run.trigger)}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                                             {/* The job itself, which is where the log is. Without
@@ -135,13 +135,13 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="inline-flex items-center gap-1 hover:underline"
-                                                    title="Open the job that ran this"
+                                                    title={t("runs.openJob")}
                                                 >
-                                                    {AGENT_EXECUTION_LABELS[run.execution]}
+                                                    {agentWord(t, "execution", run.execution)}
                                                     <ExternalLink className="size-3 shrink-0" />
                                                 </a>
                                             ) : (
-                                                AGENT_EXECUTION_LABELS[run.execution]
+                                                agentWord(t, "execution", run.execution)
                                             )}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3">
@@ -152,8 +152,8 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label="Stop this run"
-                                                    title="Stop this run"
+                                                    aria-label={t("runs.stop")}
+                                                    title={t("runs.stop")}
                                                     onClick={() => cancel(run)}
                                                 >
                                                     <Square className="size-4 shrink-0" />
@@ -181,6 +181,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
  * step keeps what it said, because that is the thing somebody has to act on.
  */
 function GateSteps({ steps }: { steps: GateStepReport[] }) {
+    const t = useTranslations("agents");
     if (steps.length === 0) return null;
     return (
         <ul className="mt-1.5 space-y-1">
@@ -194,7 +195,7 @@ function GateSteps({ steps }: { steps: GateStepReport[] }) {
                         ) : (
                             <TriangleAlert className="size-3 shrink-0 text-danger" />
                         )}
-                        {GATE_STEP_LABELS[step.step]}
+                        {step.step === "verify" ? t("runs.gate.verify") : t("runs.gate.review")}
                     </span>
                     {step.state === "failed" && step.detail ? (
                         <pre className="mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[0.6875rem] text-danger">
@@ -230,6 +231,8 @@ function target(run: AgentRunView): string {
 }
 
 function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => void }) {
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const [repoFullName, setRepoFullName] = useState(repos[0] ?? "");
     const [prompt, setPrompt] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -252,11 +255,11 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Start a run</DialogTitle>
+                    <DialogTitle>{t("runs.start")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">Repository</label>
+                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
                         <Select
                             value={repoFullName}
                             onValueChange={setRepoFullName}
@@ -264,25 +267,25 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">What should it do?</label>
+                        <label className="text-sm font-medium">{t("runs.what")}</label>
                         <Textarea
                             rows={5}
                             value={prompt}
                             onChange={(event) => setPrompt(event.target.value)}
-                            placeholder="Add a regression test for the timezone bug in the report exporter, and open a pull request."
+                            placeholder={t("runs.whatPlaceholder")}
                         />
                     </div>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button
                         onClick={start}
                         disabled={!repoFullName || prompt.trim().length === 0 || pending}
                     >
-                        {pending ? "Starting..." : "Start"}
+                        {pending ? t("runs.starting") : t("sessions.form.submit")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

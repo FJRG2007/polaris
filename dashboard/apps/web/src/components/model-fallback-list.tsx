@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@polaris/ui";
 import { ChevronDown, ChevronUp, GripVertical, Plus, X } from "lucide-react";
 import { ModelPicker, formatContext, type PickerModel } from "@/components/model-picker";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ModelFallbackList({
     value,
@@ -30,6 +31,7 @@ export function ModelFallbackList({
     onChange: (next: string[] | null) => void;
     loadModels: () => Promise<PickerModel[]>;
 }) {
+    const t = useTranslations("components");
     const [adding, setAdding] = useState(false);
     // Read so a row can say what the model holds. The picker caches the same
     // call for the session, so this is the same one request either way, and a
@@ -68,9 +70,9 @@ export function ModelFallbackList({
     if (value === null) {
         return (
             <div className="flex items-center gap-2">
-                <p className="text-muted-foreground flex-1 text-xs">Inherited.</p>
+                <p className="text-muted-foreground flex-1 text-xs">{t("fallback.inherited")}</p>
                 <Button type="button" variant="secondary" size="sm" onClick={() => onChange([])}>
-                    Set here
+                    {t("fallback.setHere")}
                 </Button>
             </div>
         );
@@ -91,21 +93,19 @@ export function ModelFallbackList({
             ))}
 
             {list.length === 0 ? (
-                <p className="text-muted-foreground text-xs">
-                    Nothing to fall back to. A run refused by its provider stops there.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("fallback.none")}</p>
             ) : null}
 
             {adding ? (
-                <ModelPicker value={null} onChange={add} load={loadModels} inheritLabel={null} placeholder="Add a model" />
+                <ModelPicker value={null} onChange={add} load={loadModels} inheritLabel={null} placeholder={t("fallback.add")} />
             ) : (
                 <div className="flex items-center gap-2">
                     <Button type="button" variant="secondary" size="sm" onClick={() => setAdding(true)}>
                         <Plus className="size-4 shrink-0" />
-                        Add a model
+                        {t("fallback.add")}
                     </Button>
                     <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null)}>
-                        Inherit instead
+                        {t("fallback.inheritInstead")}
                     </Button>
                 </div>
             )}
@@ -128,6 +128,7 @@ function Row({
     onMove: (from: number, to: number) => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("components");
     const [over, setOver] = useState(false);
 
     return (
@@ -165,8 +166,8 @@ function Row({
                 size="icon"
                 disabled={index === 0}
                 onClick={() => onMove(index, index - 1)}
-                aria-label={`Move ${slug} earlier`}
-                title="Move earlier"
+                aria-label={t("fallback.earlierNamed", { slug })}
+                title={t("fallback.earlier")}
             >
                 <ChevronUp className="size-4 shrink-0" />
             </Button>
@@ -176,8 +177,8 @@ function Row({
                 size="icon"
                 disabled={index === total - 1}
                 onClick={() => onMove(index, index + 1)}
-                aria-label={`Move ${slug} later`}
-                title="Move later"
+                aria-label={t("fallback.laterNamed", { slug })}
+                title={t("fallback.later")}
             >
                 <ChevronDown className="size-4 shrink-0" />
             </Button>
@@ -186,8 +187,8 @@ function Row({
                 variant="ghost"
                 size="icon"
                 onClick={onRemove}
-                aria-label={`Remove ${slug} from the fallback list`}
-                title="Remove"
+                aria-label={t("fallback.removeNamed", { slug })}
+                title={t("ownerDomains.remove")}
             >
                 <X className="size-4 shrink-0" />
             </Button>

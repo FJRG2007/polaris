@@ -43,6 +43,8 @@ import {
     Switch,
     Textarea
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { agentText, agentWord, sessionStateWord } from "@/lib/agents/words";
 
 /** How often a live session is re-read. A session reports through its hooks, so
  *  this is only how quickly the list notices - fast enough that "needs you" is
@@ -79,6 +81,7 @@ interface Choices {
 }
 
 export function SessionsView({ sessions }: { sessions: SessionView[] }) {
+    const t = useTranslations("agents");
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -111,15 +114,15 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setStarting(true)}>
                     <Play className="size-4 shrink-0" />
-                    Start a session
+                    {t("sessions.start")}
                 </Button>
             </div>
 
             {ordered.length === 0 ? (
                 <EmptyState
                     icon={<Bot />}
-                    title="No sessions yet"
-                    description="A session puts a coding agent in a branch of its own, on a machine you already have. You can watch it work, answer its questions, and send it the next thing."
+                    title={t("sessions.none")}
+                    description={t("sessions.noneHint")}
                 />
             ) : (
                 <div className="space-y-2">
@@ -135,7 +138,9 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                         {session.title}
                                     </Link>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {session.detail || session.repoFullName || "A workspace"}
+                                        {(session.detail ? agentText(t, session.detail) : "") ||
+                                            session.repoFullName ||
+                                            t("sessions.workspace")}
                                     </p>
                                 </div>
                                 <Badge variant="neutral" className="shrink-0">
@@ -147,22 +152,19 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     {session.place === "host" ? (
                                         <span className="flex items-center gap-1">
                                             <Server className="size-3 shrink-0" />
-                                            {session.hostName ?? "a server"}
+                                            {session.hostName ?? t("sessions.aServer")}
                                         </span>
                                     ) : (
-                                        "this box"
+                                        t("sessions.thisBox")
                                     )}
                                 </span>
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
-                                    {core.sessionStateLabel(
-                                        session.state,
-                                        session.lastEventAt !== null
-                                    )}
+                                    {sessionStateWord(t, session.state, session.lastEventAt !== null)}
                                 </span>
                                 {core.isSessionOver(session.state) ? null : (
                                     <Button size="sm" variant="ghost" onClick={() => stop(session)}>
                                         <Square className="size-4 shrink-0" />
-                                        Stop
+                                        {t("sessions.stop")}
                                     </Button>
                                 )}
                             </CardBody>
@@ -194,6 +196,8 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
 const NO_REPO = "workspace";
 
 function StartDialog({ onClose }: { onClose: () => void }) {
+    const t = useTranslations("agents");
+    const tcommon = useTranslations("common");
     const [choices, setChoices] = useState<Choices | null>(null);
     const [repoId, setRepoId] = useState("");
     const [title, setTitle] = useState("");
@@ -277,21 +281,21 @@ function StartDialog({ onClose }: { onClose: () => void }) {
         <Dialog open onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Start a session</DialogTitle>
+                    <DialogTitle>{t("sessions.start")}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">What is it working on</span>
+                        <span className="text-xs text-muted-foreground">{t("sessions.form.title")}</span>
                         <Input
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
-                            placeholder="Fix the login redirect"
+                            placeholder={t("sessions.form.titlePlaceholder")}
                         />
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Repository</span>
+                        <span className="text-xs text-muted-foreground">{t("sessions.form.repository")}</span>
                         <Select
                             value={repoId}
                             onValueChange={setRepoId}
@@ -300,35 +304,33 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                                 // nothing set up. Somebody who just wants an
                                 // agent should not have to connect a
                                 // repository to get one.
-                                { value: NO_REPO, label: "No repository - just open the agent" },
+                                { value: NO_REPO, label: t("sessions.form.noRepo") },
                                 ...(choices?.repos ?? []).map((repo) => ({
                                     value: repo.id,
                                     label: repo.name
                                 }))
                             ]}
-                            placeholder="Pick a repository"
+                            placeholder={t("text.pickRepository")}
                         />
                     </label>
 
                     {workspace ? (
-                        <p className="text-xs text-muted-foreground">
-                            It opens on a machine of your own with an empty directory and nothing
-                            checked out. The machine keeps its home, so what you install and sign in
-                            to stays there for next time.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("sessions.form.workspaceHint")}</p>
                     ) : null}
                     {noRepos ? (
                         <p className="text-xs text-muted-foreground">
-                            Nothing is connected yet. Add one under{" "}
-                            <Link href="/apps/agents/repos" className="underline">
-                                Repositories
-                            </Link>{" "}
-                            to have an agent work in it.
+                            {t.rich("sessions.form.noRepos", {
+                                link: (chunks) => (
+                                    <Link href="/apps/agents/repos" className="underline">
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
                         </p>
                     ) : null}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Agent</span>
+                        <span className="text-xs text-muted-foreground">{t("sessions.form.agent")}</span>
                         <AgentSelect
                             options={agents}
                             value={cli}
@@ -341,26 +343,23 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     {cli === core.CUSTOM_AGENT_CLI ? (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">
-                                The command that starts it. It has to already be installed on the
-                                machine.
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("sessions.form.command")}</span>
                             <Input
                                 value={command}
                                 onChange={(event) => setCommand(event.target.value)}
-                                placeholder="my-agent"
+                                placeholder="my-agent" // i18n-ignore an example command
                             />
                         </label>
                     ) : null}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Where it runs</span>
+                        <span className="text-xs text-muted-foreground">{t("sessions.form.where")}</span>
                         <Select
                             value={place}
                             onValueChange={(value) => setPlace(value as core.AgentSessionPlace)}
                             options={core.AGENT_SESSION_PLACES.map((option) => ({
                                 value: option,
-                                label: core.AGENT_SESSION_PLACE_LABELS[option]
+                                label: agentWord(t, "sessionPlace", option)
                             }))}
                         />
                     </label>
@@ -373,11 +372,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     {place === "local" && choices?.sharedWorkspace ? (
                         <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                             <div className="min-w-0">
-                                <p className="text-sm">Use the machine everybody shares</p>
+                                <p className="text-sm">{t("sessions.form.shared")}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {sharedHome
-                                        ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find. Sign it in with an API key or a team plan - a personal subscription used by several people is what gets suspended."
-                                        : "It opens on a machine of your own, with your logins and your files. Nobody else reaches it."}
+                                    {sharedHome ? t("sessions.form.sharedOn") : t("sessions.form.sharedOff")}
                                 </p>
                             </div>
                             <Switch checked={sharedHome} onChange={setSharedHome} />
@@ -386,7 +383,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     {place === "host" ? (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Which server</span>
+                            <span className="text-xs text-muted-foreground">{t("sessions.form.whichServer")}</span>
                             <Select
                                 value={hostId}
                                 onValueChange={setHostId}
@@ -394,35 +391,29 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                                     value: host.id,
                                     label: host.name
                                 }))}
-                                placeholder="Pick a server"
+                                placeholder={t("sessions.form.pickServer")}
                             />
                         </label>
                     ) : null}
 
                     {workspace ? null : (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">
-                                Branch to start from. Leave it empty for the repository&apos;s
-                                default.
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("sessions.form.branch")}</span>
                             <Input
                                 value={baseRef}
                                 onChange={(event) => setBaseRef(event.target.value)}
-                                placeholder="main"
+                                placeholder="main" // i18n-ignore a branch name
                             />
                         </label>
                     )}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">
-                            What to start with. Leave it empty to open the agent and type into it
-                            yourself.
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("sessions.form.prompt")}</span>
                         <Textarea
                             value={prompt}
                             onChange={(event) => setPrompt(event.target.value)}
                             rows={4}
-                            placeholder="Read the failing test in auth.test.ts and fix what it is telling you."
+                            placeholder={t("sessions.form.promptPlaceholder")}
                         />
                     </label>
 
@@ -434,13 +425,13 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             tool that asks and a tool that does not. */}
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                         <div className="min-w-0">
-                            <p className="text-sm">Let it work without asking</p>
+                            <p className="text-sm">{t("sessions.form.unattended")}</p>
                             <p className="text-xs text-muted-foreground">
                                 {enigma
-                                    ? "Enigma is on, so this is one of the things it settles: your own policies decide what the agent may run without asking, and Polaris does not add anything on top."
+                                    ? t("sessions.form.unattendedEnigma")
                                     : place === "host"
-                                      ? "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it."
-                                      : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
+                                      ? t("sessions.form.unattendedHost")
+                                      : t("sessions.form.unattendedContainer")}
                             </p>
                         </div>
                         <Switch
@@ -452,12 +443,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                         <div className="min-w-0">
-                            <p className="text-sm">Work to your Enigma standards</p>
-                            <p className="text-xs text-muted-foreground">
-                                Installs your policies, conventions and guardrails into the session
-                                before the agent starts. Its own settings come from this repository
-                                and from Agents settings.
-                            </p>
+                            <p className="text-sm">{t("sessions.form.enigma")}</p>
+                            <p className="text-xs text-muted-foreground">{t("sessions.form.enigmaHint")}</p>
                         </div>
                         <Switch checked={enigma} onChange={setEnigma} />
                     </div>
@@ -467,14 +454,14 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button
                         onClick={submit}
                         disabled={busy || !title || !repoId || unlinked !== null}
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        Start
+                        {t("sessions.form.submit")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

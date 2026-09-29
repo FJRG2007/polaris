@@ -34,7 +34,7 @@ export async function saveSmsSenderAction(
     const result = await saveSmsSender(user.id, parsed.data);
     if (!result.error) revalidatePath("/admin/inbox/channels");
     // The sender answers in English; the reader gets their own words.
-    return result.error ? { ...result, error: deliveryText(await getTranslations("notices"), result.error) } : result;
+    return result.error ? { ...result, error: deliveryText(await getTranslations("components"), result.error) } : result;
 }
 
 export async function deleteSmsSenderAction(id: unknown): Promise<void> {

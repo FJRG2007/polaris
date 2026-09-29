@@ -6,6 +6,7 @@ import { Button, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
 import { listAgentRuns } from "@/lib/agents/agent-run-service";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AgentsPage() {
     const user = await requirePermission("agents.read");
+    const t = await getTranslations("agents");
     const [repos, runs] = await Promise.all([
         listAgentRepos(user.id),
         listAgentRuns(user.id, { limit: 10 })
@@ -27,12 +29,12 @@ export default async function AgentsPage() {
     return (
         <>
             <PageHeader
-                title="Agents"
-                description="Put a coding agent in your repositories. It reviews pull requests, answers issues, fixes failing checks, and opens pull requests when you ask it to."
+                title={t("page.title")}
+                description={t("page.description")}
                 actions={
                     repos.length > 0 ? (
                         <Button asChild size="sm">
-                            <Link href="/apps/agents/repos">Repositories</Link>
+                            <Link href="/apps/agents/repos">{t("overview.repositories")}</Link>
                         </Button>
                     ) : null
                 }
