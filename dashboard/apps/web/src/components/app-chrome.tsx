@@ -386,5 +386,5 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
 
     // The frame's own words - the rail, the switcher, the account menu - for
     // every client component in it.
-    return <Messages namespaces={["nav"]}>{frame}</Messages>;
+    return <Messages namespaces={["nav", "chat"]}>{frame}</Messages>;
 }

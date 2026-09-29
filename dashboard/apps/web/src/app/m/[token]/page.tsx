@@ -15,6 +15,7 @@
 import { prisma } from "@polaris/db";
 import { GuestCall } from "./guest-call";
 import { getSession } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
 import { LinkUnavailable } from "@/components/public-shell";
 
 export const runtime = "nodejs";
@@ -57,15 +58,17 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
     }
 
     return (
-        <GuestCall
-            token={token}
-            title={meeting.title}
-            signedIn={Boolean(session?.user)}
-            suggestedName={session?.user?.name ?? ""}
-            // Whose name they arrive under. A meeting that asked for accounts
-            // seats whoever is signed in as themselves - there is nothing to
-            // type, and nothing they could type that would be believed.
-            asAccount={meeting.requireAccount}
-        />
+        <Messages namespaces={["chat"]}>
+            <GuestCall
+                token={token}
+                title={meeting.title}
+                signedIn={Boolean(session?.user)}
+                suggestedName={session?.user?.name ?? ""}
+                // Whose name they arrive under. A meeting that asked for accounts
+                // seats whoever is signed in as themselves - there is nothing to
+                // type, and nothing they could type that would be believed.
+                asAccount={meeting.requireAccount}
+            />
+        </Messages>
     );
 }

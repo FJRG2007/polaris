@@ -23,6 +23,7 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
 import { requirePermission } from "@/lib/session";
+import { getLocale } from "@/lib/i18n/request";
 import * as moderation from "@/lib/chat/call-moderation";
 import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
@@ -46,7 +47,7 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof ChatAccessError) return { error: caught.message };
+        if (caught instanceof ChatAccessError) return { error: caught.textIn(await getLocale()) };
         throw caught;
     }
 }

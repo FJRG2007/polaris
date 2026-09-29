@@ -34,6 +34,8 @@ import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
+import { translate } from "@/lib/i18n/translate";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
@@ -44,10 +46,38 @@ export interface ChatActor {
 /** What somebody may do in a space. `owner` outranks both stored roles. */
 export type ChatSpaceAccess = "member" | "admin" | "owner";
 
+/** A refusal in words from the `chat` catalog: the key under `errors`, and the
+ *  values its sentence takes. */
+export interface ChatErrorText {
+    readonly key: ChatErrorKey;
+    readonly params?: core.MessageParams;
+}
+
+/** The keys a refusal may be written with. */
+export type ChatErrorKey = Extract<NamespaceKey<"chat">, `errors.${string}`>;
+
+/**
+ * A refusal the person who asked is shown.
+ *
+ * Thrown with a key from the `chat` catalog rather than a sentence, because it
+ * is read by whoever pressed the button, in their language, and only the layer
+ * that answers them knows which that is: `textIn(locale)` is what an action or a
+ * route hands back. `message` stays the English sentence, for logs and for any
+ * caller that has no reader to ask.
+ */
 export class ChatAccessError extends Error {
-    constructor(message = "You are not in that conversation") {
-        super(message);
+    /** The catalog words, or null for a sentence thrown as it is. */
+    readonly text: ChatErrorText | null;
+
+    constructor(text: ChatErrorText | string = { key: "errors.notInConversation" }) {
+        super(typeof text === "string" ? text : translate(core.DEFAULT_LOCALE, `chat.${text.key}`, text.params));
+        this.text = typeof text === "string" ? null : text;
         this.name = "ChatAccessError";
+    }
+
+    /** The refusal in one reader's language. */
+    textIn(locale: core.Locale): string {
+        return this.text ? translate(locale, `chat.${this.text.key}`, this.text.params) : this.message;
     }
 }
 
@@ -61,8 +91,8 @@ export class ChatAccessError extends Error {
  * name is what tells the two apart in a log.
  */
 export class ChatRuleError extends ChatAccessError {
-    constructor(message: string) {
-        super(message);
+    constructor(text: ChatErrorText | string) {
+        super(text);
         this.name = "ChatRuleError";
     }
 }

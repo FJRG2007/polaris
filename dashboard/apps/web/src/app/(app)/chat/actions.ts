@@ -26,6 +26,7 @@ import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
+import { getLocale } from "@/lib/i18n/request";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
@@ -83,7 +84,7 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof ChatAccessError) return { error: caught.message };
+        if (caught instanceof ChatAccessError) return { error: caught.textIn(await getLocale()) };
         throw caught;
     }
 }
