@@ -15,6 +15,7 @@ import type { InstalledAppView } from "@/lib/apps/install-service";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { uninstallInstalledAppAction } from "@/app/(app)/apps/installed/[id]/actions";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const refresh = vi.fn();
 
@@ -52,7 +53,7 @@ describe("uninstalling from the marketplace grid", () => {
         vi.mocked(uninstallInstalledAppAction).mockResolvedValue({
             error: "Delete your game servers first (Ark Island). Uninstalling Game servers never deletes a world."
         });
-        render(<MarketplaceView installed={[installed({})]} />);
+        render(<MarketplaceView installed={[installed({})]} />, { wrapper: MessagesWrapper });
 
         fireEvent.click(screen.getByRole("button", { name: "Uninstall Game servers" }));
         const dialog = await screen.findByRole("dialog");
@@ -70,7 +71,8 @@ describe("uninstalling from the marketplace grid", () => {
         render(
             <MarketplaceView
                 installed={[installed({ id: "install-2", catalogId: "home", name: "Places" })]}
-            />
+            />,
+            { wrapper: MessagesWrapper }
         );
 
         fireEvent.click(screen.getByRole("button", { name: "Uninstall Places" }));
@@ -83,7 +85,7 @@ describe("uninstalling from the marketplace grid", () => {
     });
 
     it("leaves the app installed when Cancel is pressed", async () => {
-        render(<MarketplaceView installed={[installed({})]} />);
+        render(<MarketplaceView installed={[installed({})]} />, { wrapper: MessagesWrapper });
 
         fireEvent.click(screen.getByRole("button", { name: "Uninstall Game servers" }));
         const dialog = await screen.findByRole("dialog");

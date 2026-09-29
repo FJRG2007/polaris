@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MinecraftMods } from "@polaris-app/game-servers/src/screens/installed/minecraft-mods";
 // The dashboard's pieces the screen takes, as the layout provides them.
 import "@/components/app-host/client";
+import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     updateServerSettingsAction: vi.fn()
@@ -73,7 +74,8 @@ describe("removing a mod from an installed server", () => {
                 settings={SETTINGS}
                 playersOnline={0}
                 onSaved={vi.fn()}
-            />
+            />,
+            { wrapper: MessagesWrapper }
         );
 
         await screen.findByText("CoreProtect");
