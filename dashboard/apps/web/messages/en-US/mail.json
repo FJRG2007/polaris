@@ -1,1 +1,52 @@
-{}
+{
+    "labels": {
+        "signatureAuto": {
+            "never": "Only when I insert it",
+            "new": "On messages I start",
+            "always": "On everything, replies included"
+        },
+        "category": {
+            "primary": "Primary",
+            "social": "Social",
+            "promotions": "Promotions",
+            "billing": "Purchases and bills",
+            "updates": "Updates",
+            "security": "Security"
+        },
+        "filter": {
+            "unread": "Unread",
+            "read": "Read",
+            "starred": "Starred",
+            "attachments": "With attachments"
+        },
+        "sort": {
+            "newest": "Newest first",
+            "oldest": "Oldest first",
+            "largest": "Largest first",
+            "smallest": "Smallest first"
+        },
+        "folderRole": {
+            "inbox": "Inbox",
+            "sent": "Sent",
+            "drafts": "Drafts",
+            "trash": "Trash",
+            "junk": "Spam",
+            "archive": "Archive",
+            "all": "All mail",
+            "none": "No particular use"
+        },
+        "markRead": {
+            "open": "As soon as I open it",
+            "delay": "After a few seconds",
+            "never": "Only when I say so"
+        },
+        "afterFiling": {
+            "list": "Go back to the list",
+            "next": "Open the next conversation"
+        },
+        "mailboxScope": {
+            "shelf": "The account or organization in view",
+            "all": "All of them at once"
+        }
+    }
+}

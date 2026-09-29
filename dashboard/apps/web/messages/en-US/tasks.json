@@ -1,1 +1,182 @@
-{}
+{
+    "labels": {
+        "priority": {
+            "urgent": "Urgent",
+            "high": "High",
+            "normal": "Normal",
+            "low": "Low",
+            "none": "No priority"
+        },
+        "statusType": {
+            "open": "Not started",
+            "active": "Active",
+            "blocked": "Blocked",
+            "done": "Done",
+            "closed": "Closed"
+        },
+        "statusTypeHint": {
+            "open": "Work that has not been picked up yet.",
+            "active": "Work in progress. Counts as started but not finished.",
+            "blocked": "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
+            "done": "Finished work. Completing a task moves it to the first status of this kind.",
+            "closed": "Filed away without being completed: cancelled, duplicate, or won't do."
+        },
+        "customField": {
+            "text": "Text",
+            "longText": "Long text",
+            "number": "Number",
+            "money": "Money",
+            "percent": "Percent",
+            "date": "Date",
+            "checkbox": "Checkbox",
+            "dropdown": "Dropdown",
+            "labels": "Labels",
+            "url": "URL",
+            "email": "Email",
+            "phone": "Phone",
+            "people": "People",
+            "rating": "Rating",
+            "progress": "Progress"
+        },
+        "view": {
+            "list": "List",
+            "board": "Board",
+            "table": "Table",
+            "calendar": "Calendar",
+            "gantt": "Gantt"
+        },
+        "group": {
+            "status": "Status",
+            "assignee": "Assignee",
+            "priority": "Priority",
+            "dueDate": "Due date",
+            "tag": "Tag",
+            "list": "List",
+            "blocked": "Blocked",
+            "none": "No grouping"
+        },
+        "sort": {
+            "manual": "Manual order",
+            "name": "Name",
+            "status": "Status",
+            "priority": "Priority",
+            "dueDate": "Due date",
+            "startDate": "Start date",
+            "createdAt": "Created",
+            "updatedAt": "Updated",
+            "points": "Points",
+            "timeEstimate": "Estimate"
+        },
+        "filter": {
+            "status": "Status",
+            "statusType": "Status kind",
+            "assignee": "Assignee",
+            "watcher": "Watcher",
+            "createdBy": "Created by",
+            "priority": "Priority",
+            "tag": "Tag",
+            "list": "List",
+            "dueDate": "Due date",
+            "startDate": "Start date",
+            "createdAt": "Created",
+            "name": "Name",
+            "points": "Points",
+            "timeEstimate": "Estimate",
+            "archived": "Archived",
+            "blocked": "Blocked",
+            "customField": "Custom field"
+        },
+        "filterOperator": {
+            "is": "is",
+            "isNot": "is not",
+            "anyOf": "is any of",
+            "noneOf": "is none of",
+            "contains": "contains",
+            "notContains": "does not contain",
+            "isSet": "is set",
+            "isNotSet": "is not set",
+            "before": "is before",
+            "after": "is after",
+            "between": "is between",
+            "gt": "is greater than",
+            "lt": "is less than"
+        },
+        "relativeDate": {
+            "today": "Today",
+            "tomorrow": "Tomorrow",
+            "yesterday": "Yesterday",
+            "thisWeek": "This week",
+            "nextWeek": "Next week",
+            "lastWeek": "Last week",
+            "thisMonth": "This month",
+            "nextMonth": "Next month",
+            "overdue": "Overdue"
+        },
+        "recurrence": {
+            "daily": "Daily",
+            "weekly": "Weekly",
+            "monthly": "Monthly",
+            "yearly": "Yearly"
+        },
+        "automationTrigger": {
+            "created": "A task is created",
+            "statusChanged": "Status changes",
+            "priorityChanged": "Priority changes",
+            "assigneeAdded": "An assignee is added",
+            "assigneeRemoved": "An assignee is removed",
+            "tagAdded": "A tag is added",
+            "moved": "A task moves list",
+            "dueDateSet": "A due date is set",
+            "commentAdded": "A comment is posted",
+            "completed": "A task is completed"
+        },
+        "automationAction": {
+            "setStatus": "Change status",
+            "setPriority": "Change priority",
+            "addAssignee": "Assign to",
+            "removeAssignee": "Unassign",
+            "addTag": "Add tag",
+            "removeTag": "Remove tag",
+            "setDueDate": "Set due date",
+            "moveToList": "Move to list",
+            "addComment": "Post a comment",
+            "addWatcher": "Add a watcher",
+            "archive": "Archive the task",
+            "createSubtask": "Create a subtask"
+        },
+        "formField": {
+            "text": "Short answer",
+            "longText": "Paragraph",
+            "email": "Email",
+            "number": "Number",
+            "date": "Date",
+            "dropdown": "Choice",
+            "checkbox": "Checkbox"
+        },
+        "goalTarget": {
+            "number": "Number",
+            "currency": "Currency",
+            "percent": "Percent",
+            "boolean": "Done or not",
+            "tasks": "Tasks completed"
+        },
+        "spaceRole": {
+            "guest": "Guest",
+            "member": "Member",
+            "admin": "Admin"
+        },
+        "spaceRoleHint": {
+            "guest": "Read tasks and comment on the ones they are assigned to.",
+            "member": "Create and edit tasks, lists and views.",
+            "admin": "Everything a member can do, plus statuses, fields, automations and deletion."
+        },
+        "dueBucket": {
+            "overdue": "Overdue",
+            "today": "Today",
+            "tomorrow": "Tomorrow",
+            "thisWeek": "This week",
+            "later": "Later",
+            "none": "No due date"
+        }
+    }
+}

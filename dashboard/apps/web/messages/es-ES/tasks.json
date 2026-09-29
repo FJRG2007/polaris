@@ -1,1 +1,182 @@
-{}
+{
+    "labels": {
+        "priority": {
+            "urgent": "Urgente",
+            "high": "Alta",
+            "normal": "Normal",
+            "low": "Baja",
+            "none": "Sin prioridad"
+        },
+        "statusType": {
+            "open": "Sin empezar",
+            "active": "En curso",
+            "blocked": "Bloqueada",
+            "done": "Hecha",
+            "closed": "Cerrada"
+        },
+        "statusTypeHint": {
+            "open": "Trabajo que nadie ha empezado todavía.",
+            "active": "Trabajo en marcha. Cuenta como empezado pero no terminado.",
+            "blocked": "Trabajo que no puede avanzar. Aparece como detenido en todas partes, sin que nadie tenga que explicar por qué.",
+            "done": "Trabajo terminado. Completar una tarea la lleva al primer estado de este tipo.",
+            "closed": "Archivado sin completarse: cancelado, duplicado o descartado."
+        },
+        "customField": {
+            "text": "Texto",
+            "longText": "Texto largo",
+            "number": "Número",
+            "money": "Importe",
+            "percent": "Porcentaje",
+            "date": "Fecha",
+            "checkbox": "Casilla",
+            "dropdown": "Desplegable",
+            "labels": "Etiquetas",
+            "url": "URL",
+            "email": "Correo",
+            "phone": "Teléfono",
+            "people": "Personas",
+            "rating": "Valoración",
+            "progress": "Progreso"
+        },
+        "view": {
+            "list": "Lista",
+            "board": "Tablero",
+            "table": "Tabla",
+            "calendar": "Calendario",
+            "gantt": "Gantt"
+        },
+        "group": {
+            "status": "Estado",
+            "assignee": "Responsable",
+            "priority": "Prioridad",
+            "dueDate": "Fecha límite",
+            "tag": "Etiqueta",
+            "list": "Lista",
+            "blocked": "Bloqueada",
+            "none": "Sin agrupar"
+        },
+        "sort": {
+            "manual": "Orden manual",
+            "name": "Nombre",
+            "status": "Estado",
+            "priority": "Prioridad",
+            "dueDate": "Fecha límite",
+            "startDate": "Fecha de inicio",
+            "createdAt": "Creada",
+            "updatedAt": "Actualizada",
+            "points": "Puntos",
+            "timeEstimate": "Estimación"
+        },
+        "filter": {
+            "status": "Estado",
+            "statusType": "Tipo de estado",
+            "assignee": "Responsable",
+            "watcher": "Seguidor",
+            "createdBy": "Creada por",
+            "priority": "Prioridad",
+            "tag": "Etiqueta",
+            "list": "Lista",
+            "dueDate": "Fecha límite",
+            "startDate": "Fecha de inicio",
+            "createdAt": "Creada",
+            "name": "Nombre",
+            "points": "Puntos",
+            "timeEstimate": "Estimación",
+            "archived": "Archivada",
+            "blocked": "Bloqueada",
+            "customField": "Campo personalizado"
+        },
+        "filterOperator": {
+            "is": "es",
+            "isNot": "no es",
+            "anyOf": "es alguno de",
+            "noneOf": "no es ninguno de",
+            "contains": "contiene",
+            "notContains": "no contiene",
+            "isSet": "tiene valor",
+            "isNotSet": "no tiene valor",
+            "before": "es anterior a",
+            "after": "es posterior a",
+            "between": "está entre",
+            "gt": "es mayor que",
+            "lt": "es menor que"
+        },
+        "relativeDate": {
+            "today": "Hoy",
+            "tomorrow": "Mañana",
+            "yesterday": "Ayer",
+            "thisWeek": "Esta semana",
+            "nextWeek": "La semana que viene",
+            "lastWeek": "La semana pasada",
+            "thisMonth": "Este mes",
+            "nextMonth": "El mes que viene",
+            "overdue": "Vencidas"
+        },
+        "recurrence": {
+            "daily": "Cada día",
+            "weekly": "Cada semana",
+            "monthly": "Cada mes",
+            "yearly": "Cada año"
+        },
+        "automationTrigger": {
+            "created": "Se crea una tarea",
+            "statusChanged": "Cambia el estado",
+            "priorityChanged": "Cambia la prioridad",
+            "assigneeAdded": "Se añade un responsable",
+            "assigneeRemoved": "Se quita un responsable",
+            "tagAdded": "Se añade una etiqueta",
+            "moved": "Una tarea cambia de lista",
+            "dueDateSet": "Se pone una fecha límite",
+            "commentAdded": "Se publica un comentario",
+            "completed": "Se completa una tarea"
+        },
+        "automationAction": {
+            "setStatus": "Cambiar el estado",
+            "setPriority": "Cambiar la prioridad",
+            "addAssignee": "Asignar a",
+            "removeAssignee": "Desasignar",
+            "addTag": "Añadir etiqueta",
+            "removeTag": "Quitar etiqueta",
+            "setDueDate": "Poner fecha límite",
+            "moveToList": "Mover a la lista",
+            "addComment": "Publicar un comentario",
+            "addWatcher": "Añadir un seguidor",
+            "archive": "Archivar la tarea",
+            "createSubtask": "Crear una subtarea"
+        },
+        "formField": {
+            "text": "Respuesta corta",
+            "longText": "Párrafo",
+            "email": "Correo",
+            "number": "Número",
+            "date": "Fecha",
+            "dropdown": "Opción",
+            "checkbox": "Casilla"
+        },
+        "goalTarget": {
+            "number": "Número",
+            "currency": "Moneda",
+            "percent": "Porcentaje",
+            "boolean": "Hecho o no",
+            "tasks": "Tareas completadas"
+        },
+        "spaceRole": {
+            "guest": "Invitado",
+            "member": "Miembro",
+            "admin": "Administrador"
+        },
+        "spaceRoleHint": {
+            "guest": "Ve las tareas y comenta en las que tiene asignadas.",
+            "member": "Crea y edita tareas, listas y vistas.",
+            "admin": "Todo lo que puede hacer un miembro, además de estados, campos, automatizaciones y borrar."
+        },
+        "dueBucket": {
+            "overdue": "Vencidas",
+            "today": "Hoy",
+            "tomorrow": "Mañana",
+            "thisWeek": "Esta semana",
+            "later": "Más adelante",
+            "none": "Sin fecha límite"
+        }
+    }
+}

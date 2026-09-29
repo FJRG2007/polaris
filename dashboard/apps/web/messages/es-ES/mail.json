@@ -1,1 +1,52 @@
-{}
+{
+    "labels": {
+        "signatureAuto": {
+            "never": "Solo cuando la inserto",
+            "new": "En los mensajes que empiezo",
+            "always": "En todo, también en las respuestas"
+        },
+        "category": {
+            "primary": "Principal",
+            "social": "Social",
+            "promotions": "Promociones",
+            "billing": "Compras y facturas",
+            "updates": "Notificaciones",
+            "security": "Seguridad"
+        },
+        "filter": {
+            "unread": "Sin leer",
+            "read": "Leídos",
+            "starred": "Destacados",
+            "attachments": "Con adjuntos"
+        },
+        "sort": {
+            "newest": "Más recientes primero",
+            "oldest": "Más antiguos primero",
+            "largest": "Más grandes primero",
+            "smallest": "Más pequeños primero"
+        },
+        "folderRole": {
+            "inbox": "Recibidos",
+            "sent": "Enviados",
+            "drafts": "Borradores",
+            "trash": "Papelera",
+            "junk": "Spam",
+            "archive": "Archivo",
+            "all": "Todo el correo",
+            "none": "Sin uso concreto"
+        },
+        "markRead": {
+            "open": "En cuanto lo abro",
+            "delay": "Tras unos segundos",
+            "never": "Solo cuando yo lo diga"
+        },
+        "afterFiling": {
+            "list": "Volver a la lista",
+            "next": "Abrir la siguiente conversación"
+        },
+        "mailboxScope": {
+            "shelf": "La cuenta u organización que tengo abierta",
+            "all": "Todas a la vez"
+        }
+    }
+}
