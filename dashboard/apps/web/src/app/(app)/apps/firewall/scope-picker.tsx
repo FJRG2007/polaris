@@ -18,7 +18,15 @@
 import { Select } from "@polaris/ui";
 import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SCOPE_KINDS, scopeNeedsTarget, scopeOptions, type ScopeCatalog, type ScopeKind } from "./scope-kinds";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import {
+    SCOPE_KINDS,
+    scopeKindLabel,
+    scopeNeedsTarget,
+    scopeOptions,
+    type ScopeCatalog,
+    type ScopeKind
+} from "./scope-kinds";
 
 export function ScopePicker({
     kind,
@@ -33,13 +41,14 @@ export function ScopePicker({
      *  them at all rather than being offered them and refused. */
     canOperate: boolean;
 }) {
+    const t = useTranslations("firewall");
     const router = useRouter();
     const params = useSearchParams();
     const kinds = SCOPE_KINDS.filter(
-        (entry) => canOperate || (entry.value !== "polaris" && entry.value !== "global")
+        (entry) => canOperate || (entry !== "polaris" && entry !== "global")
         // Nothing installed from the marketplace means no shortcut to offer, and a
         // kind that resolves to an empty list is one that only wastes a click.
-    ).filter((entry) => entry.value !== "marketplace" || catalog.marketplace.length > 0);
+    ).filter((entry) => entry !== "marketplace" || catalog.marketplace.length > 0);
     const targets = scopeOptions(kind, catalog);
 
     function go(nextKind: ScopeKind, nextId: string) {
@@ -53,9 +62,9 @@ export function ScopePicker({
     const kindSelect = (
         <Select
             value={kind}
-            aria-label="Scope"
+            aria-label={t("picker.scope")}
             className="h-8 min-w-0 flex-1 font-medium md:w-40 md:min-w-[10rem] md:flex-none"
-            options={kinds.map((entry) => ({ value: entry.value, label: entry.label }))}
+            options={kinds.map((entry) => ({ value: entry, label: scopeKindLabel(t, entry) }))}
             onValueChange={(value) => {
                 const nextKind = value as ScopeKind;
                 // Moving to a kind that names something lands on its first entry, so the
@@ -69,13 +78,13 @@ export function ScopePicker({
     const targetSelect = !scopeNeedsTarget(kind) ? null : targets.length > 0 ? (
         <Select
             value={id || (targets[0]?.id ?? "")}
-            aria-label="Scope target"
+            aria-label={t("picker.target")}
             className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
             options={targets.map((target) => ({ value: target.id, label: target.label }))}
             onValueChange={(value) => go(kind, value)}
         />
     ) : (
-        <span className="whitespace-nowrap text-sm text-muted-foreground">Nothing of that kind yet.</span>
+        <span className="whitespace-nowrap text-sm text-muted-foreground">{t("picker.none")}</span>
     );
 
     return (

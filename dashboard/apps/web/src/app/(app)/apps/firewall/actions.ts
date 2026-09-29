@@ -32,6 +32,21 @@ import {
     setWafAnomalySettings,
     type WafAnomalySettings
 } from "@/lib/waf-anomaly-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+type FirewallKey = NamespaceKey<"firewall">;
+
+/** A reply in the reader's language. */
+async function say(key: FirewallKey): Promise<string> {
+    return (await getTranslations("firewall"))(key);
+}
+
+/** What went wrong, for the reader: a service's own sentence passes through, and
+ *  anything that is not an Error reads as `fallback`. */
+async function failure(caught: unknown, fallback: FirewallKey): Promise<string> {
+    return caught instanceof Error ? caught.message : say(fallback);
+}
 
 type WafAddressActivity = core.WafAddressActivity;
 type WafAnomaly = core.WafAnomaly;
@@ -99,7 +114,7 @@ export async function getWafRuleAction(input: {
         return { rule, inherited, tor };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not load the firewall rule"
+            error: await failure(caught, "errors.load")
         };
     }
 }
@@ -177,7 +192,7 @@ export async function setWafRuleAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the firewall rule"
+            error: await failure(caught, "errors.save")
         };
     }
 }
@@ -241,7 +256,7 @@ export async function getWafRuleMatchesAction(input: {
         return { matches, from, to };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not read recent traffic"
+            error: await failure(caught, "errors.traffic")
         };
     }
 }
@@ -307,7 +322,7 @@ export async function listWafPrincipalsAction(): Promise<{
             ]
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not load the directory" };
+        return { error: await failure(caught, "errors.directory") };
     }
 }
 
@@ -355,7 +370,7 @@ export async function getWafOverviewAction(hours = 24): Promise<{
         };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not load the firewall overview"
+            error: await failure(caught, "errors.overview")
         };
     }
 }
@@ -415,9 +430,9 @@ export async function getWafAddressActivityAction(
 }> {
     const user = await requirePermission("system.manage");
     const address = core.cidrOrIp.safeParse(ip);
-    if (!address.success) return { error: "That is not a valid address" };
+    if (!address.success) return { error: await say("errors.address") };
     const window = z.number().int().min(1).max(168).safeParse(hours);
-    if (!window.success) return { error: "That is not a valid window" };
+    if (!window.success) return { error: await say("errors.window") };
     try {
         // A ban can be a range, and sessions and sign-ins are recorded against the
         // one address they came from - so a range matches nothing, and answering it
@@ -456,7 +471,7 @@ export async function getWafAddressActivityAction(
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not read that address's activity"
+                await failure(caught, "errors.activity")
         };
     }
 }
@@ -464,7 +479,7 @@ export async function getWafAddressActivityAction(
 export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = z.array(wafJailSchema).max(32).safeParse(jails);
-    if (!parsed.success) return { error: "Those jail settings are not valid" };
+    if (!parsed.success) return { error: await say("errors.jailsInvalid") };
     try {
         await setWafJails(parsed.data);
         await recordAudit({
@@ -477,7 +492,7 @@ export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ err
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the jail settings"
+            error: await failure(caught, "errors.jailsSave")
         };
     }
 }
@@ -485,7 +500,7 @@ export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ err
 export async function setWafIgnoreListAction(entries: string[]): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = z.array(core.cidrOrIp).max(core.WAF_LIST_MAX).safeParse(entries);
-    if (!parsed.success) return { error: "Enter valid IP addresses or CIDR ranges" };
+    if (!parsed.success) return { error: await say("errors.addresses") };
     try {
         await intel.setWafIgnoreList(parsed.data);
         // Trusting lifts the bans, and a ban reaches the machines as well as the edge.
@@ -503,7 +518,7 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the list" };
+        return { error: await failure(caught, "errors.listSave") };
     }
 }
 
@@ -512,7 +527,7 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
 export async function liftWafBanAction(ip: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = core.cidrOrIp.safeParse(ip);
-    if (!parsed.success) return { error: "That is not a valid address" };
+    if (!parsed.success) return { error: await say("errors.address") };
     try {
         await intel.removeWafBan(parsed.data);
         // The edge is only half of where a ban lives; the SSH jail drops the address
@@ -529,7 +544,7 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not lift the ban" };
+        return { error: await failure(caught, "errors.lift") };
     }
 }
 
@@ -549,7 +564,7 @@ export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: s
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change the Tor setting"
+            error: await failure(caught, "errors.tor")
         };
     }
 }
@@ -573,7 +588,7 @@ export async function setWafAnomalySettingsAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = anomalySettingsSchema.safeParse(settings);
-    if (!parsed.success) return { error: "Those anomaly settings are not valid" };
+    if (!parsed.success) return { error: await say("errors.anomalyInvalid") };
     try {
         await setWafAnomalySettings(parsed.data);
         await recordAudit({
@@ -585,7 +600,7 @@ export async function setWafAnomalySettingsAction(
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+        return { error: await failure(caught, "errors.settingsSave") };
     }
 }
 
@@ -594,7 +609,7 @@ export async function setWafAnomalySettingsAction(
 export async function blockAnomalyAction(ip: string, note: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = core.cidrOrIp.safeParse(ip);
-    if (!parsed.success) return { error: "That is not a valid address" };
+    if (!parsed.success) return { error: await say("errors.address") };
     try {
         const settings = await getWafAnomalySettings();
         await intel.recordWafBan({
@@ -614,6 +629,6 @@ export async function blockAnomalyAction(ip: string, note: string): Promise<{ er
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not block that address" };
+        return { error: await failure(caught, "errors.block") };
     }
 }

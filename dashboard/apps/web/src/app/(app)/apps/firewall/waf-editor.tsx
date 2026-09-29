@@ -39,6 +39,9 @@ import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
 import { PredefinedRuleList, type PredefinedRuleRow } from "./predefined-list";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { localizeManaged } from "./waf-words";
 import {
     WAF_MANAGED_RULES,
     WAF_RULES_MAX,
@@ -101,21 +104,12 @@ function managedPatch(rule: WafManagedRule, saved: WafScopeRule, on: boolean): P
     };
 }
 
+type Words = NamespaceTranslator<"firewall">;
+
 /** Said once, because the row and the rule's own page both say it. */
-const ARMED_ABOVE = {
-    label: "From a broader scope",
-    why: "A scope above this one arms it, and a narrower scope cannot switch a refusal off. Write an allow rule above it to carve out an exception."
-};
-
-const OFF_ABOVE = {
-    label: "Off above",
-    why: "A scope above this one switched it off for everything it covers, and a narrower scope cannot switch it back on."
-};
-
-const INSTANCE_FEED = {
-    label: "Instance-wide",
-    why: "One switch for the whole instance: the edge refuses the address before it knows which service was asked for. Open the rule to change it."
-};
+const armedAbove = (t: Words) => ({ label: t("scope.armedAbove"), why: t("scope.armedAboveWhy") });
+const offAbove = (t: Words) => ({ label: t("scope.offAbove"), why: t("scope.offAboveWhy") });
+const instanceFeed = (t: Words) => ({ label: t("scope.instanceWide"), why: t("scope.instanceWideWhy") });
 
 /**
  * Who decides this rule, when it is not this scope.
@@ -134,7 +128,8 @@ function decidedElsewhere(
     saved: WafScopeRule,
     inherited: WafInheritedView | null,
     tor: WafFeedView | null,
-    canOperate: boolean
+    canOperate: boolean,
+    t: Words
 ): { on: boolean; label: string; why: string } | undefined {
     if (rule.control.kind === "feed") {
         // Never switched from the row: an operator changes it on the rule's own page,
@@ -143,20 +138,20 @@ function decidedElsewhere(
         // to do in passing.
         return {
             on: tor?.enabled ?? false,
-            ...INSTANCE_FEED,
-            why: canOperate ? INSTANCE_FEED.why : "Set by whoever runs this instance."
+            ...instanceFeed(t),
+            why: canOperate ? instanceFeed(t).why : t("scope.setByOperator")
         };
     }
     if (!inherited) return undefined;
     if (rule.control.kind === "preset") {
         if (saved.presets.includes(rule.control.preset)) return undefined;
-        return inherited.presets.includes(rule.control.preset) ? { on: true, ...ARMED_ABOVE } : undefined;
+        return inherited.presets.includes(rule.control.preset) ? { on: true, ...armedAbove(t) } : undefined;
     }
     if (rule.control.setting === "browserIntegrity") {
         if (saved.browserIntegrity) return undefined;
-        return inherited.browserIntegrity ? { on: true, ...ARMED_ABOVE } : undefined;
+        return inherited.browserIntegrity ? { on: true, ...armedAbove(t) } : undefined;
     }
-    return inherited[rule.control.setting] ? undefined : { on: false, ...OFF_ABOVE };
+    return inherited[rule.control.setting] ? undefined : { on: false, ...offAbove(t) };
 }
 
 export function WafEditor({
@@ -185,6 +180,7 @@ export function WafEditor({
     canOperate?: boolean;
     instancePanels?: React.ReactNode;
 }) {
+    const t = useTranslations("firewall");
     // What the server holds. Every immediate change is composed against this, so a
     // half-typed address list can never ride along with a switch.
     const [saved, setSaved] = useState<WafScopeRule | null>(null);
@@ -316,10 +312,11 @@ export function WafEditor({
     }
 
     if (view.kind === "managed") {
-        const rule = wafManagedRule(view.id);
+        const found = wafManagedRule(view.id);
         // A pack this build no longer ships can still be named by a saved scope. The
         // list does not offer a row for it, so getting here means a stale link.
-        if (!rule) return <MissingRule onBack={backToList} />;
+        if (!found) return <MissingRule onBack={backToList} />;
+        const rule = localizeManaged(found, t);
         const feed = rule.control.kind === "feed";
         return (
             <ManagedRulePage
@@ -329,7 +326,7 @@ export function WafEditor({
                 // A feed is the one rule this page can change instance-wide, so the
                 // switch stays live here for an operator - the row does not offer it.
                 decidedElsewhere={
-                    feed && canOperate ? undefined : decidedElsewhere(rule, saved, inherited, tor, canOperate)
+                    feed && canOperate ? undefined : decidedElsewhere(rule, saved, inherited, tor, canOperate, t)
                 }
                 // Only an operator is told how the fetch is going; for everybody else
                 // the rule is on or off and the plumbing is not theirs. The action
@@ -342,8 +339,12 @@ export function WafEditor({
                         kind: "custom",
                         index: null,
                         rule: {
-                            ...emptyRule(saved.rules.length),
-                            name: `Allow past ${rule.label.replace(/^Block /, "")}`.slice(0, 80),
+                            ...emptyRule(saved.rules.length, t),
+                            name: t("editor.allowPast", {
+                                what: rule.label.startsWith(t("editor.blockPrefix"))
+                                    ? rule.label.slice(t("editor.blockPrefix").length)
+                                    : rule.label
+                            }).slice(0, 80),
                             action: "allow"
                         }
                     })
@@ -396,25 +397,25 @@ export function WafEditor({
     const accessRows: PredefinedRuleRow[] = [
         {
             id: "addresses",
-            name: "IP access rules",
-            description: "Addresses this scope admits, and addresses it refuses before anything else is checked.",
-            action: { label: "Access", variant: "neutral" },
+            name: t("access.addressesTitle"),
+            description: t("access.addressesDescription"),
+            action: { label: t("access.accessBadge"), variant: "neutral" },
             enabled: null,
             // Enforced before any rule is evaluated, so there is nothing to replay.
             activity: null,
             state: addressesUnsaved
-                ? "Unsaved changes"
+                ? t("access.unsaved")
                 : addressCount === 0
-                  ? "No addresses"
-                  : `${saved.ipAllowlist.length} allowed, ${saved.ipDenylist.length} blocked`
+                  ? t("access.noAddresses")
+                  : t("access.counts", { allowed: saved.ipAllowlist.length, blocked: saved.ipDenylist.length })
         },
         ...(offerLogin
             ? [
                   {
                       id: "login",
-                      name: "Require a Polaris login",
-                      description: "Visitors sign in to Polaris first, and the rule can name which accounts it admits.",
-                      action: { label: "Login", variant: "neutral" as const },
+                      name: t("access.loginTitle"),
+                      description: t("access.loginDescription"),
+                      action: { label: t("access.loginBadge"), variant: "neutral" as const },
                       enabled: saved.requireLogin,
                       // Unions downward like a pack: a project demanding a login means
                       // its services demand one, and the row has to say so rather than
@@ -423,8 +424,8 @@ export function WafEditor({
                           !saved.requireLogin && inherited?.requireLogin
                               ? {
                                     on: true,
-                                    label: ARMED_ABOVE.label,
-                                    why: "A scope above this one requires a login, and a narrower scope cannot waive it."
+                                    label: armedAbove(t).label,
+                                    why: t("scope.loginAboveWhy")
                                 }
                               : undefined,
                       activity: null
@@ -433,13 +434,13 @@ export function WafEditor({
             : [])
     ];
 
-    const managedRows: PredefinedRuleRow[] = WAF_MANAGED_RULES.map((rule) => ({
+    const managedRows: PredefinedRuleRow[] = WAF_MANAGED_RULES.map((core) => localizeManaged(core, t)).map((rule) => ({
         id: rule.id,
         name: rule.label,
         description: rule.description,
-        action: { label: "Block", variant: "danger" as const },
+        action: { label: t("actions.block"), variant: "danger" as const },
         enabled: managedEnabled(rule, saved, tor),
-        decidedElsewhere: decidedElsewhere(rule, saved, inherited, tor, canOperate),
+        decidedElsewhere: decidedElsewhere(rule, saved, inherited, tor, canOperate, t),
         caution: rule.caution,
         // A signature check and a fetched list have no conditions to replay, so there
         // is nothing honest to draw for them.
@@ -465,7 +466,7 @@ export function WafEditor({
                           ...saved.rules.map((rule, index) => ({
                               key: `custom:${index}`,
                               name: rule.name,
-                              description: ruleDescription(rule)
+                              description: ruleDescription(rule, t)
                           })),
                           ...accessRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description })),
                           ...managedRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description }))
@@ -505,20 +506,20 @@ export function WafEditor({
                     />
                     <Input
                         value={search}
-                        aria-label="Search rules by name"
-                        placeholder="Search rules by name"
+                        aria-label={t("search.label")}
+                        placeholder={t("search.label")}
                         className="pl-8"
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </div>
                 <Select
                     value={status}
-                    aria-label="Show"
+                    aria-label={t("search.show")}
                     className="w-40"
                     options={[
-                        { value: "all", label: "Show all" },
-                        { value: "active", label: "Active only" },
-                        { value: "off", label: "Off only" }
+                        { value: "all", label: t("search.all") },
+                        { value: "active", label: t("search.active") },
+                        { value: "off", label: t("search.off") }
                     ]}
                     onValueChange={(value) => setStatus(value as "all" | "active" | "off")}
                 />
@@ -533,7 +534,7 @@ export function WafEditor({
                 canEdit={!busy && !filtering}
                 hidden={hiddenRules}
                 matches={matches}
-                onCreate={() => setView({ kind: "custom", index: null, rule: emptyRule(saved.rules.length) })}
+                onCreate={() => setView({ kind: "custom", index: null, rule: emptyRule(saved.rules.length, t) })}
                 onEdit={(index) => {
                     const rule = saved.rules[index];
                     if (rule) setView({ kind: "custom", index, rule });
@@ -542,8 +543,8 @@ export function WafEditor({
             />
 
             <PredefinedRuleList
-                title="Access rules"
-                hint="Who reaches this scope at all. Both are checked before any rule above."
+                title={t("access.title")}
+                hint={t("access.hint")}
                 canEdit={!busy}
                 onOpen={(id) => setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })}
                 onToggle={(_, on) => persist({ requireLogin: on })}
@@ -551,8 +552,8 @@ export function WafEditor({
             />
 
             <PredefinedRuleList
-                title="Managed rules"
-                hint="Signatures and lists Polaris keeps up to date. Open one to read what it enforces."
+                title={t("managedList.title")}
+                hint={t("managedList.hint")}
                 canEdit={!busy}
                 onOpen={(id) => setView({ kind: "managed", id })}
                 onToggle={(id, on) => {
@@ -566,25 +567,18 @@ export function WafEditor({
                 )}
             />
 
-            <Section
-                title="Scrape shield"
-                hint="Changes the response rather than refusing the request, which is why it is not a rule."
-            >
+            <Section title={t("shield.title")} hint={t("shield.hint")}>
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-2">
                         <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         <div className="min-w-0">
-                            <div className="text-sm">Email address obfuscation</div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                Replaces email addresses in served HTML with a token the page decodes in the browser,
-                                so the address is not in the source. Visitors see no change. A harvester driving a real
-                                browser still reads it.
-                            </p>
+                            <div className="text-sm">{t("shield.obfuscation")}</div>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{t("shield.obfuscationHint")}</p>
                             {/* It intersects across scopes, so a broader one can only
                                 switch it OFF - and this switch would otherwise sit on
                                 "on" while nothing was being rewritten. */}
                             {obfuscationOffAbove ? (
-                                <p className="mt-1 text-xs text-muted-foreground">{OFF_ABOVE.why}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">{offAbove(t).why}</p>
                             ) : null}
                         </div>
                     </div>
@@ -592,7 +586,7 @@ export function WafEditor({
                         checked={saved.emailObfuscation && !obfuscationOffAbove}
                         disabled={busy || obfuscationOffAbove}
                         onChange={(on) => persist({ emailObfuscation: on })}
-                        aria-label="Email address obfuscation"
+                        aria-label={t("shield.obfuscation")}
                     />
                 </div>
             </Section>
@@ -600,8 +594,8 @@ export function WafEditor({
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <p className="text-xs text-muted-foreground">
                 {scopeType === "polaris"
-                    ? "Applies to the public domains Polaris answers on. The local network name is served separately and stays reachable."
-                    : "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy."}
+                    ? t("scope.polarisNote")
+                    : t("scope.remoteNote")}
             </p>
 
             {/* Under the rules rather than under whichever rule is open: what the
@@ -645,15 +639,16 @@ function placed(
 /** A rule that was opened by id and is not in this build - a pack retired in a
  *  release, reached from a link somebody kept. */
 function MissingRule({ onBack }: { onBack: () => void }) {
+    const t = useTranslations("firewall");
     return (
         <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">This rule is not part of this version of Polaris.</p>
+            <p className="text-sm text-muted-foreground">{t("missing.text")}</p>
             <button
                 type="button"
                 onClick={onBack}
                 className="w-fit text-sm text-primary underline-offset-2 hover:underline"
             >
-                Back to the rules
+                {t("missing.back")}
             </button>
         </div>
     );
@@ -662,11 +657,12 @@ function MissingRule({ onBack }: { onBack: () => void }) {
 /** The shape of the screen, drawn before its contents arrive. Sized to what lands so
  *  nothing jumps when it does. */
 function LoadingShape() {
+    const t = useTranslations("firewall");
     return (
         <div className="flex flex-col gap-4" aria-busy="true">
             <span className="sr-only">
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                Loading the firewall rules
+                {t("loading")}
             </span>
             <Skeleton className="h-56 w-full rounded-lg" />
             <Skeleton className="h-40 w-full rounded-lg" />

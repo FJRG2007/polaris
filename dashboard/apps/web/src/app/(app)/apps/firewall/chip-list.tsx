@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button, Input } from "@polaris/ui";
 import { isCidr, isIpAddress } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** True if a trimmed entry is a valid single IP or CIDR range. */
 export function validAddress(value: string): boolean {
@@ -38,6 +39,7 @@ export function ChipList({
     invalidMessage?: string;
     disabled?: boolean;
 }) {
+    const t = useTranslations("firewall");
     const [draft, setDraft] = useState("");
     const trimmed = draft.trim();
     const ok = trimmed !== "" && (validate ? validate(trimmed) : true);
@@ -74,14 +76,14 @@ export function ChipList({
                     variant="secondary"
                     onClick={add}
                     disabled={disabled || !ok || duplicate}
-                    title="Add"
-                    aria-label={`Add ${trimmed || "entry"}`}
+                    title={t("chips.add")}
+                    aria-label={trimmed ? t("chips.addNamed", { value: trimmed }) : t("chips.addEntry")}
                 >
                     <Plus className="size-4" aria-hidden="true" />
                 </Button>
             </div>
             {invalid && invalidMessage ? <p className="text-xs text-danger">{invalidMessage}</p> : null}
-            {duplicate && trimmed !== "" ? <p className="text-xs text-muted-foreground">Already in the list.</p> : null}
+            {duplicate && trimmed !== "" ? <p className="text-xs text-muted-foreground">{t("chips.duplicate")}</p> : null}
             {entries.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                     {entries.map((entry) => (
@@ -97,8 +99,8 @@ export function ChipList({
                             <button
                                 type="button"
                                 disabled={disabled}
-                                aria-label={`Remove ${entry}`}
-                                title="Remove"
+                                aria-label={t("principals.remove", { name: entry })}
+                                title={t("conditions.remove")}
                                 onClick={() => onChange(entries.filter((value) => value !== entry))}
                                 className="shrink-0 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                             >

@@ -26,6 +26,8 @@ import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
 import { firewallSlot } from "@/lib/app-extensions/registry";
 import { listInstalledAppScopes } from "@/lib/apps/install-service";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     ruleScopeFor,
     scopeNeedsTarget,
@@ -38,24 +40,24 @@ import {
 export const dynamic = "force-dynamic";
 
 /** What each scope covers, said once here rather than repeated in the editor. */
-function describe(kind: ScopeKind, label: string): string {
+function describe(kind: ScopeKind, label: string, t: NamespaceTranslator<"firewall">): string {
     switch (kind) {
         case "marketplace":
-            return `Applies to ${label} alone. It is an installed app, and these are the rules on the service it runs.`;
+            return t("describe.marketplace", { label });
         case "polaris":
-            return "Guards the dashboard itself on the public domains it answers on. The local network name is served separately and stays reachable, so shutting the public internet out here is something you can undo from your own network.";
+            return t("describe.polaris");
         case "global":
-            return "Applies to every deployed service across all projects. Anything narrower can add restrictions on top, never loosen these.";
+            return t("describe.global");
         case "server-group":
-            return `Applies to every service running on any server in ${label}. Adding a server to the group brings it under these rules.`;
+            return t("describe.serverGroup", { label });
         case "server":
-            return `Applies to every service running on ${label}, whichever project it belongs to.`;
+            return t("describe.server", { label });
         case "project":
-            return `Applies to every service in ${label}, in every environment.`;
+            return t("describe.project", { label });
         case "environment":
-            return `Applies to every service in ${label}.`;
+            return t("describe.environment", { label });
         case "application":
-            return `Applies to ${label} alone.`;
+            return t("describe.application", { label });
     }
 }
 
@@ -67,6 +69,7 @@ export default async function FirewallPage({
     const { scope, id } = await searchParams;
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
+    const t = await getTranslations("firewall");
 
     const [projects, hosts, groups, marketplace] = await Promise.all([
         listProjectScopes(user.id),
@@ -147,7 +150,7 @@ export default async function FirewallPage({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Firewall</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
                     {/* The selects live in the app bar on a wide screen, where the
                         chosen scope is no longer next to the title - so the title
                         carries it. */}
@@ -165,8 +168,7 @@ export default async function FirewallPage({
 
             {scopeNeedsTarget(kind) && !scopeId ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    Nothing of that kind exists yet, so there is nothing to protect. Create one and
-                    its rules appear here.
+                    {t("page.nothing")}
                 </p>
             ) : (
                 <>
@@ -175,7 +177,7 @@ export default async function FirewallPage({
                         key={`${ruleScope}:${scopeId}`}
                         scopeType={ruleScope}
                         scopeId={scopeId}
-                        description={describe(kind, label)}
+                        description={describe(kind, label, t)}
                         // Polaris has a login of its own; sending its visitors round the
                         // guard's cross-domain handoff to reach it would be a loop.
                         offerLogin={kind !== "polaris"}

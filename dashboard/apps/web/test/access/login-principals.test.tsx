@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WafPrincipalGrant } from "@polaris/core";
 import { renderToStaticMarkup } from "react-dom/server";
+import { withMessages } from "../setup/i18n";
 
 vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
     listWafPrincipalsAction: async () => ({
@@ -28,9 +29,9 @@ const { LoginPrincipals } = await import("../../src/app/(app)/apps/firewall/logi
 const { LoginRulePage } = await import("../../src/app/(app)/apps/firewall/access-rules");
 
 function render(admitted: WafPrincipalGrant[], refused: WafPrincipalGrant[]): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <LoginPrincipals admitted={admitted} refused={refused} onChange={() => {}} />
-    );
+    ));
 }
 
 describe("the require-login panel", () => {
@@ -65,7 +66,7 @@ describe("the require-login panel", () => {
 
 describe("the require-login page, when a broader scope already demands one", () => {
     function page(required: boolean, requiredAbove: boolean): string {
-        return renderToStaticMarkup(
+        return renderToStaticMarkup(withMessages(
             <LoginRulePage
                 required={required}
                 requiredAbove={requiredAbove}
@@ -74,7 +75,7 @@ describe("the require-login page, when a broader scope already demands one", () 
                 onBack={() => {}}
                 onChange={() => {}}
             />
-        );
+        ));
     }
 
     it("says a login is required rather than showing this scope's unused off", () => {

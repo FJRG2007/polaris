@@ -20,55 +20,30 @@ import { TriangleAlert } from "lucide-react";
 import { PageHeader, Section } from "./page-parts";
 import { ConditionBuilder } from "./condition-builder";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 type WafCondition = core.WafCondition;
 type WafCustomRule = core.WafCustomRule;
 type WafSkipComponent = core.WafSkipComponent;
 
-const ACTION_OPTIONS = [
-    { value: "block", label: "Block" },
-    { value: "allow", label: "Allow" },
-    { value: "skip", label: "Skip" }
+type Words = NamespaceTranslator<"firewall">;
+
+const ACTIONS = ["block", "allow", "skip"] as const;
+
+/** What each component skips, in order; its title and what leaving it on would still
+ *  do are `editor.skip.<component>` in the catalog. */
+const SKIP_COMPONENTS: readonly WafSkipComponent[] = [
+    "custom_rules",
+    "managed_rules",
+    "injection_checks",
+    "browser_integrity",
+    "challenge"
 ];
-
-/** What the chosen action actually does, said where the choice is made. */
-const ACTION_EFFECT: Record<WafCustomRule["action"], string> = {
-    block: "Refuses matching requests with 403 and stops evaluating later rules.",
-    allow: "Admits matching requests and stops evaluating later rules, so a rule below cannot block them.",
-    skip: "Steps over the checks below for matching requests and lets everything else carry on deciding. It cannot skip the address rules, which are enforced before any rule runs."
-};
-
-/** What each component is called, and what leaving it on would still do. */
-const SKIP_LABELS: Record<WafSkipComponent, { title: string; detail: string }> = {
-    custom_rules: {
-        title: "All remaining custom rules",
-        detail: "Every rule below this one stops evaluating for the matching request."
-    },
-    managed_rules: {
-        title: "All managed rules",
-        detail: "The rule packs Polaris maintains: scanners, dotfiles, admin panels and the rest."
-    },
-    injection_checks: {
-        title: "The SQL injection and cross-site scripting checks",
-        detail: "The signature scan of the request line."
-    },
-    browser_integrity: {
-        title: "The browser integrity check",
-        detail: "The heuristic that refuses a client claiming to be a browser and not behaving like one."
-    },
-    challenge: {
-        title: "The browser challenge",
-        detail: "The check page a service asks visitors to pass while it is under attack. Skip it for webhooks and APIs that machines call."
-    }
-};
 
 /** Where the rule sits. `custom` is the only one that needs a second answer, which is
  *  why it is a separate choice rather than every rule in a single long list. */
-const POSITION_OPTIONS = [
-    { value: "first", label: "First" },
-    { value: "last", label: "Last" },
-    { value: "custom", label: "Custom" }
-];
+const POSITIONS = ["first", "last", "custom"] as const;
 
 /** Three separate members rather than one with a `"first" | "last"` kind: only a
  *  single literal per member discriminates, which is what lets a reader (and the
@@ -79,9 +54,9 @@ export type RulePosition =
     | { readonly kind: "after"; readonly index: number };
 
 /** A rule with nothing in it yet, offered when one is created. */
-export function emptyRule(count: number): WafCustomRule {
+export function emptyRule(count: number, t: Words): WafCustomRule {
     return {
-        name: `Rule ${count + 1}`,
+        name: t("editor.newName", { number: count + 1 }),
         enabled: true,
         action: "block",
         conditions: [{ field: "path", operator: "starts_with", values: [] }]
@@ -100,13 +75,13 @@ function anyEmpty(conditions: readonly WafCondition[]): boolean {
 
 /** Why this rule cannot be saved yet, or null when it can. Every reason is something
  *  the reader can see and fix on this screen. */
-function blockingReason(rule: WafCustomRule): string | null {
-    if (rule.name.trim() === "") return "Give the rule a name.";
-    if (rule.conditions.length === 0) return "Add at least one condition.";
-    if (anyEmpty(rule.conditions)) return "Every condition needs at least one value.";
+function blockingReason(rule: WafCustomRule, t: Words): string | null {
+    if (rule.name.trim() === "") return t("editor.blocked.name");
+    if (rule.conditions.length === 0) return t("editor.blocked.noCondition");
+    if (anyEmpty(rule.conditions)) return t("editor.blocked.emptyValue");
     const tests = rule.conditions.reduce((total, condition) => total + core.wafConditionTests(condition), 0);
-    if (tests > core.WAF_RULE_TESTS_MAX) return `A rule can hold at most ${core.WAF_RULE_TESTS_MAX} conditions.`;
-    if (rule.action === "skip" && (rule.skip ?? []).length === 0) return "Choose at least one thing to skip.";
+    if (tests > core.WAF_RULE_TESTS_MAX) return t("editor.blocked.tooMany", { max: core.WAF_RULE_TESTS_MAX });
+    if (rule.action === "skip" && (rule.skip ?? []).length === 0) return t("editor.blocked.nothingSkipped");
     return null;
 }
 
@@ -126,27 +101,26 @@ export function RuleEditor({
     onCancel: () => void;
     onSave: (rule: WafCustomRule, position: RulePosition) => void;
 }) {
+    const t = useTranslations("firewall");
+    const tcommon = useTranslations("common");
     const [rule, setRule] = useState<WafCustomRule>(initial);
     // A rule that already exists keeps its place unless the reader moves it, so the
     // position picker starts on where it already is rather than on a default that
     // would silently relocate it the moment anything else was edited.
     const [position, setPosition] = useState<RulePosition>(() => startingPosition(index));
-    const blocked = blockingReason(rule);
+    const blocked = blockingReason(rule, t);
     const creating = index === null;
     const skip = rule.skip ?? [];
 
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader title={creating ? "Create custom rule" : "Edit custom rule"} onBack={onCancel} />
+            <PageHeader title={creating ? t("editor.createTitle") : t("editor.editTitle")} onBack={onCancel} />
 
-            <Section
-                title="Rule name"
-                hint="Names the rule in the list and in the reason a blocked request is refused with."
-            >
+            <Section title={t("editor.name")} hint={t("editor.nameHint")}>
                 <Input
                     value={rule.name}
                     maxLength={80}
-                    aria-label="Rule name"
+                    aria-label={t("editor.name")}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -155,27 +129,24 @@ export function RuleEditor({
                 />
             </Section>
 
-            <Section
-                title="When incoming requests match..."
-                hint="Every condition must hold. Within one condition, any of its values is enough. Join a row with Or to ask for either instead."
-            >
+            <Section title={t("editor.when")} hint={t("editor.whenHint")}>
                 <ConditionBuilder
                     conditions={rule.conditions}
                     onChange={(conditions) => setRule({ ...rule, conditions })}
                 />
             </Section>
 
-            <Section title="Then take action...">
+            <Section title={t("editor.then")}>
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">Choose action</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t("editor.chooseAction")}</span>
                     <Select
                         value={rule.action}
-                        aria-label="Action"
+                        aria-label={t("list.columns.action")}
                         className="max-w-xs"
-                        options={ACTION_OPTIONS}
+                        options={ACTIONS.map((action) => ({ value: action, label: t(`actions.${action}`) }))}
                         onValueChange={(value) => setRule({ ...rule, action: value as WafCustomRule["action"] })}
                     />
-                    <p className="text-xs text-muted-foreground">{ACTION_EFFECT[rule.action]}</p>
+                    <p className="text-xs text-muted-foreground">{t(`editor.effects.${rule.action}`)}</p>
                 </div>
 
                 {/* Only under the action that gives them meaning. The choice is kept
@@ -183,13 +154,13 @@ export function RuleEditor({
                     picked rather than to nothing. */}
                 {rule.action === "skip" ? (
                     <fieldset className="flex flex-col gap-2 border-t border-border pt-3">
-                        <legend className="text-xs font-medium text-muted-foreground">What to skip</legend>
-                        {(Object.keys(SKIP_LABELS) as WafSkipComponent[]).map((component) => (
+                        <legend className="text-xs font-medium text-muted-foreground">{t("editor.whatToSkip")}</legend>
+                        {SKIP_COMPONENTS.map((component) => (
                             <label key={component} className="flex w-fit cursor-pointer items-start gap-2 text-sm">
                                 <Checkbox
                                     className="mt-0.5"
                                     checked={skip.includes(component)}
-                                    aria-label={SKIP_LABELS[component].title}
+                                    aria-label={t(`editor.skip.${component}.title`)}
                                     onChange={(event) =>
                                         setRule({
                                             ...rule,
@@ -200,9 +171,9 @@ export function RuleEditor({
                                     }
                                 />
                                 <span className="min-w-0">
-                                    {SKIP_LABELS[component].title}
+                                    {t(`editor.skip.${component}.title`)}
                                     <span className="block text-xs text-muted-foreground">
-                                        {SKIP_LABELS[component].detail}
+                                        {t(`editor.skip.${component}.detail`)}
                                     </span>
                                 </span>
                             </label>
@@ -211,18 +182,15 @@ export function RuleEditor({
                 ) : null}
             </Section>
 
-            <Section
-                title="Execution order"
-                hint="Rules are evaluated in order. Where this one sits decides whether it gets the request before or after the others."
-            >
+            <Section title={t("editor.order")} hint={t("editor.orderHint")}>
                 <div className="flex flex-wrap gap-4">
                     <div className="flex min-w-0 flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Select order</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("editor.selectOrder")}</span>
                         <Select
                             value={position.kind === "after" ? "custom" : position.kind}
-                            aria-label="Order"
+                            aria-label={t("list.columns.order")}
                             className="w-40"
-                            options={POSITION_OPTIONS}
+                            options={POSITIONS.map((one) => ({ value: one, label: t(`editor.positions.${one}`) }))}
                             onValueChange={(value) => {
                                 if (value === "custom") {
                                     setPosition({ kind: "after", index: others[0]?.index ?? 0 });
@@ -235,14 +203,14 @@ export function RuleEditor({
                     {position.kind === "after" ? (
                         <div className="flex min-w-0 flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">
-                                Select which rule this will fire after
+                                {t("editor.fireAfter")}
                             </span>
                             {others.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">There is no other rule yet.</p>
+                                <p className="text-sm text-muted-foreground">{t("editor.noOther")}</p>
                             ) : (
                                 <Select
                                     value={String(position.index)}
-                                    aria-label="Fires after"
+                                    aria-label={t("editor.firesAfter")}
                                     className="w-full max-w-sm"
                                     options={others.map((entry) => ({
                                         value: String(entry.index),
@@ -256,18 +224,18 @@ export function RuleEditor({
                 </div>
             </Section>
 
-            <Section title="Status" hint="Controls whether the rule evaluates incoming traffic.">
+            <Section title={t("list.columns.status")} hint={t("editor.statusHint")}>
                 <fieldset className="flex flex-col gap-2">
-                    <legend className="sr-only">Status</legend>
+                    <legend className="sr-only">{t("list.columns.status")}</legend>
                     <Radio
                         name="rule-status"
-                        label="Active"
+                        label={t("list.active")}
                         checked={rule.enabled}
                         onSelect={() => setRule({ ...rule, enabled: true })}
                     />
                     <Radio
                         name="rule-status"
-                        label="Disabled"
+                        label={t("editor.disabled")}
                         checked={!rule.enabled}
                         onSelect={() => setRule({ ...rule, enabled: false })}
                     />
@@ -283,7 +251,7 @@ export function RuleEditor({
 
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button type="button" variant="secondary" onClick={onCancel}>
-                    Cancel
+                    {tcommon("actions.cancel")}
                 </Button>
                 <Button
                     type="button"
@@ -291,7 +259,7 @@ export function RuleEditor({
                     title={blocked ?? undefined}
                     onClick={() => onSave({ ...rule, name: rule.name.trim() }, position)}
                 >
-                    Save
+                    {tcommon("actions.save")}
                 </Button>
             </div>
         </div>

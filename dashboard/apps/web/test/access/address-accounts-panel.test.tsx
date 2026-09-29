@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AddressAccount } from "@/lib/address-accounts";
 import { AddressAccounts } from "../../src/app/(app)/apps/firewall/address-accounts";
+import { withMessages } from "../setup/i18n";
 
 function account(overrides: Partial<AddressAccount> = {}): AddressAccount {
     return {
@@ -42,7 +43,7 @@ function account(overrides: Partial<AddressAccount> = {}): AddressAccount {
 }
 
 function render(list: AddressAccount[], more = false): string {
-    return renderToStaticMarkup(<AddressAccounts accounts={{ list, more }} />);
+    return renderToStaticMarkup(withMessages(<AddressAccounts accounts={{ list, more }} />));
 }
 
 describe("the accounts behind an address", () => {

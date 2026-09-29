@@ -19,6 +19,8 @@ import Link from "next/link";
 import { grouped } from "./page-parts";
 import { ChipList, validAddress } from "./chip-list";
 import { AddressAccounts } from "./address-accounts";
+import { localizeJail } from "./waf-words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -69,9 +71,9 @@ type AddressReport = Awaited<ReturnType<typeof getWafAddressActivityAction>>;
 /** How far back the traffic panel looks. The edge log is the source, so a longer
  *  window is only as good as the log's own rotation - see wafTraffic. */
 const WINDOWS = [
-    { hours: 1, label: "1h" },
-    { hours: 24, label: "24h" },
-    { hours: 168, label: "7d" }
+    { hours: 1, label: "1h" }, // i18n-ignore unit symbol
+    { hours: 24, label: "24h" }, // i18n-ignore unit symbol
+    { hours: 168, label: "7d" } // i18n-ignore unit symbol
 ];
 
 /**
@@ -217,13 +219,14 @@ function AddressLink({
     callerIp?: string | null;
     onInspect: (ip: string) => void;
 }) {
+    const t = useTranslations("firewall");
     const mine = callerIp !== null && callerIp !== undefined && callerIp === ip;
     return (
         <span className="inline-flex items-baseline gap-1.5">
             <button
                 type="button"
                 onClick={() => onInspect(ip)}
-                title={`What ${ip} has been doing`}
+                title={t("panels.whatDoing", { ip })}
                 className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline "
             >
                 {ip}
@@ -231,9 +234,9 @@ function AddressLink({
             {mine ? (
                 <span
                     className="shrink-0 rounded bg-muted px-1 py-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground"
-                    title="The address you are reading this page over. Everyone on your network shares it."
+                    title={t("panels.youHint")}
                 >
-                    You
+                    {t("panels.you")}
                 </span>
             ) : null}
         </span>
@@ -257,13 +260,14 @@ function TrafficPanel({
     onRefresh: () => void;
     onInspect: (ip: string) => void;
 }) {
+    const t = useTranslations("firewall");
     const format = useDisplayFormat();
     return (
         <Card>
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <Activity className="size-4 text-muted-foreground" />
-                    Traffic
+                    {t("panels.traffic")}
                 </CardTitle>
                 <div className="flex items-center gap-1">
                     {WINDOWS.map((window) => (
@@ -283,8 +287,8 @@ function TrafficPanel({
                     <button
                         type="button"
                         onClick={onRefresh}
-                        aria-label="Refresh"
-                        title="Refresh"
+                        aria-label={t("panels.refresh")}
+                        title={t("panels.refresh")}
                         className="ml-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -296,16 +300,15 @@ function TrafficPanel({
                     <Skeleton className="h-32 w-full" />
                 ) : !traffic || traffic.total === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nothing recorded in this window. The figures come from the edge&apos;s own
-                        request log, so a service reached directly on its port does not appear here.
+                        {t("panels.noTraffic")}
                     </p>
                 ) : (
                     <>
                         <div className="flex flex-wrap gap-6">
-                            <Stat label="Requests" value={grouped(traffic.total)} />
-                            <Stat label="Blocked" value={grouped(traffic.blocked)} tone="danger" />
+                            <Stat label={t("panels.requests")} value={grouped(traffic.total)} />
+                            <Stat label={t("panels.blocked")} value={grouped(traffic.blocked)} tone="danger" />
                             <Stat
-                                label="Share blocked"
+                                label={t("panels.shareBlocked")}
                                 value={
                                     traffic.blockedRate === null
                                         ? "-"
@@ -322,17 +325,17 @@ function TrafficPanel({
                             to={traffic.to}
                             tone="danger"
                             summary="sum"
-                            label="Blocked"
+                            label={t("panels.blocked")}
                             formatTime={(at) => format.dateTime(at)}
                         />
                         <div className="grid gap-4 md:grid-cols-3">
                             <TopList
-                                title="Addresses"
+                                title={t("panels.topAddresses")}
                                 entries={traffic.topAddresses}
                                 onInspect={onInspect}
                             />
-                            <TopList title="Paths" entries={traffic.topPaths} />
-                            <TopList title="User agents" entries={traffic.topAgents} />
+                            <TopList title={t("panels.topPaths")} entries={traffic.topPaths} />
+                            <TopList title={t("panels.topAgents")} entries={traffic.topAgents} />
                         </div>
                     </>
                 )}
@@ -362,13 +365,12 @@ function TopList({
     /** Given only for the address list; a path is not something to open. */
     onInspect?: (ip: string) => void;
 }) {
+    const t = useTranslations("firewall");
     return (
         <div className="min-w-0">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-                Top blocked {title.toLowerCase()}
-            </div>
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">{title}</div>
             {entries.length === 0 ? (
-                <p className="text-xs text-muted-foreground">None.</p>
+                <p className="text-xs text-muted-foreground">{t("panels.none")}</p>
             ) : (
                 <ul className="flex flex-col gap-1">
                     {entries.map((entry) => (
@@ -420,6 +422,7 @@ function AnomaliesPanel({
     onTrust: (ip: string) => void;
     onInspect: (ip: string) => void;
 }) {
+    const t = useTranslations("firewall");
     const high = (anomalies ?? []).filter((anomaly) => anomaly.severity === "high").length;
 
     function patchSettings(next: WafAnomalySettings) {
@@ -434,33 +437,31 @@ function AnomaliesPanel({
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <RadarIcon className="size-4 text-muted-foreground" />
-                    Anomalies
+                    {t("anomalies.title")}
                     {high > 0 ? <Badge variant="danger">{String(high)}</Badge> : null}
                 </CardTitle>
                 {settings ? (
                     <Switch
                         checked={settings.enabled}
-                        aria-label="Detect route abuse"
+                        aria-label={t("anomalies.detect")}
                         onChange={(on) => patchSettings({ ...settings, enabled: on })}
                     />
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Traffic that is fine one request at a time and wrong in aggregate. Each address
-                    is judged against what the rest of that route&apos;s visitors do, so a busy
-                    endpoint is not an anomaly for being busy. Trusted addresses are never judged.
+                    {t("anomalies.intro")}
                 </p>
 
                 {loading ? (
                     <Skeleton className="h-20 w-full" />
                 ) : !settings?.enabled ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        Detection is off.
+                        {t("anomalies.off")}
                     </p>
                 ) : !anomalies || anomalies.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        Nothing unusual in the last ten minutes.
+                        {t("anomalies.none")}
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -483,7 +484,7 @@ function AnomaliesPanel({
                                                 anomaly.severity === "high" ? "danger" : "neutral"
                                             }
                                         >
-                                            {anomaly.kind.replace(/-/g, " ")}
+                                            {t(`anomalies.kinds.${anomaly.kind}`)}
                                         </Badge>
                                         <span className="truncate font-mono text-xs text-muted-foreground">
                                             {anomaly.route}
@@ -500,8 +501,8 @@ function AnomaliesPanel({
                                 <div className="flex shrink-0 items-center gap-1">
                                     <button
                                         type="button"
-                                        aria-label={`Trust ${anomaly.ip}`}
-                                        title="This is not an attack: never judge this address"
+                                        aria-label={t("anomalies.trustNamed", { ip: anomaly.ip })}
+                                        title={t("anomalies.trustHint")}
                                         onClick={() => onTrust(anomaly.ip)}
                                         className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
@@ -509,8 +510,8 @@ function AnomaliesPanel({
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label={`Block ${anomaly.ip}`}
-                                        title="Block this address"
+                                        aria-label={t("anomalies.blockNamed", { ip: anomaly.ip })}
+                                        title={t("anomalies.blockHint")}
                                         onClick={() =>
                                             mutate(
                                                 (current) => ({
@@ -540,22 +541,18 @@ function AnomaliesPanel({
                     <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-sm">Block automatically</div>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    Bans the address behind anything scored high, without waiting
-                                    for you. Leave it off until the findings above have been right a
-                                    few times.
-                                </p>
+                                <div className="text-sm">{t("anomalies.auto")}</div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{t("anomalies.autoHint")}</p>
                             </div>
                             <Switch
                                 checked={settings.autoBlock}
-                                aria-label="Block anomalies automatically"
+                                aria-label={t("anomalies.autoLabel")}
                                 onChange={(on) => patchSettings({ ...settings, autoBlock: on })}
                             />
                         </div>
                         <div className="flex flex-wrap gap-3">
                             <NumberField
-                                label="Times the norm"
+                                label={t("anomalies.overBaseline")}
                                 value={settings.overBaseline}
                                 min={2}
                                 max={1000}
@@ -564,7 +561,7 @@ function AnomaliesPanel({
                                 }
                             />
                             <NumberField
-                                label="Asset fetches"
+                                label={t("anomalies.assetMax")}
                                 value={settings.assetMax}
                                 min={5}
                                 max={100000}
@@ -573,7 +570,7 @@ function AnomaliesPanel({
                                 }
                             />
                             <NumberField
-                                label="Query variants"
+                                label={t("anomalies.variantMax")}
                                 value={settings.variantMax}
                                 min={5}
                                 max={100000}
@@ -582,7 +579,7 @@ function AnomaliesPanel({
                                 }
                             />
                             <NumberField
-                                label="Ban for (min)"
+                                label={t("panels.banFor")}
                                 value={Math.round(settings.banTimeSec / 60)}
                                 min={1}
                                 max={43200}
@@ -611,6 +608,7 @@ function BansPanel({
     mutate: Mutate;
     onInspect: (ip: string) => void;
 }) {
+    const t = useTranslations("firewall");
     const format = useDisplayFormat();
 
     return (
@@ -618,7 +616,7 @@ function BansPanel({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Ban className="size-4 text-muted-foreground" />
-                    Blocked right now
+                    {t("bans.title")}
                     {bans && bans.length > 0 ? <Badge>{String(bans.length)}</Badge> : null}
                 </CardTitle>
             </CardHeader>
@@ -627,18 +625,17 @@ function BansPanel({
                     <Skeleton className="h-20 w-full" />
                 ) : !bans || bans.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        Nobody is banned. Addresses appear here when they trip a jail below, or when
-                        a reputation provider flags them.
+                        {t("bans.none")}
                     </p>
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
                         <table className="w-full min-w-[36rem] text-sm">
                             <thead>
                                 <tr className="text-left text-xs text-muted-foreground">
-                                    <th className="px-2 pb-2 font-medium">Address</th>
-                                    <th className="px-2 pb-2 font-medium">Why</th>
-                                    <th className="px-2 pb-2 font-medium">Until</th>
-                                    <th className="px-2 pb-2 font-medium sr-only">Actions</th>
+                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.address")}</th>
+                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.why")}</th>
+                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.until")}</th>
+                                    <th className="px-2 pb-2 font-medium sr-only">{t("list.columns.actions")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -652,7 +649,7 @@ function BansPanel({
                                             />
                                             {ban.offences > 1 ? (
                                                 <span className="ml-2 text-muted-foreground">
-                                                    {ban.offences}x
+                                                    {t("bans.offences", { count: ban.offences })}
                                                 </span>
                                             ) : null}
                                         </td>
@@ -666,14 +663,14 @@ function BansPanel({
                                             {ban.until ? (
                                                 format.dateTime(ban.until)
                                             ) : (
-                                                <Badge variant="danger">Until you lift it</Badge>
+                                                <Badge variant="danger">{t("bans.untilLifted")}</Badge>
                                             )}
                                         </td>
                                         <td className="px-2 py-2 text-right">
                                             <button
                                                 type="button"
-                                                aria-label={`Lift the ban on ${ban.ip}`}
-                                                title="Lift this ban"
+                                                aria-label={t("bans.liftNamed", { ip: ban.ip })}
+                                                title={t("bans.lift")}
                                                 onClick={() =>
                                                     mutate(
                                                         (current) => ({
@@ -710,6 +707,8 @@ function JailsPanel({
     loading: boolean;
     onSaved: () => void;
 }) {
+    const t = useTranslations("firewall");
+    const tcommon = useTranslations("common");
     const [draft, setDraft] = useState<WafJail[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
@@ -747,23 +746,22 @@ function JailsPanel({
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <Timer className="size-4 text-muted-foreground" />
-                    Automatic bans
+                    {t("jails.title")}
                 </CardTitle>
                 {dirty ? (
                     <Button type="button" size="sm" disabled={pending} onClick={save}>
-                        Save
+                        {tcommon("actions.save")}
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Counted from the edge&apos;s request log rather than per request, so watching an
-                    address costs a visitor nothing. A repeat offender is held progressively longer.
+                    {t("jails.intro")}
                 </p>
                 {loading ? (
                     <Skeleton className="h-32 w-full" />
                 ) : (
-                    current.map((jail) => (
+                    current.map((stored) => localizeJail(stored, t)).map((jail) => (
                         <div
                             key={jail.id}
                             className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
@@ -785,7 +783,7 @@ function JailsPanel({
                                 <div className="flex flex-wrap gap-3">
                                     <NumberField
                                         label={
-                                            jail.counts === "hostnames" ? "Hostnames" : "Requests"
+                                            jail.counts === "hostnames" ? t("jails.hostnames") : t("panels.requests")
                                         }
                                         value={jail.maxRetry}
                                         min={1}
@@ -793,7 +791,7 @@ function JailsPanel({
                                         onChange={(value) => update(jail.id, { maxRetry: value })}
                                     />
                                     <NumberField
-                                        label="Within (min)"
+                                        label={t("jails.within")}
                                         value={Math.round(jail.findTimeSec / 60)}
                                         min={1}
                                         max={1440}
@@ -802,7 +800,7 @@ function JailsPanel({
                                         }
                                     />
                                     <NumberField
-                                        label="Ban for (min)"
+                                        label={t("panels.banFor")}
                                         value={Math.round(jail.banTimeSec / 60)}
                                         min={1}
                                         max={43200}
@@ -874,6 +872,8 @@ function TrustedPanel({
     callerIp?: string | null;
     onSaved: () => void;
 }) {
+    const t = useTranslations("firewall");
+    const tcommon = useTranslations("common");
     const [draft, setDraft] = useState<string[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
@@ -911,7 +911,7 @@ function TrustedPanel({
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <ShieldCheck className="size-4 text-muted-foreground" />
-                    Trusted addresses
+                    {t("trusted.title")}
                 </CardTitle>
                 {dirty ? (
                     <Button
@@ -920,15 +920,13 @@ function TrustedPanel({
                         disabled={pending}
                         onClick={() => save(current)}
                     >
-                        Save
+                        {tcommon("actions.save")}
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Never banned and never reported as an anomaly. Loopback is always trusted. Add
-                    your own address or range so your everyday use of the instance is not read as an
-                    attack on it.
+                    {t("trusted.intro")}
                 </p>
                 {loading ? (
                     <Skeleton className="h-16 w-full" />
@@ -936,10 +934,10 @@ function TrustedPanel({
                     <>
                         <ChipList
                             entries={current}
-                            placeholder="203.0.113.4 or 203.0.113.0/24"
+                            placeholder={t("rules.ipExample")}
                             disabled={pending}
                             validate={validAddress}
-                            invalidMessage="Enter an IP address or a CIDR range."
+                            invalidMessage={t("rules.invalidAddress")}
                             onChange={setDraft}
                         />
                         {canAddSelf ? (
@@ -949,7 +947,14 @@ function TrustedPanel({
                                 onClick={() => save([...current, callerIp])}
                                 className="w-fit text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
                             >
-                                Trust this device (<span className="font-mono">{callerIp}</span>)
+                                {t.rich("trusted.trustSelf", {
+                                    ip: callerIp,
+                                    mono: (chunks) => (
+                                        <span key="ip" className="font-mono">
+                                            {chunks}
+                                        </span>
+                                    )
+                                })}
                             </button>
                         ) : null}
                     </>
@@ -961,25 +966,28 @@ function TrustedPanel({
 }
 
 function IntelPanel() {
+    const t = useTranslations("firewall");
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Globe className="size-4 text-muted-foreground" />
-                    Reputation providers
+                    {t("intel.title")}
                 </CardTitle>
             </CardHeader>
             <CardBody>
                 <p className="text-xs text-muted-foreground">
-                    Blocks addresses already known for scanning or attacks. Connect{" "}
-                    <Link
-                        href="/admin/integrations"
-                        className="text-primary underline-offset-2 hover:underline"
-                    >
-                        Dymo API or Criminal IP
-                    </Link>{" "}
-                    to switch them on. They are asked in the background about addresses seen in your
-                    traffic, never while a request is waiting.
+                    {t.rich("intel.body", {
+                        link: (chunks) => (
+                            <Link
+                                key="link"
+                                href="/admin/integrations"
+                                className="text-primary underline-offset-2 hover:underline"
+                            >
+                                {chunks}
+                            </Link>
+                        )
+                    })}
                 </p>
             </CardBody>
         </Card>
@@ -1019,23 +1027,27 @@ function BanReason({
     ban: NonNullable<AddressReport["ban"]>;
     format: ReturnType<typeof useDisplayFormat>;
 }) {
+    const t = useTranslations("firewall");
     const active = ban.until === null || new Date(ban.until) > new Date();
     return (
         <div
             className={`mb-4 flex flex-col gap-1 rounded-md border p-3 ${active ? "border-danger-edge bg-danger-soft" : "border-border"}`}
         >
             <p className="text-sm font-medium">
-                {active ? "Blocked by the firewall" : "Was blocked by the firewall"}
+                {active ? t("ban.blocked") : t("ban.wasBlocked")}
             </p>
             <p className="text-sm text-muted-foreground">
-                {ban.note ?? "No reason was recorded."}{" "}
+                {ban.note ?? t("ban.noReason")}{" "}
                 {ban.until === null
-                    ? "It stands until somebody lifts it."
-                    : `${active ? "Lifts" : "Lifted"} ${format.dateTime(ban.until)}.`}
+                    ? t("ban.stands")
+                    : active
+                      ? t("ban.lifts", { when: format.dateTime(ban.until) })
+                      : t("ban.lifted", { when: format.dateTime(ban.until) })}
             </p>
             <p className="text-xs text-muted-foreground">
-                Decided by {ban.source}
-                {ban.offences > 1 ? `, after ${ban.offences} separate offences` : ""}.
+                {ban.offences > 1
+                    ? t("ban.decidedAfter", { source: ban.source, offences: ban.offences })
+                    : t("ban.decided", { source: ban.source })}
             </p>
         </div>
     );
@@ -1050,6 +1062,7 @@ function AddressDialog({
     hours: number;
     onClose: () => void;
 }) {
+    const t = useTranslations("firewall");
     const format = useDisplayFormat();
     const [loaded, setLoaded] = useState<AddressReport | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1077,8 +1090,7 @@ function AddressDialog({
                 <DialogHeader className="pr-8">
                     <DialogTitle className="font-mono">{ip}</DialogTitle>
                     <DialogDescription>
-                        Every request from this address in the last {windowLabel}, read from the
-                        edge&apos;s own log.
+                        {t("address.intro", { window: windowLabel })}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1106,23 +1118,22 @@ function AddressDialog({
                     </div>
                 ) : activity.total === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nothing from this address in that window. A ban outlives the log it was made
-                        from, so an older one can be enforced with nothing left here to show for it.
+                        {t("address.none")}
                     </p>
                 ) : (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-wrap gap-6">
-                            <Stat label="Requests" value={grouped(activity.total)} />
-                            <Stat label="Blocked" value={grouped(activity.blocked)} tone="danger" />
+                            <Stat label={t("panels.requests")} value={grouped(activity.total)} />
+                            <Stat label={t("panels.blocked")} value={grouped(activity.blocked)} tone="danger" />
                             {activity.firstSeen ? (
                                 <Stat
-                                    label="First seen"
+                                    label={t("address.firstSeen")}
                                     value={format.dateTime(activity.firstSeen)}
                                 />
                             ) : null}
                             {activity.lastSeen ? (
                                 <Stat
-                                    label="Last seen"
+                                    label={t("address.lastSeen")}
                                     value={format.dateTime(activity.lastSeen)}
                                 />
                             ) : null}
@@ -1153,7 +1164,7 @@ function AddressDialog({
                             {activity.topPaths.length > 0 ? (
                                 <div className="min-w-0">
                                     <div className="mb-1 text-xs font-medium text-muted-foreground">
-                                        Most asked for
+                                        {t("address.mostAsked")}
                                     </div>
                                     <ul className="flex flex-col gap-0.5">
                                         {activity.topPaths.map((entry) => (
@@ -1178,7 +1189,7 @@ function AddressDialog({
                             {activity.agents.length > 0 ? (
                                 <div className="min-w-0">
                                     <div className="mb-1 text-xs font-medium text-muted-foreground">
-                                        Calling itself
+                                        {t("address.callingItself")}
                                     </div>
                                     <ul className="flex flex-col gap-0.5">
                                         {activity.agents.map((agent) => (
@@ -1199,10 +1210,10 @@ function AddressDialog({
                             <table className="w-full min-w-[34rem] text-xs">
                                 <thead className="sticky top-0 bg-card">
                                     <tr className="text-left text-muted-foreground">
-                                        <th className="px-2 py-1.5 font-medium">When</th>
-                                        <th className="px-2 py-1.5 font-medium">Method</th>
-                                        <th className="px-2 py-1.5 font-medium">Status</th>
-                                        <th className="px-2 py-1.5 font-medium">Path</th>
+                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.when")}</th>
+                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.method")}</th>
+                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.status")}</th>
+                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.path")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1239,8 +1250,10 @@ function AddressDialog({
 
                         {activity.truncated ? (
                             <p className="text-xs text-muted-foreground">
-                                Showing the {grouped(activity.requests.length)} most recent of{" "}
-                                {grouped(activity.total)}. The counts above cover all of them.
+                                {t("address.truncated", {
+                                    shown: grouped(activity.requests.length),
+                                    total: grouped(activity.total)
+                                })}
                             </p>
                         ) : null}
                     </div>

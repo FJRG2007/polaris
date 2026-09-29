@@ -9,6 +9,7 @@
  */
 
 import type { WafScopeType } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** One selectable target within a kind. */
 export interface ScopeOption {
@@ -39,16 +40,21 @@ export interface ScopeCatalog {
  * to find its rules is the difference between a screen they can use and one they
  * give up on.
  */
-export const SCOPE_KINDS: readonly { readonly value: ScopeKind; readonly label: string }[] = [
-    { value: "polaris", label: "Polaris itself" },
-    { value: "global", label: "All services" },
-    { value: "server-group", label: "Server group" },
-    { value: "server", label: "Server" },
-    { value: "project", label: "Project" },
-    { value: "environment", label: "Environment" },
-    { value: "marketplace", label: "Marketplace app" },
-    { value: "application", label: "Service" }
+export const SCOPE_KINDS: readonly ScopeKind[] = [
+    "polaris",
+    "global",
+    "server-group",
+    "server",
+    "project",
+    "environment",
+    "marketplace",
+    "application"
 ];
+
+/** A kind's name, as `scopes.<kind>` in the `firewall` catalog. */
+export function scopeKindLabel(t: NamespaceTranslator<"firewall">, kind: ScopeKind): string {
+    return t(kind === "server-group" ? "scopes.serverGroup" : `scopes.${kind}`);
+}
 
 /** What the picker offers, which is the rule scopes plus the marketplace shortcut
  *  into one of them. */

@@ -17,6 +17,7 @@ import { ChipList, validAddress } from "./chip-list";
 import type { WafPrincipalGrant } from "@polaris/core";
 import { Ban, ShieldCheck, TriangleAlert } from "lucide-react";
 import { LoginPrincipals, type LoginPrincipalsPatch } from "./login-principals";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AddressRulesPage({
     allowlist,
@@ -44,6 +45,7 @@ export function AddressRulesPage({
     onEdit: (allow: string[], deny: string[]) => void;
     onSave: (allowlist: string[], denylist: string[]) => void;
 }) {
+    const t = useTranslations("firewall");
     const setAllow = (next: string[]): void => onEdit(next, deny);
     const setDeny = (next: string[]): void => onEdit(allow, next);
 
@@ -55,29 +57,23 @@ export function AddressRulesPage({
 
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader title="IP access rules" onBack={onBack} />
+            <PageHeader title={t("access.addressesTitle")} onBack={onBack} />
 
-            <Section
-                title="Addresses"
-                hint="Checked before every other rule. The allowlist is enforced by the edge itself; the denylist always wins over it."
-            >
+            <Section title={t("addresses.title")} hint={t("addresses.hint")}>
                 <div className="grid gap-5 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
                             <ShieldCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            Allowed
+                            {t("addresses.allowed")}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            If any address is listed, only those get through. A narrower scope can shorten this list,
-                            never lengthen it.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("addresses.allowedHint")}</p>
                         <ChipList
                             entries={allow}
                             disabled={disabled}
                             onChange={setAllow}
                             placeholder="203.0.113.0/24"
                             validate={validAddress}
-                            invalidMessage="Enter a valid IP address or CIDR range."
+                            invalidMessage={t("addresses.invalid")}
                         />
                         {callerIp && !allow.includes(callerIp) ? (
                             <button
@@ -85,18 +81,16 @@ export function AddressRulesPage({
                                 onClick={() => setAllow([...allow, callerIp])}
                                 className="w-fit text-xs text-primary underline-offset-2 hover:underline"
                             >
-                                Add my address ({callerIp})
+                                {t("addresses.addMine", { ip: callerIp })}
                             </button>
                         ) : null}
                     </div>
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
                             <Ban className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            Blocked
+                            {t("addresses.blocked")}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Always refused, even when they match the allowlist.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("addresses.blockedHint")}</p>
                         <ChipList
                             entries={deny}
                             accent="deny"
@@ -104,17 +98,16 @@ export function AddressRulesPage({
                             onChange={setDeny}
                             placeholder="198.51.100.7"
                             validate={validAddress}
-                            invalidMessage="Enter a valid IP address or CIDR range."
+                            invalidMessage={t("addresses.invalid")}
                         />
                     </div>
                 </div>
 
-                {overlap ? <p className="text-xs text-danger">&quot;{overlap}&quot; is in both lists.</p> : null}
+                {overlap ? <p className="text-xs text-danger">{t("addresses.overlap", { address: overlap })}</p> : null}
                 {wouldLockOut ? (
                     <p className="flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                         <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                        This allowlist does not include the address you are reading this over ({callerIp}). Saving it
-                        will shut you out of everything in this scope.
+                        {t("addresses.lockOut", { ip: callerIp ?? "" })}
                     </p>
                 ) : null}
 
@@ -123,10 +116,10 @@ export function AddressRulesPage({
                         type="button"
                         size="sm"
                         disabled={!dirty || disabled || Boolean(overlap)}
-                        title={dirty ? undefined : "No changes to save"}
+                        title={dirty ? undefined : t("addresses.noChanges")}
                         onClick={() => onSave(allow, deny)}
                     >
-                        Save address lists
+                        {t("addresses.save")}
                     </Button>
                     {dirty ? (
                         <button
@@ -134,7 +127,7 @@ export function AddressRulesPage({
                             onClick={() => onEdit([...allowlist], [...denylist])}
                             className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                         >
-                            Discard
+                            {t("addresses.discard")}
                         </button>
                     ) : null}
                 </div>
@@ -162,36 +155,33 @@ export function LoginRulePage({
     onBack: () => void;
     onChange: (patch: LoginPrincipalsPatch & { requireLogin?: boolean }) => void;
 }) {
+    const t = useTranslations("firewall");
     const on = required || requiredAbove;
     return (
         <div className="flex flex-col gap-4">
-            <PageHeader title="Require a Polaris login" onBack={onBack} />
+            <PageHeader title={t("access.loginTitle")} onBack={onBack} />
 
-            <Section title="What it does">
-                <p className="text-sm text-muted-foreground">
-                    Visitors must sign in to Polaris to reach anything in this scope. Existing sessions keep working if
-                    the control plane is down; new sign-ins need it reachable.
-                </p>
+            <Section title={t("managedPage.whatItDoes")}>
+                <p className="text-sm text-muted-foreground">{t("login.what")}</p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Across scopes:</span> a scope that requires a login
-                    cannot be overruled by a narrower one, and every scope that names who it admits gets a say.
+                    <span className="font-medium text-foreground">{t("managedPage.acrossScopes")}</span>{" "}
+                    {t("login.across")}
                 </p>
             </Section>
 
-            <Section title="Status" hint="Whether this scope demands a login at all.">
+            <Section title={t("list.columns.status")} hint={t("login.statusHint")}>
                 <div className="flex items-center gap-3">
                     <Switch
                         checked={on}
                         disabled={disabled || requiredAbove}
                         onChange={(next) => onChange({ requireLogin: next })}
-                        aria-label={`${on ? "Stop requiring" : "Require"} a Polaris login`}
+                        aria-label={on ? t("login.stopRequiring") : t("login.require")}
                     />
-                    <span className="text-sm">{on ? "A login is required" : "No login is required"}</span>
+                    <span className="text-sm">{on ? t("login.required") : t("login.notRequired")}</span>
                 </div>
                 {requiredAbove ? (
                     <p className="text-xs text-muted-foreground">
-                        A scope above this one requires a login, and a narrower scope cannot waive it. The lists below
-                        still apply: every scope that names who it admits gets a say.
+                        {t("login.aboveNote")}
                     </p>
                 ) : null}
             </Section>
@@ -200,7 +190,7 @@ export function LoginRulePage({
                 way, so switching the login off and back on comes back to the same
                 people rather than to everybody. */}
             {on ? (
-                <Section title="Who it admits" hint="Named nobody means anyone with a Polaris account.">
+                <Section title={t("login.admits")} hint={t("login.admitsHint")}>
                     <LoginPrincipals admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
                 </Section>
             ) : null}

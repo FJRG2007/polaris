@@ -1,1 +1,600 @@
-{}
+{
+    "conditions": {
+        "expression": "Expresión",
+        "useBuilder": "Usar el editor",
+        "expressionLabel": "Expresión",
+        "expressionHint": "Los campos se nombran como en el edge, unidos con and / or y paréntesis.",
+        "characters": "{used} / {max} caracteres",
+        "preview": "Vista previa",
+        "edit": "Editar expresión",
+        "previewEmpty": "Añade una condición para ver la expresión.",
+        "or": "o",
+        "and": "y",
+        "add": "Añadir condición",
+        "matches": "Cumple",
+        "matchLabel": "Cómo se cumple este grupo",
+        "any": "alguna de estas",
+        "all": "todas estas",
+        "removeGroup": "Quitar este grupo",
+        "removeGroupTitle": "Quitar el grupo",
+        "field": "Campo",
+        "operator": "Operador",
+        "andButton": "Y",
+        "orButton": "O",
+        "joinAnd": "Añadir una condición unida con y",
+        "joinOr": "Añadir una condición unida con o",
+        "removeCondition": "Quitar esta condición",
+        "remove": "Quitar",
+        "value": "Valor",
+        "signalHint": "Usa la misma comprobación que la regla gestionada, así que se puede limitar a parte del tráfico en lugar de desactivarla en todo el ámbito.",
+        "tooDeep": "Una regla no admite más anidamiento"
+    },
+    "rules": {
+        "fields": {
+            "ip": "IP del cliente",
+            "host": "Host",
+            "path": "Ruta",
+            "method": "Método",
+            "user_agent": "User agent",
+            "query": "Consulta"
+        },
+        "signals": {
+            "sql_injection": "Inyección SQL",
+            "xss": "Detección de XSS",
+            "browser_integrity": "Integridad del navegador"
+        },
+        "operators": {
+            "equals": "igual a",
+            "not_equals": "distinto de",
+            "contains": "contiene",
+            "not_contains": "no contiene",
+            "starts_with": "empieza por",
+            "not_starts_with": "no empieza por",
+            "ends_with": "termina en",
+            "not_ends_with": "no termina en"
+        },
+        "signalOperators": {
+            "matches": "rechazaría la petición",
+            "notMatches": "no rechazaría la petición"
+        },
+        "ipExample": "203.0.113.4 o 203.0.113.0/24",
+        "invalidAddress": "Escribe una dirección IP o un rango CIDR.",
+        "and": " y ",
+        "or": " o ",
+        "signalOn": "{label} salta",
+        "signalOff": "{label} no salta",
+        "moreValues": "{field} {operator} {shown} y {rest} más"
+    },
+    "list": {
+        "title": "Reglas propias",
+        "count": "{count}/{max} reglas",
+        "atMost": "Como máximo {max} reglas",
+        "create": "Crear regla",
+        "empty": "Sin reglas personalizadas. Las listas de direcciones y las reglas gestionadas de abajo siguen aplicándose.",
+        "columns": {
+            "reorder": "Reordenar",
+            "order": "Orden",
+            "name": "Nombre",
+            "description": "Descripción",
+            "action": "Acción",
+            "matches": "Aciertos",
+            "status": "Estado",
+            "actions": "Acciones"
+        },
+        "copyName": "{name} (copia)",
+        "orderHint": "Las reglas se evalúan en orden y decide la primera que coincide. Pon un permitir encima de un bloquear para hacer una excepción.",
+        "kind": "regla",
+        "deleteBody": "El tráfico que bloqueaba vuelve a llegar al servicio, salvo que coincida otra regla de más abajo.",
+        "sparkline": "Lo que coincide con {name} en el último día, por horas",
+        "matchesHint": "Peticiones del último día que coinciden con esta regla. Se cuentan repitiendo la regla sobre el registro del edge, así que es lo que coincide, no lo que ha frenado.",
+        "disable": "Desactivar {name}",
+        "enable": "Activar {name}",
+        "active": "Activa",
+        "off": "Apagada",
+        "actionsFor": "Acciones de {name}",
+        "edit": "Editar",
+        "moveUp": "Subir",
+        "moveDown": "Bajar",
+        "duplicate": "Duplicar",
+        "delete": "Eliminar"
+    },
+    "actions": {
+        "block": "Bloquear",
+        "allow": "Permitir",
+        "skip": "Omitir"
+    },
+    "editor": {
+        "newName": "Regla {number}",
+        "blocked": {
+            "name": "Ponle un nombre a la regla.",
+            "noCondition": "Añade al menos una condición.",
+            "emptyValue": "Cada condición necesita al menos un valor.",
+            "tooMany": "Una regla admite como máximo {max} condiciones.",
+            "nothingSkipped": "Elige al menos una cosa que omitir."
+        },
+        "createTitle": "Crear regla propia",
+        "editTitle": "Editar regla propia",
+        "name": "Nombre",
+        "nameHint": "Da nombre a la regla en la lista y en el motivo con el que se rechaza una petición bloqueada.",
+        "when": "Cuando las peticiones coincidan con...",
+        "whenHint": "Deben cumplirse todas las condiciones. Dentro de una condición, basta con cualquiera de sus valores. Une una fila con O para pedir una u otra.",
+        "then": "Entonces...",
+        "chooseAction": "Elige la acción",
+        "effects": {
+            "block": "Rechaza las peticiones que coinciden con un 403 y deja de evaluar las reglas siguientes.",
+            "allow": "Admite las peticiones que coinciden y deja de evaluar las reglas siguientes, así que una regla de más abajo no puede bloquearlas.",
+            "skip": "Se salta las comprobaciones de abajo para las peticiones que coinciden y deja que el resto siga decidiendo. No puede saltarse las reglas de direcciones, que se aplican antes de cualquier regla."
+        },
+        "whatToSkip": "Qué omitir",
+        "skip": {
+            "custom_rules": {
+                "title": "Las demás reglas propias",
+                "detail": "Todas las reglas de debajo de esta dejan de evaluarse para la petición que coincide."
+            },
+            "managed_rules": {
+                "title": "Las reglas gestionadas",
+                "detail": "Los paquetes de reglas que mantiene Polaris: escáneres, archivos ocultos, paneles de administración y demás."
+            },
+            "injection_checks": {
+                "title": "Las detecciones de inyección SQL y de XSS",
+                "detail": "El análisis por firmas de la línea de petición."
+            },
+            "browser_integrity": {
+                "title": "La integridad del navegador",
+                "detail": "La heurística que rechaza a un cliente que dice ser un navegador y no se comporta como tal."
+            },
+            "challenge": {
+                "title": "El desafío del navegador",
+                "detail": "La página de comprobación que un servicio pide superar mientras está bajo ataque. Omítela en webhooks y APIs a las que llaman máquinas."
+            }
+        },
+        "order": "Orden de ejecución",
+        "orderHint": "Las reglas se evalúan en orden. Dónde esté esta decide si recibe la petición antes o después que las demás.",
+        "selectOrder": "Elige el orden",
+        "positions": {
+            "first": "Primera",
+            "last": "Última",
+            "custom": "A medida"
+        },
+        "fireAfter": "Elige después de qué regla se ejecutará",
+        "noOther": "Aún no hay ninguna otra regla.",
+        "firesAfter": "Va después de",
+        "statusHint": "Controla si la regla evalúa el tráfico entrante.",
+        "disabled": "Desactivada",
+        "allowPast": "Permitir pese a {what}",
+        "blockPrefix": "Bloquear "
+    },
+    "managed": {
+        "sqlInjection": {
+            "label": "Bloquear inyección SQL",
+            "description": "Rechaza una petición cuya URL lleva una carga SQL.",
+            "inspects": "La cadena de consulta, la ruta y el user agent, decodificados antes. Una firma solo cuenta dentro de un mismo valor, así que palabras clave repartidas en parámetros distintos no son una inyección. No ve una carga en el cuerpo de la petición.",
+            "combines": "Activa en todas partes salvo que un ámbito la desactive. Cualquier ámbito puede hacerlo para lo que abarca, y uno más estrecho no puede volver a activarla: así un servicio que de verdad pone texto parecido a SQL en la cadena de consulta tiene dónde decirlo.",
+            "signatures": {
+                "0": "Un booleano añadido a una consulta: or/and/xor seguido de una comparación entre dos constantes. Solo cuentan las constantes, así que un parámetro con nombre de columna no lo es.",
+                "1": "Un UNION y un SELECT dentro del mismo valor, que es como se injerta un segundo conjunto de resultados en el primero.",
+                "2": "Un SELECT y su FROM dentro del mismo valor.",
+                "3": "Los catálogos y procedimientos del sistema con los que un atacante recorre una base de datos: information_schema, sysobjects, syscolumns, xp_cmdshell, pg_sleep.",
+                "4": "Una función de tiempo o de archivos llamada de verdad: sleep(, benchmark(, load_file(, updatexml(, extractvalue(, group_concat(. La palabra sola no basta.",
+                "5": "Una sentencia destructiva delante de su propio objeto: drop table, truncate table, alter user, delete from, insert into.",
+                "6": "Un punto y coma seguido de una segunda sentencia, que convierte una consulta en dos.",
+                "7": "Un comentario que cierra el resto de una sentencia después de una comilla, o el comentario versionado /*! de MySQL: código escrito para ejecutarse en la base de datos y en ningún otro sitio."
+            }
+        },
+        "xss": {
+            "label": "Bloquear cross-site scripting",
+            "description": "Rechaza una petición cuya URL lleva una carga de script.",
+            "inspects": "La cadena de consulta, la ruta y el user agent, decodificados antes. Las listas se limitan a lo que de verdad puede ejecutarse, no a todo el HTML. No ve una carga en el cuerpo de la petición.",
+            "combines": "Activa en todas partes salvo que un ámbito la desactive, y se resuelve aparte de la comprobación de SQL: el ámbito que tiene que permitir una rara vez tiene que permitir la otra.",
+            "signatures": {
+                "0": "Un elemento que puede ejecutar script, cargar un documento remoto o robar el envío de un formulario: script, iframe, svg, img, object, embed, form, style, base, meta y similares. El marcado normal como {tag} no lo es.",
+                "1": "Un manejador en línea que se asigna: onerror=, onload=, onmouseover= y demás. Se busca por nombre y solo cuando se asigna, así que un parámetro llamado online= no lo es.",
+                "2": "Un punto de entrada de script llamado de verdad: eval(, alert(, atob(, setTimeout(, unescape(, fromCharCode(.",
+                "3": "Un esquema que ejecuta en lugar de descargar (javascript:, vbscript:) o una URL data: que lleva HTML.",
+                "4": "Un objeto del navegador junto con el miembro que busca una carga: document.cookie, window.location, element.innerHTML, localStorage."
+            }
+        },
+        "browserIntegrity": {
+            "label": "Bloquear clientes que fingen ser un navegador",
+            "description": "Rechaza un cliente cuyas cabeceras no encajan como las de un navegador.",
+            "caution": "Desactivada por defecto: también rechaza una petición sin ningún user agent, algo que envían algunos scripts y comprobaciones de estado. Actívala donde sepas qué habla con el ámbito.",
+            "inspects": "Las cabeceras User-Agent, Accept, Accept-Language y Accept-Encoding. Aparte del caso sin user agent, solo exige al cliente lo que dice ser: curl es honesto y pasa; un user agent de Mozilla sin cabecera Accept, no.",
+            "signatures": {
+                "0": "Ningún user agent, algo que no envía ningún navegador ni ningún cliente bien hecho.",
+                "1": "Un carácter de control en el user agent: un cliente roto o un intento de partir una cabecera más adelante en la cadena.",
+                "2": "Un user agent de más de 512 caracteres. Los reales se quedan en unos 200.",
+                "3": "Un cliente que dice ser un navegador y no ha enviado cabecera Accept. Todos los navegadores la envían en cada petición.",
+                "4": "Un cliente que dice ser un navegador y no ha enviado ninguna de las dos. Que falte solo una no basta."
+            }
+        },
+        "tor": {
+            "label": "Bloquear la red Tor",
+            "description": "Rechaza todos los nodos de salida de Tor.",
+            "caution": "También deja fuera a quien usa Tor por motivos normales de privacidad.",
+            "inspects": "La dirección de la que llega la petición, frente a una lista que se descarga cada hora y se guarda en el edge.",
+            "combines": "Un solo interruptor para toda la instancia, se active donde se active. El edge rechaza la dirección antes de saber qué servicio se ha pedido, así que no puede variar por ámbito."
+        },
+        "scanners": {
+            "label": "Bloquear escáneres",
+            "description": "Bloquea sqlmap, nikto, nmap, wpscan y el resto de agentes de sondeo.",
+            "rules": {
+                "0": "User agents de escáneres",
+                "1": "User agent de escáner (exacto)"
+            }
+        },
+        "dotfiles": {
+            "label": "Bloquear secretos y archivos ocultos expuestos",
+            "description": "Bloquea peticiones de .env, .git, claves SSH, volcados de bases de datos y carpetas de editores.",
+            "rules": {
+                "0": "Rutas sensibles",
+                "1": "Archivos ocultos"
+            }
+        },
+        "directoryListing": {
+            "label": "Bloquear listados de carpetas",
+            "description": "Bloquea los enlaces de ordenación que genera una página de listado y las lecturas de directorios que nada debería recorrer.",
+            "rules": {
+                "0": "Orden de autoindex",
+                "1": "Recorrer un directorio que no debería listarse"
+            }
+        },
+        "adminPanels": {
+            "label": "Bloquear paneles de admin",
+            "description": "Bloquea los sondeos de Adminer, pgAdmin, Portainer, Jenkins, Grafana y la API de Kubernetes.",
+            "caution": "Desactívala en un ámbito que sirva a propósito uno de ellos.",
+            "rules": {
+                "0": "Rutas de paneles admin"
+            }
+        },
+        "cmsProbes": {
+            "label": "Bloquear sondeos de WordPress y PHP",
+            "description": "Bloquea /wp-admin, /phpmyadmin, .php y el resto del barrido habitual de exploits.",
+            "rules": {
+                "0": "Rutas de sondeo CMS",
+                "1": "PHP en un servicio que no tiene"
+            }
+        },
+        "aiCrawlers": {
+            "label": "Bloquear bots de IA",
+            "description": "Bloquea GPTBot, ClaudeBot, PerplexityBot y otros agentes de modelos y buscadores de respuestas.",
+            "caution": "Solo frena a los agentes que se identifican honestamente.",
+            "rules": {
+                "0": "User agents de bots de IA"
+            }
+        },
+        "searchCrawlers": {
+            "label": "Bloquear rastreadores de buscadores",
+            "description": "Bloquea Googlebot, bingbot, Slurp, LinkedInBot y otros indexadores.",
+            "caution": "Quita el servicio de los resultados de búsqueda. Para algo privado, no para un sitio público.",
+            "rules": {
+                "0": "User agents de buscadores"
+            }
+        },
+        "sharedInspects": "La línea de petición, tal como la reenvía el edge.",
+        "sharedCombines": "Un ámbito que la activa no puede ser anulado por uno más estrecho. Escribe una regla de permitir encima para hacer una excepción."
+    },
+    "jails": {
+        "notFound": {
+            "label": "Avalancha de 404",
+            "description": "Bloquea una dirección que no deja de pedir páginas que no existen: la forma de una enumeración de URLs."
+        },
+        "subdomainListing": {
+            "label": "Barrido de subdominios",
+            "description": "Bloquea una dirección que recorre tu comodín buscando nombres que respondan: host tras host sin nada desplegado. Se cuenta en nombres y no en peticiones, así que machacar una sola dirección no es esto y probar seis con discreción sí."
+        },
+        "rateLimited": {
+            "label": "Abuso del límite",
+            "description": "Bloquea una dirección que sigue insistiendo después de haber sido limitada."
+        },
+        "authFailed": {
+            "label": "Rechazos repetidos",
+            "description": "Bloquea una dirección que acumula rechazos: inicios de sesión fallidos, peticiones bloqueadas."
+        },
+        "probes": {
+            "label": "Sondeo de exploits",
+            "description": "Bloquea una dirección que busca WordPress, phpMyAdmin o .git en un servicio que no los tiene. Una sola petición a un almacén de credenciales (.env, una clave privada, la ruta de metadatos de la nube) basta por sí sola, y ese bloqueo se mantiene hasta que lo levantes."
+        },
+        "sshAuth": {
+            "label": "Fallos de acceso SSH y SFTP",
+            "description": "Bloquea una dirección que no deja de fallar al iniciar sesión por SSH o SFTP en tus servidores. Se lee del registro de autenticación de cada servidor, así que detecta el tráfico que nunca llega al edge web."
+        },
+        "title": "Bloqueos automáticos",
+        "intro": "Se cuentan desde el registro de peticiones del edge y no en cada petición, así que vigilar una dirección no le cuesta nada al visitante. Un reincidente queda bloqueado cada vez más tiempo.",
+        "hostnames": "Hosts",
+        "within": "En (min)"
+    },
+    "scope": {
+        "armedAbove": "Desde un ámbito superior",
+        "armedAboveWhy": "Un ámbito por encima de este la activa, y uno más estrecho no puede desactivar un rechazo. Escribe una regla de permitir encima para hacer una excepción.",
+        "offAbove": "Apagada arriba",
+        "offAboveWhy": "Un ámbito por encima de este la desactivó para todo lo que abarca, y uno más estrecho no puede volver a activarla.",
+        "instanceWide": "Toda la instancia",
+        "instanceWideWhy": "Un solo interruptor para toda la instancia: el edge rechaza la dirección antes de saber qué servicio se ha pedido. Abre la regla para cambiarlo.",
+        "setByOperator": "Lo decide quien gestiona esta instancia.",
+        "loginAboveWhy": "Un ámbito por encima de este exige iniciar sesión, y uno más estrecho no puede eximirlo.",
+        "polarisNote": "Se aplica a los dominios públicos en los que responde Polaris. El nombre de la red local se sirve aparte y sigue accesible.",
+        "remoteNote": "El edge local aplica los cambios al momento; un servicio en un servidor remoto los recoge en su siguiente despliegue."
+    },
+    "access": {
+        "addressesTitle": "Acceso por IP",
+        "addressesDescription": "Direcciones que este ámbito admite y direcciones que rechaza antes de comprobar nada más.",
+        "accessBadge": "Acceso",
+        "unsaved": "Cambios sin guardar",
+        "noAddresses": "Sin direcciones",
+        "counts": "{allowed} permitidas, {blocked} bloqueadas",
+        "loginTitle": "Exigir sesión en Polaris",
+        "loginDescription": "Los visitantes inician sesión en Polaris primero, y la regla puede indicar qué cuentas admite.",
+        "loginBadge": "Sesión",
+        "title": "Reglas de acceso",
+        "hint": "Quién llega a este ámbito. Ambas se comprueban antes que cualquier regla de arriba."
+    },
+    "managedList": {
+        "title": "Reglas gestionadas",
+        "hint": "Firmas y listas que Polaris mantiene al día. Abre una para ver qué aplica."
+    },
+    "search": {
+        "label": "Buscar reglas por nombre",
+        "show": "Mostrar",
+        "all": "Todas",
+        "active": "Solo activas",
+        "off": "Apagadas"
+    },
+    "shield": {
+        "title": "Antiscraping",
+        "hint": "Cambia la respuesta en lugar de rechazar la petición, y por eso no es una regla.",
+        "obfuscation": "Ocultar direcciones de correo",
+        "obfuscationHint": "Sustituye las direcciones de correo del HTML servido por un token que la página decodifica en el navegador, así que la dirección no está en el código fuente. Los visitantes no notan nada. Un recolector que maneje un navegador real sigue leyéndola."
+    },
+    "missing": {
+        "text": "Esta regla no forma parte de esta versión de Polaris.",
+        "back": "Volver a las reglas"
+    },
+    "loading": "Cargando las reglas del firewall",
+    "predefined": {
+        "open": "Abrir",
+        "openNamed": "Abrir {name}"
+    },
+    "managedPage": {
+        "whatItDoes": "Qué hace",
+        "reads": "Lee:",
+        "acrossScopes": "Entre ámbitos:",
+        "statusHint": "Si este ámbito aplica la regla.",
+        "activeHere": "Activa en este ámbito",
+        "offHere": "Apagada en este ámbito",
+        "list": "La lista",
+        "listHint": "Se descarga cada hora y se guarda en el edge, así que ninguna petición espera a una consulta.",
+        "addresses": "direcciones",
+        "addressesUpdated": "direcciones, actualizada {when}",
+        "notFetched": "Aún no se ha descargado. Llega pocos minutos después de activar la regla.",
+        "refreshFailed": "La última actualización falló ({reason}). Se sigue aplicando la lista anterior.",
+        "conditions": "Condiciones",
+        "conditionsHint": "Las mantiene Polaris y las evalúa el mismo motor que tus propias reglas, después de ellas.",
+        "expressionHint": "Cópiala en una regla propia para acotar la comprobación (a un host, una ruta, un cliente) en lugar de desactivarla en todo el ámbito.",
+        "matches": "Qué detecta",
+        "matchesHint": "Las familias que rechaza. Cada motivo es el que se escribe en el rechazo, así que una petición bloqueada en el registro de tráfico nombra la línea de la que viene.",
+        "example": "Se rechaza, por ejemplo:",
+        "exceptions": "Excepciones",
+        "exceptionsHint": "Tus reglas se ejecutan antes que cualquier regla gestionada, así que un permitir por encima de esta admite el tráfico sin desactivar la regla para todo lo demás.",
+        "createException": "Crear una excepción",
+        "theExpression": "la expresión"
+    },
+    "addresses": {
+        "title": "Direcciones",
+        "hint": "Se comprueban antes que cualquier otra regla. La lista de permitidas la aplica el propio edge; la de bloqueadas siempre gana.",
+        "allowed": "Permitidas",
+        "allowedHint": "Si hay alguna dirección en la lista, solo pasan esas. Un ámbito más estrecho puede acortar esta lista, nunca alargarla.",
+        "invalid": "Escribe una dirección IP o un rango CIDR válidos.",
+        "addMine": "Añadir mi dirección ({ip})",
+        "blocked": "Bloqueadas",
+        "blockedHint": "Siempre se rechazan, aunque coincidan con la lista de permitidas.",
+        "overlap": "\"{address}\" está en las dos listas.",
+        "lockOut": "Esta lista de permitidas no incluye la dirección desde la que lees esto ({ip}). Si la guardas, te quedarás fuera de todo lo de este ámbito.",
+        "noChanges": "Nada que guardar",
+        "save": "Guardar listas",
+        "discard": "Descartar"
+    },
+    "login": {
+        "what": "Los visitantes deben iniciar sesión en Polaris para llegar a cualquier cosa de este ámbito. Las sesiones abiertas siguen funcionando si el panel de control cae; los inicios de sesión nuevos necesitan que responda.",
+        "across": "un ámbito que exige iniciar sesión no puede ser anulado por uno más estrecho, y cada ámbito que indica a quién admite tiene voz.",
+        "statusHint": "Si este ámbito exige iniciar sesión.",
+        "stopRequiring": "Dejar de exigir sesión en Polaris",
+        "require": "Exigir sesión en Polaris",
+        "required": "Hay que iniciar sesión",
+        "notRequired": "No hace falta sesión",
+        "aboveNote": "Un ámbito por encima de este exige iniciar sesión, y uno más estrecho no puede eximirlo. Las listas de abajo siguen aplicándose: cada ámbito que indica a quién admite tiene voz.",
+        "admits": "A quién admite",
+        "admitsHint": "Sin nadie nombrado, entra cualquiera con cuenta en Polaris."
+    },
+    "page": {
+        "backToList": "Volver a la lista de reglas",
+        "back": "Volver",
+        "title": "Firewall",
+        "nothing": "Aún no existe nada de ese tipo, así que no hay nada que proteger. Crea uno y sus reglas aparecerán aquí."
+    },
+    "principals": {
+        "admitted": "Quién entra",
+        "admittedEmpty": "Entra cualquiera con cuenta en Polaris. Nombra un rol, un grupo o una persona para limitarlo a ellos.",
+        "admittedFilled": "Solo entran estos. Un ámbito más estrecho puede acortar esta lista, nunca alargarla.",
+        "admittedAdd": "Añadir a quien admite este acceso",
+        "refused": "Quién no entra nunca",
+        "refusedEmpty": "No se rechaza a nadie de entrada.",
+        "refusedFilled": "Se rechazan aunque algo de arriba los admita, y el rechazo de un ámbito más amplio también se aplica aquí.",
+        "refusedAdd": "Añadir a quien rechaza este acceso",
+        "manage": "Gestionar roles y grupos",
+        "loading": "Cargando a quién se puede elegir",
+        "allNamed": "Ya están todos nombrados",
+        "addPlaceholder": "Añade un rol, grupo o persona...",
+        "option": "{name} ({kind})",
+        "types": {
+            "user": "usuario",
+            "group": "grupo",
+            "role": "rol"
+        },
+        "gone": "{name} (ya no existe)",
+        "schedule": "Programar {name}",
+        "scheduleHint": "Fijar inicio o caducidad",
+        "remove": "Quitar {name}",
+        "startAfterExpiry": "El inicio tiene que ser anterior a la caducidad",
+        "invalidWindow": "No es un periodo válido",
+        "starts": "Empieza",
+        "expires": "Caduca",
+        "always": "Siempre",
+        "expired": "caducó {when}",
+        "from": "desde {when}",
+        "until": "hasta {when}"
+    },
+    "accounts": {
+        "title": "Cuentas vistas aquí",
+        "none": "Ninguna cuenta ha iniciado sesión desde esta dirección.",
+        "liveNow": "{count} con sesión ahora",
+        "banned": "Bloqueada",
+        "active": "Activa",
+        "lastActive": "Última vez",
+        "expired": "Caducada",
+        "waiting": "Pendiente de aprobación",
+        "refused": "Rechazada",
+        "moreSessions": "y {count, plural, one {{shown} sesión más} other {{shown} sesiones más}}",
+        "moreAccounts": "y {atLeast, select, yes {al menos } other {}}{shown} más, las vistas hace más tiempo",
+        "tallySigned": "{shown} con sesión iniciada",
+        "tallyRefused": "{shown} rechazadas",
+        "tallyWaiting": "{shown} pendientes de aprobación"
+    },
+    "chips": {
+        "add": "Añadir",
+        "addNamed": "Añadir {value}",
+        "addEntry": "Añadir",
+        "duplicate": "Ya está en la lista."
+    },
+    "scopes": {
+        "polaris": "El propio Polaris",
+        "global": "Todos los servicios",
+        "serverGroup": "Grupo de servidores",
+        "server": "Servidor",
+        "project": "Proyecto",
+        "environment": "Entorno",
+        "marketplace": "App del marketplace",
+        "application": "Servicio"
+    },
+    "picker": {
+        "scope": "Ámbito",
+        "target": "Destino",
+        "none": "Aún no hay nada de ese tipo."
+    },
+    "describe": {
+        "marketplace": "Se aplica solo a {label}. Es una app instalada, y estas son las reglas del servicio que ejecuta.",
+        "polaris": "Protege el propio panel en los dominios públicos en los que responde. El nombre de la red local se sirve aparte y sigue accesible, así que si aquí dejas fuera la internet pública puedes deshacerlo desde tu propia red.",
+        "global": "Se aplica a todos los servicios desplegados de todos los proyectos. Lo más estrecho puede añadir restricciones encima, nunca relajar estas.",
+        "serverGroup": "Se aplica a todos los servicios que corren en cualquier servidor de {label}. Al añadir un servidor al grupo, pasa a regirse por estas reglas.",
+        "server": "Se aplica a todos los servicios que corren en {label}, sea cual sea su proyecto.",
+        "project": "Se aplica a todos los servicios de {label}, en todos los entornos.",
+        "environment": "Se aplica a todos los servicios de {label}.",
+        "application": "Se aplica solo a {label}."
+    },
+    "errors": {
+        "load": "No se pudo cargar la regla del firewall",
+        "save": "No se pudo guardar la regla del firewall",
+        "traffic": "No se pudo leer el tráfico reciente",
+        "directory": "No se pudo cargar el directorio",
+        "overview": "No se pudo cargar el resumen del firewall",
+        "address": "Esa dirección no es válida",
+        "window": "Ese periodo no es válido",
+        "activity": "No se pudo leer la actividad de esa dirección",
+        "jailsInvalid": "Esos ajustes de bloqueo no son válidos",
+        "jailsSave": "No se guardaron los ajustes de bloqueo",
+        "addresses": "Escribe direcciones IP o rangos CIDR válidos",
+        "listSave": "No se pudo guardar la lista",
+        "lift": "No se pudo quitar el bloqueo",
+        "tor": "No se pudo cambiar el ajuste de Tor",
+        "anomalyInvalid": "Esos ajustes de anomalías no son válidos",
+        "settingsSave": "No se pudieron guardar los ajustes",
+        "block": "No se pudo bloquear esa dirección"
+    },
+    "panels": {
+        "whatDoing": "Qué ha estado haciendo {ip}",
+        "youHint": "La dirección desde la que lees esta página. La comparte toda tu red.",
+        "you": "Tú",
+        "traffic": "Tráfico",
+        "refresh": "Actualizar",
+        "noTraffic": "No hay nada registrado en este periodo. Las cifras salen del propio registro de peticiones del edge, así que un servicio al que se llega directamente por su puerto no aparece aquí.",
+        "requests": "Peticiones",
+        "blocked": "Bloqueadas",
+        "shareBlocked": "% bloqueado",
+        "topAddresses": "Direcciones más bloqueadas",
+        "topPaths": "Rutas más bloqueadas",
+        "topAgents": "User agents más bloqueados",
+        "none": "Ninguno.",
+        "banFor": "Bloquear (min)"
+    },
+    "anomalies": {
+        "title": "Anomalías",
+        "detect": "Detectar abuso de rutas",
+        "intro": "Tráfico que está bien petición a petición y mal en conjunto. Cada dirección se compara con lo que hacen el resto de visitantes de esa ruta, así que un endpoint con mucho uso no es una anomalía por estar ocupado. Las direcciones de confianza nunca se evalúan.",
+        "off": "La detección está desactivada.",
+        "none": "Nada fuera de lo normal en los últimos diez minutos.",
+        "kinds": {
+            "route-flood": "ruta saturada",
+            "asset-abuse": "abuso de recursos",
+            "cache-buster": "salto de caché",
+            "path-enumeration": "enumeración de rutas",
+            "query-payload": "carga en consulta",
+            "method-mismatch": "método inesperado"
+        },
+        "trustNamed": "Confiar en {ip}",
+        "trustHint": "Esto no es un ataque: no evaluar nunca esta dirección",
+        "blockNamed": "Bloquear {ip}",
+        "blockHint": "Bloquear esta dirección",
+        "auto": "Bloquear automáticamente",
+        "autoHint": "Bloquea la dirección de todo lo que puntúe alto, sin esperarte. Déjalo apagado hasta que los hallazgos de arriba hayan acertado unas cuantas veces.",
+        "autoLabel": "Bloquear anomalías automáticamente",
+        "overBaseline": "Veces lo normal",
+        "assetMax": "Recursos pedidos",
+        "variantMax": "Variantes de consulta"
+    },
+    "bans": {
+        "title": "Bloqueadas ahora",
+        "none": "No hay nadie bloqueado. Las direcciones aparecen aquí cuando saltan un bloqueo automático de abajo o cuando las marca un proveedor de reputación.",
+        "columns": {
+            "address": "Dirección",
+            "why": "Motivo",
+            "until": "Hasta"
+        },
+        "offences": "{count}x",
+        "untilLifted": "Hasta que lo levantes",
+        "liftNamed": "Levantar el bloqueo de {ip}",
+        "lift": "Levantar bloqueo"
+    },
+    "trusted": {
+        "title": "Direcciones fiables",
+        "intro": "Nunca se bloquean ni se marcan como anomalía. Loopback siempre es de confianza. Añade tu propia dirección o rango para que tu uso diario de la instancia no se lea como un ataque.",
+        "trustSelf": "Confiar en este dispositivo (<mono>{ip}</mono>)"
+    },
+    "intel": {
+        "title": "Proveedores de reputación",
+        "body": "Bloquea direcciones ya conocidas por escanear o atacar. Conecta <link>Dymo API o Criminal IP</link> para activarlos. Se les pregunta en segundo plano por las direcciones vistas en tu tráfico, nunca mientras una petición espera."
+    },
+    "ban": {
+        "blocked": "Bloqueada por el firewall",
+        "wasBlocked": "Estuvo bloqueada por el firewall",
+        "noReason": "No se registró ningún motivo.",
+        "stands": "Se mantiene hasta que alguien lo levante.",
+        "lifts": "Se levanta {when}.",
+        "lifted": "Se levantó {when}.",
+        "decided": "Lo decidió {source}.",
+        "decidedAfter": "Lo decidió {source}, tras {offences} infracciones distintas."
+    },
+    "address": {
+        "intro": "Todas las peticiones de esta dirección en las últimas {window}, leídas del propio registro del edge.",
+        "none": "Nada de esta dirección en ese periodo. Un bloqueo dura más que el registro del que salió, así que uno antiguo puede seguir aplicándose sin nada que mostrar aquí.",
+        "firstSeen": "Primera vez",
+        "lastSeen": "Última vez",
+        "mostAsked": "Lo más pedido",
+        "callingItself": "Se identifica como",
+        "columns": {
+            "when": "Cuándo",
+            "method": "Método",
+            "status": "Estado",
+            "path": "Ruta"
+        },
+        "truncated": "Se muestran las {shown} más recientes de {total}. Los recuentos de arriba las incluyen todas."
+    }
+}

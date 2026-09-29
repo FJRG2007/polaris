@@ -15,14 +15,16 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ruleDescription } from "../../src/app/(app)/apps/firewall/rule-language";
+import { translatorFor } from "../../src/lib/i18n/translate";
 import { ManagedRulePage } from "../../src/app/(app)/apps/firewall/managed-rule-page";
 import { PredefinedRuleList } from "../../src/app/(app)/apps/firewall/predefined-list";
 import { renderWafExpression, wafManagedRule, WAF_MANAGED_RULES, type WafCustomRule } from "@polaris/core";
+import { withMessages } from "../setup/i18n";
 
 function page(id: string): string {
     const rule = wafManagedRule(id);
     if (!rule) throw new Error(`no managed rule ${id}`);
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <ManagedRulePage
             rule={rule}
             enabled
@@ -30,7 +32,7 @@ function page(id: string): string {
             onToggle={() => {}}
             onCreateException={() => {}}
         />
-    );
+    ));
 }
 
 describe("a predefined rule, opened", () => {
@@ -63,7 +65,7 @@ describe("a predefined rule, opened", () => {
 
 describe("the predefined rule list", () => {
     it("has a row for every managed rule, so each one can be opened", () => {
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <PredefinedRuleList
                 title="Managed rules"
                 hint="Signatures and lists Polaris keeps up to date."
@@ -78,7 +80,7 @@ describe("the predefined rule list", () => {
                     enabled: false
                 }))}
             />
-        );
+        ));
 
         for (const rule of WAF_MANAGED_RULES) expect(markup).toContain(rule.label);
     });
@@ -87,7 +89,7 @@ describe("the predefined rule list", () => {
         // The whole point: a project's row used to say "Off" for a pack the instance
         // was already enforcing on its behalf, which is the switch saying the opposite
         // of what is happening.
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <PredefinedRuleList
                 title="Managed rules"
                 hint="Signatures and lists Polaris keeps up to date."
@@ -109,7 +111,7 @@ describe("the predefined rule list", () => {
                     }
                 ]}
             />
-        );
+        ));
 
         expect(markup).toContain("From a broader scope");
         expect(markup).not.toContain(">Off<");
@@ -118,7 +120,7 @@ describe("the predefined rule list", () => {
     });
 
     it("reads a row with no switch as what it holds rather than as off", () => {
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <PredefinedRuleList
                 title="Access rules"
                 hint="Who reaches this scope at all."
@@ -136,7 +138,7 @@ describe("the predefined rule list", () => {
                     }
                 ]}
             />
-        );
+        ));
 
         expect(markup).toContain("2 allowed, 1 blocked");
         expect(markup).not.toContain("Active");
@@ -151,7 +153,7 @@ describe("a rule that is a fetched list", () => {
     it("shows the list instead of conditions it does not have", () => {
         const rule = wafManagedRule("tor");
         if (!rule) throw new Error("no managed rule tor");
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <ManagedRulePage
                 rule={rule}
                 enabled
@@ -160,7 +162,7 @@ describe("a rule that is a fetched list", () => {
                 onToggle={() => {}}
                 onCreateException={() => {}}
             />
-        );
+        ));
 
         expect(markup).toContain("The list");
         expect(markup).toContain("1,398");
@@ -172,7 +174,7 @@ describe("a rule that is a fetched list", () => {
     it("says so rather than showing an empty list before the first fetch", () => {
         const rule = wafManagedRule("tor");
         if (!rule) throw new Error("no managed rule tor");
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <ManagedRulePage
                 rule={rule}
                 enabled
@@ -181,7 +183,7 @@ describe("a rule that is a fetched list", () => {
                 onToggle={() => {}}
                 onCreateException={() => {}}
             />
-        );
+        ));
 
         expect(markup).toContain("Not fetched yet");
     });
@@ -226,7 +228,7 @@ describe("a nested rule, written out", () => {
     });
 
     it("says the same thing in the sentence the list shows", () => {
-        expect(ruleDescription(nested)).toBe(
+        expect(ruleDescription(nested, translatorFor("en-US", "firewall"))).toBe(
             "Client address does not equal 203.0.113.0/24 and (URL path starts with /admin or Query string contains debug=1)"
         );
     });

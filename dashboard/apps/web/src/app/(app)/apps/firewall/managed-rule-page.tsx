@@ -25,6 +25,7 @@ import { CopyButton } from "@/components/copy-button";
 import { grouped, PageHeader, Section } from "./page-parts";
 import { useDisplayFormat } from "@/components/display-format";
 import { CircleOff, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /**
  * The expression a signature check is written as.
@@ -69,6 +70,7 @@ export function ManagedRulePage({
     /** Opens the custom rule editor on an allow rule named after this one. */
     onCreateException: () => void;
 }) {
+    const t = useTranslations("firewall");
     const format = useDisplayFormat();
     const expression = signalExpression(rule);
     const on = decidedElsewhere ? decidedElsewhere.on : enabled;
@@ -77,13 +79,13 @@ export function ManagedRulePage({
         <div className="flex flex-col gap-4">
             <PageHeader title={rule.label} onBack={onBack} />
 
-            <Section title="What it does">
+            <Section title={t("managedPage.whatItDoes")}>
                 <p className="text-sm text-muted-foreground">{rule.description}</p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Reads:</span> {rule.inspects}
+                    <span className="font-medium text-foreground">{t("managedPage.reads")}</span> {rule.inspects}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Across scopes:</span> {rule.combines}
+                    <span className="font-medium text-foreground">{t("managedPage.acrossScopes")}</span> {rule.combines}
                 </p>
                 {rule.caution ? (
                     <p className="flex items-start gap-1.5 text-xs text-warning">
@@ -93,13 +95,13 @@ export function ManagedRulePage({
                 ) : null}
             </Section>
 
-            <Section title="Status" hint="Whether this scope enforces the rule.">
+            <Section title={t("list.columns.status")} hint={t("managedPage.statusHint")}>
                 <div className="flex items-center gap-3">
                     <Switch
                         checked={on}
                         disabled={disabled || decidedElsewhere !== undefined}
                         onChange={onToggle}
-                        aria-label={`${on ? "Disable" : "Enable"} ${rule.label}`}
+                        aria-label={on ? t("list.disable", { name: rule.label }) : t("list.enable", { name: rule.label })}
                     />
                     <span className="flex items-center gap-1.5 text-sm">
                         {on ? (
@@ -107,7 +109,11 @@ export function ManagedRulePage({
                         ) : (
                             <CircleOff className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         )}
-                        {decidedElsewhere ? decidedElsewhere.label : on ? "Active on this scope" : "Off on this scope"}
+                        {decidedElsewhere
+                            ? decidedElsewhere.label
+                            : on
+                              ? t("managedPage.activeHere")
+                              : t("managedPage.offHere")}
                     </span>
                 </div>
                 {decidedElsewhere ? (
@@ -116,45 +122,43 @@ export function ManagedRulePage({
             </Section>
 
             {feed ? (
-                <Section title="The list" hint="Fetched hourly and held at the edge, so no request waits on a lookup.">
+                <Section title={t("managedPage.list")} hint={t("managedPage.listHint")}>
                     {feed.count > 0 ? (
                         <p className="text-sm">
                             <span className="font-medium tabular-nums">{grouped(feed.count)}</span>{" "}
                             <span className="text-muted-foreground">
-                                addresses
-                                {feed.fetchedAt ? `, updated ${format.dateTime(feed.fetchedAt)}` : ""}
+                                {feed.fetchedAt
+                                    ? t("managedPage.addressesUpdated", { when: format.dateTime(feed.fetchedAt) })
+                                    : t("managedPage.addresses")}
                             </span>
                         </p>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            Not fetched yet. It arrives within a few minutes of the rule being armed.
+                            {t("managedPage.notFetched")}
                         </p>
                     )}
                     {feed.error ? (
                         <p className="flex items-start gap-1.5 text-xs text-warning">
                             <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                            The last refresh failed ({feed.error}). The previous list is still being enforced.
+                            {t("managedPage.refreshFailed", { reason: feed.error })}
                         </p>
                     ) : null}
                 </Section>
             ) : null}
 
             {rule.rules.length > 0 ? (
-                <Section
-                    title="Conditions"
-                    hint="Maintained by Polaris, and evaluated by the same engine as your own rules - after them."
-                >
+                <Section title={t("managedPage.conditions")} hint={t("managedPage.conditionsHint")}>
                     <div className="flex flex-col gap-4">
                         {rule.rules.map((entry, index) => (
                             <div key={index} className="flex flex-col gap-2">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-sm font-medium">{entry.name}</span>
                                     <Badge variant={entry.action === "block" ? "danger" : "success"}>
-                                        {entry.action === "block" ? "Block" : "Allow"}
+                                        {entry.action === "block" ? t("actions.block") : t("actions.allow")}
                                     </Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                                    {ruleDescription(entry)}
+                                    {ruleDescription(entry, t)}
                                 </p>
                                 <Expression value={core.renderWafExpression(entry.conditions)} />
                             </div>
@@ -164,19 +168,13 @@ export function ManagedRulePage({
             ) : null}
 
             {expression ? (
-                <Section
-                    title="Expression"
-                    hint="Copy it into a rule of your own to narrow the check - to one hostname, one path, one client - instead of switching it off for the whole scope."
-                >
+                <Section title={t("conditions.expression")} hint={t("managedPage.expressionHint")}>
                     <Expression value={expression} />
                 </Section>
             ) : null}
 
             {rule.signatures.length > 0 ? (
-                <Section
-                    title="What it matches"
-                    hint="The families it refuses. Each reason is the one written into the refusal, so a blocked request in the traffic log names the line it came from."
-                >
+                <Section title={t("managedPage.matches")} hint={t("managedPage.matchesHint")}>
                     <ul className="flex flex-col divide-y divide-border">
                         {rule.signatures.map((family) => (
                             <li key={family.reason} className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0">
@@ -186,7 +184,7 @@ export function ManagedRulePage({
                                 <p className="text-xs text-muted-foreground">{family.detail}</p>
                                 {family.example ? (
                                     <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                                        Refused, for example:{" "}
+                                        {t("managedPage.example")}{" "}
                                         <code className="font-mono text-foreground">?{family.example}</code>
                                     </p>
                                 ) : null}
@@ -196,13 +194,10 @@ export function ManagedRulePage({
                 </Section>
             ) : null}
 
-            <Section
-                title="Exceptions"
-                hint="Your own rules run before every managed one, so an allow above this admits the traffic without switching the rule off for everything else."
-            >
+            <Section title={t("managedPage.exceptions")} hint={t("managedPage.exceptionsHint")}>
                 <Button type="button" variant="secondary" size="sm" className="w-fit" onClick={onCreateException}>
                     <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                    Create an exception
+                    {t("managedPage.createException")}
                 </Button>
             </Section>
         </div>
@@ -211,12 +206,13 @@ export function ManagedRulePage({
 
 /** One expression, in the shape it is read and copied in. */
 function Expression({ value }: { value: string }) {
+    const t = useTranslations("firewall");
     return (
         <div className="flex items-start gap-2">
             <pre className="min-w-0 flex-1 overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
                 {value}
             </pre>
-            <CopyButton value={value} label="Copy the expression" className="mt-1.5" />
+            <CopyButton value={value} label={t("managedPage.theExpression")} className="mt-1.5" />
         </div>
     );
 }

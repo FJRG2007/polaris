@@ -10,6 +10,7 @@
  */
 
 import { ArrowLeft } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Thousands separators without a locale. Deliberately hand-rolled: toLocaleString
  *  would pick a separator from the browser, which disagrees with the server on the
@@ -20,13 +21,14 @@ export function grouped(value: number): string {
 
 /** The title of a page you got to by opening something, with the way back. */
 export function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
+    const t = useTranslations("firewall");
     return (
         <div className="flex items-center gap-2">
             <button
                 type="button"
                 onClick={onBack}
-                aria-label="Back to the rule list"
-                title="Back"
+                aria-label={t("page.backToList")}
+                title={t("page.back")}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />

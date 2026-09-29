@@ -850,6 +850,24 @@
         "web/src/lib/dns/propagation.ts",
         "web/src/lib/dns/record-schema.ts",
         "web/src/lib/dns/records-view.ts",
-        "web/src/lib/dns/zone-records.ts"
+        "web/src/lib/dns/zone-records.ts",
+        "web/src/app/(app)/apps/firewall/access-rules.tsx",
+        "web/src/app/(app)/apps/firewall/actions.ts",
+        "web/src/app/(app)/apps/firewall/address-accounts.tsx",
+        "web/src/app/(app)/apps/firewall/chip-list.tsx",
+        "web/src/app/(app)/apps/firewall/condition-builder.tsx",
+        "web/src/app/(app)/apps/firewall/instance-panels.tsx",
+        "web/src/app/(app)/apps/firewall/login-principals.tsx",
+        "web/src/app/(app)/apps/firewall/managed-rule-page.tsx",
+        "web/src/app/(app)/apps/firewall/page-parts.tsx",
+        "web/src/app/(app)/apps/firewall/page.tsx",
+        "web/src/app/(app)/apps/firewall/predefined-list.tsx",
+        "web/src/app/(app)/apps/firewall/rule-editor.tsx",
+        "web/src/app/(app)/apps/firewall/rule-language.ts",
+        "web/src/app/(app)/apps/firewall/rule-list.tsx",
+        "web/src/app/(app)/apps/firewall/scope-kinds.ts",
+        "web/src/app/(app)/apps/firewall/scope-picker.tsx",
+        "web/src/app/(app)/apps/firewall/waf-editor.tsx",
+        "web/src/app/(app)/apps/firewall/waf-words.ts"
     ]
 }

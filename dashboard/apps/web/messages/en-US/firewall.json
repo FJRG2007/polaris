@@ -1,1 +1,600 @@
-{}
+{
+    "conditions": {
+        "expression": "Expression",
+        "useBuilder": "Use the builder",
+        "expressionLabel": "Rule expression",
+        "expressionHint": "Fields are named as they are at the edge, joined with and / or and brackets.",
+        "characters": "{used} / {max} characters",
+        "preview": "Expression Preview",
+        "edit": "Edit expression",
+        "previewEmpty": "Add a condition to see the expression.",
+        "or": "or",
+        "and": "and",
+        "add": "Add a condition",
+        "matches": "Matches",
+        "matchLabel": "How this group matches",
+        "any": "any of these",
+        "all": "all of these",
+        "removeGroup": "Remove this group",
+        "removeGroupTitle": "Remove the group",
+        "field": "Field",
+        "operator": "Operator",
+        "andButton": "And",
+        "orButton": "Or",
+        "joinAnd": "Add a condition joined by and",
+        "joinOr": "Add a condition joined by or",
+        "removeCondition": "Remove this condition",
+        "remove": "Remove",
+        "value": "Value",
+        "signalHint": "Reads the same check the managed rule does, so it can be narrowed to part of the traffic instead of switched off for the whole scope.",
+        "tooDeep": "A rule cannot nest any deeper"
+    },
+    "rules": {
+        "fields": {
+            "ip": "Client address",
+            "host": "Hostname",
+            "path": "URL path",
+            "method": "Request method",
+            "user_agent": "User agent",
+            "query": "Query string"
+        },
+        "signals": {
+            "sql_injection": "SQL injection check",
+            "xss": "Cross-site scripting check",
+            "browser_integrity": "Browser integrity check"
+        },
+        "operators": {
+            "equals": "equals",
+            "not_equals": "does not equal",
+            "contains": "contains",
+            "not_contains": "does not contain",
+            "starts_with": "starts with",
+            "not_starts_with": "does not start with",
+            "ends_with": "ends with",
+            "not_ends_with": "does not end with"
+        },
+        "signalOperators": {
+            "matches": "would refuse the request",
+            "notMatches": "would not refuse the request"
+        },
+        "ipExample": "203.0.113.4 or 203.0.113.0/24",
+        "invalidAddress": "Enter an IP address or a CIDR range.",
+        "and": " and ",
+        "or": " or ",
+        "signalOn": "{label} fires",
+        "signalOff": "{label} does not fire",
+        "moreValues": "{field} {operator} {shown} and {rest} more"
+    },
+    "list": {
+        "title": "Custom rules",
+        "count": "{count}/{max} rules",
+        "atMost": "At most {max} rules",
+        "create": "Create rule",
+        "empty": "No custom rules. The address lists and managed rules below still apply.",
+        "columns": {
+            "reorder": "Reorder",
+            "order": "Order",
+            "name": "Name",
+            "description": "Description",
+            "action": "Action",
+            "matches": "Matches",
+            "status": "Status",
+            "actions": "Actions"
+        },
+        "copyName": "{name} (copy)",
+        "orderHint": "Rules are evaluated in order and the first one that matches decides. Put an allow above a block to carve out an exception.",
+        "kind": "rule",
+        "deleteBody": "Traffic it was blocking reaches the service again, unless another rule below it matches.",
+        "sparkline": "What {name} matches over the last day, by hour",
+        "matchesHint": "Requests in the last day this rule matches. Counted by replaying the rule over the edge log, so it is what the rule matches rather than what it caught.",
+        "disable": "Disable {name}",
+        "enable": "Enable {name}",
+        "active": "Active",
+        "off": "Off",
+        "actionsFor": "Actions for {name}",
+        "edit": "Edit",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "duplicate": "Duplicate",
+        "delete": "Delete"
+    },
+    "actions": {
+        "block": "Block",
+        "allow": "Allow",
+        "skip": "Skip"
+    },
+    "editor": {
+        "newName": "Rule {number}",
+        "blocked": {
+            "name": "Give the rule a name.",
+            "noCondition": "Add at least one condition.",
+            "emptyValue": "Every condition needs at least one value.",
+            "tooMany": "A rule can hold at most {max} conditions.",
+            "nothingSkipped": "Choose at least one thing to skip."
+        },
+        "createTitle": "Create custom rule",
+        "editTitle": "Edit custom rule",
+        "name": "Rule name",
+        "nameHint": "Names the rule in the list and in the reason a blocked request is refused with.",
+        "when": "When incoming requests match...",
+        "whenHint": "Every condition must hold. Within one condition, any of its values is enough. Join a row with Or to ask for either instead.",
+        "then": "Then take action...",
+        "chooseAction": "Choose action",
+        "effects": {
+            "block": "Refuses matching requests with 403 and stops evaluating later rules.",
+            "allow": "Admits matching requests and stops evaluating later rules, so a rule below cannot block them.",
+            "skip": "Steps over the checks below for matching requests and lets everything else carry on deciding. It cannot skip the address rules, which are enforced before any rule runs."
+        },
+        "whatToSkip": "What to skip",
+        "skip": {
+            "custom_rules": {
+                "title": "All remaining custom rules",
+                "detail": "Every rule below this one stops evaluating for the matching request."
+            },
+            "managed_rules": {
+                "title": "All managed rules",
+                "detail": "The rule packs Polaris maintains: scanners, dotfiles, admin panels and the rest."
+            },
+            "injection_checks": {
+                "title": "The SQL injection and cross-site scripting checks",
+                "detail": "The signature scan of the request line."
+            },
+            "browser_integrity": {
+                "title": "The browser integrity check",
+                "detail": "The heuristic that refuses a client claiming to be a browser and not behaving like one."
+            },
+            "challenge": {
+                "title": "The browser challenge",
+                "detail": "The check page a service asks visitors to pass while it is under attack. Skip it for webhooks and APIs that machines call."
+            }
+        },
+        "order": "Execution order",
+        "orderHint": "Rules are evaluated in order. Where this one sits decides whether it gets the request before or after the others.",
+        "selectOrder": "Select order",
+        "positions": {
+            "first": "First",
+            "last": "Last",
+            "custom": "Custom"
+        },
+        "fireAfter": "Select which rule this will fire after",
+        "noOther": "There is no other rule yet.",
+        "firesAfter": "Fires after",
+        "statusHint": "Controls whether the rule evaluates incoming traffic.",
+        "disabled": "Disabled",
+        "allowPast": "Allow past {what}",
+        "blockPrefix": "Block "
+    },
+    "managed": {
+        "sqlInjection": {
+            "label": "Block SQL injection",
+            "description": "Refuses a request whose URL carries a SQL payload.",
+            "inspects": "The query string, the path and the user agent, decoded first. A signature only counts within one value, so keywords spread across separate parameters are not an injection. A payload in a request body is not visible to it.",
+            "combines": "On everywhere unless a scope switches it off. Any scope can, for what that scope covers, and a narrower one cannot switch it back on - so a service that really does put SQL-looking text in a query string has somewhere to say so.",
+            "signatures": {
+                "0": "A boolean tacked onto a query - or/and/xor followed by a comparison of two constants. Only constants count, so a parameter named like a column is not one.",
+                "1": "A UNION and a SELECT within the same value, which is how a second result set is grafted onto the first.",
+                "2": "A SELECT and its FROM within the same value.",
+                "3": "The catalogs and system procedures an attacker enumerates a database with: information_schema, sysobjects, syscolumns, xp_cmdshell, pg_sleep.",
+                "4": "A timing or file function actually being called - sleep(, benchmark(, load_file(, updatexml(, extractvalue(, group_concat(. The bare word is not enough.",
+                "5": "A destructive statement in front of its own object: drop table, truncate table, alter user, delete from, insert into.",
+                "6": "A semicolon followed by a second statement, which is one query being turned into two.",
+                "7": "A comment closing off the rest of a statement after a quote, or MySQL's /*! versioned comment - code written to run on the database and nowhere else."
+            }
+        },
+        "xss": {
+            "label": "Block cross-site scripting",
+            "description": "Refuses a request whose URL carries a script payload.",
+            "inspects": "The query string, the path and the user agent, decoded first. The lists are kept to what can actually execute rather than to all of HTML. A payload in a request body is not visible to it.",
+            "combines": "On everywhere unless a scope switches it off, and resolved separately from the SQL check - the scope that has to allow one of them rarely has to allow the other.",
+            "signatures": {
+                "0": "An element that can run script, load a remote document or steal a form post: script, iframe, svg, img, object, embed, form, style, base, meta and their kin. Ordinary markup like {tag} is not one.",
+                "1": "An inline handler being assigned - onerror=, onload=, onmouseover= and the rest. Matched by name and only when assigned, so a parameter called online= is not one.",
+                "2": "A script entry point actually being called: eval(, alert(, atob(, setTimeout(, unescape(, fromCharCode(.",
+                "3": "A scheme that executes rather than fetches - javascript:, vbscript: - or a data: URL carrying HTML.",
+                "4": "A browser object and the member a payload reaches for together: document.cookie, window.location, element.innerHTML, localStorage."
+            }
+        },
+        "browserIntegrity": {
+            "label": "Block clients that fake a browser",
+            "description": "Refuses a client whose headers do not hold together as a browser's.",
+            "caution": "Off by default: it also refuses a request with no user agent at all, which some scripts and health checks send. Arm it where you know what talks to the scope.",
+            "inspects": "The User-Agent, Accept, Accept-Language and Accept-Encoding headers. Past the missing-user-agent case it only holds a client to what it claimed: curl is honest and passes, a Mozilla user agent with no Accept header is not.",
+            "signatures": {
+                "0": "No user agent at all, which no browser and no well-made client sends.",
+                "1": "A control character in the user agent - a broken client, or an attempt to split a header further down the chain.",
+                "2": "A user agent past 512 characters. Real ones stop around 200.",
+                "3": "A client claiming to be a browser that sent no Accept header. Every browser sends one on every request.",
+                "4": "A client claiming to be a browser that sent neither. Either one missing alone is not enough."
+            }
+        },
+        "tor": {
+            "label": "Block the Tor network",
+            "description": "Refuses every Tor exit node.",
+            "caution": "It also shuts out people who use Tor for ordinary privacy reasons.",
+            "inspects": "The address the request came from, against a list fetched hourly and held at the edge.",
+            "combines": "One switch for the whole instance, wherever it is set. The edge refuses the address before it knows which service was asked for, so this cannot differ per scope."
+        },
+        "scanners": {
+            "label": "Block vulnerability scanners",
+            "description": "Blocks sqlmap, nikto, nmap, wpscan and the rest of the probing agents.",
+            "rules": {
+                "0": "Scanner user agents",
+                "1": "Scanner user agent (exact)"
+            }
+        },
+        "dotfiles": {
+            "label": "Block exposed secrets and dotfiles",
+            "description": "Blocks requests for .env, .git, SSH keys, database dumps and editor folders.",
+            "rules": {
+                "0": "Sensitive paths",
+                "1": "Hidden files"
+            }
+        },
+        "directoryListing": {
+            "label": "Block directory listing",
+            "description": "Blocks the sort links a listing page generates, and reads of directories nothing should browse.",
+            "rules": {
+                "0": "Autoindex sort links",
+                "1": "Browsing a directory that should not be listed"
+            }
+        },
+        "adminPanels": {
+            "label": "Block exposed admin panels",
+            "description": "Blocks probes for Adminer, pgAdmin, Portainer, Jenkins, Grafana and the Kubernetes API.",
+            "caution": "Turn it off on a scope that deliberately serves one of these.",
+            "rules": {
+                "0": "Admin panel paths"
+            }
+        },
+        "cmsProbes": {
+            "label": "Block WordPress and PHP probing",
+            "description": "Blocks /wp-admin, /phpmyadmin, .php and the rest of the standard exploit sweep.",
+            "rules": {
+                "0": "CMS probe paths",
+                "1": "PHP on a service that has none"
+            }
+        },
+        "aiCrawlers": {
+            "label": "Block AI crawlers",
+            "description": "Blocks GPTBot, ClaudeBot, PerplexityBot and other model and answer-engine agents.",
+            "caution": "Only stops agents that identify themselves honestly.",
+            "rules": {
+                "0": "AI crawler user agents"
+            }
+        },
+        "searchCrawlers": {
+            "label": "Block search engine crawlers",
+            "description": "Blocks Googlebot, bingbot, Slurp, LinkedInBot and other indexers.",
+            "caution": "Removes the service from search results. For something private, not a public site.",
+            "rules": {
+                "0": "Search crawler user agents"
+            }
+        },
+        "sharedInspects": "The request line, as the edge forwards it.",
+        "sharedCombines": "A scope that arms this cannot be overruled by a narrower one. Write an allow rule above it to carve out an exception."
+    },
+    "jails": {
+        "notFound": {
+            "label": "Missing-page flood",
+            "description": "Bans an address that keeps asking for pages that do not exist - the shape of URL enumeration."
+        },
+        "subdomainListing": {
+            "label": "Subdomain sweep",
+            "description": "Bans an address that walks your wildcard looking for names that answer - host after host that has nothing deployed on it. Counted in names rather than requests, so hammering one address is not this and quietly trying six is."
+        },
+        "rateLimited": {
+            "label": "Rate-limit flood",
+            "description": "Bans an address that keeps going after it has already been rate limited."
+        },
+        "authFailed": {
+            "label": "Rejected repeatedly",
+            "description": "Bans an address that collects refusals - failed logins, blocked requests."
+        },
+        "probes": {
+            "label": "Exploit probing",
+            "description": "Bans an address that goes looking for WordPress, phpMyAdmin or .git on a service that has none. One request for a credential store - .env, a private key, the cloud metadata route - is enough on its own, and that ban stands until you lift it."
+        },
+        "sshAuth": {
+            "label": "Failed SSH and SFTP logins",
+            "description": "Bans an address that keeps failing to log in over SSH or SFTP on your servers. Read from each server's own auth log, so it catches the traffic that never reaches the web edge."
+        },
+        "title": "Automatic bans",
+        "intro": "Counted from the edge's request log rather than per request, so watching an address costs a visitor nothing. A repeat offender is held progressively longer.",
+        "hostnames": "Hostnames",
+        "within": "Within (min)"
+    },
+    "scope": {
+        "armedAbove": "From a broader scope",
+        "armedAboveWhy": "A scope above this one arms it, and a narrower scope cannot switch a refusal off. Write an allow rule above it to carve out an exception.",
+        "offAbove": "Off above",
+        "offAboveWhy": "A scope above this one switched it off for everything it covers, and a narrower scope cannot switch it back on.",
+        "instanceWide": "Instance-wide",
+        "instanceWideWhy": "One switch for the whole instance: the edge refuses the address before it knows which service was asked for. Open the rule to change it.",
+        "setByOperator": "Set by whoever runs this instance.",
+        "loginAboveWhy": "A scope above this one requires a login, and a narrower scope cannot waive it.",
+        "polarisNote": "Applies to the public domains Polaris answers on. The local network name is served separately and stays reachable.",
+        "remoteNote": "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy."
+    },
+    "access": {
+        "addressesTitle": "IP access rules",
+        "addressesDescription": "Addresses this scope admits, and addresses it refuses before anything else is checked.",
+        "accessBadge": "Access",
+        "unsaved": "Unsaved changes",
+        "noAddresses": "No addresses",
+        "counts": "{allowed} allowed, {blocked} blocked",
+        "loginTitle": "Require a Polaris login",
+        "loginDescription": "Visitors sign in to Polaris first, and the rule can name which accounts it admits.",
+        "loginBadge": "Login",
+        "title": "Access rules",
+        "hint": "Who reaches this scope at all. Both are checked before any rule above."
+    },
+    "managedList": {
+        "title": "Managed rules",
+        "hint": "Signatures and lists Polaris keeps up to date. Open one to read what it enforces."
+    },
+    "search": {
+        "label": "Search rules by name",
+        "show": "Show",
+        "all": "Show all",
+        "active": "Active only",
+        "off": "Off only"
+    },
+    "shield": {
+        "title": "Scrape shield",
+        "hint": "Changes the response rather than refusing the request, which is why it is not a rule.",
+        "obfuscation": "Email address obfuscation",
+        "obfuscationHint": "Replaces email addresses in served HTML with a token the page decodes in the browser, so the address is not in the source. Visitors see no change. A harvester driving a real browser still reads it."
+    },
+    "missing": {
+        "text": "This rule is not part of this version of Polaris.",
+        "back": "Back to the rules"
+    },
+    "loading": "Loading the firewall rules",
+    "predefined": {
+        "open": "Open",
+        "openNamed": "Open {name}"
+    },
+    "managedPage": {
+        "whatItDoes": "What it does",
+        "reads": "Reads:",
+        "acrossScopes": "Across scopes:",
+        "statusHint": "Whether this scope enforces the rule.",
+        "activeHere": "Active on this scope",
+        "offHere": "Off on this scope",
+        "list": "The list",
+        "listHint": "Fetched hourly and held at the edge, so no request waits on a lookup.",
+        "addresses": "addresses",
+        "addressesUpdated": "addresses, updated {when}",
+        "notFetched": "Not fetched yet. It arrives within a few minutes of the rule being armed.",
+        "refreshFailed": "The last refresh failed ({reason}). The previous list is still being enforced.",
+        "conditions": "Conditions",
+        "conditionsHint": "Maintained by Polaris, and evaluated by the same engine as your own rules - after them.",
+        "expressionHint": "Copy it into a rule of your own to narrow the check - to one hostname, one path, one client - instead of switching it off for the whole scope.",
+        "matches": "What it matches",
+        "matchesHint": "The families it refuses. Each reason is the one written into the refusal, so a blocked request in the traffic log names the line it came from.",
+        "example": "Refused, for example:",
+        "exceptions": "Exceptions",
+        "exceptionsHint": "Your own rules run before every managed one, so an allow above this admits the traffic without switching the rule off for everything else.",
+        "createException": "Create an exception",
+        "theExpression": "the expression"
+    },
+    "addresses": {
+        "title": "Addresses",
+        "hint": "Checked before every other rule. The allowlist is enforced by the edge itself; the denylist always wins over it.",
+        "allowed": "Allowed",
+        "allowedHint": "If any address is listed, only those get through. A narrower scope can shorten this list, never lengthen it.",
+        "invalid": "Enter a valid IP address or CIDR range.",
+        "addMine": "Add my address ({ip})",
+        "blocked": "Blocked",
+        "blockedHint": "Always refused, even when they match the allowlist.",
+        "overlap": "\"{address}\" is in both lists.",
+        "lockOut": "This allowlist does not include the address you are reading this over ({ip}). Saving it will shut you out of everything in this scope.",
+        "noChanges": "No changes to save",
+        "save": "Save address lists",
+        "discard": "Discard"
+    },
+    "login": {
+        "what": "Visitors must sign in to Polaris to reach anything in this scope. Existing sessions keep working if the control plane is down; new sign-ins need it reachable.",
+        "across": "a scope that requires a login cannot be overruled by a narrower one, and every scope that names who it admits gets a say.",
+        "statusHint": "Whether this scope demands a login at all.",
+        "stopRequiring": "Stop requiring a Polaris login",
+        "require": "Require a Polaris login",
+        "required": "A login is required",
+        "notRequired": "No login is required",
+        "aboveNote": "A scope above this one requires a login, and a narrower scope cannot waive it. The lists below still apply: every scope that names who it admits gets a say.",
+        "admits": "Who it admits",
+        "admitsHint": "Named nobody means anyone with a Polaris account."
+    },
+    "page": {
+        "backToList": "Back to the rule list",
+        "back": "Back",
+        "title": "Firewall",
+        "nothing": "Nothing of that kind exists yet, so there is nothing to protect. Create one and its rules appear here."
+    },
+    "principals": {
+        "admitted": "Who gets in",
+        "admittedEmpty": "Anyone with a Polaris account gets in. Name a role, a group or a person to narrow it to them.",
+        "admittedFilled": "Only these get in. A narrower scope can shorten this list, never lengthen it.",
+        "admittedAdd": "Add someone this login admits",
+        "refused": "Who never gets in",
+        "refusedEmpty": "Nobody is refused outright.",
+        "refusedFilled": "Refused even when something above admits them, and a broader scope's refusal still applies here.",
+        "refusedAdd": "Add someone this login refuses",
+        "manage": "Manage roles and groups",
+        "loading": "Loading who there is to choose from",
+        "allNamed": "Everyone is already named",
+        "addPlaceholder": "Add a role, group or person...",
+        "option": "{name} ({kind})",
+        "types": {
+            "user": "user",
+            "group": "group",
+            "role": "role"
+        },
+        "gone": "{name} (no longer exists)",
+        "schedule": "Schedule {name}",
+        "scheduleHint": "Set a start or an expiry",
+        "remove": "Remove {name}",
+        "startAfterExpiry": "The start must come before the expiry",
+        "invalidWindow": "Not a valid window",
+        "starts": "Starts",
+        "expires": "Expires",
+        "always": "Always",
+        "expired": "expired {when}",
+        "from": "from {when}",
+        "until": "until {when}"
+    },
+    "accounts": {
+        "title": "Accounts seen here",
+        "none": "No account has signed in from this address.",
+        "liveNow": "{count} signed in now",
+        "banned": "Banned",
+        "active": "Active",
+        "lastActive": "Last active",
+        "expired": "Expired",
+        "waiting": "Waiting for approval",
+        "refused": "Refused",
+        "moreSessions": "and {shown} more {count, plural, one {session} other {sessions}}",
+        "moreAccounts": "and {atLeast, select, yes {at least } other {}}{shown} more, least recently seen",
+        "tallySigned": "{shown} signed in",
+        "tallyRefused": "{shown} refused",
+        "tallyWaiting": "{shown} left waiting for approval"
+    },
+    "chips": {
+        "add": "Add",
+        "addNamed": "Add {value}",
+        "addEntry": "Add entry",
+        "duplicate": "Already in the list."
+    },
+    "scopes": {
+        "polaris": "Polaris itself",
+        "global": "All services",
+        "serverGroup": "Server group",
+        "server": "Server",
+        "project": "Project",
+        "environment": "Environment",
+        "marketplace": "Marketplace app",
+        "application": "Service"
+    },
+    "picker": {
+        "scope": "Scope",
+        "target": "Scope target",
+        "none": "Nothing of that kind yet."
+    },
+    "describe": {
+        "marketplace": "Applies to {label} alone. It is an installed app, and these are the rules on the service it runs.",
+        "polaris": "Guards the dashboard itself on the public domains it answers on. The local network name is served separately and stays reachable, so shutting the public internet out here is something you can undo from your own network.",
+        "global": "Applies to every deployed service across all projects. Anything narrower can add restrictions on top, never loosen these.",
+        "serverGroup": "Applies to every service running on any server in {label}. Adding a server to the group brings it under these rules.",
+        "server": "Applies to every service running on {label}, whichever project it belongs to.",
+        "project": "Applies to every service in {label}, in every environment.",
+        "environment": "Applies to every service in {label}.",
+        "application": "Applies to {label} alone."
+    },
+    "errors": {
+        "load": "Could not load the firewall rule",
+        "save": "Could not save the firewall rule",
+        "traffic": "Could not read recent traffic",
+        "directory": "Could not load the directory",
+        "overview": "Could not load the firewall overview",
+        "address": "That is not a valid address",
+        "window": "That is not a valid window",
+        "activity": "Could not read that address's activity",
+        "jailsInvalid": "Those jail settings are not valid",
+        "jailsSave": "Could not save the jail settings",
+        "addresses": "Enter valid IP addresses or CIDR ranges",
+        "listSave": "Could not save the list",
+        "lift": "Could not lift the ban",
+        "tor": "Could not change the Tor setting",
+        "anomalyInvalid": "Those anomaly settings are not valid",
+        "settingsSave": "Could not save the settings",
+        "block": "Could not block that address"
+    },
+    "panels": {
+        "whatDoing": "What {ip} has been doing",
+        "youHint": "The address you are reading this page over. Everyone on your network shares it.",
+        "you": "You",
+        "traffic": "Traffic",
+        "refresh": "Refresh",
+        "noTraffic": "Nothing recorded in this window. The figures come from the edge's own request log, so a service reached directly on its port does not appear here.",
+        "requests": "Requests",
+        "blocked": "Blocked",
+        "shareBlocked": "Share blocked",
+        "topAddresses": "Top blocked addresses",
+        "topPaths": "Top blocked paths",
+        "topAgents": "Top blocked user agents",
+        "none": "None.",
+        "banFor": "Ban for (min)"
+    },
+    "anomalies": {
+        "title": "Anomalies",
+        "detect": "Detect route abuse",
+        "intro": "Traffic that is fine one request at a time and wrong in aggregate. Each address is judged against what the rest of that route's visitors do, so a busy endpoint is not an anomaly for being busy. Trusted addresses are never judged.",
+        "off": "Detection is off.",
+        "none": "Nothing unusual in the last ten minutes.",
+        "kinds": {
+            "route-flood": "route flood",
+            "asset-abuse": "asset abuse",
+            "cache-buster": "cache buster",
+            "path-enumeration": "path enumeration",
+            "query-payload": "query payload",
+            "method-mismatch": "method mismatch"
+        },
+        "trustNamed": "Trust {ip}",
+        "trustHint": "This is not an attack: never judge this address",
+        "blockNamed": "Block {ip}",
+        "blockHint": "Block this address",
+        "auto": "Block automatically",
+        "autoHint": "Bans the address behind anything scored high, without waiting for you. Leave it off until the findings above have been right a few times.",
+        "autoLabel": "Block anomalies automatically",
+        "overBaseline": "Times the norm",
+        "assetMax": "Asset fetches",
+        "variantMax": "Query variants"
+    },
+    "bans": {
+        "title": "Blocked right now",
+        "none": "Nobody is banned. Addresses appear here when they trip a jail below, or when a reputation provider flags them.",
+        "columns": {
+            "address": "Address",
+            "why": "Why",
+            "until": "Until"
+        },
+        "offences": "{count}x",
+        "untilLifted": "Until you lift it",
+        "liftNamed": "Lift the ban on {ip}",
+        "lift": "Lift this ban"
+    },
+    "trusted": {
+        "title": "Trusted addresses",
+        "intro": "Never banned and never reported as an anomaly. Loopback is always trusted. Add your own address or range so your everyday use of the instance is not read as an attack on it.",
+        "trustSelf": "Trust this device (<mono>{ip}</mono>)"
+    },
+    "intel": {
+        "title": "Reputation providers",
+        "body": "Blocks addresses already known for scanning or attacks. Connect <link>Dymo API or Criminal IP</link> to switch them on. They are asked in the background about addresses seen in your traffic, never while a request is waiting."
+    },
+    "ban": {
+        "blocked": "Blocked by the firewall",
+        "wasBlocked": "Was blocked by the firewall",
+        "noReason": "No reason was recorded.",
+        "stands": "It stands until somebody lifts it.",
+        "lifts": "Lifts {when}.",
+        "lifted": "Lifted {when}.",
+        "decided": "Decided by {source}.",
+        "decidedAfter": "Decided by {source}, after {offences} separate offences."
+    },
+    "address": {
+        "intro": "Every request from this address in the last {window}, read from the edge's own log.",
+        "none": "Nothing from this address in that window. A ban outlives the log it was made from, so an older one can be enforced with nothing left here to show for it.",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "mostAsked": "Most asked for",
+        "callingItself": "Calling itself",
+        "columns": {
+            "when": "When",
+            "method": "Method",
+            "status": "Status",
+            "path": "Path"
+        },
+        "truncated": "Showing the {shown} most recent of {total}. The counts above cover all of them."
+    }
+}

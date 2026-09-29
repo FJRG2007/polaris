@@ -26,6 +26,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
 import { wafPrincipalGrantSchema, type WafPrincipalGrant } from "@polaris/core";
 import { ArrowUpRight, CalendarClock, Shield, TriangleAlert, User, UserMinus, Users, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 /**
  * The directory, shared across mounts for a short while.
@@ -90,6 +92,7 @@ export function LoginPrincipals({
     disabled?: boolean;
     onChange: (patch: LoginPrincipalsPatch) => void;
 }) {
+    const t = useTranslations("firewall");
     const [options, setOptions] = useState<WafPrincipalOption[] | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -108,10 +111,10 @@ export function LoginPrincipals({
     return (
         <div className="flex flex-col gap-4">
             <GrantList
-                title="Who gets in"
-                empty="Anyone with a Polaris account gets in. Name a role, a group or a person to narrow it to them."
-                filled="Only these get in. A narrower scope can shorten this list, never lengthen it."
-                addLabel="Add someone this login admits"
+                title={t("principals.admitted")}
+                empty={t("principals.admittedEmpty")}
+                filled={t("principals.admittedFilled")}
+                addLabel={t("principals.admittedAdd")}
                 grants={admitted}
                 // Naming somebody in both lists is an operator contradicting themselves,
                 // and the save would fail on it. Not offered rather than explained.
@@ -122,10 +125,10 @@ export function LoginPrincipals({
             />
 
             <GrantList
-                title="Who never gets in"
-                empty="Nobody is refused outright."
-                filled="Refused even when something above admits them, and a broader scope's refusal still applies here."
-                addLabel="Add someone this login refuses"
+                title={t("principals.refused")}
+                empty={t("principals.refusedEmpty")}
+                filled={t("principals.refusedFilled")}
+                addLabel={t("principals.refusedAdd")}
                 grants={refused}
                 taken={admitted}
                 options={options}
@@ -140,7 +143,7 @@ export function LoginPrincipals({
                 href="/admin/groups"
                 className="flex w-fit items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline"
             >
-                Manage roles and groups
+                {t("principals.manage")}
                 <ArrowUpRight className="size-3" aria-hidden="true" />
             </Link>
         </div>
@@ -174,6 +177,7 @@ function GrantList({
 }) {
     // Which entry has its window open. One at a time: the two inputs are wide, and an
     // operator schedules one person at a time anyway.
+    const t = useTranslations("firewall");
     const [scheduling, setScheduling] = useState<string | null>(null);
     const known = new Map((options ?? []).map((option) => [option.ref, option]));
     const spoken = new Set([...grants, ...taken].map((grant) => grant.ref));
@@ -215,7 +219,7 @@ function GrantList({
             {options === null ? (
                 // Sized to the select that lands here, so nothing moves when it does.
                 <div aria-busy="true">
-                    <span className="sr-only">Loading who there is to choose from</span>
+                    <span className="sr-only">{t("principals.loading")}</span>
                     <Skeleton className="h-9 w-full max-w-xs rounded-md" />
                 </div>
             ) : (
@@ -224,7 +228,7 @@ function GrantList({
                     value=""
                     aria-label={addLabel}
                     disabled={disabled || remaining.length === 0}
-                    placeholder={remaining.length === 0 ? "Everyone is already named" : "Add a role, group or person..."}
+                    placeholder={remaining.length === 0 ? t("principals.allNamed") : t("principals.addPlaceholder")}
                     onValueChange={(ref) => {
                         if (ref) onChange([...grants, { ref }]);
                     }}
@@ -233,7 +237,10 @@ function GrantList({
                         icon: ICONS[option.type],
                         // Qualified in every case, so a role and a group that share a
                         // name are still two different entries to read.
-                        label: `${option.label} (${option.sublabel ?? option.type})`
+                        label: t("principals.option", {
+                            name: option.label,
+                            kind: option.sublabel ?? t(`principals.types.${option.type}` as NamespaceKey<"firewall">)
+                        })
                     }))}
                 />
             )}
@@ -263,10 +270,11 @@ function GrantRow({
     onChange: (next: WafPrincipalGrant) => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("firewall");
     const format = useDisplayFormat();
     const missing = resolved && !option;
     const label = option?.label ?? grant.ref;
-    const window = describeWindow(grant, format.dateTime);
+    const window = describeWindow(grant, format.dateTime, t);
 
     return (
         <li className="flex flex-col gap-1 rounded-md bg-muted px-2 py-1.5">
@@ -285,8 +293,7 @@ function GrantRow({
                         ICONS[grant.ref.slice(0, grant.ref.indexOf(":"))]
                     )}
                     <span className="truncate [overflow-wrap:anywhere]">
-                        {label}
-                        {missing ? " (no longer exists)" : ""}
+                        {missing ? t("principals.gone", { name: label }) : label}
                     </span>
                 </span>
 
@@ -300,9 +307,9 @@ function GrantRow({
                     <button
                         type="button"
                         disabled={disabled}
-                        aria-label={`Schedule ${label}`}
+                        aria-label={t("principals.schedule", { name: label })}
                         aria-expanded={open}
-                        title="Set a start or an expiry"
+                        title={t("principals.scheduleHint")}
                         onClick={onToggleSchedule}
                         className={`transition-colors hover:text-foreground disabled:opacity-50 ${
                             open || window ? "text-foreground" : "text-muted-foreground"
@@ -313,8 +320,8 @@ function GrantRow({
                     <button
                         type="button"
                         disabled={disabled}
-                        aria-label={`Remove ${label}`}
-                        title="Remove"
+                        aria-label={t("principals.remove", { name: label })}
+                        title={t("conditions.remove")}
                         onClick={onRemove}
                         className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                     >
@@ -344,6 +351,7 @@ function GrantWindow({
     disabled?: boolean;
     onChange: (next: WafPrincipalGrant) => void;
 }) {
+    const t = useTranslations("firewall");
     const [from, setFrom] = useState(toInputValue(grant.from));
     const [until, setUntil] = useState(toInputValue(grant.until));
 
@@ -351,7 +359,12 @@ function GrantWindow({
     // The same schema the server validates against, so the message an operator reads
     // here is the one that would have come back.
     const parsed = wafPrincipalGrantSchema.safeParse(draft);
-    const problem = parsed.success ? null : (parsed.error.issues[0]?.message ?? "Not a valid window");
+    const said = parsed.success ? null : parsed.error.issues[0]?.message;
+    const problem = parsed.success
+        ? null
+        : said === "The start must come before the expiry"
+          ? t("principals.startAfterExpiry")
+          : t("principals.invalidWindow");
 
     const commit = (): void => {
         if (!parsed.success) return;
@@ -362,7 +375,7 @@ function GrantWindow({
     return (
         <div className="flex flex-wrap items-end gap-2 pl-5">
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                Starts
+                {t("principals.starts")}
                 <Input
                     type="datetime-local"
                     className="h-8 w-auto text-xs"
@@ -373,7 +386,7 @@ function GrantWindow({
                 />
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                Expires
+                {t("principals.expires")}
                 <Input
                     type="datetime-local"
                     className="h-8 w-auto text-xs"
@@ -394,7 +407,7 @@ function GrantWindow({
                     }}
                     className="h-8 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
                 >
-                    Always
+                    {t("principals.always")}
                 </button>
             ) : null}
             {problem ? <p className="w-full text-xs text-danger">{problem}</p> : null}
@@ -406,15 +419,18 @@ function GrantWindow({
  *  longer applies is still stored, and reading it as if it did would be wrong. */
 function describeWindow(
     grant: WafPrincipalGrant,
-    dateTime: (value: Date) => string
+    dateTime: (value: Date) => string,
+    t: NamespaceTranslator<"firewall">
 ): { text: string; spent: boolean } | null {
     const now = Date.now() / 1000;
     if (grant.until !== undefined && now >= grant.until) {
-        return { text: `expired ${dateTime(new Date(grant.until * 1000))}`, spent: true };
+        return { text: t("principals.expired", { when: dateTime(new Date(grant.until * 1000)) }), spent: true };
     }
     if (grant.from !== undefined && now < grant.from) {
-        return { text: `from ${dateTime(new Date(grant.from * 1000))}`, spent: true };
+        return { text: t("principals.from", { when: dateTime(new Date(grant.from * 1000)) }), spent: true };
     }
-    if (grant.until !== undefined) return { text: `until ${dateTime(new Date(grant.until * 1000))}`, spent: false };
+    if (grant.until !== undefined) {
+        return { text: t("principals.until", { when: dateTime(new Date(grant.until * 1000)) }), spent: false };
+    }
     return null;
 }

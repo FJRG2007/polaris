@@ -18,6 +18,7 @@
 import { MatchesCell } from "./rule-list";
 import { Badge, Switch } from "@polaris/ui";
 import { ChevronRight, TriangleAlert } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface PredefinedRuleRow {
     readonly id: string;
@@ -60,6 +61,7 @@ export function PredefinedRuleList({
     onOpen: (id: string) => void;
     onToggle: (id: string, on: boolean) => void;
 }) {
+    const t = useTranslations("firewall");
     return (
         <section className="rounded-lg border border-border bg-card">
             <header className="flex flex-col gap-1 px-4 py-3">
@@ -71,12 +73,12 @@ export function PredefinedRuleList({
                 <table className="w-full min-w-[44rem] text-sm">
                     <thead>
                         <tr className="text-left text-xs text-muted-foreground">
-                            <th className="px-4 py-2.5 font-medium">Name</th>
-                            <th className="px-4 py-2.5 font-medium">Description</th>
-                            <th className="w-24 px-3 py-2.5 font-medium">Action</th>
-                            <th className="w-32 px-3 py-2.5 font-medium">Matches</th>
-                            <th className="w-32 px-3 py-2.5 font-medium">Status</th>
-                            <th className="w-10 px-2 py-2.5" aria-label="Open" />
+                            <th className="px-4 py-2.5 font-medium">{t("list.columns.name")}</th>
+                            <th className="px-4 py-2.5 font-medium">{t("list.columns.description")}</th>
+                            <th className="w-24 px-3 py-2.5 font-medium">{t("list.columns.action")}</th>
+                            <th className="w-32 px-3 py-2.5 font-medium">{t("list.columns.matches")}</th>
+                            <th className="w-32 px-3 py-2.5 font-medium">{t("list.columns.status")}</th>
+                            <th className="w-10 px-2 py-2.5" aria-label={t("predefined.open")} />
                         </tr>
                     </thead>
                     <tbody>
@@ -129,13 +131,13 @@ export function PredefinedRuleList({
                                                 checked={on === true}
                                                 disabled={!canEdit || decided !== undefined}
                                                 onChange={(next) => onToggle(row.id, next)}
-                                                aria-label={`${on ? "Disable" : "Enable"} ${row.name}`}
+                                                aria-label={on ? t("list.disable", { name: row.name }) : t("list.enable", { name: row.name })}
                                             />
                                             <span
                                                 className="text-xs text-muted-foreground"
                                                 title={decided ? decided.why : undefined}
                                             >
-                                                {decided ? decided.label : on ? "Active" : "Off"}
+                                                {decided ? decided.label : on ? t("list.active") : t("list.off")}
                                             </span>
                                         </div>
                                     )}
@@ -144,8 +146,8 @@ export function PredefinedRuleList({
                                     <button
                                         type="button"
                                         onClick={() => onOpen(row.id)}
-                                        aria-label={`Open ${row.name}`}
-                                        title="Open"
+                                        aria-label={t("predefined.openNamed", { name: row.name })}
+                                        title={t("predefined.open")}
                                         className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                                     >
                                         <ChevronRight className="size-4 shrink-0" aria-hidden="true" />

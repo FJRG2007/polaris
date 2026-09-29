@@ -19,6 +19,7 @@ import { useState } from "react";
 import { Sparkline } from "./sparkline";
 import { ruleDescription } from "./rule-language";
 import type { WafCustomRule } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     Badge,
@@ -66,6 +67,7 @@ export function RuleList({
     /** The whole list, already reordered/toggled/removed. The caller persists it. */
     onChange: (next: WafCustomRule[]) => void;
 }) {
+    const t = useTranslations("firewall");
     // Where the drag started, and which row it is currently over. Held here rather
     // than per row so the drop target can draw the insertion line without every row
     // knowing about every other one.
@@ -87,40 +89,40 @@ export function RuleList({
         <section className="rounded-lg border border-border bg-card">
             <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <h2 className="text-sm font-semibold">Custom rules</h2>
+                    <h2 className="text-sm font-semibold">{t("list.title")}</h2>
                     <span className="text-xs text-muted-foreground">
-                        {rules.length}/{max} rules
+                        {t("list.count", { count: rules.length, max })}
                     </span>
                 </div>
                 <Button
                     type="button"
                     size="sm"
                     disabled={!canEdit || rules.length >= max}
-                    title={rules.length >= max ? `At most ${max} rules` : undefined}
+                    title={rules.length >= max ? t("list.atMost", { max }) : undefined}
                     onClick={onCreate}
                 >
                     <Plus className="size-4 shrink-0" aria-hidden="true" />
-                    Create rule
+                    {t("list.create")}
                 </Button>
             </header>
 
             {rules.length === 0 ? (
                 <p className="border-t border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                    No custom rules. The address lists and managed rules below still apply.
+                    {t("list.empty")}
                 </p>
             ) : (
                 <div className="overflow-x-auto border-t border-border">
                     <table className="w-full min-w-[48rem] text-sm">
                         <thead>
                             <tr className="text-left text-xs text-muted-foreground">
-                                <th className="w-8 px-2 py-2.5" aria-label="Reorder" />
-                                <th className="w-14 px-2 py-2.5 font-medium">Order</th>
-                                <th className="px-4 py-2.5 font-medium">Name</th>
-                                <th className="px-4 py-2.5 font-medium">Description</th>
-                                <th className="w-24 px-3 py-2.5 font-medium">Action</th>
-                                <th className="w-32 px-3 py-2.5 font-medium">Matches</th>
-                                <th className="w-24 px-3 py-2.5 font-medium">Status</th>
-                                <th className="w-10 px-2 py-2.5" aria-label="Actions" />
+                                <th className="w-8 px-2 py-2.5" aria-label={t("list.columns.reorder")} />
+                                <th className="w-14 px-2 py-2.5 font-medium">{t("list.columns.order")}</th>
+                                <th className="px-4 py-2.5 font-medium">{t("list.columns.name")}</th>
+                                <th className="px-4 py-2.5 font-medium">{t("list.columns.description")}</th>
+                                <th className="w-24 px-3 py-2.5 font-medium">{t("list.columns.action")}</th>
+                                <th className="w-32 px-3 py-2.5 font-medium">{t("list.columns.matches")}</th>
+                                <th className="w-24 px-3 py-2.5 font-medium">{t("list.columns.status")}</th>
+                                <th className="w-10 px-2 py-2.5" aria-label={t("list.columns.actions")} />
                             </tr>
                         </thead>
                         <tbody>
@@ -147,7 +149,7 @@ export function RuleList({
                                         onChange(rules.map((entry, i) => (i === index ? { ...entry, enabled } : entry)))
                                     }
                                     onDuplicate={() => {
-                                        const copy = { ...rule, name: `${rule.name} (copy)`.slice(0, 80) };
+                                        const copy = { ...rule, name: t("list.copyName", { name: rule.name }).slice(0, 80) };
                                         const next = [...rules];
                                         next.splice(index + 1, 0, copy);
                                         onChange(next);
@@ -162,17 +164,16 @@ export function RuleList({
             )}
 
             <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-                Rules are evaluated in order and the first one that matches decides. Put an allow above a block to
-                carve out an exception.
+                {t("list.orderHint")}
             </p>
 
             <ConfirmDeleteDialog
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
-                kind="rule"
+                kind={t("list.kind")}
                 requireTyping={false}
                 name={deleting === null ? "" : (rules[deleting]?.name ?? "")}
-                description="Traffic it was blocking reaches the service again, unless another rule below it matches."
+                description={t("list.deleteBody")}
                 onConfirm={() => {
                     if (deleting === null) return;
                     onChange(rules.filter((_, i) => i !== deleting));
@@ -198,16 +199,17 @@ export function MatchesCell({
     name: string;
     activity?: { total: number; series: number[] };
 }) {
+    const t = useTranslations("firewall");
     if (!activity) return <Skeleton className="h-6 w-24 rounded" />;
     return (
         <div className="flex items-center gap-2">
             <Sparkline
                 series={activity.series}
-                label={`What ${name} matches over the last day, by hour`}
+                label={t("list.sparkline", { name })}
             />
             <span
                 className="tabular-nums text-xs text-muted-foreground"
-                title="Requests in the last day this rule matches. Counted by replaying the rule over the edge log, so it is what the rule matches rather than what it caught."
+                title={t("list.matchesHint")}
             >
                 {activity.total}
             </span>
@@ -215,11 +217,11 @@ export function MatchesCell({
     );
 }
 
-/** How each action reads in the Action column. */
-const ACTION_BADGE: Record<WafCustomRule["action"], { label: string; variant: "danger" | "success" | "neutral" }> = {
-    block: { label: "Block", variant: "danger" },
-    allow: { label: "Allow", variant: "success" },
-    skip: { label: "Skip", variant: "neutral" }
+/** How each action reads in the Action column; its words are `actions.<action>`. */
+const ACTION_BADGE: Record<WafCustomRule["action"], "danger" | "success" | "neutral"> = {
+    block: "danger",
+    allow: "success",
+    skip: "neutral"
 };
 
 function RuleRow({
@@ -255,7 +257,8 @@ function RuleRow({
     onDuplicate: () => void;
     onRemove: () => void;
 }) {
-    const description = ruleDescription(rule);
+    const t = useTranslations("firewall");
+    const description = ruleDescription(rule, t);
     return (
         <tr
             draggable={canEdit}
@@ -301,7 +304,7 @@ function RuleRow({
                 </span>
             </td>
             <td className="px-3 py-3.5 align-top">
-                <Badge variant={ACTION_BADGE[rule.action].variant}>{ACTION_BADGE[rule.action].label}</Badge>
+                <Badge variant={ACTION_BADGE[rule.action]}>{t(`actions.${rule.action}`)}</Badge>
             </td>
             <td className="px-3 py-3.5 align-top">
                 <MatchesCell name={rule.name} activity={activity} />
@@ -312,16 +315,16 @@ function RuleRow({
                         checked={rule.enabled}
                         disabled={!canEdit}
                         onChange={onToggle}
-                        aria-label={`${rule.enabled ? "Disable" : "Enable"} ${rule.name}`}
+                        aria-label={rule.enabled ? t("list.disable", { name: rule.name }) : t("list.enable", { name: rule.name })}
                     />
-                    <span className="text-xs text-muted-foreground">{rule.enabled ? "Active" : "Off"}</span>
+                    <span className="text-xs text-muted-foreground">{rule.enabled ? t("list.active") : t("list.off")}</span>
                 </div>
             </td>
             <td className="px-2 py-3.5 align-top text-right">
                 <DropdownMenu>
                     <DropdownMenuTrigger
-                        aria-label={`Actions for ${rule.name}`}
-                        title="Actions"
+                        aria-label={t("list.actionsFor", { name: rule.name })}
+                        title={t("list.columns.actions")}
                         className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                     >
                         <span aria-hidden="true">...</span>
@@ -329,27 +332,27 @@ function RuleRow({
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={onEdit}>
                             <Pencil className="size-3.5 shrink-0" aria-hidden="true" />
-                            Edit
+                            {t("list.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled={!canEdit || index === 0} onSelect={() => onMove(index - 1)}>
                             <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" />
-                            Move up
+                            {t("list.moveUp")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             disabled={!canEdit || index === total - 1}
                             onSelect={() => onMove(index + 1)}
                         >
                             <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
-                            Move down
+                            {t("list.moveDown")}
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled={!canEdit} onSelect={onDuplicate}>
                             <Copy className="size-3.5 shrink-0" aria-hidden="true" />
-                            Duplicate
+                            {t("list.duplicate")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem variant="danger" disabled={!canEdit} onSelect={onRemove}>
                             <Trash2 className="size-3.5 shrink-0" aria-hidden="true" />
-                            Delete
+                            {t("list.delete")}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
