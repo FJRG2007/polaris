@@ -833,6 +833,48 @@ export function afkCounts(preset: EventPreset): boolean {
     }
 }
 
+/**
+ * Whether an event is playable yet, from what it has written down: its place
+ * found and set up, its boss standing, its first question asked, its players
+ * brought in. Its clock only starts then (`events-service` `markReady`); an
+ * event with nothing to set up is playable as soon as it begins.
+ */
+export function readyToPlay(run: {
+    readonly preset: EventPreset;
+    readonly place: unknown;
+    readonly hidden: boolean;
+    readonly meteors: readonly unknown[];
+    readonly round: number;
+    readonly stage: { readonly racers: readonly unknown[] } | null;
+    readonly readyAt: number | null;
+}): boolean {
+    const { preset } = run;
+    switch (preset.kind) {
+        case "supply-drop":
+        case "world-boss":
+        case "king-of-the-hill":
+        case "waves":
+            return run.place !== null;
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode !== "race" || run.place !== null;
+        case "treasure-hunt":
+            return run.hidden;
+        case "meteor-shower":
+            return run.meteors.length > 0;
+        case "trivia":
+            return run.round >= 0;
+        case "parkour":
+        case "spleef":
+            return (run.stage?.racers.length ?? 0) > 0;
+        case "team-duel":
+        case "build-battle":
+            // The arena writes its own start when everybody is in it.
+            return run.readyAt !== null;
+        default:
+            return true;
+    }
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;
@@ -883,6 +925,15 @@ export function playsOnStage(preset: EventPreset): boolean {
  *  a marked kit (`kinds/arena-service.ts`). */
 export function playsInArena(preset: EventPreset): boolean {
     return preset.kind === "team-duel" || preset.kind === "build-battle";
+}
+
+/**
+ * Played on something built in the sky that has to be seen: the day is held
+ * still while it runs, and no phantom or other hostile reaches it
+ * (`commands.DAY_RULES`). Never a blood moon, which is the night.
+ */
+export function keepsDay(preset: EventPreset): boolean {
+    return playsInArena(preset) || playsOnStage(preset);
 }
 
 /** The least countdown an event asked to join gets, whatever the settings say:

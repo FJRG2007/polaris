@@ -1660,6 +1660,7 @@
             "buildGlass": "Solo se puede colocar el cristal del kit: los constructores juegan en modo aventura, donde sus propios bloques no se pueden poner, así que no se usa ni se deja nada suyo en una parcela. El cristal roto a mano no suelta nada, así que ningún kit sale de una parcela.",
             "buildNeeds": "Necesita Minecraft 1.16 o posterior. Hasta 12 constructores.",
             "arena": "No se toca nada de nadie. La arena solo va donde el aire estaba vacío, y se desmonta tipo de bloque a tipo de bloque; solo se recoge el kit marcado del propio evento; cada jugador vuelve exactamente donde estaba, en su propio modo de juego, con lo que soltara. Quien esté desconectado al final la encuentra aún en pie al entrar, y se le devuelve entonces.",
+            "keepsDay": "Mantiene el día mientras dura, sin phantoms; el ciclo de día y los phantoms vuelven como estaban después.",
             "overworld": "Ocurre en el mundo normal; solo participan los jugadores que están allí.",
             "rankedFrom": "Clasifica desde {score} {unit}; por debajo, ni podio ni premio.",
             "startsWith": "Solo empieza solo con {count} {count, plural, one {jugador jugando} other {jugadores jugando}} de verdad, y no mientras alguien esté en un combate.",

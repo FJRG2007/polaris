@@ -153,10 +153,35 @@ export function plotSpot(box: Box, index: number, size: number, count: number): 
     };
 }
 
-/** Where everybody stands to look at a plot on the tour: its corner, facing in. */
-export function plotView(box: Box, index: number, size: number, count: number): Spot {
+/**
+ * Where everybody can stand to look at a plot on the tour, best first: on the
+ * platform's barrier roof - which nothing is built through, and which they see
+ * through - over the wall beside the plot, looking down into it. Never on the
+ * plot itself: a plot built solid to its roof had the tour spawn them inside it.
+ */
+export function plotViews(box: Box, index: number, size: number, count: number): Spot[] {
     const floor = plotFloorIn(box, index, size, grid(count).cols);
-    return { x: floor.x1, y: floor.y1 + 1, z: floor.z1, yaw: -45, pitch: 20 };
+    const y = box.y2 + 1;
+    const midX = floor.x1 + Math.floor(size / 2);
+    const midZ = floor.z1 + Math.floor(size / 2);
+    const pitch = 55;
+    return [
+        // North of it looking south, south looking north, west looking east, east looking west.
+        { x: midX, y, z: floor.z1 - 1, yaw: 0, pitch },
+        { x: midX, y, z: floor.z2 + 1, yaw: 180, pitch },
+        { x: floor.x1 - 1, y, z: midZ, yaw: -90, pitch },
+        { x: floor.x2 + 1, y, z: midZ, yaw: 90, pitch }
+    ];
+}
+
+/** The platform with the room over its roof that the tour stands in. */
+export function tourBounds(box: Box): Box {
+    return { ...box, y2: box.y2 + 3 };
+}
+
+/** Whether a block is empty air: two of these, feet and head, clear a spot. */
+export function airAt(spot: { x: number; y: number; z: number }, above = 0): string {
+    return `execute in minecraft:overworld if block ${spot.x} ${spot.y + above} ${spot.z} minecraft:air`;
 }
 
 /** The kit for one builder: the glass, placeable only on the plot and on itself,

@@ -205,7 +205,7 @@ export async function stageTick(
     if (Math.floor(now / 2_000) % 5 === 0) lines.push(stage.FEED_INSIDE);
     const layout = built(loop.run);
     if (!layout) return null;
-    lines.push(stage.floatDown(layout.volume, 10));
+    lines.push(stage.floatDown(layout.volume, 10), ...commands.hostilesOut(layout.volume));
     return layout.kind === "parkour"
         ? parkourTick(loop, server, tools, layout.course, layout.volume, heard, now, lines)
         : spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
@@ -391,6 +391,7 @@ async function admit(
     // Nobody is moved until where they were is kept.
     await tools.persist();
     const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
+    if (layout.kind === "parkour") lines.push(...parkour.SCORES_ADDED);
     fresh.forEach((one, index) => {
         const racer = racers.find((each) => same(each.name, one.name))!;
         const spot =
@@ -407,7 +408,9 @@ async function admit(
                 layout.kind === "parkour"
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
-            )}`
+            )}`,
+            // Their checkpoint, once they are on it, for the quick look.
+            ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : [])
         );
     });
     return fresh.length;
@@ -496,8 +499,23 @@ async function parkourTick(
 
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
     const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    // What the quick look (`quickLines`) has already marked: each racer's
+    // checkpoint as the game keeps it.
+    const scored = lowered(commands.readScores(await server.say([parkour.READ_CHECKPOINTS])));
     const jumps = course.platforms.length - 1;
     const checkpoints = course.checkpoints.length;
+    // When a racer the quick look saw finish stepped onto it, from the game's
+    // own ticks - asked only when somebody has.
+    let ticks: { at: Map<string, number>; now: number | null } | null = null;
+    const finishedAt = async (racer: stage.Racer): Promise<number> => {
+        ticks ??= {
+            at: lowered(commands.readScores(await server.say([parkour.READ_FINISH_TICKS]))),
+            now: commands.readDaytime(await server.say([parkour.READ_GAME_TIME]))
+        };
+        const tick = ticks.at.get(racer.name.toLowerCase());
+        if (tick === undefined || ticks.now === null) return now;
+        return Math.max(racer.since, Math.min(now, now - Math.max(0, ticks.now - tick) * 50));
+    };
     for (const racer of state(loop).racers) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
@@ -520,9 +538,10 @@ async function parkourTick(
             );
             continue;
         }
-        // Fell: on the net or past it. Back to the last checkpoint before the
-        // ground is anywhere near.
-        if (at.y < course.floor + 0.5) {
+        const game = scored.get(racer.name.toLowerCase());
+        // Fell, and the quick look does not know them - a run from before it
+        // kept a score: back to the last checkpoint from here.
+        if (game === undefined && at.y < course.floor + 0.5) {
             lines.push(
                 stage.moveLine(racer.name, parkour.spotOn(course, racer.checkpoint)),
                 tell(racer.name, messages.tag(language) + messages.backToCheckpoint(language))
@@ -530,37 +549,49 @@ async function parkourTick(
             continue;
         }
         let next = racer;
+        // A checkpoint the quick look marked, and told them of already.
+        if (game !== undefined && game > racer.checkpoint && game <= jumps) {
+            next = { ...next, checkpoint: game, best: Math.max(next.best, game) };
+            if (game === jumps) next = { ...next, finishedAt: await finishedAt(racer) };
+        }
+        // Anything it missed, from where they stand.
         const on = parkour.platformUnder(course, at);
-        if (on !== null && on > racer.best) {
+        let sounded = next.finishedAt !== null;
+        if (on !== null && on > next.best) {
             next = { ...next, best: on };
             const role = course.platforms[on]!.role;
-            if (role === "checkpoint" || role === "finish") {
+            if ((role === "checkpoint" || role === "finish") && on > next.checkpoint) {
                 next = { ...next, checkpoint: on };
                 const reached = parkour.checkpointsBy(course, on);
                 lines.push(
                     `title ${racer.name} times 5 30 10`,
                     `title ${racer.name} subtitle ${commands.text(" ")}`,
                     `title ${racer.name} title ${commands.text(messages.checkpointTitle(reached, checkpoints, language))}`,
-                    soundFor(racer.name, commands.SOUNDS.tick)
+                    soundFor(racer.name, commands.SOUNDS.tick),
+                    `scoreboard players set ${racer.name} ${parkour.CHECKPOINT_SCORE} ${on}`
                 );
             }
-            if (role === "finish") {
+            if (role === "finish" && next.finishedAt === null) {
                 next = { ...next, finishedAt: now };
-                const place =
-                    state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
-                lines.push(
-                    commands.say(
-                        messages.tag(language) +
-                            messages.finishedLine(
-                                racer.name,
-                                messages.clock((now - racer.since) / 1000),
-                                place,
-                                language
-                            )
-                    ),
-                    soundFor(racer.name, commands.SOUNDS.win)
-                );
+                sounded = false;
             }
+        }
+        if (next.finishedAt !== null) {
+            const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
+            lines.push(
+                commands.say(
+                    messages.tag(language) +
+                        messages.finishedLine(
+                            racer.name,
+                            messages.clock((next.finishedAt - racer.since) / 1000),
+                            place,
+                            language
+                        )
+                )
+            );
+            if (!sounded) lines.push(soundFor(racer.name, commands.SOUNDS.win));
+        }
+        if (next !== racer) {
             change(loop, {
                 racers: state(loop).racers.map((one) => (same(one.name, racer.name) ? next : one))
             });
@@ -589,6 +620,57 @@ async function parkourTick(
         return "Everybody finished or dropped out";
     }
     return null;
+}
+
+/** A read's names in lower case, for matching against racers. */
+function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
+    return new Map([...scores].map(([name, score]) => [name.toLowerCase(), score]));
+}
+
+/**
+ * The quick look at a parkour race, run far oftener than the tick: whoever fell
+ * is sent back to their checkpoint, and whoever stepped onto a checkpoint or
+ * the finish is told and has it marked - with selectors over the checkpoints the
+ * game keeps (`parkour.CHECKPOINT_SCORE`), so it reads nothing and is one batch
+ * whatever the number of racers. The tick picks up what it marked. Nothing
+ * while no racer is still going.
+ */
+export function quickLines(loop: StageLoop): string[] {
+    const layout = built(loop.run);
+    if (!layout || layout.kind !== "parkour" || !state(loop).built) return [];
+    if (!state(loop).racers.some((one) => one.outAt === null && one.finishedAt === null))
+        return [];
+    const language = loop.language;
+    const course = layout.course;
+    const total = course.checkpoints.length;
+    const { fell, reached } = parkour.quickSelectors(course);
+    const as = (selector: string) => `execute in minecraft:overworld as ${selector}`;
+    const lines: string[] = [];
+    for (const one of fell) {
+        const spot = one.spot;
+        lines.push(
+            `${as(one.selector)} run tellraw @s ${commands.text(messages.tag(language) + messages.backToCheckpoint(language))}`,
+            `${as(one.selector)} run tp @s ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
+        );
+    }
+    for (const one of reached) {
+        const count = parkour.checkpointsBy(course, one.checkpoint);
+        const sound = one.finish ? commands.SOUNDS.win : commands.SOUNDS.tick;
+        lines.push(
+            `${as(one.selector)} run title @s times 5 30 10`,
+            `${as(one.selector)} run title @s subtitle ${commands.text(" ")}`,
+            `${as(one.selector)} run title @s title ${commands.text(messages.checkpointTitle(count, total, language))}`,
+            `${as(one.selector)} at @s run playsound ${sound} master @s ~ ~ ~ 1 1`,
+            ...(one.finish
+                ? [
+                      `${as(one.selector)} store result score @s ${parkour.FINISH_TICK} run time query gametime`
+                  ]
+                : []),
+            // Marked last: the lines before it still find them.
+            `${as(one.selector)} run scoreboard players set @s ${parkour.CHECKPOINT_SCORE} ${one.checkpoint}`
+        );
+    }
+    return lines;
 }
 
 function markOut(loop: StageLoop, name: string, now: number, points: number): void {

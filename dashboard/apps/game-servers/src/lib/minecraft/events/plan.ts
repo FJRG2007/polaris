@@ -141,7 +141,7 @@ export function busy(one: Seen, now: number): boolean {
 export function idleThroughout(seen: ReadonlyMap<string, Seen> | null, since: number): string[] {
     if (!seen) return [];
     return [...seen.values()]
-        .filter((one) => (one.movedAt ?? 0) < since && one.since < since)
+        .filter((one) => (one.movedAt ?? 0) < since && one.since <= since)
         .map((one) => one.name);
 }
 

@@ -41,6 +41,11 @@ interface World {
     creative: string[];
     difficulty: string;
     daylightCycle: "true" | "false";
+    /** Whether phantoms come for a player who has not slept. */
+    insomnia: "true" | "false";
+    /** Parkour: each racer's checkpoint as the game keeps it, and the tick they finished at. */
+    checkpoint: Record<string, number>;
+    finishTick: Record<string, number>;
     /** A version that knows the game rules by their new names only. */
     renamedRules: boolean;
     /** Whether the ground under a place is somebody's build. */
@@ -162,6 +167,9 @@ const world: World = {
     creative: [],
     difficulty: "Normal",
     daylightCycle: "true",
+    insomnia: "true",
+    checkpoint: {},
+    finishTick: {},
     renamedRules: false,
     built: false,
     refusedGround: [],
@@ -244,6 +252,71 @@ function fillAnswer(line: string): string | null {
 function dimension(id: string): string {
     if (events.atLeast(world.version, [1, 16])) return `"${id}"`;
     return String({ "minecraft:the_nether": -1, "minecraft:the_end": 1 }[id] ?? 0);
+}
+
+/**
+ * A parkour racer's checkpoint and finish, and the quick look's selectors over
+ * them, as the game answers: `@a[tag=pe_in,scores={pe_cp=..},x=,y=,z=,dx=,dy=,dz=]`
+ * finds a player inside whose score is in range and whose hitbox (0.6 wide, 1.8
+ * tall, from their feet) meets the box - which reaches one block past each `d`.
+ */
+function quickAnswer(line: string): string | null {
+    const set = /^scoreboard players set (\w+) pe_cp (-?\d+)$/.exec(line);
+    if (set) {
+        world.checkpoint[set[1]!] = Number(set[2]);
+        return `Set [pe_cp] for ${set[1]} to ${set[2]}`;
+    }
+    const reset = /^scoreboard players reset (\w+) pe_done$/.exec(line);
+    if (reset) {
+        delete world.finishTick[reset[1]!];
+        return `Reset [pe_done] for ${reset[1]}`;
+    }
+    const inside = world.online.filter((name) => world.inside.has(name));
+    if (line === "execute as @a[tag=pe_in,scores={pe_cp=0..}] run scoreboard players get @s pe_cp")
+        return inside
+            .filter((name) => world.checkpoint[name] !== undefined)
+            .map((name) => `${name} has ${world.checkpoint[name]} [pe_cp]`)
+            .join("\n");
+    if (line === "execute as @a[tag=pe_in,scores={pe_done=1..}] run scoreboard players get @s pe_done")
+        return inside
+            .filter((name) => world.finishTick[name] !== undefined)
+            .map((name) => `${name} has ${world.finishTick[name]} [pe_done]`)
+            .join("\n");
+    const look =
+        /^execute in minecraft:overworld as @a\[tag=pe_in,scores=\{pe_cp=(-?\d*)(\.\.)?(-?\d*)\},x=(-?\d+),y=(-?\d+),z=(-?\d+),dx=(\d+),dy=(\d+),dz=(\d+)\] (?:at @s )?(?:store result score @s pe_done )?run (.+)$/.exec(
+            line
+        );
+    if (!look) return null;
+    const [, low, range, high, ...rest] = look as unknown as string[];
+    const [x, y, z, dx, dy, dz] = rest.slice(0, 6).map(Number) as number[];
+    const command = rest[6]!;
+    const inRange = (score: number) =>
+        range
+            ? (low === "" || score >= Number(low)) && (high === "" || score <= Number(high))
+            : score === Number(low);
+    const found = inside.filter((name) => {
+        const score = world.checkpoint[name];
+        const [px, py, pz] = world.at[name] ?? [0, 0, 0];
+        return (
+            score !== undefined &&
+            inRange(score) &&
+            px + 0.3 > x! &&
+            px - 0.3 < x! + dx! + 1 &&
+            py + 1.8 > y! &&
+            py < y! + dy! + 1 &&
+            pz + 0.3 > z! &&
+            pz - 0.3 < z! + dz! + 1
+        );
+    });
+    for (const name of found) {
+        const moved = /^tp @s (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(command);
+        if (moved) world.at[name] = [Number(moved[1]), Number(moved[2]), Number(moved[3])];
+        const marked = /^scoreboard players set @s pe_cp (\d+)$/.exec(command);
+        if (marked) world.checkpoint[name] = Number(marked[1]);
+        if (line.includes(" store result score @s pe_done "))
+            world.finishTick[name] = Math.floor(Date.now() / 50) % 2147483647;
+    }
+    return found.map((name) => `${command.split(" ")[0]} ${name}`).join("\n");
 }
 
 /** How a server refuses a line it cannot read: the brigadier error and where it stopped. */
@@ -366,6 +439,8 @@ function answer(sent: string): string {
         world.at[name] = [Number(moved[3]), Number(moved[4]), Number(moved[5])];
         return `Teleported ${name} to ${moved[3]}, ${moved[4]}, ${moved[5]}`;
     }
+    const quick = quickAnswer(line);
+    if (quick !== null) return quick;
     const arenaTag = /^tag (\w+) (add|remove) pe_in$/.exec(line);
     if (arenaTag) {
         if (arenaTag[2] === "add") world.inside.add(arenaTag[1] as string);
@@ -556,6 +631,27 @@ function answer(sent: string): string {
     }
     if (line === "gamerule doDaylightCycle")
         return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
+    if (line === "gamerule doInsomnia")
+        return `Gamerule doInsomnia is currently set to: ${world.insomnia}`;
+    if (line === "gamerule spawn_phantoms") {
+        return world.renamedRules
+            ? `Gamerule spawn_phantoms is currently set to: ${world.insomnia}`
+            : "Unknown or incomplete command, see below for error";
+    }
+    const ruleSet = /^gamerule (doDaylightCycle|advance_time|doInsomnia|spawn_phantoms) (true|false)$/.exec(
+        line
+    );
+    if (ruleSet) {
+        const [, name, value] = ruleSet as unknown as [string, string, "true" | "false"];
+        if (world.renamedRules !== !name.startsWith("do"))
+            return "Unknown or incomplete command, see below for error";
+        if (name === "doInsomnia" || name === "spawn_phantoms") world.insomnia = value;
+        else world.daylightCycle = value;
+        return `Gamerule ${name} is now set to: ${value}`;
+    }
+    // The game's own tick count, twenty a second.
+    if (line === "time query gametime")
+        return `The time is ${Math.floor(Date.now() / 50) % 2147483647}`;
     if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
         return world.creative
             .map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`)
@@ -976,6 +1072,9 @@ beforeEach(() => {
     world.creative = [];
     world.difficulty = "Normal";
     world.daylightCycle = "true";
+    world.insomnia = "true";
+    world.checkpoint = {};
+    world.finishTick = {};
     world.renamedRules = false;
     world.built = false;
     world.refusedGround = [];
@@ -1301,7 +1400,9 @@ describe("a supply drop", () => {
             trigger: "manual",
             startedBy: null
         });
-        await play(4_100);
+        // Begun at once: the column is chosen on the first tick after, and
+        // the chest not yet down.
+        await play(2_100);
         const added = world.sent.filter((line) => line.includes("run forceload add"));
         expect(added.length).toBeGreaterThan(0);
         expect(state().run?.target).not.toBeNull();
@@ -1813,6 +1914,9 @@ describe("a blood moon", () => {
         expect(world.sent).toContain("gamerule doDaylightCycle true");
         expect(world.sent).toContain("gamerule doWeatherCycle true");
         expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        // Its night is the event: phantoms are left as the server has them.
+        expect(world.sent.some((line) => line.startsWith("gamerule doInsomnia"))).toBe(false);
+        expect(world.sent).not.toContain("time set 6000");
     });
 });
 
@@ -3400,7 +3504,8 @@ describe("a meteor shower", () => {
             }
         ]);
         await start();
-        await play(4_100);
+        // Begun at once, the column is chosen on the first tick after.
+        await play(2_100);
         const target = state().run?.target;
         expect(target).not.toBeNull();
         expect(Math.hypot(target!.x, target!.z)).toBeGreaterThanOrEqual(48);
@@ -3531,29 +3636,46 @@ describe("a parkour race", () => {
             const one = course.platforms[index]!;
             return [one.x + one.size / 2, one.y + 1, one.z + one.size / 2];
         };
+        // Each racer's checkpoint is kept in the game, for the quick look.
+        expect(world.checkpoint).toEqual({ Ana: 0, Ben: 0 });
         world.at.Ana = top(course.checkpoints[0]!);
         world.at.Ben = [top(3)[0], course.floor - 3, top(3)[2]];
         const from = world.sent.length;
+        // Under half a second, not a tick: Ana's checkpoint marked and told, and
+        // Ben - who fell onto the net - back at the start, unhurt.
+        await play(450);
+        const quick = world.sent.slice(from);
+        const start = parkour.spotOn(course, 0);
+        expect(world.checkpoint.Ana).toBe(course.checkpoints[0]);
+        expect(world.at.Ben).toEqual([start.x, start.y, start.z]);
+        expect(
+            quick.some(
+                (line) =>
+                    line.startsWith("execute in minecraft:overworld as @a[tag=pe_in,scores={pe_cp=..") &&
+                    line.includes(" run title @s title ") &&
+                    line.includes("Checkpoint 1/")
+            )
+        ).toBe(true);
+        expect(quick.some((line) => /^execute in minecraft:overworld as @a\[tag=pe_in,scores=\{pe_cp=0\},.* run tp @s /.test(line))).toBe(true);
+        // Nothing read per player to do it.
+        expect(quick.some((line) => line.includes("data get entity"))).toBe(false);
         await play(2_100);
         const said = world.sent.slice(from);
         expect(state().run?.stage?.racers.find((one) => one.name === "Ana")?.checkpoint).toBe(
             course.checkpoints[0]
         );
-        expect(
-            said.some(
-                (line) => line.startsWith("title Ana title") && line.includes("Checkpoint 1/")
-            )
-        ).toBe(true);
-        // Ben fell onto the net and is back at the start, unhurt.
-        const start = parkour.spotOn(course, 0);
-        expect(said).toContain(
-            `execute in minecraft:overworld run tp Ben ${start.x.toFixed(3)} ${start.y.toFixed(3)} ${start.z.toFixed(3)} ${start.yaw.toFixed(1)} 0.0`
+        // Told once, by the quick look - not again by the tick.
+        expect(said.some((line) => line.startsWith("title Ana title"))).toBe(false);
+        expect(said.some((line) => line.startsWith("execute in minecraft:overworld run tp Ben"))).toBe(
+            false
         );
 
         const savedBen = state().run!.stage!.saved.find((one) => one.name === "Ben")!;
         world.at.Ana = top(course.platforms.length - 1);
         chat(["Ben", "leave"]);
         await play(4_100);
+        // Her time is to the moment she stepped on the finish, not the next tick.
+        expect(world.finishTick.Ana).toBeGreaterThan(0);
 
         const after = state();
         expect(after.run).toBeNull();
@@ -3567,6 +3689,64 @@ describe("a parkour race", () => {
         expect(world.inside.size).toBe(0);
         expect(after.stageLeftovers).toEqual([]);
         keptTheRules();
+    });
+
+    it("holds the day and keeps phantoms and hostiles off while it runs, and gives both rules back exactly", async () => {
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        expect(state().run?.stage?.built).toBe(true);
+        // Written down before either is changed, so a restart gives them back too.
+        expect(state().run?.gamerules).toMatchObject({ doDaylightCycle: "true", doInsomnia: "true" });
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
+        expect(world.sent).toContain("gamerule doInsomnia false");
+        expect(world.sent).toContain("time set 6000");
+        expect(world.daylightCycle).toBe("false");
+        expect(world.insomnia).toBe("false");
+        // Hostiles inside its own box and the air over it, never a named one.
+        const volume = parkour.course(
+            race().options,
+            state().run!.id,
+            state().run!.stage!.origin!,
+            state().run!.stage!.origin!.y
+        ).volume;
+        const kill = world.sent.find((line) => line.includes("kill @e[type=minecraft:phantom,"));
+        expect(kill).toBe(
+            `execute in minecraft:overworld run kill @e[type=minecraft:phantom,x=${volume.x1},y=${volume.y1},z=${volume.z1},dx=${volume.x2 - volume.x1},dy=${volume.y2 - volume.y1 + 16},dz=${volume.z2 - volume.z1},nbt=!{PersistenceRequired:1b}]`
+        );
+        // Only its own marks are killed any other way; every kill in the air
+        // names a hostile type and spares a named mob.
+        for (const line of world.sent.filter((one) => / kill @e\[.*dx=/.test(one)))
+            expect(line).toMatch(/kill @e\[type=minecraft:[a-z_]+,.*,nbt=!\{PersistenceRequired:1b\}\]$/);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        const end = world.sent.lastIndexOf("gamerule doDaylightCycle true");
+        expect(end).toBeGreaterThan(-1);
+        expect(world.sent).toContain("gamerule doInsomnia true");
+        expect(world.daylightCycle).toBe("true");
+        expect(world.insomnia).toBe("true");
+        // The world goes on from midday: the time is not wound back.
+        expect(world.sent.slice(end).some((line) => line.startsWith("time set"))).toBe(false);
+    });
+
+    it("leaves a day already held, and phantoms already off, just as they were - under their 1.21.11 names too", async () => {
+        world.renamedRules = true;
+        world.daylightCycle = "false";
+        world.insomnia = "false";
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        expect(state().run?.gamerules).toMatchObject({ advance_time: "false", spawn_phantoms: "false" });
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(world.sent).not.toContain("gamerule advance_time true");
+        expect(world.sent).not.toContain("gamerule spawn_phantoms true");
+        expect(world.daylightCycle).toBe("false");
+        expect(world.insomnia).toBe("false");
     });
 
     it("called off halfway takes down exactly what it built and brings everybody back", async () => {
@@ -4599,6 +4779,13 @@ describe("a build battle", () => {
 
         // Nobody can be hurt on a plot, or on the tour with the others.
         expect(world.sent).toContain("effect give Ben minecraft:resistance 3 4 true");
+        // The glass is seen by day, and nothing hostile reaches the platform.
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
+        expect(world.sent).toContain("gamerule doInsomnia false");
+        const platform = run.arena!.box;
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run kill @e[type=minecraft:phantom,x=${platform.x1},y=${platform.y1},z=${platform.z1},dx=${platform.x2 - platform.x1},dy=${platform.y2 - platform.y1 + 16},dz=${platform.z2 - platform.z1},nbt=!{PersistenceRequired:1b}]`
+        );
 
         // Building over: the kit comes back, none of it is left lying about,
         // and the vote opens.
@@ -4615,11 +4802,16 @@ describe("a build battle", () => {
             "clear Ana minecraft:stick[minecraft:custom_data={polaris_event:1b}]"
         );
         await play(2_100);
-        expect(
-            world.sent.some((line) =>
-                /^execute in minecraft:overworld run tp (Ana|Ben) .* -45 20$/.test(line)
+        // The tour stands on the barrier roof over the wall beside a plot, looking
+        // down into it - never on a plot, which may be built solid to its roof.
+        const roof = state().run!.arena!.box.y2;
+        const tours = world.sent
+            .map((line) =>
+                /^execute in minecraft:overworld run tp (Ana|Ben) (\S+) (\S+) (\S+) (-?\d+) 55$/.exec(line)
             )
-        ).toBe(true);
+            .filter((match): match is RegExpExecArray => match !== null);
+        expect(tours.length).toBeGreaterThan(0);
+        for (const match of tours) expect(Number(match[3])).toBe(roof + 1);
         chat(["Ana", "1"], ["Ana", "2"], ["Ana", "2"], ["Ben", "1"], ["Cy", "#2"]);
         await play(2_100);
         expect(state().run?.votes).toEqual({ ana: "Ben", ben: "Ana", cy: "Ben" });
@@ -4746,5 +4938,60 @@ describe("each player reads their own language", () => {
         // Nobody linked: everybody reads the owner's language, sent to all at once.
         expect(sentTo("@a", "Pregunta 1/3")).toBe(true);
         expect(world.sent.some((line) => line.includes("Question 1/3"))).toBe(false);
+    });
+});
+
+describe("the clock", () => {
+    it("starts when the boss stands, with the whole of its time ahead, and says it is getting ready until then", async () => {
+        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
+        setUp([boss]);
+        await startArena("boss");
+        await play(100);
+        // Begun, the place still being looked for: no running time on the bar.
+        expect(state().run?.readyAt).toBeNull();
+        await play(2_000);
+        const waiting = world.sent.filter((line) => line.startsWith("bossbar set polaris:event name "));
+        expect(waiting.some((line) => line.includes("getting ready"))).toBe(true);
+        await play(8_000);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(run.startsAt).toBe(run.readyAt);
+        expect(run.endsAt - run.readyAt!).toBe(10 * 60_000);
+        // A restart does not start it again.
+        const before = { ...run };
+        await events.sweepEvents();
+        await play(2_100);
+        expect(state().run?.readyAt).toBe(before.readyAt);
+        expect(state().run?.endsAt).toBe(before.endsAt);
+    });
+
+    it("announces a run at once, without waiting for a tick", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        setUp([hunt], { countdownSeconds: 30 });
+        await startArena("hunt");
+        await play(50);
+        expect(world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("starts in"))).toBe(true);
+    });
+});
+
+describe("the list of who joined", () => {
+    it("writes its count again as players join, not only the names under it", async () => {
+        const race = {
+            ...catalog.newPreset("parkour", "race"),
+            minutes: 5,
+            options: { place: { mode: "players" as const }, jumps: 12, difficulty: "medium" as const, height: 30 }
+        };
+        setUp([race]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("scoreboard objectives modify pe_joined displayname ") &&
+                    line.includes("(2 joined)")
+            )
+        ).toBe(true);
     });
 });

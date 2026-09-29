@@ -42,6 +42,7 @@ import * as hunt from "./kinds/treasure-hunt";
 import * as rareCatch from "./kinds/rare-catch";
 import * as meteors from "./kinds/meteor-shower";
 import * as stageService from "./kinds/stage-service";
+import * as parkour from "./kinds/parkour";
 import * as arenaService from "./kinds/arena-service";
 import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -171,6 +172,9 @@ async function openServerContainer(
 const TICK_MS = 2_000;
 /** How often the boss bar's clock moves: every second, on its own timer. */
 const CLOCK_MS = 1_000;
+/** How often a parkour race is looked at for falls and checkpoints: a fall is
+ *  caught before the ground, a checkpoint as it is stepped on. One batch each. */
+const QUICK_MS = 400;
 /** How often the loop looks at who is where, to know who took part. */
 const SAMPLE_EVERY_MS = 15_000;
 /** How often the participants are written down, so a restart knows them. */
@@ -191,6 +195,9 @@ interface Loop {
     readonly timer: ReturnType<typeof setInterval>;
     /** The boss bar's clock, a second at a time, apart from the tick. */
     clock: ReturnType<typeof setInterval> | null;
+    /** Parkour: the quick look at falls and checkpoints, far oftener than the tick. */
+    quick: ReturnType<typeof setInterval> | null;
+    quickBusy: boolean;
     busy: boolean;
     run: stored.EventRun;
     link: { server: ServerContainer; close: () => Promise<void> } | null;
@@ -220,6 +227,9 @@ interface Loop {
     home: catalog.Language;
     /** Whether `home` is settled: chosen, or the owner's looked up. */
     homeKnown: boolean;
+    /** Whether this loop has seen the event not yet playable: its clock then
+     *  starts when it becomes so, rather than keeping the start it had. */
+    sawUnready: boolean;
     countdown: number;
     /** Parkour and spleef: how this server spells marked items, and its build limit. */
     flavour: stage.Flavour | null;
@@ -636,6 +646,7 @@ export async function startNow(ownerId: string, installedAppId: string): Promise
     const loop = loops.get(installedAppId);
     if (loop) {
         if (loop.run.phase === "countdown") loop.run = skipped(loop.run);
+        kick(installedAppId, loop);
     } else {
         const row = await readRow(installedAppId);
         if (row) startLoop(ownerId, installedAppId, state.run, settingsOf(row.config).settings);
@@ -652,6 +663,26 @@ export async function forgetPending(installedAppId: string, pendingId: string): 
 
 // ------------------------------------------------------------------ the loop
 
+/**
+ * A tick now, unless one is already running - that one does it. The timer's way
+ * in, and the way an action (Run, Start now) is answered at once instead of on
+ * the next tick; never two at a time, so nothing is announced twice.
+ */
+function kick(installedAppId: string, loop: Loop): void {
+    if (loop.busy || loop.finishing) return;
+    loop.busy = true;
+    void tick(installedAppId, loop)
+        .catch((error: unknown) => {
+            console.warn("polaris: event tick failed", installedAppId, String(error));
+            // Opened again on the next tick: a server that restarted
+            // took the connection with it.
+            void dropLink(loop);
+        })
+        .finally(() => {
+            loop.busy = false;
+        });
+}
+
 function startLoop(
     ownerId: string,
     installedAppId: string,
@@ -666,21 +697,10 @@ function startLoop(
     if (run.finishing) return;
     const loop: Loop = {
         ownerId,
-        timer: setInterval(() => {
-            if (loop.busy) return;
-            loop.busy = true;
-            void tick(installedAppId, loop)
-                .catch((error: unknown) => {
-                    console.warn("polaris: event tick failed", installedAppId, String(error));
-                    // Opened again on the next tick: a server that restarted
-                    // took the connection with it.
-                    void dropLink(loop);
-                })
-                .finally(() => {
-                    loop.busy = false;
-                });
-        }, TICK_MS),
+        timer: setInterval(() => kick(installedAppId, loop), TICK_MS),
         clock: null,
+        quick: null,
+        quickBusy: false,
         busy: false,
         run,
         link: null,
@@ -699,6 +719,7 @@ function startLoop(
         language: speech.EVERY,
         home: settings.language,
         homeKnown: false,
+        sawUnready: false,
         countdown: catalog.countdownSecondsFor(run.preset, settings),
         flavour: null,
         quiet: false
@@ -706,7 +727,13 @@ function startLoop(
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
     loop.clock.unref?.();
+    if (run.preset.kind === "parkour") {
+        loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
+        loop.quick.unref?.();
+    }
     loops.set(installedAppId, loop);
+    // Said in the game at once, not a tick later.
+    kick(installedAppId, loop);
     // Picked up again after a restart: the side of the screen is the event's
     // again, or the live panel would be drawn over its scoreboard.
     if (run.phase === "running" && commands.hasScoreboard(run.preset)) holdSidebar(installedAppId);
@@ -803,9 +830,32 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         throw error;
     }
     if (done) return finish(installedAppId, loop, server, "finished", done);
-    if (now >= loop.run.endsAt)
+    if (loop.run.readyAt === null) {
+        if (catalog.readyToPlay(loop.run)) await markReady(installedAppId, loop, Date.now());
+        // Never playable in as long again as it was to last: given up.
+        else if (now >= loop.run.endsAt + catalog.runMinutes(loop.run.preset) * 60_000)
+            return finish(installedAppId, loop, server, "failed", "It could not get ready in time");
+        else loop.sawUnready = true;
+    } else if (now >= loop.run.endsAt)
         return finish(installedAppId, loop, server, "finished", "Ran its full time");
     if (now - loop.lastSave >= SAVE_EVERY_MS) await persist(installedAppId, loop);
+}
+
+/**
+ * The event playable from now: its clock starts with the whole of its time
+ * ahead - the place searched, the boss standing, everybody brought in all
+ * before it, never out of it. Written down, and only ever once, so a restart
+ * neither starts it again nor loses its end.
+ */
+async function markReady(installedAppId: string, loop: Loop, now: number): Promise<void> {
+    if (loop.run.readyAt !== null) return;
+    const planned = catalog.runMinutes(loop.run.preset) * 60_000;
+    loop.run = loop.sawUnready
+        ? { ...loop.run, readyAt: now, startsAt: now, endsAt: now + planned }
+        : // Picked up after a restart already playable - it was being played
+          // before this was written down: its clock stays as it was.
+          { ...loop.run, readyAt: loop.run.startsAt };
+    await persist(installedAppId, loop);
 }
 
 async function countdown(
@@ -818,6 +868,8 @@ async function countdown(
     const language = loop.language;
     const left = (loop.run.startsAt - now) / 1000;
     const title = preset.name;
+    // Quietened first - one read and one write - so the announcement itself
+    // does not flood the operators' chat.
     await quieten(installedAppId, loop, server);
     // No warning asked for: straight to the start, rather than "starts in 0:00".
     if (!loop.announced && loop.run.startsAt <= now) loop.announced = true;
@@ -889,6 +941,25 @@ async function countdown(
  * back. The marks of the last seconds are sounded here too, so they are on time.
  * The boss's and a horde's bars show health and waves, and are left to them.
  */
+/**
+ * Parkour's quick look (`stageService.quickLines`): one batch, nothing read,
+ * never two at once, and nothing while the tick has no connection open.
+ */
+async function quickLook(loop: Loop): Promise<void> {
+    const server = loop.link?.server;
+    if (!server || loop.finishing || loop.quickBusy || loop.run.phase !== "running") return;
+    const lines = stageService.quickLines(loop);
+    if (lines.length === 0) return;
+    loop.quickBusy = true;
+    try {
+        await server.sayAll(lines);
+    } catch {
+        // The tick finds a connection that went, and opens another.
+    } finally {
+        loop.quickBusy = false;
+    }
+}
+
 async function showClock(loop: Loop): Promise<void> {
     const server = loop.link?.server;
     if (!server || loop.finishing || !loop.announced) return;
@@ -914,9 +985,10 @@ async function showClock(loop: Loop): Promise<void> {
             lines.push(commands.sound(commands.SOUNDS.tick));
             if (mark <= 5) lines.push(`title @a actionbar ${commands.text(`&e${mark}`)}`);
         }
-    } else if (catalog.playsInArena(preset) && loop.run.readyAt === null) {
-        // Its time starts once everybody is in the arena, so the clock waits
-        // full until then instead of running down and jumping back up.
+    } else if (loop.run.readyAt === null) {
+        // Its time starts once it can be played - the place set up, the boss
+        // standing, everybody brought in - so the clock waits full until then
+        // instead of running down while nobody can play.
         lines.push(
             ...commands.barUpdate(messages.arenaGettingReady(preset.name, loop.language), 1, 1)
         );
@@ -1079,6 +1151,26 @@ async function begin(
         );
     }
     if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, loop.home));
+    if (catalog.keepsDay(preset)) {
+        // Day held still, and no phantoms, for as long as it runs: what each
+        // rule was is written down before it is changed, so whatever ends it -
+        // a restart included - puts back exactly that.
+        const before: Record<string, string> = {};
+        for (const names of commands.DAY_RULES) {
+            for (const rule of names) {
+                const value =
+                    loop.run.gamerules[rule] ??
+                    commands.readRuleValue(await server.say([commands.readRule(rule)]));
+                if (value === null) continue;
+                before[rule] = value;
+                lines.push(commands.setRule(rule, "false"));
+                break;
+            }
+        }
+        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        await persist(installedAppId, loop);
+        lines.push(commands.MIDDAY);
+    }
     if (catalog.needsPvp(preset)) {
         // Nobody loses what they carry to a fight: a death keeps all of it, for
         // exactly as long as the duel lasts, and the rule is put back after.
@@ -1105,7 +1197,11 @@ async function begin(
     }
     await server.sayAll(lines);
     loop.run = { ...loop.run, phase: "running", startsAt: now };
-    await persist(installedAppId, loop);
+    // Its clock starts now if there is nothing to set up first, and when there
+    // is, once it has been.
+    loop.sawUnready = true;
+    if (catalog.readyToPlay(loop.run)) await markReady(installedAppId, loop, now);
+    else await persist(installedAppId, loop);
 }
 
 /**
@@ -2662,6 +2758,7 @@ async function finish(
     loop.finishing = true;
     clearInterval(loop.timer);
     if (loop.clock) clearInterval(loop.clock);
+    if (loop.quick) clearInterval(loop.quick);
     const run = loop.run;
     await updateEventState(installedAppId, (state) =>
         state.run?.id === run.id ? { ...state, run: { ...state.run, finishing: true } } : state
@@ -2948,6 +3045,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "gathering":
             after.push(...gather.gatheringCleanup());
+            break;
+        case "parkour":
+            after.push(...parkour.SCORES_REMOVED);
             break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());

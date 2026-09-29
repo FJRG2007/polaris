@@ -11,7 +11,7 @@
 
 import { seeded } from "../trivia-bank";
 import type { EventOptions } from "../catalog";
-import type { Box, Spot, Volume } from "./stage";
+import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 
 export type Role = "start" | "jump" | "checkpoint" | "finish";
 
@@ -231,4 +231,88 @@ export function finishScore(seconds: number): number {
 
 export function isFinish(score: number): boolean {
     return score > FINISH_BASE / 2;
+}
+
+// ------------------------------------------------------------------ the quick look
+
+/**
+ * Each racer's checkpoint - the platform a fall sends them back to - kept in the
+ * game as well as in Polaris, so the quick look (`quickSelectors`) can send a
+ * fallen racer back and mark a checkpoint reached with selectors alone, never
+ * a read per player.
+ */
+export const CHECKPOINT_SCORE = "pe_cp";
+/** The game tick a racer stepped onto the finish, for their time to the tick. */
+export const FINISH_TICK = "pe_done";
+
+export const SCORES_ADDED = [
+    `scoreboard objectives add ${CHECKPOINT_SCORE} dummy`,
+    `scoreboard objectives add ${FINISH_TICK} dummy`
+];
+
+export const SCORES_REMOVED = [
+    `scoreboard objectives remove ${CHECKPOINT_SCORE}`,
+    `scoreboard objectives remove ${FINISH_TICK}`
+];
+
+/** A racer coming in: at their checkpoint, and not finished. */
+export function racerScores(name: string, checkpoint: number): string[] {
+    return [
+        `scoreboard players set ${name} ${CHECKPOINT_SCORE} ${checkpoint}`,
+        `scoreboard players reset ${name} ${FINISH_TICK}`
+    ];
+}
+
+/** Every racer's checkpoint, as the game has it. */
+export const READ_CHECKPOINTS = `execute as @a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=0..}] run scoreboard players get @s ${CHECKPOINT_SCORE}`;
+/** The tick each racer who reached the finish reached it at. */
+export const READ_FINISH_TICKS = `execute as @a[tag=${IN_ARENA},scores={${FINISH_TICK}=1..}] run scoreboard players get @s ${FINISH_TICK}`;
+/** The game's own tick count now: `The time is 123456`. */
+export const READ_GAME_TIME = "time query gametime";
+
+/** How far to each side of the course a fall is still caught. */
+const FALL_SIDE = 4;
+/** How far under the net a fall is still caught. */
+const FALL_DEPTH = 64;
+
+/**
+ * The selectors the quick look uses, all of them only for racers inside
+ * (`IN_ARENA`):
+ * - `fell`: one per checkpoint a racer can be sent back to (the start and every
+ *   checkpoint but the finish) - whoever with that checkpoint is under the
+ *   lowest platform's top, with where they go;
+ * - `reached`: one per checkpoint and the finish - whoever with an earlier one
+ *   is standing over it (or in the block above it).
+ * A racer standing on the lowest platforms has their feet a block over `floor`;
+ * a box whose top is `floor` catches them only once they are under that.
+ */
+export function quickSelectors(course: Course): {
+    fell: { checkpoint: number; selector: string; spot: Spot }[];
+    reached: { checkpoint: number; selector: string; finish: boolean }[];
+} {
+    const volume = course.volume;
+    const x = Math.min(volume.x1, volume.x2) - FALL_SIDE;
+    const z = Math.min(volume.z1, volume.z2) - FALL_SIDE;
+    const y = Math.min(volume.y1, volume.y2) - FALL_DEPTH;
+    const dx = Math.abs(volume.x2 - volume.x1) + 2 * FALL_SIDE;
+    const dz = Math.abs(volume.z2 - volume.z1) + 2 * FALL_SIDE;
+    const dy = course.floor - y - 1;
+    const below = `x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz}`;
+    const finish = course.platforms.length - 1;
+    const backTo = [0, ...course.checkpoints.filter((index) => index !== finish && index !== 0)];
+    return {
+        fell: backTo.map((checkpoint) => ({
+            checkpoint,
+            selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=${checkpoint}},${below}]`,
+            spot: spotOn(course, checkpoint)
+        })),
+        reached: course.checkpoints.map((checkpoint) => {
+            const one = course.platforms[checkpoint]!;
+            return {
+                checkpoint,
+                selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=..${checkpoint - 1}},x=${one.x},y=${one.y + 1},z=${one.z},dx=${one.size - 1},dy=0,dz=${one.size - 1}]`,
+                finish: checkpoint === finish
+            };
+        })
+    };
 }

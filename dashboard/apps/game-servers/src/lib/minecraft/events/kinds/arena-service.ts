@@ -89,6 +89,8 @@ interface Memory {
     lastHit: Map<string, number>;
     shieldedUntil: Map<string, number>;
     tour: number;
+    /** The spot the tour stands at for each plot, once found clear. */
+    views: Map<number, arena.Spot | null>;
 }
 
 const memories = new Map<string, Memory>();
@@ -102,7 +104,8 @@ function memoryOf(runId: string): Memory {
             kills: new Map(),
             lastHit: new Map(),
             shieldedUntil: new Map(),
-            tour: -1
+            tour: -1,
+            views: new Map()
         };
         memories.set(runId, memory);
     }
@@ -154,6 +157,8 @@ export function beginLines(preset: catalog.EventPreset, language: catalog.Langua
  * game itself after that. Never decided early - both run their whole time.
  */
 export async function arenaTick(ctx: KindContext, lines: string[]): Promise<string | null> {
+    // Nothing hostile reaches it once it stands - a phantom least of all.
+    if (ctx.run.arena) lines.push(...commands.hostilesOut(ctx.run.arena.box));
     if (ctx.run.readyAt === null) {
         if (!ctx.run.enrolled) await enrol(ctx, lines);
         else if (!ctx.run.arena) await raise(ctx);
@@ -412,7 +417,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const seconds =
         run.preset.minutes * 60 +
         (duelling ? 0 : (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds);
-    ctx.run = { ...ctx.run, readyAt: ctx.now, endsAt: ctx.now + seconds * 1000 };
+    ctx.run = {
+        ...ctx.run,
+        readyAt: ctx.now,
+        startsAt: ctx.now,
+        endsAt: ctx.now + seconds * 1000
+    };
     await ctx.persist();
 }
 
@@ -510,6 +520,34 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
 
 // ------------------------------------------------------------------ build battle
 
+/**
+ * Where everybody stands to see one plot: the first of its spots over the roof
+ * whose feet and head are both air, asked once per plot and remembered; null
+ * when none is, and then nobody is moved.
+ */
+async function tourView(
+    ctx: KindContext,
+    memory: Memory,
+    box: stored.Box,
+    plot: number,
+    size: number,
+    count: number
+): Promise<arena.Spot | null> {
+    const known = memory.views.get(plot);
+    if (known !== undefined) return known;
+    let found: arena.Spot | null = null;
+    for (const spot of build.plotViews(box, plot, size, count)) {
+        const clear = async (above: number) =>
+            commands.readTest(await ctx.server.say([build.airAt(spot, above)])) === "passed";
+        if ((await clear(0)) && (await clear(1))) {
+            found = spot;
+            break;
+        }
+    }
+    memory.views.set(plot, found);
+    return found;
+}
+
 async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
     const run = ctx.run;
     const language = ctx.language;
@@ -528,22 +566,25 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
             ? Math.floor((now - buildEnds) / 1000 / step) % plots.length
             : -1;
     const touring = index >= 0 ? plots[index]! : null;
+    // The tour's spot over the roof, found clear once per plot.
+    const view = touring === null ? null : await tourView(ctx, memory, box, touring, options.plotSize, count);
     const spotOf = (one: stored.Entrant) =>
-        touring === null
-            ? build.plotSpot(box, one.side, options.plotSize, count)
-            : build.plotView(box, touring, options.plotSize, count);
+        view ?? build.plotSpot(box, one.side, options.plotSize, count);
     const here = new Map(
         commands
             .readWhere(await ctx.server.say([commands.IN_OVERWORLD]))
             .map((one) => [lower(one.name), one])
     );
     lines.push(...arena.keepThrown(box));
+    const bounds = run.voting ? build.tourBounds(box) : box;
     for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         // Out of it some other way - a chorus fruit, say: back where they belong.
-        if (at && !arena.contains(box, at)) lines.push(arena.moveTo(one.name, spotOf(one)));
-        // Nobody is hurt here, least of all by another builder on the tour.
+        if (at && !arena.contains(bounds, at)) lines.push(arena.moveTo(one.name, spotOf(one)));
+        // Nobody is hurt here, least of all by another builder on the tour -
+        // nor by stepping off the roof while touring it.
         lines.push(arena.feed(one.name), arena.protect(one.name));
+        if (run.voting) lines.push(arena.floatDown(one.name));
     }
     if (now < buildEnds) {
         for (const one of run.entrants) {
@@ -588,7 +629,8 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
         memory.tour = index;
         for (const one of run.entrants) {
             lines.push(
-                arena.moveTo(one.name, spotOf(one)),
+                // Only to a spot found clear; with none, they look from where they are.
+                ...(view ? [arena.moveTo(one.name, view)] : []),
                 ...arena.titleTo(one.name, messages.plotTitle(touring + 1, language), "")
             );
         }

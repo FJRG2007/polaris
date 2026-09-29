@@ -1660,6 +1660,7 @@
             "buildGlass": "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
             "buildNeeds": "Needs Minecraft 1.16 or later. Up to 12 builders.",
             "arena": "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then.",
+            "keepsDay": "Keeps it day while it runs, with no phantoms; the day cycle and phantoms come back as they were afterwards.",
             "overworld": "Happens in the Overworld; only players there take part.",
             "rankedFrom": "Ranked from {score} {unit}; below that, no podium and no prize.",
             "startsWith": "Starts on its own only with {count} {count, plural, one {player} other {players}} actually playing, and not while somebody is in a fight.",

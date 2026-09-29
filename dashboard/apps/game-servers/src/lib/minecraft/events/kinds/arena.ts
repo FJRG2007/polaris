@@ -319,6 +319,11 @@ export function wentHome(output: string): boolean {
     return /teleported/i.test(plain) && !/no (player|entity) was found/i.test(plain);
 }
 
+/** Falling slowly for a moment past each look: nobody is hurt stepping off a roof. */
+export function floatDown(name: string): string {
+    return `effect give ${name} minecraft:slow_falling 3 0 true`;
+}
+
 /** Nobody goes hungry in an arena: fed for a moment past each look. */
 export function feed(name: string): string {
     return `effect give ${name} minecraft:saturation 3 0 true`;

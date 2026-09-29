@@ -1062,6 +1062,74 @@ export const FROZEN_RULES = [
 ] as const;
 
 /**
+ * The rules an event played on something built in the sky holds while it runs
+ * (`catalog.keepsDay`): the clock stopped at midday, so what is built there -
+ * glass above all - can be seen and nothing spawns on it in the dark; and no
+ * phantoms, which a player who has not slept brings down on the arena. Put back
+ * to exactly what they were when it ends. Their names before 1.21.11, then after.
+ */
+export const DAY_RULES = [
+    ["doDaylightCycle", "advance_time"],
+    ["doInsomnia", "spawn_phantoms"]
+] as const;
+
+/** Midday: the day held still at its brightest. The world goes on from there. */
+export const MIDDAY = "time set 6000";
+
+/**
+ * The hostile creatures that can reach something built in the sky: whatever
+ * flies to it, and whatever spawns on a dark corner of it. There is no selector
+ * for "hostile" without a datapack, so each is named - an older version that
+ * lacks one refuses that line alone.
+ */
+const HOSTILES = [
+    "phantom",
+    "zombie",
+    "zombie_villager",
+    "husk",
+    "drowned",
+    "skeleton",
+    "stray",
+    "creeper",
+    "spider",
+    "cave_spider",
+    "enderman",
+    "witch",
+    "slime",
+    "pillager",
+    "vex"
+] as const;
+
+/** How far above an arena a hostile is still taken out: a phantom circles there. */
+export const HOSTILE_MARGIN = 16;
+
+/**
+ * Every hostile creature inside an event's own box - and the air above it - taken
+ * out, one line each, and nothing outside it. A named mob is kept: naming one
+ * (a name tag) makes it persistent, and a persistent one is never touched - nor
+ * is anything tamed, since nothing on the list can be.
+ */
+export function hostilesOut(box: {
+    readonly x1: number;
+    readonly y1: number;
+    readonly z1: number;
+    readonly x2: number;
+    readonly y2: number;
+    readonly z2: number;
+}): string[] {
+    const x = Math.min(box.x1, box.x2);
+    const y = Math.min(box.y1, box.y2);
+    const z = Math.min(box.z1, box.z2);
+    const dx = Math.abs(box.x2 - box.x1);
+    const dy = Math.abs(box.y2 - box.y1) + HOSTILE_MARGIN;
+    const dz = Math.abs(box.z2 - box.z1);
+    return HOSTILES.map(
+        (type) =>
+            `execute in minecraft:overworld run kill @e[type=minecraft:${type},x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz},nbt=!{PersistenceRequired:1b}]`
+    );
+}
+
+/**
  * The rule that shows operators what commands did, as `[Rcon: Set [pe_sum] for
  * Alice to 3]` in their chat. An event runs dozens of commands a second - the
  * clock, the scoreboard, a title for each player - and every one of them landed
@@ -1585,6 +1653,9 @@ export const JOIN_LIST = "pe_joined";
 export function joinListLines(title: string, names: readonly string[]): string[] {
     return [
         `scoreboard objectives add ${JOIN_LIST} dummy ${text(title)}`,
+        // Made once and then refused as already there: the title - its count of
+        // who joined - is written again each time, or it stays at "(0 joined)".
+        `scoreboard objectives modify ${JOIN_LIST} displayname ${text(title)}`,
         `scoreboard objectives modify ${JOIN_LIST} numberformat blank`,
         `scoreboard objectives setdisplay sidebar ${JOIN_LIST}`,
         `scoreboard players reset * ${JOIN_LIST}`,

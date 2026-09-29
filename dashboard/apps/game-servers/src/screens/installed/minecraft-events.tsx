@@ -269,6 +269,7 @@ function EventExplained({
     if (catalog.playsInArena(preset)) {
         facts.push(t("events.facts.arena"));
     }
+    if (catalog.keepsDay(preset)) facts.push(t("events.facts.keepsDay"));
     if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
         facts.push(t("events.facts.overworld"));
     if (catalog.hasMinScore(preset)) {
