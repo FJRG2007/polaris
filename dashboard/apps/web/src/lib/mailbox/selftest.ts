@@ -33,6 +33,8 @@ import { asJson } from "./json";
 import { prisma } from "@polaris/db";
 import { queueSend } from "./compose";
 import { ownedAccount } from "./access";
+import { mailRefusalText } from "./refusal-text";
+import { readerMailWords } from "./reader-words";
 
 /** What the check is waiting for, or what it found. */
 export type MailCheckStage = "none" | "sending" | "refused" | "accepted" | "arrived" | "bounced";
@@ -125,6 +127,8 @@ export async function startSendCheck(userId: string, accountId: string): Promise
  */
 export async function readSendCheck(userId: string, accountId: string): Promise<MailSendCheck> {
     await ownedAccount(userId, accountId);
+    // Read by whoever pressed the check, in the request that asks.
+    const t = await readerMailWords();
 
     const draft = await prisma.mailDraft.findFirst({
         where: { accountId, probe: true },
@@ -135,7 +139,7 @@ export async function readSendCheck(userId: string, accountId: string): Promise<
         return {
             stage: "sending",
             startedAt: draft.createdAt.toISOString(),
-            detail: "Sending a message from this mailbox to itself.",
+            detail: t("selftest.sending"),
             waiting: true
         };
     }
@@ -143,7 +147,7 @@ export async function readSendCheck(userId: string, accountId: string): Promise<
         return {
             stage: "refused",
             startedAt: draft.createdAt.toISOString(),
-            detail: draft.failure || "The outgoing server would not take the message.",
+            detail: draft.failure ? mailRefusalText(t, draft.failure) : t("selftest.refused"),
             waiting: !draft.permanent
         };
     }
@@ -160,7 +164,7 @@ export async function readSendCheck(userId: string, accountId: string): Promise<
         return {
             stage: sent.state === "bounced" ? "bounced" : "accepted",
             startedAt: sent.sentAt.toISOString(),
-            detail: sent.detail,
+            detail: mailRefusalText(t, sent.detail),
             waiting: sent.state === "delayed"
         };
     }
@@ -181,22 +185,20 @@ export async function readSendCheck(userId: string, accountId: string): Promise<
         return {
             stage: "arrived",
             startedAt: sent.sentAt.toISOString(),
-            detail: `${copyNote(sent.sentCopy)}The message was sent and came back into this mailbox, so sending and receiving both work.`.trim(),
+            detail: t("selftest.arrived", { copy: copyState(sent.sentCopy) }),
             waiting: false
         };
     }
     return {
         stage: "accepted",
         startedAt: sent.sentAt.toISOString(),
-        detail: `${copyNote(sent.sentCopy)}Your outgoing server accepted the message. It has not arrived back here yet, which for a mailbox at another provider can take a few minutes.`.trim(),
+        detail: t("selftest.accepted", { copy: copyState(sent.sentCopy) }),
         waiting: true
     };
 }
 
 /** Said first where there is something to say about it, because a mailbox that
- *  sends but keeps no copy is a separate thing to fix. */
-function copyNote(copy: string): string {
-    if (copy === "failed") return "No copy could be filed in Sent. ";
-    if (copy === "none") return "This mailbox has no Sent folder, so no copy was kept. ";
-    return "";
+ *  sends but keeps no copy is a separate thing to fix: the sentences choose on it. */
+function copyState(copy: string): "failed" | "none" | "kept" {
+    return copy === "failed" || copy === "none" ? copy : "kept";
 }

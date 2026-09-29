@@ -16,6 +16,6 @@ export const dynamic = "force-dynamic";
 export default async function MailSignaturePage() {
     const user = await requirePermission("mail.use");
     const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
-    if (accounts.length === 0) return <NoMailboxes what="A signature" />;
+    if (accounts.length === 0) return <NoMailboxes what="signature" />;
     return <SignatureView accounts={accounts} />;
 }

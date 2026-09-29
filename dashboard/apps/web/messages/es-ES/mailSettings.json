@@ -1,1 +1,33 @@
-{}
+{
+    "noMailboxes": {
+        "title": "Todavía no hay buzones",
+        "body": "{what, select, archive {La importación y exportación se configura} away {La respuesta automática se configura} identities {Una dirección para enviar como se configura} junk {El spam se configura} privacy {La privacidad se configura} rules {Un filtro se configura} other {La firma se configura}} por buzón. <link>Conecta uno</link> y esta pantalla se rellenará."
+    },
+    "layout": {
+        "title": "Ajustes de Correo",
+        "back": "Volver a Recibidos"
+    },
+    "picker": {
+        "label": "Buzón"
+    },
+    "sendCheck": {
+        "notStarted": "No se pudo iniciar esa comprobación.",
+        "again": "Comprobar de nuevo",
+        "start": "Comprobar el envío"
+    },
+    "nav": {
+        "general": "General",
+        "shortcuts": "Atajos",
+        "accounts": "Buzones",
+        "identities": "Enviar como",
+        "labels": "Etiquetas",
+        "rules": "Filtros",
+        "signature": "Firma",
+        "templates": "Plantillas",
+        "privacy": "Privacidad",
+        "junk": "Spam",
+        "blocked": "Bloqueados",
+        "away": "Respuesta automática",
+        "archive": "Importar y exportar"
+    }
+}

@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import { useMail } from "./mail-shell";
 import { useRouter } from "next/navigation";
 import { useAppUrl } from "@/components/app-url";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { MailThreadView } from "@/lib/mailbox/views";
 import {
@@ -112,6 +113,7 @@ export function ThreadContextMenu({
     const { labels } = useMail();
     const appUrl = useAppUrl();
     const toast = useToast();
+    const t = useTranslations("mail");
     const router = useRouter();
     // What every item that acts on mail acts on: the selection when this row is
     // inside one, and this row alone otherwise.
@@ -120,8 +122,7 @@ export function ThreadContextMenu({
     /** An item's own words when it is about one conversation, and its words when
      *  it is about several. Said rather than counted in a corner: "Move to
      *  trash" and "Move 12 to trash" are different decisions. */
-    const said = (one: string, more: (count: number) => string): string =>
-        many > 1 ? more(many) : one;
+    const shown = many > 1 ? many : 1;
     const unread = thread.unreadCount > 0;
     const sender = thread.participants[0]?.address ?? "";
     const keyFor = (command: core.MailKeyCommand): string =>
@@ -134,7 +135,7 @@ export function ThreadContextMenu({
         } catch {
             // A browser that refuses the clipboard is not something the reader
             // can act on, and the menu has already closed over the row.
-            toast.show({ title: "This browser would not let Polaris copy that." });
+            toast.show({ title: t("thread.copyRefused") });
         }
     }
 
@@ -147,7 +148,7 @@ export function ThreadContextMenu({
                     disabled={!thread.leadMessageId}
                 >
                     <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
-                    Reply
+                    {t("thread.reply")}
                     <MenuShortcut keys={keyFor("reply")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -155,7 +156,7 @@ export function ThreadContextMenu({
                     disabled={!thread.leadMessageId}
                 >
                     <CornerUpRight className="size-3.5 shrink-0" aria-hidden />
-                    Reply to everybody
+                    {t("thread.replyAll")}
                     <MenuShortcut keys={keyFor("replyAll")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -163,7 +164,7 @@ export function ThreadContextMenu({
                     disabled={!thread.leadMessageId}
                 >
                     <Forward className="size-3.5 shrink-0" aria-hidden />
-                    Forward
+                    {t("thread.forward")}
                     <MenuShortcut keys={keyFor("forward")} />
                 </ContextMenuItem>
 
@@ -171,7 +172,7 @@ export function ThreadContextMenu({
 
                 <ContextMenuItem
                     onSelect={() =>
-                        onAct(unread ? "read" : "unread", ids, unread ? "Marked as read." : "Marked as unread.")
+                        onAct(unread ? "read" : "unread", ids, unread ? t("thread.announce.read") : t("thread.announce.unread"))
                     }
                 >
                     {unread ? (
@@ -180,8 +181,8 @@ export function ThreadContextMenu({
                         <Mail className="size-3.5 shrink-0" aria-hidden />
                     )}
                     {unread
-                        ? said("Mark as read", (n) => `Mark ${n} as read`)
-                        : said("Mark as unread", (n) => `Mark ${n} as unread`)}
+                        ? t("thread.markRead", { count: shown })
+                        : t("thread.markUnread", { count: shown })}
                     <MenuShortcut keys={keyFor("markUnread")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -189,14 +190,14 @@ export function ThreadContextMenu({
                         onAct(
                             thread.starred ? "unstar" : "star",
                             ids,
-                            thread.starred ? "Unstarred." : "Starred."
+                            thread.starred ? t("thread.announce.unstarred") : t("thread.announce.starred")
                         )
                     }
                 >
                     <Star className="size-3.5 shrink-0" aria-hidden />
                     {thread.starred
-                        ? said("Unstar", (n) => `Unstar ${n}`)
-                        : said("Star", (n) => `Star ${n}`)}
+                        ? t("thread.unstar", { count: shown })
+                        : t("thread.star", { count: shown })}
                     <MenuShortcut keys={keyFor("star")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -204,14 +205,14 @@ export function ThreadContextMenu({
                         onAct(
                             thread.important ? "unimportant" : "important",
                             ids,
-                            thread.important ? "No longer important." : "Marked important."
+                            thread.important ? t("thread.announce.unimportant") : t("thread.announce.important")
                         )
                     }
                 >
                     <Bookmark className="size-3.5 shrink-0" aria-hidden />
                     {thread.important
-                        ? said("Mark not important", (n) => `Mark ${n} not important`)
-                        : said("Mark important", (n) => `Mark ${n} important`)}
+                        ? t("thread.unimportant", { count: shown })
+                        : t("thread.important", { count: shown })}
                     <MenuShortcut keys={keyFor("important")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -219,7 +220,7 @@ export function ThreadContextMenu({
                         onConversation(
                             ids,
                             { pinned: !thread.pinned },
-                            thread.pinned ? "Unpinned." : "Pinned to the top."
+                            thread.pinned ? t("thread.announce.unpinned") : t("thread.announce.pinned")
                         )
                     }
                 >
@@ -229,8 +230,8 @@ export function ThreadContextMenu({
                         <Pin className="size-3.5 shrink-0" aria-hidden />
                     )}
                     {thread.pinned
-                        ? said("Unpin", (n) => `Unpin ${n}`)
-                        : said("Pin to the top", (n) => `Pin ${n} to the top`)}
+                        ? t("thread.unpin", { count: shown })
+                        : t("thread.pin", { count: shown })}
                     <MenuShortcut keys={keyFor("pin")} />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -239,8 +240,8 @@ export function ThreadContextMenu({
                             ids,
                             { muted: !thread.muted },
                             thread.muted
-                                ? "Unmuted."
-                                : "Muted. New messages in it will not be announced."
+                                ? t("thread.announce.unmuted")
+                                : t("thread.announce.muted")
                         )
                     }
                 >
@@ -250,20 +251,20 @@ export function ThreadContextMenu({
                         <BellOff className="size-3.5 shrink-0" aria-hidden />
                     )}
                     {thread.muted
-                        ? said("Unmute", (n) => `Unmute ${n}`)
-                        : said("Mute", (n) => `Mute ${n}`)}
+                        ? t("thread.unmute", { count: shown })
+                        : t("thread.mute", { count: shown })}
                     <MenuShortcut keys={keyFor("mute")} />
                 </ContextMenuItem>
 
                 <ContextMenuSub>
                     <ContextMenuSubTrigger>
                         <Clock className="size-3.5 shrink-0" aria-hidden />
-                        {said("Snooze", (n) => `Snooze ${n}`)}
+                        {t("thread.snooze", { count: shown })}
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {SNOOZES.map((snooze) => (
-                            <ContextMenuItem key={snooze.label} onSelect={() => onSnooze(ids, snooze.when())}>
-                                {snooze.label}
+                            <ContextMenuItem key={snooze.id} onSelect={() => onSnooze(ids, snooze.when())}>
+                                {t(`thread.snoozes.${snooze.id}`)}
                             </ContextMenuItem>
                         ))}
                     </ContextMenuSubContent>
@@ -273,7 +274,7 @@ export function ThreadContextMenu({
                     <ContextMenuSub>
                         <ContextMenuSubTrigger>
                             <Tag className="size-3.5 shrink-0" aria-hidden />
-                            {said("Label", (n) => `Label ${n}`)}
+                            {t("thread.label", { count: shown })}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {labels.map((label) => (
@@ -293,9 +294,9 @@ export function ThreadContextMenu({
                 <ContextMenuSeparator />
 
                 {canArchive ? (
-                    <ContextMenuItem onSelect={() => onAct("archive", ids, "Archived.")}>
+                    <ContextMenuItem onSelect={() => onAct("archive", ids, t("thread.announce.archived"))}>
                         <Archive className="size-3.5 shrink-0" aria-hidden />
-                        {said("Archive", (n) => `Archive ${n}`)}
+                        {t("thread.archive", { count: shown })}
                         <MenuShortcut keys={keyFor("archive")} />
                     </ContextMenuItem>
                 ) : null}
@@ -303,17 +304,17 @@ export function ThreadContextMenu({
                     they are. Spam is destructive twice over: it moves the
                     message AND teaches a provider about the sender. */}
                 {restorable ? (
-                    <ContextMenuItem onSelect={() => onAct("restore", ids, "Put back.")}>
+                    <ContextMenuItem onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}>
                         <Undo2 className="size-3.5 shrink-0" aria-hidden />
-                        {said("Put back where it was", (n) => `Put ${n} back`)}
+                        {t("thread.restore", { count: shown })}
                     </ContextMenuItem>
                 ) : (
                     <ContextMenuItem
                         variant="danger"
-                        onSelect={() => onAct("junk", ids, "Moved to spam.")}
+                        onSelect={() => onAct("junk", ids, t("thread.announce.junk"))}
                     >
                         <Bug className="size-3.5 shrink-0" aria-hidden />
-                        {said("Report as spam", (n) => `Report ${n} as spam`)}
+                        {t("thread.junk", { count: shown })}
                         <MenuShortcut keys={keyFor("junk")} />
                     </ContextMenuItem>
                 )}
@@ -323,14 +324,14 @@ export function ThreadContextMenu({
                         onAct(
                             permanentDelete ? "delete" : "trash",
                             ids,
-                            permanentDelete ? "Deleted." : "Moved to the trash."
+                            permanentDelete ? t("thread.announce.deleted") : t("thread.announce.trashed")
                         )
                     }
                 >
                     <Trash2 className="size-3.5 shrink-0" aria-hidden />
                     {permanentDelete
-                        ? said("Delete for ever", (n) => `Delete ${n} for ever`)
-                        : said("Move to trash", (n) => `Move ${n} to the trash`)}
+                        ? t("thread.delete", { count: shown })
+                        : t("thread.trash", { count: shown })}
                     <MenuShortcut keys="Delete" />
                 </ContextMenuItem>
 
@@ -341,7 +342,7 @@ export function ThreadContextMenu({
                     disabled={!sender}
                 >
                     <Search className="size-3.5 shrink-0" aria-hidden />
-                    Find everything from {sender || "this sender"}
+                    {sender ? t("thread.findFrom", { sender }) : t("thread.findFromThis")}
                 </ContextMenuItem>
 
                 <ContextMenuItem
@@ -350,26 +351,26 @@ export function ThreadContextMenu({
                     disabled={!sender}
                 >
                     <ShieldOff className="size-3.5 shrink-0" aria-hidden />
-                    Block {sender || "this sender"}
+                    {sender ? t("thread.block", { sender }) : t("thread.blockThis")}
                 </ContextMenuItem>
 
                 <ContextMenuSeparator />
 
                 <ContextMenuItem
-                    onSelect={() => void copy(sender, "Address copied.")}
+                    onSelect={() => void copy(sender, t("thread.announce.addressCopied"))}
                     disabled={!sender}
                 >
                     <Copy className="size-3.5 shrink-0" aria-hidden />
-                    Copy the sender&apos;s address
+                    {t("thread.copySender")}
                 </ContextMenuItem>
                 <ContextMenuItem
                     // Built on the address this Polaris is configured with rather
                     // than on the tab's hostname, so a link handed to somebody
                     // else opens for them too.
-                    onSelect={() => void copy(`${appUrl}/mail/t/${thread.id}`, "Link copied.")}
+                    onSelect={() => void copy(`${appUrl}/mail/t/${thread.id}`, t("thread.announce.linkCopied"))}
                 >
                     <Link2 className="size-3.5 shrink-0" aria-hidden />
-                    Copy link to this conversation
+                    {t("thread.copyLink")}
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
@@ -385,9 +386,9 @@ function SEARCH_FOR(address: string): string {
 
 /** The snoozes worth having on a menu. Anything finer belongs in a picker, and
  *  nobody has ever wanted one on a right-click. */
-const SNOOZES: readonly { label: string; when: () => Date }[] = [
+const SNOOZES: readonly { id: "laterToday" | "tomorrow" | "weekend" | "nextWeek"; when: () => Date }[] = [
     {
-        label: "Later today",
+        id: "laterToday",
         when: () => {
             const when = new Date();
             when.setHours(when.getHours() + 3, 0, 0, 0);
@@ -395,7 +396,7 @@ const SNOOZES: readonly { label: string; when: () => Date }[] = [
         }
     },
     {
-        label: "Tomorrow morning",
+        id: "tomorrow",
         when: () => {
             const when = new Date();
             when.setDate(when.getDate() + 1);
@@ -404,7 +405,7 @@ const SNOOZES: readonly { label: string; when: () => Date }[] = [
         }
     },
     {
-        label: "This weekend",
+        id: "weekend",
         when: () => {
             const when = new Date();
             // The coming Saturday, or the next one if today already is.
@@ -414,7 +415,7 @@ const SNOOZES: readonly { label: string; when: () => Date }[] = [
         }
     },
     {
-        label: "Next week",
+        id: "nextWeek",
         when: () => {
             const when = new Date();
             when.setDate(when.getDate() + ((8 - when.getDay()) % 7 || 7));

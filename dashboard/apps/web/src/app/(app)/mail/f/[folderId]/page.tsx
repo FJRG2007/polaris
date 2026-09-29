@@ -9,6 +9,7 @@
 
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { ownedFolder, MailAccessError } from "@/lib/mailbox/access";
 import { MailListPage, type MailSearchParams } from "@/app/(app)/mail/list-page";
 
@@ -28,15 +29,18 @@ export default async function MailFolderPage({
         throw caught;
     });
     if (!folder) notFound();
+    const t = await getTranslations("mail");
 
     return (
         <MailListPage
             route={{
                 narrow: { folderId, accountId: folder.accountId },
-                context: {
+                words: {
                     title: folder.name,
-                    emptyTitle: `${folder.name} is empty`,
-                    emptyBody: "Nothing in this folder has been synced yet, or there is nothing in it.",
+                    emptyTitle: t("routes.folderEmptyTitle", { name: folder.name }),
+                    emptyBody: t("routes.folderEmptyBody")
+                },
+                context: {
                     canArchive: folder.role !== "archive",
                     permanentDelete: folder.role === "trash" || folder.role === "junk",
                     restorable: folder.role === "trash",

@@ -19,7 +19,7 @@ export default async function MailRulesPage() {
     const user = await requirePermission("mail.use");
     const shelfOrgId = await mailShelfFor(user.id);
     const accounts = await listAccountViews(user.id, shelfOrgId);
-    if (accounts.length === 0) return <NoMailboxes what="A filter" />;
+    if (accounts.length === 0) return <NoMailboxes what="rules" />;
 
     const [folders, labels] = await Promise.all([
         listFolders(user.id, shelfOrgId),

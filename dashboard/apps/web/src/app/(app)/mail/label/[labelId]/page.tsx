@@ -9,6 +9,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@polaris/db";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { MailListPage, type MailSearchParams } from "@/app/(app)/mail/list-page";
 
 export const dynamic = "force-dynamic";
@@ -27,15 +28,18 @@ export default async function MailLabelPage({
         select: { name: true }
     });
     if (!label) notFound();
+    const t = await getTranslations("mail");
 
     return (
         <MailListPage
             route={{
                 narrow: { labelId },
-                context: {
+                words: {
                     title: label.name,
-                    emptyTitle: `Nothing labelled ${label.name}`,
-                    emptyBody: "Put this label on a conversation and it will be collected here.",
+                    emptyTitle: t("routes.labelEmptyTitle", { name: label.name }),
+                    emptyBody: t("routes.labelEmptyBody")
+                },
+                context: {
                     canArchive: true,
                     permanentDelete: false,
                     restorable: false,

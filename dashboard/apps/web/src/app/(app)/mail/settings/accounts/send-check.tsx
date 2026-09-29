@@ -16,6 +16,7 @@
 
 import { z } from "zod";
 import { Button, cn, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Loader2, MailCheck, Send, TriangleAlert } from "lucide-react";
 
@@ -40,6 +41,7 @@ const POLL_FOR_MS = 5 * 60 * 1000;
 
 export function SendCheck({ accountId }: { accountId: string }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [check, setCheck] = useState<Check | null>(null);
     const [busy, setBusy] = useState(false);
     /** When this screen started waiting, so the polling stops on its own. */
@@ -90,7 +92,7 @@ export function SendCheck({ accountId }: { accountId: string }) {
             }
             const said = (body as { error?: unknown } | null)?.error;
             toast.show({
-                title: typeof said === "string" ? said : "That check could not be started."
+                title: typeof said === "string" ? said : t("sendCheck.notStarted")
             });
         })();
     };
@@ -117,7 +119,7 @@ export function SendCheck({ accountId }: { accountId: string }) {
                 disabled={busy || check?.stage === "sending"}
                 onClick={start}
             >
-                {check && check.stage !== "none" ? "Check again" : "Check sending"}
+                {check && check.stage !== "none" ? t("sendCheck.again") : t("sendCheck.start")}
             </Button>
         </div>
     );

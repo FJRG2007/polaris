@@ -26,6 +26,8 @@
 import * as core from "@polaris/core";
 import { MailOnboarding } from "./onboarding";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { ownedAccountIds } from "@/lib/mailbox/access";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
@@ -34,10 +36,20 @@ import type { MailPageNarrow } from "@/lib/mailbox/page-params";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { EMPTY_QUERY, type MailListQuery } from "@/lib/mailbox/views";
 
-/** What a route knows about itself, beyond the query it narrows to. */
+/** The merged views, which name their words in the `mail` catalog. */
+export type MailViewName = "inbox" | "starred" | "important" | "snoozed" | "sent" | "archive" | "junk" | "trash";
+
+/** What a screen says about itself: its title and what it says when empty. */
+export type ListWords = Pick<MailViewContext, "title" | "emptyTitle" | "emptyBody">;
+
+/** What a route knows about itself, beyond the query it narrows to. A merged
+ *  view's words are drawn from `mail.views.<view>` in the reader's language; a
+ *  mailbox, a folder or a label says its own, already in it. */
 export interface ListRoute {
+    readonly view?: MailViewName;
+    readonly words?: ListWords;
     readonly narrow: Partial<MailListQuery>;
-    readonly context: MailViewContext;
+    readonly context: Omit<MailViewContext, "title" | "emptyTitle" | "emptyBody">;
     /** Whether this list is worth sorting into tabs. An inbox is; Sent is not. */
     readonly categorised?: boolean;
 }
@@ -68,6 +80,14 @@ function fixedFilter(narrow: Partial<MailListQuery>): core.MailFilter | "" {
     return "";
 }
 
+function viewWords(t: NamespaceTranslator<"mail">, view: MailViewName): ListWords {
+    return {
+        title: t(`views.${view}.title`),
+        emptyTitle: t(`views.${view}.emptyTitle`),
+        emptyBody: t(`views.${view}.emptyBody`)
+    };
+}
+
 export async function MailListPage({
     route,
     searchParams
@@ -76,6 +96,7 @@ export async function MailListPage({
     searchParams: MailSearchParams;
 }) {
     const user = await requirePermission("mail.use");
+    const t = await getTranslations("mail");
     // Together rather than one after the other. Both are single indexed reads,
     // and both stand between a press on the rail and this screen rendering at
     // all - which is the whole budget this route has left now that the
@@ -152,12 +173,11 @@ export async function MailListPage({
                 searched
                     ? {
                           ...route.context,
-                          title: `Search: ${query.query}`,
-                          emptyTitle: "Nothing matched",
-                          emptyBody:
-                              "Polaris searches the mail it has already fetched, which is the newest few hundred messages of each folder. Anything older is still on the mail server."
+                          title: t("search.title", { query: query.query }),
+                          emptyTitle: t("search.emptyTitle"),
+                          emptyBody: t("search.emptyBody")
                       }
-                    : route.context
+                    : { ...route.context, ...(route.words ?? viewWords(t, route.view ?? "inbox")) }
             }
         />
     );

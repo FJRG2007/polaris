@@ -1,1 +1,33 @@
-{}
+{
+    "noMailboxes": {
+        "title": "No mailboxes yet",
+        "body": "{what, select, archive {Import and export} away {An away message} identities {A send-as address} junk {Junk} privacy {Privacy} rules {A filter} other {A signature}} is set per mailbox. <link>Connect one</link> and this screen fills in."
+    },
+    "layout": {
+        "title": "Mail settings",
+        "back": "Back to the inbox"
+    },
+    "picker": {
+        "label": "Mailbox"
+    },
+    "sendCheck": {
+        "notStarted": "That check could not be started.",
+        "again": "Check again",
+        "start": "Check sending"
+    },
+    "nav": {
+        "general": "General",
+        "shortcuts": "Shortcuts",
+        "accounts": "Mailboxes",
+        "identities": "Send-as",
+        "labels": "Labels",
+        "rules": "Filters",
+        "signature": "Signature",
+        "templates": "Templates",
+        "privacy": "Privacy",
+        "junk": "Junk",
+        "blocked": "Blocked",
+        "away": "Away",
+        "archive": "Import and export"
+    }
+}

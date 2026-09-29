@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function MailIdentitiesPage() {
     const user = await requirePermission("mail.use");
     const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
-    if (accounts.length === 0) return <NoMailboxes what="A send-as address" />;
+    if (accounts.length === 0) return <NoMailboxes what="identities" />;
 
     const identities: Record<string, Awaited<ReturnType<typeof listIdentities>>> = {};
     for (const account of accounts)

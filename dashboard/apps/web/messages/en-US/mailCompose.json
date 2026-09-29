@@ -1,1 +1,6 @@
-{}
+{
+    "recipients": {
+        "remove": "Remove {address}",
+        "invalid": "That is not an email address."
+    }
+}

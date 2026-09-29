@@ -31,6 +31,9 @@ import * as reading from "@/lib/mailbox/reading";
 import { syncAccount } from "@/lib/mailbox/sync";
 import * as folders from "@/lib/mailbox/folders";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import * as blocking from "@/lib/mailbox/blocking";
 import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
@@ -50,6 +53,8 @@ import { MailAccessError, ownedAccount, ownedAccountIds } from "@/lib/mailbox/ac
 
 const MAIL_PATH = "/mail";
 
+type MailErrorKey = Extract<NamespaceKey<"mail">, `errors.${string}`>;
+
 async function actorId(): Promise<string> {
     return (await requirePermission("mail.use")).id;
 }
@@ -57,29 +62,43 @@ async function actorId(): Promise<string> {
 /** What a refusal looks like on the way out. Anything that is not one of the
  *  three the caller could act on is a fault rather than an answer, and is logged
  *  rather than described. */
-function failure(
+async function failure(
     caught: unknown,
-    fallback: string
-): { error: string; field?: string; needsFolderRole?: { role: string; accountId: string } } {
+    fallback: MailErrorKey
+): Promise<{ error: string; field?: string; needsFolderRole?: { role: string; accountId: string } }> {
+    const t = await getTranslations("mail");
+    const said = (error: Error) => mailRefusalText(t, error.message);
     // The one refusal a screen answers with a question rather than a sentence:
     // this mailbox has no folder for what was asked, and its owner can say which
     // of theirs it is. Carried out structured so the dialog knows what to ask.
     if (caught instanceof MailFolderRoleMissing) {
         return {
-            error: caught.message,
+            error: said(caught),
             needsFolderRole: { role: caught.role, accountId: caught.accountId }
         };
     }
-    if (caught instanceof MailAccessError) return { error: caught.message };
+    if (caught instanceof MailAccessError) return { error: said(caught) };
     if (caught instanceof accounts.MailSetupError)
-        return { error: caught.message, field: caught.field };
-    if (caught instanceof MailAuthError) return { error: caught.message };
-    if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
-    if (caught instanceof folders.MailFolderError) return { error: caught.message };
-    if (caught instanceof templates.MailTemplateNameTaken) return { error: caught.message, field: "name" };
-    if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
+        return { error: said(caught), field: caught.field };
+    if (caught instanceof MailAuthError) return { error: said(caught) };
+    if (caught instanceof labels.MailLabelNameTaken) return { error: said(caught) };
+    if (caught instanceof folders.MailFolderError) return { error: said(caught) };
+    if (caught instanceof templates.MailTemplateNameTaken) return { error: said(caught), field: "name" };
+    if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: said(caught) };
     console.error("polaris: a mail action failed:", caught);
-    return { error: fallback };
+    return { error: t(fallback) };
+}
+
+/** A reply in the reader's language. */
+async function errorText(key: MailErrorKey): Promise<string> {
+    return (await getTranslations("mail"))(key);
+}
+
+/** What a schema refused, in the reader's language, or `fallback` when it said
+ *  nothing. */
+async function inputError(message: string | undefined, fallback: MailErrorKey): Promise<string> {
+    const t = await getTranslations("mail");
+    return message ? mailRefusalText(t, message) : t(fallback);
 }
 
 /**
@@ -111,7 +130,7 @@ function refresh(): void {
 export async function discoverAction(formData: FormData) {
     await actorId();
     const parsed = core.mailDiscoverySchema.safeParse({ address: formData.get("address") });
-    if (!parsed.success) return { error: "That is not an email address." };
+    if (!parsed.success) return { error: await errorText("errors.notEmail") };
     try {
         return { discovery: await discoverMailbox(parsed.data.address) };
     } catch {
@@ -127,7 +146,7 @@ export async function addAccountAction(input: unknown) {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the details.",
+            error: await inputError(issue?.message, "errors.checkDetails"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -139,7 +158,7 @@ export async function addAccountAction(input: unknown) {
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That mailbox could not be added.");
+        return failure(caught, "errors.mailboxAdd");
     }
 }
 
@@ -151,11 +170,11 @@ export async function addAccountAction(input: unknown) {
 export async function openImportAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailImportSchema.safeParse(input);
-    if (!parsed.success) return { error: "That file could not be read." };
+    if (!parsed.success) return { error: await errorText("errors.fileRead") };
     try {
         return await mailImport.openImport(userId, parsed.data);
     } catch (caught) {
-        return failure(caught, "That file could not be read.");
+        return failure(caught, "errors.fileRead");
     }
 }
 
@@ -174,7 +193,7 @@ export async function importBatchAction(input: unknown, from: unknown) {
     // that started at `NaN` appended nothing and answered that the import had
     // finished, which is the one failure an import must not have.
     const at = core.mailImportFromSchema.safeParse(from);
-    if (!parsed.success || !at.success) return { error: "That batch could not be imported." };
+    if (!parsed.success || !at.success) return { error: await errorText("errors.batchImport") };
     try {
         const answer = await mailImport.importBatch(userId, parsed.data, at.data);
         // The folder is only re-read when the last batch lands: a sync between
@@ -185,7 +204,7 @@ export async function importBatchAction(input: unknown, from: unknown) {
         }
         return answer;
     } catch (caught) {
-        return failure(caught, "That batch could not be imported.");
+        return failure(caught, "errors.batchImport");
     }
 }
 
@@ -194,11 +213,11 @@ export async function importBatchAction(input: unknown, from: unknown) {
 export async function exportSizeAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailExportScopeSchema.safeParse(input);
-    if (!parsed.success) return { error: "That mailbox could not be counted." };
+    if (!parsed.success) return { error: await errorText("errors.mailboxCount") };
     try {
         return { count: await mailExport.exportSize(userId, parsed.data) };
     } catch (caught) {
-        return failure(caught, "That mailbox could not be counted.");
+        return failure(caught, "errors.mailboxCount");
     }
 }
 
@@ -211,7 +230,7 @@ export async function setFolderColorAction(folderId: string, color: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That colour could not be saved.");
+        return failure(caught, "errors.colourSave");
     }
 }
 
@@ -225,14 +244,14 @@ export async function renameFolderAction(folderId: unknown, name: unknown) {
     const userId = await actorId();
     const id = z.string().uuid().safeParse(folderId);
     const wanted = z.string().min(1).max(100).safeParse(name);
-    if (!id.success) return { error: "That folder is not here." };
-    if (!wanted.success) return { error: "A folder needs a name." };
+    if (!id.success) return { error: await errorText("errors.folderNotHere") };
+    if (!wanted.success) return { error: await errorText("errors.folderNeedsName") };
     try {
         await folders.renameFolder(userId, id.data, wanted.data);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That folder could not be renamed.");
+        return failure(caught, "errors.folderRename");
     }
 }
 
@@ -245,13 +264,13 @@ export async function renameFolderAction(folderId: unknown, name: unknown) {
 export async function deleteFolderAction(folderId: unknown) {
     const userId = await actorId();
     const id = z.string().uuid().safeParse(folderId);
-    if (!id.success) return { error: "That folder is not here." };
+    if (!id.success) return { error: await errorText("errors.folderNotHere") };
     try {
         await folders.deleteFolder(userId, id.data);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That folder could not be deleted.");
+        return failure(caught, "errors.folderDelete");
     }
 }
 
@@ -263,7 +282,7 @@ export async function setSpamFilterAction(accountId: string, on: boolean) {
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That could not be changed.");
+        return failure(caught, "errors.changeFailed");
     }
 }
 
@@ -276,7 +295,7 @@ export async function forgetSpamAction(accountId: string) {
         refresh();
         return { learning: await spam.spamLearning(accountId) };
     } catch (caught) {
-        return failure(caught, "That could not be forgotten.");
+        return failure(caught, "errors.forgetFailed");
     }
 }
 
@@ -285,13 +304,13 @@ export async function editAccountAction(accountId: string, input: unknown) {
     // A patch: only what the screen sent is written, so one switch never puts
     // every other setting back to its default.
     const parsed = core.mailAccountPatchSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details." };
+    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkDetails") };
     try {
         const account = await accounts.editAccount(userId, accountId, parsed.data);
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -306,7 +325,7 @@ export async function updateAccountAction(accountId: string, input: unknown) {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the details.",
+            error: await inputError(issue?.message, "errors.checkDetails"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -315,20 +334,20 @@ export async function updateAccountAction(accountId: string, input: unknown) {
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That mailbox could not be saved.");
+        return failure(caught, "errors.mailboxSave");
     }
 }
 
 export async function setPrivacyAction(accountId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailPrivacySchema.safeParse(input);
-    if (!parsed.success) return { error: "Check the details." };
+    if (!parsed.success) return { error: await errorText("errors.checkDetails") };
     try {
         const account = await accounts.setAccountPrivacy(userId, accountId, parsed.data);
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -338,7 +357,7 @@ export async function setVacationAction(accountId: string, input: unknown) {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the details.",
+            error: await inputError(issue?.message, "errors.checkDetails"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -347,7 +366,7 @@ export async function setVacationAction(accountId: string, input: unknown) {
         refresh();
         return { account };
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -358,7 +377,7 @@ export async function removeAccountAction(accountId: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That mailbox could not be removed.");
+        return failure(caught, "errors.mailboxRemove");
     }
 }
 
@@ -373,7 +392,7 @@ export async function syncAccountAction(accountId: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That mailbox could not be checked.");
+        return failure(caught, "errors.mailboxCheck");
     }
 }
 
@@ -395,7 +414,7 @@ export async function syncAllAction() {
 export async function actOnAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailActionSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was selected." };
+    if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
         const done = await messages.actOnMessages(
             userId,
@@ -405,7 +424,7 @@ export async function actOnAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "The mail server did not accept that.");
+        return failure(caught, "errors.serverRefused");
     }
 }
 
@@ -414,7 +433,7 @@ export async function actOnAction(input: unknown) {
 export async function setConversationStateAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailConversationStateSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was selected." };
+    if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
         const done = await messages.setConversationState(userId, parsed.data.messageIds, {
             pinned: parsed.data.pinned,
@@ -422,14 +441,14 @@ export async function setConversationStateAction(input: unknown) {
         });
         return { done };
     } catch (caught) {
-        return failure(caught, "That could not be changed.");
+        return failure(caught, "errors.changeFailed");
     }
 }
 
 export async function moveAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailMoveSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was selected." };
+    if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
         const done = await messages.moveMessages(
             userId,
@@ -438,7 +457,7 @@ export async function moveAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "The mail server did not accept that.");
+        return failure(caught, "errors.serverRefused");
     }
 }
 
@@ -453,7 +472,7 @@ export async function moveAction(input: unknown) {
 export async function emptyFolderAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailEmptyFolderSchema.safeParse(input);
-    if (!parsed.success) return { error: "Say which folder to empty." };
+    if (!parsed.success) return { error: await errorText("errors.sayWhichFolder") };
     try {
         const done = await emptyEveryFolderOfRole(
             userId,
@@ -462,14 +481,14 @@ export async function emptyFolderAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "The mail server did not accept that.");
+        return failure(caught, "errors.serverRefused");
     }
 }
 
 export async function snoozeAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailSnoozeSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was selected." };
+    if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
         const done = await messages.snoozeMessages(
             userId,
@@ -478,7 +497,7 @@ export async function snoozeAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "That could not be put off.");
+        return failure(caught, "errors.snoozeFailed");
     }
 }
 
@@ -486,14 +505,14 @@ export async function snoozeAction(input: unknown) {
 export async function trustSenderAction(accountId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailTrustSenderSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not an email address." };
+    if (!parsed.success) return { error: await errorText("errors.notEmail") };
     try {
         await ownedAccount(userId, accountId);
         await reading.trustSender(accountId, parsed.data.address, parsed.data.trusted);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -506,13 +525,13 @@ export async function trustSenderAction(accountId: string, input: unknown) {
 export async function setFolderRoleAction(folderId: string, role: string) {
     const userId = await actorId();
     const wanted = core.MAIL_FOLDER_ROLES.find((one) => one === role);
-    if (!wanted) return { error: "That is not a folder role." };
+    if (!wanted) return { error: await errorText("errors.notFolderRole") };
     try {
         await messages.setFolderRole(userId, folderId, wanted);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -521,13 +540,13 @@ export async function setFolderRoleAction(folderId: string, role: string) {
 export async function createFolderForRoleAction(accountId: string, role: string) {
     const userId = await actorId();
     const wanted = core.MAIL_FOLDER_ROLES.find((one) => one === role);
-    if (!wanted) return { error: "That is not a folder role." };
+    if (!wanted) return { error: await errorText("errors.notFolderRole") };
     try {
         const id = await messages.createFolderForRole(userId, accountId, wanted);
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That folder could not be made on the mail server.");
+        return failure(caught, "errors.folderCreate");
     }
 }
 
@@ -571,26 +590,26 @@ export async function suggestContactsAction(query: string) {
 export async function createLabelAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailLabelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name." };
+    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
     try {
         const id = await labels.createLabel(userId, parsed.data.name, parsed.data.color);
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That label could not be made.");
+        return failure(caught, "errors.labelCreate");
     }
 }
 
 export async function renameLabelAction(labelId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailLabelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name." };
+    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
     try {
         await labels.renameLabel(userId, labelId, parsed.data.name, parsed.data.color);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That label could not be changed.");
+        return failure(caught, "errors.labelChange");
     }
 }
 
@@ -604,7 +623,7 @@ export async function deleteLabelAction(labelId: string) {
 export async function applyLabelAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailLabelApplySchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was selected." };
+    if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
         const done = await labels.applyLabel(
             userId,
@@ -614,7 +633,7 @@ export async function applyLabelAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "That label could not be applied.");
+        return failure(caught, "errors.labelApply");
     }
 }
 
@@ -631,7 +650,7 @@ export async function setMailPreferencesAction(input: unknown) {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the details.",
+            error: await inputError(issue?.message, "errors.checkDetails"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -646,7 +665,7 @@ export async function setMailPreferencesAction(input: unknown) {
         refresh();
         return { saved: true };
     } catch (caught) {
-        return failure(caught, "That could not be saved.");
+        return failure(caught, "errors.saveFailed");
     }
 }
 
@@ -663,7 +682,7 @@ export async function setMailKeysAction(input: unknown) {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Those shortcuts could not be saved.",
+            error: await inputError(issue?.message, "errors.shortcutsSave"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -673,7 +692,7 @@ export async function setMailKeysAction(input: unknown) {
         refresh();
         return { keys: parsed.data };
     } catch (caught) {
-        return failure(caught, "Those shortcuts could not be saved.");
+        return failure(caught, "errors.shortcutsSave");
     }
 }
 
@@ -691,7 +710,7 @@ export async function saveTemplateAction(templateId: string | null, input: unkno
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the template.",
+            error: await inputError(issue?.message, "errors.checkTemplate"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -700,7 +719,7 @@ export async function saveTemplateAction(templateId: string | null, input: unkno
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That template could not be saved.");
+        return failure(caught, "errors.templateSave");
     }
 }
 
@@ -711,7 +730,7 @@ export async function deleteTemplateAction(templateId: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That template could not be removed.");
+        return failure(caught, "errors.templateRemove");
     }
 }
 
@@ -725,7 +744,7 @@ export async function saveIdentityAction(
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return {
-            error: issue?.message ?? "Check the details.",
+            error: await inputError(issue?.message, "errors.checkDetails"),
             field: String(issue?.path[0] ?? "")
         };
     }
@@ -734,7 +753,7 @@ export async function saveIdentityAction(
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That address could not be saved.");
+        return failure(caught, "errors.addressSave");
     }
 }
 
@@ -745,7 +764,7 @@ export async function deleteIdentityAction(accountId: string, identityId: string
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That address could not be removed.");
+        return failure(caught, "errors.addressRemove");
     }
 }
 
@@ -754,14 +773,14 @@ export async function saveRuleAction(accountId: string, ruleId: string | null, i
     const parsed = core.mailRuleSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the rule.", field: String(issue?.path[0] ?? "") };
+        return { error: await inputError(issue?.message, "errors.checkRule"), field: String(issue?.path[0] ?? "") };
     }
     try {
         const id = await rules.saveRule(userId, accountId, ruleId, parsed.data);
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That rule could not be saved.");
+        return failure(caught, "errors.ruleSave");
     }
 }
 
@@ -772,7 +791,7 @@ export async function deleteRuleAction(accountId: string, ruleId: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That rule could not be removed.");
+        return failure(caught, "errors.ruleRemove");
     }
 }
 
@@ -783,7 +802,7 @@ export async function reorderRulesAction(accountId: string, orderedIds: string[]
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That order could not be saved.");
+        return failure(caught, "errors.orderSave");
     }
 }
 
@@ -796,7 +815,7 @@ export async function reorderRulesAction(accountId: string, orderedIds: string[]
 export async function attachFromDriveAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailAttachFromDriveSchema.safeParse(input);
-    if (!parsed.success) return { error: "That file could not be attached." };
+    if (!parsed.success) return { error: await errorText("errors.fileAttach") };
     try {
         const upload = await attachFrom.attachFromDrive(
             userId,
@@ -806,7 +825,7 @@ export async function attachFromDriveAction(input: unknown) {
         return { upload };
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
-        return failure(caught, "That file could not be attached.");
+        return failure(caught, "errors.fileAttach");
     }
 }
 
@@ -815,13 +834,13 @@ export async function attachFromDriveAction(input: unknown) {
 export async function attachFromAddressAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailAttachFromAddressSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not an address Polaris can fetch." };
+    if (!parsed.success) return { error: await errorText("errors.notFetchable") };
     try {
         const upload = await attachFrom.attachFromAddress(userId, parsed.data.url);
         return { upload };
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
-        return failure(caught, "That file could not be attached.");
+        return failure(caught, "errors.fileAttach");
     }
 }
 
@@ -830,11 +849,11 @@ export async function attachFromAddressAction(input: unknown) {
 export async function attachFromMessageAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailAttachFromMessageSchema.safeParse(input);
-    if (!parsed.success) return { error: "Those files could not be carried over." };
+    if (!parsed.success) return { error: await errorText("errors.filesCarry") };
     try {
         return await attachFrom.attachFromMessage(userId, parsed.data.messageId);
     } catch (caught) {
-        return failure(caught, "Those files could not be carried over.");
+        return failure(caught, "errors.filesCarry");
     }
 }
 
@@ -849,14 +868,14 @@ export async function attachFromMessageAction(input: unknown) {
 export async function blockSenderAction(accountId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailBlockSenderSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not an email address." };
+    if (!parsed.success) return { error: await errorText("errors.notEmail") };
     try {
         await ownedAccount(userId, accountId);
         await blocking.blockSender(userId, accountId, parsed.data.address, parsed.data.as);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That sender could not be blocked.");
+        return failure(caught, "errors.senderBlock");
     }
 }
 
@@ -870,7 +889,7 @@ export async function unblockSenderAction(accountId: string, ruleId: string) {
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That block could not be removed.");
+        return failure(caught, "errors.blockRemove");
     }
 }
 
@@ -893,7 +912,7 @@ export async function unsubscribeAction(subscriptionId: string) {
         refresh();
         return { outcome };
     } catch (caught) {
-        return failure(caught, "That unsubscribe could not be sent.");
+        return failure(caught, "errors.unsubscribeSend");
     }
 }
 
@@ -907,7 +926,7 @@ export async function unsubscribeFromMessageAction(messageId: string) {
         refresh();
         return { outcome };
     } catch (caught) {
-        return failure(caught, "That unsubscribe could not be sent.");
+        return failure(caught, "errors.unsubscribeSend");
     }
 }
 
@@ -919,7 +938,7 @@ export async function discardDraftAction(draftId: string) {
         await compose.discardDraft(userId, draftId);
         return {};
     } catch (caught) {
-        return failure(caught, "That draft could not be removed.");
+        return failure(caught, "errors.draftRemove");
     }
 }
 
@@ -936,7 +955,7 @@ export async function retrySendAction(draftId: string) {
     try {
         return { queued: await compose.retrySend(userId, draftId) };
     } catch (caught) {
-        return failure(caught, "That message could not be sent again.");
+        return failure(caught, "errors.resendFailed");
     }
 }
 
@@ -944,7 +963,7 @@ export async function retrySendAction(draftId: string) {
 export async function moveToFolderAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailMoveSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing was moved." };
+    if (!parsed.success) return { error: await errorText("errors.nothingMoved") };
     try {
         const done = await messages.moveMessages(
             userId,
@@ -953,6 +972,6 @@ export async function moveToFolderAction(input: unknown) {
         );
         return { done };
     } catch (caught) {
-        return failure(caught, "Those could not be moved.");
+        return failure(caught, "errors.moveFailed");
     }
 }
