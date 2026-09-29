@@ -12,6 +12,7 @@
  */
 
 import { cookies } from "next/headers";
+import { getTranslations } from "@/lib/i18n/request";
 import { loadEnv } from "@polaris/config";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
@@ -49,7 +50,7 @@ export async function createSnippetAction(
 ): Promise<{ id?: string; url?: string | null; error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = createSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid snippet" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSnippet") };
 
     const { id, token } = await snippetService.createSnippet(user.id, parsed.data);
     await recordAudit({
@@ -82,9 +83,9 @@ export async function updateSnippetAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = updateSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid snippet" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSnippet") };
     if (!(await snippetService.updateSnippet(user.id, snippetId, parsed.data))) {
-        return { error: "This snippet is not yours." };
+        return { error: (await getTranslations("drive"))("errors.snippetNotYours") };
     }
     await recordAudit({
         actorId: user.id,
@@ -103,10 +104,10 @@ export async function shareSnippetAction(
 ): Promise<{ url?: string | null; error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = shareSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid sharing" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSharing") };
 
     const result = await snippetService.shareSnippet(user.id, snippetId, parsed.data);
-    if (!result.ok) return { error: "This snippet is not yours." };
+    if (!result.ok) return { error: (await getTranslations("drive"))("errors.snippetNotYours") };
     await recordAudit({
         actorId: user.id,
         action: "snippet.share",
@@ -125,7 +126,7 @@ export async function revealSnippetLinkAction(
 ): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("snippets.write");
     const url = await snippetService.revealSnippetLink(user.id, snippetId);
-    if (!url) return { error: "This snippet has no link. Share it to create one." };
+    if (!url) return { error: (await getTranslations("drive"))("errors.snippetNoLink") };
     return { url };
 }
 
@@ -146,7 +147,7 @@ export async function revokeSnippetShareAction(snippetId: string): Promise<void>
 export async function deleteSnippetAction(snippetId: string): Promise<{ error?: string }> {
     const user = await requirePermission("snippets.write");
     if (!(await snippetService.deleteSnippet(user.id, snippetId)))
-        return { error: "This snippet is not yours." };
+        return { error: (await getTranslations("drive"))("errors.snippetNotYours") };
     await recordAudit({
         actorId: user.id,
         action: "snippet.delete",
@@ -194,7 +195,7 @@ export async function openBurnSnippetAction(
 ): Promise<{ files?: PublicSnippetFile[]; error?: string }> {
     const gate = await gateSnippetRequest(token, "open");
     if (!gate.ok) return { error: snippetDenialMessage(gate.reason) };
-    if (!gate.snippet.burnAfterRead) return { error: "This link is not a one-time link." };
+    if (!gate.snippet.burnAfterRead) return { error: (await getTranslations("drive"))("errors.notOneTime") };
 
     if (!(await snippetService.registerSnippetView(gate.snippet.id))) {
         return { error: snippetDenialMessage("exhausted") };
@@ -229,16 +230,16 @@ export async function unlockSnippetAction(
     password: string
 ): Promise<{ error?: string }> {
     const snippet = await snippetService.resolveSnippetByToken(token);
-    if (!snippet) return { error: "This link is not available." };
+    if (!snippet) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
     if (!snippetService.snippetUsability(snippet).ok)
-        return { error: "This link is no longer available." };
+        return { error: (await getTranslations("drive"))("errors.linkGone") };
 
     const limitKey = `snippet-unlock:${snippet.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("drive"))("errors.tooManyAttempts") };
     }
     if (!(await snippetService.verifySnippetPassword(snippet.passwordHash, password))) {
-        return { error: "Incorrect password." };
+        return { error: (await getTranslations("drive"))("errors.wrongPassword") };
     }
 
     await resetRateLimit(limitKey);

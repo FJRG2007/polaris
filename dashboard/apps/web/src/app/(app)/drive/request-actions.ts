@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { revalidatePath } from "next/cache";
@@ -99,7 +100,7 @@ export async function createFileRequestAction(
 ): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = createFileRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidRequest") };
 
     // A blank title gets a generated name; resolve it once so the drop point's
     // folder and its stored title match.
@@ -117,13 +118,13 @@ export async function createFileRequestAction(
         );
     } catch (caught) {
         if (caught instanceof DriveAccessError)
-            return { error: "You cannot collect uploads into that folder" };
-        if (caught instanceof DriveLockedError) return { error: "That folder is locked" };
+            return { error: (await getTranslations("drive"))("errors.collectDenied") };
+        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
         if (caught instanceof SmbShareRequiredError)
-            return { error: "Set up the connection's share first" };
+            return { error: (await getTranslations("drive"))("errors.shareFirst") };
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not prepare the drop-point folder"
+                caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.prepareFailed")
         };
     }
 
@@ -198,14 +199,14 @@ const updateDropPointSchema = z
             value.minSizeBytes == null ||
             value.maxSizeBytes === undefined ||
             value.minSizeBytes <= value.maxSizeBytes,
-        { message: "Minimum size cannot exceed the maximum size", path: ["minSizeBytes"] }
+        { message: "errors.minOverMax", path: ["minSizeBytes"] }
     )
     .refine(
         (value) =>
             !value.startsAt ||
             !value.expiresAt ||
             new Date(value.startsAt) < new Date(value.expiresAt),
-        { message: "Start time must be before the expiry time", path: ["startsAt"] }
+        { message: "errors.startAfterExpiry", path: ["startsAt"] }
     );
 
 /** Update a drop point's limits/config. Owner-scoped; destination folder stays fixed. */
@@ -215,7 +216,18 @@ export async function updateFileRequestAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = updateDropPointSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid changes" };
+    if (!parsed.success) {
+        // The two cross-field rules above carry a catalog key rather than a sentence,
+        // since the schema is built once for every reader.
+        const t = await getTranslations("drive");
+        const message = parsed.error.issues[0]?.message;
+        return {
+            error:
+                message === "errors.minOverMax" || message === "errors.startAfterExpiry"
+                    ? t(message)
+                    : (message ?? t("errors.invalidChanges"))
+        };
+    }
 
     const { expiresAt, startsAt, ...rest } = parsed.data;
     await dropPoints.updateFileRequest(user.id, requestId, {
@@ -259,17 +271,17 @@ export async function unlockFileRequestAction(
     password: string
 ): Promise<{ error?: string }> {
     const request = await dropPoints.resolveFileRequestByToken(token);
-    if (!request) return { error: "This link is not available." };
+    if (!request) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
     if (!dropPoints.fileRequestUsability(request).ok)
-        return { error: "This link is no longer available." };
+        return { error: (await getTranslations("drive"))("errors.linkGone") };
 
     const limitKey = `drop-unlock:${request.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("drive"))("errors.tooManyAttempts") };
     }
 
     if (!(await dropPoints.verifyFileRequestPassword(request.passwordHash, password))) {
-        return { error: "Incorrect PIN." };
+        return { error: (await getTranslations("drive"))("errors.wrongPin") };
     }
     await resetRateLimit(limitKey);
 
@@ -319,7 +331,7 @@ export async function deleteFileRequestAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     const request = await dropPoints.getFileRequestForOwner(user.id, requestId);
-    if (!request) return { error: "That drop point no longer exists." };
+    if (!request) return { error: (await getTranslations("drive"))("errors.dropPointGone") };
 
     if (deleteFolder) {
         // The drop point collects into the connection's own root, so there is no
@@ -328,7 +340,7 @@ export async function deleteFileRequestAction(
         // refusal the delete would raise, which a read-only backend raises too.
         if (normalizeRelPath(request.destinationPath) === "") {
             return {
-                error: "This drop point collects into the whole connection, so there is no folder of its own to delete. Delete it without the folder, or clear the files from Drive."
+                error: (await getTranslations("drive"))("errors.wholeConnection")
             };
         }
         try {
@@ -347,22 +359,22 @@ export async function deleteFileRequestAction(
             await invalidateFolderSizes(request.destinationConnectionId, request.destinationPath);
         } catch (caught) {
             if (caught instanceof DriveAccessError)
-                return { error: "You cannot delete that folder" };
-            if (caught instanceof DriveLockedError) return { error: "That folder is locked" };
+                return { error: (await getTranslations("drive"))("errors.folderDeleteDenied") };
+            if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
             const code = caught instanceof StorageError ? caught.code : null;
             if (code !== "not_found") {
                 return {
                     error:
                         caught instanceof Error
-                            ? `The folder could not be deleted: ${caught.message}`
-                            : "The folder could not be deleted"
+                            ? (await getTranslations("drive"))("errors.folderDeleteReason", { reason: caught.message })
+                            : (await getTranslations("drive"))("errors.folderDeleteFailed")
                 };
             }
         }
     }
 
     if (!(await dropPoints.deleteFileRequestForOwner(user.id, requestId))) {
-        return { error: "That drop point no longer exists." };
+        return { error: (await getTranslations("drive"))("errors.dropPointGone") };
     }
     await recordAudit({
         actorId: user.id,
@@ -386,7 +398,7 @@ export async function deleteSubmissionAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     const ok = await dropPoints.deleteSubmissionForOwner(user.id, requestId, submissionId);
-    if (!ok) return { error: "That file no longer exists." };
+    if (!ok) return { error: (await getTranslations("drive"))("errors.fileGone") };
     await recordAudit({
         actorId: user.id,
         action: "request.submission.delete",
@@ -442,9 +454,9 @@ export async function saveDropPointTemplateAction(
 ): Promise<{ id?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const trimmed = name.trim();
-    if (!trimmed) return { error: "Name the template." };
+    if (!trimmed) return { error: (await getTranslations("drive"))("errors.templateName") };
     const parsed = templateConfigSchema.safeParse(config);
-    if (!parsed.success) return { error: "That template config is invalid." };
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.templateInvalid") };
     const { id } = await dropPoints.createTemplate(
         user.id,
         trimmed.slice(0, 120),

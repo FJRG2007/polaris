@@ -9,6 +9,7 @@
  */
 
 import { cookies } from "next/headers";
+import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
@@ -63,7 +64,7 @@ export interface ShareLogRow {
 export async function createShareAction(input: unknown): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("shares.create");
     const parsed = createShareSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid share" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidShare") };
     const { id, token } = await createShare(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -92,7 +93,7 @@ export async function revealShareLinkAction(
     const url = await revealShareLink(user.id, shareId);
     if (!url) {
         return {
-            error: "This link cannot be revealed - it predates link recovery. Create a new share instead."
+            error: (await getTranslations("drive"))("errors.cannotReveal")
         };
     }
     return { url };
@@ -106,7 +107,7 @@ export async function updateShareAction(
     const user = await requirePermission("shares.create");
     const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
     const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
-    if (invalid) return { error: `Invalid IP or range: ${invalid}` };
+    if (invalid) return { error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid }) };
     await updateShare(user.id, shareId, {
         password: input.password === undefined ? undefined : input.password || null,
         maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
@@ -174,16 +175,16 @@ export async function unlockShareAction(
     password: string
 ): Promise<{ error?: string }> {
     const share = await resolveShareByToken(token);
-    if (!share) return { error: "This link is not available." };
-    if (!shareUsability(share).ok) return { error: "This link is no longer available." };
+    if (!share) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
+    if (!shareUsability(share).ok) return { error: (await getTranslations("drive"))("errors.linkGone") };
 
     const limitKey = `share-unlock:${share.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("drive"))("errors.tooManyAttempts") };
     }
 
     if (!(await verifySharePassword(share.passwordHash, password))) {
-        return { error: "Incorrect password." };
+        return { error: (await getTranslations("drive"))("errors.wrongPassword") };
     }
     await resetRateLimit(limitKey);
     const env = loadEnv();

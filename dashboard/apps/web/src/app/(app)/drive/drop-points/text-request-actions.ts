@@ -12,6 +12,7 @@
  */
 
 import { cookies } from "next/headers";
+import { getTranslations } from "@/lib/i18n/request";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
@@ -19,6 +20,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { requirePermission } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { notify } from "@/lib/notifications/dispatch";
+import { translatorFor } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
 import { linkAddressDenial } from "@/lib/link-guards";
 import * as textRequests from "@/lib/text-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
@@ -46,7 +49,7 @@ export async function createTextRequestAction(
 ): Promise<{ id?: string; url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = createTextRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid drop point" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidDropPoint") };
 
     const { id, token } = await textRequests.createTextRequest(user.id, parsed.data);
     await recordAudit({
@@ -73,7 +76,7 @@ export async function updateTextRequestAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = updateTextRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid drop point" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidDropPoint") };
     await textRequests.updateTextRequest(user.id, requestId, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -91,7 +94,7 @@ export async function revealTextRequestLinkAction(
 ): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const url = await textRequests.revealTextRequestLink(user.id, requestId);
-    if (!url) return { error: "This drop point's link cannot be recovered. Open a new one." };
+    if (!url) return { error: (await getTranslations("drive"))("errors.linkUnrecoverable") };
     return { url };
 }
 
@@ -125,7 +128,7 @@ export async function reopenTextRequestAction(requestId: string): Promise<void> 
 export async function deleteTextRequestAction(requestId: string): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     if (!(await textRequests.deleteTextRequest(user.id, requestId))) {
-        return { error: "This drop point is not yours." };
+        return { error: (await getTranslations("drive"))("errors.dropPointNotYours") };
     }
     await recordAudit({
         actorId: user.id,
@@ -146,17 +149,17 @@ export async function unlockTextRequestAction(
     password: string
 ): Promise<{ error?: string }> {
     const request = await textRequests.resolveTextRequestByToken(token);
-    if (!request) return { error: "This link is not available." };
+    if (!request) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
     if (!textRequests.textRequestUsability(request).ok) {
-        return { error: "This link is no longer available." };
+        return { error: (await getTranslations("drive"))("errors.linkGone") };
     }
 
     const limitKey = `textdrop-unlock:${request.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("drive"))("errors.tooManyAttempts") };
     }
     if (!(await textRequests.verifyTextRequestPassword(request.passwordHash, password))) {
-        return { error: "Incorrect password." };
+        return { error: (await getTranslations("drive"))("errors.wrongPassword") };
     }
 
     await resetRateLimit(limitKey);
@@ -193,32 +196,32 @@ export async function submitTextAction(
     input: unknown
 ): Promise<{ ok?: true; error?: string }> {
     const request = await textRequests.resolveTextRequestByToken(token);
-    if (!request) return { error: "This link is not available." };
+    if (!request) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
 
     const usable = textRequests.textRequestUsability(request);
     if (!usable.ok) {
         return {
             error:
                 usable.reason === "scheduled"
-                    ? "This drop point is not open yet."
-                    : "This drop point is closed."
+                    ? (await getTranslations("drive"))("errors.notOpenYet")
+                    : (await getTranslations("drive"))("errors.closed")
         };
     }
 
     const ip = await clientIp();
     const ipHash = hashForLog(ip);
     if (await linkAddressDenial(request, ip)) {
-        return { error: "This drop point is not available from your network." };
+        return { error: (await getTranslations("drive"))("errors.networkDenied") };
     }
     if (!(await dymoIpAllowed(ip)).allowed) {
-        return { error: "This drop point is not available from your network." };
+        return { error: (await getTranslations("drive"))("errors.networkDenied") };
     }
 
     const session = await getSession();
     const userId = session?.user?.id ?? null;
-    if (request.requireLogin && !userId) return { error: "Sign in to send this." };
+    if (request.requireLogin && !userId) return { error: (await getTranslations("drive"))("errors.signInToSend") };
     if (!(await textRequests.textRequestUserAllowed(request.allowedUsers, userId))) {
-        return { error: "This drop point does not accept submissions from your account." };
+        return { error: (await getTranslations("drive"))("errors.accountDenied") };
     }
     if (request.passwordHash) {
         const cookieValue = (await cookies()).get(
@@ -232,7 +235,7 @@ export async function submitTextAction(
                 loadEnv().POLARIS_AUTH_SECRET
             )
         ) {
-            return { error: "This link is protected." };
+            return { error: (await getTranslations("drive"))("errors.linkProtected") };
         }
     }
 
@@ -240,11 +243,11 @@ export async function submitTextAction(
         !(await rateLimit(`textdrop-submit:${ipHash ?? "unknown"}`, SUBMIT_LIMIT, SUBMIT_WINDOW_MS))
             .ok
     ) {
-        return { error: "Too many submissions from here. Try again later." };
+        return { error: (await getTranslations("drive"))("errors.tooManySubmissions") };
     }
 
     const parsed = submitTextSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid submission" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSubmission") };
 
     const result = await textRequests.submitText(request, parsed.data, {
         userId,
@@ -254,17 +257,18 @@ export async function submitTextAction(
         return {
             error:
                 result.reason === "too_long"
-                    ? `This is longer than the ${request.maxLength.toLocaleString()} characters this drop point accepts.`
+                    ? (await getTranslations("drive"))("errors.textTooLong", { max: request.maxLength })
                     : result.reason === "full"
-                      ? "This drop point has taken everything it was going to."
-                      : "This drop point does not accept sealed submissions."
+                      ? (await getTranslations("drive"))("errors.full")
+                      : (await getTranslations("drive"))("errors.noSealed")
         };
     }
 
     await notify({
         userId: request.ownerId,
         event: "drive.dropPoint.received",
-        title: `Something arrived at "${request.title}"`,
+        // Written for the owner, who reads it later, in their own language.
+        title: translatorFor(await getUserLocale(request.ownerId), "drive")("errors.arrived", { title: request.title }),
         body: parsed.data.name,
         href: `/drive/snippets/${result.snippetId}`
     });

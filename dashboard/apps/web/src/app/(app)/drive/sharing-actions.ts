@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -102,15 +103,15 @@ export async function shareItemAction(
 ): Promise<{ error?: string }> {
     const parsed = shareItemSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That is not something to share" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.notShareable") };
     }
     const share = parsed.data;
     const userId = await requireOwner(share.connectionId);
 
     const expiresAt = share.expiresAt ? new Date(share.expiresAt) : null;
-    if (expiresAt && Number.isNaN(expiresAt.getTime())) return { error: "That date is not a date" };
+    if (expiresAt && Number.isNaN(expiresAt.getTime())) return { error: (await getTranslations("drive"))("errors.notADate") };
     if (expiresAt && expiresAt.getTime() <= Date.now()) {
-        return { error: "Choose a date in the future" };
+        return { error: (await getTranslations("drive"))("errors.futureDate") };
     }
 
     try {
@@ -125,7 +126,7 @@ export async function shareItemAction(
             sharedById: userId
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not share it" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.shareFailed") };
     }
 
     await recordAudit({
@@ -153,7 +154,7 @@ export async function stopSharingAction(
     try {
         userId = await requireOwner(connectionId);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Only the owner can do that" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.ownerOnly") };
     }
     await stopSharing(connectionId, grantId);
     await recordAudit({
@@ -178,7 +179,7 @@ export async function listItemSharesAction(
     } catch (caught) {
         return {
             people: [],
-            error: caught instanceof Error ? caught.message : "Only the owner can see this"
+            error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.ownerOnlySee")
         };
     }
     const wanted = normalizeRelPath(path);

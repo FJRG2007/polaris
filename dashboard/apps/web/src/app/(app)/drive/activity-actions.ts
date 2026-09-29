@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireAdmin, requireUser } from "@/lib/session";
 import { banUser, unbanUser } from "@/lib/user-admin-service";
 
@@ -32,7 +33,7 @@ export async function getUserProfileAction(userId: string): Promise<{ profile?: 
         where: { id: userId },
         select: { id: true, name: true, email: true, isAdmin: true, bannedAt: true, banReason: true }
     });
-    if (!user) return { error: "User not found." };
+    if (!user) return { error: (await getTranslations("drive"))("errors.userNotFound") };
     const admin = viewer.isAdmin;
     return {
         profile: {

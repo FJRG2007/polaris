@@ -9,6 +9,8 @@
  */
 
 import { useEffect, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import Link from "next/link";
 import {
     ArrowUpRight,
@@ -52,21 +54,21 @@ export interface AccessTarget {
 }
 
 /** Human labels for the raw Drive verbs, so a grant reads plainly. */
-const ACTION_LABELS: Record<DriveAction, string> = {
-    read: "View",
-    download: "Download",
-    write: "Edit",
-    rename: "Rename",
-    copy: "Copy",
-    delete: "Delete"
-};
+const ACTION_LABELS = {
+    read: "access.actions.read",
+    download: "access.actions.download",
+    write: "access.actions.write",
+    rename: "access.actions.rename",
+    copy: "access.actions.copy",
+    delete: "access.actions.delete"
+} as const satisfies Record<DriveAction, NamespaceKey<"drive">>;
 
 /** One-click access levels; "Custom" just leaves the checkboxes as-is. */
-const PRESETS: { id: string; label: string; actions: DriveAction[] }[] = [
-    { id: "viewer", label: "Viewer", actions: ["read", "download"] },
+const PRESETS: { id: string; label: NamespaceKey<"drive">; actions: DriveAction[] }[] = [
+    { id: "viewer", label: "access.presets.viewer", actions: ["read", "download"] },
     {
         id: "editor",
-        label: "Editor",
+        label: "access.presets.editor",
         actions: ["read", "download", "write", "rename", "copy", "delete"]
     }
 ];
@@ -94,6 +96,7 @@ export function AccessDialog({
     onChanged?: () => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("drive");
     const [settings, setSettings] = useState<AccessSettings | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -114,7 +117,7 @@ export function AccessDialog({
         try {
             setSettings(await getAccessSettingsAction(connectionId));
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not load access settings");
+            setError(caught instanceof Error ? caught.message : t("access.loadFailed"));
         } finally {
             setLoading(false);
         }
@@ -166,7 +169,7 @@ export function AccessDialog({
 
     function addGrant() {
         if (!principal) {
-            setError("Choose who to grant access to");
+            setError(t("access.choosePrincipal"));
             return;
         }
         const [type, id] = principal.split(":");
@@ -186,7 +189,7 @@ export function AccessDialog({
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Permissions &amp; lock</DialogTitle>
+                    <DialogTitle>{t("access.title")}</DialogTitle>
                     <DialogDescription className="truncate">
                         {target.name} - /{path}
                     </DialogDescription>
@@ -194,23 +197,26 @@ export function AccessDialog({
 
                 {loading ? (
                     <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Loading...
+                        <Loader2 className="size-4 animate-spin" /> {t("access.loading")}
                     </div>
                 ) : (
                     <div className="flex flex-col gap-5">
                         <section className="flex flex-col gap-2">
                             <div>
-                                <h3 className="text-sm font-medium">Who can access this</h3>
+                                <h3 className="text-sm font-medium">{t("access.whoTitle")}</h3>
                                 <p className="text-xs text-muted-foreground">
-                                    The owner and admins always have full access. Add people or
-                                    groups below to give them specific actions; a{" "}
-                                    <span className="text-danger">Deny</span> always wins over an
-                                    allow.
+                                    {t.rich("access.whoBody", {
+                                        deny: (chunks) => (
+                                            <span key="deny" className="text-danger">
+                                                {chunks}
+                                            </span>
+                                        )
+                                    })}
                                 </p>
                             </div>
                             {grants.length === 0 ? (
                                 <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                                    No one else has been granted access yet.
+                                    {t("access.noGrants")}
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1.5">
@@ -251,10 +257,10 @@ export function AccessDialog({
                                                                 }
                                                             >
                                                                 {lapsed
-                                                                    ? "Lapsed"
+                                                                    ? t("access.lapsed")
                                                                     : grant.effect === "deny"
-                                                                      ? "Denied"
-                                                                      : "Allowed"}
+                                                                      ? t("access.denied")
+                                                                      : t("access.allowed")}
                                                             </Badge>
                                                             {grant.expiresAt && (
                                                                 <Badge
@@ -264,8 +270,9 @@ export function AccessDialog({
                                                                             : "warning"
                                                                     }
                                                                 >
-                                                                    {lapsed ? "Since" : "Until"}{" "}
-                                                                    {format.date(grant.expiresAt)}
+                                                                    {t(lapsed ? "access.since" : "access.until", {
+                                                                        date: format.date(grant.expiresAt)
+                                                                    })}
                                                                 </Badge>
                                                             )}
                                                         </span>
@@ -275,8 +282,9 @@ export function AccessDialog({
                                                                     key={action}
                                                                     className="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                                                                 >
-                                                                    {ACTION_LABELS[action] ??
-                                                                        action}
+                                                                    {ACTION_LABELS[action]
+                                                                        ? t(ACTION_LABELS[action])
+                                                                        : action}
                                                                 </span>
                                                             ))}
                                                         </span>
@@ -285,7 +293,7 @@ export function AccessDialog({
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    aria-label="Remove grant"
+                                                    aria-label={t("access.removeGrant")}
                                                     disabled={busy}
                                                     onClick={() =>
                                                         run(() =>
@@ -307,7 +315,7 @@ export function AccessDialog({
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-surface/40 p-3">
                                 <PrincipalPicker value={principal} onChange={setPrincipal} />
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-xs text-muted-foreground">Level</span>
+                                    <span className="text-xs text-muted-foreground">{t("access.level")}</span>
                                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                                         {PRESETS.map((preset) => (
                                             <button
@@ -321,7 +329,7 @@ export function AccessDialog({
                                                         : "text-muted-foreground")
                                                 }
                                             >
-                                                {preset.label}
+                                                {t(preset.label)}
                                             </button>
                                         ))}
                                         <span
@@ -332,7 +340,7 @@ export function AccessDialog({
                                                     : "text-muted-foreground")
                                             }
                                         >
-                                            Custom
+                                            {t("access.custom")}
                                         </span>
                                     </div>
                                 </div>
@@ -345,9 +353,9 @@ export function AccessDialog({
                                             <Checkbox
                                                 checked={actions.has(action)}
                                                 onChange={() => toggleAction(action)}
-                                                aria-label={ACTION_LABELS[action] ?? action}
+                                                aria-label={ACTION_LABELS[action] ? t(ACTION_LABELS[action]) : action}
                                             />
-                                            {ACTION_LABELS[action] ?? action}
+                                            {ACTION_LABELS[action] ? t(ACTION_LABELS[action]) : action}
                                         </label>
                                     ))}
                                 </div>
@@ -359,12 +367,12 @@ export function AccessDialog({
                                             setEffect(value as "allow" | "deny")
                                         }
                                         options={[
-                                            { value: "allow", label: "Allow" },
-                                            { value: "deny", label: "Deny" }
+                                            { value: "allow", label: t("access.allow") },
+                                            { value: "deny", label: t("access.deny") }
                                         ]}
                                     />
                                     <Button size="sm" disabled={busy} onClick={addGrant}>
-                                        Add grant
+                                        {t("access.addGrant")}
                                     </Button>
                                 </div>
                             </div>
@@ -374,20 +382,19 @@ export function AccessDialog({
                                 className="flex items-center gap-1.5 text-xs text-primary hover:underline"
                             >
                                 <ShieldCheck className="size-3.5" />
-                                Manage roles, groups and org-wide policies in the IAM dashboard
+                                {t("access.manageIam")}
                                 <ArrowUpRight className="size-3.5" />
                             </Link>
                         </section>
 
                         <section className="flex flex-col gap-2 border-t border-border pt-4">
                             <h3 className="flex items-center gap-1.5 text-sm font-medium">
-                                <Lock className="size-4" /> Access lock
+                                <Lock className="size-4" /> {t("access.lockTitle")}
                             </h3>
                             {lock ? (
                                 <div className="flex items-center justify-between gap-2 text-sm">
                                     <span className="text-muted-foreground">
-                                        This item is password-gated. Anyone opening it must unlock
-                                        it first.
+                                        {t("access.lockedBody")}
                                     </span>
                                     <Button
                                         size="sm"
@@ -400,18 +407,18 @@ export function AccessDialog({
                                         }
                                     >
                                         <Unlock className="size-4" />
-                                        Remove
+                                        {t("access.removeLock")}
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="flex items-end gap-2">
                                     <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                                        Set a password to gate this item
+                                        {t("access.setPassword")}
                                         <Input
                                             type="password"
                                             value={password}
                                             onChange={(event) => setPassword(event.target.value)}
-                                            placeholder="At least 4 characters"
+                                            placeholder={t("access.passwordPlaceholder")}
                                         />
                                     </label>
                                     <Button
@@ -430,7 +437,7 @@ export function AccessDialog({
                                         }
                                     >
                                         <Lock className="size-4" />
-                                        Lock
+                                        {t("access.lock")}
                                     </Button>
                                 </div>
                             )}
@@ -459,6 +466,7 @@ export function UnlockPanel({
     lockPath: string;
     onUnlocked: () => void;
 }) {
+    const t = useTranslations("drive");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -483,7 +491,7 @@ export function UnlockPanel({
                 <Lock className="size-5 text-muted-foreground" />
             </div>
             <div>
-                <p className="text-sm font-medium">This location is locked</p>
+                <p className="text-sm font-medium">{t("access.unlockTitle")}</p>
                 <p className="truncate text-xs text-muted-foreground">/{lockPath}</p>
             </div>
             <form onSubmit={submit} className="flex w-full flex-col gap-2">
@@ -492,11 +500,11 @@ export function UnlockPanel({
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Enter password"
+                    placeholder={t("access.enterPassword")}
                 />
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 <Button type="submit" disabled={busy || !password}>
-                    {busy ? "Unlocking..." : "Unlock"}
+                    {busy ? t("access.unlocking") : t("access.unlock")}
                 </Button>
             </form>
         </div>

@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { findPeople } from "@/lib/people-search";
@@ -48,7 +49,7 @@ const sendSchema = z.object({
 function refusal(caught: unknown): { error: string } {
     if (caught instanceof transfers.TransferRefused) return { error: caught.message };
     console.error(caught);
-    return { error: "That could not be sent." };
+    return { error: (await getTranslations("drive"))("errors.sendFailed") };
 }
 
 /** Who this account may offer something to, for the dialog's search box. Two
@@ -94,7 +95,7 @@ export async function sendTransferAction(
 ): Promise<{ sent?: number; error?: string }> {
     const user = await requireUser();
     const parsed = sendSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not something Polaris can send." };
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.notSendable") };
     try {
         const made = await transfers.sendTransfer({
             senderId: user.id,
@@ -143,7 +144,7 @@ export async function acceptTransferAction(
 ): Promise<{ path?: string; error?: string }> {
     const user = await requireUser();
     const parsed = acceptSchema.safeParse({ transferId, into });
-    if (!parsed.success) return { error: "That is not an offer." };
+    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.notAnOffer") };
     try {
         const landed = await transfers.acceptTransfer(
             parsed.data.transferId,
@@ -159,7 +160,7 @@ export async function acceptTransferAction(
 
 export async function declineTransferAction(transferId: string): Promise<{ error?: string }> {
     const user = await requireUser();
-    if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
+    if (!z.string().uuid().safeParse(transferId).success) return { error: (await getTranslations("drive"))("errors.notAnOffer") };
     try {
         await transfers.declineTransfer(transferId, user.id);
         revalidatePath("/drive");
@@ -171,7 +172,7 @@ export async function declineTransferAction(transferId: string): Promise<{ error
 
 export async function cancelTransferAction(transferId: string): Promise<{ error?: string }> {
     const user = await requireUser();
-    if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
+    if (!z.string().uuid().safeParse(transferId).success) return { error: (await getTranslations("drive"))("errors.notAnOffer") };
     try {
         await transfers.cancelTransfer(transferId, user.id);
         revalidatePath("/drive");
@@ -185,7 +186,7 @@ export async function cancelTransferAction(transferId: string): Promise<{ error?
  *  it. Only the notice goes; what happened already happened. */
 export async function dismissTransferNoticeAction(transferId: string): Promise<{ error?: string }> {
     const user = await requireUser();
-    if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
+    if (!z.string().uuid().safeParse(transferId).success) return { error: (await getTranslations("drive"))("errors.notAnOffer") };
     try {
         await transfers.dismissTransferNotice(transferId, user.id);
         revalidatePath("/drive");

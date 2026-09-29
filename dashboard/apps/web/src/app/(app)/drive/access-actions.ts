@@ -10,6 +10,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
@@ -106,12 +107,12 @@ export async function setDriveAclAction(input: {
     const actions = input.actions.filter((action) =>
         (DRIVE_ACTIONS as readonly string[]).includes(action)
     );
-    if (actions.length === 0) return { error: "Select at least one action" };
-    if (!input.principalId) return { error: "Choose who to grant access to" };
+    if (actions.length === 0) return { error: (await getTranslations("drive"))("access.errors.noAction") };
+    if (!input.principalId) return { error: (await getTranslations("drive"))("access.errors.noPrincipal") };
     try {
         await setDriveAcl({ ...input, actions, createdById: userId });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the grant" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("access.errors.saveFailed") };
     }
     await recordAudit({
         actorId: userId,
@@ -149,11 +150,11 @@ export async function lockPathAction(
 ): Promise<{ error?: string }> {
     const userId = await requireConnectionManager(connectionId);
     if (!password || password.length < 4)
-        return { error: "Use a password of at least 4 characters" };
+        return { error: (await getTranslations("drive"))("access.errors.shortPassword") };
     try {
         await createLock(connectionId, path, password, userId);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not set the lock" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("access.errors.lockFailed") };
     }
     await recordAudit({
         actorId: userId,
@@ -195,23 +196,23 @@ export async function unlockPathAction(
     try {
         await authorizeDrive(user.id, connectionId, "", "read", { skipLock: true });
     } catch {
-        return { error: "You do not have access to this item" };
+        return { error: (await getTranslations("drive"))("access.errors.noAccess") };
     }
 
     // One spelling per lock, so the limit below is one bucket per lock: the
     // database reads the same id in upper case or without its dashes, and each of
     // those spellings would otherwise be a fresh ten tries at the password.
     const parsed = z.string().uuid().safeParse(lockId);
-    if (!parsed.success) return { error: "Incorrect password." };
+    if (!parsed.success) return { error: (await getTranslations("drive"))("access.errors.wrongPassword") };
     lockId = parsed.data.toLowerCase();
 
     const limitKey = `lock-unlock:${lockId}:${user.id}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("drive"))("access.errors.tooMany") };
     }
     const passwordHash = await verifyLockPassword(lockId, password);
     if (!passwordHash) {
-        return { error: "Incorrect password." };
+        return { error: (await getTranslations("drive"))("access.errors.wrongPassword") };
     }
     await resetRateLimit(limitKey);
 
