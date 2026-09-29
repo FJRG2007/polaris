@@ -12,6 +12,7 @@
  */
 
 import { tokenList } from "@/lib/token-field";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Copy, Inbox } from "lucide-react";
 import { GeoPicker } from "@/components/geo-picker";
 import { AccountInput } from "@/components/account-input";
@@ -147,6 +148,7 @@ export function RequestDialog({
     /** Open the Schedule section expanded (used by the "Schedule drop point" entry). */
     scheduleFocus?: boolean;
 }) {
+    const t = useTranslations("drivePoints");
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
     const [denyCategories, setDenyCategories] = useState<Set<FileCategory>>(new Set());
     const [pending, setPending] = useState(false);
@@ -220,7 +222,7 @@ export function RequestDialog({
         const destinationPath = "";
         if (!destinationConnectionId) {
             setPending(false);
-            setError("Choose a connection to collect into");
+            setError(t("create.chooseConnection"));
             return;
         }
 
@@ -267,18 +269,20 @@ export function RequestDialog({
         <Dialog open={target !== null} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>Request files</DialogTitle>
+                    <DialogTitle>{t("create.title")}</DialogTitle>
                     <DialogDescription className="truncate">
                         {needsPicker
-                            ? "Choose where uploads should be collected."
-                            : `Collect uploads into ${target?.name ? `"${target.name}"` : "this connection"}.`}
+                            ? t("create.chooseWhere")
+                            : target?.name
+                              ? t("create.collectInto", { name: target.name })
+                              : t("create.collectIntoConnection")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {url ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            Share this link to collect files. It is shown only once - copy it now.
+                            {t("create.shareOnce")}
                         </p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={url} className="font-mono text-xs" />
@@ -292,7 +296,7 @@ export function RequestDialog({
                         </div>
                         <div className="flex justify-end">
                             <Button type="button" onClick={() => onOpenChange(false)}>
-                                Done
+                                {t("create.done")}
                             </Button>
                         </div>
                     </div>
@@ -303,7 +307,7 @@ export function RequestDialog({
                             managed by Polaris, so there is no destination-folder field. */}
                         {needsPicker && (connections?.length ?? 0) > 1 ? (
                             <label className="flex flex-col gap-1 text-sm">
-                                Connection
+                                {t("create.connection")}
                                 <Select
                                     value={pickConnection}
                                     onValueChange={setPickConnection}
@@ -315,101 +319,99 @@ export function RequestDialog({
                             </label>
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
-                            Title (optional)
+                            {t("create.titleField")}
                             <Input
                                 name="title"
                                 defaultValue={initial?.title}
-                                placeholder="e.g. Send me your photos"
+                                placeholder={t("create.titlePlaceholder")}
                                 autoComplete="off"
                             />
                             <span className="text-xs text-muted-foreground">
-                                Leave blank for a random name. Uploads collect in a folder named
-                                after this drop point, under &quot;Drop Points&quot;.
+                                {t("create.titleHint")}
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Instructions (optional)
+                            {t("form.instructions")}
                             <Textarea
                                 name="instructions"
                                 rows={2}
                                 defaultValue={initial?.instructions}
-                                placeholder="What should people upload?"
+                                placeholder={t("create.instructionsPlaceholder")}
                                 className="max-h-48 min-h-[2.5rem] resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm"
                             />
                         </label>
 
-                        <Section title="Schedule" defaultOpen={scheduleFocus}>
+                        <Section title={t("create.schedule")} defaultOpen={scheduleFocus}>
                             <label className="flex flex-col gap-1 text-sm">
-                                Starts (optional)
+                                {t("create.starts")}
                                 <Input
                                     type="datetime-local"
                                     name="startsAt"
                                     defaultValue={initial?.startsAt}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    The link stays closed until this time. Leave blank to open
-                                    immediately.
+                                    {t("create.startsHint")}
                                 </span>
                             </label>
                         </Section>
 
-                        <Section title="File types">
+                        <Section title={t("create.fileTypes")}>
                             <div className="flex flex-col gap-1.5 text-sm">
-                                <span>Allowed file types</span>
+                                <span>{t("create.allowedTypes")}</span>
                                 <CategoryToggles
                                     selected={categories}
                                     onToggle={(id) => toggle(setCategories, id)}
                                     tone="allow"
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Leave all off to allow any file type.
+                                    {t("create.allowedHint")}
                                 </span>
                             </div>
                             <label className="flex flex-col gap-1 text-sm">
-                                Also allow these extensions (optional)
+                                {t("create.alsoAllow")}
                                 <Input
                                     name="extensions"
                                     defaultValue={initial?.extensions}
-                                    placeholder="e.g. psd, ai, sketch"
+                                    placeholder={t("form.extensionsPlaceholder")}
                                     autoComplete="off"
                                 />
                             </label>
                             <div className="flex flex-col gap-1.5 text-sm">
-                                <span>Blocked file types</span>
+                                <span>{t("create.blockedTypes")}</span>
                                 <CategoryToggles
                                     selected={denyCategories}
                                     onToggle={(id) => toggle(setDenyCategories, id)}
                                     tone="deny"
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Blocked types are rejected even if also allowed.
+                                    {t("create.blockedHint")}
                                 </span>
                             </div>
                             <label className="flex flex-col gap-1 text-sm">
-                                Also block these extensions (optional)
+                                {t("create.alsoBlock")}
                                 <Input
                                     name="deniedExtensions"
                                     defaultValue={initial?.deniedExtensions}
-                                    placeholder="e.g. exe, bat, sh"
+                                    placeholder={t("form.deniedPlaceholder")}
                                     autoComplete="off"
                                 />
                             </label>
                         </Section>
 
-                        <Section title="Size &amp; limits">
+                        <Section title={t("create.limits")}>
                             <div className="grid grid-cols-3 gap-3">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Min size (MB)
+                                    {t("form.minSize")}
                                     <Input
                                         name="minMb"
                                         type="number"
                                         min="0"
                                         defaultValue={initial?.minMb}
-                                        placeholder="None"
+                                        placeholder={t("create.none")}
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Max size (MB)
+                                    {t("form.maxSize")}
                                     <Input
                                         name="maxMb"
                                         type="number"
@@ -419,29 +421,29 @@ export function RequestDialog({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Max files
+                                    {t("form.maxFiles")}
                                     <Input
                                         name="maxFiles"
                                         type="number"
                                         min="1"
                                         defaultValue={initial?.maxFiles}
-                                        placeholder="No limit"
+                                        placeholder={t("create.noLimit")}
                                     />
                                 </label>
                             </div>
                             <div className="flex flex-col gap-1 text-sm">
-                                Expires
+                                {t("create.expires")}
                                 <ExpirySelect onChange={setExpiry} />
                             </div>
                         </Section>
 
-                        <Section title="Access &amp; security">
+                        <Section title={t("create.security")}>
                             <label className="flex flex-col gap-1 text-sm">
-                                Access PIN (optional)
+                                {t("create.pin")}
                                 <Input
                                     name="password"
                                     type="password"
-                                    placeholder="No PIN"
+                                    placeholder={t("form.noPin")}
                                     autoComplete="off"
                                 />
                             </label>
@@ -452,7 +454,7 @@ export function RequestDialog({
                                     defaultChecked={initial?.requireLogin}
                                     className="size-4"
                                 />
-                                Require uploaders to sign in
+                                {t("form.requireLogin")}
                             </label>
                             <label className="flex items-center gap-2 text-sm">
                                 <input
@@ -461,7 +463,7 @@ export function RequestDialog({
                                     defaultChecked={initial?.allowOverwrite}
                                     className="size-4"
                                 />
-                                Let an upload replace a file of the same name
+                                {t("form.overwrite")}
                             </label>
                             <div className="flex flex-col gap-1.5 text-sm">
                                 <label className="flex items-center gap-2">
@@ -471,46 +473,48 @@ export function RequestDialog({
                                         defaultChecked={initial?.allowUploaderDelete}
                                         className="size-4"
                                     />
-                                    Let uploaders delete their own files
+                                    {t("form.uploaderDelete")}
                                 </label>
                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    Only within
-                                    <Input
-                                        name="deleteWindowMin"
-                                        type="number"
-                                        min="1"
-                                        defaultValue={initial?.deleteWindowMin}
-                                        placeholder="anytime"
-                                        className="h-8 w-24"
-                                    />
-                                    minutes of upload (blank = anytime)
+                                    {t.rich("form.deleteWindow", {
+                                        field: () => (
+                                            <Input
+                                                key="window"
+                                                name="deleteWindowMin"
+                                                type="number"
+                                                min="1"
+                                                defaultValue={initial?.deleteWindowMin}
+                                                placeholder={t("form.anytime")}
+                                                className="h-8 w-24"
+                                            />
+                                        )
+                                    })}
                                 </label>
                             </div>
                             <label className="flex flex-col gap-1 text-sm">
-                                Restrict to specific users (optional)
+                                {t("form.users")}
                                 <AccountInput
                                     multiple
                                     name="allowedUsers"
                                     defaultValue={initial?.allowedUsers}
-                                    placeholder="e.g. @alice, bob@example.com"
-                                    aria-label="Restrict to specific users"
+                                    placeholder={t("form.usersPlaceholder")}
+                                    aria-label={t("form.usersLabel")}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Only these accounts may upload (sign-in required). Match by
-                                    username or email.
+                                    {t("form.usersHint")}
                                 </span>
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Restrict to IPs / ranges (optional)
+                                {t("form.cidrs")}
                                 <Input
                                     name="allowedCidrs"
                                     defaultValue={initial?.allowedCidrs}
-                                    placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                    placeholder={t("form.cidrsPlaceholder")}
                                     autoComplete="off"
                                 />
                             </label>
                             <div className="flex flex-col gap-1 text-sm">
-                                Restrict by location (optional)
+                                {t("form.location")}
                                 <GeoPicker
                                     countries={geoCountries}
                                     continents={geoContinents}
@@ -524,7 +528,7 @@ export function RequestDialog({
                         <div className="mt-1 flex justify-end gap-2">
                             <Button type="submit" disabled={pending}>
                                 <Inbox className="size-4" />
-                                {pending ? "Creating..." : "Create drop point"}
+                                {pending ? t("create.creating") : t("create.submit")}
                             </Button>
                         </div>
                     </form>

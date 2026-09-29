@@ -695,5 +695,110 @@
         "invalidSubmission": "Envío no válido",
         "full": "Este buzón ya ha recibido todo lo que iba a aceptar.",
         "noSealed": "Este buzón no acepta envíos sellados."
+    },
+    "sharedLinks": {
+        "status": {
+            "revoked": "Revocado",
+            "expired": "Caducado",
+            "exhausted": "Agotado",
+            "active": "Activo"
+        },
+        "actions": {
+            "view": "ver",
+            "download": "descargar",
+            "upload": "subir",
+            "rename": "renombrar",
+            "delete": "borrar",
+            "mkdir": "carpeta"
+        },
+        "revokeTitle": "¿Revocar este enlace?",
+        "revokeBody": "Dejará de funcionar de inmediato.",
+        "revoke": "Revocar",
+        "revealFailed": "No se pudo mostrar el enlace",
+        "empty": "Aún no has compartido nada. Usa la acción de compartir en un archivo o una carpeta de Drive.",
+        "root": "(raíz)",
+        "downloadsOf": "{count}/{max} descargas",
+        "downloads": "{count} descargas",
+        "expires": "caduca el {date}",
+        "ipRestricted": "IP limitada",
+        "open": "Abrir",
+        "link": "Enlace",
+        "logs": "Logs",
+        "edit": "Editar",
+        "editTitle": "Editar",
+        "password": "Contraseña",
+        "keepPassword": "Vacío para mantenerla",
+        "removePassword": "Quitar contraseña",
+        "maxDownloads": "Máx. descargas",
+        "unlimited": "Sin límite",
+        "expiresField": "Caduca",
+        "cidrs": "Solo estas IP o rangos",
+        "cidrsPlaceholder": "p. ej. 203.0.113.4, 10.0.0.0/24",
+        "allowDownload": "Permitir descargar",
+        "allowPreview": "Permitir ver",
+        "allowUpload": "Permitir subir a la carpeta (buzón)",
+        "allowMkdir": "Permitir crear carpetas",
+        "allowOverwrite": "Permitir reemplazar un archivo igual",
+        "allowRename": "Permitir renombrar y mover",
+        "allowDelete": "Permitir borrar (para siempre)",
+        "saving": "Guardando...",
+        "save": "Guardar cambios",
+        "logTitle": "Accesos",
+        "views": "{count} vistas",
+        "uniqueIps": "{count} IP únicas",
+        "denied": "{count} denegados",
+        "loading": "Cargando...",
+        "noAccess": "Aún no ha accedido nadie.",
+        "when": "Cuándo",
+        "action": "Acción",
+        "actionDenied": "Denegado: {action} ({reason})"
+    },
+    "pages": {
+        "drive": {
+            "title": "Drive",
+            "description": "Explora y gestiona archivos en todos los NAS y nubes conectados."
+        },
+        "favorites": {
+            "title": "Favoritos",
+            "description": "Archivos y carpetas que has marcado, en todas las conexiones.",
+            "empty": "Aún no hay favoritos. Haz clic derecho en un archivo o una carpeta y elige \"Añadir a favoritos\"."
+        },
+        "insights": {
+            "title": "Dónde fue el espacio",
+            "description": "Elige una ubicación y Polaris la recorre: las carpetas que más ocupan, los archivos más grandes y cuánto suma cada tipo de archivo."
+        },
+        "overview": {
+            "title": "Resumen",
+            "description": "Tus dispositivos de almacenamiento conectados y su estado."
+        },
+        "recent": {
+            "title": "Recientes",
+            "description": "Archivos que has abierto, cambiado o creado hace poco."
+        },
+        "shared": {
+            "title": "En común",
+            "description": "Lo que otros han compartido contigo y lo que tú has compartido con ellos."
+        },
+        "sharedLinks": {
+            "title": "Enlaces",
+            "description": "Enlaces que has creado y puedes revocar."
+        },
+        "snippets": {
+            "title": "Fragmentos",
+            "description": "Texto que puedes repartir por enlace, con los mismos límites que un archivo compartido.",
+            "new": "Nuevo",
+            "newTitle": "Nuevo texto",
+            "newDescription": "Pega el texto, pon nombre a los archivos y compártelo si quieres.",
+            "collected": "Recogido a través de uno de tus buzones.",
+            "editHint": "Edita el texto y guarda.",
+            "sealed": "Este fragmento se selló en el navegador de quien lo envió. Polaris solo guarda el texto cifrado, así que no se puede mostrar ni editar aquí - se abre con la clave de su enlace.",
+            "back": "Volver a fragmentos"
+        },
+        "dropPoints": {
+            "title": "Buzones",
+            "description": "Enlaces que recogen cosas por ti: archivos en tus carpetas y texto en tus fragmentos.",
+            "files": "Archivos",
+            "text": "Texto"
+        }
     }
 }

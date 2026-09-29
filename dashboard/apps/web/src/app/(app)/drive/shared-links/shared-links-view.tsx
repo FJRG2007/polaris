@@ -9,6 +9,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import Link from "next/link";
 import {
     Ban,
@@ -66,19 +68,33 @@ export interface ShareRow {
     canReveal: boolean;
 }
 
-function status(share: ShareRow): { label: string; variant: "success" | "neutral" | "warning" } {
-    if (share.revokedAt) return { label: "Revoked", variant: "neutral" };
+function status(share: ShareRow): {
+    label: NamespaceKey<"drive">;
+    variant: "success" | "neutral" | "warning";
+} {
+    if (share.revokedAt) return { label: "sharedLinks.status.revoked", variant: "neutral" };
     if (share.expiresAt && new Date(share.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", variant: "warning" };
+        return { label: "sharedLinks.status.expired", variant: "warning" };
     }
     if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
-        return { label: "Exhausted", variant: "warning" };
+        return { label: "sharedLinks.status.exhausted", variant: "warning" };
     }
-    return { label: "Active", variant: "success" };
+    return { label: "sharedLinks.status.active", variant: "success" };
 }
+
+/** What a visitor did, in words; an action this list does not know shows as recorded. */
+const LOG_ACTIONS: Record<string, NamespaceKey<"drive">> = {
+    view: "sharedLinks.actions.view",
+    download: "sharedLinks.actions.download",
+    upload: "sharedLinks.actions.upload",
+    rename: "sharedLinks.actions.rename",
+    delete: "sharedLinks.actions.delete",
+    mkdir: "sharedLinks.actions.mkdir"
+};
 
 export function SharedView({ shares }: { shares: ShareRow[] }) {
     const format = useDisplayFormat();
+    const t = useTranslations("drive");
     const [rows, setRows] = useState(shares);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
@@ -91,9 +107,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
     async function onRevoke(id: string) {
         if (
             !(await confirm({
-                title: "Revoke this link?",
-                description: "It will stop working immediately.",
-                confirmLabel: "Revoke",
+                title: t("sharedLinks.revokeTitle"),
+                description: t("sharedLinks.revokeBody"),
+                confirmLabel: t("sharedLinks.revoke"),
                 danger: true
             }))
         )
@@ -116,7 +132,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         setBusy(null);
         if (result.error) {
             await confirm({
-                title: "Could not reveal the link",
+                title: t("sharedLinks.revealFailed"),
                 description: result.error,
                 alert: true
             });
@@ -130,8 +146,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    You have not shared anything yet. Use the share action on a file or folder in
-                    Drive.
+                    {t("sharedLinks.empty")}
                 </CardBody>
             </Card>
         );
@@ -155,24 +170,28 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                         )}
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">
-                                                {share.path || "(root)"}
+                                                {share.path || t("sharedLinks.root")}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {share.connectionName}
+                                                {" - "}
                                                 {share.maxDownloads !== null
-                                                    ? ` - ${share.downloadCount}/${share.maxDownloads} downloads`
-                                                    : ` - ${share.downloadCount} downloads`}
+                                                    ? t("sharedLinks.downloadsOf", {
+                                                          count: share.downloadCount,
+                                                          max: share.maxDownloads
+                                                      })
+                                                    : t("sharedLinks.downloads", { count: share.downloadCount })}
                                                 {share.expiresAt
-                                                    ? ` - expires ${format.date(share.expiresAt)}`
+                                                    ? ` - ${t("sharedLinks.expires", { date: format.date(share.expiresAt) })}`
                                                     : ""}
                                                 {share.allowedCidrs.length > 0
-                                                    ? ` - IP-restricted`
+                                                    ? ` - ${t("sharedLinks.ipRestricted")}`
                                                     : ""}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Badge variant={state.variant}>{state.label}</Badge>
+                                        <Badge variant={state.variant}>{t(state.label)}</Badge>
                                         <Button size="sm" variant="ghost" asChild>
                                             <Link
                                                 href={`/drive?c=${share.connectionId}&p=${encodeURIComponent(
@@ -185,7 +204,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 )}`}
                                             >
                                                 <FolderOpen className="size-4" />
-                                                Open
+                                                {t("sharedLinks.open")}
                                             </Link>
                                         </Button>
                                         {share.canReveal && !share.revokedAt ? (
@@ -196,7 +215,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 disabled={busy === share.id}
                                             >
                                                 <Link2 className="size-4" />
-                                                Link
+                                                {t("sharedLinks.link")}
                                             </Button>
                                         ) : null}
                                         <Button
@@ -205,7 +224,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                             onClick={() => setLogsFor(share)}
                                         >
                                             <ScrollText className="size-4" />
-                                            Logs
+                                            {t("sharedLinks.logs")}
                                         </Button>
                                         {!share.revokedAt ? (
                                             <Button
@@ -214,7 +233,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 onClick={() => setEditing(share)}
                                             >
                                                 <Pencil className="size-4" />
-                                                Edit
+                                                {t("sharedLinks.edit")}
                                             </Button>
                                         ) : null}
                                         {!share.revokedAt ? (
@@ -225,7 +244,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 disabled={pending && busy === share.id}
                                             >
                                                 <Ban className="size-4" />
-                                                Revoke
+                                                {t("sharedLinks.revoke")}
                                             </Button>
                                         ) : null}
                                     </div>
@@ -283,6 +302,7 @@ function EditShareDialog({
     onOpenChange: (open: boolean) => void;
     onSaved: (row: ShareRow) => void;
 }) {
+    const t = useTranslations("drive");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { formProps, changed } = useFormChanged();
@@ -339,39 +359,39 @@ function EditShareDialog({
         <Dialog open={share !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit link</DialogTitle>
+                    <DialogTitle>{t("sharedLinks.editTitle")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        {share?.path || "(root)"}
+                        {share?.path || t("sharedLinks.root")}
                     </DialogDescription>
                 </DialogHeader>
                 {share ? (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                         <label className="flex flex-col gap-1 text-sm">
-                            Password
+                            {t("sharedLinks.password")}
                             <Input
                                 name="password"
                                 type="password"
-                                placeholder="Leave blank to keep"
+                                placeholder={t("sharedLinks.keepPassword")}
                                 autoComplete="off"
                             />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="removePassword" className="size-4" />
-                            Remove password
+                            {t("sharedLinks.removePassword")}
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                Max downloads
+                                {t("sharedLinks.maxDownloads")}
                                 <Input
                                     name="maxDownloads"
                                     type="number"
                                     min="1"
                                     defaultValue={share.maxDownloads ?? ""}
-                                    placeholder="Unlimited"
+                                    placeholder={t("sharedLinks.unlimited")}
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Expires
+                                {t("sharedLinks.expiresField")}
                                 <Input
                                     name="expiresAt"
                                     type="date"
@@ -382,11 +402,11 @@ function EditShareDialog({
                             </label>
                         </div>
                         <label className="flex flex-col gap-1 text-sm">
-                            Restrict to IPs / ranges
+                            {t("sharedLinks.cidrs")}
                             <Input
                                 name="allowedCidrs"
                                 defaultValue={share.allowedCidrs.join(", ")}
-                                placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                placeholder={t("sharedLinks.cidrsPlaceholder")}
                                 autoComplete="off"
                             />
                         </label>
@@ -398,7 +418,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowDownload}
                                     className="size-4"
                                 />
-                                Allow downloading
+                                {t("sharedLinks.allowDownload")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -407,7 +427,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowPreview}
                                     className="size-4"
                                 />
-                                Allow previewing
+                                {t("sharedLinks.allowPreview")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -416,7 +436,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowUpload}
                                     className="size-4"
                                 />
-                                Allow uploads into the folder (drop box)
+                                {t("sharedLinks.allowUpload")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -425,7 +445,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowCreateFolder}
                                     className="size-4"
                                 />
-                                Allow creating folders
+                                {t("sharedLinks.allowMkdir")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -434,7 +454,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowOverwrite}
                                     className="size-4"
                                 />
-                                Let an upload replace a file of the same name
+                                {t("sharedLinks.allowOverwrite")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -443,7 +463,7 @@ function EditShareDialog({
                                     defaultChecked={share.allowRename}
                                     className="size-4"
                                 />
-                                Allow renaming and moving items
+                                {t("sharedLinks.allowRename")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -452,13 +472,13 @@ function EditShareDialog({
                                     defaultChecked={share.allowDelete}
                                     className="size-4"
                                 />
-                                Allow deleting items (permanent)
+                                {t("sharedLinks.allowDelete")}
                             </label>
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
                             <Button type="submit" disabled={pending || !changed}>
-                                {pending ? "Saving..." : "Save changes"}
+                                {pending ? t("sharedLinks.saving") : t("sharedLinks.save")}
                             </Button>
                         </div>
                     </form>
@@ -476,6 +496,7 @@ function ShareLogsDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("drive");
     const [logs, setLogs] = useState<ShareLogRow[] | null>(null);
     const shareId = share?.id ?? null;
 
@@ -500,31 +521,33 @@ function ShareLogsDialog({
         <Dialog open={share !== null} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] overflow-hidden">
                 <DialogHeader>
-                    <DialogTitle>Access log</DialogTitle>
+                    <DialogTitle>{t("sharedLinks.logTitle")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        {share?.path || "(root)"}
+                        {share?.path || t("sharedLinks.root")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="mb-2 flex flex-wrap gap-2 text-xs">
-                    <Badge variant="neutral">{views} views</Badge>
-                    <Badge variant="neutral">{downloads} downloads</Badge>
-                    <Badge variant="neutral">{uniqueIps} unique IPs</Badge>
-                    {denied > 0 ? <Badge variant="warning">{denied} denied</Badge> : null}
+                    <Badge variant="neutral">{t("sharedLinks.views", { count: views })}</Badge>
+                    <Badge variant="neutral">{t("sharedLinks.downloads", { count: downloads })}</Badge>
+                    <Badge variant="neutral">{t("sharedLinks.uniqueIps", { count: uniqueIps })}</Badge>
+                    {denied > 0 ? (
+                        <Badge variant="warning">{t("sharedLinks.denied", { count: denied })}</Badge>
+                    ) : null}
                 </div>
                 <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     {logs === null ? (
-                        <p className="p-6 text-center text-sm text-muted-foreground">Loading...</p>
+                        <p className="p-6 text-center text-sm text-muted-foreground">{t("sharedLinks.loading")}</p>
                     ) : logs.length === 0 ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">
-                            No access yet.
+                            {t("sharedLinks.noAccess")}
                         </p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">When</th>
+                                    <th className="py-1 pr-3 font-medium">{t("sharedLinks.when")}</th>
                                     <th className="py-1 pr-3 font-medium">IP</th>
-                                    <th className="py-1 font-medium">Action</th>
+                                    <th className="py-1 font-medium">{t("sharedLinks.action")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -539,8 +562,13 @@ function ShareLogsDialog({
                                         <td className="py-1">
                                             {row.reason ? (
                                                 <span className="text-danger">
-                                                    {row.action} denied ({row.reason})
+                                                    {t("sharedLinks.actionDenied", {
+                                                        action: LOG_ACTIONS[row.action] ? t(LOG_ACTIONS[row.action]!) : row.action,
+                                                        reason: row.reason
+                                                    })}
                                                 </span>
+                                            ) : LOG_ACTIONS[row.action] ? (
+                                                t(LOG_ACTIONS[row.action]!)
                                             ) : (
                                                 row.action
                                             )}

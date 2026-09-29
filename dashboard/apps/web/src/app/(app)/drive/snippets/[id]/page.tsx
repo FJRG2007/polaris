@@ -7,6 +7,7 @@
  */
 
 import Link from "next/link";
+import { getTranslations } from "@/lib/i18n/request";
 import { EyeOff } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
@@ -17,6 +18,7 @@ import { getSnippetForOwner } from "@/lib/snippet-service";
 export const dynamic = "force-dynamic";
 
 export default async function SnippetPage({ params }: { params: Promise<{ id: string }> }) {
+    const t = await getTranslations("drive");
     const { id } = await params;
     const user = await requirePermission("snippets.write");
     const snippet = await getSnippetForOwner(user.id, id);
@@ -29,8 +31,8 @@ export default async function SnippetPage({ params }: { params: Promise<{ id: st
                 <p className="text-sm text-muted-foreground">
                     {snippet.description ??
                         (snippet.requestId
-                            ? "Collected through one of your drop points."
-                            : "Edit the text, then save.")}
+                            ? t("pages.snippets.collected")
+                            : t("pages.snippets.editHint"))}
                 </p>
             </div>
 
@@ -39,12 +41,10 @@ export default async function SnippetPage({ params }: { params: Promise<{ id: st
                     <CardBody className="flex flex-col items-center gap-3 p-8 text-center">
                         <EyeOff className="size-5 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                            This snippet was sealed in the sender&apos;s browser. Polaris holds only
-                            ciphertext, so it cannot be shown or edited here - it opens with the key
-                            in its link.
+                            {t("pages.snippets.sealed")}
                         </p>
                         <Button asChild variant="secondary" size="sm">
-                            <Link href="/drive/snippets">Back to snippets</Link>
+                            <Link href="/drive/snippets">{t("pages.snippets.back")}</Link>
                         </Button>
                     </CardBody>
                 </Card>

@@ -6,12 +6,14 @@
  */
 
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { listSharesForOwner } from "@/lib/share-service";
 import { SharedView, type ShareRow } from "./shared-links-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function SharedPage() {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
     const shares = await listSharesForOwner(user.id);
     const rows: ShareRow[] = shares.map((share) => {
@@ -48,8 +50,8 @@ export default async function SharedPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Shared links</h1>
-                <p className="text-sm text-muted-foreground">Links you have created and can revoke.</p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("pages.sharedLinks.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("pages.sharedLinks.description")}</p>
             </div>
             <SharedView shares={rows} />
         </div>

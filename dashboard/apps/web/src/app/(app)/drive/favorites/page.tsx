@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "@/lib/i18n/request";
 import { Folder, Star } from "lucide-react";
 import { Card, CardBody, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
@@ -19,20 +20,20 @@ function parentOf(path: string): string {
 }
 
 export default async function FavoritesPage() {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
     const favorites = await listFavorites(user.id);
 
     return (
         <>
             <PageHeader
-                title="Favorites"
-                description="Files and folders you have starred, across every connection."
+                title={t("pages.favorites.title")}
+                description={t("pages.favorites.description")}
             />
             {favorites.length === 0 ? (
                 <Card>
                     <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        No favorites yet. Right-click any file or folder and choose &quot;Add to
-                        favorites&quot;.
+                        {t("pages.favorites.empty")}
                     </CardBody>
                 </Card>
             ) : (

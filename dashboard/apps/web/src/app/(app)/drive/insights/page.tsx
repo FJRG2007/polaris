@@ -13,6 +13,7 @@
  */
 
 import { PageHeader } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission } from "@/lib/session";
 import type { StorageProviderKind } from "@polaris/core";
@@ -26,6 +27,7 @@ export default async function DriveInsightsPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
     const params = await searchParams;
     const asked = Array.isArray(params.c) ? params.c[0] : params.c;
@@ -39,8 +41,8 @@ export default async function DriveInsightsPage({
     return (
         <div className="flex flex-col gap-4">
             <PageHeader
-                title="Where the room went"
-                description="Pick a location and Polaris walks it: the folders holding the most, the biggest single files, and what each kind of file adds up to."
+                title={t("pages.insights.title")}
+                description={t("pages.insights.description")}
             />
             <DriveInsights locations={locations} initial={asked ?? locations[0]?.id ?? null} />
         </div>

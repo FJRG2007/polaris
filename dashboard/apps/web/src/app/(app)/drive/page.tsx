@@ -1,4 +1,5 @@
 import { PageHeader } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { DriveExplorer } from "./drive-explorer";
 import { requirePermission } from "@/lib/session";
@@ -34,6 +35,7 @@ export default async function DrivePage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
 
     // Everybody has their own drive, and this is where it starts existing. It is
@@ -162,8 +164,8 @@ export default async function DrivePage({
     return (
         <>
             <PageHeader
-                title="Drive"
-                description="Browse and manage files across every connected NAS and cloud."
+                title={t("pages.drive.title")}
+                description={t("pages.drive.description")}
             />
             <DriveExplorer
                 connections={connections}

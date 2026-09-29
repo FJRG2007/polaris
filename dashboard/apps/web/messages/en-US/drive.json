@@ -695,5 +695,110 @@
         "invalidSubmission": "Invalid submission",
         "full": "This drop point has taken everything it was going to.",
         "noSealed": "This drop point does not accept sealed submissions."
+    },
+    "sharedLinks": {
+        "status": {
+            "revoked": "Revoked",
+            "expired": "Expired",
+            "exhausted": "Exhausted",
+            "active": "Active"
+        },
+        "actions": {
+            "view": "view",
+            "download": "download",
+            "upload": "upload",
+            "rename": "rename",
+            "delete": "delete",
+            "mkdir": "mkdir"
+        },
+        "revokeTitle": "Revoke this link?",
+        "revokeBody": "It will stop working immediately.",
+        "revoke": "Revoke",
+        "revealFailed": "Could not reveal the link",
+        "empty": "You have not shared anything yet. Use the share action on a file or folder in Drive.",
+        "root": "(root)",
+        "downloadsOf": "{count}/{max} downloads",
+        "downloads": "{count} downloads",
+        "expires": "expires {date}",
+        "ipRestricted": "IP-restricted",
+        "open": "Open",
+        "link": "Link",
+        "logs": "Logs",
+        "edit": "Edit",
+        "editTitle": "Edit link",
+        "password": "Password",
+        "keepPassword": "Leave blank to keep",
+        "removePassword": "Remove password",
+        "maxDownloads": "Max downloads",
+        "unlimited": "Unlimited",
+        "expiresField": "Expires",
+        "cidrs": "Restrict to IPs / ranges",
+        "cidrsPlaceholder": "e.g. 203.0.113.4, 10.0.0.0/24",
+        "allowDownload": "Allow downloading",
+        "allowPreview": "Allow previewing",
+        "allowUpload": "Allow uploads into the folder (drop box)",
+        "allowMkdir": "Allow creating folders",
+        "allowOverwrite": "Let an upload replace a file of the same name",
+        "allowRename": "Allow renaming and moving items",
+        "allowDelete": "Allow deleting items (permanent)",
+        "saving": "Saving...",
+        "save": "Save changes",
+        "logTitle": "Access log",
+        "views": "{count} views",
+        "uniqueIps": "{count} unique IPs",
+        "denied": "{count} denied",
+        "loading": "Loading...",
+        "noAccess": "No access yet.",
+        "when": "When",
+        "action": "Action",
+        "actionDenied": "{action} denied ({reason})"
+    },
+    "pages": {
+        "drive": {
+            "title": "Drive",
+            "description": "Browse and manage files across every connected NAS and cloud."
+        },
+        "favorites": {
+            "title": "Favorites",
+            "description": "Files and folders you have starred, across every connection.",
+            "empty": "No favorites yet. Right-click any file or folder and choose \"Add to favorites\"."
+        },
+        "insights": {
+            "title": "Where the room went",
+            "description": "Pick a location and Polaris walks it: the folders holding the most, the biggest single files, and what each kind of file adds up to."
+        },
+        "overview": {
+            "title": "Overview",
+            "description": "Your connected storage devices and their health."
+        },
+        "recent": {
+            "title": "Recent",
+            "description": "Files you recently opened, changed, or created."
+        },
+        "shared": {
+            "title": "Shared",
+            "description": "What people have shared with you, and what you have shared with them."
+        },
+        "sharedLinks": {
+            "title": "Shared links",
+            "description": "Links you have created and can revoke."
+        },
+        "snippets": {
+            "title": "Snippets",
+            "description": "Text you can hand out by link, with the same limits as a shared file.",
+            "new": "New snippet",
+            "newTitle": "New snippet",
+            "newDescription": "Paste the text, name the files, and share it if you want to.",
+            "collected": "Collected through one of your drop points.",
+            "editHint": "Edit the text, then save.",
+            "sealed": "This snippet was sealed in the sender's browser. Polaris holds only ciphertext, so it cannot be shown or edited here - it opens with the key in its link.",
+            "back": "Back to snippets"
+        },
+        "dropPoints": {
+            "title": "Drop points",
+            "description": "Links that collect things for you: files into your folders, text into your snippets.",
+            "files": "Files",
+            "text": "Text"
+        }
     }
 }

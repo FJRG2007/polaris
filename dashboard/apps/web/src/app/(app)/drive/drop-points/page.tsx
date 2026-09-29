@@ -8,6 +8,7 @@
  */
 
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { listConnections } from "@/lib/storage-service";
 import { NewDropPointButton } from "./new-drop-point-button";
 import { listFileRequestsForOwner } from "@/lib/file-request-service";
@@ -19,6 +20,7 @@ import { TextDropPointsView, type TextDropPointRow } from "./text-drop-points-vi
 export const dynamic = "force-dynamic";
 
 export default async function DropPointsPage() {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
     const [requests, textRequests, connections] = await Promise.all([
         listFileRequestsForOwner(user.id),
@@ -54,10 +56,9 @@ export default async function DropPointsPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Drop points</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("pages.dropPoints.title")}</h1>
                     <p className="text-sm text-muted-foreground">
-                        Links that collect things for you: files into your folders, text into your
-                        snippets.
+                        {t("pages.dropPoints.description")}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -69,12 +70,12 @@ export default async function DropPointsPage() {
             </div>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Files</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">{t("pages.dropPoints.files")}</h2>
                 <DropPointsView requests={rows} />
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">Text</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">{t("pages.dropPoints.text")}</h2>
                 <TextDropPointsView requests={textRows} />
             </section>
         </div>

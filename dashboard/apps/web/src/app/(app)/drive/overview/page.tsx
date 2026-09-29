@@ -1,4 +1,5 @@
 import type { StorageProviderKind } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
 import { connectionWebUrl, listConnections } from "@/lib/storage-service";
@@ -8,6 +9,7 @@ import { OverviewView } from "./overview-view";
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
+    const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
     const connections: ConnectionSummary[] = (
         await listConnections(user.id, { personal: true })
@@ -22,8 +24,8 @@ export default async function OverviewPage() {
     return (
         <>
             <PageHeader
-                title="Overview"
-                description="Your connected storage devices and their health."
+                title={t("pages.overview.title")}
+                description={t("pages.overview.description")}
             />
             <OverviewView connections={connections} />
         </>
