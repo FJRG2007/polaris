@@ -38,22 +38,33 @@ const OWN_PROJECTS = ["polaris", TUNNEL_PROJECT, PUBLIC_TUNNEL_PROJECT];
  *  replaced. */
 const PARTS: Record<string, { label: string; summary: string }> = {
     web: {
+        // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
         label: "Dashboard",
         summary: "The control plane: every page, the API, and the background sweeps."
     },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     postgres: { label: "Database", summary: "Everything Polaris remembers." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     traefik: { label: "Edge", summary: "Routes every domain and holds the certificates." },
     "edge-guard": {
+        // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
         label: "Edge guard",
         summary: "Applies the firewall to requests as they arrive."
     },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     hostd: { label: "Host daemon", summary: "Mounts, host files and the Docker proxy." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     livekit: { label: "Call server", summary: "Carries the sound and the picture in a call." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     mdns: { label: "Local discovery", summary: "Answers to polaris.local on the network." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     "mc-router": { label: "Minecraft router", summary: "One port for every Java server." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     caddy: { label: "Edge (legacy)", summary: "The previous edge, kept for rollback." },
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     ptunnel: { label: "Public tunnel", summary: "Publishes Polaris without a port forward." },
     "polaris-tunnel": {
+        // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
         label: "Public tunnel",
         summary: "Publishes Polaris without a port forward."
     }

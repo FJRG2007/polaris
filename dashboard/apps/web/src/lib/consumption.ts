@@ -78,30 +78,40 @@ export const GROUPS: ReadonlyArray<{ id: ConsumptionGroupId; label: string; desc
     [
         {
             id: "polaris",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             label: "Polaris itself",
             description:
+                // i18n-ignore said in the reader's words by admin/consumption's stateLabel
                 "The control plane: the dashboard, the database, the edge, and the rest of the stack."
         },
         {
             id: "apps",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             label: "Marketplace apps",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             description: "Everything installed from the marketplace, game servers included."
         },
         {
             id: "services",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             label: "Deployed services",
             description:
+                // i18n-ignore said in the reader's words by admin/consumption's stateLabel
                 "Services and databases deployed here, with the releases and tunnels they keep."
         },
         {
             id: "leftover",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             label: "Left behind by Polaris",
             description:
+                // i18n-ignore said in the reader's words by admin/consumption's stateLabel
                 "Started by Polaris for something that no longer exists. Nothing will start them again, and removing one frees what it holds."
         },
         {
             id: "other",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             label: "Everything else",
+            // i18n-ignore said in the reader's words by admin/consumption's stateLabel
             description: "Containers on this machine that Polaris did not start."
         }
     ];

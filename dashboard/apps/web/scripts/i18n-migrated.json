@@ -1464,6 +1464,13 @@
         "web/src/lib/compliance/evidence-export.ts",
         "web/src/lib/compliance/evidence-readings.ts",
         "web/src/lib/router-guide.ts",
-        "web/src/app/(app)/admin/domains/router-words.ts"
+        "web/src/app/(app)/admin/domains/router-words.ts",
+        "web/src/lib/api-key-scopes.ts",
+        "web/src/lib/polaris-parts.ts",
+        "web/src/lib/consumption.ts",
+        "web/src/lib/access/sharing-service.ts",
+        "web/src/lib/deploy/deploy-steps.ts",
+        "web/src/lib/agents/boot-progress.ts",
+        "web/src/lib/backup-codes.ts"
     ]
 }

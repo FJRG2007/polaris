@@ -43,29 +43,36 @@ const BOOT_STEPS: readonly {
 }[] = [
     {
         key: "workspace",
+        // i18n-ignore said in the reader's words by lib/agents/words.ts
         label: "Preparing your machine",
         marks: [{ text: "polaris: preparing this account" }]
     },
     {
         key: "fetch",
+        // i18n-ignore said in the reader's words by lib/agents/words.ts
         label: "Fetching the repository",
         marks: [
             { text: "polaris: fetching " },
+            // i18n-ignore said in the reader's words by lib/agents/words.ts
             { text: "polaris: opening your workspace", label: "Opening your workspace" }
         ]
     },
+    // i18n-ignore said in the reader's words by lib/agents/words.ts
     { key: "enigma", label: "Installing Enigma", marks: [{ text: "polaris: installing Enigma" }] },
     {
         key: "agent",
+        // i18n-ignore said in the reader's words by lib/agents/words.ts
         label: "Installing the agent",
         // Either of the two things that line can say. The second is what the
         // second session prints, and it means done rather than doing - but it is
         // followed immediately by `starting`, which settles it anyway.
         marks: [
             { text: "This happens once" },
+            // i18n-ignore said in the reader's words by lib/agents/words.ts
             { text: "is already installed here", label: "The agent is already here" }
         ]
     },
+    // i18n-ignore said in the reader's words by lib/agents/words.ts
     { key: "start", label: "Starting the agent", marks: [{ text: "polaris: starting " }] }
 ];
 

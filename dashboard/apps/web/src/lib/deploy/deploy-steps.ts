@@ -63,17 +63,23 @@ export function deploySteps(status: string, log: string): DeployStep[] {
         : { started: kept || notKept, ended: kept || notKept };
 
     const rows: Array<{ id: DeployStepId; label: string; mark: Marker; skip: boolean; warn?: boolean }> = [
+        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "queued", label: "Queued", mark: { started: status !== "queued", ended: status !== "queued" }, skip: false },
         {
             id: "source",
+            // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
             label: rollback ? "Kept image" : fetch.started ? "Clone" : pull.started ? "Pull" : "Source",
             mark: source,
             skip: false
         },
         // An image source and a rollback have nothing to build.
+        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "build", label: "Build", mark: build, skip: rollback || (pull.started && !fetch.started) },
+        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "keep", label: "Keep", mark: keep, skip: false, warn: notKept && !rollback },
+        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "start", label: "Start", mark: start, skip: false },
+        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "live", label: "Live", mark: { started: status === "running", ended: status === "running" }, skip: false }
     ];
 

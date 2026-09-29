@@ -45,9 +45,13 @@ function accountSlug(account: string): string {
 }
 
 export const BACKUP_CODE_FORMATS: ReadonlyArray<{ format: BackupCodeFormat; label: string }> = [
+    // i18n-ignore said in the reader's words by the backup codes panel (backupCodes.formats)
     { format: "txt", label: "Text (.txt)" },
+    // i18n-ignore said in the reader's words by the backup codes panel (backupCodes.formats)
     { format: "json", label: "JSON (.json)" },
+    // i18n-ignore said in the reader's words by the backup codes panel (backupCodes.formats)
     { format: "csv", label: "CSV (.csv)" },
+    // i18n-ignore said in the reader's words by the backup codes panel (backupCodes.formats)
     { format: "pdf", label: "PDF (.pdf)" }
 ];
 

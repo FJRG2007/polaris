@@ -233,9 +233,14 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
  *  the vocabulary rather than in each screen, so the three places that draw this
  *  say the same words. */
 export const CAPABILITY_LABELS: Record<string, { label: string; hint: string }> = {
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     guest: { label: "Guest", hint: "Read it, and comment where they are involved." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     member: { label: "Member", hint: "Take part: post, create and edit." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     admin: { label: "Admin", hint: "Everything a member can do, plus running it." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     view: { label: "Can see", hint: "Watch it and see its state. Nothing else." },
+    // i18n-ignore said in the reader's words by the share dialog (share.capabilities)
     control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." }
 };
