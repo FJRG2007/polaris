@@ -9,9 +9,9 @@
  * English fragment ends up inside a Spanish sentence.
  */
 
-import type * as core from "@polaris/core";
-import { translate } from "@/lib/i18n/translate";
-import type { NamespaceKey } from "@/lib/i18n/types";
+import * as core from "@polaris/core";
+import { translate, translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 /** A message of the `chat` catalog and its values. */
 export interface ChatText<K extends NamespaceKey<"chat"> = NamespaceKey<"chat">> {
@@ -34,4 +34,22 @@ export function chatText(locale: core.Locale, text: ChatText): string {
           )
         : undefined;
     return translate(locale, `chat.${text.key}`, params);
+}
+
+/**
+ * The chat catalog in one person's language, for words written now and read by
+ * them later - a notification, a call's title.
+ *
+ * The locale service is loaded when asked for rather than at the top, because
+ * the modules that call this also run in jobs and tests that never load the
+ * session; where it cannot load, or the person cannot be read, the default
+ * language answers rather than the message going unsent.
+ */
+export async function chatWordsFor(userId: string): Promise<NamespaceTranslator<"chat">> {
+    try {
+        const { getUserLocale } = await import("@/lib/i18n/locale-service");
+        return translatorFor(await getUserLocale(userId), "chat");
+    } catch {
+        return translatorFor(core.DEFAULT_LOCALE, "chat");
+    }
 }

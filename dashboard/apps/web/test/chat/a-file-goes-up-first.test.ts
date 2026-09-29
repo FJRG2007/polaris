@@ -80,7 +80,7 @@ describe("the send route", () => {
         // The instance's limit is about disks now and is measured in gigabytes; a
         // file read out of this request is still held whole while that happens.
         expect(ROUTE).toContain("Math.min(biggest, MAX_ATTACHMENT_BYTES)");
-        expect(ROUTE).toContain("has to be uploaded before the message it goes on");
+        expect(ROUTE).toContain("errors.uploadFirst");
     });
 });
 

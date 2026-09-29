@@ -33,8 +33,7 @@ import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
-import { translatorFor } from "@/lib/i18n/translate";
-import { getUserLocale } from "@/lib/i18n/locale-service";
+import { chatWordsFor } from "./text";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ChatAccessError, channelAccess, requireChannel, type ChatActor, type ChatErrorText } from "./access";
 
@@ -572,7 +571,7 @@ export async function callElsewhere(userId: string): Promise<CallElsewhere | nul
     if (!seat?.meeting.channelId || !channel) return null;
 
     // Read by the person sitting in the call, in their own language.
-    const words = translatorFor(await getUserLocale(userId), "chat");
+    const words = await chatWordsFor(userId);
     const named = channel.spaceId
         ? channel.kind === "text"
             ? `#${channel.name}`
@@ -1470,7 +1469,7 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
         await Promise.all(
             missed.map(async (userId) => {
                 // Written for whoever missed it, who reads it later, in their language.
-                const words = translatorFor(await getUserLocale(userId), "chat");
+                const words = await chatWordsFor(userId);
                 return notify({
                     userId,
                     event: "chat.callMissed",

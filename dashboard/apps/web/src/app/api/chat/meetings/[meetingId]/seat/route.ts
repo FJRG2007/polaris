@@ -17,7 +17,7 @@
  */
 
 import { z } from "zod";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
 import * as meetings from "@/lib/chat/meetings";
 
@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     const seat = await seatFor(params);
     // Gone rather than not found: the seat was swept or left, and the browser
     // asking should stop rather than keep trying a path that exists.
-    if (!seat) return Response.json({ error: (await getTranslations("chat"))("errors.notInCall") }, { status: 410 });
+    if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInCall") }, { status: 410 });
     const voice = await voiceFrom(request);
     // i18n-ignore: a protocol answer the call client never shows
     if (voice === null) return Response.json({ error: "Malformed call state" }, { status: 400 });

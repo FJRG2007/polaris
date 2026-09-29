@@ -40,8 +40,7 @@ import { createNotification } from "@/lib/notification-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
 import { chatAlertShelf } from "./isolation";
-import { translatorFor } from "@/lib/i18n/translate";
-import { getUserLocale } from "@/lib/i18n/locale-service";
+import { chatWordsFor } from "./text";
 import { recipientShelf } from "@/lib/workspace-scope";
 import {
     ChatAccessError,
@@ -153,7 +152,7 @@ export async function announceRoomMention(
             .filter((userId) => online === null || online.has(userId))
             .map(async (userId) => {
                 // Written for whoever is told, in their own language.
-                const words = translatorFor(await getUserLocale(userId), "chat");
+                const words = await chatWordsFor(userId);
                 return createNotification({
                     userId,
                     type: "chat.mention",

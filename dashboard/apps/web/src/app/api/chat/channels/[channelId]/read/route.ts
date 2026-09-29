@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import * as core from "@polaris/core";
 import { markRead } from "@/lib/chat/messages";
 import { apiPermission } from "@/lib/api-session";
@@ -36,18 +36,18 @@ export async function POST(
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.notRead") }, { status: 400 });
     }
     const parsed = core.chatMarkReadSchema.safeParse({
         channelId,
         messageId: bodySchema.safeParse(body).data?.messageId
     });
-    if (!parsed.success) return Response.json({ error: (await getTranslations("chat"))("errors.notAMessage") }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: (await readerWords("chat"))("errors.notAMessage") }, { status: 400 });
     try {
         await markRead({ id: user.id }, parsed.data);
     } catch (caught) {
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.message }, { status: 403 });
+            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
         }
         throw caught;
     }

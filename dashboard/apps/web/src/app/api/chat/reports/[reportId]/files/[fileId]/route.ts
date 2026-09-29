@@ -21,7 +21,7 @@
  */
 
 import { describeReportFile } from "@/lib/chat/report-files";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { apiAdmin } from "@/lib/api-session";
 import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
 import { isInlineImage, isPlayableMedia } from "@/lib/chat/attachments";
@@ -46,7 +46,7 @@ export async function GET(
     // The same answer for "not there" and "not that report's", so this cannot be
     // used to find out which files exist.
     if (!file) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.fileGone") }, { status: 410 });
+        return Response.json({ error: (await readerWords("chat"))("errors.fileGone") }, { status: 410 });
     }
 
     const asFile = new URL(request.url).searchParams.get("download") === "1";
@@ -64,7 +64,7 @@ export async function GET(
         if (opened.why === "unsatisfiable") {
             return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes" } });
         }
-        return Response.json({ error: (await getTranslations("chat"))("errors.fileGone") }, { status: 410 });
+        return Response.json({ error: (await readerWords("chat"))("errors.fileGone") }, { status: 410 });
     }
     return new Response(opened.body, {
         status: opened.range ? 206 : 200,

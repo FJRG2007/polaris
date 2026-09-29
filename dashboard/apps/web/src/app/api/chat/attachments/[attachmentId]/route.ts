@@ -18,7 +18,7 @@
  */
 
 import { apiPermission } from "@/lib/api-session";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 import { channelAccess } from "@/lib/chat/access";
 import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
@@ -126,7 +126,7 @@ export async function GET(
         console.error(`chat: attachment ${attachmentId} is gone - ${detail || "(not diagnosed)"}`);
         return Response.json(
             {
-                error: (await getTranslations("chat"))("errors.attachmentGone"),
+                error: (await readerWords("chat"))("errors.attachmentGone"),
                 detail
             },
             { status: 410 }

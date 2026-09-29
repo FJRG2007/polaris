@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { ChatAccessError } from "@/lib/chat/access";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
 import { sayInMeeting } from "@/lib/chat/meeting-chat";
@@ -45,35 +45,35 @@ export async function POST(
 ): Promise<Response> {
     const { meetingId } = await params;
     const seat = await resolveSeat(meetingId);
-    if (!seat) return Response.json({ error: (await getTranslations("chat"))("errors.notInCall") }, { status: 403 });
+    if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInCall") }, { status: 403 });
     if (seat.admission !== "admitted") {
-        return Response.json({ error: (await getTranslations("chat"))("errors.stillWaiting") }, { status: 403 });
+        return Response.json({ error: (await readerWords("chat"))("errors.stillWaiting") }, { status: 403 });
     }
 
     let form: FormData;
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.notRead") }, { status: 400 });
     }
 
     const body = bodySchema.safeParse(String(form.get("body") ?? ""));
-    if (!body.success) return Response.json({ error: (await getTranslations("chat"))("errors.notSent") }, { status: 400 });
+    if (!body.success) return Response.json({ error: (await readerWords("chat"))("errors.notSent") }, { status: 400 });
 
     const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
     if (files.length === 0 && !body.data) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.writeOrAttach") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.writeOrAttach") }, { status: 400 });
     }
     if (files.length > MAX_MEETING_FILES) {
         return Response.json(
-            { error: (await getTranslations("chat"))("errors.tooManyFiles", { max: MAX_MEETING_FILES }) },
+            { error: (await readerWords("chat"))("errors.tooManyFiles", { max: MAX_MEETING_FILES }) },
             { status: 400 }
         );
     }
     for (const file of files) {
         if (file.size > MAX_MEETING_FILE_BYTES) {
             return Response.json(
-                { error: (await getTranslations("chat"))("errors.fileTooBig", { name: file.name, max: MAX_MEETING_FILE_MB }) },
+                { error: (await readerWords("chat"))("errors.fileTooBig", { name: file.name, max: MAX_MEETING_FILE_MB }) },
                 { status: 400 }
             );
         }
@@ -98,9 +98,9 @@ export async function POST(
         // worse than a failed send, but only just.
         await dropStoredFiles(stored);
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.message }, { status: 403 });
+            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
         }
         console.error("polaris: a file could not be put into a call:", caught);
-        return Response.json({ error: (await getTranslations("chat"))("errors.notSent") }, { status: 500 });
+        return Response.json({ error: (await readerWords("chat"))("errors.notSent") }, { status: 500 });
     }
 }

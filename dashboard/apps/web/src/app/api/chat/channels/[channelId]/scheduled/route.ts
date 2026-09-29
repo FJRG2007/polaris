@@ -20,7 +20,7 @@
  */
 
 import { z } from "zod";
-import { getTranslations } from "@/lib/i18n/request";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -116,7 +116,7 @@ export async function POST(
         await requirePostable({ id: user.id }, channelId);
     } catch (caught) {
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.message }, { status: 403 });
+            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
         }
         throw caught;
     }
@@ -125,7 +125,7 @@ export async function POST(
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.notRead") }, { status: 400 });
     }
 
     const sounds = soundsSchema.safeParse(readSounds(form.get("sounds")));
@@ -136,7 +136,7 @@ export async function POST(
         sendAt: String(form.get("sendAt") ?? "")
     });
     if (!fields.success) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.notScheduled") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.notScheduled") }, { status: 400 });
     }
     // The window, before a byte is read: a moment in the past is a message that
     // goes the second it is written, and one in the far future never goes at all.
@@ -154,18 +154,18 @@ export async function POST(
     const uploads = readUploads(form.get("uploads"));
     const carrying = uploads.length + files.length;
     if (carrying === 0 && !fields.data.body) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.writeOrAttach") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.writeOrAttach") }, { status: 400 });
     }
     if (carrying > 0 && !(await can(user.id, "chat.attach"))) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesAllowed") }, { status: 403 });
+        return Response.json({ error: (await readerWords("chat"))("errors.noFilesAllowed") }, { status: 403 });
     }
 
     const rules = await rulesForChannel(channelId);
     if (carrying > 0 && rules.maxAttachments === 0) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesHere") }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.noFilesHere") }, { status: 400 });
     }
     if (carrying > rules.maxAttachments) {
-        return Response.json({ error: (await getTranslations("chat"))("errors.tooManyFiles", { max: rules.maxAttachments }) }, { status: 400 });
+        return Response.json({ error: (await readerWords("chat"))("errors.tooManyFiles", { max: rules.maxAttachments }) }, { status: 400 });
     }
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
     // A file that came in this request is held in memory to be read out of the
@@ -174,13 +174,13 @@ export async function POST(
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
-                { error: (await getTranslations("chat"))("errors.fileTooBig", { name: file.name, max: rules.maxAttachmentMib }) },
+                { error: (await readerWords("chat"))("errors.fileTooBig", { name: file.name, max: rules.maxAttachmentMib }) },
                 { status: 400 }
             );
         }
         if (file.size > inTheForm) {
             return Response.json(
-                { error: (await getTranslations("chat"))("errors.uploadFirst", { name: file.name }) },
+                { error: (await readerWords("chat"))("errors.uploadFirst", { name: file.name }) },
                 { status: 413 }
             );
         }
@@ -233,7 +233,7 @@ export async function POST(
         // Nothing points at these bytes now.
         await removeStoredFiles(stored).catch(() => undefined);
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.message }, { status: 403 });
+            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
         }
         // A file this message named that is not there to claim: swept, already sent,
         // or never this sender's.
@@ -249,8 +249,8 @@ export async function POST(
         return Response.json(
             {
                 error: user.isAdmin
-                    ? (await getTranslations("chat"))("errors.notScheduledDetail", { detail })
-                    : (await getTranslations("chat"))("errors.notScheduled")
+                    ? (await readerWords("chat"))("errors.notScheduledDetail", { detail })
+                    : (await readerWords("chat"))("errors.notScheduled")
             },
             { status: 500 }
         );

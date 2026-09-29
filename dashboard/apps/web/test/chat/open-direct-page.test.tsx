@@ -11,6 +11,7 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 class ChatAccessError extends Error {}
@@ -62,7 +63,7 @@ describe("the conversation with somebody", () => {
     });
 
     it("leaves one that does not exist yet to the browser to open", async () => {
-        render(await page(GRACE));
+        render(await page(GRACE), { wrapper: MessagesWrapper });
         expect(await screen.findByText("opened from the browser")).toBeTruthy();
         expect(opened).toBeGreaterThan(0);
         expect(redirected).toBeNull();
@@ -72,7 +73,7 @@ describe("the conversation with somebody", () => {
         existing = async () => {
             throw new ChatAccessError("You cannot start that conversation");
         };
-        render(await page(GRACE));
+        render(await page(GRACE), { wrapper: MessagesWrapper });
         expect(await screen.findByText("You cannot start that conversation")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Back to conversations" })).toBeTruthy();
         expect(opened).toBe(0);
@@ -82,7 +83,7 @@ describe("the conversation with somebody", () => {
         existing = async () => {
             throw new Error("reached the database with it");
         };
-        render(await page("not-a-person"));
+        render(await page("not-a-person"), { wrapper: MessagesWrapper });
         expect(await screen.findByText("opened from the browser")).toBeTruthy();
     });
 });
