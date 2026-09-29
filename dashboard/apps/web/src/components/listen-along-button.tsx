@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Listen along" under somebody's track, and "Stop listening" once pressed.
+ * t("listen.start") under somebody's track, and "Stop listening" once pressed.
  *
  * Who this account is following is one answer shared by every card on the
  * screen, asked once and kept for a short while (`FRESH_MS`), so a member list
@@ -18,6 +18,7 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { Headphones, Loader2, Square } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const PATH = "/api/activity/listen-along";
 
@@ -87,6 +88,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
         () => held.hostId,
         () => null
     );
+    const t = useTranslations("components");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<{ text: string; link: boolean } | null>(null);
 
@@ -113,13 +115,13 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
             if (!response.ok) {
                 publish(before);
                 setError({
-                    text: typeof body?.error === "string" ? body.error : "That did not work. Try again.",
+                    text: typeof body?.error === "string" ? body.error : t("listen.failed"),
                     link: body?.kind === "link"
                 });
             }
         } catch {
             publish(before);
-            setError({ text: "Polaris could not be reached. Try again.", link: false });
+            setError({ text: t("listen.unreachable"), link: false });
         } finally {
             setBusy(false);
         }
@@ -133,7 +135,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
                 onClick={() => void press()}
                 disabled={busy}
                 className="w-full"
-                title={mine ? "Stop following their music" : "Play this on your own Spotify, in step with them"}
+                title={mine ? t("listen.stopTitle") : t("listen.startTitle")}
             >
                 {busy ? (
                     <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -142,14 +144,14 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
                 ) : (
                     <Headphones className="size-4 shrink-0" />
                 )}
-                {mine ? "Stop listening along" : "Listen along"}
+                {mine ? t("listen.stop") : t("listen.start")}
             </Button>
             {error ? (
                 <p role="alert" className="text-[0.6875rem] leading-snug text-danger">
                     {error.text}{" "}
                     {error.link ? (
                         <Link href="/account/connections" className="underline underline-offset-2">
-                            Connected accounts
+                            {t("listen.connections")}
                         </Link>
                     ) : null}
                 </p>

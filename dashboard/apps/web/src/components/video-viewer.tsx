@@ -18,6 +18,7 @@
 
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MediaPlayer } from "@/components/media-player";
 
 export function VideoViewer({
@@ -33,6 +34,7 @@ export function VideoViewer({
     poster?: string;
     onClose: () => void;
 }) {
+    const t = useTranslations("components");
     useEffect(() => {
         const key = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
@@ -56,7 +58,7 @@ export function VideoViewer({
             role="dialog"
             data-state="open"
             aria-modal="true"
-            aria-label={name ? `Watching ${name}` : "Watching a video"}
+            aria-label={name ? t("viewer.watchingNamed", { name }) : t("viewer.watching")}
             // The ground closes it; the player does not. A press that landed on
             // the pause button must not also put the video away.
             onClick={onClose}
@@ -65,8 +67,8 @@ export function VideoViewer({
             <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close"
-                title="Close"
+                aria-label={t("viewer.close")}
+                title={t("viewer.close")}
                 className="absolute right-3 top-3 rounded-full bg-black/50 p-2 text-white/80 transition-colors hover:bg-black/70 hover:text-white"
             >
                 <X className="size-5" />

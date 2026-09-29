@@ -17,6 +17,7 @@
 
 import type { PickedFile } from "./picked-file";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { cn, Button, Dialog, DialogContent, EmptyState, Input, Select } from "@polaris/ui";
 import {
     ArrowLeft,
@@ -35,12 +36,13 @@ import {
 /** Where the dialog is looking. */
 type Tab = "recent" | "mine" | "shared" | "upload" | "url";
 
-const TABS: readonly { id: Tab; label: string; icon: typeof Clock }[] = [
-    { id: "recent", label: "Recent", icon: Clock },
-    { id: "mine", label: "My files", icon: HardDrive },
-    { id: "shared", label: "Shared with me", icon: Users },
-    { id: "upload", label: "Upload", icon: Upload },
-    { id: "url", label: "By address", icon: Link2 }
+/** Each is named as `files.tabs.<id>`. */
+const TABS: readonly { id: Tab; icon: typeof Clock }[] = [
+    { id: "recent", icon: Clock },
+    { id: "mine", icon: HardDrive },
+    { id: "shared", icon: Users },
+    { id: "upload", icon: Upload },
+    { id: "url", icon: Link2 }
 ];
 
 /** What a listing row looks like, whichever endpoint answered. */
@@ -62,16 +64,12 @@ interface Source {
 
 /** The kinds worth filtering by. Named for what somebody is looking for rather
  *  than for a MIME type, which is not a thing anybody thinks in. */
-const KINDS: readonly { id: string; label: string; matches: RegExp }[] = [
-    { id: "image", label: "Images", matches: /\.(?:png|jpe?g|gif|webp|avif|bmp|svg|heic)$/i },
-    { id: "document", label: "Documents", matches: /\.(?:pdf|docx?|odt|rtf|txt|md|pages)$/i },
-    { id: "sheet", label: "Spreadsheets", matches: /\.(?:xlsx?|ods|csv|numbers)$/i },
-    {
-        id: "media",
-        label: "Audio and video",
-        matches: /\.(?:mp3|wav|flac|m4a|ogg|mp4|mov|mkv|webm|avi)$/i
-    },
-    { id: "archive", label: "Archives", matches: /\.(?:zip|tar|gz|bz2|xz|7z|rar)$/i }
+const KINDS: readonly { id: "image" | "document" | "sheet" | "media" | "archive"; matches: RegExp }[] = [
+    { id: "image", matches: /\.(?:png|jpe?g|gif|webp|avif|bmp|svg|heic)$/i },
+    { id: "document", matches: /\.(?:pdf|docx?|odt|rtf|txt|md|pages)$/i },
+    { id: "sheet", matches: /\.(?:xlsx?|ods|csv|numbers)$/i },
+    { id: "media", matches: /\.(?:mp3|wav|flac|m4a|ogg|mp4|mov|mkv|webm|avi)$/i },
+    { id: "archive", matches: /\.(?:zip|tar|gz|bz2|xz|7z|rar)$/i }
 ];
 
 export function FilePickerDialog({
@@ -79,7 +77,7 @@ export function FilePickerDialog({
     onClose,
     accept,
     multiple = true,
-    title = "Attach a file"
+    title
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -90,6 +88,8 @@ export function FilePickerDialog({
     multiple?: boolean;
     title?: string;
 }) {
+    const t = useTranslations("components");
+    const heading = title ?? t("files.title");
     const [tab, setTab] = useState<Tab>("recent");
     const [sources, setSources] = useState<Source[]>([]);
     const [sourceId, setSourceId] = useState("");
@@ -151,14 +151,14 @@ export function FilePickerDialog({
                         const body = (await answer.json()) as { entries?: Entry[]; error?: string };
                         if (wanted.current !== asked) return;
                         if (body.error) {
-                            setProblem("That folder could not be opened.");
+                            setProblem(t("files.folderFailed"));
                             setEntries([]);
                             return;
                         }
                         setEntries(body.entries ?? []);
                     } catch {
                         if (wanted.current === asked)
-                            setProblem("That folder could not be opened.");
+                            setProblem(t("files.folderFailed"));
                     } finally {
                         if (wanted.current === asked) setLoading(false);
                     }
@@ -233,11 +233,11 @@ export function FilePickerDialog({
             <DialogContent className="max-w-3xl">
                 <div className="flex h-[30rem] min-h-0 flex-col">
                     <h2 className="mb-3 shrink-0 pr-8 text-[15px] font-semibold tracking-tight">
-                        {title}
+                        {heading}
                     </h2>
 
                     <div className="flex min-h-0 flex-1 gap-3">
-                        <nav className="w-40 shrink-0 space-y-0.5" aria-label="Where to look">
+                        <nav className="w-40 shrink-0 space-y-0.5" aria-label={t("files.where")}>
                             {TABS.map((entry) => (
                                 <button
                                     key={entry.id}
@@ -257,7 +257,7 @@ export function FilePickerDialog({
                                     }}
                                 >
                                     <entry.icon className="size-4 shrink-0" aria-hidden />
-                                    {entry.label}
+                                    {t(`files.tabs.${entry.id}`)}
                                 </button>
                             ))}
                         </nav>
@@ -269,7 +269,7 @@ export function FilePickerDialog({
                                         {forTab.length > 1 ? (
                                             <Select
                                                 value={active}
-                                                aria-label="Which storage"
+                                                aria-label={t("files.storage")}
                                                 className="h-7 w-40 shrink-0 text-[12px]"
                                                 options={forTab.map((one) => ({
                                                     value: one.id,
@@ -288,21 +288,21 @@ export function FilePickerDialog({
                                             />
                                             <Input
                                                 value={query}
-                                                placeholder="Search these files"
-                                                aria-label="Search these files"
+                                                placeholder={t("files.search")}
+                                                aria-label={t("files.search")}
                                                 className="h-7 pl-7 text-[12px]"
                                                 onChange={(event) => setQuery(event.target.value)}
                                             />
                                         </div>
                                         <Select
                                             value={kind}
-                                            aria-label="Only show"
+                                            aria-label={t("files.onlyShow")}
                                             className="h-7 w-36 shrink-0 text-[12px]"
                                             options={[
-                                                { value: "", label: "Everything" },
+                                                { value: "", label: t("files.everything") },
                                                 ...KINDS.map((one) => ({
                                                     value: one.id,
-                                                    label: one.label
+                                                    label: t(`files.kinds.${one.id}`)
                                                 }))
                                             ]}
                                             onValueChange={setKind}
@@ -339,11 +339,11 @@ export function FilePickerDialog({
                                                             aria-hidden
                                                         />
                                                     }
-                                                    title={problem || "Nothing here"}
+                                                    title={problem || t("files.nothing")}
                                                     description={
                                                         problem
-                                                            ? "Try another storage, or upload from this machine."
-                                                            : "Nothing in this folder matches what you are looking for."
+                                                            ? t("files.tryOther")
+                                                            : t("files.noMatch")
                                                     }
                                                 />
                                             </li>
@@ -429,7 +429,7 @@ export function FilePickerDialog({
                                         aria-hidden
                                     />
                                     <p className="mt-2 text-[13px] text-muted-foreground">
-                                        Drop files here, or choose them from this machine.
+                                        {t("files.drop")}
                                     </p>
                                     <input
                                         ref={file}
@@ -440,25 +440,24 @@ export function FilePickerDialog({
                                         onChange={(event) => fromComputer(event.target.files)}
                                     />
                                     <Button className="mt-3" onClick={() => file.current?.click()}>
-                                        Choose files
+                                        {t("files.choose")}
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="m-3 flex-1">
                                     <label className="block">
                                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                                            Address of the file
+                                            {t("files.address")}
                                         </span>
                                         <Input
                                             value={address}
                                             placeholder="https://example.com/report.pdf"
-                                            aria-label="Address of the file"
+                                            aria-label={t("files.address")}
                                             onChange={(event) => setAddress(event.target.value)}
                                         />
                                     </label>
                                     <p className="mt-1 text-[12px] text-foreground-subtle">
-                                        Polaris fetches it, not your browser, so the site it comes
-                                        from learns nothing about you.
+                                        {t("files.addressHint")}
                                     </p>
                                     <Button
                                         className="mt-3"
@@ -468,7 +467,7 @@ export function FilePickerDialog({
                                             onClose();
                                         }}
                                     >
-                                        Attach it
+                                        {t("files.attachIt")}
                                     </Button>
                                 </div>
                             )}
@@ -479,15 +478,15 @@ export function FilePickerDialog({
                         <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
                             <span className="text-[12px] text-muted-foreground">
                                 {picked === 0
-                                    ? "Nothing chosen"
-                                    : `${picked} ${picked === 1 ? "file" : "files"} chosen`}
+                                    ? t("files.noneChosen")
+                                    : t("files.chosen", { count: picked })}
                             </span>
                             <div className="flex items-center gap-2">
                                 <Button variant="ghost" onClick={onClose}>
-                                    Cancel
+                                    {t("ui.cancel")}
                                 </Button>
                                 <Button disabled={picked === 0} onClick={done}>
-                                    Attach
+                                    {t("files.attach")}
                                 </Button>
                             </div>
                         </div>

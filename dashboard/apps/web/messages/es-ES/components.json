@@ -202,5 +202,215 @@
             "attachment": "Adjunto",
             "saidIn": "{author} en {channel}"
         }
+    },
+    "editor": {
+        "blocks": {
+            "text": "Texto",
+            "heading": "Título",
+            "subheading": "Subtítulo",
+            "smallHeading": "Título menor",
+            "bullets": "Viñetas",
+            "numbered": "Lista numerada",
+            "checklist": "Tareas",
+            "quote": "Cita",
+            "code": "Código",
+            "divider": "Separador"
+        },
+        "placeholder": "Escribe algo",
+        "cut": "Cortar",
+        "nothingToPaste": "Nada que pegar",
+        "paste": "Pegar",
+        "bold": "Negrita",
+        "italic": "Cursiva",
+        "strike": "Tachado",
+        "bulleted": "Viñetas",
+        "linkAddress": "URL del enlace",
+        "pasteLink": "Pega un enlace",
+        "applyLink": "Aplicar el enlace",
+        "removeLink": "Quitar el enlace",
+        "addLink": "Añadir enlace",
+        "copyCode": "Copiar este código",
+        "codeLanguage": "Lenguaje de este código",
+        "plainText": "Texto plano",
+        "done": "Hecho",
+        "notDone": "Sin hacer",
+        "noAccess": "No tienes acceso a esto",
+        "unavailable": "No disponible",
+        "unnamed": {
+            "channel": "Conversación",
+            "message": "Mensaje",
+            "task": "Tarea",
+            "doc": "Documento",
+            "note": "Nota"
+        }
+    },
+    "picker": {
+        "remove": "Quitar a {name}",
+        "full": "No caben más",
+        "placeholder": "Nombre, correo o usuario",
+        "label": "Añadir gente",
+        "withheld": "{count, plural, one {Una cuenta coincide pero no tiene Chat.} other {# cuentas coinciden pero no tienen Chat.}}",
+        "withheldHint": "Un administrador puede activárselo en Personas.",
+        "typeSomething": "Escribe un nombre, un correo o un usuario.",
+        "looking": "Buscando",
+        "nobody": "No se ha encontrado a nadie."
+    },
+    "files": {
+        "tabs": {
+            "recent": "Recientes",
+            "mine": "Mis archivos",
+            "shared": "Compartido conmigo",
+            "upload": "Subir",
+            "url": "Por dirección"
+        },
+        "kinds": {
+            "image": "Imágenes",
+            "document": "Documentos",
+            "sheet": "Hojas",
+            "media": "Audio y vídeo",
+            "archive": "Comprimidos"
+        },
+        "title": "Adjuntar archivo",
+        "addressHint": "Lo descarga Polaris, no tu navegador, así que el sitio del que viene no sabe nada de ti.",
+        "chosen": "{count, plural, one {# archivo elegido} other {# archivos elegidos}}",
+        "folderFailed": "No se pudo abrir esa carpeta.",
+        "where": "Dónde buscar",
+        "storage": "Almacenamiento",
+        "search": "Buscar archivos",
+        "onlyShow": "Mostrar solo",
+        "everything": "Todo",
+        "nothing": "Nada aquí",
+        "tryOther": "Prueba otro almacenamiento o sube desde este equipo.",
+        "noMatch": "Nada de esta carpeta coincide con lo que buscas.",
+        "drop": "Suelta aquí los archivos o elígelos de este equipo.",
+        "choose": "Elegir archivos",
+        "address": "Dirección del archivo",
+        "attachIt": "Adjuntarlo",
+        "noneChosen": "Nada elegido",
+        "attach": "Adjuntar"
+    },
+    "transfers": {
+        "label": "Transferencias",
+        "finished": "Terminado",
+        "clearFinished": "Quitar las terminadas",
+        "clearFinishedShort": "Quitar las terminadas",
+        "stopNamed": "Dejar de enviar {name}",
+        "stop": "Parar",
+        "clearNamed": "Quitar {name}",
+        "clear": "Quitar",
+        "stopped": "Parado",
+        "sent": "Enviado",
+        "saved": "Guardado",
+        "starting": "Empezando",
+        "waiting": "Esperando al servidor",
+        "ofTotal": "{moved} de {total}",
+        "left": "{size} - quedan unos {left}",
+        "both": "{up} subiendo, {down} bajando",
+        "sending": "{count, plural, one {Enviando un archivo} other {Enviando # archivos}}",
+        "getting": "{count, plural, one {Recibiendo un archivo} other {Recibiendo # archivos}}"
+    },
+    "calls": {
+        "inNamed": "en {name}",
+        "inGroup": "{size, plural, =0 {en un grupo} other {en un grupo de #}}",
+        "calling": "{name} te está llamando",
+        "somebody": "Alguien",
+        "groupAnswer": "Llamada de grupo {where}. Responde en Polaris",
+        "answerHere": "Responde en Polaris",
+        "missedGroup": "Llamada de grupo perdida {where}",
+        "missed": "Llamada perdida",
+        "onlyThisTab": "Polaris solo puede sonar en esta pestaña. Deja que te avise en cualquier parte.",
+        "blocked": "Este navegador bloquea los avisos de Polaris, así que una llamada solo puede sonar en esta pestaña.",
+        "whatToDo": "Qué hacer",
+        "callBack": "Devolver",
+        "dismiss": "Descartar",
+        "group": "Llamada de grupo {where}",
+        "answer": "Responder",
+        "silence": "Silenciar el tono",
+        "decline": "Rechazar"
+    },
+    "report": {
+        "blocked": "{name} está bloqueado",
+        "blockQuestion": "¿Bloquear a {name}?",
+        "blockedHint": "No puede escribirte ni llamarte, y no verás lo que diga.",
+        "blockHint": "Aparte de la denuncia, y funciona al momento. No se avisa a nadie.",
+        "block": "Bloquear",
+        "reasons": {
+            "spam": "Spam o estafas",
+            "abuse": "Acoso o abuso",
+            "impersonation": "Se hace pasar por otra persona",
+            "sexual": "Contenido sexual",
+            "illegal": "Algo ilegal",
+            "other": "Otra cosa"
+        },
+        "title": "Denunciar esta cuenta",
+        "sent": "Se ha enviado a quien administra este Polaris. Esa persona decide qué pasa después.",
+        "intro": "Esto llega a quien administra este Polaris. Denunciar a alguien no lo bloquea: eso lo haces tú aparte, y funciona al momento.",
+        "what": "Qué pasa",
+        "why": "Por qué lo denuncias",
+        "happened": "Qué ocurrió",
+        "notePlaceholder": "Opcional, y lo más útil. Dónde ocurrió y más o menos cuándo.",
+        "done": "Hecho",
+        "report": "Denunciar"
+    },
+    "images": {
+        "copied": "Copiada",
+        "copyRefused": "Este navegador no acepta la imagen: copia el enlace",
+        "copy": "Copiar imagen",
+        "linkCopied": "Enlace copiado",
+        "copyLink": "Copiar enlace",
+        "downloadVideo": "Descargar vídeo",
+        "download": "Descargar",
+        "open": "Abrir en el navegador",
+        "forward": "Reenviar"
+    },
+    "cropper": {
+        "intro": "Lo que queda dentro del marco es lo que ven los demás. Arrástrala para moverla y usa el control para acercar.",
+        "saveFailed": "Este navegador no pudo guardar esa imagen",
+        "unreadable": "Ese archivo no se pudo leer como imagen",
+        "title": "Encuadra la imagen",
+        "move": "Mueve la imagen dentro del marco con las flechas",
+        "zoom": "Zoom",
+        "save": "Guardar"
+    },
+    "viewer": {
+        "watchingNamed": "Viendo {name}",
+        "watching": "Viendo un vídeo",
+        "playNamed": "Reproducir {name}",
+        "play": "Ver el vídeo",
+        "zoomOut": "Alejar",
+        "zoomIn": "Acercar",
+        "more": "Más opciones de la imagen",
+        "close": "Cerrar"
+    },
+    "mutual": {
+        "friends": "{count, plural, one {# amistad en común} other {# amistades en común}}",
+        "spaces": "{count, plural, one {# espacio en común} other {# espacios en común}}"
+    },
+    "listen": {
+        "failed": "No ha funcionado. Inténtalo de nuevo.",
+        "unreachable": "No se pudo contactar con Polaris. Inténtalo de nuevo.",
+        "stopTitle": "Dejar de seguir su música",
+        "startTitle": "Reproducirlo en tu Spotify, a la vez que esa persona",
+        "stop": "Dejar de escuchar",
+        "start": "Escuchar juntos",
+        "connections": "Cuentas conectadas"
+    },
+    "build": {
+        "title": "Polaris se ha actualizado",
+        "body": "Esta pestaña sigue con la versión anterior. Recarga cuando quieras: se pierde lo que tengas a medio escribir en esta página{call, select, yes {, aunque volverás directamente a tu llamada} other {}}.",
+        "reload": "Recargar",
+        "hide": "Ocultar hasta que haga falta",
+        "later": "Luego"
+    },
+    "update": {
+        "behind": "{count, plural, one {# commit por detrás} other {# commits por detrás}}: abre los ajustes",
+        "published": "Hay una versión nueva publicada: abre los ajustes",
+        "update": "Actualizar"
+    },
+    "scope": {
+        "failed": "No se pudo cambiar. Inténtalo de nuevo.",
+        "workingIn": "Trabajando en {name}",
+        "heading": "Trabajando en",
+        "manage": "Gestionar {name}"
     }
 }

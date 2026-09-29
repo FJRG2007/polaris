@@ -18,6 +18,7 @@
 import { IncomingCalls } from "@/components/incoming-calls";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = null;
 /** The call this browser is sitting in, as the provider would report it. */
@@ -89,7 +90,7 @@ afterEach(() => {
 
 describe("a missed call while the reader is on the phone", () => {
     it("goes when the second attempt is answered", async () => {
-        const view = render(<IncomingCalls viewerId="ada" />);
+        const view = render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         // Flushed one at a time: the card is drawn from state, and a frame
         // arriving in the same tick as the one before it finds a component that
         // has not been told about the first yet.
@@ -111,7 +112,7 @@ describe("a missed call while the reader is on the phone", () => {
         // one gives up afterwards - which is the usual one, because a caller
         // rings again before the first attempt has run out.
         session = { meetingId: "m2", channelId: "c1", title: "Grace" };
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         await act(async () => onFrame?.(ring("m1"), { owner: true }));
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
         await act(async () => onFrame?.(gaveUp("m1"), { owner: true }));
@@ -122,7 +123,7 @@ describe("a missed call while the reader is on the phone", () => {
 
     it("keeps one from somebody else, which is the call worth coming back to", async () => {
         session = { meetingId: "m2", channelId: "c1", title: "Grace" };
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         await act(async () => onFrame?.(ring("m9", "c2"), { owner: true }));
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
         await act(async () => onFrame?.(gaveUp("m9", "c2"), { owner: true }));

@@ -19,6 +19,8 @@ import * as refs from "./references";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { chipClass, chipLabel } from "./chip";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { splitSpoilers } from "@polaris/core";
 import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
@@ -178,18 +180,26 @@ function listItems(nodes: readonly JSONContent[] | undefined): React.ReactNode {
 function taskItems(nodes: readonly JSONContent[] | undefined): React.ReactNode {
     return (nodes ?? []).map((item, index) => (
         <li key={index} className="flex items-start gap-2">
-            <input
-                type="checkbox"
-                disabled
-                checked={item.attrs?.checked === true}
-                aria-label={item.attrs?.checked === true ? "Done" : "Not done"}
-                className="mt-1 shrink-0"
-            />
+            <TaskBox checked={item.attrs?.checked === true} />
             <span className={cn("min-w-0", item.attrs?.checked === true && "text-muted-foreground line-through")}>
                 {blocks(item.content)}
             </span>
         </li>
     ));
+}
+
+/** The box a checklist item is drawn with, named for what it says. */
+function TaskBox({ checked }: { checked: boolean }) {
+    const t = useTranslations("components");
+    return (
+        <input
+            type="checkbox"
+            disabled
+            checked={checked}
+            aria-label={checked ? t("editor.done") : t("editor.notDone")}
+            className="mt-1 shrink-0"
+        />
+    );
 }
 
 function Media({ node }: { node: JSONContent }) {
@@ -328,6 +338,7 @@ export function isSafeHref(href: string): boolean {
 }
 
 function Chip({ node }: { node: JSONContent }) {
+    const t = useTranslations("components");
     const kind = node.attrs?.kind as refs.ReferenceKind;
     const id = String(node.attrs?.id ?? "");
 
@@ -339,14 +350,16 @@ function Chip({ node }: { node: JSONContent }) {
         return (
             <span
                 className={`${chipClass(kind)} italic opacity-70`}
-                title="You do not have access to this"
+                title={t("editor.noAccess")}
             >
-                Unavailable
+                {t("editor.unavailable")}
             </span>
         );
     }
 
-    const label = chipLabel(kind, String(node.attrs?.label ?? ""));
+    const label = chipLabel(kind, String(node.attrs?.label ?? ""), (of) =>
+        t.has(`editor.unnamed.${of}`) ? t(`editor.unnamed.${of}` as NamespaceKey<"components">) : undefined
+    );
     // A person has no page of their own to link to from here; what pressing one
     // does is the screen's to decide - see `PersonMention`.
     if (kind === "user") return <PersonMention id={id} label={label} className={chipClass(kind)} />;

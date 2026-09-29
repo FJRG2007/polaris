@@ -28,6 +28,7 @@ import type { Editor } from "@tiptap/react";
 import { EditorMenu } from "@/components/rich-text/editor-menu";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 const writeText = vi.fn(async () => undefined);
 /** Asked on the way open, and still thinking - see the note above. */
@@ -137,8 +138,7 @@ function draw(editor: Editor): void {
     render(
         <EditorMenu editor={editor}>
             <div data-testid="surface">{TEXT}</div>
-        </EditorMenu>
-    );
+        </EditorMenu>, { wrapper: MessagesWrapper });
 }
 
 /** Right-press the writing surface. */

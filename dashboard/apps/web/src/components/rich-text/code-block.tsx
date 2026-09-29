@@ -24,6 +24,7 @@ import { cn } from "@polaris/ui";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useHighlighter } from "@/lib/code-highlight";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { languageForToken } from "@/lib/code-language";
 
 /** How long the copy button stays ticked. Long enough to be seen, short enough
@@ -63,6 +64,7 @@ export function CodeBlock({ code, language }: { code: string; language: string |
 }
 
 function CopyButton({ code }: { code: string }) {
+    const t = useTranslations("components");
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -74,8 +76,8 @@ function CopyButton({ code }: { code: string }) {
     return (
         <button
             type="button"
-            title="Copy this code"
-            aria-label="Copy this code"
+            title={t("editor.copyCode")}
+            aria-label={t("editor.copyCode")}
             onClick={async () => {
                 if (!navigator.clipboard) return;
                 try {

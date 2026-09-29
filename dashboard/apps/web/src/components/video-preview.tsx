@@ -26,6 +26,7 @@
 import { cn } from "@polaris/ui";
 import { Play } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createPortal } from "react-dom";
 import { VideoViewer } from "@/components/video-viewer";
 import { MediaPlayer } from "@/components/media-player";
@@ -60,6 +61,7 @@ export function VideoPreview({
     eager?: boolean;
     className?: string;
 }) {
+    const t = useTranslations("components");
     const [watching, setWatching] = useState(false);
 
     // Bytes that are already here: drawn as the player itself, in place. There
@@ -99,7 +101,7 @@ export function VideoPreview({
             <button
                 type="button"
             onClick={() => setWatching(true)}
-            aria-label={name ? `Play ${name}` : "Play the video"}
+            aria-label={name ? t("viewer.playNamed", { name }) : t("viewer.play")}
             className={cn(
                 "group relative flex aspect-video w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-border bg-black/80 transition-colors hover:bg-black",
                 className

@@ -37,6 +37,7 @@ import { whereLine } from "@/lib/chat/call-place";
 import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useSessionScope } from "./session-scope";
 import { claimForDevice } from "@/lib/device-once";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
@@ -94,6 +95,15 @@ interface Ringing {
 }
 
 export function IncomingCalls({ viewerId }: { viewerId: string }) {
+    const t = useTranslations("components");
+    /** Which group a call is in, in the reader's words, or nothing for a
+     *  call between two people. */
+    const where = (group: Parameters<typeof whereLine>[0]): string | null =>
+        whereLine(group) === null
+            ? null
+            : group?.name
+              ? t("calls.inNamed", { name: group.name })
+              : t("calls.inGroup", { size: group?.size ?? 0 });
     const scope = useSessionScope();
     const held = useHeldCall();
     const [ringing, setRinging] = useState<readonly Ringing[]>([]);
@@ -495,10 +505,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                 // top of it.
                 if (heard && tabIsWatched()) return;
                 const notice = await notifyDesktop({
-                    title: `${entry.name || "Somebody"} is calling`,
-                    body: whereLine(entry.group)
-                        ? `Group call ${whereLine(entry.group)}. Answer in Polaris`
-                        : "Answer in Polaris",
+                    title: t("calls.calling", { name: entry.name || t("calls.somebody") }),
+                    body: where(entry.group)
+                        ? t("calls.groupAnswer", { where: where(entry.group) ?? "" })
+                        : t("calls.answerHere"),
                     tag: `call:${entry.meetingId}`,
                     href: `/chat/c/${entry.channelId}`,
                     insistent: true,
@@ -564,15 +574,15 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border bg-elevated p-3 shadow-modal"
                 >
                     <span className="flex items-center gap-2.5">
-                        <Avatar size={36} person={{ id: entry.userId, name: entry.name || "Somebody" }} />
+                        <Avatar size={36} person={{ id: entry.userId, name: entry.name || t("calls.somebody") }} />
                         <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
-                                {entry.name || "Somebody"}
+                                {entry.name || t("calls.somebody")}
                             </span>
                             <span className="block truncate text-xs text-muted-foreground">
-                                {whereLine(entry.group)
-                                    ? `Missed group call ${whereLine(entry.group)}`
-                                    : "Missed call"}
+                                {where(entry.group)
+                                    ? t("calls.missedGroup", { where: where(entry.group) ?? "" })
+                                    : t("calls.missed")}
                             </span>
                         </span>
                         <PhoneMissed className="size-4 shrink-0 text-danger" aria-hidden />
@@ -590,14 +600,13 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                 void mayNotify().finally(() => setStanding(noticeStanding()))
                             }
                         >
-                            Polaris can only ring this tab. Let it reach you anywhere.
+                            {t("calls.onlyThisTab")}
                         </button>
                     ) : index === 0 && standing === "denied" ? (
                         <span className="text-xs text-muted-foreground">
-                            This browser is blocking Polaris' notices, so a call can only ring in
-                            this tab.{" "}
+                            {t("calls.blocked")}{" "}
                             <Link className="text-primary hover:underline" href="/account/notifications">
-                                What to do about it
+                                {t("calls.whatToDo")}
                             </Link>
                         </span>
                     ) : null}
@@ -616,14 +625,14 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                 what calling somebody back is. */}
                             <Link href={`/chat/c/${entry.channelId}?answer=${entry.meetingId}`}>
                                 <Phone className="size-4" />
-                                Call back
+                                {t("calls.callBack")}
                             </Link>
                         </Button>
                         <Button
                             size="sm"
                             variant="ghost"
-                            aria-label="Dismiss"
-                            title="Dismiss"
+                            aria-label={t("calls.dismiss")}
+                            title={t("calls.dismiss")}
                             onClick={() => forget(entry.meetingId)}
                         >
                             <X className="size-4" />
@@ -640,15 +649,15 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     <span className="flex items-center gap-2.5">
                         <Avatar
                             size={36}
-                            person={{ id: entry.userId, name: entry.name || "Somebody" }}
+                            person={{ id: entry.userId, name: entry.name || t("calls.somebody") }}
                         />
                         <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
-                                {entry.name || "Somebody"} is calling
+                                {t("calls.calling", { name: entry.name || t("calls.somebody") })}
                             </span>
-                            {whereLine(entry.group) ? (
+                            {where(entry.group) ? (
                                 <span className="block truncate text-xs text-muted-foreground">
-                                    Group call {whereLine(entry.group)}
+                                    {t("calls.group", { where: where(entry.group) ?? "" })}
                                 </span>
                             ) : null}
                         </span>
@@ -669,14 +678,14 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                 anything but a press that says so. */}
                             <Link href={`/chat/c/${entry.channelId}?answer=${entry.meetingId}`}>
                                 <Phone className="size-4" />
-                                Answer
+                                {t("calls.answer")}
                             </Link>
                         </Button>
                         <Button
                             size="sm"
                             variant="ghost"
-                            aria-label="Silence the ring"
-                            title="Silence the ring"
+                            aria-label={t("calls.silence")}
+                            title={t("calls.silence")}
                             disabled={silenced.includes(entry.meetingId)}
                             onClick={() => hush(entry.meetingId)}
                         >
@@ -685,8 +694,8 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         <Button
                             size="sm"
                             variant="danger"
-                            aria-label="Decline"
-                            title="Decline"
+                            aria-label={t("calls.decline")}
+                            title={t("calls.decline")}
                             onClick={() => {
                                 // Declined here and nowhere else: the caller is
                                 // not told, because a missed call and a refused

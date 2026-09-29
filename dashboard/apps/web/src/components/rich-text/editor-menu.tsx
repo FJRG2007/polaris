@@ -31,6 +31,7 @@ import {
     ContextMenuTrigger,
     MenuShortcut
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Bold,
     ClipboardPaste,
@@ -188,6 +189,7 @@ export function EditorMenu({
     onPaste?: (text: string) => void;
     children: ReactNode;
 }) {
+    const t = useTranslations("components");
     /**
      * The selection as it was when the menu opened.
      *
@@ -263,7 +265,7 @@ export function EditorMenu({
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
             <ContextMenuContent className="w-60">
                 <Item
-                    label="Cut"
+                    label={t("editor.cut")}
                     keys={`${keys}+X`}
                     disabled={!marks}
                     icon={<Scissors className="size-3.5" />}
@@ -284,14 +286,14 @@ export function EditorMenu({
                     }}
                 />
                 <Item
-                    label="Copy"
+                    label={t("ui.copy")}
                     keys={`${keys}+C`}
                     disabled={!marks}
                     icon={<Copy className="size-3.5" />}
                     onSelect={() => void put(opened?.selection.text ?? "")}
                 />
                 <Item
-                    label={pending === "" ? "Nothing to paste" : "Paste"}
+                    label={pending === "" ? t("editor.nothingToPaste") : t("editor.paste")}
                     keys={`${keys}+V`}
                     disabled={!pending}
                     icon={<ClipboardPaste className="size-3.5" />}
@@ -306,22 +308,22 @@ export function EditorMenu({
                 {marks ? (
                     <>
                         <Item
-                            label="Bold"
+                            label={t("editor.bold")}
                             icon={<Bold className="size-3.5" />}
                             onSelect={mark("toggleBold")}
                         />
                         <Item
-                            label="Italic"
+                            label={t("editor.italic")}
                             icon={<Italic className="size-3.5" />}
                             onSelect={mark("toggleItalic")}
                         />
                         <Item
-                            label="Strikethrough"
+                            label={t("editor.strike")}
                             icon={<Strikethrough className="size-3.5" />}
                             onSelect={mark("toggleStrike")}
                         />
                         <Item
-                            label="Code"
+                            label={t("editor.blocks.code")}
                             icon={<Code className="size-3.5" />}
                             onSelect={mark("toggleCode")}
                         />
@@ -330,22 +332,22 @@ export function EditorMenu({
                 ) : null}
 
                 <Item
-                    label="Heading"
+                    label={t("editor.blocks.heading")}
                     icon={<Heading2 className="size-3.5" />}
                     onSelect={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                 />
                 <Item
-                    label="Bulleted list"
+                    label={t("editor.bulleted")}
                     icon={<List className="size-3.5" />}
                     onSelect={() => editor.chain().focus().toggleBulletList().run()}
                 />
                 <Item
-                    label="Numbered list"
+                    label={t("editor.blocks.numbered")}
                     icon={<ListOrdered className="size-3.5" />}
                     onSelect={() => editor.chain().focus().toggleOrderedList().run()}
                 />
                 <Item
-                    label="Quote"
+                    label={t("editor.blocks.quote")}
                     icon={<Quote className="size-3.5" />}
                     onSelect={() => editor.chain().focus().toggleBlockquote().run()}
                 />

@@ -14,6 +14,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { useEffect, useRef, useState } from "react";
@@ -51,6 +52,7 @@ function Control({
 }
 
 export function SelectionToolbar({ editor }: { editor: Editor }) {
+    const t = useTranslations("components");
     const [linking, setLinking] = useState(false);
     const [href, setHref] = useState("");
     const field = useRef<HTMLInputElement>(null);
@@ -88,8 +90,8 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                     <input
                         ref={field}
                         value={href}
-                        aria-label="Link address"
-                        placeholder="Paste a link"
+                        aria-label={t("editor.linkAddress")}
+                        placeholder={t("editor.pasteLink")}
                         onChange={(event) => setHref(event.target.value)}
                         onKeyDown={(event) => {
                             if (event.key !== "Escape") return;
@@ -98,35 +100,35 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                         }}
                         className="h-7 w-56 rounded border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
-                    <Control label="Apply the link" onClick={commit}>
+                    <Control label={t("editor.applyLink")} onClick={commit}>
                         <Link2 className="size-4" />
                     </Control>
                 </form>
             ) : (
                 <>
                     <Control
-                        label="Bold"
+                        label={t("editor.bold")}
                         active={editor.isActive("bold")}
                         onClick={() => editor.chain().focus().toggleBold().run()}
                     >
                         <Bold className="size-4" />
                     </Control>
                     <Control
-                        label="Italic"
+                        label={t("editor.italic")}
                         active={editor.isActive("italic")}
                         onClick={() => editor.chain().focus().toggleItalic().run()}
                     >
                         <Italic className="size-4" />
                     </Control>
                     <Control
-                        label="Strikethrough"
+                        label={t("editor.strike")}
                         active={editor.isActive("strike")}
                         onClick={() => editor.chain().focus().toggleStrike().run()}
                     >
                         <Strikethrough className="size-4" />
                     </Control>
                     <Control
-                        label="Code"
+                        label={t("editor.blocks.code")}
                         active={editor.isActive("code")}
                         onClick={() => editor.chain().focus().toggleCode().run()}
                     >
@@ -135,7 +137,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                     <span className="mx-0.5 h-5 w-px bg-border" />
                     {editor.isActive("link") ? (
                         <Control
-                            label="Remove the link"
+                            label={t("editor.removeLink")}
                             onClick={() =>
                                 editor.chain().focus().extendMarkRange("link").unsetLink().run()
                             }
@@ -144,7 +146,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                         </Control>
                     ) : (
                         <Control
-                            label="Add a link"
+                            label={t("editor.addLink")}
                             onClick={() => {
                                 setHref(editor.getAttributes("link").href ?? "");
                                 setLinking(true);

@@ -21,6 +21,7 @@
  */
 
 import { useMemo } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Select } from "@polaris/ui";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { CodeBlock } from "@tiptap/extension-code-block";
@@ -36,12 +37,9 @@ import {
     type NodeViewProps
 } from "@tiptap/react";
 
-/** What the picker offers, once. Every grammar Polaris carries, plus the honest
- *  first entry: a block that is not any of them. */
-const OPTIONS = [
-    { value: "", label: "Plain text" },
-    ...CODE_LANGUAGES.map((language) => ({ value: language.id, label: language.label }))
-];
+/** Every grammar Polaris carries. The picker adds the honest first entry, a
+ *  block that is not any of them, in the reader's words. */
+const LANGUAGES = CODE_LANGUAGES.map((language) => ({ value: language.id, label: language.label }));
 
 const key = new PluginKey("polaris-code-highlight");
 
@@ -161,6 +159,7 @@ function highlightPlugin(): Plugin {
 
 /** The header: what this block is, and a way to say something else. */
 function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
+    const t = useTranslations("components");
     const token = typeof node.attrs.language === "string" ? node.attrs.language : "";
     // A fence tag is whatever was typed - "sh", "golang", "c++" - so the picker
     // shows the grammar it resolves to rather than the word, and an unknown one
@@ -179,11 +178,11 @@ function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
                 <Select
                     value={value}
                     disabled={!editor.isEditable}
-                    aria-label="Language of this code"
+                    aria-label={t("editor.codeLanguage")}
                     onValueChange={(next) => updateAttributes({ language: next || null })}
                     className="h-6 w-40 border-none bg-transparent px-1 text-[0.625rem] uppercase tracking-[0.06em]"
                     contentClassName="max-h-72"
-                    options={OPTIONS}
+                    options={[{ value: "", label: t("editor.plainText") }, ...LANGUAGES]}
                 />
             </div>
             <pre data-code="" className="overflow-x-auto p-3 font-mono text-xs leading-relaxed">

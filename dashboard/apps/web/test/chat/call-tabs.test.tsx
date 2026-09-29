@@ -18,6 +18,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { IncomingCalls } from "@/components/incoming-calls";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 /** The frame handler `useChatStream` was given, so a call can be made to arrive. */
 let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = null;
@@ -101,7 +102,7 @@ afterEach(() => {
 
 describe("a call ringing in several tabs", () => {
     it("puts it down when another tab has dealt with it", async () => {
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         onFrame?.(ring("m1"), { owner: true });
         expect(await screen.findByText("Grace is calling")).toBeTruthy();
 
@@ -113,7 +114,7 @@ describe("a call ringing in several tabs", () => {
     });
 
     it("ignores a message it cannot make sense of", async () => {
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         onFrame?.(ring("m1"), { owner: true });
         expect(await screen.findByText("Grace is calling")).toBeTruthy();
 
@@ -125,7 +126,7 @@ describe("a call ringing in several tabs", () => {
     });
 
     it("tells the others when it is the tab that declines", async () => {
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         onFrame?.(ring("m1"), { owner: true });
         fireEvent.click(await screen.findByLabelText("Decline"));
 
@@ -138,7 +139,7 @@ describe("a call ringing in several tabs", () => {
         // not survive is not arriving - a phone with its screen off has a stream
         // the operating system suspended, and it wakes up ringing about a call
         // answered on the desk five minutes ago. So it is asked as well.
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
         onFrame?.(ring("m1"), { owner: true });
         expect(await screen.findByText("Grace is calling")).toBeTruthy();
 
@@ -154,7 +155,7 @@ describe("a call ringing in several tabs", () => {
         // the card is not the only way in, and being in the call is the fact
         // every other tab needs.
         session = { meetingId: "m1", channelId: "c1", title: "Grace" };
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await vi.waitFor(() => expect(posted).toEqual([{ kind: "settled", meetingId: "m1" }]));
     });

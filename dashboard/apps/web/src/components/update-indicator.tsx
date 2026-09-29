@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { Badge } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { DownloadCloud } from "lucide-react";
 
@@ -17,6 +18,7 @@ import { DownloadCloud } from "lucide-react";
 const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export function UpdateIndicator() {
+    const t = useTranslations("components");
     const [available, setAvailable] = useState<{ behindBy: number | null } | null>(null);
 
     useEffect(() => {
@@ -51,13 +53,13 @@ export function UpdateIndicator() {
             href="/admin/settings"
             title={
                 available.behindBy
-                    ? `${available.behindBy} commit(s) behind - open settings`
-                    : "A new build is published - open settings"
+                    ? t("update.behind", { count: available.behindBy })
+                    : t("update.published")
             }
         >
             <Badge variant="primary" className="gap-1">
                 <DownloadCloud className="size-3.5" />
-                Update
+                {t("update.update")}
             </Badge>
         </Link>
     );

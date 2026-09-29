@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
 import { PERSONAL_SCOPE, formatScope } from "@polaris/core";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
@@ -47,6 +48,7 @@ export function ScopeSwitcher({
     current: ScopeOption | null;
 }) {
     const toast = useToast();
+    const t = useTranslations("components");
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
 
@@ -70,7 +72,7 @@ export function ScopeSwitcher({
             .then((outcome) => {
                 if (outcome.error) toast.show({ title: outcome.error });
             })
-            .catch(() => toast.show({ title: "That could not be switched. Try again." }))
+            .catch(() => toast.show({ title: t("scope.failed") }))
             .finally(() => setPending(false));
     };
 
@@ -81,7 +83,7 @@ export function ScopeSwitcher({
                     variant="ghost"
                     size="sm"
                     disabled={pending}
-                    aria-label={`Working in ${current?.name ?? personalName}`}
+                    aria-label={t("scope.workingIn", { name: current?.name ?? personalName })}
                     className="max-w-40 gap-1.5 px-2"
                 >
                     {current ? (
@@ -96,7 +98,7 @@ export function ScopeSwitcher({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-56">
-                <DropdownMenuLabel>Working in</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("scope.heading")}</DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => choose(PERSONAL_SCOPE)}>
                     <UserRound className="size-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate" title={personalName}>{personalName}</span>
@@ -116,7 +118,7 @@ export function ScopeSwitcher({
                         <DropdownMenuItem asChild>
                             <Link href={`/account/organizations/${current.slug}`}>
                                 <Settings2 className="size-4 shrink-0" />
-                                Manage {current.name}
+                                {t("scope.manage", { name: current.name })}
                             </Link>
                         </DropdownMenuItem>
                     </>

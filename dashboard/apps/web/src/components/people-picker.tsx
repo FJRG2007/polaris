@@ -26,6 +26,7 @@ import { cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { Loader2, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 
 export interface PickedPerson {
@@ -46,7 +47,7 @@ export function PeoplePicker({
     onChange,
     exclude = [],
     max,
-    label = "Add people",
+    label,
     search
 }: {
     picked: readonly PickedPerson[];
@@ -63,6 +64,7 @@ export function PeoplePicker({
         query: string
     ) => Promise<{ results?: { id: string; name: string }[]; withheld?: number }>;
 }) {
+    const t = useTranslations("components");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<readonly PickedPerson[]>([]);
     const [withheld, setWithheld] = useState(0);
@@ -116,7 +118,7 @@ export function PeoplePicker({
                                     </span>
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${person.name}`}
+                                        aria-label={t("picker.remove", { name: person.name })}
                                         onClick={() =>
                                             onChange(
                                                 picked.filter((entry) => entry.id !== person.id)
@@ -138,10 +140,8 @@ export function PeoplePicker({
                         value={query}
                         disabled={full}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder={
-                            full ? "That is as many as this holds" : "Name, email or username"
-                        }
-                        aria-label={label}
+                        placeholder={full ? t("picker.full") : t("picker.placeholder")}
+                        aria-label={label ?? t("picker.label")}
                         className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-7 text-sm hover:border-border-strong focus:border-border-strong disabled:opacity-60"
                     />
                     {searching && (
@@ -159,10 +159,7 @@ export function PeoplePicker({
                             and it holds back accounts with no chat to receive the
                             message. Every other caller answers with `withheld: 0`,
                             so this never appears where it would not be true. */}
-                        {withheld === 1
-                            ? "One account matches but does not have Chat."
-                            : `${withheld} accounts match but do not have Chat.`}{" "}
-                        An administrator can turn it on for them under People.
+                        {t("picker.withheld", { count: withheld })} {t("picker.withheldHint")}
                     </p>
                 )}
 
@@ -170,10 +167,10 @@ export function PeoplePicker({
                     {offered.length === 0 ? (
                         <li className="px-2 py-2 text-xs text-muted-foreground">
                             {query.trim().length < SHORTEST
-                                ? "Type a name, an email or a username."
+                                ? t("picker.typeSomething")
                                 : searching
-                                  ? "Looking"
-                                  : "Nobody found."}
+                                  ? t("picker.looking")
+                                  : t("picker.nobody")}
                         </li>
                     ) : (
                         offered.map((person) => (

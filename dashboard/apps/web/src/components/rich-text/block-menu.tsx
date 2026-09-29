@@ -56,66 +56,79 @@ export interface BlockCommand {
     readonly run: (editor: Editor, range: Range) => void;
 }
 
-const BLOCKS: readonly BlockCommand[] = [
+/** The blocks the slash offers, each named as `editor.blocks.<id>`. */
+export type BlockId =
+    | "text"
+    | "heading"
+    | "subheading"
+    | "smallHeading"
+    | "bullets"
+    | "numbered"
+    | "checklist"
+    | "quote"
+    | "code"
+    | "divider";
+
+const BLOCKS: readonly (Omit<BlockCommand, "label"> & { readonly id: BlockId })[] = [
     {
-        label: "Text",
+        id: "text",
         keywords: "paragraph plain",
         icon: Type,
         run: (editor, range) => editor.chain().focus().deleteRange(range).setParagraph().run()
     },
     {
-        label: "Heading",
+        id: "heading",
         keywords: "title h1",
         icon: Heading1,
         run: (editor, range) =>
             editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run()
     },
     {
-        label: "Subheading",
+        id: "subheading",
         keywords: "h2 section",
         icon: Heading2,
         run: (editor, range) =>
             editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run()
     },
     {
-        label: "Small heading",
+        id: "smallHeading",
         keywords: "h3",
         icon: Heading3,
         run: (editor, range) =>
             editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run()
     },
     {
-        label: "Bullet list",
+        id: "bullets",
         keywords: "unordered ul points",
         icon: List,
         run: (editor, range) => editor.chain().focus().deleteRange(range).toggleBulletList().run()
     },
     {
-        label: "Numbered list",
+        id: "numbered",
         keywords: "ordered ol steps",
         icon: ListOrdered,
         run: (editor, range) => editor.chain().focus().deleteRange(range).toggleOrderedList().run()
     },
     {
-        label: "Checklist",
+        id: "checklist",
         keywords: "todo task checkbox",
         icon: ListTodo,
         run: (editor, range) => editor.chain().focus().deleteRange(range).toggleTaskList().run()
     },
     {
-        label: "Quote",
+        id: "quote",
         keywords: "blockquote citation",
         icon: Quote,
         run: (editor, range) => editor.chain().focus().deleteRange(range).toggleBlockquote().run()
     },
     {
-        label: "Code",
+        id: "code",
         keywords: "snippet fence pre",
         icon: Code2,
         run: (editor, range) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run()
     },
     {
-        label: "Divider",
+        id: "divider",
         keywords: "rule separator hr line",
         icon: Minus,
         run: (editor, range) => editor.chain().focus().deleteRange(range).setHorizontalRule().run()
@@ -208,13 +221,18 @@ function commandEntries(commands: readonly SlashCommand[], term: string): BlockC
 
 /** What the list holds for what has been typed after the slash: the
  *  conversation's commands first, then the blocks. */
-export function menuItems(commands: readonly SlashCommand[], query: string): BlockCommand[] {
+export function menuItems(
+    commands: readonly SlashCommand[],
+    query: string,
+    say: (id: BlockId) => string = (id) => id
+): BlockCommand[] {
     const term = query.trim().toLowerCase();
     const offered = commandEntries(commands, term);
-    if (!term) return [...offered, ...BLOCKS];
+    const blocks = BLOCKS.map(({ id, ...block }) => ({ ...block, label: say(id) }));
+    if (!term) return [...offered, ...blocks];
     return [
         ...offered,
-        ...BLOCKS.filter(
+        ...blocks.filter(
             (block) => block.label.toLowerCase().includes(term) || block.keywords.includes(term)
         )
     ];
@@ -225,15 +243,18 @@ export const BlockMenu = Extension.create<{
     /** The conversation's commands, read when the list opens so they can change
      *  without the editor being built again. */
     commands: () => readonly SlashCommand[];
+    /** A block's name in the reader's language, read when the list opens. */
+    say: () => (id: BlockId) => string;
 }>({
     name: "polarisBlockMenu",
 
     addOptions() {
-        return { commands: () => [] };
+        return { commands: () => [], say: () => (id: BlockId) => id };
     },
 
     addProseMirrorPlugins() {
         const commands = this.options.commands;
+        const say = this.options.say;
         return [
             Suggestion<BlockCommand>({
                 editor: this.editor,
@@ -243,7 +264,7 @@ export const BlockMenu = Extension.create<{
                 // sentence is a slash, and inside code it is a path.
                 allow: ({ editor }) =>
                     !editor.isActive("codeBlock") && !editor.isActive("markdownBlock"),
-                items: ({ query }) => menuItems(commands(), query),
+                items: ({ query }) => menuItems(commands(), query, say()),
                 command: ({ editor, range, props }) => props.run(editor, range),
                 render: () => {
                     let renderer: ReactRenderer<

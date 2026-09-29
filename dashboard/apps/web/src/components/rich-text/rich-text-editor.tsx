@@ -21,6 +21,7 @@ import { BlockMenu, type SlashCommand } from "./block-menu";
 import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
 import { mentionExtension, popupOpen } from "./suggestion";
@@ -207,7 +208,7 @@ export function RichTextEditor({
     onBlur,
     onSubmit,
     onTyping,
-    placeholder = "Write something",
+    placeholder,
     disabled = false,
     autoFocus = false,
     focusAt = 0,
@@ -235,6 +236,11 @@ export function RichTextEditor({
     // editor was built, and read when the menu opens.
     const commands = useRef(slashCommands);
     commands.current = slashCommands;
+    // And for the words the menus say, which follow the page's language.
+    const t = useTranslations("components");
+    const words = useRef(t);
+    words.current = t;
+    const hint = placeholder ?? t("editor.placeholder");
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -267,11 +273,14 @@ export function RichTextEditor({
         // conversation, and offering "@everyone" in a task description would name
         // a set of people nobody can point at.
         () => [
-            ...baseExtensions(placeholder),
-            BlockMenu.configure({ commands: () => commands.current ?? [] }),
+            ...baseExtensions(hint),
+            BlockMenu.configure({
+                commands: () => commands.current ?? [],
+                say: () => (id) => words.current(`editor.blocks.${id}`)
+            }),
             mentionExtension(search, mentionsIn !== null && roomMentions)
         ],
-        [placeholder, search, mentionsIn, roomMentions]
+        [hint, search, mentionsIn, roomMentions]
     );
 
     /** What goes into the editor for a value: the document, with a line to write

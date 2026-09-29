@@ -9,6 +9,7 @@ import type { Editor } from "@tiptap/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useCloseOnEscape } from "@/app/(app)/chat/close-on-escape";
+import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("@tiptap/react/menus", () => ({
     BubbleMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
@@ -28,7 +29,7 @@ function Conversation({ onClose }: { onClose: () => void }) {
 describe("the link field over a selection", () => {
     it("closes on Escape without closing the conversation", () => {
         const onClose = vi.fn();
-        render(<Conversation onClose={onClose} />);
+        render(<Conversation onClose={onClose} />, { wrapper: MessagesWrapper });
         fireEvent.click(screen.getByRole("button", { name: "Add a link" }));
 
         fireEvent.keyDown(screen.getByRole("textbox", { name: "Link address" }), {

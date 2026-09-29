@@ -27,6 +27,7 @@
  */
 
 import { useAppUrl } from "@/components/app-url";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageItems, type ActionableImage } from "@/components/image-actions";
 import { MoreHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
@@ -74,6 +75,7 @@ export function ImageViewer({
     onForward?: (messageId: string) => void;
     onReport?: (messageId: string) => void;
 }) {
+    const t = useTranslations("components");
     const baseUrl = useAppUrl();
     const [zoom, setZoom] = useState(1);
     const [at, setAt] = useState({ x: 0, y: 0 });
@@ -132,7 +134,7 @@ export function ImageViewer({
 
                 <button
                     type="button"
-                    aria-label="Zoom out"
+                    aria-label={t("viewer.zoomOut")}
                     onClick={() => setZoom((current) => step(current, -1))}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -143,7 +145,7 @@ export function ImageViewer({
                 </span>
                 <button
                     type="button"
-                    aria-label="Zoom in"
+                    aria-label={t("viewer.zoomIn")}
                     onClick={() => setZoom((current) => step(current, 1))}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -154,7 +156,7 @@ export function ImageViewer({
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            aria-label="More for this picture"
+                            aria-label={t("viewer.more")}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <MoreHorizontal className="size-4" />
@@ -167,7 +169,7 @@ export function ImageViewer({
 
                 <button
                     type="button"
-                    aria-label="Close"
+                    aria-label={t("viewer.close")}
                     onClick={onClose}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >

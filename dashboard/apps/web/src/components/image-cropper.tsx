@@ -28,6 +28,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -158,6 +159,7 @@ export function ImageCropDialog({
     // mounts a commit later than this component, so a ref read in the first
     // effect is still null and an effect that ran once would never look again -
     // leaving the frame unmeasured and the picture invisible.
+    const t = useTranslations("components");
     const [stage, setStage] = useState<HTMLDivElement | null>(null);
     const pointers = useRef(new Map<number, { x: number; y: number }>());
     const pinch = useRef<{ spread: number; zoom: number } | null>(null);
@@ -251,7 +253,7 @@ export function ImageCropDialog({
             if (!blob) throw new Error("no blob");
             onCropped(blob);
         } catch {
-            setError("This browser could not save that picture");
+            setError(t("cropper.saveFailed"));
         } finally {
             // Put back either way. The caller normally takes the dialog away at
             // this point, but a caller that keeps it open must not be left with
@@ -266,10 +268,9 @@ export function ImageCropDialog({
         <Dialog open onOpenChange={(next) => !next && !working && onCancel()}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Frame the picture</DialogTitle>
+                    <DialogTitle>{t("cropper.title")}</DialogTitle>
                     <DialogDescription>
-                        What is inside the frame is what everybody else sees. Drag it to move, and use
-                        the slider to zoom.
+                        {t("cropper.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -324,7 +325,7 @@ export function ImageCropDialog({
                                 height: event.currentTarget.naturalHeight
                             })
                         }
-                        onError={() => setError("That file could not be read as an image")}
+                        onError={() => setError(t("cropper.unreadable"))}
                         className="pointer-events-none absolute max-w-none select-none"
                         style={
                             source && crop && drawn
@@ -361,7 +362,7 @@ export function ImageCropDialog({
                     <div
                         tabIndex={0}
                         role="group"
-                        aria-label="Move the picture inside the frame with the arrow keys"
+                        aria-label={t("cropper.move")}
                         className={`absolute cursor-move ${shape.round ? "rounded-full" : "rounded-md"}`}
                         style={{ left: frameLeft, top: SPILL, width: frameWidth, height: frameHeight }}
                         onKeyDown={(event) => {
@@ -382,7 +383,7 @@ export function ImageCropDialog({
                 </div>
 
                 <label className="mt-3 flex items-center gap-3 text-xs">
-                    <span className="text-foreground-subtle font-medium">Zoom</span>
+                    <span className="text-foreground-subtle font-medium">{t("cropper.zoom")}</span>
                     <input
                         type="range"
                         min={100}
@@ -390,7 +391,7 @@ export function ImageCropDialog({
                         step={1}
                         value={Math.round(framing.zoom * 100)}
                         disabled={!source}
-                        aria-label="Zoom"
+                        aria-label={t("cropper.zoom")}
                         onChange={(event) => setZoom(Number(event.target.value) / 100)}
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
                     />
@@ -404,11 +405,11 @@ export function ImageCropDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" disabled={working} onClick={onCancel}>
-                        Cancel
+                        {t("ui.cancel")}
                     </Button>
                     <Button disabled={working || !source || Boolean(error)} onClick={() => void save()}>
                         {working ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        Save
+                        {t("cropper.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

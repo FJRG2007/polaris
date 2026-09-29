@@ -18,6 +18,7 @@
 import { IncomingCalls } from "@/components/incoming-calls";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = null;
 /** Whether the tab's own audio would be heard, as `call-sounds` answers it. */
@@ -109,7 +110,7 @@ afterEach(() => {
 describe("a call arriving while nobody is looking at the tab", () => {
     it("lets the notice ring when the tab's own sound cannot be", async () => {
         audible = false;
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await act(async () => onFrame?.(ring, { owner: true }));
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
@@ -125,7 +126,7 @@ describe("a call arriving while nobody is looking at the tab", () => {
         // one whose audio the browser had never allowed, the notice tab stayed
         // silent because "the ring is already sounding", and the call arrived in
         // silence. Whoever holds this knows whether its own ring can be heard.
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await act(async () => onFrame?.(ring, { owner: true }));
 
@@ -137,7 +138,7 @@ describe("a call arriving while nobody is looking at the tab", () => {
 
     it("keeps the notice silent when the ring is already sounding", async () => {
         audible = true;
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await act(async () => onFrame?.(ring, { owner: true }));
 
@@ -153,7 +154,7 @@ describe("a call arriving on a tab that is on screen", () => {
     it("draws nothing over a tab that is being read and can ring", async () => {
         watched = true;
         audible = true;
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await act(async () => onFrame?.(ring, { owner: true }));
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
@@ -174,7 +175,7 @@ describe("a call arriving on a tab that is on screen", () => {
         // believed somebody was looking at it.
         watched = true;
         audible = false;
-        render(<IncomingCalls viewerId="ada" />);
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
 
         await act(async () => onFrame?.(ring, { owner: true }));
 

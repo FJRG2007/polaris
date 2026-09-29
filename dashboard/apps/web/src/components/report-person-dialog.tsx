@@ -16,6 +16,7 @@ import { useState } from "react";
 import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BlockAfterReport } from "@/components/block-after-report";
 import { reportPersonAction } from "@/app/(app)/account/report-actions";
 import {
@@ -43,6 +44,7 @@ export function ReportPersonDialog({
 }) {
     const [reason, setReason] = useState<core.UserReportReason>("abuse");
     const [note, setNote] = useState("");
+    const t = useTranslations("components");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sent, setSent] = useState(false);
@@ -74,11 +76,11 @@ export function ReportPersonDialog({
         >
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Report this account</DialogTitle>
+                    <DialogTitle>{t("report.title")}</DialogTitle>
                     <DialogDescription>
                         {sent
-                            ? "It has gone to whoever administers this Polaris. They decide what happens next."
-                            : "This goes to whoever administers this Polaris. Reporting somebody does not block them - that is yours to do separately, and it works straight away."}
+                            ? t("report.sent")
+                            : t("report.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -87,24 +89,24 @@ export function ReportPersonDialog({
                 ) : (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            What is wrong
+                            {t("report.what")}
                             <Select
                                 value={reason}
-                                aria-label="Why you are reporting them"
+                                aria-label={t("report.why")}
                                 onValueChange={(value) => setReason(value as core.UserReportReason)}
                                 options={core.USER_REPORT_REASONS.map((value) => ({
                                     value,
-                                    label: core.USER_REPORT_REASON_LABELS[value]
+                                    label: t(`report.reasons.${value}`)
                                 }))}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            What happened
+                            {t("report.happened")}
                             <Textarea
                                 rows={4}
                                 value={note}
                                 maxLength={core.MAX_REPORT_NOTE}
-                                placeholder="Optional, and the most useful part. Where it happened and roughly when."
+                                placeholder={t("report.notePlaceholder")}
                                 onChange={(event) => setNote(event.target.value)}
                             />
                         </label>
@@ -121,12 +123,12 @@ export function ReportPersonDialog({
                         variant={sent ? "primary" : "ghost"}
                         onClick={() => onOpenChange(false)}
                     >
-                        {sent ? "Done" : "Cancel"}
+                        {sent ? t("report.done") : t("ui.cancel")}
                     </Button>
                     {sent ? null : (
                         <Button variant="danger" disabled={busy} onClick={() => void send()}>
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Report
+                            {t("report.report")}
                         </Button>
                     )}
                 </DialogFooter>

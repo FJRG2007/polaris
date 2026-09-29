@@ -14,6 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
+import { MessagesWrapper } from "../setup/i18n";
 
 afterEach(() => {
     cleanup();
@@ -46,7 +47,7 @@ function stubDrive(): void {
 describe("choosing a file for a screen that takes some of them", () => {
     it("lists only what the screen accepts", async () => {
         stubDrive();
-        render(<FilePickerDialog accept=".xlsx,.csv" onPick={() => {}} onClose={() => {}} />);
+        render(<FilePickerDialog accept=".xlsx,.csv" onPick={() => {}} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
         expect(screen.queryByText("Clip.mp4")).toBeNull();
@@ -57,7 +58,7 @@ describe("choosing a file for a screen that takes some of them", () => {
 
     it("lists everything when the screen said nothing", async () => {
         stubDrive();
-        render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />);
+        render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
         expect(screen.getByText("Clip.mp4")).toBeTruthy();
@@ -65,7 +66,7 @@ describe("choosing a file for a screen that takes some of them", () => {
 
     it("hands the same list to the machine's own chooser", async () => {
         stubDrive();
-        render(<FilePickerDialog accept=".xlsx,.csv" onPick={() => {}} onClose={() => {}} />);
+        render(<FilePickerDialog accept=".xlsx,.csv" onPick={() => {}} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await userEvent.click(screen.getByRole("button", { name: "Upload" }));
         const input = document.querySelector('input[type="file"]');

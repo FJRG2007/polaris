@@ -9,7 +9,13 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { menuItems } from "@/components/rich-text/block-menu";
+import { menuItems as blocksFor, type SlashCommand } from "@/components/rich-text/block-menu";
+import { translatorFor } from "@/lib/i18n/translate";
+
+/** The list as an English reader is shown it. */
+const english = translatorFor("en-US", "components");
+const menuItems = (commands: readonly SlashCommand[], query: string) =>
+    blocksFor(commands, query, (id) => english(`editor.blocks.${id}`));
 import { GameLinkChips, GameLinkMark } from "@/app/(app)/chat/game-link-badge";
 
 afterEach(cleanup);

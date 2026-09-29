@@ -19,6 +19,7 @@
 import { copyText, downloadFile } from "@/app/(app)/chat/links";
 import { Copy, Download, ExternalLink, Flag, Forward, Link2 } from "lucide-react";
 import type { DropdownMenuItem, DropdownMenuSeparator } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface ActionableImage {
     readonly url: string;
@@ -78,17 +79,17 @@ export function sharable(url: string): boolean {
  * image expects to paste an image. PNG because that is the one format every
  * clipboard implementation takes.
  */
-export async function copyImage(url: string): Promise<string> {
+export async function copyImage(url: string): Promise<"copied" | "refused"> {
     try {
         const response = await fetch(url);
         const blob = await response.blob();
         const painted = await toPng(blob);
         await navigator.clipboard.write([new ClipboardItem({ "image/png": painted })]);
-        return "Copied";
+        return "copied";
     } catch {
         // A browser without the clipboard image API, or a refused permission.
         // The link is the honest fallback and is one press away.
-        return "This browser would not take the image - copy the link instead";
+        return "refused";
     }
 }
 
@@ -99,7 +100,24 @@ export async function copyImage(url: string): Promise<string> {
  * list can be a dropdown in one place and a right-click menu in another without
  * either of them growing a copy of it.
  */
-export function imageItems({
+export function imageItems(props: ImageItemsProps): React.ReactNode {
+    // A component of its own, so the words can follow the page's language
+    // however the caller builds its menu.
+    return <ImageItems {...props} />;
+}
+
+interface ImageItemsProps {
+    image: ActionableImage;
+    kind?: "image" | "video";
+    baseUrl: string;
+    announce: (words: string) => void;
+    onForward?: (messageId: string) => void;
+    onReport?: (messageId: string) => void;
+    Item: typeof DropdownMenuItem;
+    Separator: typeof DropdownMenuSeparator;
+}
+
+function ImageItems({
     image,
     kind = "image",
     baseUrl,
@@ -131,42 +149,49 @@ export function imageItems({
     Item: typeof DropdownMenuItem;
     Separator: typeof DropdownMenuSeparator;
 }): React.ReactNode {
+    const t = useTranslations("components");
     const messageId = image.messageId;
     return (
         <>
             {kind === "image" && (
-                <Item onSelect={() => void copyImage(image.url).then(announce)}>
+                <Item
+                    onSelect={() =>
+                        void copyImage(image.url).then((outcome) =>
+                            announce(outcome === "copied" ? t("images.copied") : t("images.copyRefused"))
+                        )
+                    }
+                >
                     <Copy className="size-3.5" />
-                    Copy image
+                    {t("images.copy")}
                 </Item>
             )}
             {sharable(image.url) && (
                 <Item
                     onSelect={() => {
                         void copyText(imageLink(image.url, baseUrl));
-                        announce("Link copied");
+                        announce(t("images.linkCopied"));
                     }}
                 >
                     <Link2 className="size-3.5" />
-                    Copy media link
+                    {t("images.copyLink")}
                 </Item>
             )}
             {savable(image.url) && (
                 <Item onSelect={() => downloadFile(image.url, image.name)}>
                     <Download className="size-3.5" />
-                    {kind === "video" ? "Download video" : "Download"}
+                    {kind === "video" ? t("images.downloadVideo") : t("images.download")}
                 </Item>
             )}
             {sharable(image.url) && (
                 <Item onSelect={() => window.open(image.url, "_blank", "noopener,noreferrer")}>
                     <ExternalLink className="size-3.5" />
-                    Open in the browser
+                    {t("images.open")}
                 </Item>
             )}
             {onForward && image.forwardable && messageId && (
                 <Item onSelect={() => onForward(messageId)}>
                     <Forward className="size-3.5" />
-                    Forward
+                    {t("images.forward")}
                 </Item>
             )}
             {onReport && messageId && (
@@ -174,7 +199,7 @@ export function imageItems({
                     <Separator />
                     <Item variant="danger" onSelect={() => onReport(messageId)}>
                         <Flag className="size-3.5" />
-                        Report
+                        {t("report.report")}
                     </Item>
                 </>
             )}

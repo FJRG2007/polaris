@@ -202,5 +202,215 @@
             "attachment": "Attachment",
             "saidIn": "{author} in {channel}"
         }
+    },
+    "editor": {
+        "blocks": {
+            "text": "Text",
+            "heading": "Heading",
+            "subheading": "Subheading",
+            "smallHeading": "Small heading",
+            "bullets": "Bullet list",
+            "numbered": "Numbered list",
+            "checklist": "Checklist",
+            "quote": "Quote",
+            "code": "Code",
+            "divider": "Divider"
+        },
+        "placeholder": "Write something",
+        "cut": "Cut",
+        "nothingToPaste": "Nothing to paste",
+        "paste": "Paste",
+        "bold": "Bold",
+        "italic": "Italic",
+        "strike": "Strikethrough",
+        "bulleted": "Bulleted list",
+        "linkAddress": "Link address",
+        "pasteLink": "Paste a link",
+        "applyLink": "Apply the link",
+        "removeLink": "Remove the link",
+        "addLink": "Add a link",
+        "copyCode": "Copy this code",
+        "codeLanguage": "Language of this code",
+        "plainText": "Plain text",
+        "done": "Done",
+        "notDone": "Not done",
+        "noAccess": "You do not have access to this",
+        "unavailable": "Unavailable",
+        "unnamed": {
+            "channel": "Conversation",
+            "message": "Message",
+            "task": "Task",
+            "doc": "Document",
+            "note": "Note"
+        }
+    },
+    "picker": {
+        "remove": "Remove {name}",
+        "full": "That is as many as this holds",
+        "placeholder": "Name, email or username",
+        "label": "Add people",
+        "withheld": "{count, plural, one {One account matches but does not have Chat.} other {# accounts match but do not have Chat.}}",
+        "withheldHint": "An administrator can turn it on for them under People.",
+        "typeSomething": "Type a name, an email or a username.",
+        "looking": "Looking",
+        "nobody": "Nobody found."
+    },
+    "files": {
+        "tabs": {
+            "recent": "Recent",
+            "mine": "My files",
+            "shared": "Shared with me",
+            "upload": "Upload",
+            "url": "By address"
+        },
+        "kinds": {
+            "image": "Images",
+            "document": "Documents",
+            "sheet": "Spreadsheets",
+            "media": "Audio and video",
+            "archive": "Archives"
+        },
+        "title": "Attach a file",
+        "addressHint": "Polaris fetches it, not your browser, so the site it comes from learns nothing about you.",
+        "chosen": "{count, plural, one {# file chosen} other {# files chosen}}",
+        "folderFailed": "That folder could not be opened.",
+        "where": "Where to look",
+        "storage": "Which storage",
+        "search": "Search these files",
+        "onlyShow": "Only show",
+        "everything": "Everything",
+        "nothing": "Nothing here",
+        "tryOther": "Try another storage, or upload from this machine.",
+        "noMatch": "Nothing in this folder matches what you are looking for.",
+        "drop": "Drop files here, or choose them from this machine.",
+        "choose": "Choose files",
+        "address": "Address of the file",
+        "attachIt": "Attach it",
+        "noneChosen": "Nothing chosen",
+        "attach": "Attach"
+    },
+    "transfers": {
+        "label": "Transfers",
+        "finished": "Finished",
+        "clearFinished": "Clear the finished transfers",
+        "clearFinishedShort": "Clear the finished ones",
+        "stopNamed": "Stop sending {name}",
+        "stop": "Stop",
+        "clearNamed": "Clear {name}",
+        "clear": "Clear",
+        "stopped": "Stopped",
+        "sent": "Sent",
+        "saved": "Saved",
+        "starting": "Starting",
+        "waiting": "Waiting for the server",
+        "ofTotal": "{moved} of {total}",
+        "left": "{size} - about {left} left",
+        "both": "{up} going up, {down} coming down",
+        "sending": "{count, plural, one {Sending a file} other {Sending # files}}",
+        "getting": "{count, plural, one {Getting a file} other {Getting # files}}"
+    },
+    "calls": {
+        "inNamed": "in {name}",
+        "inGroup": "{size, plural, =0 {in a group} other {in a group of #}}",
+        "calling": "{name} is calling",
+        "somebody": "Somebody",
+        "groupAnswer": "Group call {where}. Answer in Polaris",
+        "answerHere": "Answer in Polaris",
+        "missedGroup": "Missed group call {where}",
+        "missed": "Missed call",
+        "onlyThisTab": "Polaris can only ring this tab. Let it reach you anywhere.",
+        "blocked": "This browser is blocking Polaris' notices, so a call can only ring in this tab.",
+        "whatToDo": "What to do about it",
+        "callBack": "Call back",
+        "dismiss": "Dismiss",
+        "group": "Group call {where}",
+        "answer": "Answer",
+        "silence": "Silence the ring",
+        "decline": "Decline"
+    },
+    "report": {
+        "blocked": "{name} is blocked",
+        "blockQuestion": "Block {name}?",
+        "blockedHint": "They cannot message or call you, and you will not see what they say.",
+        "blockHint": "Separate from the report, and it works straight away. Nobody is told.",
+        "block": "Block",
+        "reasons": {
+            "spam": "Spam or scams",
+            "abuse": "Harassment or abuse",
+            "impersonation": "Pretending to be somebody else",
+            "sexual": "Sexual content",
+            "illegal": "Something illegal",
+            "other": "Something else"
+        },
+        "title": "Report this account",
+        "sent": "It has gone to whoever administers this Polaris. They decide what happens next.",
+        "intro": "This goes to whoever administers this Polaris. Reporting somebody does not block them - that is yours to do separately, and it works straight away.",
+        "what": "What is wrong",
+        "why": "Why you are reporting them",
+        "happened": "What happened",
+        "notePlaceholder": "Optional, and the most useful part. Where it happened and roughly when.",
+        "done": "Done",
+        "report": "Report"
+    },
+    "images": {
+        "copied": "Copied",
+        "copyRefused": "This browser would not take the image - copy the link instead",
+        "copy": "Copy image",
+        "linkCopied": "Link copied",
+        "copyLink": "Copy media link",
+        "downloadVideo": "Download video",
+        "download": "Download",
+        "open": "Open in the browser",
+        "forward": "Forward"
+    },
+    "cropper": {
+        "intro": "What is inside the frame is what everybody else sees. Drag it to move, and use the slider to zoom.",
+        "saveFailed": "This browser could not save that picture",
+        "unreadable": "That file could not be read as an image",
+        "title": "Frame the picture",
+        "move": "Move the picture inside the frame with the arrow keys",
+        "zoom": "Zoom",
+        "save": "Save"
+    },
+    "viewer": {
+        "watchingNamed": "Watching {name}",
+        "watching": "Watching a video",
+        "playNamed": "Play {name}",
+        "play": "Play the video",
+        "zoomOut": "Zoom out",
+        "zoomIn": "Zoom in",
+        "more": "More for this picture",
+        "close": "Close"
+    },
+    "mutual": {
+        "friends": "{count, plural, one {# friend in common} other {# friends in common}}",
+        "spaces": "{count, plural, one {# space in common} other {# spaces in common}}"
+    },
+    "listen": {
+        "failed": "That did not work. Try again.",
+        "unreachable": "Polaris could not be reached. Try again.",
+        "stopTitle": "Stop following their music",
+        "startTitle": "Play this on your own Spotify, in step with them",
+        "stop": "Stop listening along",
+        "start": "Listen along",
+        "connections": "Connected accounts"
+    },
+    "build": {
+        "title": "Polaris has been updated",
+        "body": "This tab is still running the previous version. Reload when you are ready - anything half-written on this page is lost{call, select, yes {, though you will come straight back into your call} other {}}.",
+        "reload": "Reload",
+        "hide": "Hide until something needs it",
+        "later": "Later"
+    },
+    "update": {
+        "behind": "{count} commit(s) behind - open settings",
+        "published": "A new build is published - open settings",
+        "update": "Update"
+    },
+    "scope": {
+        "failed": "That could not be switched. Try again.",
+        "workingIn": "Working in {name}",
+        "heading": "Working in",
+        "manage": "Manage {name}"
     }
 }

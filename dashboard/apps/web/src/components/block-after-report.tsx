@@ -19,6 +19,7 @@
 import { useState } from "react";
 import { Button } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2, ShieldBan, ShieldCheck } from "lucide-react";
 import { blockPersonAction } from "@/app/(app)/account/privacy/actions";
 
@@ -31,6 +32,7 @@ export function BlockAfterReport({
     person: { id: string; name: string } | null;
 }) {
     const [blocked, setBlocked] = useState(false);
+    const t = useTranslations("components");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -51,12 +53,12 @@ export function BlockAfterReport({
             <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0">
                     <span className="block text-sm">
-                        {blocked ? `${person.name} is blocked` : `Block ${person.name}?`}
+                        {blocked
+                            ? t("report.blocked", { name: person.name })
+                            : t("report.blockQuestion", { name: person.name })}
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                        {blocked
-                            ? "They cannot message or call you, and you will not see what they say."
-                            : "Separate from the report, and it works straight away. Nobody is told."}
+                        {blocked ? t("report.blockedHint") : t("report.blockHint")}
                     </span>
                 </span>
                 {blocked ? (
@@ -68,7 +70,7 @@ export function BlockAfterReport({
                         ) : (
                             <ShieldBan className="size-3.5" />
                         )}
-                        Block
+                        {t("report.block")}
                     </Button>
                 )}
             </div>

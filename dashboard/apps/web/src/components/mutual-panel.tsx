@@ -26,6 +26,7 @@
 import Link from "next/link";
 import { Hash, Users } from "lucide-react";
 import { AvatarStack } from "@/components/avatar";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow } from "@/components/person-name";
 
 export interface MutualPanelProps {
@@ -42,6 +43,7 @@ export interface MutualPanelProps {
 }
 
 export function MutualPanel({ friends, spaces, compact = false }: MutualPanelProps) {
+    const t = useTranslations("components");
     if (friends.total === 0 && spaces.total === 0) return null;
 
     return (
@@ -50,7 +52,7 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                 <div className="flex flex-col gap-1.5">
                     <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
                         <Users className="size-3.5 shrink-0" />
-                        {friends.total === 1 ? "1 friend in common" : `${friends.total} friends in common`}
+                        {t("mutual.friends", { count: friends.total })}
                     </p>
                     <div className="flex items-center gap-2 px-1.5">
                         {/* The faces, and then the names in writing. The stack
@@ -85,7 +87,7 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                 <div className="flex flex-col gap-1.5">
                     <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
                         <Hash className="size-3.5 shrink-0" />
-                        {spaces.total === 1 ? "1 space in common" : `${spaces.total} spaces in common`}
+                        {t("mutual.spaces", { count: spaces.total })}
                     </p>
                     <ul className="flex flex-col gap-0.5">
                         {spaces.spaces.map((space) => (

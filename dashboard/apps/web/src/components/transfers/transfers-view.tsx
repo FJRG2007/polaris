@@ -21,6 +21,8 @@
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Check, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     clearSettledTransfers,
     clearTransfer,
@@ -31,6 +33,7 @@ import {
 } from "./transfer-store";
 
 export function TransfersView() {
+    const t = useTranslations("components");
     const transfers = useTransfers();
     // A clock, so "40 seconds left" counts down rather than sitting at whatever it
     // said when the last chunk landed. Only while something is moving.
@@ -52,7 +55,7 @@ export function TransfersView() {
 
     return (
         <div
-            aria-label="Transfers"
+            aria-label={t("transfers.label")}
             /**
              * Above whatever is docked in this corner, not on top of it.
              *
@@ -70,15 +73,15 @@ export function TransfersView() {
         >
             <div className="flex items-center gap-2">
                 <p className="flex-1 text-xs font-medium text-muted-foreground">
-                    {moving ? countSaid(transfers) : "Finished"}
+                    {moving ? countSaid(transfers, t) : t("transfers.finished")}
                 </p>
                 {settled.length > 0 && (
                     <button
                         type="button"
                         onClick={clearSettledTransfers}
                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Clear the finished transfers"
-                        title="Clear the finished ones"
+                        aria-label={t("transfers.clearFinished")}
+                        title={t("transfers.clearFinishedShort")}
                     >
                         <X className="size-3.5" />
                     </button>
@@ -94,6 +97,7 @@ export function TransfersView() {
 }
 
 function TransferRow({ transfer }: { transfer: Transfer }) {
+    const t = useTranslations("components");
     const fraction = transferFraction(transfer);
     const left = transferSecondsLeft(transfer);
     const failed = transfer.state === "failed";
@@ -115,8 +119,8 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
                     <button
                         type="button"
                         onClick={transfer.stop}
-                        aria-label={`Stop sending ${transfer.name}`}
-                        title="Stop"
+                        aria-label={t("transfers.stopNamed", { name: transfer.name })}
+                        title={t("transfers.stop")}
                         className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
                         <X className="size-3" />
@@ -125,8 +129,8 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
                     <button
                         type="button"
                         onClick={() => clearTransfer(transfer.id)}
-                        aria-label={`Clear ${transfer.name}`}
-                        title="Clear"
+                        aria-label={t("transfers.clearNamed", { name: transfer.name })}
+                        title={t("transfers.clear")}
                         className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
                         <X className="size-3" />
@@ -161,33 +165,37 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
             )}
 
             <p className={cn("text-[0.6875rem]", failed ? "text-danger" : "text-muted-foreground")}>
-                {failed ? transfer.error : said(transfer, left)}
+                {failed ? transfer.error : said(transfer, left, t)}
             </p>
         </li>
     );
 }
 
 /** What the row says under the bar. */
-function said(transfer: Transfer, secondsLeft: number | null): string {
-    if (transfer.state === "stopped") return "Stopped";
-    if (transfer.state === "done") return transfer.way === "up" ? "Sent" : "Saved";
+function said(transfer: Transfer, secondsLeft: number | null, t: Words): string {
+    if (transfer.state === "stopped") return t("transfers.stopped");
+    if (transfer.state === "done") return transfer.way === "up" ? t("transfers.sent") : t("transfers.saved");
     if (transfer.state === "waiting") {
-        return transfer.way === "up" ? "Starting" : "Waiting for the server";
+        return transfer.way === "up" ? t("transfers.starting") : t("transfers.waiting");
     }
-    const size = transfer.total ? `${readable(transfer.moved)} of ${readable(transfer.total)}` : readable(transfer.moved);
-    return secondsLeft === null ? size : `${size} - about ${clock(secondsLeft)} left`;
+    const size = transfer.total
+        ? t("transfers.ofTotal", { moved: readable(transfer.moved), total: readable(transfer.total) })
+        : readable(transfer.moved);
+    return secondsLeft === null ? size : t("transfers.left", { size, left: clock(secondsLeft) });
 }
 
-function countSaid(transfers: readonly Transfer[]): string {
+function countSaid(transfers: readonly Transfer[], t: Words): string {
     const moving = transfers.filter(
         (transfer) => transfer.state === "waiting" || transfer.state === "moving"
     );
     const up = moving.filter((transfer) => transfer.way === "up").length;
     const down = moving.length - up;
-    if (up > 0 && down > 0) return `${up} going up, ${down} coming down`;
-    if (up > 0) return up === 1 ? "Sending a file" : `Sending ${up} files`;
-    return down === 1 ? "Getting a file" : `Getting ${down} files`;
+    if (up > 0 && down > 0) return t("transfers.both", { up, down });
+    if (up > 0) return t("transfers.sending", { count: up });
+    return t("transfers.getting", { count: down });
 }
+
+type Words = NamespaceTranslator<"components">;
 
 /** A size somebody can read at a glance. */
 function readable(bytes: number): string {

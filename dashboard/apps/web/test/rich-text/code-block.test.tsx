@@ -16,9 +16,10 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RichText } from "@/components/rich-text/rich-text";
+import { withMessages } from "../setup/i18n";
 
 function render(markdown: string): string {
-    return renderToStaticMarkup(<RichText value={markdown} />);
+    return renderToStaticMarkup(withMessages(<RichText value={markdown} />));
 }
 
 describe("a fence", () => {

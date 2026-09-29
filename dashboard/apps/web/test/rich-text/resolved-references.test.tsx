@@ -19,6 +19,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RichText, type ResolvedReference } from "@/components/rich-text/rich-text";
+import { withMessages } from "../setup/i18n";
 
 const CHANNEL = "0193aaaa-1111-4222-8333-444444444444";
 const MESSAGE = "0193bbbb-5555-4666-8777-888888888888";
@@ -29,9 +30,9 @@ function render(
     references?: ReadonlyMap<string, ResolvedReference>,
     origin: string | null = null
 ): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <RichText value={markdown} references={references} origin={origin} />
-    );
+    ));
 }
 
 describe("what a chip says", () => {

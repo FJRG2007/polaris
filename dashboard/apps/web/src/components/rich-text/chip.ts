@@ -30,17 +30,23 @@ export function chipClass(kind: refs.ReferenceKind): string {
  * the real name; this is what is drawn until then, and on the screens that
  * resolve nothing.
  */
+// i18n-ignore: the English kept for where nobody is reading - an excerpt, the
+// editor's schema. A drawn chip passes the reader's words (`unnamed`).
 const UNNAMED: Partial<Record<refs.ReferenceKind, string>> = {
-    channel: "Conversation",
-    message: "Message",
-    task: "Task",
-    doc: "Document",
-    note: "Note"
+    channel: "Conversation", // i18n-ignore
+    message: "Message", // i18n-ignore
+    task: "Task", // i18n-ignore
+    doc: "Document", // i18n-ignore
+    note: "Note" // i18n-ignore
 };
 
 /** What a chip says: an @ for a person or a team, the name alone otherwise. */
-export function chipLabel(kind: refs.ReferenceKind, label: string): string {
+export function chipLabel(
+    kind: refs.ReferenceKind,
+    label: string,
+    unnamed: (kind: refs.ReferenceKind) => string | undefined = (of) => UNNAMED[of]
+): string {
     const named =
-        /^https?:\/\//i.test(label.trim()) || !label.trim() ? (UNNAMED[kind] ?? label) : label;
+        /^https?:\/\//i.test(label.trim()) || !label.trim() ? (unnamed(kind) ?? label) : label;
     return `${refs.referenceSigil(kind)}${named}`;
 }

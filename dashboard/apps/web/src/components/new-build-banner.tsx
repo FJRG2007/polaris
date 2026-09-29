@@ -20,6 +20,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowUpCircle, RotateCcw } from "lucide-react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { rememberCall } from "@/app/(app)/chat/call-resume";
@@ -36,6 +37,7 @@ import {
 const POLL_MS = 2 * 60 * 1000;
 
 export function NewBuildBanner({ served }: { served: string | null }) {
+    const t = useTranslations("components");
     const [dismissed, setDismissed] = useState(false);
     const ready = useSyncExternalStore(subscribeToBuild, newBuildReady, () => false);
     // Null on an instance without Chat, where there is no call to lose.
@@ -92,25 +94,23 @@ export function NewBuildBanner({ served }: { served: string | null }) {
         >
             <span className="flex items-center gap-2.5">
                 <ArrowUpCircle className="size-4 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1 text-sm font-medium">Polaris has been updated</span>
+                <span className="min-w-0 flex-1 text-sm font-medium">{t("build.title")}</span>
             </span>
             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                This tab is still running the previous version. Reload when you are ready -
-                anything half-written on this page is lost
-                {held?.session ? ", though you will come straight back into your call" : ""}.
+                {t("build.body", { call: held?.session ? "yes" : "no" })}
             </p>
             <span className="flex items-center gap-2">
                 <Button size="sm" className="flex-1" onClick={reload}>
                     <RotateCcw className="size-4" />
-                    Reload
+                    {t("build.reload")}
                 </Button>
                 <Button
                     size="sm"
                     variant="secondary"
-                    title="Hide until something needs it"
+                    title={t("build.hide")}
                     onClick={() => setDismissed(true)}
                 >
-                    Later
+                    {t("build.later")}
                 </Button>
             </span>
         </div>
