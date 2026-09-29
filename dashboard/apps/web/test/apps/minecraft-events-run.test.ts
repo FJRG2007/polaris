@@ -330,7 +330,15 @@ function answer(line: string): string {
         } else world.stormTicks = Number(storm[1]) * (seconds ? 20 : 1);
         return "Changing to rain and thunder";
     }
-    if (line === "time query daytime") return "The time is 6000";
+    // `daytime` is gone from 26.1, read as a timeline that does not exist; the
+    // day's own timeline answers instead.
+    if (line === "time query daytime") {
+        return events.atLeast(world.version, [26, 1])
+            ? "Unknown timeline 'minecraft:daytime'\n...query daytime<--[HERE]"
+            : "The time is 6000";
+    }
+    if (line === "time query minecraft:day" && events.atLeast(world.version, [26, 1]))
+        return "Timeline minecraft:day is at 6000 tick(s)";
     if (world.renamedRules && /^gamerule do\w+$/.test(line))
         return "Unknown or incomplete command, see below for error";
     if (line === "gamerule advance_time" || line === "gamerule advance_weather") {
@@ -1793,6 +1801,27 @@ describe("what the audit found", () => {
             await play(4_100);
             // What is left of the three minutes once it has started, in ticks.
             expect(world.stormTicks).toBeGreaterThanOrEqual(170 * 20);
+        }
+    );
+
+    it.each(["1.21.4", "26.1"])(
+        "gives a server on %s whose clock stands still its own time back after a blood moon",
+        async (version) => {
+            world.version = version;
+            world.renamedRules = events.atLeast(version, [1, 21, 11]);
+            world.daylightCycle = "false";
+            const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+            setUp([moon]);
+            await events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "moon",
+                trigger: "manual",
+                startedBy: null
+            });
+            await play(3 * 60_000 + 4_000);
+            expect(world.sent).toContain("time set 6000");
+            expect(world.sent).not.toContain("time set 23500");
         }
     );
 

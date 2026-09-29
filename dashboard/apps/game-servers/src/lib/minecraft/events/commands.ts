@@ -897,11 +897,17 @@ export function daybreak(
     ];
 }
 
-/** The world's time of day, to put back: `The time is 6000`. */
+/**
+ * The world's time of day, to put back: `The time is 6000`. From 26.1 there is
+ * no `daytime` to ask for - the day is a timeline, `READ_DAY_TIMELINE`, which
+ * answers `Timeline minecraft:day is at 6000 tick(s)` - so that is asked when
+ * the first answers nothing readable.
+ */
 export const READ_DAYTIME = "time query daytime";
+export const READ_DAY_TIMELINE = "time query minecraft:day";
 export function readDaytime(output: string): number | null {
-    const match = /time is (\d+)/i.exec(output);
-    return match ? Number(match[1]) : null;
+    const match = /time is (\d+)|is at (\d+) tick/i.exec(output);
+    return match ? Number(match[1] ?? match[2]) : null;
 }
 
 /** `The difficulty is Peaceful` - where hostile mobs vanish as they appear. */

@@ -868,7 +868,9 @@ async function begin(
                 break;
             }
         }
-        const timeBefore = commands.readDaytime(await server.say([commands.READ_DAYTIME]));
+        const timeBefore =
+            commands.readDaytime(await server.say([commands.READ_DAYTIME])) ??
+            commands.readDaytime(await server.say([commands.READ_DAY_TIMELINE]));
         loop.run = {
             ...loop.run,
             gamerules: { ...before, ...loop.run.gamerules },
