@@ -1079,6 +1079,7 @@ function MessageDialog({
     onClose: () => void;
     onSend: (message: string) => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("fivem");
     const [message, setMessage] = useState("");
     const invalid = message.length > 0 && !isBanReason(message);
@@ -1094,7 +1095,7 @@ function MessageDialog({
         >
             <PlayerFormField label={t("panel.message")}>
                 <Input value={message} onChange={(event) => setMessage(event.target.value)} maxLength={200} />
-                {invalid && <span className="text-xs text-danger">{REASON_HINT}</span>}
+                {invalid && <span className="text-xs text-danger">{schemaText(REASON_HINT)}</span>}
             </PlayerFormField>
         </PlayerFormDialog>
     );
@@ -1185,6 +1186,7 @@ function ConsolePasswordCard({
     canManage: boolean;
     running: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("fivem");
     const [shown, setShown] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
@@ -1264,7 +1266,7 @@ function ConsolePasswordCard({
                                 </Button>
                             </div>
                             <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? CONSOLE_PASSWORD_HINT : t("panel.itTakesEffectAtOnce")}
+                                {invalid ? schemaText(CONSOLE_PASSWORD_HINT) : t("panel.itTakesEffectAtOnce")}
                             </span>
                         </label>
                         <Button

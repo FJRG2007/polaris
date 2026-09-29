@@ -7,6 +7,8 @@
  * any game; it asks through the app extension, and this is what answers.
  */
 
+import { ownerWords, readerLocale } from "../owner-words";
+import { gameCatalogs } from "../../../messages";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { findGame } from "@polaris/core";
@@ -100,6 +102,7 @@ async function readLinkedServers(): Promise<LinkedServer[]> {
 export async function chatGameLinks(channelIds: readonly string[]): Promise<ChatGameLink[]> {
     const wanted = new Set(channelIds);
     if (wanted.size === 0 || !MINECRAFT) return [];
+    const t = gameCatalogs.translator(await readerLocale(), "minecraft");
     const found: ChatGameLink[] = [];
     for (const server of await linkedServers()) {
         const text = linkedChannels(server.link).text;
@@ -114,7 +117,10 @@ export async function chatGameLinks(channelIds: readonly string[]): Promise<Chat
                 logo: MINECRAFT.logo,
                 commands:
                     channelId === text && server.link.commands
-                        ? CHAT_COMMANDS.map((command) => ({ ...command }))
+                        ? CHAT_COMMANDS.map((command) => ({
+                              ...command,
+                              description: t(command.description)
+                          }))
                         : []
             });
         }
@@ -150,12 +156,18 @@ export async function answerChatCommand(input: {
         }));
         const release = typeof server.config.mcRelease === "string" ? server.config.mcRelease : "";
         answers.push(
-            commandAnswer(command, {
-                name: server.name,
-                running: reading.running,
-                players: reading.players,
-                release: release.trim() || null
-            })
+            commandAnswer(
+                command,
+                {
+                    name: server.name,
+                    running: reading.running,
+                    players: reading.players,
+                    release: release.trim() || null
+                },
+                // Written into the conversation for everybody in it, in the words
+                // of the person the server belongs to.
+                await ownerWords(server.ownerId, "minecraft")
+            )
         );
     }
     return answers;
@@ -230,7 +242,13 @@ export async function mirrorAnnouncement(
     const link = readChatLink(readInstallConfig(config));
     const text = linkedChannels(link).text;
     if (!link?.announcements || !text) return;
-    const line = announcementMirror(serverName, announcement, values);
+    // In the words of whoever sent it, as anything they write into Chat is.
+    const line = announcementMirror(
+        serverName,
+        announcement,
+        values,
+        await ownerWords(actorId, "minecraft")
+    );
     if (!line) return;
     await host.chatLinks.postAppNotice(text, line, actorId).catch((error: unknown) => {
         console.error(`polaris: ${installedAppId}'s announcement was not repeated in chat:`, error);

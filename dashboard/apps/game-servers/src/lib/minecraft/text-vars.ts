@@ -22,6 +22,8 @@
  * and the editor checks as it is typed with the same functions the send uses.
  */
 
+import { gameMessage } from "../game-message";
+import type { GameKey } from "../../../messages";
 import type { MinecraftEdition } from "./service";
 import { EVENTS_RANKING, LEVEL_RANKING, RANKINGS, STATS_RANKINGS } from "./rankings";
 
@@ -88,7 +90,7 @@ const HEALTH = {
 export const VARIABLES: readonly VariableSpec[] = [
     {
         name: "player",
-        label: "Player name",
+        label: gameMessage("games", "lib.vars.player"),
         kind: "game",
         sample: "Steve",
         component: { selector: "@s" },
@@ -97,7 +99,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "player.level",
-        label: "Player level",
+        label: gameMessage("games", "lib.vars.player_level"),
         kind: "game",
         sample: "12",
         component: { score: { name: "@s", objective: LEVEL.name } },
@@ -107,7 +109,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "player.health",
-        label: "Player health",
+        label: gameMessage("games", "lib.vars.player_health"),
         kind: "game",
         sample: "20",
         component: { score: { name: "@s", objective: HEALTH.name } },
@@ -117,7 +119,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "polaris.name",
-        label: "Polaris account name",
+        label: gameMessage("games", "lib.vars.polaris_name"),
         kind: "account",
         sample: "Ada Lovelace",
         bedrock: true,
@@ -125,7 +127,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "polaris.username",
-        label: "Polaris username",
+        label: gameMessage("games", "lib.vars.polaris_username"),
         kind: "account",
         sample: "ada",
         bedrock: true,
@@ -133,7 +135,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "server.name",
-        label: "Server name",
+        label: gameMessage("games", "lib.vars.server_name"),
         kind: "server",
         sample: "Survival",
         bedrock: true,
@@ -141,7 +143,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "server.online",
-        label: "Players online",
+        label: gameMessage("games", "lib.vars.server_online"),
         kind: "server",
         sample: "3",
         bedrock: true,
@@ -149,7 +151,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "server.max",
-        label: "Player slots",
+        label: gameMessage("games", "lib.vars.server_max"),
         kind: "server",
         sample: "20",
         bedrock: true,
@@ -157,7 +159,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "server.players",
-        label: "Who is online",
+        label: gameMessage("games", "lib.vars.server_players"),
         kind: "server",
         sample: "Steve, Alex",
         bedrock: true,
@@ -167,7 +169,7 @@ export const VARIABLES: readonly VariableSpec[] = [
         // Everybody online and their level. Inline it reads "Steve Lv 12, Alex
         // Lv 5"; alone on a side panel line it becomes a line a player.
         name: "server.levels",
-        label: "Everybody's level",
+        label: gameMessage("games", "lib.vars.server_levels"),
         kind: "server",
         sample: "Steve Lv 12, Alex Lv 5",
         bedrock: false,
@@ -177,7 +179,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     // panel line each becomes a line a place, as many as there is room for.
     {
         name: "rank.level",
-        label: "Top levels, of who is on",
+        label: gameMessage("games", "lib.vars.rank_level"),
         kind: "server",
         sample: "1. Steve 12, 2. Alex 5",
         bedrock: false,
@@ -186,7 +188,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     ...STATS_RANKINGS.map(
         (name): VariableSpec => ({
             name,
-            label: RANKINGS[name].label,
+            label: gameMessage("minecraft", `sidebar.blocks.${name}` as GameKey<"minecraft">),
             kind: "server",
             sample: RANKINGS[name].sample.join(", "),
             bedrock: false,
@@ -196,7 +198,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     {
         // Polaris's own record, so it costs the server nothing to read.
         name: EVENTS_RANKING,
-        label: "Most events won",
+        label: gameMessage("games", "lib.vars.rank_events"),
         kind: "server",
         sample: "1. Steve 7, 2. Alex 3",
         bedrock: true,
@@ -204,7 +206,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "death.player",
-        label: "Who died last",
+        label: gameMessage("games", "lib.vars.death_player"),
         kind: "server",
         sample: "Steve",
         bedrock: false,
@@ -212,7 +214,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "death.message",
-        label: "The last death, as the game said it",
+        label: gameMessage("games", "lib.vars.death_message"),
         kind: "server",
         sample: "Steve fell from a high place",
         bedrock: false,
@@ -220,7 +222,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "call.count",
-        label: "People in the linked call",
+        label: gameMessage("games", "lib.vars.call_count"),
         kind: "server",
         sample: "2",
         bedrock: true,
@@ -230,7 +232,7 @@ export const VARIABLES: readonly VariableSpec[] = [
         // Beside `{call.count}` the way `{server.max}` sits beside
         // `{server.online}`: "In call: 2/5" is how many of those who could be are in it.
         name: "call.max",
-        label: "People who could join the call",
+        label: gameMessage("games", "lib.vars.call_max"),
         kind: "server",
         sample: "5",
         bedrock: true,
@@ -238,7 +240,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "call.members",
-        label: "Who is in the linked call",
+        label: gameMessage("games", "lib.vars.call_members"),
         kind: "server",
         sample: "Ada, Grace",
         bedrock: true,
@@ -289,17 +291,17 @@ export function variablesIn(text: string): VariableUse[] {
  */
 export function variableProblem(text: string, edition: MinecraftEdition): string | null {
     for (const use of variablesIn(text)) {
-        if (!use.spec) return `{${use.name}} is not something Polaris can fill in`;
+        if (!use.spec) return gameMessage("games", "lib.vars.unknown", { name: use.name });
         if (use.fallback !== null && use.fallback.length > FALLBACK_MAX) {
-            return `The text after | is at most ${FALLBACK_MAX} characters`;
+            return gameMessage("games", "lib.vars.fallbackTooLong", { count: FALLBACK_MAX });
         }
         if (edition === "bedrock" && !use.spec.bedrock) {
-            return `Bedrock cannot show {${use.spec.name}}`;
+            return gameMessage("games", "lib.vars.notOnBedrock", { name: use.spec.name });
         }
     }
     const rest = text.replace(TOKEN, "");
     if (/[{}]/.test(rest)) {
-        return 'A { } has to hold a variable, like {player} or {polaris.name | "Player"}';
+        return gameMessage("games", "lib.vars.braces");
     }
     return null;
 }

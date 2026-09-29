@@ -11,7 +11,7 @@
 
 import * as mc from "../lib/minecraft/motd";
 import type { GameKey } from "../../messages";
-import { colorName, styleName, useGameText } from "../screens/game-text";
+import { colorName, styleName, useGameText, useSchemaText } from "../screens/game-text";
 import { Card, CardBody, cn } from "@polaris/ui";
 import type { MinecraftEdition } from "../lib/minecraft/service";
 import { VARIABLES, type VariableSpec } from "../lib/minecraft/text-vars";
@@ -45,6 +45,7 @@ export function VariablesHelp({
     /** Set where it shares a column of fixed height and scrolls within it. */
     className?: string;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     const offered = VARIABLES.filter(
         (spec) =>
@@ -80,7 +81,8 @@ export function VariablesHelp({
                                         <code className="rounded bg-muted px-1 font-mono text-xs">{`{${spec.name}}`}</code>
                                     </dt>
                                     <dd className="text-xs text-muted-foreground">
-                                        {spec.label} - <span className="italic">{spec.sample}</span>
+                                        {schemaText(spec.label)} -{" "}
+                                        <span className="italic">{spec.sample}</span>
                                     </dd>
                                 </div>
                             ))}

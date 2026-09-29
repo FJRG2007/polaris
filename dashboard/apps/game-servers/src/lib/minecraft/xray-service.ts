@@ -22,13 +22,15 @@
  * and a honeypot placed while the settings are saved is never forgotten.
  */
 
+import { gameCatalogs } from "../../../messages";
+import { ownerLocale, ownerWords } from "../owner-words";
 import { gameMessage } from "../game-message";
 import * as xray from "./xray";
 import { prisma } from "@polaris/db";
 import * as movement from "./movement";
 import { parseNameFile } from "./parse";
 import { host } from "@polaris/app-host";
-import { movementScore } from "./suspicion";
+import { movementScore, reasonLine } from "./suspicion";
 import { javaComponent } from "./announcement";
 import { timeoutPlayer } from "./timeout-service";
 import { withServerContainer, type ServerContainer } from "./service";
@@ -331,16 +333,17 @@ async function act(
         });
     }
     if (todo.report || banned) {
+        const t = await ownerWords(loop.ownerId, "games");
         const done = banned
-            ? ` Banned for ${state.settings.banHours} h.`
+            ? ` ${t("notify.xrayBanned", { hours: state.settings.banHours })}`
             : warned
-              ? " Warned in the game."
+              ? ` ${t("notify.xrayWarned")}`
               : "";
         await createNotification({
             userId: loop.ownerId,
             type: "games.xray",
-            title: `${evidence.name} dug to ${hits} hidden ores on ${serverName}`,
-            body: `Each one was fully enclosed in rock, where it could not be seen without X-Ray.${done}`,
+            title: t("notify.xrayTitle", { name: evidence.name, count: hits, server: serverName }),
+            body: `${t("notify.xrayBody")}${done}`,
             href: `/apps/installed/${installedAppId}/security`,
             level: "warning",
             actionRequired: !banned
@@ -687,11 +690,16 @@ async function reportMovement(
         return { ...fresh, movement: { ...fresh.movement, [key]: { ...held, reportedAt: now } } };
     });
     const serverName = (await readState(installedAppId))?.name ?? "Minecraft";
+    const locale = await ownerLocale(loop.ownerId);
+    const t = gameCatalogs.translator(locale, "games");
+    const said = gameCatalogs.translator(locale, "minecraft");
     await createNotification({
         userId: loop.ownerId,
         type: "games.xray",
-        title: `${name} may be flying or teleporting on ${serverName}`,
-        body: `${score.reasons.join(". ")}. Nothing was done to them: look at where and when before deciding.`,
+        title: t("notify.movementTitle", { name, server: serverName }),
+        body: t("notify.movementBody", {
+            reasons: score.why.map((reason) => reasonLine(reason, said)).join(". ")
+        }),
         href: `/apps/installed/${installedAppId}/security`,
         level: "warning",
         actionRequired: true

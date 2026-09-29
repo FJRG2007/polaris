@@ -6,6 +6,8 @@
  * the plugin caught for the evidence window the Anti-cheat tab scores over.
  */
 
+import { gameCatalogs } from "../../../messages";
+import { ownerLocale } from "../owner-words";
 import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
@@ -13,7 +15,7 @@ import { TOKEN_KEY, loginOn } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
-import { engineScore } from "./suspicion";
+import { engineScore, reasonLine } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 
@@ -442,11 +444,19 @@ async function tellOwner(
     for (const key of crossed) {
         const record = after.get(key)!;
         const score = engineScore(record.checks);
+        const locale = await ownerLocale(server.ownerId);
+        const t = gameCatalogs.translator(locale, "games");
+        const said = gameCatalogs.translator(locale, "minecraft");
         await createNotification({
             userId: server.ownerId,
             type: "games.xray",
-            title: `${record.name} is likely cheating on ${install?.name ?? "Minecraft"}`,
-            body: `${score.reasons.join(". ")}. Polaris anti-cheat caught it; look at the Anti-cheat tab before deciding.`,
+            title: t("notify.likelyCheatingTitle", {
+                name: record.name,
+                server: install?.name ?? "Minecraft"
+            }),
+            body: t("notify.likelyCheatingBody", {
+                reasons: score.why.map((reason) => reasonLine(reason, said)).join(". ")
+            }),
             href: `/apps/installed/${server.installedAppId}/security`,
             level: "warning",
             actionRequired: true

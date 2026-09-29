@@ -29,6 +29,7 @@
  * the difference between "this is broken" and "this is the next step".
  */
 
+import { gameMessage } from "../game-message";
 import { projectSlug } from "./modrinth";
 import { FLAT_LEVEL_TYPE } from "./world";
 import type { MapCategory } from "./maps";
@@ -79,16 +80,16 @@ export interface GameBlueprint {
 export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
     {
         id: "survival",
-        name: "Survival",
-        summary: "The ordinary game. Nothing added beyond the protection every server gets.",
+        name: gameMessage("games", "lib.blueprints.survival.name"),
+        summary: gameMessage("games", "lib.blueprints.survival.summary"),
         editions: ["java", "bedrock"],
         projects: [],
         weight: "normal"
     },
     {
         id: "creative",
-        name: "Creative",
-        summary: "Everything unlocked and nothing to survive, for building together.",
+        name: gameMessage("games", "lib.blueprints.creative.name"),
+        summary: gameMessage("games", "lib.blueprints.creative.summary"),
         editions: ["java", "bedrock"],
         projects: [],
         env: { MODE: "creative", DIFFICULTY: "peaceful", GAMEMODE: "creative" },
@@ -96,8 +97,8 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
     },
     {
         id: "skyblock",
-        name: "Skyblock",
-        summary: "Islands in the void, one block at a time. Installs IridiumSkyblock.",
+        name: gameMessage("games", "lib.blueprints.skyblock.name"),
+        summary: gameMessage("games", "lib.blueprints.skyblock.summary"),
         editions: ["java"],
         software: "PAPER",
         projects: ["iridiumskyblock"],
@@ -108,30 +109,29 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         // The islands are worlds the plugin makes and manages itself; what the
         // server generates is only where people land before they have one.
         levelType: FLAT_LEVEL_TYPE,
-        setup: "The island worlds are the plugin's own and it creates them on its first start. The world the server generates is only the lobby people land in.",
+        setup: gameMessage("games", "lib.blueprints.skyblock.setup"),
         docs: "https://docs.iridiumdevelopment.net/",
         mapCategory: "skyblock",
         weight: "normal"
     },
     {
         id: "parkour",
-        name: "Infinite parkour",
-        summary:
-            "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
+        name: gameMessage("games", "lib.blueprints.parkour.name"),
+        summary: gameMessage("games", "lib.blueprints.parkour.summary"),
         editions: ["java"],
         software: "PAPER",
         projects: ["infiniteparkour"],
         env: { MODE: "adventure", DIFFICULTY: "peaceful", PVP: "false" },
         levelType: FLAT_LEVEL_TYPE,
-        setup: "Run /parkour in game to start a course. The world the server generates is the lobby; the courses are generated as they are run.",
+        setup: gameMessage("games", "lib.blueprints.parkour.setup"),
         docs: "https://efnilite.dev/projects/ip/wiki",
         mapCategory: "parkour",
         weight: "light"
     },
     {
         id: "bedwars",
-        name: "Bed wars",
-        summary: "Teams, beds and a lot of shouting. Installs BedWars1058.",
+        name: gameMessage("games", "lib.blueprints.bedwars.name"),
+        summary: gameMessage("games", "lib.blueprints.bedwars.summary"),
         editions: ["java"],
         software: "PAPER",
         // BedWars1058's finished releases stop at 1.20.4; everything from 1.21 on
@@ -144,15 +144,15 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         // The one blueprint whose game does not exist until somebody makes it. Said
         // plainly, because a server that looks like an empty world is exactly what
         // BedWars1058 with no arena is - not a failed install.
-        setup: "BedWars1058 ships no arenas, so until you add one the server is a lobby and nothing else. Take a ready-made map below, or build one and register it, then players join with /bw join.",
+        setup: gameMessage("games", "lib.blueprints.bedwars.setup"),
         docs: "https://wiki.andrei1058.com/docs/BedWars1058/addons",
         mapCategory: "bedwars",
         weight: "heavy"
     },
     {
         id: "luckyblock",
-        name: "Lucky blocks",
-        summary: "Break a block, take what it gives you, hope it was not the bad one.",
+        name: gameMessage("games", "lib.blueprints.luckyblock.name"),
+        summary: gameMessage("games", "lib.blueprints.luckyblock.summary"),
         editions: ["java"],
         software: "PAPER",
         // The game is the map here. There is no lucky block plugin that works on a
@@ -162,18 +162,18 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         projects: [],
         levelType: FLAT_LEVEL_TYPE,
         env: { MODE: "adventure", PVP: "true" },
-        setup: "The lucky blocks are in the map, so without one this is an empty world in adventure mode.",
+        setup: gameMessage("games", "lib.blueprints.luckyblock.setup"),
         mapCategory: "luckyblock",
         weight: "light"
     },
     {
         id: "shrinking-world",
-        name: "Shrinking world",
-        summary: "A border that keeps moving, so nobody settles down. Installs DynamicWorldBorder.",
+        name: gameMessage("games", "lib.blueprints.shrinking-world.name"),
+        summary: gameMessage("games", "lib.blueprints.shrinking-world.summary"),
         editions: ["java"],
         software: "PAPER",
         projects: ["dynamicworldborder"],
-        setup: "The border moves on the schedule in the plugin's config, and /dwb on and /dwb off stop and start it.",
+        setup: gameMessage("games", "lib.blueprints.shrinking-world.setup"),
         docs: "https://github.com/mauajsi/Dynamic-World-Border",
         weight: "normal"
     }

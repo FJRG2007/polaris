@@ -1022,7 +1022,24 @@
         "commandsHint": "Los miembros pueden escribir {commands} allí para preguntar por el servidor.",
         "announcementsHint": "Un anuncio enviado a todos también aparece allí.",
         "javaOnly": "Solo un servidor Java puede mostrarlos.",
-        "relayHint": "Todos los que juegan los ven en su chat, estén o no en la conversación."
+        "relayHint": "Todos los que juegan los ven en su chat, estén o no en la conversación.",
+        "lines": {
+            "theServer": "El servidor",
+            "andMore": "{names} y {count} más",
+            "notRunning": "{name} no está en marcha.",
+            "notAnswering": "{name} no responde ahora.",
+            "nobody": "No hay nadie jugando en {name} (0 de {max}).",
+            "playing": "{online} de {max} jugando en {name}: {names}",
+            "stopped": "{name} está parado.",
+            "startingOrSilent": "{name} está arrancando, o no responde ahora.",
+            "up": "{name} está en marcha - {online} de {max} jugando.",
+            "upOnRelease": "{name} está en marcha - {online} de {max} jugando, Minecraft {release}.",
+            "announced": "Anunciado en {name}: {text}"
+        },
+        "commandHelp": {
+            "online": "Quién está jugando ahora",
+            "status": "Si el servidor está en marcha, y cómo de lleno"
+        }
     },
     "clientMods": {
         "couldNotSaveTheList": "No se pudo guardar la lista",

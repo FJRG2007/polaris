@@ -2476,7 +2476,7 @@ export async function updateClientModsAction(
         return {
             error:
                 error instanceof Error
-                    ? error.message
+                    ? await messageText(error.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheList")
         };
     }

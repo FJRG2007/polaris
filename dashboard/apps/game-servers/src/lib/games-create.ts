@@ -18,6 +18,7 @@
  * which is strictly better than no server.
  */
 
+import { ownerWords } from "./owner-words";
 import { gameMessage } from "./game-message";
 import { prisma } from "@polaris/db";
 import * as fivemAccess from "./fivem/access";
@@ -752,7 +753,10 @@ async function createArkServer(
     await patchInstallConfig(install.installedAppId, {
         [ALLOW_LIST_KEY]: withPlayer(
             [],
-            { steamId: input.ownerSteamId, label: input.ownerLabel?.trim() || "You" },
+            {
+                steamId: input.ownerSteamId,
+                label: input.ownerLabel?.trim() || (await ownerWords(ownerId, "games"))("lib.you")
+            },
             new Date().toISOString()
         ),
         // What the machine picker bills this server at. ARK has no heap to set, so
@@ -833,7 +837,7 @@ async function createFivemServer(
     const owner = input.ownerIdentifier
         ? {
               identifier: normalizeIdentifier(input.ownerIdentifier),
-              label: input.ownerLabel?.trim() || "You"
+              label: input.ownerLabel?.trim() || (await ownerWords(ownerId, "games"))("lib.you")
           }
         : null;
     await patchInstallConfig(install.installedAppId, {

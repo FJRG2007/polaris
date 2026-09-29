@@ -23,7 +23,7 @@
 
 import { ChevronDown, Search } from "lucide-react";
 import type { GameKey } from "../../messages";
-import { useGameText } from "../screens/game-text";
+import { useGameText, useSchemaText } from "../screens/game-text";
 import { hostUi } from "@polaris/app-host/client";
 import * as world from "../lib/minecraft/world";
 import { useEffect, useMemo, useState } from "react";
@@ -143,6 +143,7 @@ export function BlueprintFields({
     onChange: (next: BlueprintShape) => void;
     ready?: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     const [advanced, setAdvanced] = useState(false);
     /** Null until the releases are known, which is a wait worth showing rather
@@ -267,8 +268,8 @@ export function BlueprintFields({
                                     version: LATEST
                                 })
                             }
-                            title={entry.name}
-                            detail={entry.summary}
+                            title={schemaText(entry.name) ?? ""}
+                            detail={schemaText(entry.summary) ?? ""}
                         />
                     ))}
                 </div>
@@ -283,7 +284,7 @@ export function BlueprintFields({
                         t("blueprint.theReleaseIsChosenWhen")
                     ) : offered.pinned && isLatest ? (
                         t("blueprint.blueprintPins", {
-                            name: blueprint?.name ?? "",
+                            name: schemaText(blueprint?.name) ?? "",
                             version: running ?? ""
                         })
                     ) : (
@@ -293,7 +294,7 @@ export function BlueprintFields({
                         the thing that decides, and the blueprint's note is about
                         the plugin the map replaced. */}
                     {(map ? map.setup : blueprint?.setup) &&
-                        ` ${map ? map.setup : blueprint?.setup}`}
+                        ` ${schemaText(map ? map.setup : blueprint?.setup)}`}
                 </p>
             </div>
 
@@ -311,8 +312,8 @@ export function BlueprintFields({
                                 // and one left in a field nobody can see is a
                                 // submit refused for a reason nobody can read.
                                 onSelect={() => set({ mapId: entry.id, version: LATEST, seed: "" })}
-                                title={entry.name}
-                                detail={entry.summary}
+                                title={schemaText(entry.name) ?? ""}
+                                detail={schemaText(entry.summary) ?? ""}
                                 note={
                                     entry.players.min === entry.players.max
                                         ? t("blueprint.mapNote", {
@@ -367,7 +368,11 @@ export function BlueprintFields({
                                     value={blueprint?.software ?? value.software}
                                     source={value.source}
                                     onChange={(software, source) => set({ software, source })}
-                                    pinnedBy={blueprint?.software ? blueprint.name : null}
+                                    pinnedBy={
+                                        blueprint?.software
+                                            ? (schemaText(blueprint.name) ?? null)
+                                            : null
+                                    }
                                 />
                             )}
                             <label className="flex flex-col gap-1 text-sm">
@@ -424,7 +429,7 @@ export function BlueprintFields({
                                           ? t(channel.detail)
                                           : unsupported
                                             ? t("blueprint.nothingBuiltFor", {
-                                                  name: blueprint?.name ?? "",
+                                                  name: schemaText(blueprint?.name) ?? "",
                                                   version: value.version.trim()
                                               })
                                             : offered?.pinned
@@ -551,6 +556,7 @@ function SoftwarePicker({
      *  thing, and choosing another is a server that boots without them. */
     pinnedBy: string | null;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -654,8 +660,8 @@ function SoftwarePicker({
                                                 );
                                                 setOpen(false);
                                             }}
-                                            title={entry.name}
-                                            detail={entry.summary}
+                                            title={schemaText(entry.name) ?? ""}
+                                            detail={schemaText(entry.summary) ?? ""}
                                             {...(entry.caveat ? { note: entry.caveat } : {})}
                                         />
                                     ))}

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { findMap } from "../../lib/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
 import { expectedMemoryAction, saveServerAsTemplateAction } from "../actions";
@@ -68,6 +68,7 @@ export function MinecraftReset({
     playersOnline: number;
     onDone: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [open, setOpen] = useState(false);
     const current = findBlueprint(blueprintId ?? "");
@@ -86,11 +87,11 @@ export function MinecraftReset({
                 <p className="text-xs text-muted-foreground">
                     {currentMap
                         ? t("reset.builtFromOn", {
-                              name: current?.name ?? t("reset.aBlueprint"),
+                              name: schemaText(current?.name) ?? t("reset.aBlueprint"),
                               map: currentMap.name
                           })
                         : current
-                          ? t("reset.builtFrom", { name: current.name })
+                          ? t("reset.builtFrom", { name: schemaText(current.name) ?? "" })
                           : t("reset.itWasNotBuiltFrom")}{" "}
                     {t("reset.theMapItIsOn")}
                 </p>

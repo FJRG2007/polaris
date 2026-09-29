@@ -14,7 +14,7 @@
  */
 
 import { Code2, Plus } from "lucide-react";
-import { colorName, styleName, useGameText } from "../screens/game-text";
+import { colorName, styleName, useGameText, useSchemaText } from "../screens/game-text";
 import {
     Button,
     DropdownMenu,
@@ -56,6 +56,7 @@ export function FormattedTextField({
      *  name, offered as buttons that put them where the caret is. */
     inserts?: readonly { readonly label: string; readonly text: string; readonly title: string }[];
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     // Whether the field holds the text or the codes.
     const [raw, setRaw] = useState(false);
@@ -364,7 +365,7 @@ export function FormattedTextField({
                                     {option.text}
                                 </code>
                                 <span className="truncate text-muted-foreground">
-                                    {option.label}
+                                    {schemaText(option.label)}
                                 </span>
                             </li>
                         ))}
@@ -409,7 +410,7 @@ export function FormattedTextField({
                                         title={one.title}
                                     >
                                         <span className="flex min-w-0 flex-col">
-                                            <span>{one.label}</span>
+                                            <span>{schemaText(one.label)}</span>
                                             <code className="text-[11px] text-muted-foreground">
                                                 {one.text}
                                             </code>

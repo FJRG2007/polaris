@@ -18,7 +18,9 @@
  * running - including backing it up. Callers say so rather than failing blankly.
  */
 
-import { gameMessage, readGameMessage } from "../game-message";
+import { gameCatalogs } from "../../../messages";
+import { ownerLocale } from "../owner-words";
+import { gameMessage, gameMessageIn, readGameMessage } from "../game-message";
 import * as world from "./world";
 import { readWorldTrim, readWorldTrimRun, type WorldTrimRun, type WorldTrimSettings } from "./world-trim";
 import { prisma } from "@polaris/db";
@@ -1083,11 +1085,12 @@ async function sweepOne(
         )
             return null;
         if (rules.notifyOnFailure && (await noteBackupFailure(install, message))) {
+            const locale = await ownerLocale(ownerId);
             await createNotification({
                 userId: ownerId,
                 type: "games.backup-failed",
-                title: `Could not back up ${install.name}`,
-                body: message,
+                title: gameCatalogs.translator(locale, "games")("notify.backupFailedTitle", { name: install.name }),
+                body: gameMessageIn(locale, message),
                 href: `/apps/installed/${install.id}/world`,
                 level: "warning",
                 actionRequired: true

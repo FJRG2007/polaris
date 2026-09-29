@@ -21,6 +21,8 @@
  * Pure, so the screen, the service and the tests read it the same way.
  */
 
+import type { Translator } from "@polaris/core";
+import { gameCatalogs, type GameKey } from "../../../messages";
 import { gameMessage } from "../game-message";
 import { z } from "zod";
 import { stripMotd } from "./motd";
@@ -166,14 +168,20 @@ export function linkRefusal(link: ChatLink, linkable: Linkable): string | null {
     return null;
 }
 
+/** The words a line written into Chat is in. */
+type ChatLinkText = Translator<GameKey<"minecraft">>;
+
+const ENGLISH: ChatLinkText = gameCatalogs.translator("en-US", "minecraft");
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
 
-/** What members of the linked channel may ask the server. */
+/** What members of the linked channel may ask the server; each description is a
+ *  key into the `minecraft` catalog, written out for whoever the list is for. */
 export const CHAT_COMMANDS = [
-    { name: "online", description: "Who is playing right now" },
-    { name: "status", description: "Whether the server is up, and how full it is" }
+    { name: "online", description: "chatLink.commandHelp.online" },
+    { name: "status", description: "chatLink.commandHelp.status" }
 ] as const;
 
 export type ChatCommandName = (typeof CHAT_COMMANDS)[number]["name"];
@@ -198,8 +206,8 @@ export interface ServerReading {
 }
 
 /** A server's name as a line of chat writes it: nothing Chat reads as markup. */
-function named(name: string): string {
-    return name.replace(/[[\]()*_`~<>\\]/g, "").trim() || "The server";
+function named(name: string, t: ChatLinkText): string {
+    return name.replace(/[[\]()*_`~<>\\]/g, "").trim() || t("chatLink.lines.theServer");
 }
 
 /** A player's name as a line of chat writes it: nothing that could pass for a
@@ -208,39 +216,47 @@ function playerName(name: string): string {
     return name.replace(/[[\]()<>\\]/g, "").trim() || "?";
 }
 
-function names(players: readonly string[]): string {
+function names(players: readonly string[], t: ChatLinkText): string {
     const shown = players.slice(0, MOST_NAMES).map(playerName).join(", ");
     const more = players.length - MOST_NAMES;
-    return more > 0 ? `${shown} and ${more} more` : shown;
+    return more > 0 ? t("chatLink.lines.andMore", { names: shown, count: more }) : shown;
 }
 
 /** The answer to `/online`. */
-export function onlineAnswer(reading: ServerReading): string {
-    const name = named(reading.name);
-    if (!reading.running) return `${name} is not running.`;
+export function onlineAnswer(reading: ServerReading, t: ChatLinkText = ENGLISH): string {
+    const name = named(reading.name, t);
+    if (!reading.running) return t("chatLink.lines.notRunning", { name });
     const players = reading.players;
-    if (!players) return `${name} is not answering right now.`;
+    if (!players) return t("chatLink.lines.notAnswering", { name });
     if (players.online === 0 || players.players.length === 0) {
-        return `Nobody is playing on ${name} (0 of ${players.max}).`;
+        return t("chatLink.lines.nobody", { name, max: players.max });
     }
-    return `${players.online} of ${players.max} playing on ${name}: ${names(players.players)}`;
+    return t("chatLink.lines.playing", {
+        online: players.online,
+        max: players.max,
+        name,
+        names: names(players.players, t)
+    });
 }
 
 /** The answer to `/status`. */
-export function statusAnswer(reading: ServerReading): string {
-    const name = named(reading.name);
-    if (!reading.running) return `${name} is stopped.`;
+export function statusAnswer(reading: ServerReading, t: ChatLinkText = ENGLISH): string {
+    const name = named(reading.name, t);
+    if (!reading.running) return t("chatLink.lines.stopped", { name });
     const players = reading.players;
-    if (!players) return `${name} is starting, or not answering right now.`;
-    const release =
-        reading.release && reading.release.toUpperCase() !== "LATEST"
-            ? `, Minecraft ${reading.release}`
-            : "";
-    return `${name} is up - ${players.online} of ${players.max} playing${release}.`;
+    if (!players) return t("chatLink.lines.startingOrSilent", { name });
+    const figures = { name, online: players.online, max: players.max };
+    return reading.release && reading.release.toUpperCase() !== "LATEST"
+        ? t("chatLink.lines.upOnRelease", { ...figures, release: reading.release })
+        : t("chatLink.lines.up", figures);
 }
 
-export function commandAnswer(command: ChatCommandName, reading: ServerReading): string {
-    return command === "online" ? onlineAnswer(reading) : statusAnswer(reading);
+export function commandAnswer(
+    command: ChatCommandName,
+    reading: ServerReading,
+    t: ChatLinkText = ENGLISH
+): string {
+    return command === "online" ? onlineAnswer(reading, t) : statusAnswer(reading, t);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +279,8 @@ const MIRROR_MAX = 600;
 export function announcementMirror(
     serverName: string,
     announcement: Pick<Announcement, "target" | "title" | "subtitle" | "actionbar" | "chat">,
-    values: VariableValues
+    values: VariableValues,
+    t: ChatLinkText = ENGLISH
 ): string | null {
     if (announcement.target !== EVERYBODY) return null;
     const parts = [
@@ -276,6 +293,9 @@ export function announcementMirror(
         .map((text) => stripMotd(fillValues(text, values)).replace(/\s+/g, " ").trim())
         .filter(Boolean);
     if (parts.length === 0) return null;
-    const line = `Announced on ${named(serverName)}: ${parts.join(" - ")}`;
+    const line = t("chatLink.lines.announced", {
+        name: named(serverName, t),
+        text: parts.join(" - ")
+    });
     return line.length > MIRROR_MAX ? `${line.slice(0, MIRROR_MAX - 3).trimEnd()}...` : line;
 }

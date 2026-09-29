@@ -141,33 +141,31 @@ describe("sending one stack", () => {
 
     it("takes nothing when the recipient is not on", async () => {
         bags.delete("Bob");
-        await expect(
+        expect(await rejection(
             transferStack(OWNER, SERVER, "Alice", "Bob", 0, {
                 slot: 0,
                 id: "minecraft:diamond",
                 count: 10,
                 data: null
             })
-        ).rejects.toThrow(/has to be on the server/);
+        )).toMatch(/has to be on the server/);
         expect(bags.get("Alice")?.get(0)).toEqual({ id: "minecraft:diamond", count: 10 });
     });
 
     it("refuses a stack that changed since the screen read it", async () => {
-        await expect(
+        expect(await rejection(
             transferStack(OWNER, SERVER, "Alice", "Bob", 0, {
                 slot: 0,
                 id: "minecraft:diamond",
                 count: 3,
                 data: null
             })
-        ).rejects.toThrow(/moved that stack/);
+        )).toMatch(/moved that stack/);
         expect(bags.get("Bob")?.size).toBe(0);
     });
 
     it("refuses sending to the same player", async () => {
-        await expect(transferStack(OWNER, SERVER, "Alice", "alice", 0, null)).rejects.toThrow(
-            /different player/
-        );
+        expect(await rejection(transferStack(OWNER, SERVER, "Alice", "alice", 0, null))).toMatch(/different player/);
     });
 });
 
@@ -211,9 +209,7 @@ describe("sending everything", () => {
 
     it("moves nothing when the recipient is not on", async () => {
         bags.delete("Bob");
-        await expect(transferInventory(OWNER, SERVER, "Alice", "Bob")).rejects.toThrow(
-            /has to be on the server/
-        );
+        expect(await rejection(transferInventory(OWNER, SERVER, "Alice", "Bob"))).toMatch(/has to be on the server/);
         expect(bags.get("Alice")?.size).toBe(2);
     });
 

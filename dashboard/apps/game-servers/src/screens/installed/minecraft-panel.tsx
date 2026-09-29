@@ -1143,14 +1143,14 @@ function OverviewTab({
     const note = map
         ? {
               title: map.name,
-              text: map.setup,
+              text: schemaText(map.setup) ?? "",
               docs: map.source,
               docsLabel: t("panel.mapSource")
           }
         : blueprint?.setup
           ? {
-                title: t("panel.setupLeft", { name: blueprint.name }),
-                text: blueprint.setup,
+                title: t("panel.setupLeft", { name: schemaText(blueprint.name) ?? "" }),
+                text: schemaText(blueprint.setup) ?? "",
                 docs: blueprint.docs,
                 docsLabel: t("panel.pluginDocs")
             }

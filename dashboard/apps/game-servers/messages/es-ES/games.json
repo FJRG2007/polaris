@@ -954,6 +954,114 @@
             "changed": "La memoria pasó de {from} a {to} por {reason}. Se aplica en el próximo reinicio.",
             "changedRestarted": "La memoria pasó de {from} a {to} por {reason}. El reinicio la aplica."
         },
-        "noRoom": "No hay sitio suficiente junto al mundo para copiarlo - {free} libres, y el mundo ocupa {size}. Borra una copia o dos, o baja cuántas se guardan."
+        "noRoom": "No hay sitio suficiente junto al mundo para copiarlo - {free} libres, y el mundo ocupa {size}. Borra una copia o dos, o baja cuántas se guardan.",
+        "move": {
+            "unreadable": "Ese montón lleva datos que Polaris no puede volver a escribir exactamente, así que moverlo se los quitaría. Da el objeto de nuevo en su lugar.",
+            "tooLong": "Ese montón lleva más datos de los que caben en un comando, así que no se puede mover sin perder parte.",
+            "moved": "Movió ese montón mientras lo arrastrabas. La casilla no se tocó.",
+            "gone": "Esa casilla ya está vacía. La casilla no se tocó.",
+            "unsupported": "Este servidor es anterior al comando que mueve un objeto a una casilla (Minecraft 1.17).",
+            "occupied": "Suelta parte de un montón en una casilla vacía o sobre el mismo objeto. Partirlo sobre otra cosa no es algo que haga el juego.",
+            "indivisible": "Ese montón lleva sus propios datos, así que sus objetos no son intercambiables y no se puede partir.",
+            "recipient": "El otro jugador tiene que estar en el servidor para recibirlo. No se movió nada.",
+            "same": "Elige otro jugador al que enviarlo."
+        },
+        "blueprints": {
+            "survival": {
+                "name": "Survival",
+                "summary": "El juego de siempre. Nada añadido más allá de la protección que tiene todo servidor."
+            },
+            "creative": {
+                "name": "Creativo",
+                "summary": "Todo desbloqueado y nada que sobrevivir, para construir juntos."
+            },
+            "skyblock": {
+                "name": "Skyblock",
+                "summary": "Islas en el vacío, bloque a bloque. Instala IridiumSkyblock.",
+                "setup": "Los mundos de las islas son del plugin y los crea en su primer arranque. El mundo que genera el servidor es solo el lobby al que llega la gente."
+            },
+            "parkour": {
+                "name": "Parkour infinito",
+                "summary": "Un recorrido que se genera mientras corres, con tiempos que batir. Instala InfiniteParkour.",
+                "setup": "Ejecuta /parkour en el juego para empezar un recorrido. El mundo que genera el servidor es el lobby; los recorridos se generan al correrlos."
+            },
+            "bedwars": {
+                "name": "Bed wars",
+                "summary": "Equipos, camas y muchos gritos. Instala BedWars1058.",
+                "setup": "BedWars1058 no trae arenas, así que hasta que añadas una el servidor es un lobby y nada más. Coge un mapa hecho de abajo, o construye uno y regístralo, y los jugadores entran con /bw join."
+            },
+            "luckyblock": {
+                "name": "Lucky blocks",
+                "summary": "Rompe un bloque, llévate lo que te dé, y ojalá no sea el malo.",
+                "setup": "Los lucky blocks están en el mapa, así que sin uno esto es un mundo vacío en modo aventura."
+            },
+            "shrinking-world": {
+                "name": "Mundo menguante",
+                "summary": "Un borde que no para de moverse, para que nadie se asiente. Instala DynamicWorldBorder.",
+                "setup": "El borde se mueve según el horario de la configuración del plugin, y /dwb on y /dwb off lo paran y lo arrancan."
+            }
+        },
+        "maps": {
+            "skyblock-2-1": {
+                "summary": "La isla original en el vacío, un árbol y un cofre. Sobrevive con lo que puedas sacar de ella.",
+                "setup": "Todos empiezan en la misma isla. La lista de desafíos está en el cofre."
+            },
+            "parkour-spiral": {
+                "summary": "Una torre de recorridos temáticos con puntos de control, que se sube desde abajo.",
+                "setup": "Los puntos de control se guardan por jugador, así que la gente puede entrar y salir sin perder la subida."
+            },
+            "bedwars-treasure-island": {
+                "summary": "Ocho equipos, una cama cada uno y una isla pirata en el centro. Tiendas, generadores y trampas incluidos.",
+                "setup": "Ponte en la plataforma de un equipo para unirte y la partida empieza sola. Nada que configurar ni arena que registrar."
+            },
+            "luckyblock-towers": {
+                "summary": "Sube a toda prisa torres de lucky blocks y llévate lo que te den. Un cofre oculto en cada torre."
+            }
+        },
+        "vars": {
+            "player": "Jugador",
+            "player_level": "Nivel",
+            "player_health": "Salud del jugador",
+            "polaris_name": "Nombre en Polaris",
+            "polaris_username": "Usuario de Polaris",
+            "server_name": "Servidor",
+            "server_online": "Conectados",
+            "server_max": "Plazas",
+            "server_players": "Quién está",
+            "server_levels": "El nivel de todos",
+            "rank_level": "Mejores niveles conectados",
+            "death_player": "Último en morir",
+            "death_message": "La última muerte, como la dijo el juego",
+            "call_count": "Personas en la llamada vinculada",
+            "call_max": "Plazas de la llamada",
+            "call_members": "Quién está en la llamada",
+            "rank_events": "Más eventos ganados",
+            "unknown": "'{'{name}'}' no es algo que Polaris pueda rellenar",
+            "fallbackTooLong": "El texto tras | tiene como mucho {count} caracteres",
+            "notOnBedrock": "Bedrock no puede mostrar '{'{name}'}'",
+            "braces": "Un '{ }' tiene que contener una variable, como '{player}' o '{polaris.name | \"Jugador\"}'"
+        },
+        "you": "Tú"
+    },
+    "notify": {
+        "crashLoopTitle": "{name} sigue sin poder arrancar",
+        "crashLoopBody": "Se reinició {count} veces sin llegar a arrancar, así que se ha parado.",
+        "outOfMemoryTitle": "{name} se quedó sin memoria",
+        "outOfMemoryAtLimit": "Se quedó sin memoria en {size}, que es lo máximo que puede usar: es su límite de memoria. Sube el límite en Memoria, o libera memoria en la máquina, y reinícialo.",
+        "outOfMemoryAtMachine": "Se quedó sin memoria en {size}, que es lo máximo que puede usar: es todo lo que su máquina puede ceder. Sube el límite en Memoria, o libera memoria en la máquina, y reinícialo.",
+        "memoryRaisedTitle": "{name} recibió más memoria",
+        "memoryRaisedRestarted": "Se quedó sin memoria, así que su memoria pasó de {from} a {to}. Se reinició con ella, ya que no jugaba nadie.",
+        "memoryRaisedRestartFailed": "Se quedó sin memoria, así que su memoria pasó de {from} a {to}. El reinicio para aplicarla no salió, así que la tomará en su próximo reinicio.",
+        "memoryRaisedNextRestart": "Se quedó sin memoria, así que su memoria pasó de {from} a {to}. La toma en su próximo reinicio.",
+        "memoryRaisedFor": "Su memoria pasó de {from} a {to} por {reason}. La toma en su próximo reinicio.",
+        "backupFailedTitle": "No se pudo copiar {name}",
+        "likelyCheatingTitle": "{name} probablemente hace trampas en {server}",
+        "likelyCheatingBody": "{reasons}. Lo detectó el anti-trampas de Polaris; mira la pestaña Anti-trampas antes de decidir.",
+        "xrayBanned": "Vetado durante {hours} h.",
+        "xrayWarned": "Advertido en el juego.",
+        "xrayTitle": "{name} cavó hasta {count} menas ocultas en {server}",
+        "xrayBody": "Cada una estaba completamente rodeada de roca, donde no se podía ver sin X-Ray.",
+        "movementTitle": "{name} puede estar volando o teletransportándose en {server}",
+        "movementBody": "{reasons}. No se le hizo nada: mira dónde y cuándo antes de decidir."
     }
 }

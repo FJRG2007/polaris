@@ -461,7 +461,7 @@ export async function revealFivemPasswordAction(
 /** Change it. Written to the server's config and to the deploy, so a container
  *  rebuilt from scratch comes up on the same one. */
 export async function setFivemPasswordAction(installedAppId: string, password: string): Promise<{ error?: string }> {
-    if (!isConsolePassword(password)) return { error: CONSOLE_PASSWORD_HINT };
+    if (!isConsolePassword(password)) return { error: await messageText(CONSOLE_PASSWORD_HINT) };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await fivem.setConsolePassword(access.ownerId, installedAppId, password);

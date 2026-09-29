@@ -76,17 +76,17 @@ describe("filling in the words", () => {
 
 describe("checking what was written", () => {
     it("names a variable that does not exist", () => {
-        expect(variableProblem("Hi {palyer}", "java")).toBe(
+        expect(english(variableProblem("Hi {palyer}", "java"))).toBe(
             "{palyer} is not something Polaris can fill in"
         );
     });
 
     it("refuses a brace that is not a variable", () => {
-        expect(variableProblem("Hi {player", "java")).toMatch(/has to hold a variable/);
+        expect(english(variableProblem("Hi {player", "java"))).toMatch(/has to hold a variable/);
     });
 
     it("refuses what Bedrock cannot draw there, and nowhere else", () => {
-        expect(variableProblem("{player.level}", "bedrock")).toBe(
+        expect(english(variableProblem("{player.level}", "bedrock"))).toBe(
             "Bedrock cannot show {player.level}"
         );
         expect(variableProblem("{player.level}", "java")).toBeNull();

@@ -23,6 +23,9 @@
  * purpose is not failing at anything.
  */
 
+import { gameMessageIn } from "./game-message";
+import { gameCatalogs } from "../../messages";
+import { ownerLocale } from "./owner-words";
 import { prisma } from "@polaris/db";
 import { isGameServerApp } from "./games-service";
 import {
@@ -173,13 +176,15 @@ export async function sweepCrashLoops(
         // anything: whatever happens next has to prove itself from scratch.
         await forget(install.id, RESTART_WATCH_KEY);
 
+        const locale = await ownerLocale(ownerId);
+        const t = gameCatalogs.translator(locale, "games");
         await createNotification({
             userId: ownerId,
             type: "games.crash-loop",
-            title: `${install.name} keeps failing to start`,
+            title: t("notify.crashLoopTitle", { name: install.name }),
             body: loop.cause
-                ? `${loop.cause}${loop.advice ? ` ${loop.advice}` : ""}`
-                : `It restarted ${loop.restarts} times without starting, so it has been stopped.`,
+                ? `${loop.cause}${loop.advice ? ` ${gameMessageIn(locale, loop.advice)}` : ""}`
+                : t("notify.crashLoopBody", { count: loop.restarts }),
             href: `/apps/installed/${install.id}`,
             level: "warning",
             actionRequired: true

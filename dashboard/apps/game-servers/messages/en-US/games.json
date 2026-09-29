@@ -954,6 +954,114 @@
             "changed": "Memory went from {from} to {to} for {reason}. It applies at the next restart.",
             "changedRestarted": "Memory went from {from} to {to} for {reason}. The restart applies it."
         },
-        "noRoom": "There is not enough room beside the world to copy it - {free} free, and the world is {size}. Delete a backup or two, or lower how many are kept."
+        "noRoom": "There is not enough room beside the world to copy it - {free} free, and the world is {size}. Delete a backup or two, or lower how many are kept.",
+        "move": {
+            "unreadable": "That stack carries data Polaris cannot write back exactly, so moving it would strip it. Give the item again instead.",
+            "tooLong": "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
+            "moved": "They moved that stack while you were dragging it. The slot was left alone.",
+            "gone": "That slot is empty now. The slot was left alone.",
+            "unsupported": "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
+            "occupied": "Drop part of a stack on an empty slot or on the same item. Splitting onto something else is not something the game does.",
+            "indivisible": "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
+            "recipient": "The other player has to be on the server to receive it. Nothing was moved.",
+            "same": "Pick a different player to send it to."
+        },
+        "blueprints": {
+            "survival": {
+                "name": "Survival",
+                "summary": "The ordinary game. Nothing added beyond the protection every server gets."
+            },
+            "creative": {
+                "name": "Creative",
+                "summary": "Everything unlocked and nothing to survive, for building together."
+            },
+            "skyblock": {
+                "name": "Skyblock",
+                "summary": "Islands in the void, one block at a time. Installs IridiumSkyblock.",
+                "setup": "The island worlds are the plugin's own and it creates them on its first start. The world the server generates is only the lobby people land in."
+            },
+            "parkour": {
+                "name": "Infinite parkour",
+                "summary": "A course that generates as you run it, with times to beat. Installs InfiniteParkour.",
+                "setup": "Run /parkour in game to start a course. The world the server generates is the lobby; the courses are generated as they are run."
+            },
+            "bedwars": {
+                "name": "Bed wars",
+                "summary": "Teams, beds and a lot of shouting. Installs BedWars1058.",
+                "setup": "BedWars1058 ships no arenas, so until you add one the server is a lobby and nothing else. Take a ready-made map below, or build one and register it, then players join with /bw join."
+            },
+            "luckyblock": {
+                "name": "Lucky blocks",
+                "summary": "Break a block, take what it gives you, hope it was not the bad one.",
+                "setup": "The lucky blocks are in the map, so without one this is an empty world in adventure mode."
+            },
+            "shrinking-world": {
+                "name": "Shrinking world",
+                "summary": "A border that keeps moving, so nobody settles down. Installs DynamicWorldBorder.",
+                "setup": "The border moves on the schedule in the plugin's config, and /dwb on and /dwb off stop and start it."
+            }
+        },
+        "maps": {
+            "skyblock-2-1": {
+                "summary": "The original island in the void, a tree and a chest. Survive on what you can make of it.",
+                "setup": "Everyone starts on the same island. The challenge list is in the chest."
+            },
+            "parkour-spiral": {
+                "summary": "A tower of themed courses with checkpoints, climbed from the bottom.",
+                "setup": "Checkpoints are saved per player, so people can join and leave without losing the climb."
+            },
+            "bedwars-treasure-island": {
+                "summary": "Eight teams, a bed each and a pirate island in the middle. Shops, generators and traps are built in.",
+                "setup": "Stand on a team's pad to join it and the game starts itself. Nothing to configure and no arena to register."
+            },
+            "luckyblock-towers": {
+                "summary": "Race up towers of lucky blocks and take whatever they give you. Hidden chest in every tower."
+            }
+        },
+        "vars": {
+            "player": "Player name",
+            "player_level": "Player level",
+            "player_health": "Player health",
+            "polaris_name": "Polaris account name",
+            "polaris_username": "Polaris username",
+            "server_name": "Server name",
+            "server_online": "Players online",
+            "server_max": "Player slots",
+            "server_players": "Who is online",
+            "server_levels": "Everybody's level",
+            "rank_level": "Top levels, of who is on",
+            "death_player": "Who died last",
+            "death_message": "The last death, as the game said it",
+            "call_count": "People in the linked call",
+            "call_max": "People who could join the call",
+            "call_members": "Who is in the linked call",
+            "rank_events": "Most events won",
+            "unknown": "'{'{name}'}' is not something Polaris can fill in",
+            "fallbackTooLong": "The text after | is at most {count} characters",
+            "notOnBedrock": "Bedrock cannot show '{'{name}'}'",
+            "braces": "A '{ }' has to hold a variable, like '{player}' or '{polaris.name | \"Player\"}'"
+        },
+        "you": "You"
+    },
+    "notify": {
+        "crashLoopTitle": "{name} keeps failing to start",
+        "crashLoopBody": "It restarted {count} times without starting, so it has been stopped.",
+        "outOfMemoryTitle": "{name} ran out of memory",
+        "outOfMemoryAtLimit": "It ran out at {size}, which is as far as it may go: that is its memory limit. Raise the limit under Memory, or free up memory on the machine, and restart it.",
+        "outOfMemoryAtMachine": "It ran out at {size}, which is as far as it may go: that is all its machine can spare. Raise the limit under Memory, or free up memory on the machine, and restart it.",
+        "memoryRaisedTitle": "{name} was given more memory",
+        "memoryRaisedRestarted": "It ran out of memory, so its heap went from {from} to {to}. It was restarted onto it, since nobody was playing.",
+        "memoryRaisedRestartFailed": "It ran out of memory, so its heap went from {from} to {to}. Restarting it onto that did not go through, so it picks it up at its next restart.",
+        "memoryRaisedNextRestart": "It ran out of memory, so its heap went from {from} to {to}. It picks that up at its next restart.",
+        "memoryRaisedFor": "Its heap went from {from} to {to} for {reason}. It picks that up at its next restart.",
+        "backupFailedTitle": "Could not back up {name}",
+        "likelyCheatingTitle": "{name} is likely cheating on {server}",
+        "likelyCheatingBody": "{reasons}. Polaris anti-cheat caught it; look at the Anti-cheat tab before deciding.",
+        "xrayBanned": "Banned for {hours} h.",
+        "xrayWarned": "Warned in the game.",
+        "xrayTitle": "{name} dug to {count} hidden ores on {server}",
+        "xrayBody": "Each one was fully enclosed in rock, where it could not be seen without X-Ray.",
+        "movementTitle": "{name} may be flying or teleporting on {server}",
+        "movementBody": "{reasons}. Nothing was done to them: look at where and when before deciding."
     }
 }

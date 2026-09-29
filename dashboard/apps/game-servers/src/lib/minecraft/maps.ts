@@ -152,7 +152,7 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         id: "skyblock-2-1",
         name: "Skyblock 2.1",
         category: "skyblock",
-        summary: "The original island in the void, a tree and a chest. Survive on what you can make of it.",
+        summary: gameMessage("games", "lib.maps.skyblock-2-1.summary"),
         author: "Noobcrew",
         source: "https://skyblock.net",
         url: `${MIRROR}/skyblock-2-1.zip`,
@@ -163,13 +163,13 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         players: { min: 1, max: 10 },
         env: { ...MAP_BASE_ENV, MODE: "survival", DIFFICULTY: "normal", PVP: "false" },
         projects: [],
-        setup: "Everyone starts on the same island. The challenge list is in the chest."
+        setup: gameMessage("games", "lib.maps.skyblock-2-1.setup")
     },
     {
         id: "parkour-spiral",
         name: "Parkour Spiral",
         category: "parkour",
-        summary: "A tower of themed courses with checkpoints, climbed from the bottom.",
+        summary: gameMessage("games", "lib.maps.parkour-spiral.summary"),
         author: "Hielke",
         source: "https://hielkemaps.com/maps/parkour-spiral",
         url: `${MIRROR}/parkour-spiral.zip`,
@@ -182,13 +182,13 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         players: { min: 1, max: 20 },
         env: { ...MAP_BASE_ENV, MODE: "adventure", DIFFICULTY: "peaceful", PVP: "false" },
         projects: [],
-        setup: "Checkpoints are saved per player, so people can join and leave without losing the climb."
+        setup: gameMessage("games", "lib.maps.parkour-spiral.setup")
     },
     {
         id: "bedwars-treasure-island",
         name: "Bedwars: Treasure Island",
         category: "bedwars",
-        summary: "Eight teams, a bed each and a pirate island in the middle. Shops, generators and traps are built in.",
+        summary: gameMessage("games", "lib.maps.bedwars-treasure-island.summary"),
         author: "TriplicataMC",
         source: "https://www.minecraftmaps.com/51834-bedwars-treasure-island",
         url: `${MIRROR}/bedwars-treasure-island.zip`,
@@ -209,13 +209,13 @@ export const WORLD_MAPS: readonly WorldMap[] = [
         // blueprint's own plugin is a second bed wars implementation, and two of
         // them in one world is neither.
         projects: [],
-        setup: "Stand on a team's pad to join it and the game starts itself. Nothing to configure and no arena to register."
+        setup: gameMessage("games", "lib.maps.bedwars-treasure-island.setup")
     },
     {
         id: "luckyblock-towers",
         name: "Luckyblock Towers",
         category: "luckyblock",
-        summary: "Race up towers of lucky blocks and take whatever they give you. Hidden chest in every tower.",
+        summary: gameMessage("games", "lib.maps.luckyblock-towers.summary"),
         author: "Polaris",
         source: "https://www.minecraftmaps.com",
         url: `${MIRROR}/luckyblock-towers.zip`,

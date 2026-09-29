@@ -56,20 +56,15 @@ export class ItemWriteError extends Error {
 }
 
 const REFUSALS: Record<WriteRefusal, string> = {
-    unreadable:
-        "That stack carries data Polaris cannot write back exactly, so moving it would strip it. Give the item again instead.",
-    "too-long":
-        "That stack carries more data than one command can hold, so it cannot be moved without losing some.",
-    moved: "They moved that stack while you were dragging it. The slot was left alone.",
-    gone: "That slot is empty now. The slot was left alone.",
-    unsupported:
-        "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
-    occupied:
-        "Drop part of a stack on an empty slot or on the same item. Splitting onto something else is not something the game does.",
-    indivisible:
-        "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
-    recipient: "The other player has to be on the server to receive it. Nothing was moved.",
-    same: "Pick a different player to send it to."
+    unreadable: gameMessage("games", "lib.move.unreadable"),
+    "too-long": gameMessage("games", "lib.move.tooLong"),
+    moved: gameMessage("games", "lib.move.moved"),
+    gone: gameMessage("games", "lib.move.gone"),
+    unsupported: gameMessage("games", "lib.move.unsupported"),
+    occupied: gameMessage("games", "lib.move.occupied"),
+    indivisible: gameMessage("games", "lib.move.indivisible"),
+    recipient: gameMessage("games", "lib.move.recipient"),
+    same: gameMessage("games", "lib.move.same")
 };
 
 function refuse(why: WriteRefusal): never {

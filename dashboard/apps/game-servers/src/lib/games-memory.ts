@@ -24,6 +24,9 @@
  *   the repair, and waiting means leaving it broken until somebody notices.
  */
 
+import { gameMessageIn } from "./game-message";
+import { gameCatalogs } from "../../messages";
+import { ownerLocale, ownerWords } from "./owner-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import * as plan from "./minecraft/memory-plan";
@@ -322,15 +325,17 @@ export async function sweepMemoryPlans(
         if (failed) continue;
         if (!applied) {
             if (exhausted) {
+                const t = await ownerWords(ownerId, "games");
                 await createNotification({
                     userId: ownerId,
                     type: "games.memory-exhausted",
-                    title: `${install.name} ran out of memory`,
-                    body: `It ran out at ${formatMemory(planned.currentMb)}, which is as far as it may go: ${
+                    title: t("notify.outOfMemoryTitle", { name: install.name }),
+                    body: t(
                         planned.currentMb >= plan.memoryCeilingMb(config[plan.MEMORY_CEILING_KEY])
-                            ? "that is its memory limit"
-                            : "that is all its machine can spare"
-                    }. Raise the limit under Memory, or free up memory on the machine, and restart it.`,
+                            ? "notify.outOfMemoryAtLimit"
+                            : "notify.outOfMemoryAtMachine",
+                        { size: formatMemory(planned.currentMb) }
+                    ),
                     href: `/apps/installed/${install.id}`,
                     level: "warning",
                     actionRequired: true
@@ -359,19 +364,26 @@ export async function sweepMemoryPlans(
             if (done) restarted += 1;
         }
 
+        const locale = await ownerLocale(ownerId);
+        const t = gameCatalogs.translator(locale, "games");
+        const heap = { from: formatMemory(applied.fromMb), to: formatMemory(applied.toMb) };
         await createNotification({
             userId: ownerId,
             type: "games.memory-raised",
-            title: `${install.name} was given more memory`,
+            title: t("notify.memoryRaisedTitle", { name: install.name }),
             body: exhausted
-                ? `It ran out of memory, so its heap went from ${formatMemory(applied.fromMb)} to ${formatMemory(applied.toMb)}.${
+                ? t(
                       done
-                          ? " It was restarted onto it, since nobody was playing."
+                          ? "notify.memoryRaisedRestarted"
                           : repairNow
-                            ? " Restarting it onto that did not go through, so it picks it up at its next restart."
-                            : " It picks that up at its next restart."
-                  }`
-                : `Its heap went from ${formatMemory(applied.fromMb)} to ${formatMemory(applied.toMb)} for ${applied.reason}. It picks that up at its next restart.`,
+                            ? "notify.memoryRaisedRestartFailed"
+                            : "notify.memoryRaisedNextRestart",
+                      heap
+                  )
+                : t("notify.memoryRaisedFor", {
+                      ...heap,
+                      reason: gameMessageIn(locale, applied.reason)
+                  }),
             href: `/apps/installed/${install.id}`,
             level: exhausted ? "warning" : "info",
             actionRequired: false
