@@ -15,19 +15,22 @@
 
 import type { ReactNode } from "react";
 import { TasksLiveRefresh } from "./live-refresh";
+import { Messages } from "@/components/i18n/messages";
 import { PlainNames } from "@/components/person-name";
 import { PlaceRecorder } from "@/components/place-recorder";
 
 export default function TasksLayout({ children }: { children: ReactNode }) {
     return (
-        <PlainNames>
-            <TasksLiveRefresh />
-            {/* A task's own URL is deliberately not remembered: it is a deep link
-                to one record, and the one thing worse than opening on the app's
-                front door is opening on a task somebody deleted. The list it
-                lives in is what comes back. */}
-            <PlaceRecorder appId="tasks" root="/tasks" skip={["/tasks/t/"]} />
-            {children}
-        </PlainNames>
+        <Messages namespaces={["tasks", "tasksViews", "tasksDetail"]}>
+            <PlainNames>
+                <TasksLiveRefresh />
+                {/* A task's own URL is deliberately not remembered: it is a deep link
+                    to one record, and the one thing worse than opening on the app's
+                    front door is opening on a task somebody deleted. The list it
+                    lives in is what comes back. */}
+                <PlaceRecorder appId="tasks" root="/tasks" skip={["/tasks/t/"]} />
+                {children}
+            </PlainNames>
+        </Messages>
     );
 }

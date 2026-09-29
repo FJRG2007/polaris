@@ -16,6 +16,7 @@
  */
 
 import { MailShell } from "./mail-shell";
+import { Messages } from "@/components/i18n/messages";
 import { requirePermission } from "@/lib/session";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
@@ -48,16 +49,18 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     );
 
     return (
-        <MailShell
-            accounts={accounts}
-            folders={folders}
-            labels={labels}
-            identities={identities}
-            unread={unread}
-            viewerName={user.name}
-            shelf={shelfOrgId ?? "personal"}
-        >
-            {children}
-        </MailShell>
+        <Messages namespaces={["mail", "mailCompose", "mailSettings"]}>
+            <MailShell
+                accounts={accounts}
+                folders={folders}
+                labels={labels}
+                identities={identities}
+                unread={unread}
+                viewerName={user.name}
+                shelf={shelfOrgId ?? "personal"}
+            >
+                {children}
+            </MailShell>
+        </Messages>
     );
 }
