@@ -10,6 +10,7 @@
  * and the offer the wrong way round, and because both are strings it compiled.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import type { TransferView } from "@/lib/drive-transfer-service";
 import { TransfersPanel } from "@/app/(app)/drive/transfers-panel";
@@ -57,7 +58,7 @@ beforeEach(() => {
 
 describe("what somebody has been sent", () => {
     it("shows who sent it and what they said before it can be accepted", async () => {
-        render(<TransfersPanel />);
+        render(<TransfersPanel />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Q3 contract.pdf")).toBeTruthy();
         expect(screen.getByText(/Ada Lovelace/)).toBeTruthy();
         expect(screen.getByText("the signed one")).toBeTruthy();
@@ -68,7 +69,7 @@ describe("what somebody has been sent", () => {
         // the wrong way round would pass the session id here instead.
         acceptTransferAction.mockResolvedValue({ path: "Q3 contract.pdf" });
         const user = userEvent.setup();
-        render(<TransfersPanel />);
+        render(<TransfersPanel />, { wrapper: MessagesWrapper });
         await user.click(await screen.findByRole("button", { name: "Accept" }));
         await waitFor(() => expect(acceptTransferAction).toHaveBeenCalledWith(OFFER.id));
     });
@@ -76,7 +77,7 @@ describe("what somebody has been sent", () => {
     it("declines the offer that was shown", async () => {
         declineTransferAction.mockResolvedValue({});
         const user = userEvent.setup();
-        render(<TransfersPanel />);
+        render(<TransfersPanel />, { wrapper: MessagesWrapper });
         await user.click(await screen.findByRole("button", { name: "Decline" }));
         await waitFor(() => expect(declineTransferAction).toHaveBeenCalledWith(OFFER.id));
     });
@@ -84,7 +85,7 @@ describe("what somebody has been sent", () => {
     it("says nothing has left your Drive while an offer you made waits", async () => {
         waitingTransfersAction.mockResolvedValue([]);
         sentTransfersAction.mockResolvedValue([{ ...OFFER, id: "sent-1", mode: "move" }]);
-        render(<TransfersPanel />);
+        render(<TransfersPanel />, { wrapper: MessagesWrapper });
         expect(
             await screen.findByText("Waiting to be answered. Nothing has left your Drive.")
         ).toBeTruthy();
@@ -94,7 +95,7 @@ describe("what somebody has been sent", () => {
     it("is nothing at all when there is nothing waiting and nothing sent", async () => {
         waitingTransfersAction.mockResolvedValue([]);
         sentTransfersAction.mockResolvedValue([]);
-        const { container } = render(<TransfersPanel />);
+        const { container } = render(<TransfersPanel />, { wrapper: MessagesWrapper });
         await waitFor(() => expect(container.innerHTML).toBe(""));
     });
 });

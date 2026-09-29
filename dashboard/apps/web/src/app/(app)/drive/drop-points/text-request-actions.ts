@@ -20,6 +20,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { requirePermission } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { notify } from "@/lib/notifications/dispatch";
+import { DEFAULT_LOCALE } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { linkAddressDenial } from "@/lib/link-guards";
@@ -268,10 +269,20 @@ export async function submitTextAction(
         userId: request.ownerId,
         event: "drive.dropPoint.received",
         // Written for the owner, who reads it later, in their own language.
-        title: translatorFor(await getUserLocale(request.ownerId), "drive")("errors.arrived", { title: request.title }),
+        title: (await ownerWords(request.ownerId))("errors.arrived", { title: request.title }),
         body: parsed.data.name,
         href: `/drive/snippets/${result.snippetId}`
     });
     revalidateDropPoints(request.id);
     return { ok: true };
+}
+
+/** Drive's words in the owner's language; the default one when theirs cannot
+ *  be read, so the notice is still sent. */
+async function ownerWords(userId: string) {
+    try {
+        return translatorFor(await getUserLocale(userId), "drive");
+    } catch {
+        return translatorFor(DEFAULT_LOCALE, "drive");
+    }
 }

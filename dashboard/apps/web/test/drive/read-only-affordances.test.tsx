@@ -18,6 +18,7 @@
  * reasons having nothing to do with permissions.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { FilesView } from "@/app/(app)/drive/files-view";
 import type { DriveEntry } from "@/app/(app)/drive/types";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -91,7 +92,7 @@ function renderAs(abilities: { read: boolean; write: boolean; remove: boolean })
             onDeletePermanent={noop}
             onEmptyFolder={noop}
             onScheduleDelete={noop}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

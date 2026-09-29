@@ -10,6 +10,7 @@
  * refused is a question with an answer.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { SendDialog } from "@/app/(app)/drive/send-dialog";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -49,7 +50,7 @@ describe("sending a file", () => {
                 connectionId="c1"
                 path="a/report.pdf"
                 name="report.pdf"
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         await user.type(screen.getByLabelText("Search for a person"), "xx");
@@ -71,7 +72,7 @@ describe("sending a file", () => {
                 connectionId="c1"
                 path="a/report.pdf"
                 name="report.pdf"
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         await user.type(screen.getByLabelText("Search for a person"), "xx");
@@ -105,7 +106,7 @@ describe("sending a file", () => {
                 connectionId="c1"
                 path="a/report.pdf"
                 name="report.pdf"
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         await user.type(screen.getByLabelText("Search for a person"), "xx");

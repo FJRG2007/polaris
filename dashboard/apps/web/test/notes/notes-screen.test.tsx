@@ -6,6 +6,7 @@
  * put its text on the page, and that a note inside another says where it sits.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ShelfData } from "@/app/(app)/notes/note-tree";
@@ -53,7 +54,7 @@ function ownShelf(notes: readonly NoteSummary[], folders: ShelfData["folders"] =
 }
 
 function screen(shelves: readonly ShelfData[], open: NoteView | null): string {
-    return renderToStaticMarkup(<NotesView shelves={shelves} note={open} />);
+    return renderToStaticMarkup(withMessages(<NotesView shelves={shelves} note={open} />));
 }
 
 describe("the notes screen", () => {

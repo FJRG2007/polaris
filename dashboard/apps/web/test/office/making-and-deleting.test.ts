@@ -88,14 +88,14 @@ describe("putting one in the bin", () => {
 
     it("asks, and names the document it is about to take", async () => {
         const source = await view;
-        expect(source).toContain("title: `Move ${row.title} to the bin?`");
-        expect(source).toContain('confirmLabel: "Move to the bin"');
+        expect(source).toContain('title: t("view.binTitle", { name: row.title })');
+        expect(source).toContain('confirmLabel: t("view.bin")');
         expect(source).toContain("if (!sure) return;");
     });
 
     it("says where it goes and that it can come back", async () => {
         const source = await view;
-        expect(source).toContain("waits in the bin, where you can put it back");
+        expect(source).toContain('description: t("view.binBody")');
     });
 
     it("does not ask to put one back, which loses nothing", async () => {
@@ -118,7 +118,7 @@ describe("deleting one for good", () => {
         const source = await view;
         expect(source).toContain("<ConfirmDeleteDialog");
         expect(source).toContain("onDelete={() => setBurning({ id: row.id, title: row.title })}");
-        expect(source).toContain("Nothing here can bring it back.");
+        expect(source).toContain('description={t("view.burnBody")}');
     });
 
     it("asks it plainly: one row of a bin somebody empties a few at a time", async () => {

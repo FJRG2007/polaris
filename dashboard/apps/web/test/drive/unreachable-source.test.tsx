@@ -16,6 +16,7 @@
  * none of them takes part in the decision.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ConnectionSummary, SourceStatus } from "../../src/app/(app)/drive/types";
@@ -95,7 +96,7 @@ const NAS: ConnectionSummary = {
 function render(source: ConnectionSummary, status: SourceStatus[]): string {
     statuses = status;
     return renderToStaticMarkup(
-        <DriveExplorer connections={[source]} connectionId={source.id} path="" />
+        withMessages(<DriveExplorer connections={[source]} connectionId={source.id} path="" />)
     );
 }
 

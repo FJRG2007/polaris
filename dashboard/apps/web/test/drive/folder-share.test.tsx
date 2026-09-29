@@ -12,6 +12,7 @@
  * empty and the dialogs (which live in a portal) never open.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DriveEntry } from "../../src/app/(app)/drive/types";
@@ -42,7 +43,7 @@ const ENTRIES: DriveEntry[] = [];
 
 function render(extra: { onShareFolder?: () => void }): string {
     return renderToStaticMarkup(
-        <FilesView
+        withMessages(<FilesView
             connectionId="44444444-4444-4444-8444-444444444444"
             path="photos/2026"
             segments={["photos", "2026"]}
@@ -72,7 +73,7 @@ function render(extra: { onShareFolder?: () => void }): string {
             onEmptyFolder={() => {}}
             onScheduleDelete={() => {}}
             {...extra}
-        />
+        />)
     );
 }
 

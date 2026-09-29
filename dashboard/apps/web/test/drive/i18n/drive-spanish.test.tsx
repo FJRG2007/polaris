@@ -4,11 +4,15 @@
  * the English stays what it was.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { withMessages } from "../../setup/i18n";
 import { webCatalogs } from "../../../messages";
 import { renderToStaticMarkup } from "react-dom/server";
 import { UnlockPanel } from "@/app/(app)/drive/access-dialog";
+
+// The panel is drawn, never submitted: its server actions are not reached.
+vi.mock("@/app/(app)/drive/access-actions", () => ({}));
+vi.mock("@/app/(app)/drive/principal-picker", () => ({ PrincipalPicker: () => null }));
 import { matchSummary, zoomLabel } from "@/app/(app)/drive/viewer/pdf-controls";
 import { OFFICE_KIND_KEYS, OFFICE_KIND_PLURAL_KEYS } from "@/app/(app)/office/office-kinds";
 
