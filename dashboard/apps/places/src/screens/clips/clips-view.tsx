@@ -49,16 +49,14 @@ import {
     Select
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
+import type { PlacesKey } from "../../../messages";
 
 const { runAction } = hostUi.runAction;
 const { MediaPlayer } = hostUi.mediaPlayer;
 const { useDisplayFormat } = hostUi.displayFormat;
 
-const REASON_LABEL: Record<string, string> = {
-    motion: "Something happened",
-    continuous: "Recorded all day",
-    manual: "Recorded by hand"
-};
+const REASONS = new Set(["motion", "continuous", "manual"]);
 
 /** Bytes as somebody reads them. Kept here rather than pulled from a formatter,
  *  because this is the only screen that says it. */
@@ -87,6 +85,7 @@ function download(clip: ClipView, when: string) {
 
 export function ClipsView({ canManage }: { canManage: boolean }) {
     const format = useDisplayFormat();
+    const t = usePlacesT();
     const [clips, setClips] = useState<ClipView[] | null>(null);
     const [cameras, setCameras] = useState<CameraView[]>([]);
     const [cameraId, setCameraId] = useState("");
@@ -244,7 +243,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
             cursor.current = null;
             return;
         }
-        if (event.key === "Delete" && canManage && chosen.length > 0) {
+        if (event.key === t("clips.delete") && canManage && chosen.length > 0) {
             event.preventDefault();
             setRemoving(chosen);
             return;
@@ -295,22 +294,22 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                     value={cameraId}
                     onValueChange={setCameraId}
                     className="w-52"
-                    aria-label="Camera"
+                    aria-label={t("cameras.columns.camera")}
                     options={[
-                        { value: "", label: "Every camera" },
+                        { value: "", label: t("clips.everyCamera") },
                         ...cameras.map((camera) => ({ value: camera.id, label: camera.name }))
                     ]}
                 />
                 {chosen.length > 0 ? (
                     <div className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1">
                         <span className="text-[0.75rem] text-foreground-subtle">
-                            {chosen.length} selected
+                            {t("clips.selected", { count: chosen.length })}
                         </span>
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={allKept ? "Stop keeping these" : "Keep these"}
-                            title={allKept ? "Stop keeping these" : "Keep these"}
+                            aria-label={allKept ? t("clips.unkeepThese") : t("clips.keepThese")}
+                            title={allKept ? t("clips.unkeepThese") : t("clips.keepThese")}
                             onClick={() => keep(chosen, !allKept)}
                         >
                             {allKept ? (
@@ -323,8 +322,8 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Delete these clips"
-                                title="Delete"
+                                aria-label={t("clips.deleteThese")}
+                                title={t("clips.delete")}
                                 onClick={() => setRemoving(chosen)}
                             >
                                 <Trash2 className="size-4 shrink-0" />
@@ -333,8 +332,8 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Clear the selection"
-                            title="Clear"
+                            aria-label={t("clips.clearSelection")}
+                            title={t("clips.clear")}
                             onClick={() => setSelected(new Set())}
                         >
                             <X className="size-4 shrink-0" />
@@ -350,15 +349,15 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
             ) : rows.length === 0 ? (
                 <EmptyState
                     icon={<Video />}
-                    title="No footage yet"
-                    description="A camera keeps footage once you tell it to, on its own settings screen."
+                    title={t("clips.emptyTitle")}
+                    description={t("clips.emptyBody")}
                 />
             ) : (
                 <>
                     <ul
                         tabIndex={0}
                         onKeyDown={onKeyDown}
-                        aria-label="Footage"
+                        aria-label={t("clips.footage")}
                         aria-multiselectable
                         className="flex flex-col divide-y divide-border rounded-lg border border-border"
                     >
@@ -387,25 +386,28 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                         {clip.cameraName} - {when}
                                                     </p>
                                                     <p className="truncate text-[0.6875rem] text-foreground-subtle">
-                                                        {REASON_LABEL[clip.reason] ?? clip.reason} -{" "}
+                                                        {REASONS.has(clip.reason)
+                                                            ? t(`clips.reasons.${clip.reason}` as PlacesKey)
+                                                            : clip.reason}{" "}
+                                                        -{" "}
                                                         {duration(clip.durationMs)} -{" "}
                                                         {size(clip.bytes)}
                                                     </p>
                                                 </div>
                                                 <div className="flex shrink-0 items-center gap-1">
                                                     {clip.pinned ? (
-                                                        <Badge variant="neutral">Kept</Badge>
+                                                        <Badge variant="neutral">{t("clips.kept")}</Badge>
                                                     ) : null}
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         aria-label={
                                                             playing === clip.id
-                                                                ? "Stop"
-                                                                : "Play this clip"
+                                                                ? t("clips.stop")
+                                                                : t("clips.playThis")
                                                         }
                                                         title={
-                                                            playing === clip.id ? "Stop" : "Play"
+                                                            playing === clip.id ? t("clips.stop") : t("clips.play")
                                                         }
                                                         onClick={(event) => {
                                                             event.stopPropagation();
@@ -425,13 +427,13 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                         size="icon"
                                                         aria-label={
                                                             clip.pinned
-                                                                ? "Stop keeping this"
-                                                                : "Keep this one"
+                                                                ? t("clips.unkeepThis")
+                                                                : t("clips.keepThis")
                                                         }
                                                         title={
                                                             clip.pinned
-                                                                ? "Stop keeping this"
-                                                                : "Keep this one"
+                                                                ? t("clips.unkeepThis")
+                                                                : t("clips.keepThis")
                                                         }
                                                         onClick={(event) => {
                                                             event.stopPropagation();
@@ -448,8 +450,8 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label="Delete this clip"
-                                                            title="Delete"
+                                                            aria-label={t("clips.deleteThis")}
+                                                            title={t("clips.delete")}
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
                                                                 setRemoving([clip]);
@@ -497,7 +499,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                     <ContextMenuContent>
                                         <ContextMenuLabel>
                                             {selected.has(clip.id) && chosen.length > 1
-                                                ? `${chosen.length} clips selected`
+                                                ? t("clips.clipsSelected", { count: chosen.length })
                                                 : `${clip.cameraName} - ${when}`}
                                         </ContextMenuLabel>
                                         <ContextMenuItem
@@ -508,7 +510,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             }
                                         >
                                             <Play className="size-4 shrink-0" />
-                                            {playing === clip.id ? "Stop" : "Play"}
+                                            {playing === clip.id ? t("clips.stop") : t("clips.play")}
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() => {
@@ -520,7 +522,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             }}
                                         >
                                             <Pin className="size-4 shrink-0" />
-                                            {clip.pinned ? "Stop keeping" : "Keep"}
+                                            {clip.pinned ? t("clips.unkeep") : t("clips.keep")}
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() => {
@@ -533,13 +535,13 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             }}
                                         >
                                             <Download className="size-4 shrink-0" />
-                                            Download
+                                            {t("clips.download")}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
                                         <ContextMenuItem
                                             onSelect={() => setSelected(new Set(keys))}
                                         >
-                                            Select all
+                                            {t("clips.selectAll")}
                                         </ContextMenuItem>
                                         {canManage ? (
                                             <>
@@ -551,7 +553,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                     }
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
-                                                    Delete
+                                                    {t("clips.delete")}
                                                 </ContextMenuItem>
                                             </>
                                         ) : null}
@@ -571,7 +573,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                 {loadingMore ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
                                 ) : null}
-                                Show older
+                                {t("clips.older")}
                             </Button>
                         </div>
                     ) : null}
@@ -585,12 +587,20 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                     name={
                         removing.length === 1 && removing[0]
                             ? `${removing[0].cameraName} - ${format.dateTime(removing[0].startedAt)}`
-                            : `${removing.length} clips`
+                            : t("clips.count", { count: removing.length })
                     }
                     kind="clip"
+                    title={t("clips.deleteTitle")}
+                    question={t.rich("common.deleteQuestion", {
+                        name:
+                            removing.length === 1 && removing[0]
+                                ? `${removing[0].cameraName} - ${format.dateTime(removing[0].startedAt)}`
+                                : t("clips.count", { count: removing.length }),
+                        em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
+                    })}
                     requireTyping={false}
-                    description="The file is removed from wherever it was written. There is no copy."
-                    confirmLabel="Delete"
+                    description={t("clips.deleteBody")}
+                    confirmLabel={t("clips.delete")}
                     onConfirm={() => remove(removing)}
                 />
             ) : null}

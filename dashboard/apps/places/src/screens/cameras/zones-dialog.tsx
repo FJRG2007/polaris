@@ -27,7 +27,8 @@ import * as actions from "../actions";
 import * as zoning from "@polaris/core";
 import { useEffect, useRef, useState } from "react";
 import { Eraser, Loader2, Plus, Trash2, Undo2 } from "lucide-react";
-import { OBJECT_CLASSES, OBJECT_CLASS_LABELS, type ObjectClass } from "../../lib/detection";
+import { OBJECT_CLASSES, type ObjectClass } from "../../lib/detection";
+import { usePlacesT } from "../use-places-t";
 import {
     Badge,
     Button,
@@ -112,6 +113,7 @@ export function ZonesDialog({
     camera: { id: string; name: string };
     onClose: () => void;
 }) {
+    const t = usePlacesT();
     const [zones, setZones] = useState<zoning.Zone[]>([]);
     const [draft, setDraft] = useState<Draft>(emptyDraft);
     const [loading, setLoading] = useState(true);
@@ -220,10 +222,9 @@ export function ZonesDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="w-[min(64rem,95vw)] max-w-[min(64rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>Areas on {camera.name}</DialogTitle>
+                    <DialogTitle>{t("zones.title", { name: camera.name })}</DialogTitle>
                     <DialogDescription>
-                        Draw the parts of the picture that matter. Click the frame to place each
-                        corner. Until you draw one, the whole picture counts.
+                        {t("zones.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -252,9 +253,7 @@ export function ZonesDialog({
                                 mean the same thing. */}
                             {noPicture ? (
                                 <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[0.75rem] text-foreground-subtle">
-                                    No picture from this camera right now. You can still draw on the
-                                    frame - an area is a fraction of the picture, not a set of
-                                    pixels.
+                                    {t("zones.noPicture")}
                                 </span>
                             ) : (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -309,7 +308,7 @@ export function ZonesDialog({
                                 <button
                                     key={`${index}-${point.x}-${point.y}`}
                                     type="button"
-                                    aria-label={`Corner ${index + 1}`}
+                                    aria-label={t("zones.corner", { number: index + 1 })}
                                     onPointerDown={(event) => {
                                         event.stopPropagation();
                                         setDragging(index);
@@ -328,7 +327,7 @@ export function ZonesDialog({
                                 onClick={() => set("points", draft.points.slice(0, -1))}
                             >
                                 <Undo2 className="size-4 shrink-0" />
-                                Undo corner
+                                {t("zones.undo")}
                             </Button>
                             <Button
                                 variant="ghost"
@@ -337,12 +336,12 @@ export function ZonesDialog({
                                 onClick={() => set("points", [])}
                             >
                                 <Eraser className="size-4 shrink-0" />
-                                Start over
+                                {t("zones.startOver")}
                             </Button>
                             <span className="text-[0.75rem] text-foreground-subtle">
                                 {enough
-                                    ? `${draft.points.length} corners. Drag one to move it.`
-                                    : `${zoning.MIN_ZONE_POINTS - draft.points.length} more corners needed.`}
+                                    ? t("zones.corners", { count: draft.points.length })
+                                    : t("zones.needMore", { count: zoning.MIN_ZONE_POINTS - draft.points.length })}
                             </span>
                         </div>
                     </div>
@@ -350,15 +349,15 @@ export function ZonesDialog({
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1">
                             <p className="text-[0.75rem] font-medium text-muted-foreground">
-                                Areas
+                                {t("cameras.areas")}
                             </p>
                             {loading ? (
                                 <p className="text-[0.8125rem] text-foreground-subtle">
-                                    Reading them...
+                                    {t("zones.reading")}
                                 </p>
                             ) : zones.length === 0 ? (
                                 <p className="text-[0.8125rem] text-foreground-subtle">
-                                    None yet, so everything this camera sees counts.
+                                    {t("zones.none")}
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1">
@@ -381,16 +380,16 @@ export function ZonesDialog({
                                                 {zone.name}
                                             </button>
                                             {zone.kind === "ignore" ? (
-                                                <Badge variant="neutral">Ignored</Badge>
+                                                <Badge variant="neutral">{t("zones.ignored")}</Badge>
                                             ) : null}
                                             {!zone.enabled ? (
-                                                <Badge variant="neutral">Off</Badge>
+                                                <Badge variant="neutral">{t("zones.off")}</Badge>
                                             ) : null}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label={`Remove ${zone.name}`}
-                                                title="Remove"
+                                                aria-label={t("cameras.removeName", { name: zone.name })}
+                                                title={t("cameras.remove")}
                                                 disabled={busy}
                                                 onClick={() => void remove(zone)}
                                             >
@@ -405,12 +404,12 @@ export function ZonesDialog({
                         <div className="flex flex-col gap-3 border-t border-border pt-3">
                             <label className="flex flex-col gap-1">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    Name <span aria-hidden>*</span>
+                                    {t("placeDialog.name")} <span aria-hidden>*</span>
                                 </span>
                                 <Input
                                     value={draft.name}
                                     onChange={(event) => set("name", event.target.value)}
-                                    placeholder="Driveway"
+                                    placeholder={t("zones.namePlaceholder")}
                                 />
                             </label>
 
@@ -419,16 +418,16 @@ export function ZonesDialog({
                                 onValueChange={(value) => set("kind", value as zoning.ZoneKind)}
                                 options={zoning.ZONE_KINDS.map((kind) => ({
                                     value: kind,
-                                    label: zoning.ZONE_KIND_META[kind].label
+                                    label: t(`zones.kinds.${kind}.label`)
                                 }))}
                             />
                             <p className="text-[0.75rem] text-foreground-subtle">
-                                {zoning.ZONE_KIND_META[draft.kind].summary}
+                                {t(`zones.kinds.${draft.kind}.summary`)}
                             </p>
 
                             <div className="flex flex-col gap-1">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    What counts here
+                                    {t("zones.counts")}
                                 </span>
                                 <div className="flex flex-wrap gap-3">
                                     {OBJECT_CLASSES.map((item) => (
@@ -449,21 +448,21 @@ export function ZonesDialog({
                                                     )
                                                 }
                                             />
-                                            {OBJECT_CLASS_LABELS[item]}
+                                            {t(`objects.${item}`)}
                                         </label>
                                     ))}
                                 </div>
                                 <p className="text-[0.75rem] text-foreground-subtle">
                                     {draft.objects.length === 0
-                                        ? "Everything this camera reports."
-                                        : "Anything else here is treated as if the area were not drawn."}
+                                        ? t("zones.everything")
+                                        : t("zones.rest")}
                                 </p>
                             </div>
 
                             <div className="flex gap-3">
                                 <label className="flex min-w-0 flex-1 flex-col gap-1">
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                        Frames before it counts
+                                        {t("zones.inertia")}
                                     </span>
                                     <Input
                                         value={draft.inertia}
@@ -473,7 +472,7 @@ export function ZonesDialog({
                                 </label>
                                 <label className="flex min-w-0 flex-1 flex-col gap-1">
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                        Seconds it must stay
+                                        {t("zones.loiter")}
                                     </span>
                                     <Input
                                         value={draft.loiterSeconds}
@@ -486,7 +485,7 @@ export function ZonesDialog({
                             </div>
 
                             <label className="flex items-center justify-between gap-3">
-                                <span className="text-[0.8125rem]">In use</span>
+                                <span className="text-[0.8125rem]">{t("zones.inUse")}</span>
                                 <Switch
                                     checked={draft.enabled}
                                     onChange={(checked) => set("enabled", checked)}
@@ -505,11 +504,11 @@ export function ZonesDialog({
                             onClick={() => setDraft(emptyDraft())}
                             disabled={busy}
                         >
-                            New area
+                            {t("zones.new")}
                         </Button>
                     ) : null}
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
-                        Done
+                        {t("zones.done")}
                     </Button>
                     <Button
                         onClick={() => void save()}
@@ -521,7 +520,7 @@ export function ZonesDialog({
                         ) : (
                             <Plus className="size-4 shrink-0" />
                         )}
-                        {draft.id ? "Save area" : "Add area"}
+                        {draft.id ? t("zones.save") : t("zones.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

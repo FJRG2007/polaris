@@ -18,7 +18,7 @@
         "add": "Añadir cámara",
         "area": "Zona",
         "areaCount": "{area} - {count}",
-        "areas": "Zonas",
+        "areas": "Áreas",
         "change": "Cambiar",
         "changeName": "Cambiar {name}",
         "columns": {
@@ -27,8 +27,8 @@
             "notices": "Detecta"
         },
         "discover": "Buscar cámaras",
-        "drawAreas": "Dibujar zonas",
-        "drawAreasOn": "Dibujar zonas en {name}",
+        "drawAreas": "Dibujar áreas",
+        "drawAreasOn": "Dibujar áreas en {name}",
         "empty": {
             "manage": "Añade una por su dirección o deja que Polaris busque las que ya están en tu red.",
             "title": "Aún no hay cámaras",
@@ -65,7 +65,8 @@
     "common": {
         "cancel": "Cancelar",
         "required": " *",
-        "save": "Guardar"
+        "save": "Guardar",
+        "deleteQuestion": "¿Borrar <em>{name}</em>?"
     },
     "detection": {
         "box": "{label} {score} %",
@@ -491,7 +492,7 @@
             },
             "fields": {
                 "host": {
-                    "label": "Dirección del bróker",
+                    "label": "Bróker",
                     "hint": "Un nombre o dirección en la misma red que las cerraduras. El firmware de Nuki no se conecta a nada fuera de ella.",
                     "placeholder": "192.168.1.20"
                 },
@@ -505,7 +506,7 @@
                     "label": "Contraseña"
                 },
                 "prefix": {
-                    "label": "Prefijo de temas",
+                    "label": "Prefijo",
                     "hint": "Bajo qué publican las cerraduras. El valor por defecto de Nuki, salvo que lo cambiaras."
                 }
             }
@@ -521,7 +522,7 @@
             },
             "fields": {
                 "host": {
-                    "label": "Dirección del bróker",
+                    "label": "Bróker",
                     "hint": "Un nombre o dirección al que Polaris llegue en esta red.",
                     "placeholder": "192.168.1.20"
                 },
@@ -535,13 +536,13 @@
                     "label": "Contraseña"
                 },
                 "prefix": {
-                    "label": "Prefijo de descubrimiento",
+                    "label": "Prefijo",
                     "hint": "Bajo qué se publican las descripciones. El valor por defecto de la convención, salvo que lo cambiaras."
                 }
             }
         },
         "tuya-cloud": {
-            "label": "Proyecto en la nube de Tuya",
+            "label": "Proyecto de Tuya Cloud",
             "summary": "Todo lo de la cuenta de la app Smart Life o Tuya, lleve la marca que lleve: interruptores, enchufes y luces.",
             "note": "Tuya es lo que hay dentro de unos miles de marcas, así que un enchufe con otro nombre en la caja suele ser esto. Las claves salen de su consola de desarrollo, que es gratuita, y la cuenta de la app tiene que estar vinculada al proyecto allí: unas claves que funcionan sin la cuenta vinculada son la única forma de que esto falle en silencio, así que Polaris lo dice en lugar de mostrar una lista vacía.",
             "steps": {
@@ -560,16 +561,16 @@
                     "placeholder": "Junto al Access ID"
                 },
                 "region": {
-                    "label": "Centro de datos",
+                    "label": "Región",
                     "hint": "En el que se creó el proyecto. Los dispositivos solo existen en ese, así que cualquier otro responde como si la cuenta estuviera vacía."
                 }
             }
         },
         "reach": {
-            "anywhere": "Desde cualquier sitio",
+            "anywhere": "Desde donde sea",
             "same-network": "En la misma red"
         },
-        "brandMqtt": "Cualquier cosa en MQTT",
+        "brandMqtt": "Todo lo de MQTT",
         "regions": {
             "eu": "Europa central",
             "weu": "Europa occidental",
@@ -604,5 +605,146 @@
         "personNotAdded": "No se pudo añadir.",
         "photoTooLarge": "Esa fotografía es demasiado grande.",
         "nameNotSaved": "No se pudo guardar ese nombre."
+    },
+    "settings": {
+        "footageBody": "Las grabaciones y las imágenes de los eventos se escriben en <em>{storage}</em>. Eso se decide para toda la instancia en Subidas, junto a dónde van las fotos y los adjuntos: un sitio para una decisión. Una cámara que quiera su propio disco lo indica en sus propios ajustes.",
+        "sensitivityBody": "Nadie acierta con esto a la primera, y no es lo mismo un pasillo que un jardín frente a un seto. Ajústalos aquí una vez, a partir de la cámara que ya tengas afinada, y cada cámara que añadas después empezará así. Cada cámara puede seguir teniendo los suyos.",
+        "settleHint": "Segundos. Es el que frena polillas, ráfagas y camiones que pasan: casi toda falsa alarma dura uno o dos segundos, y una persona no.",
+        "gapHint": "Segundos. Alguien de pie en una puerta es una cosa que ha pasado, no sesenta.",
+        "facesBody": "Desactivado salvo que lo actives. Pone nombre a las personas que le hayas enseñado en Personas, y solo después de que una cámara haya visto a alguien: las imágenes y lo que se aprende de ellas se quedan en la máquina donde se ejecuta. Mientras está activado mantiene sus modelos en memoria, así que déjalo desactivado si solo quieres que las cámaras digan que hay alguien.",
+        "offButRunning": "Desactivado, pero sigue ejecutándose en {server}.",
+        "offButRunningHint": "Nada le pregunta nada. Pararlo libera la memoria de sus modelos; volver a activar el reconocimiento lo arranca de nuevo.",
+        "offHint": "Las cámaras avisan de que hay alguien, y nunca de quién. No hay nada ejecutándose para ello.",
+        "runningOn": "Ejecutándose en {server}.",
+        "notAnsweringOn": "No responde en {server}.",
+        "startingOn": "Arrancando en {server}.",
+        "installHint": "Unos cientos de megas, una vez. Funciona con el procesador: no hace falta tarjeta gráfica.",
+        "noneYet": "Hasta que haya uno, las cámaras que reconocen caras siguen avisando de que hay alguien, pero no de quién.",
+        "thisServer": "este servidor",
+        "anotherServer": "otro servidor",
+        "footage": "Dónde se graba",
+        "changeUploads": "Cambiarlo en Subidas",
+        "sensitivityTitle": "Sensibilidad de una cámara nueva",
+        "settleLabel": "Segundos de espera",
+        "saved": "Guardado",
+        "faces": "Reconocer caras",
+        "stop": "Pararlo",
+        "checkAgain": "Repetir",
+        "runOn": "Instalar en",
+        "installing": "Instalando",
+        "install": "Instalarlo",
+        "recognizerAddress": "URL del reconocedor",
+        "key": "Clave",
+        "recognizerKey": "Clave",
+        "pasteKey": "Pega la clave",
+        "ownRecognizer": "Ya tengo uno propio",
+        "runningHint": "Enséñale quién vive aquí en Personas, y las cámaras que reconocen caras empezarán a usar sus nombres.",
+        "waitedHint": "Ha tenido varios minutos y no ha arrancado. Puede que la máquina aún lo esté descargando, o que el contenedor se haya parado: está en Apps, con el nombre con que se instaló.",
+        "startingHint": "Carga sus modelos la primera vez que arranca, lo que lleva un minuto o dos. Mientras tanto no se pierde nada: las cámaras siguen avisando de que hay alguien."
+    },
+    "clips": {
+        "reasons": {
+            "motion": "Pasó algo",
+            "continuous": "Grabado todo el día",
+            "manual": "Grabado a mano"
+        },
+        "selected": "{count, plural, one {# seleccionado} other {# seleccionados}}",
+        "clipsSelected": "{count, plural, one {# clip seleccionado} other {# clips seleccionados}}",
+        "count": "{count, plural, one {# clip} other {# clips}}",
+        "deleteTitle": "Borrar clip",
+        "everyCamera": "Todas",
+        "unkeepThese": "Dejar de fijarlos",
+        "keepThese": "Fijarlos",
+        "deleteThese": "Borrar estos clips",
+        "clearSelection": "Quitar la selección",
+        "clear": "Quitar",
+        "emptyTitle": "Sin grabaciones",
+        "emptyBody": "Una cámara guarda grabaciones cuando se lo indicas, en su propia pantalla de ajustes.",
+        "footage": "Vídeos",
+        "kept": "Fijado",
+        "stop": "Parar",
+        "playThis": "Ver este clip",
+        "play": "Ver",
+        "unkeepThis": "Dejar de fijarlo",
+        "keepThis": "Fijar este",
+        "deleteThis": "Borrar este clip",
+        "delete": "Borrar",
+        "unkeep": "No fijar",
+        "keep": "Fijar",
+        "download": "Descargar",
+        "selectAll": "Elegir todo",
+        "older": "Anteriores",
+        "deleteBody": "El archivo se borra de donde se escribió. No hay copia."
+    },
+    "events": {
+        "kinds": {
+            "all": "Todo",
+            "person": "Personas",
+            "face": "Conocidos",
+            "vehicle": "Vehículos",
+            "animal": "Animales",
+            "package": "Paquetes",
+            "motion": "Movimiento",
+            "tamper": "Manipulación",
+            "offline": "Cámaras sin respuesta"
+        },
+        "momentTitle": "{what} - {camera}, {at}",
+        "what": "Qué pasó",
+        "who": "Quién",
+        "anybody": "Cualquiera",
+        "where": "Dónde",
+        "anywhere": "Donde sea",
+        "from": "Desde",
+        "to": "Hasta",
+        "clearFilters": "Quitar filtros",
+        "deleteThese": "Borrarlos",
+        "emptyTitle": "Nada todavía",
+        "emptyBody": "Cuando una cámara detecta algo, aparece aquí con la imagen que tomó.",
+        "noPicture": "Sin imagen",
+        "noFootage": "No se guardó vídeo de este momento",
+        "score": "Certeza del detector",
+        "markSeen": "Marcar visto",
+        "deleteThis": "Borrar detección",
+        "deleteNothing": "Borrar: no era nada",
+        "theseDetections": "estas detecciones",
+        "deleteAllTitle": "¿Borrar las detecciones en pantalla?",
+        "deleteAllBody": "Se borra todo lo que coincide con los filtros actuales, con sus imágenes. Los vídeos no se tocan.",
+        "deleteThem": "Borrarlas",
+        "see": "Ver {camera}, {at}"
+    },
+    "zones": {
+        "corner": "Esquina {number}",
+        "corners": "{count} esquinas. Arrastra una para moverla.",
+        "needMore": "{count, plural, one {Falta # esquina.} other {Faltan # esquinas.}}",
+        "kinds": {
+            "watch": {
+                "label": "Vigilar esta área",
+                "summary": "Solo cuenta lo que pasa dentro. Dibuja más de una y valdrá cualquiera."
+            },
+            "ignore": {
+                "label": "Ignorar esta área",
+                "summary": "Nunca se avisa de nada de aquí. La carretera, la acera, el árbol que se mueve toda la tarde."
+            }
+        },
+        "title": "Áreas en {name}",
+        "intro": "Dibuja las partes de la imagen que importan. Haz clic en la imagen para poner cada esquina. Hasta que dibujes una, cuenta toda la imagen.",
+        "undo": "Quitar esquina",
+        "startOver": "Desde cero",
+        "reading": "Leyéndolas...",
+        "none": "Todavía ninguna, así que cuenta todo lo que ve esta cámara.",
+        "ignored": "Ignorada",
+        "off": "Parada",
+        "namePlaceholder": "Entrada",
+        "counts": "Qué cuenta aquí",
+        "everything": "Todo lo que avisa esta cámara.",
+        "rest": "Todo lo demás aquí se trata como si el área no estuviera dibujada.",
+        "inertia": "Fotogramas antes de contar",
+        "loiter": "Segundos que debe estar",
+        "inUse": "En uso",
+        "new": "Nueva área",
+        "done": "Hecho",
+        "save": "Guardar área",
+        "add": "Añadir área",
+        "noPicture": "Ahora mismo no hay imagen de esta cámara. Puedes dibujar igualmente sobre el marco: un área es una fracción de la imagen, no un conjunto de píxeles."
     }
 }

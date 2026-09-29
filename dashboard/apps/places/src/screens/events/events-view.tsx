@@ -23,7 +23,8 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { EventView } from "../../lib/events";
 import { DetectionBox } from "../detection-box";
-import { KIND_LABEL } from "../detection-label";
+import { kindLabel } from "../detection-label";
+import { usePlacesT } from "../use-places-t";
 import type { CameraView } from "../../lib/cameras";
 import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import {
@@ -45,17 +46,8 @@ const { runAction } = hostUi.runAction;
 const { MediaPlayer } = hostUi.mediaPlayer;
 const { useDisplayFormat } = hostUi.displayFormat;
 
-const KINDS = [
-    { value: "", label: "Everything" },
-    { value: "person", label: "People" },
-    { value: "face", label: "Known faces" },
-    { value: "vehicle", label: "Vehicles" },
-    { value: "animal", label: "Animals" },
-    { value: "package", label: "Parcels" },
-    { value: "motion", label: "Movement" },
-    { value: "tamper", label: "Tampering" },
-    { value: "offline", label: "Cameras going quiet" }
-];
+/** What the list can be narrowed to; each reads as `events.kinds.<value>`. */
+const KINDS = ["", "person", "face", "vehicle", "animal", "package", "motion", "tamper", "offline"] as const;
 
 /** The shape every tile is drawn at. The stills are not all this shape - a
  *  still keeps whatever the camera sends - so it is also what the box drawn over
@@ -76,6 +68,7 @@ function lasted(event: EventView): string | null {
 
 export function EventsView({ canControl }: { canControl: boolean }) {
     const format = useDisplayFormat();
+    const t = usePlacesT();
     /** The moment a link asked for, if any. */
     const asked = useSearchParams().get("event");
     const [events, setEvents] = useState<EventView[] | null>(null);
@@ -288,9 +281,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     value={cameraId}
                     onValueChange={setCameraId}
                     className="w-52"
-                    aria-label="Camera"
+                    aria-label={t("cameras.columns.camera")}
                     options={[
-                        { value: "", label: "Every camera" },
+                        { value: "", label: t("clips.everyCamera") },
                         ...cameras.map((camera) => ({ value: camera.id, label: camera.name }))
                     ]}
                 />
@@ -298,17 +291,17 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     value={kind}
                     onValueChange={setKind}
                     className="w-44"
-                    aria-label="What happened"
-                    options={KINDS}
+                    aria-label={t("events.what")}
+                    options={KINDS.map((value) => ({ value, label: t(`events.kinds.${value || "all"}`) }))}
                 />
                 {people.length > 0 ? (
                     <Select
                         value={label}
                         onValueChange={setLabel}
                         className="w-44"
-                        aria-label="Who"
+                        aria-label={t("events.who")}
                         options={[
-                            { value: "", label: "Anybody" },
+                            { value: "", label: t("events.anybody") },
                             // Filtered on the subject the recognizer wrote into
                             // the event, shown under whatever they are called
                             // now: a name corrected here still finds everything
@@ -325,9 +318,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         value={zone}
                         onValueChange={setZone}
                         className="w-44"
-                        aria-label="Where"
+                        aria-label={t("events.where")}
                         options={[
-                            { value: "", label: "Anywhere" },
+                            { value: "", label: t("events.anywhere") },
                             ...zones.map((name) => ({ value: name, label: name }))
                         ]}
                     />
@@ -336,14 +329,14 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     type="datetime-local"
                     value={from}
                     onChange={(event) => setFrom(event.target.value)}
-                    aria-label="From"
+                    aria-label={t("events.from")}
                     className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
                 />
                 <input
                     type="datetime-local"
                     value={to}
                     onChange={(event) => setTo(event.target.value)}
-                    aria-label="To"
+                    aria-label={t("events.to")}
                     className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
                 />
                 {cameraId || kind || label || zone || from || to ? (
@@ -359,13 +352,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             setTo("");
                         }}
                     >
-                        Clear filters
+                        {t("events.clearFilters")}
                     </Button>
                 ) : null}
                 {canControl && (events?.length ?? 0) > 0 ? (
                     <Button variant="ghost" size="sm" onClick={() => setClearing(true)}>
                         <Trash2 className="size-4 shrink-0" />
-                        Delete these
+                        {t("events.deleteThese")}
                     </Button>
                 ) : null}
             </div>
@@ -377,8 +370,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
             ) : events.length === 0 ? (
                 <EmptyState
                     icon={<Bell />}
-                    title="Nothing yet"
-                    description="When a camera notices something, it turns up here with the picture it took."
+                    title={t("events.emptyTitle")}
+                    description={t("events.emptyBody")}
                 />
             ) : (
                 <>
@@ -398,7 +391,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     style={{ aspectRatio: TILE_SHAPE }}
                                     className="relative block w-full cursor-zoom-in bg-background"
                                     onClick={() => void openMoment(event)}
-                                    aria-label={`See ${event.cameraName} at ${format.dateTime(event.at)}`}
+                                    aria-label={t("events.see", { camera: event.cameraName, at: format.dateTime(event.at) })}
                                 >
                                     {event.stillKey ? (
                                         // Drawn whole rather than cropped to
@@ -432,7 +425,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                         />
                                     ) : (
                                         <span className="flex size-full items-center justify-center text-[0.6875rem] text-foreground-subtle">
-                                            No picture kept
+                                            {t("events.noPicture")}
                                         </span>
                                     )}
                                     {event.stillKey ? (
@@ -440,8 +433,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             box={event.box}
                                             label={
                                                 nameFor(event.label) ??
-                                                KIND_LABEL[event.kind] ??
-                                                null
+                                                kindLabel(event.kind, t)
                                             }
                                             picture={shapes[event.id] ?? null}
                                             tile={TILE_SHAPE}
@@ -449,16 +441,14 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     ) : null}
                                     {noFootage === event.id ? (
                                         <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[0.6875rem] text-white">
-                                            No footage of this moment was kept
+                                            {t("events.noFootage")}
                                         </span>
                                     ) : null}
                                 </button>
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
                                         <p className="truncate text-[0.8125rem] text-foreground">
-                                            {nameFor(event.label) ??
-                                                KIND_LABEL[event.kind] ??
-                                                event.kind}
+                                            {nameFor(event.label) ?? kindLabel(event.kind, t)}
                                         </p>
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {[
@@ -477,7 +467,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                         {event.score !== null ? (
                                             <Badge
                                                 variant="neutral"
-                                                title="How sure the detector was"
+                                                title={t("events.score")}
                                             >
                                                 {event.score}
                                             </Badge>
@@ -486,8 +476,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label="Mark as seen"
-                                                title="Mark as seen"
+                                                aria-label={t("events.markSeen")}
+                                                title={t("events.markSeen")}
                                                 onClick={() => acknowledge(event)}
                                             >
                                                 <Check className="size-4 shrink-0" />
@@ -497,8 +487,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                aria-label="Delete this detection"
-                                                title="Delete - it was nothing"
+                                                aria-label={t("events.deleteThis")}
+                                                title={t("events.deleteNothing")}
                                                 onClick={() => void remove(event)}
                                             >
                                                 <Trash2 className="size-4 shrink-0" />
@@ -520,7 +510,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                 {loadingMore ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
                                 ) : null}
-                                Show older
+                                {t("clips.older")}
                             </Button>
                         </div>
                     ) : null}
@@ -530,19 +520,23 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setClearing(false)}
-                    name="these detections"
+                    name={t("events.theseDetections")}
                     kind="detections"
                     requireTyping={false}
-                    title="Delete the detections on screen?"
-                    question="Everything the current filters match is removed, along with its pictures. Footage is not touched."
-                    confirmLabel="Delete them"
+                    title={t("events.deleteAllTitle")}
+                    question={t("events.deleteAllBody")}
+                    confirmLabel={t("events.deleteThem")}
                     onConfirm={() => void clearShown()}
                 />
             ) : null}
 
             {moment ? (
                 <MomentDialog
-                    title={`${moment.event.label ?? KIND_LABEL[moment.event.kind] ?? moment.event.kind} - ${moment.event.cameraName}, ${format.dateTime(moment.event.at)}`}
+                    title={t("events.momentTitle", {
+                        what: moment.event.label ?? kindLabel(moment.event.kind, t),
+                        camera: moment.event.cameraName,
+                        at: format.dateTime(moment.event.at)
+                    })}
                     clipId={moment.clipId}
                     offsetSeconds={moment.offsetSeconds}
                     onClose={() => setMoment(null)}

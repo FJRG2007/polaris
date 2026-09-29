@@ -25,6 +25,8 @@ import { useEffect, useState } from "react";
 import { CircleAlert, CircleCheck, Loader2, ScanFace } from "lucide-react";
 import { Button, Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
+import type { PlacesTranslator } from "../../lib/i18n";
 
 const { runAction } = hostUi.runAction;
 
@@ -52,6 +54,14 @@ interface Settings {
     answering: boolean;
 }
 
+/** Where the recognizer runs, in the reader's words: the server's own name, or
+ *  one of the two things `recognizer` says when it has none. */
+function serverWords(name: string | null, t: PlacesTranslator): string {
+    if (name === null || name === "this server") return t("settings.thisServer");
+    if (name === "another server") return t("settings.anotherServer");
+    return name;
+}
+
 interface Defaults {
     sensitivity: number;
     settleSeconds: number;
@@ -66,6 +76,7 @@ export function HomeSettingsView({
     storage: string;
     canAdmin: boolean;
 }) {
+    const t = usePlacesT();
     const [settings, setSettings] = useState<Settings | null>(null);
     const [defaults, setDefaults] = useState<Defaults | null>(null);
     const [savingDefaults, setSavingDefaults] = useState(false);
@@ -239,19 +250,18 @@ export function HomeSettingsView({
             <section className="flex flex-col gap-2">
                 <div>
                     <h2 className="text-[0.8125rem] font-semibold text-foreground">
-                        Where footage goes
+                        {t("settings.footage")}
                     </h2>
                     <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                        Recordings and the pictures that go with events are written to{" "}
-                        <span className="text-foreground">{storage}</span>. That is set for the
-                        whole instance under Uploads, beside where photos and attachments go - one
-                        place for one decision. A camera that wants its own disk says so on its own
-                        settings.
+                        {t.rich("settings.footageBody", {
+                            storage,
+                            em: (chunks) => <span className="text-foreground">{chunks}</span>
+                        })}
                     </p>
                 </div>
                 {canAdmin ? (
                     <Button asChild variant="secondary" size="sm" className="self-start">
-                        <Link href="/admin/uploads">Change it under Uploads</Link>
+                        <Link href="/admin/uploads">{t("settings.changeUploads")}</Link>
                     </Button>
                 ) : null}
             </section>
@@ -259,13 +269,10 @@ export function HomeSettingsView({
             <section className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-[0.8125rem] font-semibold text-foreground">
-                        How sensitive a new camera is
+                        {t("settings.sensitivityTitle")}
                     </h2>
                     <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                        Nobody guesses these right the first time, and they are not the same for a
-                        hallway and a garden facing a hedge. Set them once here, from the camera you
-                        have already tuned, and every camera added afterwards starts there. Each
-                        camera can still disagree.
+                        {t("settings.sensitivityBody")}
                     </p>
                 </div>
 
@@ -275,7 +282,7 @@ export function HomeSettingsView({
                     <>
                         <label className="flex flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Sensitivity - {defaults.sensitivity}
+                                {t("dialog.sensitivity", { value: defaults.sensitivity })}
                             </span>
                             <input
                                 type="range"
@@ -290,17 +297,16 @@ export function HomeSettingsView({
                                     setSavedDefaults(false);
                                 }}
                                 className="w-64 accent-primary"
-                                aria-label="Sensitivity"
+                                aria-label={t("dialog.sensitivityLabel")}
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Higher notices smaller changes. Too high and every shadow is an
-                                event.
+                                {t("dialog.sensitivityHint")}
                             </span>
                         </label>
 
                         <label className="flex flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Ignore anything shorter than
+                                {t("dialog.settle")}
                             </span>
                             <Input
                                 value={String(defaults.settleSeconds)}
@@ -313,18 +319,16 @@ export function HomeSettingsView({
                                 }}
                                 className="w-24"
                                 inputMode="numeric"
-                                aria-label="Settle seconds"
+                                aria-label={t("settings.settleLabel")}
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Seconds. This is the one that stops moths, gusts and passing
-                                lorries: nearly every false alarm is over within a second or two,
-                                and a person is not.
+                                {t("settings.settleHint")}
                             </span>
                         </label>
 
                         <label className="flex flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Wait between detections
+                                {t("dialog.gap")}
                             </span>
                             <Input
                                 value={String(defaults.minGapSeconds)}
@@ -337,11 +341,10 @@ export function HomeSettingsView({
                                 }}
                                 className="w-24"
                                 inputMode="numeric"
-                                aria-label="Wait between detections"
+                                aria-label={t("dialog.gap")}
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                Seconds. Somebody standing at a door is one thing that happened, not
-                                sixty.
+                                {t("settings.gapHint")}
                             </span>
                         </label>
 
@@ -354,12 +357,12 @@ export function HomeSettingsView({
                                 {savingDefaults ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
                                 ) : null}
-                                Save
+                                {t("common.save")}
                             </Button>
                             {savedDefaults ? (
                                 <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                    Saved
+                                    {t("settings.saved")}
                                 </span>
                             ) : null}
                         </div>
@@ -371,14 +374,10 @@ export function HomeSettingsView({
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-[0.8125rem] font-semibold text-foreground">
-                            Face recognition
+                            {t("settings.faces")}
                         </h2>
                         <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                            Off unless you turn it on. It puts names to the people you have taught
-                            it under People, and only after a camera has already seen somebody - the
-                            pictures and what is learned from them stay on the machine it runs on.
-                            While it is on it holds its models in memory, so leave it off if you
-                            only want cameras to say that somebody is there.
+                            {t("settings.facesBody")}
                         </p>
                     </div>
                     {settings === null ? (
@@ -388,7 +387,7 @@ export function HomeSettingsView({
                             checked={settings.faceEnabled}
                             onChange={(next) => void setEnabled(next)}
                             disabled={switching}
-                            aria-label="Face recognition"
+                            aria-label={t("settings.faces")}
                         />
                     )}
                 </div>
@@ -405,11 +404,10 @@ export function HomeSettingsView({
                         <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
                             <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
-                                Off, but still running on {settings.installedOn ?? "this server"}.
+                                {t("settings.offButRunning", { server: serverWords(settings.installedOn, t) })}
                             </p>
                             <p className="text-[0.6875rem] text-foreground-subtle">
-                                Nothing is asking it anything. Stopping it gives back the memory it
-                                holds its models in; turning recognition back on starts it again.
+                                {t("settings.offButRunningHint")}
                             </p>
                             <Button
                                 variant="secondary"
@@ -421,13 +419,12 @@ export function HomeSettingsView({
                                 {switching ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
                                 ) : null}
-                                Stop it
+                                {t("settings.stop")}
                             </Button>
                         </div>
                     ) : (
                         <p className="text-[0.75rem] text-foreground-subtle">
-                            Cameras report that somebody is there, and never who. Nothing is running
-                            for it.
+                            {t("settings.offHint")}
                         </p>
                     )
                 ) : (
@@ -443,17 +440,17 @@ export function HomeSettingsView({
                                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                                     )}
                                     {settings.answering
-                                        ? `Running on ${settings.installedOn}.`
+                                        ? t("settings.runningOn", { server: serverWords(settings.installedOn, t) })
                                         : waited
-                                          ? `Not answering on ${settings.installedOn}.`
-                                          : `Starting on ${settings.installedOn}.`}
+                                          ? t("settings.notAnsweringOn", { server: serverWords(settings.installedOn, t) })
+                                          : t("settings.startingOn", { server: serverWords(settings.installedOn, t) })}
                                 </p>
                                 <p className="text-[0.6875rem] text-foreground-subtle">
                                     {settings.answering
-                                        ? "Teach it who lives here under People, and cameras set to recognize faces will start using their names."
+                                        ? t("settings.runningHint")
                                         : waited
-                                          ? "It has had several minutes and has not come up. The machine may be busy pulling it down, or the container may have stopped - it is under Apps, by the name it was installed with."
-                                          : "It loads its models the first time it starts, which takes a minute or two. Nothing is lost in the meantime - cameras still report that somebody is there."}
+                                          ? t("settings.waitedHint")
+                                          : t("settings.startingHint")}
                                 </p>
                                 {waited ? (
                                     <Button
@@ -462,7 +459,7 @@ export function HomeSettingsView({
                                         className="self-start"
                                         onClick={() => setWaited(false)}
                                     >
-                                        Check again
+                                        {t("settings.checkAgain")}
                                     </Button>
                                 ) : null}
                             </div>
@@ -470,7 +467,7 @@ export function HomeSettingsView({
                             <div className="flex flex-wrap items-end gap-2">
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                        Run it on
+                                        {t("settings.runOn")}
                                     </span>
                                     <Select
                                         value={server}
@@ -487,11 +484,10 @@ export function HomeSettingsView({
                                     ) : (
                                         <ScanFace className="size-4 shrink-0" />
                                     )}
-                                    {installing ? "Installing" : "Install it"}
+                                    {installing ? t("settings.installing") : t("settings.install")}
                                 </Button>
                                 <span className="pb-2 text-[0.6875rem] text-foreground-subtle">
-                                    A few hundred megabytes, once. It runs on the processor - no
-                                    graphics card needed.
+                                    {t("settings.installHint")}
                                 </span>
                             </div>
                         )}
@@ -503,19 +499,19 @@ export function HomeSettingsView({
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                        Address
+                                        {t("dialog.address")}
                                     </span>
                                     <Input
                                         value={url}
                                         onChange={(event) => setUrl(event.target.value)}
                                         className="w-72"
                                         placeholder="http://192.168.1.20:8000"
-                                        aria-label="Recognizer address"
+                                        aria-label={t("settings.recognizerAddress")}
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                        Key
+                                        {t("settings.key")}
                                     </span>
                                     {/* enigma:allow-no-breach-check - this is a key the
                                     recognizer minted in its own interface, not a
@@ -529,11 +525,11 @@ export function HomeSettingsView({
                                         className="w-72"
                                         type="password"
                                         autoComplete="off"
-                                        aria-label="Recognition key"
+                                        aria-label={t("settings.recognizerKey")}
                                         placeholder={
                                             settings.hasFaceKey
-                                                ? "Stored. Type to replace it."
-                                                : "Paste the key"
+                                                ? t("dialog.passwordStored")
+                                                : t("settings.pasteKey")
                                         }
                                     />
                                 </label>
@@ -545,12 +541,12 @@ export function HomeSettingsView({
                                     {saving ? (
                                         <Loader2 className="size-4 shrink-0 animate-spin" />
                                     ) : null}
-                                    Save
+                                    {t("common.save")}
                                 </Button>
                                 {saved ? (
                                     <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
                                         <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                        Saved
+                                        {t("settings.saved")}
                                     </span>
                                 ) : null}
                             </div>
@@ -561,14 +557,13 @@ export function HomeSettingsView({
                                 className="self-start"
                                 onClick={() => setManual(true)}
                             >
-                                I already run my own
+                                {t("settings.ownRecognizer")}
                             </Button>
                         )}
 
                         {!settings.recognizerReady ? (
                             <p className="text-[0.6875rem] text-foreground-subtle">
-                                Until there is one, cameras set to recognize faces still report that
-                                somebody is there - just not who.
+                                {t("settings.noneYet")}
                             </p>
                         ) : null}
                     </>
