@@ -7,11 +7,11 @@
  */
 
 import { EmptyState } from "@polaris/ui";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { getTranslations } from "@/lib/i18n/request";
 import { MessageCircle } from "lucide-react";
 
-export default function ChatIndexPage() {
-    const t = useTranslations("chat");
+export default async function ChatIndexPage() {
+    const t = await getTranslations("chat");
     return (
         <div className="flex flex-1 items-center justify-center p-6">
             <EmptyState
