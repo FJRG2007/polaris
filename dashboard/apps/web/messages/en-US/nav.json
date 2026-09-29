@@ -273,7 +273,8 @@
         "What is on it": "What is on it",
         "Where the room went": "Where the room went",
         "Who gets in": "Who gets in",
-        "World": "World"
+        "World": "World",
+        "Developers": "Developers"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

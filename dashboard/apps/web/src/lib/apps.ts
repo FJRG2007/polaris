@@ -470,6 +470,10 @@ const OPERATIONS_GROUP = "Operations";
  */
 const PRIVACY_GROUP = "Privacy";
 
+/** The heading for what somebody building on Polaris needs: API keys, their own
+ *  model keys and the domains their deploys answer on. */
+const DEVELOPERS_GROUP = "Developers";
+
 /**
  * The headings the Management rail is read under.
  *
@@ -1258,42 +1262,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
         },
         {
-            label: "AI provider keys",
-            href: "/account/ai-keys",
-            icon: Sparkles,
-            keywords: [
-                "byok",
-                "bring your own key",
-                "models",
-                "anthropic",
-                "claude",
-                "openai",
-                "gemini",
-                "grok",
-                "deepseek",
-                "kimi",
-                "groq",
-                "cerebras",
-                "openrouter",
-                "provider",
-                "billing",
-                "agents"
-            ]
-        },
-        {
             label: "Organizations",
             href: "/account/organizations",
             icon: Building2,
             keywords: ["org", "orgs", "teams", "company", "members", "roster", "group"]
         },
-        {
-            label: "Domains",
-            href: "/account/domains",
-            icon: Globe,
-            keywords: ["dns", "custom domain", "deploys", "hostnames", "wildcard", "own domain"]
-        },
         // Everything that decides who reaches this account is one subject, and it
-        // is half the rail: six screens people go looking for together.
+        // is half the rail: five screens people go looking for together.
         {
             label: "Password & 2FA",
             href: "/account/security",
@@ -1329,12 +1304,47 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["ip", "country", "geo"],
             group: "Security"
         },
+        // What somebody building on Polaris reaches for: the keys a script or an
+        // integration signs in with, their own model keys, and the domains their
+        // deploys answer on. Under Security it read as a sign-in setting, and
+        // mixed into the account's own list it was hard to find.
         {
             label: "API keys",
             href: "/account/api-keys",
             icon: KeyRound,
-            keywords: ["tokens"],
-            group: "Security"
+            keywords: ["tokens", "developers", "integrations"],
+            group: DEVELOPERS_GROUP
+        },
+        {
+            label: "AI provider keys",
+            href: "/account/ai-keys",
+            icon: Sparkles,
+            keywords: [
+                "byok",
+                "bring your own key",
+                "models",
+                "anthropic",
+                "claude",
+                "openai",
+                "gemini",
+                "grok",
+                "deepseek",
+                "kimi",
+                "groq",
+                "cerebras",
+                "openrouter",
+                "provider",
+                "billing",
+                "agents"
+            ],
+            group: DEVELOPERS_GROUP
+        },
+        {
+            label: "Domains",
+            href: "/account/domains",
+            icon: Globe,
+            keywords: ["dns", "custom domain", "deploys", "hostnames", "wildcard", "own domain"],
+            group: DEVELOPERS_GROUP
         }
     ],
     office: [

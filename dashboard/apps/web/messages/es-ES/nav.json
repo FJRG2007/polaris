@@ -273,7 +273,8 @@
         "What is on it": "Contenido",
         "Where the room went": "Qué ocupa espacio",
         "Who gets in": "Quién entra",
-        "World": "Mundo"
+        "World": "Mundo",
+        "Developers": "Desarrollo"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",
