@@ -11,6 +11,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, HardDrive, Loader2, TriangleAlert } from "lucide-react";
 import { connectionRemovalPlanAction, removeConnectionAction } from "./actions";
@@ -22,24 +24,23 @@ import type {
 
 interface Choice {
     readonly mode: ConnectionRemovalMode;
-    readonly label: string;
-    readonly summary: string;
-    readonly confirmLabel: string;
+    readonly label: NamespaceKey<"drive">;
+    readonly summary: NamespaceKey<"drive">;
+    readonly confirmLabel: NamespaceKey<"drive">;
 }
 
 const CHOICES: readonly Choice[] = [
     {
         mode: "forget",
-        label: "Forget it",
-        summary: "Polaris stops using the device. Nothing on it is deleted, and it can be added again later.",
-        confirmLabel: "Forget connection"
+        label: "removeConnection.forget.label",
+        summary: "removeConnection.forget.summary",
+        confirmLabel: "removeConnection.forget.confirm"
     },
     {
         mode: "move",
-        label: "Copy everything somewhere else first",
-        summary:
-            "Every file is copied to another connection, the services that mount it are pointed at the copy and brought back up one at a time, and only then is it forgotten. Nothing is deleted from the old device.",
-        confirmLabel: "Copy and forget"
+        label: "removeConnection.move.label",
+        summary: "removeConnection.move.summary",
+        confirmLabel: "removeConnection.move.confirm"
     }
 ];
 
@@ -52,6 +53,7 @@ export function RemoveConnectionDialog({
     onClose: () => void;
     onRemoved: (result: RemoveConnectionResult) => void;
 }) {
+    const t = useTranslations("drive");
     const [plan, setPlan] = useState<ConnectionRemovalPlan | null>(null);
     const [mode, setMode] = useState<ConnectionRemovalMode>("forget");
     const [destination, setDestination] = useState("");
@@ -97,6 +99,7 @@ export function RemoveConnectionDialog({
 
     const canMove = (plan?.destinations.length ?? 0) > 0;
     const choices = CHOICES.filter((choice) => choice.mode !== "move" || canMove);
+    const confirmKey = CHOICES.find((choice) => choice.mode === mode)?.confirmLabel;
 
     return (
         <ConfirmDeleteDialog
@@ -104,8 +107,9 @@ export function RemoveConnectionDialog({
             onOpenChange={(open) => !open && !pending && onClose()}
             name={connection?.name ?? ""}
             kind="connection"
-            confirmLabel={CHOICES.find((choice) => choice.mode === mode)?.confirmLabel}
-            description="Polaris stops using this device. What happens to what is on it is up to you."
+            title={t("removeConnection.title")}
+            confirmLabel={confirmKey ? t(confirmKey) : undefined}
+            description={t("removeConnection.description")}
             error={error}
             pending={pending}
             onConfirm={remove}
@@ -127,17 +131,17 @@ export function RemoveConnectionDialog({
                             }`}
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
-                                {choice.label}
+                                {t(choice.label)}
                                 {mode === choice.mode ? <Check className="size-3.5 text-primary" /> : null}
                             </span>
-                            <span className="text-xs text-muted-foreground">{choice.summary}</span>
+                            <span className="text-xs text-muted-foreground">{t(choice.summary)}</span>
                         </button>
                     ))}
                 </div>
 
                 {mode === "move" && plan ? (
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">Copy everything to</span>
+                        <span className="text-xs text-muted-foreground">{t("removeConnection.copyTo")}</span>
                         <Select
                             value={destination}
                             onValueChange={setDestination}
@@ -151,8 +155,8 @@ export function RemoveConnectionDialog({
                     <p className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="size-3.5 animate-spin" />
                         {mode === "move"
-                            ? "Copying every file across, then bringing the services back up. On a full device this takes a while - leave this open."
-                            : "Removing the connection."}
+                            ? t("removeConnection.copying")
+                            : t("removeConnection.removing")}
                     </p>
                 ) : null}
             </div>
@@ -162,12 +166,13 @@ export function RemoveConnectionDialog({
 
 /** What else is hanging off this connection, stated before the choice is made. */
 function Dependents({ plan }: { plan: ConnectionRemovalPlan }) {
+    const t = useTranslations("drive");
     const links = plan.shares + plan.fileRequests;
     if (plan.services.length === 0 && links === 0) {
         return (
             <p className="flex items-start gap-2 rounded-md border border-border bg-surface/60 px-3 py-2 text-xs text-muted-foreground">
                 <HardDrive className="mt-0.5 size-3.5 shrink-0" />
-                Nothing else in Polaris depends on this connection.
+                {t("removeConnection.noDependents")}
             </p>
         );
     }
@@ -177,14 +182,16 @@ function Dependents({ plan }: { plan: ConnectionRemovalPlan }) {
                 <p className="flex items-start gap-2">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                     <span>
-                        {plan.services.map((service) => `${service.name} (${service.volume})`).join(", ")}{" "}
-                        {plan.services.length === 1 ? "keeps its data" : "keep their data"} here.
+                        {t("removeConnection.servicesKeepData", {
+                            services: plan.services.map((service) => `${service.name} (${service.volume})`).join(", "),
+                            count: plan.services.length
+                        })}
                     </span>
                 </p>
             ) : null}
             {links > 0 ? (
                 <p className="pl-6">
-                    {links} shared {links === 1 ? "link or file request" : "links and file requests"} stop working.
+                    {t("removeConnection.linksStop", { count: links })}
                 </p>
             ) : null}
         </div>

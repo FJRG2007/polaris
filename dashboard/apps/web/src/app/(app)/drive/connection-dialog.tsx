@@ -14,6 +14,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ConnectionSummary } from "./types";
 import { useFormChanged } from "@/lib/use-form-changed";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { type ConnectionProviderSlug, type StorageProviderKind } from "@polaris/core";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
@@ -51,7 +53,10 @@ import {
 
 interface FieldDef {
     name: string;
-    label: string;
+    /** Catalog key of the field's label, in the drive namespace. */
+    label: NamespaceKey<"drive">;
+    /** Catalog key of a placeholder that is words rather than an example value. */
+    hint?: NamespaceKey<"drive">;
     type?: "text" | "number" | "password" | "checkbox" | "keyfile" | "account";
     required?: boolean;
     placeholder?: string;
@@ -60,41 +65,53 @@ interface FieldDef {
     provider?: ConnectionProviderSlug;
 }
 
-const LABELS: Record<StorageProviderKind, string> = {
-    local: "Local folder",
-    sftp: "SFTP / SSH",
-    webdav: "WebDAV",
-    s3: "S3-compatible",
-    smb: "SMB / CIFS",
-    nfs: "NFS",
-    synology: "Synology DSM",
-    qnap: "QNAP QTS",
-    truenas: "TrueNAS",
-    "unifi-unas": "UniFi UNAS",
-    gdrive: "Google Drive",
-    onedrive: "OneDrive",
-    dropbox: "Dropbox",
+const LABELS = {
+    local: "connection.kinds.local",
+    sftp: "connection.kinds.sftp",
+    webdav: "connection.kinds.webdav",
+    s3: "connection.kinds.s3",
+    smb: "connection.kinds.smb",
+    nfs: "connection.kinds.nfs",
+    synology: "connection.kinds.synology",
+    qnap: "connection.kinds.qnap",
+    truenas: "connection.kinds.truenas",
+    "unifi-unas": "connection.kinds.unifiUnas",
+    gdrive: "connection.kinds.gdrive",
+    onedrive: "connection.kinds.onedrive",
+    dropbox: "connection.kinds.dropbox",
     // Never offered here - Polaris makes it - but the picker's tables are
     // exhaustive so that a new provider cannot be added without a name.
-    personal: "My files"
-};
+    personal: "connection.kinds.personal"
+} as const satisfies Record<StorageProviderKind, string>;
 
 // One-line "what is this" per provider, shown on the picker cards.
-const DESCRIPTIONS: Record<StorageProviderKind, string> = {
-    "unifi-unas": "UniFi console over HTTPS - just username + password.",
-    local: "A folder on this server or a mounted volume.",
-    sftp: "Any server reachable over SSH / SFTP.",
-    smb: "Windows or Samba shares (SMB / CIFS).",
-    nfs: "Unix NFS exports.",
-    webdav: "WebDAV endpoints (Nextcloud, ownCloud, ...).",
-    s3: "S3-compatible object storage (AWS, MinIO, R2).",
-    synology: "Synology DiskStation (DSM).",
-    qnap: "QNAP (QTS).",
-    truenas: "TrueNAS via API key.",
-    gdrive: "Your Google Drive, through an account you have linked.",
-    onedrive: "Your OneDrive, through a Microsoft account you have linked.",
-    dropbox: "Your Dropbox, through an account you have linked.",
-    personal: "Your own files, on whichever storage this instance keeps them."
+const DESCRIPTIONS = {
+    "unifi-unas": "connection.descriptions.unifiUnas",
+    local: "connection.descriptions.local",
+    sftp: "connection.descriptions.sftp",
+    smb: "connection.descriptions.smb",
+    nfs: "connection.descriptions.nfs",
+    webdav: "connection.descriptions.webdav",
+    s3: "connection.descriptions.s3",
+    synology: "connection.descriptions.synology",
+    qnap: "connection.descriptions.qnap",
+    truenas: "connection.descriptions.truenas",
+    gdrive: "connection.descriptions.gdrive",
+    onedrive: "connection.descriptions.onedrive",
+    dropbox: "connection.descriptions.dropbox",
+    personal: "connection.descriptions.personal"
+} as const satisfies Record<StorageProviderKind, string>;
+
+/** A field's placeholder: its translated hint, or the literal example value. */
+function placeholderOf(field: FieldDef, t: NamespaceTranslator<"drive">) {
+    return field.hint ? t(field.hint) : field.placeholder;
+}
+
+/** The service a linked-account field is chosen from, by its brand name. */
+const PROVIDER_NAMES: Partial<Record<ConnectionProviderSlug, string>> = {
+    google: "Google",
+    microsoft: "Microsoft",
+    dropbox: "Dropbox"
 };
 
 // Display order for the picker: UniFi first (the featured quick connect), then
@@ -126,6 +143,7 @@ const PROVIDER_ORDER: StorageProviderKind[] = [
  * screen that fixes it - an empty select somebody cannot submit explains nothing.
  */
 function LinkedAccountField({ field }: { field: FieldDef }) {
+    const t = useTranslations("drive");
     const [accounts, setAccounts] = useState<LinkedAccountOption[] | null>(null);
     const [chosen, setChosen] = useState("");
 
@@ -148,11 +166,14 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
     if (accounts.length === 0) {
         return (
             <span className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                No {field.label.replace(/ account$/, "")} account is linked yet.{" "}
-                <Link href="/account/connections" className="text-primary hover:underline">
-                    Link one
-                </Link>
-                , then come back.
+                {t.rich("connection.noLinkedAccount", {
+                    provider: (field.provider && PROVIDER_NAMES[field.provider]) ?? "",
+                    link: (chunks) => (
+                        <Link key="link" href="/account/connections" className="text-primary hover:underline">
+                            {chunks}
+                        </Link>
+                    )
+                })}
             </span>
         );
     }
@@ -161,7 +182,7 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
             name={field.name}
             value={chosen}
             onValueChange={setChosen}
-            aria-label={field.label}
+            aria-label={t(field.label)}
             options={accounts.map((account) => ({
                 value: account.accountId,
                 label: account.label
@@ -172,6 +193,7 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
 
 /** SSH private-key input: paste it, or load it from a file into the textarea. */
 function KeyFileField({ name, label }: { name: string; label: string }) {
+    const t = useTranslations("drive");
     const ref = useRef<HTMLTextAreaElement>(null);
     async function onFile(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -184,7 +206,7 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
             <span className="flex items-center justify-between gap-2">
                 {label}
                 <label className="cursor-pointer text-xs text-primary hover:underline">
-                    Upload key file
+                    {t("connection.uploadKey")}
                     <input type="file" hidden onChange={onFile} />
                 </label>
             </span>
@@ -193,18 +215,18 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
                 name={name}
                 rows={3}
                 spellCheck={false}
-                placeholder="Paste your private key (-----BEGIN OPENSSH PRIVATE KEY-----) or upload a file"
+                placeholder={t("connection.keyPlaceholder")}
                 className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
             />
         </>
     );
 }
 
-const host: FieldDef = { name: "host", label: "Host", required: true, group: "config" };
-const port: FieldDef = { name: "port", label: "Port", type: "number", group: "config" };
+const host: FieldDef = { name: "host", label: "connection.fields.host", required: true, group: "config" };
+const port: FieldDef = { name: "port", label: "connection.fields.port", type: "number", group: "config" };
 
 const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
-    local: [{ name: "root", label: "Root path", required: true, group: "config" }],
+    local: [{ name: "root", label: "connection.fields.rootPath", required: true, group: "config" }],
     // Nothing to fill in: a personal drive is made by Polaris, on the storage
     // the instance already keeps files on, and is never offered by this form.
     personal: [],
@@ -212,40 +234,40 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         host,
         {
             name: "port",
-            label: "Port",
+            label: "connection.fields.port",
             type: "number",
-            placeholder: "22 (default)",
+            hint: "connection.placeholders.sshPort",
             group: "config"
         },
-        { name: "username", label: "Username", required: true, group: "config" },
-        { name: "root", label: "Base path", placeholder: "/", group: "config" },
+        { name: "username", label: "connection.fields.username", required: true, group: "config" },
+        { name: "root", label: "connection.fields.basePath", placeholder: "/", group: "config" },
         {
             name: "password",
-            label: "Password (or use a key)",
+            label: "connection.fields.passwordOrKey",
             type: "password",
             group: "credentials"
         },
         {
             name: "privateKey",
-            label: "Private key (optional)",
+            label: "connection.fields.privateKey",
             type: "keyfile",
             group: "credentials"
         }
     ],
     webdav: [
-        { name: "baseUrl", label: "Base URL", required: true, group: "config" },
-        { name: "username", label: "Username", group: "config" },
-        { name: "password", label: "Password", type: "password", group: "credentials" }
+        { name: "baseUrl", label: "connection.fields.baseUrl", required: true, group: "config" },
+        { name: "username", label: "connection.fields.username", group: "config" },
+        { name: "password", label: "connection.fields.password", type: "password", group: "credentials" }
     ],
     s3: [
-        { name: "endpoint", label: "Endpoint (optional)", group: "config" },
-        { name: "region", label: "Region", placeholder: "us-east-1", group: "config" },
-        { name: "bucket", label: "Bucket", required: true, group: "config" },
-        { name: "forcePathStyle", label: "Force path style", type: "checkbox", group: "config" },
-        { name: "accessKeyId", label: "Access key ID", required: true, group: "config" },
+        { name: "endpoint", label: "connection.fields.endpoint", group: "config" },
+        { name: "region", label: "connection.fields.region", placeholder: "us-east-1", group: "config" },
+        { name: "bucket", label: "connection.fields.bucket", required: true, group: "config" },
+        { name: "forcePathStyle", label: "connection.fields.forcePathStyle", type: "checkbox", group: "config" },
+        { name: "accessKeyId", label: "connection.fields.accessKeyId", required: true, group: "config" },
         {
             name: "secretAccessKey",
-            label: "Secret access key",
+            label: "connection.fields.secretAccessKey",
             type: "password",
             required: true,
             group: "credentials"
@@ -253,18 +275,18 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     ],
     smb: [
         host,
-        { name: "share", label: "Share", required: true, group: "config" },
-        { name: "domain", label: "Domain", group: "config" },
-        { name: "username", label: "Username", group: "config" },
-        { name: "password", label: "Password", type: "password", group: "credentials" }
+        { name: "share", label: "connection.fields.share", required: true, group: "config" },
+        { name: "domain", label: "connection.fields.domain", group: "config" },
+        { name: "username", label: "connection.fields.username", group: "config" },
+        { name: "password", label: "connection.fields.password", type: "password", group: "credentials" }
     ],
-    nfs: [host, { name: "exportPath", label: "Export path", required: true, group: "config" }],
+    nfs: [host, { name: "exportPath", label: "connection.fields.exportPath", required: true, group: "config" }],
     synology: [
         host,
-        { name: "username", label: "Username", required: true, group: "config" },
+        { name: "username", label: "connection.fields.username", required: true, group: "config" },
         {
             name: "password",
-            label: "Password",
+            label: "connection.fields.password",
             type: "password",
             required: true,
             group: "credentials"
@@ -272,10 +294,10 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     ],
     qnap: [
         host,
-        { name: "username", label: "Username", required: true, group: "config" },
+        { name: "username", label: "connection.fields.username", required: true, group: "config" },
         {
             name: "password",
-            label: "Password",
+            label: "connection.fields.password",
             type: "password",
             required: true,
             group: "credentials"
@@ -283,14 +305,14 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     ],
     truenas: [
         host,
-        { name: "apiKey", label: "API key", type: "password", required: true, group: "credentials" }
+        { name: "apiKey", label: "connection.fields.apiKey", type: "password", required: true, group: "credentials" }
     ],
     "unifi-unas": [
         host,
         port,
-        { name: "username", label: "Console username", required: true, group: "config" },
-        { name: "password", label: "Console password", type: "password", group: "credentials" },
-        { name: "smbShare", label: "SMB share (optional, for file browsing)", group: "config" }
+        { name: "username", label: "connection.fields.consoleUsername", required: true, group: "config" },
+        { name: "password", label: "connection.fields.consolePassword", type: "password", group: "credentials" },
+        { name: "smbShare", label: "connection.fields.smbShare", group: "config" }
     ],
     // The consumer drives hold no credentials of their own: the account is
     // chosen from the ones somebody has already linked, and the token comes from
@@ -298,35 +320,37 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     gdrive: [
         {
             name: "accountId",
-            label: "Google account",
+            label: "connection.fields.googleAccount",
             type: "account",
             provider: "google",
             required: true,
             group: "config"
         },
-        { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
+        // i18n-ignore: the default folder is named after the product
+        { name: "rootFolderName", label: "connection.fields.folderName", placeholder: "Polaris", group: "config" }
     ],
     onedrive: [
         {
             name: "accountId",
-            label: "Microsoft account",
+            label: "connection.fields.microsoftAccount",
             type: "account",
             provider: "microsoft",
             required: true,
             group: "config"
         },
-        { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
+        // i18n-ignore: the default folder is named after the product
+        { name: "rootFolderName", label: "connection.fields.folderName", placeholder: "Polaris", group: "config" }
     ],
     dropbox: [
         {
             name: "accountId",
-            label: "Dropbox account",
+            label: "connection.fields.dropboxAccount",
             type: "account",
             provider: "dropbox",
             required: true,
             group: "config"
         },
-        { name: "rootPath", label: "Folder", placeholder: "/Polaris", group: "config" }
+        { name: "rootPath", label: "connection.fields.folder", placeholder: "/Polaris", group: "config" }
     ]
 };
 
@@ -347,6 +371,7 @@ export function EditConnectionDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("drive");
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const { formProps, changed } = useFormChanged();
@@ -398,21 +423,19 @@ export function EditConnectionDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {rekey ? `Update ${LABELS[kind]} credentials` : `Edit ${LABELS[kind]}`}
+                        {rekey ? t("connection.rekeyTitle", { kind: t(LABELS[kind]) }) : t("connection.editTitle", { kind: t(LABELS[kind]) })}
                     </DialogTitle>
                     <DialogDescription>
                         {rekey
-                            ? "Re-enter the password or key to restore access. Your files, shares, and settings are kept."
-                            : "Change the name, host, and settings. Leave a password or key blank to keep the current one."}
+                            ? t("connection.rekeyDescription")
+                            : t("connection.editDescription")}
                     </DialogDescription>
                 </DialogHeader>
                 {rekey ? (
                     <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span>
-                            The saved credentials were encrypted with a different master key and can
-                            no longer be read. Entering them again re-encrypts under the current key
-                            - nothing else about this connection changes.
+                            {t("connection.rekeyWarning")}
                         </span>
                     </div>
                 ) : null}
@@ -423,7 +446,7 @@ export function EditConnectionDialog({
                     {...formProps}
                 >
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("connection.name")}
                         <Input name="name" required defaultValue={connection.name} />
                     </label>
                     {FIELDS[kind].map((field) => {
@@ -438,18 +461,18 @@ export function EditConnectionDialog({
                                             defaultChecked={Boolean(current)}
                                             className="size-4"
                                         />
-                                        {field.label}
+                                        {t(field.label)}
                                     </span>
                                 ) : field.type === "keyfile" ? (
-                                    <KeyFileField name={field.name} label={field.label} />
+                                    <KeyFileField name={field.name} label={t(field.label)} />
                                 ) : field.type === "account" ? (
                                     <>
-                                        {field.label}
+                                        {t(field.label)}
                                         <LinkedAccountField field={field} />
                                     </>
                                 ) : (
                                     <>
-                                        {field.label}
+                                        {t(field.label)}
                                         <Input
                                             name={field.name}
                                             type={field.type ?? "text"}
@@ -457,9 +480,9 @@ export function EditConnectionDialog({
                                             placeholder={
                                                 field.group === "credentials"
                                                     ? rekey
-                                                        ? "Enter to restore access"
-                                                        : "Leave blank to keep current"
-                                                    : field.placeholder
+                                                        ? t("connection.restorePlaceholder")
+                                                        : t("connection.keepPlaceholder")
+                                                    : placeholderOf(field, t)
                                             }
                                             defaultValue={
                                                 field.group === "config" &&
@@ -478,11 +501,11 @@ export function EditConnectionDialog({
                     <div className="mt-2 flex justify-end gap-2">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">
-                                Cancel
+                                {t("connection.cancel")}
                             </Button>
                         </DialogClose>
                         <Button type="submit" disabled={pending || !changed}>
-                            {pending ? "Saving..." : "Save changes"}
+                            {pending ? t("connection.saving") : t("connection.save")}
                         </Button>
                     </div>
                 </form>
@@ -493,6 +516,7 @@ export function EditConnectionDialog({
 
 export function ConnectionDialog() {
     const router = useRouter();
+    const t = useTranslations("drive");
     const [open, setOpen] = useState(false);
     const [step, setStep] = useState<"provider" | "configure">("provider");
     const [kind, setKind] = useState<StorageProviderKind>("unifi-unas");
@@ -559,7 +583,7 @@ export function ConnectionDialog() {
             chooseProvider(result.suggested);
             return;
         }
-        setDetectMsg("Nothing recognizable answered on that host - pick a provider below.");
+        setDetectMsg(t("connection.nothingDetected"));
     }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -599,18 +623,18 @@ export function ConnectionDialog() {
             <DialogTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <Plus className="size-4" />
-                    Add connection
+                    {t("connection.add")}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {step === "provider" ? "New storage connection" : `Connect ${LABELS[kind]}`}
+                        {step === "provider" ? t("connection.newTitle") : t("connection.connectTitle", { kind: t(LABELS[kind]) })}
                     </DialogTitle>
                     <DialogDescription>
                         {step === "provider"
-                            ? "Pick where your files live. You can go back and change this anytime."
-                            : DESCRIPTIONS[kind]}
+                            ? t("connection.pickDescription")
+                            : t(DESCRIPTIONS[kind])}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -619,7 +643,7 @@ export function ConnectionDialog() {
                         <div className="rounded-md border border-border bg-muted/30 p-2">
                             <div className="flex items-end gap-2">
                                 <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                                    Detect a NAS by IP
+                                    {t("connection.detectLabel")}
                                     <Input
                                         placeholder="192.168.1.145"
                                         value={detectIp}
@@ -634,7 +658,7 @@ export function ConnectionDialog() {
                                     disabled={detecting}
                                 >
                                     <Radar className="size-4" />
-                                    {detecting ? "Scanning..." : "Detect"}
+                                    {detecting ? t("connection.scanning") : t("connection.detect")}
                                 </Button>
                             </div>
                             {detectMsg ? (
@@ -655,11 +679,11 @@ export function ConnectionDialog() {
                                     }`}
                                 >
                                     <span className="flex items-center justify-between text-sm font-medium">
-                                        {LABELS[value]}
+                                        {t(LABELS[value])}
                                         <ChevronRight className="size-4 text-muted-foreground" />
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                        {DESCRIPTIONS[value]}
+                                        {t(DESCRIPTIONS[value])}
                                     </span>
                                 </button>
                             ))}
@@ -668,8 +692,8 @@ export function ConnectionDialog() {
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Name
-                            <Input name="name" required placeholder="My NAS" />
+                            {t("connection.name")}
+                            <Input name="name" required placeholder={t("connection.namePlaceholder")} />
                         </label>
                         {FIELDS[kind].map((field) => (
                             <label
@@ -683,23 +707,23 @@ export function ConnectionDialog() {
                                             name={field.name}
                                             className="size-4"
                                         />
-                                        {field.label}
+                                        {t(field.label)}
                                     </span>
                                 ) : field.type === "keyfile" ? (
-                                    <KeyFileField name={field.name} label={field.label} />
+                                    <KeyFileField name={field.name} label={t(field.label)} />
                                 ) : field.type === "account" ? (
                                     <>
-                                        {field.label}
+                                        {t(field.label)}
                                         <LinkedAccountField field={field} />
                                     </>
                                 ) : (
                                     <>
-                                        {field.label}
+                                        {t(field.label)}
                                         <Input
                                             name={field.name}
                                             type={field.type ?? "text"}
                                             required={field.required}
-                                            placeholder={field.placeholder}
+                                            placeholder={placeholderOf(field, t)}
                                             defaultValue={
                                                 field.name === "host" ? detectedHost : undefined
                                             }
@@ -711,9 +735,9 @@ export function ConnectionDialog() {
                         {kind === "unifi-unas" ? (
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2">
                                 <p className="text-xs text-muted-foreground">
-                                    Use a <strong>local console account</strong> (not a Ubiquiti SSO
-                                    login with 2FA). Polaris reads metrics from the UniFi OS console
-                                    over HTTPS; SSH stays off.
+                                    {t.rich("connection.unasHint", {
+                                        strong: (chunks) => <strong key="account">{chunks}</strong>
+                                    })}
                                 </p>
                                 <div className="flex items-center gap-2">
                                     <Button
@@ -723,7 +747,7 @@ export function ConnectionDialog() {
                                         disabled={testing}
                                         onClick={(event) => onTestUnas(event.currentTarget.form)}
                                     >
-                                        {testing ? "Testing..." : "Test connection"}
+                                        {testing ? t("connection.testing") : t("connection.test")}
                                     </Button>
                                     {testResult ? (
                                         <span
@@ -735,7 +759,13 @@ export function ConnectionDialog() {
                                                 <XCircle className="size-3.5" />
                                             )}
                                             {testResult.ok
-                                                ? `${testResult.device}${testResult.firmware ? ` (fw ${testResult.firmware})` : ""} - ${testResult.pools} pools, ${testResult.bays} disks`
+                                                ? t("connection.testResult", {
+                                                      device: testResult.firmware
+                                                          ? `${testResult.device} (fw ${testResult.firmware})`
+                                                          : testResult.device,
+                                                      pools: testResult.pools,
+                                                      bays: testResult.bays
+                                                  })
                                                 : testResult.error}
                                         </span>
                                     ) : null}
@@ -750,16 +780,16 @@ export function ConnectionDialog() {
                                 onClick={() => setStep("provider")}
                             >
                                 <ArrowLeft className="size-4" />
-                                Back
+                                {t("connection.back")}
                             </Button>
                             <div className="flex gap-2">
                                 <DialogClose asChild>
                                     <Button type="button" variant="ghost">
-                                        Cancel
+                                        {t("connection.cancel")}
                                     </Button>
                                 </DialogClose>
                                 <Button type="submit" disabled={pending}>
-                                    {pending ? "Connecting..." : "Create"}
+                                    {pending ? t("connection.connecting") : t("connection.create")}
                                 </Button>
                             </div>
                         </div>
