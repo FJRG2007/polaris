@@ -669,6 +669,34 @@ afterEach(async () => {
     vi.useRealTimers();
 });
 
+describe("the boss bar's clock", () => {
+    it("moves every second through the start, with no second standing still in between", async () => {
+        // Eleven seconds: the countdown ends between two ticks, as it does on a
+        // real server, where starting takes a moment of its own.
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }], {
+            countdownSeconds: 11
+        });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        const shown: (string | null)[] = [];
+        for (let second = 0; second < 16; second += 1) {
+            const from = world.sent.length;
+            await play(1_000);
+            const names = world.sent
+                .slice(from)
+                .filter((line) => line.startsWith("bossbar set polaris:event name"));
+            shown.push(names.at(-1) ?? null);
+        }
+        // From the first second the bar is up, every second shows it again.
+        expect(shown.slice(2).every((one) => one !== null)).toBe(true);
+    });
+});
+
 describe("a mining rush, from start to podium", () => {
     it("counts, ranks, hands prizes to who is on and keeps the rest", async () => {
         const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };

@@ -745,9 +745,11 @@ async function showClock(loop: Loop): Promise<void> {
     const { preset } = loop.run;
     const now = Date.now();
     const lines: string[] = [];
-    if (loop.run.phase === "countdown") {
+    // The countdown over and the next tick not yet round to begin it: the
+    // event's own time is already running, and is what the bar shows, rather
+    // than the countdown's last second standing still until then.
+    if (loop.run.phase === "countdown" && now < loop.run.startsAt) {
         const left = (loop.run.startsAt - now) / 1000;
-        if (left <= 0) return;
         const max = Math.max(
             1,
             loop.countdown,
