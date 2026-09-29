@@ -59,6 +59,7 @@ function matches(row: Row, where: Where): boolean {
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        user: { findUnique: async () => null },
         mailAccount: {
             updateMany: vi.fn(async ({ where, data }: { where: Where; data: Partial<Row> }) => {
                 const hit = state.rows.filter((row) => matches(row, where));

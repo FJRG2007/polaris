@@ -16,6 +16,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
 
@@ -66,12 +67,13 @@ describe("a row that is showing half of what it holds", () => {
         // narrow list it is the first thing cut. "Re: your invoice for Aug..."
         // is not an answer to whether this is the message they want.
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
-        expect(view).toContain('title={thread.subject || "(no subject)"}');
+        expect(view).toContain('title={thread.subject || t("noSubject")}');
+        expect(mail.noSubject).toBe("(no subject)");
     });
 
     it("does the same for the names and the preview, which are cut too", async () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
-        expect(view).toContain("title={people(thread, mine)}");
+        expect(view).toContain("title={people(t, thread, mine)}");
         expect(view).toContain("title={thread.snippet}");
     });
 });

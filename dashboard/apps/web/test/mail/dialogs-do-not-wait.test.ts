@@ -48,7 +48,7 @@ describe("what each dialog does now", () => {
 
     it("deletes a folder from the rail before the mail server answers", async () => {
         const source = await rail;
-        const confirm = source.slice(source.indexOf('confirmLabel="Delete it"'));
+        const confirm = source.slice(source.indexOf('confirmLabel={t("rail.deleteConfirm")}'));
         const body = confirm.slice(0, confirm.indexOf("/>"));
         expect(body).toContain("patchFolder(folder.id, { gone: true });");
         // And puts it back when the server says no.

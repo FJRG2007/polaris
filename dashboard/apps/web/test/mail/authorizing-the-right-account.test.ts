@@ -26,6 +26,8 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
+import mailSettings from "../../messages/en-US/mailSettings.json";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -76,7 +78,8 @@ describe("the account that comes back", () => {
             "utf8"
         );
         expect(view).toContain('outcome === "wrong_account"');
-        expect(view).toContain("Nothing was connected");
+        expect(view).toContain('t("accounts.wrongAccount"');
+        expect(mailSettings.accounts.wrongAccount).toContain("Nothing was connected");
     });
 });
 
@@ -98,7 +101,8 @@ describe("what the dialog will use", () => {
     it("says so when the account authorized was a different one", async () => {
         const dialog = await readFile(`${SRC}app/(app)/mail/connect-dialog.tsx`, "utf8");
         expect(dialog).toContain("const otherAccount = usable.length === 0 && authorized.length > 0;");
-        expect(dialog).toContain("account you authorized is not");
+        expect(dialog).toContain('t("connect.otherAccount"');
+        expect(mail.connect.otherAccount).toContain("account you authorized is not");
     });
 });
 

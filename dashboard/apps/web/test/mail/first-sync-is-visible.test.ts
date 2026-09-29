@@ -20,6 +20,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -63,7 +64,8 @@ describe("what the list says while it waits", () => {
         const branch = view.slice(view.indexOf(") : stillFetching ? ("));
         const rest = branch.slice(0, branch.indexOf("threads.every"));
         expect(rest).toContain("<ThreadRowsSkeleton />");
-        expect(rest).toContain("Fetching this mailbox");
+        expect(rest).toContain('t("list.fetching")');
+        expect(mail.list.fetching).toContain("Fetching this mailbox");
     });
 
     it("never says it over a search, a tab or a filter", async () => {

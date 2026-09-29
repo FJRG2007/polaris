@@ -21,6 +21,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 import { mailActionSchema, mailEmptyFolderSchema } from "@polaris/core";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
@@ -136,14 +137,16 @@ describe("emptying it", () => {
 
     it("asks first, and says that older mail goes too", async () => {
         const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        expect(view).toContain("title={`Empty ${context.title}?`}");
-        expect(view).toContain("including older ones that are not on this screen");
-        expect(view).toContain('confirmLabel="Empty it"');
+        expect(view).toContain('title={t("list.emptyTitle", { name: context.title })}');
+        expect(view).toContain('description={t("list.emptyBody")}');
+        expect(mail.list.emptyTitle).toBe("Empty {name}?");
+        expect(mail.list.emptyBody).toContain("including older ones that are not on this screen");
+        expect(mail.list.emptyConfirm).toBe("Empty it");
     });
 
     it("empties the screen on the press and puts it back if the server refuses", async () => {
         const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        const dialog = view.slice(view.indexOf("title={`Empty ${context.title}?`}"));
+        const dialog = view.slice(view.indexOf('title={t("list.emptyTitle", { name: context.title })}'));
         const body = dialog.slice(0, dialog.indexOf("/>"));
         expect(body.indexOf("patchUntilAnswered(here, { gone: true });")).toBeLessThan(
             body.indexOf("await emptyFolderAction(")
@@ -180,8 +183,9 @@ describe("where the two are offered", () => {
             readFile(`${SRC}app/(app)/mail/thread-menu.tsx`, "utf8"),
             readFile(`${SRC}app/(app)/mail/thread-view.tsx`, "utf8")
         ]);
-        expect(view).toContain('onClick={() => onAct("restore", "Put back.")}');
-        expect(menu).toContain('onSelect={() => onAct("restore", ids, "Put back.")}');
+        expect(view).toContain('onClick={() => onAct("restore", t("thread.announce.restored"))}');
+        expect(menu).toContain('onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}');
+        expect(mail.thread.announce.restored).toBe("Put back.");
         expect(thread).toContain('onClick={() => act("restore")}');
     });
 });

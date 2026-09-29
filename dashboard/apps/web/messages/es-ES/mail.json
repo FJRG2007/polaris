@@ -160,7 +160,9 @@
         "alreadyGone": "Ese mensaje ya ha salido.",
         "notSentNow": "No se pudo enviar ese mensaje ahora.",
         "listNotLoaded": "No se pudo cargar esa lista.",
-        "notOpened": "No se pudo abrir ese mensaje."
+        "notOpened": "No se pudo abrir ese mensaje.",
+        "folderNotInMailbox": "Esa carpeta no está en ese buzón.",
+        "ruleNotOnMailbox": "Esa regla no está en este buzón."
     },
     "schema": {
         "matchOn": "Añade algo con lo que coincidir",
@@ -641,7 +643,7 @@
         "more2": "+{count} más",
         "to": "para",
         "oneAttachment": "1 adjunto: {name}",
-        "attachments": "{count} adjuntos",
+        "attachments": "{count, plural, one {# adjunto} other {# adjuntos}}",
         "spam": "{filed, select, yes {Polaris lo archivó como spam. } other {Este parece sospechoso. }}{reason}. {filed, select, yes {No es spam lo devuelve y enseña al filtro.} other {Spam lo archiva y enseña al filtro.}}",
         "listFrom": "{name} envía esto como lista de correo.",
         "receipt": "El remitente pidió que se le avisara cuando se abriera. Polaris no se lo dijo.",
@@ -711,7 +713,7 @@
         "dangerousFile": "Lleva un archivo que se ejecutaría al abrirlo ({file})",
         "pushes": "Presiona (\"{words}\") y nadie de aquí ha escrito a este remitente",
         "fraud": "El dominio del que vino, {domain}, es conocido por estafar a la gente",
-        "engines": "{count} motores de seguridad marcan este dominio",
+        "engines": "{count, plural, one {# motor de seguridad marca este dominio} other {# motores de seguridad marcan este dominio}}",
         "flagged": "Los motores de seguridad marcan {subject}"
     },
     "list": {

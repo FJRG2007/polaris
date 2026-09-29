@@ -160,7 +160,9 @@
         "alreadyGone": "That message has already gone.",
         "notSentNow": "That message could not be sent now.",
         "listNotLoaded": "That list could not be loaded.",
-        "notOpened": "That message could not be opened."
+        "notOpened": "That message could not be opened.",
+        "folderNotInMailbox": "That folder is not in that mailbox.",
+        "ruleNotOnMailbox": "That rule is not on this mailbox."
     },
     "schema": {
         "matchOn": "Add something to match on",

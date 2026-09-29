@@ -18,6 +18,7 @@ import { ToastProvider } from "@polaris/ui";
 import { AddressChip } from "@/app/(app)/mail/address-chip";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("@/app/(app)/mail/mail-shell", () => ({
     useMail: () => ({ openComposer: () => undefined })
@@ -39,8 +40,7 @@ function draw(after?: string): void {
     render(
         <ToastProvider>
             <AddressChip entry={ENTRY} {...(after === undefined ? {} : { after })} />
-        </ToastProvider>
-    );
+        </ToastProvider>, { wrapper: MessagesWrapper });
 }
 
 describe("the comma between two recipients", () => {

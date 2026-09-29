@@ -90,9 +90,13 @@ export function spamReasonText(t: NamespaceTranslator<"mail">, reason: string): 
     for (const { pattern, key, params } of SHAPED) {
         const found = pattern.exec(reason);
         if (!found) continue;
-        const values = Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""]));
+        const values: Record<string, string | number> = Object.fromEntries(
+            params.map((name, index) => [name, found[index + 1] ?? ""])
+        );
         // The one optional part: an obfuscated brand name says so.
         if ("dressed" in values) values.dressed = values.dressed ? "yes" : "no";
+        // A count is agreed with in the plural, which only takes a number.
+        if ("count" in values) values.count = Number(values.count);
         return t(key, values);
     }
     return reason;

@@ -18,6 +18,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AccountsView } from "@/app/(app)/mail/settings/accounts/accounts-view";
 import { RefusedMailboxes, refusedNotices } from "@/app/(app)/mail/refused-notice";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const updates: unknown[] = [];
 const shelves: string[] = [];
@@ -108,7 +109,7 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
 
 describe("the notice", () => {
     it("names the mailbox and offers the fix", () => {
-        render(<RefusedMailboxes accounts={[account()]} />);
+        render(<RefusedMailboxes accounts={[account()]} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("ana@example.com stopped accepting its password")).toBeTruthy();
         const button = screen.getByRole("link", { name: "Update password" });
         expect(button.getAttribute("href")).toBe(
@@ -117,14 +118,15 @@ describe("the notice", () => {
     });
 
     it("says reconnect for an authorized mailbox", () => {
-        render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />);
+        render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("ana@example.com stopped accepting its authorization")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Reconnect" })).toBeTruthy();
     });
 
     it("draws nothing while every mailbox works", () => {
         const { container } = render(
-            <RefusedMailboxes accounts={[account({ state: "ok" }), account({ state: "unreachable" })]} />
+            <RefusedMailboxes accounts={[account({ state: "ok" }), account({ state: "unreachable" })]} />,
+            { wrapper: MessagesWrapper }
         );
         expect(container.innerHTML).toBe("");
         expect(refusedNotices([account({ state: "never" })])).toEqual([]);
@@ -146,7 +148,8 @@ describe("the edit form it opens", () => {
                     canSetDomain={false}
                     onClose={() => undefined}
                 />
-            </ToastProvider>
+            </ToastProvider>,
+            { wrapper: MessagesWrapper }
         );
     }
 
@@ -228,7 +231,8 @@ describe("the mailboxes screen the notice lands on", () => {
                     editNow={editNow}
                     moveShelf={moveShelf}
                 />
-            </ToastProvider>
+            </ToastProvider>,
+            { wrapper: MessagesWrapper }
         );
     }
 

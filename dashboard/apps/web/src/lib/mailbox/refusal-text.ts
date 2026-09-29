@@ -21,6 +21,8 @@ type MailKey = NamespaceKey<"mail">;
 /** Sentences with nothing to fill in, by their English. */
 export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "That folder is not yours.": "refusals.folderNotYours",
+    "That folder is not in that mailbox.": "refusals.folderNotInMailbox",
+    "That rule is not on this mailbox.": "refusals.ruleNotOnMailbox",
     "That mailbox is not yours.": "refusals.mailboxNotYours",
     "That mailbox is already here.": "refusals.mailboxAlreadyHere",
     "Choose the account that authorizes this mailbox.": "refusals.chooseAuthorizer",

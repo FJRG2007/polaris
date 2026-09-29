@@ -21,6 +21,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mailSettings from "../../messages/en-US/mailSettings.json";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
@@ -82,10 +83,12 @@ describe("what the person is told", () => {
             `${SRC}app/(app)/mail/settings/accounts/accounts-view.tsx`,
             "utf8"
         );
+        expect(view).toContain('t("accounts.removeBody"');
+        const body = mailSettings.accounts.removeBody;
         for (const thing of ["filters", "templates", "signature", "send-as addresses", "drafts"]) {
-            expect(view, thing).toContain(thing);
+            expect(body, thing).toContain(thing);
         }
-        expect(view).toContain("Nothing on the mail server is touched.");
+        expect(body).toContain("Nothing on the mail server is touched.");
     });
 
     it("says the connected account is not one of them", async () => {
@@ -94,7 +97,7 @@ describe("what the person is told", () => {
             "utf8"
         );
         expect(view).toContain('account.auth === "oauth"');
-        expect(view).toContain("Your connected account stays connected");
+        expect(mailSettings.accounts.removeBody).toContain("Your connected account stays connected");
     });
 
     it("says the same on the organization's own screen", async () => {
