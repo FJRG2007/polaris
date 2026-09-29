@@ -10,6 +10,9 @@
  */
 
 import { useMemo, useState } from "react";
+import { useGameText, type GameText } from "../game-text";
+import type { GameKey } from "../../../messages";
+import { kindUnit } from "./event-kinds";
 import { Plus, Trash2 } from "lucide-react";
 import {
     Button,
@@ -31,71 +34,84 @@ import { RareCatchOptions } from "./event-options-rare-catch";
 import { XpBoostOptions } from "./event-options-xp-boost";
 import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
 
-const MINING_LABELS: Readonly<Record<(typeof catalog.MINING_TARGETS)[number], string>> = {
-    "any-ore": "Any ore, rarer worth more",
-    diamond: "Diamonds only",
-    debris: "Ancient debris only"
+const MINING_LABELS: Readonly<
+    Record<(typeof catalog.MINING_TARGETS)[number], GameKey<"minecraft">>
+> = {
+    "any-ore": "editor.labels.mining.any-ore",
+    diamond: "editor.labels.mining.diamond",
+    debris: "editor.labels.mining.debris"
 };
 
-const HUNT_LABELS: Readonly<Record<(typeof catalog.HUNT_TARGETS)[number], string>> = {
-    hostile: "Every hostile mob, the dangerous worth more",
-    zombie: "Zombies",
-    skeleton: "Skeletons",
-    creeper: "Creepers",
-    spider: "Spiders",
-    enderman: "Endermen"
+const HUNT_LABELS: Readonly<Record<(typeof catalog.HUNT_TARGETS)[number], GameKey<"minecraft">>> = {
+    hostile: "editor.labels.hunt.hostile",
+    zombie: "editor.labels.hunt.zombie",
+    skeleton: "editor.labels.hunt.skeleton",
+    creeper: "editor.labels.hunt.creeper",
+    spider: "editor.labels.hunt.spider",
+    enderman: "editor.labels.hunt.enderman"
 };
 
-export const LOOT_LABELS: Readonly<Record<(typeof catalog.LOOT_TABLES)[number], string>> = {
-    treasure: "Buried treasure",
-    dungeon: "Dungeon",
-    bastion: "Bastion treasure (1.16+)",
-    "end-city": "End city",
-    "ancient-city": "Ancient city (1.19+)"
+export const LOOT_LABELS: Readonly<
+    Record<(typeof catalog.LOOT_TABLES)[number], GameKey<"minecraft">>
+> = {
+    treasure: "editor.labels.loot.treasure",
+    dungeon: "editor.labels.loot.dungeon",
+    bastion: "editor.labels.loot.bastion",
+    "end-city": "editor.labels.loot.end-city",
+    "ancient-city": "editor.labels.loot.ancient-city"
 };
 
-const BOSS_LABELS: Readonly<Record<(typeof catalog.BOSS_KINDS)[number], string>> = {
-    "wither-skeleton": "The Warlord (wither skeleton)",
-    ravager: "The Juggernaut (ravager)",
-    vindicator: "The Executioner (vindicator)",
-    husk: "The Desert King (husk)"
+const BOSS_LABELS: Readonly<Record<(typeof catalog.BOSS_KINDS)[number], GameKey<"minecraft">>> = {
+    "wither-skeleton": "editor.labels.boss.wither-skeleton",
+    ravager: "editor.labels.boss.ravager",
+    vindicator: "editor.labels.boss.vindicator",
+    husk: "editor.labels.boss.husk"
 };
 
-const INTENSITY_LABELS: Readonly<Record<(typeof catalog.INTENSITIES)[number], string>> = {
-    low: "Low",
-    medium: "Medium",
-    high: "High"
+const INTENSITY_LABELS: Readonly<
+    Record<(typeof catalog.INTENSITIES)[number], GameKey<"minecraft">>
+> = {
+    low: "editor.labels.intensity.low",
+    medium: "editor.labels.intensity.medium",
+    high: "editor.labels.intensity.high"
 };
 
-const WAVE_MIX_LABELS: Readonly<Record<(typeof catalog.WAVE_MIXES)[number], string>> = {
-    classic: "Zombies, skeletons and spiders",
-    undead: "The undead: zombies, husks, skeletons, strays",
-    mixed: "Everything above, and witches"
+const WAVE_MIX_LABELS: Readonly<Record<(typeof catalog.WAVE_MIXES)[number], GameKey<"minecraft">>> =
+    {
+        classic: "editor.labels.waveMix.classic",
+        undead: "editor.labels.waveMix.undead",
+        mixed: "editor.labels.waveMix.mixed"
+    };
+
+const METEOR_ORE_LABELS: Readonly<
+    Record<(typeof catalog.METEOR_ORES)[number], GameKey<"minecraft">>
+> = {
+    common: "editor.labels.meteorOre.common",
+    precious: "editor.labels.meteorOre.precious",
+    diamond: "editor.labels.meteorOre.diamond",
+    debris: "editor.labels.meteorOre.debris"
 };
 
-const METEOR_ORE_LABELS: Readonly<Record<(typeof catalog.METEOR_ORES)[number], string>> = {
-    common: "Common: coal, iron, copper (1.17+), gold, redstone, lapis",
-    precious: "Precious: gold, lapis, diamond, emerald",
-    diamond: "Diamond ore only",
-    debris: "Ancient debris only (1.16+)"
-};
+const TRIVIA_LABELS: Readonly<Record<(typeof catalog.TRIVIA_MODES)[number], GameKey<"minecraft">>> =
+    {
+        questions: "editor.labels.trivia.questions",
+        scramble: "editor.labels.trivia.scramble",
+        mixed: "editor.labels.trivia.mixed"
+    };
 
-const TRIVIA_LABELS: Readonly<Record<(typeof catalog.TRIVIA_MODES)[number], string>> = {
-    questions: "Questions",
-    scramble: "Scrambled words",
-    mixed: "Both, taking turns"
-};
-
-const DIFFICULTY_LABELS: Readonly<Record<(typeof catalog.PARKOUR_DIFFICULTIES)[number], string>> = {
-    easy: "Easy",
-    medium: "Medium",
-    hard: "Hard"
+const DIFFICULTY_LABELS: Readonly<
+    Record<(typeof catalog.PARKOUR_DIFFICULTIES)[number], GameKey<"minecraft">>
+> = {
+    easy: "editor.labels.difficulty.easy",
+    medium: "editor.labels.difficulty.medium",
+    hard: "editor.labels.difficulty.hard"
 };
 
 export function options<T extends string>(
-    labels: Readonly<Record<T, string>>
+    t: GameText<"minecraft">,
+    labels: Readonly<Record<T, GameKey<"minecraft">>>
 ): { value: T; label: string }[] {
-    return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+    return (Object.keys(labels) as T[]).map((value) => ({ value, label: t(labels[value]) }));
 }
 
 /** A number typed into a field, or NaN - which the schema then names. */
@@ -150,23 +166,24 @@ export function PlaceField({
     issues: readonly { path: (string | number)[]; message: string }[];
     path: (string | number)[];
 }) {
+    const t = useGameText("minecraft");
     return (
         <div className="flex flex-col gap-2 text-sm">
-            <span className="font-medium">Where</span>
+            <span className="font-medium">{t("editor.where")}</span>
             <SegmentedControl
                 value={value.mode}
                 onValueChange={(mode) =>
                     onChange(mode === "fixed" ? { mode: "fixed", x: 0, z: 0 } : { mode: "players" })
                 }
                 options={[
-                    { value: "players", label: "Near the players" },
-                    { value: "fixed", label: "At set coordinates" }
+                    { value: "players", label: t("editor.nearThePlayers") },
+                    { value: "fixed", label: t("editor.atSetCoordinates") }
                 ]}
-                aria-label="Where it happens"
+                aria-label={t("editor.whereItHappens")}
             />
             {value.mode === "fixed" ? (
                 <div className="grid grid-cols-2 gap-2">
-                    <Field label="X" problem={problemAt(issues, ...path, "x")}>
+                    <Field label={t("editor.x")} problem={problemAt(issues, ...path, "x")}>
                         <Input
                             type="number"
                             value={Number.isFinite(value.x) ? value.x : ""}
@@ -175,7 +192,7 @@ export function PlaceField({
                             }
                         />
                     </Field>
-                    <Field label="Z" problem={problemAt(issues, ...path, "z")}>
+                    <Field label={t("editor.z")} problem={problemAt(issues, ...path, "z")}>
                         <Input
                             type="number"
                             value={Number.isFinite(value.z) ? value.z : ""}
@@ -186,9 +203,7 @@ export function PlaceField({
                     </Field>
                 </div>
             ) : (
-                <span className="text-xs text-muted-foreground">
-                    {what} around a player who is in the Overworld when it starts.
-                </span>
+                <span className="text-xs text-muted-foreground">{what}</span>
             )}
         </div>
     );
@@ -209,6 +224,7 @@ function RewardEditor({
     issues: readonly { path: (string | number)[]; message: string }[];
     path: (string | number)[];
 }) {
+    const t = useGameText("minecraft");
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div>
@@ -221,7 +237,7 @@ function RewardEditor({
                         <Input
                             value={item.id}
                             placeholder="minecraft:diamond"
-                            aria-label="Item"
+                            aria-label={t("editor.item")}
                             onChange={(event) =>
                                 onChange({
                                     ...value,
@@ -242,7 +258,7 @@ function RewardEditor({
                         type="number"
                         min={1}
                         max={256}
-                        aria-label="How many"
+                        aria-label={t("editor.howMany")}
                         value={Number.isFinite(item.count) ? item.count : ""}
                         onChange={(event) =>
                             onChange({
@@ -258,8 +274,8 @@ function RewardEditor({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Remove this item"
-                        title="Remove this item"
+                        aria-label={t("editor.removeThisItem")}
+                        title={t("editor.removeThisItem")}
                         onClick={() =>
                             onChange({
                                 ...value,
@@ -284,11 +300,11 @@ function RewardEditor({
                         }
                     >
                         <Plus className="size-4" />
-                        Item
+                        {t("editor.item")}
                     </Button>
                 )}
                 <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-                    Levels
+                    {t("editor.levels")}
                     <Input
                         className="w-20"
                         type="number"
@@ -339,6 +355,7 @@ function OptionsFields({
     onChange: (options: catalog.EventPreset["options"]) => void;
     issues: readonly { path: (string | number)[]; message: string }[];
 }) {
+    const t = useGameText("minecraft");
     const [questionsText, setQuestionsText] = useState(() =>
         preset.kind === "trivia"
             ? writeQuestions((preset.options as catalog.EventOptions<"trivia">).questions)
@@ -348,14 +365,14 @@ function OptionsFields({
         case "mining-rush": {
             const value = preset.options as catalog.EventOptions<"mining-rush">;
             return (
-                <Field label="What counts">
+                <Field label={t("editor.whatCounts")}>
                     <Select
                         value={value.target}
                         onValueChange={(target) =>
                             onChange({ ...value, target: target as typeof value.target })
                         }
-                        options={options(MINING_LABELS)}
-                        aria-label="What counts"
+                        options={options(t, MINING_LABELS)}
+                        aria-label={t("editor.whatCounts")}
                     />
                 </Field>
             );
@@ -363,14 +380,14 @@ function OptionsFields({
         case "mob-hunt": {
             const value = preset.options as catalog.EventOptions<"mob-hunt">;
             return (
-                <Field label="What counts">
+                <Field label={t("editor.whatCounts")}>
                     <Select
                         value={value.target}
                         onValueChange={(target) =>
                             onChange({ ...value, target: target as typeof value.target })
                         }
-                        options={options(HUNT_LABELS)}
-                        aria-label="What counts"
+                        options={options(t, HUNT_LABELS)}
+                        aria-label={t("editor.whatCounts")}
                     />
                 </Field>
             );
@@ -382,13 +399,13 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="It lands up to the distance below"
+                        what={t("editor.place.drop")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <Field
-                        label="How far (blocks)"
-                        hint="Between 100 and 3000. Around the players, or around the coordinates."
+                        label={t("editor.howFarBlocks")}
+                        hint={t("editor.between100And3000Around")}
                         problem={problemAt(issues, "options", "distance")}
                     >
                         <Input
@@ -401,14 +418,14 @@ function OptionsFields({
                             }
                         />
                     </Field>
-                    <Field label="What is inside">
+                    <Field label={t("editor.whatIsInside")}>
                         <Select
                             value={value.loot}
                             onValueChange={(loot) =>
                                 onChange({ ...value, loot: loot as typeof value.loot })
                             }
-                            options={options(LOOT_LABELS)}
-                            aria-label="What is inside"
+                            options={options(t, LOOT_LABELS)}
+                            aria-label={t("editor.whatIsInside")}
                         />
                     </Field>
                 </>
@@ -418,10 +435,7 @@ function OptionsFields({
             const value = preset.options as catalog.EventOptions<"blood-moon">;
             return (
                 <>
-                    <Field
-                        label="How hard"
-                        hint="How many mobs rise around each player every 40 seconds: 2, 3 or 5."
-                    >
+                    <Field label={t("editor.howHard")} hint={t("editor.howManyMobsRiseAround")}>
                         <SegmentedControl
                             value={value.intensity}
                             onValueChange={(intensity) =>
@@ -430,21 +444,21 @@ function OptionsFields({
                                     intensity: intensity as typeof value.intensity
                                 })
                             }
-                            options={options(INTENSITY_LABELS)}
-                            aria-label="How hard"
+                            options={options(t, INTENSITY_LABELS)}
+                            aria-label={t("editor.howHard")}
                         />
                     </Field>
                     <label className="flex items-center justify-between gap-3 text-sm">
                         <span>
-                            <span className="font-medium">Creepers too</span>
+                            <span className="font-medium">{t("editor.creepersToo")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                They blow holes in whatever is built nearby.
+                                {t("editor.theyBlowHolesInWhatever")}
                             </span>
                         </span>
                         <Switch
                             checked={value.creepers}
                             onChange={(creepers) => onChange({ ...value, creepers })}
-                            aria-label="Creepers too"
+                            aria-label={t("editor.creepersToo")}
                         />
                     </label>
                 </>
@@ -454,19 +468,19 @@ function OptionsFields({
             const value = preset.options as catalog.EventOptions<"world-boss">;
             return (
                 <>
-                    <Field label="Which boss">
+                    <Field label={t("editor.whichBoss")}>
                         <Select
                             value={value.boss}
                             onValueChange={(boss) =>
                                 onChange({ ...value, boss: boss as typeof value.boss })
                             }
-                            options={options(BOSS_LABELS)}
-                            aria-label="Which boss"
+                            options={options(t, BOSS_LABELS)}
+                            aria-label={t("editor.whichBoss")}
                         />
                     </Field>
                     <Field
-                        label="Health"
-                        hint="Between 100 and 1024. A player with iron gear deals about 8 a hit."
+                        label={t("editor.health")}
+                        hint={t("editor.between100And1024A")}
                         problem={problemAt(issues, "options", "health")}
                     >
                         <Input
@@ -482,7 +496,7 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="It appears about 20 blocks"
+                        what={t("editor.place.boss")}
                         issues={issues}
                         path={["options", "place"]}
                     />
@@ -495,9 +509,9 @@ function OptionsFields({
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         <Field
-                            label="Rounds"
+                            label={t("editor.rounds")}
                             problem={problemAt(issues, "options", "rounds")}
-                            hint="3 to 15"
+                            hint={t("editor.3To15")}
                         >
                             <Input
                                 type="number"
@@ -510,9 +524,9 @@ function OptionsFields({
                             />
                         </Field>
                         <Field
-                            label="Seconds a round"
+                            label={t("editor.secondsARound")}
                             problem={problemAt(issues, "options", "seconds")}
-                            hint="15 to 90"
+                            hint={t("editor.15To90")}
                         >
                             <Input
                                 type="number"
@@ -525,25 +539,25 @@ function OptionsFields({
                             />
                         </Field>
                     </div>
-                    <Field label="Rounds of">
+                    <Field label={t("editor.roundsOf")}>
                         <SegmentedControl
                             value={value.mode}
                             onValueChange={(mode) =>
                                 onChange({ ...value, mode: mode as typeof value.mode })
                             }
-                            options={options(TRIVIA_LABELS)}
-                            aria-label="Rounds of"
+                            options={options(t, TRIVIA_LABELS)}
+                            aria-label={t("editor.roundsOf")}
                         />
                     </Field>
                     <Field
-                        label="Your own questions"
-                        hint="One a line: the question, a bar, then the answers that count, separated by semicolons. Asked before the built-in ones."
+                        label={t("editor.yourOwnQuestions")}
+                        hint={t("editor.oneALineTheQuestion")}
                         problem={problemAt(issues, "options", "questions")}
                     >
                         <Textarea
                             rows={4}
                             value={questionsText}
-                            placeholder="What is the name of our spawn town? | Northwatch; north watch"
+                            placeholder={t("editor.whatIsTheNameOf")}
                             onChange={(event) => {
                                 setQuestionsText(event.target.value);
                                 onChange({
@@ -560,17 +574,17 @@ function OptionsFields({
             const value = preset.options as catalog.EventOptions<"explorer">;
             return (
                 <>
-                    <Field label="The goal">
+                    <Field label={t("editor.theGoal")}>
                         <SegmentedControl
                             value={value.mode}
                             onValueChange={(mode) =>
                                 onChange({ ...value, mode: mode as typeof value.mode })
                             }
                             options={[
-                                { value: "distance", label: "Farthest travelled" },
-                                { value: "race", label: "Race to a point" }
+                                { value: "distance", label: t("editor.farthestTravelled") },
+                                { value: "race", label: t("editor.raceToAPoint") }
                             ]}
-                            aria-label="The goal"
+                            aria-label={t("editor.theGoal")}
                         />
                     </Field>
                     {value.mode === "race" && (
@@ -578,13 +592,13 @@ function OptionsFields({
                             <PlaceField
                                 value={value.place}
                                 onChange={(place) => onChange({ ...value, place })}
-                                what="The finish is set the distance below"
+                                what={t("editor.place.finish")}
                                 issues={issues}
                                 path={["options", "place"]}
                             />
                             <Field
-                                label="How far (blocks)"
-                                hint="Between 200 and 3000."
+                                label={t("editor.howFarBlocks")}
+                                hint={t("editor.between200And3000")}
                                 problem={problemAt(issues, "options", "distance")}
                             >
                                 <Input
@@ -612,13 +626,21 @@ function OptionsFields({
                 label: string;
                 hint: string;
             }[] = [
-                { key: "haste", label: "Haste II", hint: "Mining and digging faster." },
-                { key: "luck", label: "Luck", hint: "Better fishing and chest loot." },
-                { key: "speed", label: "Speed", hint: "Moving faster." },
+                {
+                    key: "haste",
+                    label: t("editor.hasteIi"),
+                    hint: t("editor.miningAndDiggingFaster")
+                },
+                {
+                    key: "luck",
+                    label: t("editor.luck"),
+                    hint: t("editor.betterFishingAndChestLoot")
+                },
+                { key: "speed", label: t("editor.speed"), hint: t("editor.movingFaster") },
                 {
                     key: "regeneration",
-                    label: "Regeneration",
-                    hint: "Health comes back on its own."
+                    label: t("editor.regeneration"),
+                    hint: t("editor.healthComesBackOnIts")
                 }
             ];
             return (
@@ -654,13 +676,13 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="The circle is drawn about 30 blocks"
+                        what={t("editor.place.circle")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <Field
-                        label="Circle radius (blocks)"
-                        hint="Between 3 and 20."
+                        label={t("editor.circleRadiusBlocks")}
+                        hint={t("editor.between3And20")}
                         problem={problemAt(issues, "options", "radius")}
                     >
                         <Input
@@ -713,14 +735,14 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="The point is marked about 50 blocks"
+                        what={t("editor.place.point")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <div className="grid grid-cols-2 gap-3">
                         <Field
-                            label="Waves"
-                            hint="3 to 10"
+                            label={t("editor.waves")}
+                            hint={t("editor.3To10")}
                             problem={problemAt(issues, "options", "waves")}
                         >
                             <Input
@@ -734,8 +756,8 @@ function OptionsFields({
                             />
                         </Field>
                         <Field
-                            label="First wave size"
-                            hint="2 to 12 for one defender; each wave and each defender adds more."
+                            label={t("editor.firstWaveSize")}
+                            hint={t("editor.2To12ForOne")}
                             problem={problemAt(issues, "options", "size")}
                         >
                             <Input
@@ -750,16 +772,16 @@ function OptionsFields({
                         </Field>
                     </div>
                     <Field
-                        label="Monsters"
-                        hint="Never creepers, endermen or anything else that breaks blocks."
+                        label={t("editor.monsters")}
+                        hint={t("editor.neverCreepersEndermenOrAnything")}
                     >
                         <Select
                             value={value.mix}
                             onValueChange={(mix) =>
                                 onChange({ ...value, mix: mix as typeof value.mix })
                             }
-                            options={options(WAVE_MIX_LABELS)}
-                            aria-label="Monsters"
+                            options={options(t, WAVE_MIX_LABELS)}
+                            aria-label={t("editor.monsters")}
                         />
                     </Field>
                 </>
@@ -772,13 +794,13 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="Each meteor lands up to the distance below"
+                        what={t("editor.place.meteor")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <Field
-                        label="How far (blocks)"
-                        hint="Between 50 and 1000. Around the players, or around the coordinates."
+                        label={t("editor.howFarBlocks")}
+                        hint={t("editor.between50And1000Around")}
                         problem={problemAt(issues, "options", "distance")}
                     >
                         <Input
@@ -793,8 +815,8 @@ function OptionsFields({
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                         <Field
-                            label="Meteors"
-                            hint="2 to 8"
+                            label={t("editor.meteors")}
+                            hint={t("editor.2To8")}
                             problem={problemAt(issues, "options", "meteors")}
                         >
                             <Input
@@ -808,8 +830,8 @@ function OptionsFields({
                             />
                         </Field>
                         <Field
-                            label="Blocks in each"
-                            hint="3 to 12"
+                            label={t("editor.blocksInEach")}
+                            hint={t("editor.3To12")}
                             problem={problemAt(issues, "options", "size")}
                         >
                             <Input
@@ -823,14 +845,14 @@ function OptionsFields({
                             />
                         </Field>
                     </div>
-                    <Field label="Made of">
+                    <Field label={t("editor.madeOf")}>
                         <Select
                             value={value.ores}
                             onValueChange={(ores) =>
                                 onChange({ ...value, ores: ores as typeof value.ores })
                             }
-                            options={options(METEOR_ORE_LABELS)}
-                            aria-label="Made of"
+                            options={options(t, METEOR_ORE_LABELS)}
+                            aria-label={t("editor.madeOf")}
                         />
                     </Field>
                 </>
@@ -843,14 +865,14 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="It is built over open ground"
+                        what={t("editor.place.openGround")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <div className="grid grid-cols-2 gap-3">
                         <Field
-                            label="Jumps"
-                            hint="10 to 40, a checkpoint every 6."
+                            label={t("editor.jumps")}
+                            hint={t("editor.10To40ACheckpoint")}
                             problem={problemAt(issues, "options", "jumps")}
                         >
                             <Input
@@ -864,8 +886,8 @@ function OptionsFields({
                             />
                         </Field>
                         <Field
-                            label="Height (blocks)"
-                            hint="25 to 40 above the ground."
+                            label={t("editor.heightBlocks")}
+                            hint={t("editor.25To40AboveThe")}
                             problem={problemAt(issues, "options", "height")}
                         >
                             <Input
@@ -880,8 +902,8 @@ function OptionsFields({
                         </Field>
                     </div>
                     <Field
-                        label="Difficulty"
-                        hint="Easy: wide platforms, short gaps. Hard: single blocks, gaps of up to three."
+                        label={t("editor.difficulty")}
+                        hint={t("editor.easyWidePlatformsShortGaps")}
                     >
                         <SegmentedControl
                             value={value.difficulty}
@@ -891,8 +913,8 @@ function OptionsFields({
                                     difficulty: difficulty as typeof value.difficulty
                                 })
                             }
-                            options={options(DIFFICULTY_LABELS)}
-                            aria-label="Difficulty"
+                            options={options(t, DIFFICULTY_LABELS)}
+                            aria-label={t("editor.difficulty")}
                         />
                     </Field>
                 </>
@@ -905,17 +927,17 @@ function OptionsFields({
                     <PlaceField
                         value={value.place}
                         onChange={(place) => onChange({ ...value, place })}
-                        what="It is built over open ground"
+                        what={t("editor.place.openGround")}
                         issues={issues}
                         path={["options", "place"]}
                     />
                     <div className="grid grid-cols-2 gap-3">
                         <Field
-                            label="Floor size (blocks from the middle)"
+                            label={t("editor.floorSizeBlocksFromThe")}
                             hint={
                                 Number.isFinite(value.size)
-                                    ? `5 to 15: this one is ${value.size * 2 + 1} by ${value.size * 2 + 1}.`
-                                    : "5 to 15."
+                                    ? t("editor.floorSizeHint", { size: value.size * 2 + 1 })
+                                    : t("editor.5To15")
                             }
                             problem={problemAt(issues, "options", "size")}
                         >
@@ -930,8 +952,8 @@ function OptionsFields({
                             />
                         </Field>
                         <Field
-                            label="Height (blocks)"
-                            hint="25 to 40 above the ground."
+                            label={t("editor.heightBlocks")}
+                            hint={t("editor.25To40AboveThe")}
                             problem={problemAt(issues, "options", "height")}
                         >
                             <Input
@@ -980,6 +1002,7 @@ export function EventEditor({
     onOpenChange: (open: boolean) => void;
     onSave: (preset: catalog.EventPreset) => void;
 }) {
+    const t = useGameText("minecraft");
     const [draft, setDraft] = useState<catalog.EventPreset>(saved);
     const checked = useMemo(() => catalog.presetSchema.safeParse(draft), [draft]);
     const issues = checked.success ? [] : checked.error.issues;
@@ -999,8 +1022,8 @@ export function EventEditor({
                     </DialogHeader>
                     <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
                         <Field
-                            label="Name"
-                            hint="What players see in titles and on the scoreboard."
+                            label={t("editor.name")}
+                            hint={t("editor.whatPlayersSeeInTitles")}
                             problem={problemAt(issues, "name")}
                         >
                             <Input
@@ -1012,10 +1035,15 @@ export function EventEditor({
                         {draft.kind !== "trivia" && draft.kind !== "waves" && (
                             <Field
                                 label={
-                                    draft.kind === "build-battle" ? "Minutes to build" : "Minutes"
+                                    draft.kind === "build-battle"
+                                        ? t("editor.minutesToBuild")
+                                        : t("editor.minutes")
                                 }
                                 problem={problemAt(issues, "minutes")}
-                                hint={`${catalog.DURATION.min} to ${catalog.DURATION.max}`}
+                                hint={t("editor.range", {
+                                    min: catalog.DURATION.min,
+                                    max: catalog.DURATION.max
+                                })}
                             >
                                 <Input
                                     type="number"
@@ -1032,8 +1060,8 @@ export function EventEditor({
 
                     {catalog.hasMinScore(draft) && (
                         <Field
-                            label={`Least to be ranked (${catalog.KIND_INFO[draft.kind].unit})`}
-                            hint="Below this a player is not on the podium and gets no prize for taking part. Nobody reaching it means nobody wins."
+                            label={t("editor.leastRanked", { unit: kindUnit(t, draft.kind) })}
+                            hint={t("editor.belowThisAPlayerIs")}
                             problem={problemAt(issues, "minScore")}
                         >
                             <Input
@@ -1062,23 +1090,21 @@ export function EventEditor({
 
                     {info.competitive && (
                         <div className="flex flex-col gap-2">
-                            <p className="text-sm font-medium">Prizes</p>
+                            <p className="text-sm font-medium">{t("editor.prizes")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Given when it ends. Anybody offline by then gets theirs the next
-                                time they are on. Players caught by the anti-cheat during it get
-                                nothing.
+                                {t("editor.givenWhenItEndsAnybody")}
                             </p>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 <RewardEditor
-                                    label="First place"
-                                    hint="Ties share a place."
+                                    label={t("editor.firstPlace")}
+                                    hint={t("editor.tiesShareAPlace")}
                                     value={rewards.first}
                                     issues={issues}
                                     path={["rewards", "first"]}
                                     onChange={(first) => change({ rewards: { ...rewards, first } })}
                                 />
                                 <RewardEditor
-                                    label="Second place"
+                                    label={t("editor.secondPlace")}
                                     hint=""
                                     value={rewards.second}
                                     issues={issues}
@@ -1088,7 +1114,7 @@ export function EventEditor({
                                     }
                                 />
                                 <RewardEditor
-                                    label="Third place"
+                                    label={t("editor.thirdPlace")}
                                     hint=""
                                     value={rewards.third}
                                     issues={issues}
@@ -1096,24 +1122,24 @@ export function EventEditor({
                                     onChange={(third) => change({ rewards: { ...rewards, third } })}
                                 />
                                 <RewardEditor
-                                    label="Everybody who took part"
+                                    label={t("editor.everybodyWhoTookPart")}
                                     hint={
                                         draft.kind === "blood-moon"
-                                            ? "Everybody who survived the night with a kill."
+                                            ? t("editor.everybodyWhoSurvivedTheNight")
                                             : draft.kind === "waves"
-                                              ? "Everybody who held the point through a wave and fought."
+                                              ? t("editor.everybodyWhoHeldThePoint")
                                               : draft.kind === "parkour"
-                                                ? "Everybody who joined and cleared at least one jump."
+                                                ? t("editor.everybodyWhoJoinedAndCleared")
                                                 : draft.kind === "spleef"
-                                                  ? "Everybody who joined."
+                                                  ? t("editor.everybodyWhoJoined")
                                                   : draft.kind === "supply-drop" ||
                                                       draft.kind === "rare-catch" ||
                                                       (draft.kind === "explorer" &&
                                                           (
                                                               draft.options as catalog.EventOptions<"explorer">
                                                           ).mode === "race")
-                                                    ? "Nobody but the winner, in this one."
-                                                    : "Everybody who scored at all."
+                                                    ? t("editor.nobodyButTheWinnerIn")
+                                                    : t("editor.everybodyWhoScoredAtAll")
                                     }
                                     value={rewards.everyone}
                                     issues={issues}
@@ -1131,7 +1157,7 @@ export function EventEditor({
                             <span className="mr-auto text-xs text-danger">{issues[0].message}</span>
                         )}
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("editor.cancel")}
                         </Button>
                         <Button
                             disabled={!checked.success || !dirty}
@@ -1139,7 +1165,7 @@ export function EventEditor({
                                 if (checked.success) onSave(checked.data);
                             }}
                         >
-                            Done
+                            {t("editor.done")}
                         </Button>
                     </div>
                 </div>

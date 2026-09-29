@@ -362,7 +362,8 @@
         "runCount": "Lanzar {count} {count, plural, one {comando} other {comandos}}",
         "keepHelp": "Queda sobre la consola para todos los que gestionan este servidor. Pon un hueco entre ángulos - <example></example> - y al pulsarlo rellena la caja en vez de enviarlo.",
         "summary": "{count} {count, plural, one {comando} other {comandos}}.",
-        "summaryWaiting": "{count} {count, plural, one {comando} other {comandos}}, con {seconds}s de espera."
+        "summaryWaiting": "{count} {count, plural, one {comando} other {comandos}}, con {seconds}s de espera.",
+        "messagePlaceholder": "mensaje"
     },
     "blueprint": {
         "blueprint": "Plantilla",

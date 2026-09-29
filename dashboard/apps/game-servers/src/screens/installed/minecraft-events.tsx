@@ -10,7 +10,10 @@
  * event appears here without a reload.
  */
 
+import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import type { GameKey } from "../../../messages";
 import * as ui from "@polaris/ui";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import * as actions from "./events-actions";
 import { EventEditor } from "./event-editor";
 import { hostUi } from "@polaris/app-host/client";
@@ -29,24 +32,32 @@ const { useKeptSnapshot } = hostUi.liveRead;
 
 const SNAPSHOT_MS = 30_000;
 const snapshotKey = (installedAppId: string) => `minecraft-events:${installedAppId}`;
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS: readonly GameKey<"minecraft">[] = [
+    "schedule.days.sun",
+    "schedule.days.mon",
+    "schedule.days.tue",
+    "schedule.days.wed",
+    "schedule.days.thu",
+    "schedule.days.fri",
+    "schedule.days.sat"
+];
 
-const TRIGGER_LABEL: Readonly<Record<EventHistoryEntry["trigger"], string>> = {
-    manual: "Run by hand",
-    scheduled: "Scheduled",
-    random: "Drawn at random"
+const TRIGGER_LABEL: Readonly<Record<EventHistoryEntry["trigger"], GameKey<"minecraft">>> = {
+    manual: "events.triggers.manual",
+    scheduled: "events.triggers.scheduled",
+    random: "events.triggers.random"
 };
 
 const OUTCOME: Readonly<
     Record<
         EventHistoryEntry["outcome"],
-        { label: string; tone: "success" | "neutral" | "warning" | "danger" }
+        { label: GameKey<"minecraft">; tone: "success" | "neutral" | "warning" | "danger" }
     >
 > = {
-    finished: { label: "Finished", tone: "success" },
-    cancelled: { label: "Called off", tone: "neutral" },
-    skipped: { label: "Skipped", tone: "warning" },
-    failed: { label: "Failed", tone: "danger" }
+    finished: { label: "events.outcomes.finished", tone: "success" },
+    cancelled: { label: "events.outcomes.cancelled", tone: "neutral" },
+    skipped: { label: "events.outcomes.skipped", tone: "warning" },
+    failed: { label: "events.outcomes.failed", tone: "danger" }
 };
 
 /** m:ss, or h:mm:ss past an hour. */
@@ -60,12 +71,12 @@ function clock(ms: number): string {
         : `${minutes}:${seconds}`;
 }
 
-function rewardText(reward: catalog.Reward): string {
+function rewardText(t: GameText<"minecraft">, reward: catalog.Reward): string {
     const parts = reward.items.map(
         (item) => `${item.count} ${item.id.replace(/^minecraft:/, "").replace(/_/g, " ")}`
     );
-    if (reward.levels > 0) parts.push(`${reward.levels} levels`);
-    return parts.join(", ") || "Nothing";
+    if (reward.levels > 0) parts.push(t("events.levels", { count: reward.levels }));
+    return parts.join(", ") || t("events.nothing");
 }
 
 function newId(): string {
@@ -80,9 +91,15 @@ function DayPicker({
     days: readonly number[];
     onChange: (days: number[]) => void;
 }) {
+    const t = useGameText("minecraft");
     return (
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Days">
-            {DAYS.map((label, day) => {
+        <div
+            className="flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label={t("events.days")}
+        >
+            {DAYS.map((key, day) => {
+                const label = t(key);
                 const every = days.length === 0;
                 const picked = every || days.includes(day);
                 return (
@@ -126,149 +143,175 @@ function EventExplained({
     preset: catalog.EventPreset;
     settings: catalog.EventSettings | null;
 }) {
+    const t = useGameText("minecraft");
     const info = catalog.KIND_INFO[preset.kind];
     const facts: string[] = [
         preset.kind === "trivia"
-            ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds of ${(preset.options as catalog.EventOptions<"trivia">).seconds} seconds.`
-            : `Lasts ${catalog.runMinutes(preset)} minutes.`
+            ? t("events.facts.triviaRounds", {
+                  rounds: (preset.options as catalog.EventOptions<"trivia">).rounds,
+                  seconds: (preset.options as catalog.EventOptions<"trivia">).seconds
+              })
+            : t("events.facts.lasts", { minutes: catalog.runMinutes(preset) })
     ];
     if (preset.kind === "happy-hour") {
         const options = preset.options as catalog.EventOptions<"happy-hour">;
         const effects = [
-            options.haste && "Haste II (mining and digging faster)",
-            options.luck && "Luck (better fishing and chest loot)",
-            options.speed && "Speed (moving faster)",
-            options.regeneration && "Regeneration (health comes back on its own)"
+            options.haste && t("events.facts.haste"),
+            options.luck && t("events.facts.luck"),
+            options.speed && t("events.facts.speed"),
+            options.regeneration && t("events.facts.regeneration")
         ].filter(Boolean);
-        facts.push(
-            `Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`
-        );
+        facts.push(t("events.facts.happyHour", { effects: effects.join(", ") }));
     }
     if (preset.kind === "treasure-hunt") {
         const options = preset.options as catalog.EventOptions<"treasure-hunt">;
         facts.push(
-            `${options.chests} ${options.chests === 1 ? "chest" : "chests"} hidden up to ${options.distance} blocks from the players, on open natural ground well away from anybody's bed.`,
-            "Clues come in three steps: how far and which way, then the area, then the exact spot; a beam of light marks the ones left in the last minutes. A player close to one sees the way in their action bar.",
-            "A chest is only put where there is air, and one nobody opened is taken away at the end. An opened chest stays: what is inside is the finder's."
+            t("events.facts.chestsHidden", { count: options.chests, distance: options.distance }),
+            t("events.facts.clues"),
+            t("events.facts.chestsCleared")
         );
     }
     if (preset.kind === "gathering") {
         const options = preset.options as catalog.EventOptions<"gathering">;
         facts.push(
             options.material === "random"
-                ? "The material is drawn from the list each time and announced when the countdown starts."
-                : `The material: ${MATERIAL_LABELS[options.material].toLowerCase()}.`,
-            "Scored by what each player holds at the end minus what they held when it began, and never more than they picked up during it - a stack taken out of a chest does not count. Nothing is taken from anybody."
+                ? t("events.facts.materialRandom")
+                : t("events.facts.material", {
+                      material: t(MATERIAL_LABELS[options.material]).toLowerCase()
+                  }),
+            t("events.facts.gatheringScore")
         );
     }
     if (preset.kind === "rare-catch") {
         const options = preset.options as catalog.EventOptions<"rare-catch">;
         facts.push(
-            `The first player to fish up ${CATCH_LABELS[options.treasure].toLowerCase()} wins, and keeps it. Taking one out of a chest, or dropping one and picking it up, does not count.`
+            t("events.facts.rareCatch", {
+                treasure: t(CATCH_LABELS[options.treasure]).toLowerCase()
+            })
         );
     }
     if (preset.kind === "xp-boost") {
         const options = preset.options as catalog.EventOptions<"xp-boost">;
         const extra = [
-            options.perKill > 0 && `${options.perKill} extra experience per mob killed`,
-            options.perOre > 0 && `${options.perOre} per ore block mined`
+            options.perKill > 0 && t("events.facts.perKill", { count: options.perKill }),
+            options.perOre > 0 && t("events.facts.perOre", { count: options.perOre })
         ].filter(Boolean);
-        facts.push(
-            `Everybody on gets ${extra.join(" and ")} until it ends. Nothing is ever taken away; an ore block placed during it is not paid for again.`
-        );
+        facts.push(t("events.facts.xpBoost", { extra: extra.join(` ${t("events.facts.and")} `) }));
     }
     if (preset.kind === "waves") {
         const options = preset.options as catalog.EventOptions<"waves">;
-        facts[0] = `${options.waves} waves, ${catalog.runMinutes(preset)} minutes at most. A wave ends when all of it is killed, or after two minutes.`;
-        facts.push(
-            "The point is on open, flat ground the world made, at least 96 blocks from any online player's bed. Only monsters that cannot break blocks come - no creepers, endermen or ravagers - and every one of them is removed when it ends.",
-            "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterwards. Java 1.17 or later."
-        );
+        facts[0] = t("events.facts.waves", {
+            waves: options.waves,
+            minutes: catalog.runMinutes(preset)
+        });
+        facts.push(t("events.facts.wavesPoint"), t("events.facts.keepInventory"));
     }
     if (preset.kind === "meteor-shower") {
         const options = preset.options as catalog.EventOptions<"meteor-shower">;
         facts.push(
-            `${options.meteors} meteors of ${options.size} ore blocks each, landing over the first three quarters of it. Each block mined near a meteor scores 1; ore placed near one is taken off.`,
-            "Meteors land on open, flat ground the world made, at least 48 blocks from any online player's bed, and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
-            "Diamond and emerald ore need an iron pickaxe, ancient debris a diamond one."
+            t("events.facts.meteors", { meteors: options.meteors, size: options.size }),
+            t("events.facts.meteorsLand"),
+            t("events.facts.pickaxes")
         );
     }
     if (catalog.playsOnStage(preset)) {
         const options = preset.options as { height: number };
         facts.push(
             preset.kind === "parkour"
-                ? `${(preset.options as catalog.EventOptions<"parkour">).jumps} jumps, ${(preset.options as catalog.EventOptions<"parkour">).difficulty}, built about ${options.height} blocks up. A fall lands on a net and goes back to the last checkpoint.`
-                : `A ${(preset.options as catalog.EventOptions<"spleef">).size * 2 + 1} by ${(preset.options as catalog.EventOptions<"spleef">).size * 2 + 1} snow floor about ${options.height} blocks up. Falling through it is being out; the last one on it wins.`,
-            `Only players who type join (or unirse) in the chat during the countdown - at least ${catalog.JOIN_SECONDS} seconds - take part. They are taken there and brought back to exactly where they were when it ends, even after a restart.`,
-            "It is built only in empty air, over open ground away from everybody's bed, and taken down block by block afterwards - only what it placed. Inside, nobody can take damage and everybody is in adventure mode; their game mode is given back after.",
+                ? t("events.facts.parkour", {
+                      jumps: (preset.options as catalog.EventOptions<"parkour">).jumps,
+                      difficulty: t(
+                          `events.difficulties.${(preset.options as catalog.EventOptions<"parkour">).difficulty}` as GameKey<"minecraft">
+                      ),
+                      height: options.height
+                  })
+                : t("events.facts.spleef", {
+                      size: (preset.options as catalog.EventOptions<"spleef">).size * 2 + 1,
+                      height: options.height
+                  }),
+            t("events.facts.joinCountdown", { seconds: catalog.JOIN_SECONDS }),
+            t("events.facts.stageBuilt"),
             preset.kind === "spleef"
-                ? "Players get a marked shovel that only breaks the snow; it is cleared at the end, and nothing else of theirs is touched. Needs Java 1.14.4 or newer; before 1.20.5 the snow drops snowballs when dug."
-                : "Nobody's items are touched. Needs Java 1.14.4 or newer."
+                ? t("events.facts.spleefShovel")
+                : t("events.facts.parkourItems")
         );
     }
     if (preset.kind === "team-duel") {
         const options = preset.options as catalog.EventOptions<"team-duel">;
         facts.push(
-            "Only players who type join (or unirse) in the chat during the countdown take part. They are split into two teams and taken to an arena built 30 blocks up, over open ground away from anybody's bed.",
-            `Everybody gets the same ${options.kit} sword and a shield. A player down to ${options.downHearts} ${options.downHearts === 1 ? "heart" : "hearts"} is out: the other team scores, the rival who brought them down gets the elimination, and they are sent back to their side, healed. The team with more wins; the podium goes by eliminations.`,
-            "Keep inventory is on while it lasts and put back after, so even a death in the arena keeps everything.",
-            "Needs Player versus player allowed in Settings, and Minecraft 1.16 or later. Up to 16 players."
+            t("events.facts.duelJoin"),
+            t("events.facts.duelKit", {
+                kit: t(`events.kits.${options.kit}` as GameKey<"minecraft">),
+                hearts: options.downHearts
+            }),
+            t("events.facts.duelKeepInventory"),
+            t("events.facts.duelNeeds")
         );
     }
     if (preset.kind === "build-battle") {
         const options = preset.options as catalog.EventOptions<"build-battle">;
         facts.push(
-            "Only players who type join (or unirse) in the chat during the countdown take part. Each gets a plot on a platform built 30 blocks up, over open ground away from anybody's bed.",
-            `${options.themeMode === "mine" ? "A theme from your list" : "A built-in theme"}, a ${options.plotSize} by ${options.plotSize} plot, 16 kinds of glass and a brush; ${preset.minutes} minutes to build, then ${options.voteSeconds} seconds touring the plots and voting in the chat - one vote each, not for your own plot. Most votes wins.`,
-            "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
-            "Needs Minecraft 1.16 or later. Up to 12 builders."
+            t("events.facts.buildJoin"),
+            t(
+                options.themeMode === "mine"
+                    ? "events.facts.buildPlanMine"
+                    : "events.facts.buildPlanBuiltIn",
+                {
+                    size: options.plotSize,
+                    minutes: preset.minutes,
+                    seconds: options.voteSeconds
+                }
+            ),
+            t("events.facts.buildGlass"),
+            t("events.facts.buildNeeds")
         );
     }
     if (catalog.playsInArena(preset)) {
-        facts.push(
-            "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then."
-        );
+        facts.push(t("events.facts.arena"));
     }
     if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
-        facts.push("Happens in the Overworld; only players there take part.");
+        facts.push(t("events.facts.overworld"));
     if (catalog.hasMinScore(preset)) {
         facts.push(
-            `Ranked from ${catalog.minScoreOf(preset)} ${info.unit}; below that, no podium and no prize.`
+            t("events.facts.rankedFrom", {
+                score: catalog.minScoreOf(preset),
+                unit: kindUnit(t, preset.kind)
+            })
         );
     }
     if (settings) {
         const needed = catalog.activeNeeded(preset, settings);
-        facts.push(
-            `Starts on its own only with ${needed} ${needed === 1 ? "player" : "players"} actually playing, and not while somebody is in a fight.`
-        );
+        facts.push(t("events.facts.startsWith", { count: needed }));
     }
     if (catalog.needsHostileMobs(preset)) {
-        facts.push("Needs the server above Peaceful, where hostile mobs exist.");
+        facts.push(t("events.facts.hostileMobs"));
     }
     if (info.competitive) {
         facts.push(
-            catalog.afkCounts(preset)
-                ? "Nobody playing in creative or spectator, caught by the anti-cheat, or AFK the whole time is ranked."
-                : "Nobody playing in creative or spectator, or caught by the anti-cheat, is ranked."
+            catalog.afkCounts(preset) ? t("events.facts.unrankedAfk") : t("events.facts.unranked")
         );
     }
     if (info.competitive) {
         const prizes = [
-            ["1st", preset.rewards.first],
-            ["2nd", preset.rewards.second],
-            ["3rd", preset.rewards.third],
-            ["taking part", preset.rewards.everyone]
+            [t("events.facts.first"), preset.rewards.first],
+            [t("events.facts.second"), preset.rewards.second],
+            [t("events.facts.third"), preset.rewards.third],
+            [t("events.facts.takingPart"), preset.rewards.everyone]
         ] as const;
         const given = prizes.filter(([, reward]) => reward.items.length > 0 || reward.levels > 0);
         facts.push(
             given.length > 0
-                ? `Prizes - ${given.map(([place, reward]) => `${place}: ${rewardText(reward)}`).join("; ")}.`
-                : "No prizes set."
+                ? t("events.facts.prizes", {
+                      list: given
+                          .map(([place, reward]) => `${place}: ${rewardText(t, reward)}`)
+                          .join("; ")
+                  })
+                : t("events.facts.noPrizes")
         );
     }
     return (
         <div className="mt-2 flex flex-col gap-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
-            <p className="text-foreground">{info.summary}</p>
+            <p className="text-foreground">{kindSummary(t, preset.kind)}</p>
             {facts.map((fact) => (
                 <p key={fact} className="text-muted-foreground">
                     {fact}
@@ -285,6 +328,8 @@ export function MinecraftEvents({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const t = useGameText("minecraft");
+    const schemaText = useSchemaText();
     const display = useDisplayFormat();
     const [view, setView] = useState<EventsView | null>(null);
     const [draft, setDraft] = useState<catalog.EventsConfig | null>(null);
@@ -338,7 +383,7 @@ export function MinecraftEvents({
                         setView(answer.view);
                         writeSnapshot(snapshotKey(installedAppId), answer.view);
                         setDraft((current) => current ?? answer.view!.config);
-                    } else setError(answer.error ?? "The events could not be read");
+                    } else setError(answer.error ?? t("events.errors.read"));
                 })
                 .catch(() => {
                     // A read that did not come back - a restart, a dropped
@@ -372,7 +417,7 @@ export function MinecraftEvents({
     );
     const problem =
         checked && !checked.success
-            ? (checked.error.issues[0]?.message ?? "Check the events")
+            ? (schemaText(checked.error.issues[0]?.message) ?? t("events.errors.check"))
             : null;
 
     function save(): void {
@@ -381,7 +426,7 @@ export function MinecraftEvents({
         startTransition(async () => {
             const answer = await actions.saveEventsAction({ installedAppId, config: draft });
             if (!answer.view) {
-                setError(answer.error ?? "The events could not be saved");
+                setError(answer.error ?? t("events.errors.save"));
                 return;
             }
             accept(answer.view, true);
@@ -395,26 +440,25 @@ export function MinecraftEvents({
         startTransition(async () => {
             const answer = await actions.startEventAction({ installedAppId, presetId: preset.id });
             if (!answer.view) {
-                setError(answer.error ?? "The event could not start");
+                setError(answer.error ?? t("events.errors.start"));
                 return;
             }
             accept(answer.view, false);
-            setNote(`${preset.name} is starting.`);
+            setNote(t("events.starting", { name: preset.name }));
         });
     }
 
     async function cancel(): Promise<void> {
         const sure = await confirm({
-            title: "Call off the event?",
-            description:
-                "It stops now, nobody wins, and everything it put in the world is taken out again.",
-            confirmLabel: "Call it off"
+            title: t("events.callOffTheEvent"),
+            description: t("events.itStopsNowNobodyWins"),
+            confirmLabel: t("events.callItOff")
         });
         if (!sure) return;
         startTransition(async () => {
             const answer = await actions.cancelEventAction(installedAppId);
             if (answer.view) accept(answer.view, false);
-            else setError(answer.error ?? "The event could not be called off");
+            else setError(answer.error ?? t("events.errors.cancel"));
         });
     }
 
@@ -422,16 +466,15 @@ export function MinecraftEvents({
         startTransition(async () => {
             const answer = await actions.startNowAction(installedAppId);
             if (answer.view) accept(answer.view, false);
-            else setError(answer.error ?? "The event could not start now");
+            else setError(answer.error ?? t("events.errors.startNow"));
         });
     }
 
     async function remove(preset: catalog.EventPreset): Promise<void> {
         const sure = await confirm({
-            title: `Delete ${preset.name}?`,
-            description:
-                "It also comes off the schedule and out of the random draw. Save to keep the change.",
-            confirmLabel: "Delete"
+            title: t("events.deleteTitle", { name: preset.name }),
+            description: t("events.itAlsoComesOffThe"),
+            confirmLabel: t("events.delete")
         });
         if (!sure || !draft) return;
         setDraft({
@@ -450,15 +493,15 @@ export function MinecraftEvents({
 
     async function forget(id: string, player: string): Promise<void> {
         const sure = await confirm({
-            title: `Stop waiting to give ${player} their prize?`,
-            description: "It is not given when they come back.",
-            confirmLabel: "Forget it"
+            title: t("events.forgetPrizeTitle", { name: player }),
+            description: t("events.itIsNotGivenWhen"),
+            confirmLabel: t("events.forgetIt")
         });
         if (!sure) return;
         startTransition(async () => {
             const answer = await actions.forgetPrizeAction({ installedAppId, pendingId: id });
             if (answer.view) accept(answer.view, false);
-            else setError(answer.error ?? "That prize could not be forgotten");
+            else setError(answer.error ?? t("events.errors.forgetPrize"));
         });
     }
 
@@ -501,7 +544,7 @@ export function MinecraftEvents({
                 <ui.CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="text-sm font-medium">Now</p>
+                            <p className="text-sm font-medium">{t("events.now")}</p>
                             {!view ? (
                                 <ui.Skeleton className="mt-1 h-4 w-56" />
                             ) : view.run ? (
@@ -510,19 +553,23 @@ export function MinecraftEvents({
                                     <span className="text-muted-foreground">
                                         {" - "}
                                         {view.run.cancelling
-                                            ? "being called off"
+                                            ? t("events.beingCalledOff")
                                             : view.run.phase === "countdown"
-                                              ? `starts in ${clock(view.run.startsAt - now)}`
-                                              : `${clock(view.run.endsAt - now)} left`}
+                                              ? t("events.startsIn", {
+                                                    time: clock(view.run.startsAt - now)
+                                                })
+                                              : t("events.timeLeft", {
+                                                    time: clock(view.run.endsAt - now)
+                                                })}
                                         {" - "}
-                                        {TRIGGER_LABEL[view.run.trigger].toLowerCase()}
+                                        {t(TRIGGER_LABEL[view.run.trigger]).toLowerCase()}
                                     </span>
                                 </p>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    No event is on.
+                                    {t("events.noEventIsOn")}
                                     {view.players
-                                        ? ` ${view.players.online} on the server, ${view.players.active} of them playing.`
+                                        ? ` ${t("events.onServer", { online: view.players.online, active: view.players.active })}`
                                         : ""}
                                 </p>
                             )}
@@ -532,7 +579,7 @@ export function MinecraftEvents({
                                 {view.run.phase === "countdown" && (
                                     <ui.Button size="sm" disabled={pending} onClick={startNow}>
                                         <FastForward className="size-4" />
-                                        Start now
+                                        {t("events.startNow")}
                                     </ui.Button>
                                 )}
                                 <ui.Button
@@ -542,7 +589,7 @@ export function MinecraftEvents({
                                     onClick={() => void cancel()}
                                 >
                                     <Square className="size-4" />
-                                    Call off
+                                    {t("events.callOff")}
                                 </ui.Button>
                             </div>
                         )}
@@ -561,7 +608,7 @@ export function MinecraftEvents({
                                         {one.name}
                                     </span>
                                     <span className="tabular-nums text-muted-foreground">
-                                        {one.score} {catalog.KIND_INFO[view.run!.kind].unit}
+                                        {one.score} {kindUnit(t, view.run!.kind)}
                                     </span>
                                 </li>
                             ))}
@@ -573,9 +620,13 @@ export function MinecraftEvents({
                         settings?.random.enabled && (
                             <p className="text-xs text-muted-foreground">
                                 {view.waiting
-                                    ? `The next drawn event is due - ${view.waiting.charAt(0).toLowerCase()}${view.waiting.slice(1)}.`
+                                    ? t("events.nextDue", {
+                                          reason: `${view.waiting.charAt(0).toLowerCase()}${view.waiting.slice(1)}`
+                                      })
                                     : view.nextRandomAt
-                                      ? `The next drawn event comes from ${display.dateTime(view.nextRandomAt)}.`
+                                      ? t("events.nextFrom", {
+                                            date: display.dateTime(view.nextRandomAt)
+                                        })
                                       : null}
                             </p>
                         )}
@@ -586,7 +637,7 @@ export function MinecraftEvents({
             <ui.Card>
                 <ui.CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-sm font-medium">Events</p>
+                        <p className="text-sm font-medium">{t("events.events")}</p>
                         {!locked && draft && (
                             // A button that says what it does, opening the kinds
                             // with a line about each - rather than a select with
@@ -595,7 +646,7 @@ export function MinecraftEvents({
                                 <ui.DropdownMenuTrigger asChild>
                                     <ui.Button variant="secondary" size="sm">
                                         <Plus className="size-4" />
-                                        Add an event
+                                        {t("events.addAnEvent")}
                                     </ui.Button>
                                 </ui.DropdownMenuTrigger>
                                 <ui.DropdownMenuContent align="end" className="w-80">
@@ -610,11 +661,9 @@ export function MinecraftEvents({
                                                 })
                                             }
                                         >
-                                            <span className="text-sm">
-                                                {catalog.KIND_INFO[kind].label}
-                                            </span>
+                                            <span className="text-sm">{kindLabel(t, kind)}</span>
                                             <span className="line-clamp-2 text-xs text-muted-foreground">
-                                                {catalog.KIND_INFO[kind].summary}
+                                                {kindSummary(t, kind)}
                                             </span>
                                         </ui.DropdownMenuItem>
                                     ))}
@@ -630,7 +679,7 @@ export function MinecraftEvents({
                         </div>
                     ) : presets.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No events yet. Add one above.
+                            {t("events.noEventsYetAddOne")}
                         </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -645,20 +694,28 @@ export function MinecraftEvents({
                                                 {preset.name}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {catalog.KIND_INFO[preset.kind].label}
+                                                {kindLabel(t, preset.kind)}
                                                 {" - "}
                                                 {preset.kind === "trivia"
-                                                    ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds`
-                                                    : `${preset.minutes} min`}
+                                                    ? t("events.rounds", {
+                                                          count: (
+                                                              preset.options as catalog.EventOptions<"trivia">
+                                                          ).rounds
+                                                      })
+                                                    : t("events.minutes", {
+                                                          count: preset.minutes
+                                                      })}
                                                 {catalog.KIND_INFO[preset.kind].competitive
-                                                    ? ` - first place: ${rewardText(preset.rewards.first)}`
+                                                    ? ` - ${t("events.firstPlace", { reward: rewardText(t, preset.rewards.first) })}`
                                                     : ""}
                                             </p>
                                         </div>
                                         <ui.Switch
                                             checked={preset.enabled}
                                             disabled={locked}
-                                            aria-label={`${preset.name} can come round on its own`}
+                                            aria-label={t("events.canComeRound", {
+                                                name: preset.name
+                                            })}
                                             onChange={(enabled) =>
                                                 change({
                                                     presets: presets.map((one) =>
@@ -673,8 +730,10 @@ export function MinecraftEvents({
                                             <ui.Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                aria-label={`What ${preset.name} is`}
-                                                title={`What ${preset.name} is`}
+                                                aria-label={t("events.whatIs", {
+                                                    name: preset.name
+                                                })}
+                                                title={t("events.whatIs", { name: preset.name })}
                                                 aria-expanded={explained.has(preset.id)}
                                                 onClick={() => explain(preset.id)}
                                             >
@@ -683,9 +742,13 @@ export function MinecraftEvents({
                                             <ui.Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                aria-label={`Run ${preset.name} now`}
+                                                aria-label={t("events.runNow", {
+                                                    name: preset.name
+                                                })}
                                                 title={
-                                                    dirty ? "Save first" : `Run ${preset.name} now`
+                                                    dirty
+                                                        ? t("events.saveFirst")
+                                                        : t("events.runNow", { name: preset.name })
                                                 }
                                                 disabled={
                                                     locked ||
@@ -703,8 +766,10 @@ export function MinecraftEvents({
                                             <ui.Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                aria-label={`Edit ${preset.name}`}
-                                                title={`Edit ${preset.name}`}
+                                                aria-label={t("events.editNamed", {
+                                                    name: preset.name
+                                                })}
+                                                title={t("events.editNamed", { name: preset.name })}
                                                 disabled={locked}
                                                 onClick={() => setEditing({ preset, isNew: false })}
                                             >
@@ -713,8 +778,12 @@ export function MinecraftEvents({
                                             <ui.Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                aria-label={`Duplicate ${preset.name}`}
-                                                title={`Duplicate ${preset.name}`}
+                                                aria-label={t("events.duplicateNamed", {
+                                                    name: preset.name
+                                                })}
+                                                title={t("events.duplicateNamed", {
+                                                    name: preset.name
+                                                })}
                                                 disabled={locked}
                                                 onClick={() =>
                                                     setEditing({
@@ -732,8 +801,12 @@ export function MinecraftEvents({
                                             <ui.Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                aria-label={`Delete ${preset.name}`}
-                                                title={`Delete ${preset.name}`}
+                                                aria-label={t("events.deleteNamed", {
+                                                    name: preset.name
+                                                })}
+                                                title={t("events.deleteNamed", {
+                                                    name: preset.name
+                                                })}
                                                 disabled={locked}
                                                 onClick={() => void remove(preset)}
                                             >
@@ -752,8 +825,7 @@ export function MinecraftEvents({
                         </ul>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        The switch lets an event be scheduled or drawn at random. Run starts it now,
-                        whoever is playing.
+                        {t("events.theSwitchLetsAnEvent")}
                     </p>
                 </ui.CardBody>
             </ui.Card>
@@ -762,10 +834,9 @@ export function MinecraftEvents({
             <ui.Card>
                 <ui.CardBody className="flex flex-col gap-4">
                     <div>
-                        <p className="text-sm font-medium">Automatic events</p>
+                        <p className="text-sm font-medium">{t("events.automaticEvents")}</p>
                         <p className="text-xs text-muted-foreground">
-                            An automatic event only starts while enough players are actually playing
-                            - somebody who has not moved or turned for a while does not count.
+                            {t("events.anAutomaticEventOnlyStarts")}
                         </p>
                     </div>
                     {!settings ? (
@@ -774,7 +845,9 @@ export function MinecraftEvents({
                         <>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Players playing, at least</span>
+                                    <span className="font-medium">
+                                        {t("events.playersPlayingAtLeast")}
+                                    </span>
                                     <ui.Input
                                         type="number"
                                         min={1}
@@ -793,7 +866,9 @@ export function MinecraftEvents({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Idle after (minutes)</span>
+                                    <span className="font-medium">
+                                        {t("events.idleAfterMinutes")}
+                                    </span>
                                     <ui.Input
                                         type="number"
                                         min={2}
@@ -812,17 +887,19 @@ export function MinecraftEvents({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Warning before it starts</span>
+                                    <span className="font-medium">
+                                        {t("events.warningBeforeItStarts")}
+                                    </span>
                                     <ui.Select
                                         value={String(settings.countdownSeconds)}
                                         disabled={locked}
-                                        aria-label="Warning before it starts"
+                                        aria-label={t("events.warningBeforeItStarts")}
                                         options={[
-                                            { value: "0", label: "None" },
-                                            { value: "30", label: "30 seconds" },
-                                            { value: "60", label: "1 minute" },
-                                            { value: "120", label: "2 minutes" },
-                                            { value: "300", label: "5 minutes" }
+                                            { value: "0", label: t("events.none") },
+                                            { value: "30", label: t("events.30Seconds") },
+                                            { value: "60", label: t("events.1Minute") },
+                                            { value: "120", label: t("events.2Minutes") },
+                                            { value: "300", label: t("events.5Minutes") }
                                         ]}
                                         onValueChange={(value) =>
                                             changeSettings({ countdownSeconds: Number(value) })
@@ -830,14 +907,16 @@ export function MinecraftEvents({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">What players read</span>
+                                    <span className="font-medium">
+                                        {t("events.whatPlayersRead")}
+                                    </span>
                                     <ui.Select
                                         value={settings.language}
                                         disabled={locked}
-                                        aria-label="What players read"
+                                        aria-label={t("events.whatPlayersRead")}
                                         options={[
-                                            { value: "en", label: "English" },
-                                            { value: "es", label: "Español" }
+                                            { value: "en", label: "English" }, // i18n-ignore: a language by its own name
+                                            { value: "es", label: "Español" } // i18n-ignore: a language by its own name
                                         ]}
                                         onValueChange={(value) =>
                                             changeSettings({ language: value as catalog.Language })
@@ -845,10 +924,11 @@ export function MinecraftEvents({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Time zone</span>
+                                    <span className="font-medium">{t("events.timeZone")}</span>
                                     <ui.Input
                                         value={settings.timezone}
                                         disabled={locked}
+                                        // i18n-ignore: a time zone by its own name
                                         placeholder="Europe/Madrid"
                                         onChange={(event) =>
                                             changeSettings({ timezone: event.target.value })
@@ -860,17 +940,17 @@ export function MinecraftEvents({
                             <div className="flex flex-col gap-3 border-t border-border pt-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="text-sm font-medium">Random events</p>
+                                        <p className="text-sm font-medium">
+                                            {t("events.randomEvents")}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
-                                            In the hours below, an event is drawn from the ones
-                                            ticked every so often, weighted, and never the same kind
-                                            twice in a row.
+                                            {t("events.inTheHoursBelowAn")}
                                         </p>
                                     </div>
                                     <ui.Switch
                                         checked={settings.random.enabled}
                                         disabled={locked}
-                                        aria-label="Draw events at random"
+                                        aria-label={t("events.drawEventsAtRandom")}
                                         onChange={(enabled) => changeRandom({ enabled })}
                                     />
                                 </div>
@@ -882,7 +962,9 @@ export function MinecraftEvents({
                                         />
                                         <div className="grid gap-3 sm:grid-cols-4">
                                             <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">From</span>
+                                                <span className="font-medium">
+                                                    {t("events.from")}
+                                                </span>
                                                 <ui.Input
                                                     type="time"
                                                     value={settings.random.from}
@@ -893,7 +975,9 @@ export function MinecraftEvents({
                                                 />
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">Until</span>
+                                                <span className="font-medium">
+                                                    {t("events.until")}
+                                                </span>
                                                 <ui.Input
                                                     type="time"
                                                     value={settings.random.to}
@@ -905,7 +989,7 @@ export function MinecraftEvents({
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
-                                                    Time between events: at least (min)
+                                                    {t("events.timeBetweenEventsAtLeast")}
                                                 </span>
                                                 <ui.Input
                                                     type="number"
@@ -927,7 +1011,7 @@ export function MinecraftEvents({
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
-                                                    and at most (min)
+                                                    {t("events.andAtMostMin")}
                                                 </span>
                                                 <ui.Input
                                                     type="number"
@@ -949,7 +1033,9 @@ export function MinecraftEvents({
                                             </label>
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            <p className="text-sm font-medium">Drawn from</p>
+                                            <p className="text-sm font-medium">
+                                                {t("events.drawnFrom")}
+                                            </p>
                                             {presets.map((preset) => {
                                                 const entry = settings.random.pool.find(
                                                     (one) => one.presetId === preset.id
@@ -962,7 +1048,9 @@ export function MinecraftEvents({
                                                         <ui.Switch
                                                             checked={entry !== undefined}
                                                             disabled={locked || !preset.enabled}
-                                                            aria-label={`Draw ${preset.name}`}
+                                                            aria-label={t("events.drawNamed", {
+                                                                name: preset.name
+                                                            })}
                                                             onChange={(on) =>
                                                                 changeRandom({
                                                                     pool: on
@@ -991,27 +1079,35 @@ export function MinecraftEvents({
                                                             )}
                                                         >
                                                             {preset.name}
-                                                            {!preset.enabled && " (switched off)"}
+                                                            {!preset.enabled &&
+                                                                ` ${t("events.switchedOff")}`}
                                                         </span>
                                                         {entry && (
                                                             <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                How often
+                                                                {t("events.howOften")}
                                                                 <ui.Select
                                                                     value={String(entry.weight)}
                                                                     disabled={locked}
-                                                                    aria-label={`How often ${preset.name} comes up`}
+                                                                    aria-label={t(
+                                                                        "events.howOftenNamed",
+                                                                        { name: preset.name }
+                                                                    )}
                                                                     options={[
                                                                         {
                                                                             value: "1",
-                                                                            label: "Sometimes"
+                                                                            label: t(
+                                                                                "events.sometimes"
+                                                                            )
                                                                         },
                                                                         {
                                                                             value: "3",
-                                                                            label: "Often"
+                                                                            label: t("events.often")
                                                                         },
                                                                         {
                                                                             value: "6",
-                                                                            label: "Very often"
+                                                                            label: t(
+                                                                                "events.veryOften"
+                                                                            )
                                                                         }
                                                                     ]}
                                                                     onValueChange={(value) =>
@@ -1044,10 +1140,11 @@ export function MinecraftEvents({
                             <div className="flex flex-col gap-3 border-t border-border pt-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="text-sm font-medium">At set times</p>
+                                        <p className="text-sm font-medium">
+                                            {t("events.atSetTimes")}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
-                                            Skipped, and written in the history, when too few are
-                                            playing at that time.
+                                            {t("events.skippedAndWrittenInThe")}
                                         </p>
                                     </div>
                                     <ui.Button
@@ -1070,11 +1167,13 @@ export function MinecraftEvents({
                                         }
                                     >
                                         <Plus className="size-4" />
-                                        Add a time
+                                        {t("events.addATime")}
                                     </ui.Button>
                                 </div>
                                 {(draft?.schedules ?? []).length === 0 ? (
-                                    <p className="text-xs text-muted-foreground">No set times.</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("events.noSetTimes")}
+                                    </p>
                                 ) : (
                                     <ul className="flex flex-col gap-2">
                                         {(draft?.schedules ?? []).map((entry) => {
@@ -1098,7 +1197,7 @@ export function MinecraftEvents({
                                                         <ui.Select
                                                             value={entry.presetId}
                                                             disabled={locked}
-                                                            aria-label="Which event"
+                                                            aria-label={t("events.whichEvent")}
                                                             options={presetOptions}
                                                             onValueChange={(presetId) =>
                                                                 update({ presetId })
@@ -1112,7 +1211,7 @@ export function MinecraftEvents({
                                                     <ui.Input
                                                         className="w-28"
                                                         type="time"
-                                                        aria-label="At"
+                                                        aria-label={t("events.at")}
                                                         disabled={locked}
                                                         value={entry.at}
                                                         onChange={(event) =>
@@ -1122,15 +1221,15 @@ export function MinecraftEvents({
                                                     <ui.Switch
                                                         checked={entry.enabled}
                                                         disabled={locked}
-                                                        aria-label="On"
+                                                        aria-label={t("events.on")}
                                                         onChange={(enabled) => update({ enabled })}
                                                     />
                                                     <ui.Button
                                                         variant="ghost"
                                                         size="icon-sm"
                                                         className="ml-auto"
-                                                        aria-label="Remove this time"
-                                                        title="Remove this time"
+                                                        aria-label={t("events.removeThisTime")}
+                                                        title={t("events.removeThisTime")}
                                                         disabled={locked}
                                                         onClick={() =>
                                                             change({
@@ -1165,7 +1264,7 @@ export function MinecraftEvents({
                         )}
                         role={error ? "alert" : undefined}
                     >
-                        {error ?? (dirty ? (problem ?? "Unsaved changes.") : note)}
+                        {error ?? (dirty ? (problem ?? t("events.unsavedChanges")) : note)}
                     </span>
                     {dirty && (
                         <div className="flex items-center gap-2">
@@ -1174,14 +1273,14 @@ export function MinecraftEvents({
                                 disabled={pending}
                                 onClick={() => view && setDraft(view.config)}
                             >
-                                Discard
+                                {t("events.discard")}
                             </ui.Button>
                             <ui.Button
                                 disabled={pending || problem !== null || locked}
                                 onClick={save}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
-                                Save
+                                {t("events.save")}
                             </ui.Button>
                         </div>
                     )}
@@ -1193,9 +1292,9 @@ export function MinecraftEvents({
                 <ui.Card>
                     <ui.CardBody className="flex flex-col gap-2">
                         <div>
-                            <p className="text-sm font-medium">Prizes waiting</p>
+                            <p className="text-sm font-medium">{t("events.prizesWaiting")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Given the next time each player is on. Kept for 14 days.
+                                {t("events.givenTheNextTimeEach")}
                             </p>
                         </div>
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -1207,15 +1306,15 @@ export function MinecraftEvents({
                                     <span className="font-medium">{one.player}</span>
                                     <span
                                         className="min-w-0 flex-1 truncate text-muted-foreground"
-                                        title={rewardText(one.reward)}
+                                        title={rewardText(t, one.reward)}
                                     >
-                                        {one.event} - {rewardText(one.reward)}
+                                        {one.event} - {rewardText(t, one.reward)}
                                     </span>
                                     <ui.Button
                                         variant="ghost"
                                         size="icon-sm"
-                                        aria-label={`Forget ${one.player}'s prize`}
-                                        title={`Forget ${one.player}'s prize`}
+                                        aria-label={t("events.forgetPrize", { name: one.player })}
+                                        title={t("events.forgetPrize", { name: one.player })}
                                         disabled={!canManage || pending}
                                         onClick={() => void forget(one.id, one.player)}
                                     >
@@ -1231,12 +1330,12 @@ export function MinecraftEvents({
             {/* How the last ones went. */}
             <ui.Card>
                 <ui.CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">History</p>
+                    <p className="text-sm font-medium">{t("events.history")}</p>
                     {!view ? (
                         <ui.Skeleton className="h-16 w-full" />
                     ) : view.history.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No events have run on this server yet.
+                            {t("events.noEventsHaveRunOn")}
                         </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -1248,12 +1347,14 @@ export function MinecraftEvents({
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-medium">{entry.name}</span>
                                         <ui.Badge variant={OUTCOME[entry.outcome].tone}>
-                                            {OUTCOME[entry.outcome].label}
+                                            {t(OUTCOME[entry.outcome].label)}
                                         </ui.Badge>
                                         <span className="text-xs text-muted-foreground">
-                                            {TRIGGER_LABEL[entry.trigger]} -{" "}
+                                            {t(TRIGGER_LABEL[entry.trigger])} -{" "}
                                             {display.dateTime(entry.startedAt)} -{" "}
-                                            {entry.participants} on
+                                            {t("events.participants", {
+                                                count: entry.participants
+                                            })}
                                         </span>
                                     </div>
                                     <p className="text-xs text-muted-foreground">
@@ -1266,7 +1367,7 @@ export function MinecraftEvents({
                                                   .join("  ")
                                             : entry.note}
                                         {entry.disqualified.length > 0 &&
-                                            ` - left off by the anti-cheat: ${entry.disqualified.join(", ")}`}
+                                            ` - ${t("events.disqualified", { names: entry.disqualified.join(", ") })}`}
                                     </p>
                                 </li>
                             ))}

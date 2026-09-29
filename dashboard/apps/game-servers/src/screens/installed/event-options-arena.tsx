@@ -9,18 +9,20 @@ import { useState } from "react";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import { Input, SegmentedControl, Select, Textarea } from "@polaris/ui";
 import { Field, PlaceField, numberOf, options, problemAt } from "./event-editor";
+import { useGameText } from "../game-text";
+import type { GameKey } from "../../../messages";
 
 type Issues = readonly { path: (string | number)[]; message: string }[];
 
-const KIT_LABELS: Readonly<Record<(typeof catalog.DUEL_KITS)[number], string>> = {
-    wood: "Wooden sword and shield",
-    stone: "Stone sword and shield",
-    iron: "Iron sword and shield"
+const KIT_LABELS: Readonly<Record<(typeof catalog.DUEL_KITS)[number], GameKey<"minecraft">>> = {
+    wood: "editor.labels.kit.wood",
+    stone: "editor.labels.kit.stone",
+    iron: "editor.labels.kit.iron"
 };
 
-const THEME_LABELS: Readonly<Record<(typeof catalog.THEME_MODES)[number], string>> = {
-    random: "Built-in",
-    mine: "My own"
+const THEME_LABELS: Readonly<Record<(typeof catalog.THEME_MODES)[number], GameKey<"minecraft">>> = {
+    random: "editor.labels.theme.random",
+    mine: "editor.labels.theme.mine"
 };
 
 export function TeamDuelFields({
@@ -32,19 +34,20 @@ export function TeamDuelFields({
     onChange: (options: catalog.EventOptions<"team-duel">) => void;
     issues: Issues;
 }) {
+    const t = useGameText("minecraft");
     return (
         <>
-            <Field label="Kit" hint="The same for everybody, and taken back at the end.">
+            <Field label={t("editor.kit")} hint={t("editor.kitHint")}>
                 <Select
                     value={value.kit}
                     onValueChange={(kit) => onChange({ ...value, kit: kit as typeof value.kit })}
-                    options={options(KIT_LABELS)}
-                    aria-label="Kit"
+                    options={options(t, KIT_LABELS)}
+                    aria-label={t("editor.kit")}
                 />
             </Field>
             <Field
-                label="Out at (hearts)"
-                hint="1 to 6. A player this low is sent back to their side, healed, and the other team scores."
+                label={t("editor.outAtHearts")}
+                hint={t("editor.outAtHint")}
                 problem={problemAt(issues, "options", "downHearts")}
             >
                 <Input
@@ -61,7 +64,7 @@ export function TeamDuelFields({
             <PlaceField
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}
-                what="The arena is built 30 blocks up, about 30 blocks"
+                what={t("editor.place.arena")}
                 issues={issues}
                 path={["options", "place"]}
             />
@@ -78,13 +81,14 @@ export function BuildBattleFields({
     onChange: (options: catalog.EventOptions<"build-battle">) => void;
     issues: Issues;
 }) {
+    const t = useGameText("minecraft");
     const [themesText, setThemesText] = useState(() => value.themes.join("\n"));
     return (
         <>
             <div className="grid grid-cols-2 gap-3">
                 <Field
-                    label="Plot size (blocks)"
-                    hint="7 to 15 a side, as tall as it is wide"
+                    label={t("editor.plotSize")}
+                    hint={t("editor.plotSizeHint")}
                     problem={problemAt(issues, "options", "plotSize")}
                 >
                     <Input
@@ -98,8 +102,8 @@ export function BuildBattleFields({
                     />
                 </Field>
                 <Field
-                    label="Seconds to vote"
-                    hint="30 to 180, after the building time"
+                    label={t("editor.secondsToVote")}
+                    hint={t("editor.voteHint")}
                     problem={problemAt(issues, "options", "voteSeconds")}
                 >
                     <Input
@@ -113,26 +117,26 @@ export function BuildBattleFields({
                     />
                 </Field>
             </div>
-            <Field label="Theme">
+            <Field label={t("editor.theme")}>
                 <SegmentedControl
                     value={value.themeMode}
                     onValueChange={(themeMode) =>
                         onChange({ ...value, themeMode: themeMode as typeof value.themeMode })
                     }
-                    options={options(THEME_LABELS)}
-                    aria-label="Theme"
+                    options={options(t, THEME_LABELS)}
+                    aria-label={t("editor.theme")}
                 />
             </Field>
             {value.themeMode === "mine" ? (
                 <Field
-                    label="Your themes"
-                    hint="One a line; one is drawn each time."
+                    label={t("editor.yourThemes")}
+                    hint={t("editor.themesHint")}
                     problem={problemAt(issues, "options", "themes")}
                 >
                     <Textarea
                         rows={4}
                         value={themesText}
-                        placeholder={"Our spawn town\nA dragon"}
+                        placeholder={t("editor.themesPlaceholder")}
                         onChange={(event) => {
                             setThemesText(event.target.value);
                             onChange({
@@ -146,14 +150,12 @@ export function BuildBattleFields({
                     />
                 </Field>
             ) : (
-                <span className="text-xs text-muted-foreground">
-                    One of 30 built-in themes, in the players&apos; language.
-                </span>
+                <span className="text-xs text-muted-foreground">{t("editor.builtInThemes")}</span>
             )}
             <PlaceField
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}
-                what="The plots are built 30 blocks up, about 30 blocks"
+                what={t("editor.place.plots")}
                 issues={issues}
                 path={["options", "place"]}
             />

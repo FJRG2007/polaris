@@ -5,6 +5,7 @@
 import { Input, Select } from "@polaris/ui";
 import type * as catalog from "../../lib/minecraft/events/catalog";
 import { Field, LOOT_LABELS, numberOf, options, problemAt } from "./event-editor";
+import { useGameText } from "../game-text";
 
 type Value = catalog.EventOptions<"treasure-hunt">;
 
@@ -17,12 +18,13 @@ export function TreasureHuntOptions({
     onChange: (next: Value) => void;
     issues: readonly { path: (string | number)[]; message: string }[];
 }) {
+    const t = useGameText("minecraft");
     return (
         <>
             <div className="grid grid-cols-2 gap-3">
                 <Field
-                    label="Chests"
-                    hint="1 to 10"
+                    label={t("editor.chests")}
+                    hint={t("editor.1To10")}
                     problem={problemAt(issues, "options", "chests")}
                 >
                     <Input
@@ -36,8 +38,8 @@ export function TreasureHuntOptions({
                     />
                 </Field>
                 <Field
-                    label="How far out (blocks)"
-                    hint="50 to 1000, from the players"
+                    label={t("editor.howFarOut")}
+                    hint={t("editor.howFarOutHint")}
                     problem={problemAt(issues, "options", "distance")}
                 >
                     <Input
@@ -51,12 +53,12 @@ export function TreasureHuntOptions({
                     />
                 </Field>
             </div>
-            <Field label="What is inside">
+            <Field label={t("editor.whatIsInside")}>
                 <Select
                     value={value.loot}
                     onValueChange={(loot) => onChange({ ...value, loot: loot as Value["loot"] })}
-                    options={options(LOOT_LABELS)}
-                    aria-label="What is inside"
+                    options={options(t, LOOT_LABELS)}
+                    aria-label={t("editor.whatIsInside")}
                 />
             </Field>
         </>

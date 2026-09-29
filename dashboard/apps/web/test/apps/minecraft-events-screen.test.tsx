@@ -11,10 +11,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const started: string[] = [];
 let answerRead: (value: unknown) => void = () => undefined;
+let locale = "en-US";
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
-        i18nProvider: { useLocale: () => "en-US" },
+        i18nProvider: { useLocale: () => locale },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
@@ -85,6 +86,7 @@ const { EventEditor } = await import(
 afterEach(() => {
     cleanup();
     started.length = 0;
+    locale = "en-US";
 });
 
 describe("the Events tab", () => {
@@ -380,5 +382,47 @@ describe("the editor of an event players join", () => {
         await waitFor(() => expect(done().disabled).toBe(false));
         fireEvent.click(done());
         expect((saved[0]?.options as catalog.EventOptions<"team-duel">).downHearts).toBe(2);
+    });
+});
+
+describe("the editor in Spanish", () => {
+    it("names the fields and where it happens in the reader's language", () => {
+        locale = "es-ES";
+        render(
+            <EventEditor
+                preset={catalog.newPreset("team-duel", "duel")}
+                open
+                onOpenChange={() => undefined}
+                onSave={() => undefined}
+            />
+        );
+        expect(screen.getByText("Fuera a (corazones)")).toBeTruthy();
+        expect(screen.getByText("El mismo para todos, y se retira al final.")).toBeTruthy();
+        expect(screen.getByText(/La arena se construye 30 bloques en alto/)).toBeTruthy();
+        expect(screen.queryByText(/around a player who is in the Overworld/)).toBeNull();
+    });
+
+    it("says how big a spleef floor comes out", () => {
+        locale = "es-ES";
+        render(
+            <EventEditor
+                preset={catalog.newPreset("spleef", "floor")}
+                open
+                onOpenChange={() => undefined}
+                onSave={() => undefined}
+            />
+        );
+        expect(screen.getByText("De 5 a 15: este mide 17 por 17.")).toBeTruthy();
+    });
+
+    it("names each choice in the reader's language", async () => {
+        const { options, LOOT_LABELS } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
+        const { gameCatalogs } = await import("@polaris-app/game-servers/messages");
+        expect(options(gameCatalogs.translator("es-ES", "minecraft"), LOOT_LABELS)[0]).toEqual({
+            value: "treasure",
+            label: "Tesoro enterrado"
+        });
     });
 });

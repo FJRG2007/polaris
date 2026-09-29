@@ -362,7 +362,8 @@
         "runCount": "Run {count} {count, plural, one {command} other {commands}}",
         "keepHelp": "It sits above the console for everybody who runs this server. Put a blank in angle brackets - <example></example> - and pressing it fills the box instead of sending.",
         "summary": "{count} {count, plural, one {command} other {commands}}.",
-        "summaryWaiting": "{count} {count, plural, one {command} other {commands}}, with {seconds}s of waiting."
+        "summaryWaiting": "{count} {count, plural, one {command} other {commands}}, with {seconds}s of waiting.",
+        "messagePlaceholder": "message"
     },
     "blueprint": {
         "blueprint": "Blueprint",

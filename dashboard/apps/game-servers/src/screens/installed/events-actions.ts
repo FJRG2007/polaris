@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { host } from "@polaris/app-host";
 import * as events from "../../lib/minecraft/events/events-service";
+import { gameWords, messageText } from "../game-words";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -20,25 +21,27 @@ const serverId = z.string().uuid();
 
 type Answer = { view?: events.EventsView; error?: string };
 
-const failure = (caught: unknown, fallback: string): string =>
-    caught instanceof Error ? caught.message : fallback;
+const failure = async (caught: unknown, fallback: string): Promise<string> =>
+    caught instanceof Error ? await messageText(caught.message) : fallback;
 
 export async function readEventsAction(installedAppId: string): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: t("events.errors.noServer") };
     try {
         await requireGameServer("games.console", parsed.data);
         return { view: await events.eventsView(parsed.data) };
     } catch (caught) {
-        return { error: failure(caught, "The events could not be read") };
+        return { error: await failure(caught, t("events.errors.read")) };
     }
 }
 
 const saveSchema = z.object({ installedAppId: serverId, config: z.unknown() });
 
 export async function saveEventsAction(input: z.input<typeof saveSchema>): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: t("events.errors.noServer") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         await events.saveEventsConfig(parsed.data.installedAppId, parsed.data.config);
@@ -50,15 +53,16 @@ export async function saveEventsAction(input: z.input<typeof saveSchema>): Promi
         });
         return { view: await events.eventsView(parsed.data.installedAppId) };
     } catch (caught) {
-        return { error: failure(caught, "The events could not be saved") };
+        return { error: await failure(caught, t("events.errors.save")) };
     }
 }
 
 const startSchema = z.object({ installedAppId: serverId, presetId: z.string().min(1).max(64) });
 
 export async function startEventAction(input: z.input<typeof startSchema>): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = startSchema.safeParse(input);
-    if (!parsed.success) return { error: "That event is not here" };
+    if (!parsed.success) return { error: t("events.errors.noEvent") };
     try {
         const { user, access } = await requireGameServer(
             "games.console",
@@ -80,13 +84,14 @@ export async function startEventAction(input: z.input<typeof startSchema>): Prom
         });
         return { view: await events.eventsView(parsed.data.installedAppId) };
     } catch (caught) {
-        return { error: failure(caught, "The event could not start") };
+        return { error: await failure(caught, t("events.errors.start")) };
     }
 }
 
 export async function cancelEventAction(installedAppId: string): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: t("events.errors.noServer") };
     try {
         const { user, access } = await requireGameServer("games.console", parsed.data);
         await events.cancelEvent(access.ownerId, parsed.data);
@@ -98,13 +103,14 @@ export async function cancelEventAction(installedAppId: string): Promise<Answer>
         });
         return { view: await events.eventsView(parsed.data) };
     } catch (caught) {
-        return { error: failure(caught, "The event could not be called off") };
+        return { error: await failure(caught, t("events.errors.cancel")) };
     }
 }
 
 export async function startNowAction(installedAppId: string): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: t("events.errors.noServer") };
     try {
         const { user, access } = await requireGameServer("games.console", parsed.data);
         await events.startNow(access.ownerId, parsed.data);
@@ -116,15 +122,16 @@ export async function startNowAction(installedAppId: string): Promise<Answer> {
         });
         return { view: await events.eventsView(parsed.data) };
     } catch (caught) {
-        return { error: failure(caught, "The event could not start now") };
+        return { error: await failure(caught, t("events.errors.startNow")) };
     }
 }
 
 const forgetSchema = z.object({ installedAppId: serverId, pendingId: z.string().min(1).max(128) });
 
 export async function forgetPrizeAction(input: z.input<typeof forgetSchema>): Promise<Answer> {
+    const t = await gameWords("minecraft");
     const parsed = forgetSchema.safeParse(input);
-    if (!parsed.success) return { error: "That prize is not here" };
+    if (!parsed.success) return { error: t("events.errors.noPrize") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         await events.forgetPending(parsed.data.installedAppId, parsed.data.pendingId);
@@ -136,6 +143,6 @@ export async function forgetPrizeAction(input: z.input<typeof forgetSchema>): Pr
         });
         return { view: await events.eventsView(parsed.data.installedAppId) };
     } catch (caught) {
-        return { error: failure(caught, "That prize could not be forgotten") };
+        return { error: await failure(caught, t("events.errors.forgetPrize")) };
     }
 }

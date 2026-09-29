@@ -757,7 +757,7 @@ export function GameConsole({
                                 <DialogTitle>{t("console.runSeveralCommands")}</DialogTitle>
                                 <DialogDescription>
                                     {t.rich<ReactNode>("console.batchHelp", {
-                                        wait: () => <code key="wait">wait 10</code>,
+                                        wait: () => <code key="wait">wait 10</code>, // i18n-ignore: a command, typed as is
                                         hash: () => <code key="hash">#</code>
                                     })}
                                 </DialogDescription>
@@ -822,7 +822,10 @@ export function GameConsole({
                                 <DialogDescription>
                                     {t.rich<ReactNode>("console.keepHelp", {
                                         example: () => (
-                                            <code key="example">Broadcast &lt;message&gt;</code>
+                                            <code key="example">
+                                                {/* i18n-ignore: the command by its own name */}
+                                                {`Broadcast <${t("console.messagePlaceholder")}>`}
+                                            </code>
                                         )
                                     })}
                                 </DialogDescription>
