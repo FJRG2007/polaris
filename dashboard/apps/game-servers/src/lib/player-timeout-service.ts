@@ -19,6 +19,7 @@
 import { prisma } from "@polaris/db";
 import { readTimeouts, TIMEOUTS_KEY, type PlayerTimeout } from "./player-timeout";
 import { host } from "@polaris/app-host";
+import { liftSanctions, recordSanction } from "./sanctions-service";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
@@ -58,6 +59,7 @@ export async function grantTimeout(
         (held) => held.player.toLowerCase() !== player.toLowerCase()
     );
     await patchInstallConfig(installedAppId, { [TIMEOUTS_KEY]: [...kept, entry] });
+    await recordSanction({ installedAppId, player, kind: "timeout", reason, until: new Date(until) });
     return entry;
 }
 
@@ -74,6 +76,7 @@ export async function liftTimeout(
         (held) => held.player.toLowerCase() !== player.toLowerCase()
     );
     await patchInstallConfig(installedAppId, { [TIMEOUTS_KEY]: kept });
+    await liftSanctions(installedAppId, player);
 }
 
 /**

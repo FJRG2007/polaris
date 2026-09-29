@@ -3618,6 +3618,29 @@ model GamePlayerLink {
     @@index([userId])
 }
 
+// A ban, timeout or kick a game server's moderator (or its anti-cheat) put on a
+// player, written when it was applied. The game's own ban list forgets why and
+// when, and a kick leaves nothing at all, so this is the only place a linked
+// player's Account standing can read them from. Removed with the server.
+model GameSanction {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    // What the game keys on (a Minecraft name, an ARK SteamID64, a FiveM
+    // identifier), lowercased, which is how it is matched to a GamePlayerLink.
+    player         String
+    // "ban" | "timeout" | "kick"
+    kind           String
+    // As the moderator wrote it; null when none was given.
+    reason         String?
+    at             DateTime  @default(now())
+    // When a timeout lifts by itself. Null for a ban (until pardoned) and a kick.
+    until          DateTime?
+    // When it was pardoned, lifted early or replaced by a newer one.
+    liftedAt       DateTime?
+
+    @@index([installedAppId, player])
+}
+
 // The last inventory Polaris saw a player carrying.
 //
 // `data get entity` only answers for somebody who is on the server, and the

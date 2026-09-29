@@ -12,18 +12,28 @@
  * a moderator's decision.
  */
 
+import { Suspense } from "react";
+import { Card, CardBody } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { StandingView } from "./standing-view";
 import { PlainNames } from "@/components/person-name";
 import { accountStandingFor } from "@/lib/account-standing-service";
+import { gameSanctionsFor, offersGameSanctions } from "@/lib/app-extensions/registry";
+import { GameSanctionsHeading, GameSanctionsList, GameSanctionsSkeleton } from "./game-sanctions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountStandingPage() {
     const session = await requireUser();
     const t = await getTranslations("account");
-    const view = await accountStandingFor(session.id);
+    // Whether a game-server app is installed is a cached lookup, asked beside
+    // the standing so it costs the page nothing; the sanctions themselves are
+    // read behind their own boundary.
+    const [view, games] = await Promise.all([
+        accountStandingFor(session.id),
+        offersGameSanctions().catch(() => false)
+    ]);
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -48,6 +58,41 @@ export default async function AccountStandingPage() {
                     }))}
                 />
             </PlainNames>
+            {games && (
+                <Card>
+                    <CardBody className="flex flex-col gap-3">
+                        <GameSanctionsHeading />
+                        <Suspense fallback={<GameSanctionsSkeleton />}>
+                            <GameSanctions userId={session.id} />
+                        </Suspense>
+                    </CardBody>
+                </Card>
+            )}
         </div>
+    );
+}
+
+/** The sanctions game servers put on this account's linked players. Its own
+ *  boundary, so the page never waits on it. */
+async function GameSanctions({ userId }: { userId: string }) {
+    const { sanctions, incomplete } = await gameSanctionsFor(userId).catch((caught: unknown) => {
+        console.error("polaris: game sanctions could not be read:", caught);
+        return { sanctions: [], incomplete: true };
+    });
+    return (
+        <GameSanctionsList
+            incomplete={incomplete}
+            sanctions={sanctions.map((sanction) => ({
+                id: sanction.id,
+                kind: sanction.kind,
+                game: sanction.game,
+                server: sanction.server,
+                player: sanction.player,
+                at: sanction.at.toISOString(),
+                until: sanction.until ? sanction.until.toISOString() : null,
+                active: sanction.active,
+                reason: sanction.reason
+            }))}
+        />
     );
 }

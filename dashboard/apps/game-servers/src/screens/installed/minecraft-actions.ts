@@ -51,6 +51,7 @@ import { readMinecraftStats } from "../../lib/minecraft/stats-service";
 import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "../../lib/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "../../lib/minecraft/timeout-service";
+import { liftSanctions, recordSanction } from "../../lib/sanctions-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "../../lib/minecraft/experience";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "../../lib/minecraft/backup-policy";
 import { readPlayerRecord, type PlayerRecord } from "../../lib/games-activity-service";
@@ -276,6 +277,10 @@ export async function moderatePlayerAction(
             parsed.data.installedAppId
         );
         const output = await moderationOutcome(access.ownerId, parsed.data);
+        const { installedAppId, action, player, reason } = parsed.data;
+        if (action === "kick" || action === "ban")
+            await recordSanction({ installedAppId, player, kind: action, reason });
+        else if (action === "pardon") await liftSanctions(installedAppId, player);
         await recordAudit({
             actorId: user.id,
             action: `minecraft.${parsed.data.action}`,

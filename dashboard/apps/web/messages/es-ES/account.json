@@ -667,6 +667,19 @@
             "timedOut": "Expulsado temporalmente de <where>{place}</where>",
             "until": "hasta el {time}",
             "untilLifted": "hasta que se levante"
+        },
+        "games": {
+            "title": "Sanciones en juegos",
+            "description": "Lo que los moderadores o el anticheat de un servidor de juego decidieron sobre un jugador vinculado a tu cuenta. Es una decisión de ese servidor, no de Polaris, y no cambia el estado de tu cuenta aquí.",
+            "none": "Nada. Ningún servidor de juego ha sancionado a un jugador vinculado a tu cuenta.",
+            "incomplete": "Ahora mismo no se han podido leer algunos servidores de juego. Recarga la página para volver a intentarlo.",
+            "banned": "Vetado en <where>{server}</where>",
+            "timedOut": "Expulsado temporalmente de <where>{server}</where>",
+            "kicked": "Expulsado de <where>{server}</where>",
+            "as": "Como {player}, el {date}",
+            "reason": "Motivo: {reason}",
+            "active": "En vigor",
+            "ended": "Acabada"
         }
     },
     "profile": {

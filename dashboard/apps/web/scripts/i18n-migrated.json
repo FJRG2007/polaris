@@ -228,6 +228,7 @@
         "web/src/app/(app)/account/sessions/page.tsx",
         "web/src/app/(app)/account/sessions/sessions-view.tsx",
         "web/src/app/(app)/account/sessions/trusted-devices-card.tsx",
+        "web/src/app/(app)/account/standing/game-sanctions.tsx",
         "web/src/app/(app)/account/standing/page.tsx",
         "web/src/app/(app)/account/standing/standing-view.tsx",
         "web/src/app/(app)/account/step-up-actions.ts",

@@ -17,6 +17,7 @@ import * as fivem from "../../lib/fivem/service";
 import { isIdentifier } from "../../lib/fivem/players";
 import { isLicenseKey, LICENSE_KEY_HINT } from "../../lib/fivem/config";
 import { MAX_TIMEOUT_MINUTES } from "../../lib/player-timeout";
+import { liftSanctions, recordSanction } from "../../lib/sanctions-service";
 import { isResourceName, isResourceUrl, resourceNameFromUrl, type FivemResource } from "../../lib/fivem/resources";
 import {
     isBanReason,
@@ -130,6 +131,13 @@ export async function banFivemPlayerAction(
             reason: parsed.data.reason,
             until
         });
+        await recordSanction({
+            installedAppId: parsed.data.installedAppId,
+            player: parsed.data.identifier,
+            kind: until === null ? "ban" : "timeout",
+            reason: parsed.data.reason,
+            until: until === null ? null : new Date(until)
+        });
         await recordAudit({
             actorId: user.id,
             action: parsed.data.minutes === undefined ? "games.fivem.ban" : "games.fivem.timeout",
@@ -149,6 +157,7 @@ export async function unbanFivemPlayerAction(installedAppId: string, identifier:
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const view = await fivem.unbanFivemPlayer(access.ownerId, parsed.data.installedAppId, parsed.data.identifier);
+        await liftSanctions(parsed.data.installedAppId, parsed.data.identifier);
         await recordAudit({
             actorId: user.id,
             action: "games.fivem.pardon",

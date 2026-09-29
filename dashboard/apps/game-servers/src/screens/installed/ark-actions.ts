@@ -21,6 +21,7 @@ import { isModId, MAX_MODS } from "../../lib/ark/mods";
 import { warmModImages } from "../../lib/mod-image-cache";
 import { findGameIdentity } from "../../lib/game-identity";
 import { recentlyGivenItems } from "../../lib/recent-items";
+import { liftSanctions, recordSanction } from "../../lib/sanctions-service";
 import { MAX_TIMEOUT_MINUTES } from "../../lib/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "../../lib/ark/access";
 import { giveArkItems, requireArkPlayerId } from "../../lib/ark/item-service";
@@ -330,6 +331,14 @@ export async function moderateArkPlayerAction(
             unban: ark.unbanArkPlayer
         }[parsed.data.verb];
         await run(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
+        if (parsed.data.verb === "unban")
+            await liftSanctions(parsed.data.installedAppId, parsed.data.steamId);
+        else
+            await recordSanction({
+                installedAppId: parsed.data.installedAppId,
+                player: parsed.data.steamId,
+                kind: parsed.data.verb
+            });
         await recordAudit({
             actorId: user.id,
             action: `games.ark.${parsed.data.verb}`,

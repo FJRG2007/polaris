@@ -23,6 +23,7 @@ import { listGameMachines, type GameMachine } from "../lib/games-service";
 import { clearGameServerPrefs, setGameServerPref } from "../lib/games-prefs";
 import { clearLogins } from "../lib/minecraft/polaris-login-service";
 import { clearAnticheatFlags } from "../lib/minecraft/polaris-anticheat-service";
+import { clearSanctions } from "../lib/sanctions-service";
 import { isTemplateName, type ServerTemplateView } from "../lib/game-templates";
 import { adoptGameServersApp, installGameServersApp } from "../lib/game-install";
 import { createGameServerSchema, type CreateGameServerInput } from "../lib/games-schema";
@@ -393,7 +394,8 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
             clearQueue(installedAppId),
             clearGameServerPrefs(installedAppId),
             clearLogins(installedAppId),
-            clearAnticheatFlags(installedAppId)
+            clearAnticheatFlags(installedAppId),
+            clearSanctions(installedAppId)
         ]);
         await recordAudit({
             actorId: user.id,

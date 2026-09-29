@@ -21,6 +21,7 @@ import type {
     ChatCommandSpec,
     ChatGameLink,
     ExtensionInstall,
+    GameSanction,
     GameServerSummary,
     PlayingNow,
     RelayedChannelMessage,
@@ -34,6 +35,7 @@ export type {
     ChatCommandSpec,
     ChatGameLink,
     ExtensionInstall,
+    GameSanction,
     GameServerSummary,
     PlayingNow,
     RelayedChannelMessage,
@@ -328,4 +330,37 @@ export async function installedPanelSlot(install: ExtensionInstall): Promise<App
         if (slot) return withBundleSlot(slot);
     }
     return null;
+}
+
+/** Whether any installed app keeps sanctions its servers put on players, which
+ *  is whether Account standing has a section for them at all. */
+export async function offersGameSanctions(): Promise<boolean> {
+    return (await installedWith("gameSanctions")).length > 0;
+}
+
+/**
+ * The sanctions the installed apps' servers put on the players linked to this
+ * account. `incomplete` when an app could not answer, so the page says so
+ * instead of reading as a clean record.
+ */
+export async function gameSanctionsFor(
+    userId: string
+): Promise<{ sanctions: GameSanction[]; incomplete: boolean }> {
+    let incomplete = false;
+    const lists = await Promise.all(
+        (await installedWith("gameSanctions")).map((extension) =>
+            (extension.gameSanctions?.(userId) ?? Promise.resolve([])).catch((caught: unknown) => {
+                console.error(`polaris: ${extension.id} could not list game sanctions:`, caught);
+                incomplete = true;
+                return [] as readonly GameSanction[];
+            })
+        )
+    );
+    const sanctions = lists
+        .flat()
+        .sort(
+            (left, right) =>
+                Number(right.active) - Number(left.active) || right.at.getTime() - left.at.getTime()
+        );
+    return { sanctions, incomplete };
 }

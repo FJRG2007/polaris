@@ -667,6 +667,19 @@
             "timedOut": "Timed out in <where>{place}</where>",
             "until": "until {time}",
             "untilLifted": "until it is lifted"
+        },
+        "games": {
+            "title": "Game server sanctions",
+            "description": "What a game server's moderators or anti-cheat decided about a player linked to your account. It is that server's decision, not Polaris's, and does not change your standing here.",
+            "none": "Nothing. No game server has sanctioned a player linked to your account.",
+            "incomplete": "Some game servers could not be read just now. Reload the page to try again.",
+            "banned": "Banned from <where>{server}</where>",
+            "timedOut": "Timed out on <where>{server}</where>",
+            "kicked": "Kicked from <where>{server}</where>",
+            "as": "As {player}, {date}",
+            "reason": "Reason: {reason}",
+            "active": "In force",
+            "ended": "Ended"
         }
     },
     "profile": {

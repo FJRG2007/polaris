@@ -169,6 +169,31 @@ export interface AppExtension {
      * to do is not a failure: most channels are linked to nothing.
      */
     readonly relayChannelMessage?: (message: RelayedChannelMessage) => Promise<void>;
+
+    /**
+     * The bans, timeouts and kicks its servers put on the players linked to this
+     * account, for its Account standing page: those in force, and recent ones.
+     * They are the servers' decisions, not Polaris's, and are drawn apart.
+     */
+    readonly gameSanctions?: (userId: string) => Promise<readonly GameSanction[]>;
+}
+
+/** A sanction a game server put on a player linked to an account. */
+export interface GameSanction {
+    readonly id: string;
+    readonly kind: "ban" | "timeout" | "kick";
+    /** The game, as people call it: "Minecraft". */
+    readonly game: string;
+    /** The server, as its owner named it. */
+    readonly server: string;
+    /** The player it was put on. */
+    readonly player: string;
+    readonly at: Date;
+    /** When a timeout lifts by itself; null for a ban or a kick. */
+    readonly until: Date | null;
+    /** Whether it still keeps them out. */
+    readonly active: boolean;
+    readonly reason: string | null;
 }
 
 /** A command an app answers in a conversation linked to it. */
