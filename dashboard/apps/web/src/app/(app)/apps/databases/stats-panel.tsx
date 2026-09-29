@@ -40,6 +40,8 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DatabaseStats, StatValue } from "@/lib/data/stats";
 import type { DatabaseInsights } from "@/lib/data/insights";
+import { dataText, statText } from "@/lib/data/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, Select, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
 
 /** How often a reading is taken. Fast enough to watch something happen, slow
@@ -83,6 +85,7 @@ const RATES: Record<string, { keys: string[]; hitRate?: [string, string] }> = {
 };
 
 export function StatsPanel({ connectionId }: { connectionId: string }) {
+    const t = useTranslations("databases");
     const [readings, setReadings] = useState<Reading[]>([]);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -159,8 +162,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                     ) : (
                         <>
                             <Loader2 className="size-4 animate-spin" />
-                            Taking the first reading. A rate is the difference between two, so the
-                            charts appear a moment after this one.
+                            {t("stats.first")}
                         </>
                     )}
                 </CardBody>
@@ -181,7 +183,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                     <Card key={key}>
                         <CardBody className="flex flex-col gap-0.5 p-3">
                             <span className="truncate text-xs text-muted-foreground">
-                                {latest.labels[key]}
+                                {statText(t, latest.labels[key] ?? key)}
                             </span>
                             <span className="text-lg font-semibold tabular-nums">
                                 {format(latest.gauges[key] ?? 0, latest.units[key] ?? "count")}
@@ -199,20 +201,20 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                                 className="w-56"
                                 value={shown}
                                 onValueChange={setChosen}
-                                aria-label="Which rate to draw"
+                                aria-label={t("stats.whichRate")}
                                 options={rateKeys.map((key) => ({
                                     value: key,
-                                    label: `${latest.labels[key]} a second`
+                                    label: t("stats.perSecond", { what: statText(t, latest.labels[key] ?? key) })
                                 }))}
                             />
                             <span className="text-xs text-muted-foreground">
-                                {readings.length} readings, {POLL_MS / 1000}s apart
+                                {t("stats.readings", { count: readings.length, seconds: POLL_MS / 1000 })}
                             </span>
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                title="Take one now"
-                                aria-label="Take a reading now"
+                                title={t("stats.takeNow")}
+                                aria-label={t("stats.takeReading")}
                                 onClick={() => void sample()}
                             >
                                 {busy ? (
@@ -226,7 +228,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                             points={ratePoints(readings, shown)}
                             from={readings[0]?.at ?? latest.at}
                             to={latest.at}
-                            label={`${latest.labels[shown] ?? shown} a second`}
+                            label={t("stats.perSecond", { what: statText(t, latest.labels[shown] ?? shown) })}
                             format={(value) => value.toFixed(value < 10 ? 1 : 0)}
                         />
                     </CardBody>
@@ -237,13 +239,13 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                 <Card>
                     <CardBody className="flex flex-col gap-3">
                         <span className="text-xs text-muted-foreground">
-                            Hit rate - how much of what was asked for was already in memory
+                            {t("stats.hitRateHint")}
                         </span>
                         <TimeSeriesChart
                             points={hitRatePoints(readings, rates.hitRate)}
                             from={readings[0]?.at ?? latest.at}
                             to={latest.at}
-                            label="Hit rate"
+                            label={t("stats.hitRate")}
                             max={100}
                             format={(value) => `${value.toFixed(1)}%`}
                         />
@@ -339,12 +341,13 @@ function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
     const rows = insights?.biggest ?? [];
     if (insights !== null && rows.length === 0) return null;
     const largest = rows[0]?.bytes ?? 0;
+    const t = useTranslations("databases");
     return (
         <InsightCard
-            title="Biggest tables"
-            note="Table, indexes and out-of-line storage together - what the table actually costs."
+            title={t("insights.biggest")}
+            note={t("insights.biggestNote")}
             insights={insights}
-            empty="Nothing to measure yet."
+            empty={t("insights.nothingToMeasure")}
         >
             {rows.length > 0 ? (
                 <div className="flex flex-col gap-2">
@@ -357,7 +360,7 @@ function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
                             caption={
                                 row.rows === null
                                     ? formatBytes(row.bytes)
-                                    : `${formatBytes(row.bytes)} - about ${grouped(row.rows)} rows`
+                                    : t("insights.sizeRows", { size: formatBytes(row.bytes), rows: grouped(row.rows) })
                             }
                         />
                     ))}
@@ -385,12 +388,13 @@ function FrequentPanel({ insights }: { insights: DatabaseInsights | null }) {
     const unavailable = insights?.frequentUnavailable ?? "";
     if (insights !== null && rows.length === 0 && !unavailable) return null;
     const most = rows[0]?.calls ?? 0;
+    const t = useTranslations("databases");
     return (
         <InsightCard
-            title="Most repeated statements"
-            note="Counted by the engine since it last started, with the values already stripped out."
+            title={t("insights.frequent")}
+            note={t("insights.frequentNote")}
             insights={insights}
-            empty={unavailable || "Nothing recorded yet."}
+            empty={unavailable ? dataText(t, unavailable) : t("insights.nothingRecorded")}
         >
             {rows.length > 0 ? (
                 <div className="flex flex-col gap-2">
@@ -403,8 +407,8 @@ function FrequentPanel({ insights }: { insights: DatabaseInsights | null }) {
                             of={most}
                             caption={
                                 row.totalMs === null
-                                    ? `${grouped(row.calls)} calls`
-                                    : `${grouped(row.calls)} calls - ${grouped(row.totalMs)}ms total`
+                                    ? t("insights.calls", { calls: grouped(row.calls) })
+                                    : t("insights.callsTime", { calls: grouped(row.calls), ms: grouped(row.totalMs) })
                             }
                         />
                     ))}

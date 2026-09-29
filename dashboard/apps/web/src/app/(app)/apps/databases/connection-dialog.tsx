@@ -33,6 +33,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plug, Database } from "lucide-react";
 import { DbEngineSelect } from "@/components/db-engine-select";
 import type { DataConnectionView, ManagedOption } from "@/lib/data/connections";
+import { dataText } from "@/lib/data/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     connectionIssues,
     type SaveConnectionInput,
@@ -93,6 +95,8 @@ export function ConnectionDialog({
     onClose: () => void;
     onSaved: (id: string) => void;
 }) {
+    const t = useTranslations("databases");
+    const tcommon = useTranslations("common");
     const saved = connection?.tunnel ?? null;
     const [engines, setEngines] = useState<Engine[]>([]);
     const [managed, setManaged] = useState<ManagedOption[]>([]);
@@ -221,7 +225,7 @@ export function ConnectionDialog({
     // has been typed into it - see `shown`.
     const issues = connectionIssues(draft);
     const shown = (key: string, value: string): string | undefined =>
-        value.trim() === "" ? undefined : issues[key];
+        value.trim() === "" ? undefined : dataText(t, issues[key]);
 
     // A stored SSH secret is only kept when the login still signs in the same
     // way: switching from a password to a key leaves nothing to keep, so it has
@@ -268,29 +272,27 @@ export function ConnectionDialog({
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{connection ? "Edit connection" : "New connection"}</DialogTitle>
-                    <DialogDescription>
-                        A database Polaris runs, or one somewhere else you have the credentials for.
-                    </DialogDescription>
+                    <DialogTitle>{connection ? t("dialog.editTitle") : t("dialog.newTitle")}</DialogTitle>
+                    <DialogDescription>{t("dialog.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto overscroll-contain px-0.5">
                     <SegmentedControl
                         className="self-start"
-                        aria-label="Which database"
+                        aria-label={t("dialog.which")}
                         value={kind}
                         onValueChange={(next) => setKind(next)}
                         options={[
-                            { value: "managed", label: "One Polaris runs" },
-                            { value: "manual", label: "Somewhere else" }
+                            { value: "managed", label: t("dialog.managed") },
+                            { value: "manual", label: t("dialog.manual") }
                         ]}
                     />
 
-                    <Field label="Name" error={shown("name", name)}>
+                    <Field label={t("dialog.name")} error={shown("name", name)}>
                         <Input
                             autoFocus
                             value={name}
-                            placeholder="Production"
+                            placeholder={t("dialog.namePlaceholder")}
                             onChange={(event) => setName(event.target.value)}
                         />
                     </Field>
@@ -299,16 +301,16 @@ export function ConnectionDialog({
                         managed.length === 0 ? (
                             <p className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Database className="size-4 shrink-0" />
-                                Polaris is not running any databases yet.
+                                {t("dialog.noManaged")}
                             </p>
                         ) : (
                             <>
-                                <Field label="Database">
+                                <Field label={t("dialog.database")}>
                                     <Select
                                         value={managedId}
                                         onValueChange={setManagedId}
-                                        aria-label="Which database Polaris runs"
-                                        placeholder="Pick one..."
+                                        aria-label={t("dialog.whichManaged")}
+                                        placeholder={t("dialog.pickOne")}
                                         options={managed.map((entry) => ({
                                             value: entry.id,
                                             label: `${entry.name} - ${entry.where}`
@@ -316,14 +318,12 @@ export function ConnectionDialog({
                                     />
                                 </Field>
                                 {chosenManaged?.refusal ? (
-                                    <p className="text-xs text-warning">{chosenManaged.refusal}</p>
+                                    <p className="text-xs text-warning">{dataText(t, chosenManaged.refusal)}</p>
                                 ) : (
                                     chosenManaged &&
                                     !chosenManaged.reachable && (
                                         <p className="text-xs text-warning">
-                                            This one runs on another server and is not published on
-                                            a port, so Polaris cannot reach it from here. Publish it
-                                            on a port from the database&apos;s own screen first.
+                                            {t("dialog.unreachable")}
                                         </p>
                                     )
                                 )}
@@ -332,14 +332,14 @@ export function ConnectionDialog({
                     ) : (
                         <>
                             <div className="flex gap-3">
-                                <Field label="Engine" className="flex-1">
+                                <Field label={t("dialog.engine")} className="flex-1">
                                     <DbEngineSelect
                                         engines={core.DB_ENGINES}
                                         value={engine}
                                         onValueChange={(next) => setEngine(next as typeof engine)}
                                     />
                                 </Field>
-                                <Field label="Port" className="w-28" error={shown("port", port)}>
+                                <Field label={t("dialog.port")} className="w-28" error={shown("port", port)}>
                                     <Input
                                         inputMode="numeric"
                                         value={port}
@@ -348,13 +348,9 @@ export function ConnectionDialog({
                                 </Field>
                             </div>
                             <Field
-                                label="Host"
+                                label={t("dialog.host")}
                                 error={shown("host", host)}
-                                hint={
-                                    tunnelled
-                                        ? "As the SSH server sees it - usually 127.0.0.1."
-                                        : undefined
-                                }
+                                hint={tunnelled ? t("dialog.hostHint") : undefined}
                             >
                                 <Input
                                     value={host}
@@ -363,14 +359,14 @@ export function ConnectionDialog({
                                 />
                             </Field>
                             <div className="flex gap-3">
-                                <Field label="Database" className="flex-1">
+                                <Field label={t("dialog.database")} className="flex-1">
                                     <Input
                                         value={database}
                                         placeholder={engine === "redis" ? "0" : "app"}
                                         onChange={(event) => setDatabase(event.target.value)}
                                     />
                                 </Field>
-                                <Field label="User" className="flex-1">
+                                <Field label={t("dialog.user")} className="flex-1">
                                     <Input
                                         value={username}
                                         onChange={(event) => setUsername(event.target.value)}
@@ -378,8 +374,8 @@ export function ConnectionDialog({
                                 </Field>
                             </div>
                             <Field
-                                label="Password"
-                                hint={connection ? "Leave empty to keep the saved one." : undefined}
+                                label={t("dialog.password")}
+                                hint={connection ? t("dialog.keepSaved") : undefined}
                             >
                                 <Input
                                     type="password"
@@ -388,15 +384,15 @@ export function ConnectionDialog({
                                 />
                             </Field>
                             <Toggle
-                                label="Encrypted connection"
-                                hint="TLS to the server. The certificate is not verified, so a self-signed one still works."
+                                label={t("dialog.tls")}
+                                hint={t("dialog.tlsHint")}
                                 checked={tls}
                                 onChange={setTls}
                             />
 
                             <Toggle
-                                label="Reach it over SSH"
-                                hint="For a database that is not published on the network: Polaris signs in to a server that can see it and forwards the port."
+                                label={t("dialog.ssh")}
+                                hint={t("dialog.sshHint")}
                                 checked={tunnelled}
                                 onChange={setTunnelled}
                             />
@@ -404,41 +400,40 @@ export function ConnectionDialog({
                                 <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-3">
                                     <SegmentedControl
                                         className="self-start"
-                                        aria-label="Which SSH login"
+                                        aria-label={t("dialog.whichLogin")}
                                         value={tunnelKind}
                                         onValueChange={(next) =>
                                             setTunnelKind(next as "server" | "manual")
                                         }
                                         options={[
-                                            { value: "server", label: "A server in Polaris" },
-                                            { value: "manual", label: "Another login" }
+                                            { value: "server", label: t("dialog.serverLogin") },
+                                            { value: "manual", label: t("dialog.otherLogin") }
                                         ]}
                                     />
                                     {tunnelKind === "server" ? (
                                         servers.length === 0 ? (
                                             <p className="text-sm text-muted-foreground">
-                                                No servers are connected yet. Add one under Servers,
-                                                or use another login here.
+                                                {t("dialog.noServers")}
                                             </p>
                                         ) : (
                                             <Field
-                                                label="Server"
+                                                label={t("dialog.server")}
                                                 error={
                                                     serverGone && serverId === ""
-                                                        ? "The server this connection tunnelled through was removed from Servers. Pick another."
+                                                        ? t("dialog.serverGone")
                                                         : undefined
                                                 }
                                                 hint={
                                                     serverId === ""
-                                                        ? issues["ssh.hostId"]
+                                                        ? dataText(t, issues["ssh.hostId"])
                                                         : undefined
                                                 }
                                             >
                                                 <Select
                                                     value={serverId}
                                                     onValueChange={setServerId}
-                                                    aria-label="Server to tunnel through"
-                                                    placeholder="Pick one..."
+                                                    aria-label={t("dialog.tunnelServer")}
+                                                    placeholder={t("dialog.pickOne")}
                                                     options={serverOptions}
                                                 />
                                             </Field>
@@ -447,7 +442,7 @@ export function ConnectionDialog({
                                         <>
                                             <div className="flex gap-3">
                                                 <Field
-                                                    label="SSH host"
+                                                    label={t("dialog.sshHost")}
                                                     className="flex-1"
                                                     error={shown("ssh.host", sshHost)}
                                                 >
@@ -460,7 +455,7 @@ export function ConnectionDialog({
                                                     />
                                                 </Field>
                                                 <Field
-                                                    label="Port"
+                                                    label={t("dialog.port")}
                                                     className="w-24"
                                                     error={shown("ssh.port", sshPort)}
                                                 >
@@ -474,7 +469,7 @@ export function ConnectionDialog({
                                                 </Field>
                                             </div>
                                             <Field
-                                                label="SSH user"
+                                                label={t("dialog.sshUser")}
                                                 error={shown("ssh.username", sshUser)}
                                             >
                                                 <Input
@@ -487,23 +482,23 @@ export function ConnectionDialog({
                                             </Field>
                                             <SegmentedControl
                                                 className="self-start"
-                                                aria-label="How to sign in over SSH"
+                                                aria-label={t("dialog.sshAuth")}
                                                 value={sshAuth}
                                                 onValueChange={(next) =>
                                                     setSshAuth(next as SshAuthMethod)
                                                 }
                                                 options={[
-                                                    { value: "password", label: "Password" },
-                                                    { value: "key", label: "Private key" }
+                                                    { value: "password", label: t("dialog.password") },
+                                                    { value: "key", label: t("dialog.privateKey") }
                                                 ]}
                                             />
                                             {sshAuth === "password" ? (
                                                 <Field
-                                                    label="SSH password"
+                                                    label={t("dialog.sshPassword")}
                                                     hint={
                                                         keepsSshSecret
-                                                            ? "Leave empty to keep the saved one."
-                                                            : "Needed to sign in to the SSH server."
+                                                            ? t("dialog.keepSaved")
+                                                            : t("dialog.sshPasswordHint")
                                                     }
                                                 >
                                                     <Input
@@ -517,18 +512,18 @@ export function ConnectionDialog({
                                             ) : (
                                                 <>
                                                     <Field
-                                                        label="Private key"
+                                                        label={t("dialog.privateKey")}
                                                         hint={
                                                             keepsSshSecret
-                                                                ? "Leave empty to keep the saved one."
-                                                                : "The key itself, not a path to it. Needed to sign in."
+                                                                ? t("dialog.keepSaved")
+                                                                : t("dialog.privateKeyHint")
                                                         }
                                                     >
                                                         <Textarea
                                                             rows={4}
                                                             spellCheck={false}
                                                             value={sshKey}
-                                                            placeholder="Paste the key here"
+                                                            placeholder={t("dialog.keyPlaceholder")}
                                                             onChange={(event) =>
                                                                 setSshKey(event.target.value)
                                                             }
@@ -536,8 +531,8 @@ export function ConnectionDialog({
                                                         />
                                                     </Field>
                                                     <Field
-                                                        label="Key passphrase"
-                                                        hint="If it has one."
+                                                        label={t("dialog.passphrase")}
+                                                        hint={t("dialog.passphraseHint")}
                                                         error={shown(
                                                             "ssh.passphrase",
                                                             sshPassphrase
@@ -555,23 +550,19 @@ export function ConnectionDialog({
                                             )}
                                             {(servers.length > 0 || jumpGone) && (
                                                 <Field
-                                                    label="Jump through"
-                                                    error={
-                                                        jumpUnpicked
-                                                            ? "The server this tunnel jumped through was removed from Servers. Pick another, or reach it straight."
-                                                            : undefined
-                                                    }
-                                                    hint="A server Polaris already has, used to reach that SSH host."
+                                                    label={t("dialog.jump")}
+                                                    error={jumpUnpicked ? t("dialog.jumpGone") : undefined}
+                                                    hint={t("dialog.jumpHint")}
                                                 >
                                                     <Select
                                                         value={jumpId}
                                                         onValueChange={setJumpId}
-                                                        aria-label="Server to jump through"
-                                                        placeholder="Pick one..."
+                                                        aria-label={t("dialog.jumpServer")}
+                                                        placeholder={t("dialog.pickOne")}
                                                         options={[
                                                             {
                                                                 value: NO_JUMP,
-                                                                label: "Straight to it"
+                                                                label: t("dialog.straight")
                                                             },
                                                             ...serverOptions
                                                         ]}
@@ -581,8 +572,7 @@ export function ConnectionDialog({
                                         </>
                                     )}
                                     <p className="text-xs text-muted-foreground">
-                                        The SSH server&apos;s key is remembered when this is saved,
-                                        and checked on every connection after.
+                                        {t("dialog.hostKeyNote")}
                                     </p>
                                 </div>
                             )}
@@ -590,8 +580,8 @@ export function ConnectionDialog({
                     )}
 
                     <Toggle
-                        label="Read-only"
-                        hint="Refuses anything that would change the database. Turn it on for a database you came here to read."
+                        label={t("dialog.readOnly")}
+                        hint={t("dialog.readOnlyHint")}
                         checked={readOnly}
                         onChange={setReadOnly}
                     />
@@ -608,12 +598,12 @@ export function ConnectionDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button onClick={() => void save()} disabled={!complete || saving}>
                         {saving && <Loader2 className="size-4 animate-spin" />}
                         <Plug className="size-4" />
-                        {connection ? "Save" : "Add it"}
+                        {connection ? tcommon("actions.save") : t("dialog.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

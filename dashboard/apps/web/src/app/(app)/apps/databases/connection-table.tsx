@@ -25,6 +25,8 @@ import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
 import type { DataConnectionView } from "@/lib/data/connections";
 import { ArrowRight, Loader2, Pencil, Plug, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { dataText, whereText } from "@/lib/data/words";
 
 /** Seven data columns and the actions. */
 const COLUMNS = 8;
@@ -45,22 +47,23 @@ export interface ConnectionTableProps {
 }
 
 export function ConnectionTable({ rows, noMatch, ...row }: ConnectionTableProps) {
+    const t = useTranslations("databases");
     return (
         <div className="min-h-0 overflow-auto overscroll-contain rounded-lg border border-border">
             <table className="w-full min-w-[56rem] text-sm">
                 <thead className="sticky top-0 z-10 bg-surface text-left text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
-                            Name
+                            {t("dialog.name")}
                         </th>
-                        <th scope="col" className="px-3 py-2 font-medium">Engine</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Where</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Database</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Last used</th>
-                        <th scope="col" className="px-3 py-2 font-medium">Added</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("dialog.engine")}</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("list.columns.where")}</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("dialog.database")}</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("list.columns.status")}</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("list.columns.lastUsed")}</th>
+                        <th scope="col" className="px-3 py-2 font-medium">{t("list.columns.added")}</th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            <span className="sr-only">Actions</span>
+                            <span className="sr-only">{t("list.columns.actions")}</span>
                         </th>
                     </tr>
                 </thead>
@@ -118,6 +121,7 @@ function ConnectionRow({
     onSave,
     onRemove
 }: Omit<ConnectionTableProps, "rows" | "noMatch"> & { connection: DataConnectionView }) {
+    const t = useTranslations("databases");
     const format = useDisplayFormat();
     const test = tested[connection.id];
     const status = list.statusOf(connection, test);
@@ -152,14 +156,14 @@ function ConnectionRow({
                             >
                                 {connection.name}
                             </button>
-                            {connection.readOnly && <Badge>read-only</Badge>}
+                            {connection.readOnly && <Badge>{t("view.readOnly")}</Badge>}
                         </span>
                         {connection.note && (
                             <span
                                 className="block truncate text-xs text-muted-foreground"
-                                title={connection.note}
+                                title={dataText(t, connection.note)}
                             >
-                                {connection.note}
+                                {dataText(t, connection.note)}
                             </span>
                         )}
                     </span>
@@ -174,13 +178,13 @@ function ConnectionRow({
             <td className="px-3 py-2">
                 <span className="flex flex-col items-start gap-0.5">
                     <Badge variant={home === "external" ? "neutral" : "primary"}>
-                        {list.HOME_LABELS[home]}
+                        {t(`list.homes.${home}`)}
                     </Badge>
                     <span
                         className="block max-w-[14rem] truncate text-xs text-muted-foreground"
-                        title={connection.where}
+                        title={whereText(t, connection.where)}
                     >
-                        {connection.where}
+                        {whereText(t, connection.where)}
                     </span>
                 </span>
             </td>
@@ -194,8 +198,8 @@ function ConnectionRow({
                 )}
             </td>
             <td className="whitespace-nowrap px-3 py-2">
-                <Badge variant={status.tone} title={status.detail ?? undefined}>
-                    {status.label}
+                <Badge variant={status.tone} title={status.detail ? dataText(t, status.detail) : undefined}>
+                    {t(`list.status.${status.state}`)}
                 </Badge>
             </td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
@@ -204,7 +208,7 @@ function ConnectionRow({
                         <RelativeTime iso={connection.lastUsedAt} />
                     </span>
                 ) : connection.origin === "saved" ? (
-                    "Never"
+                    t("list.never")
                 ) : (
                     <Absent />
                 )}
@@ -217,8 +221,8 @@ function ConnectionRow({
                     <Button
                         size="icon-sm"
                         variant="ghost"
-                        title="Open"
-                        aria-label={`Open ${connection.name}`}
+                        title={t("list.open")}
+                        aria-label={t("list.openNamed", { name: connection.name })}
                         onClick={only(() => onOpen(connection))}
                     >
                         <ArrowRight className="size-4" />
@@ -226,8 +230,8 @@ function ConnectionRow({
                     <Button
                         size="icon-sm"
                         variant="ghost"
-                        title="Test the connection"
-                        aria-label={`Test ${connection.name}`}
+                        title={t("list.test")}
+                        aria-label={t("list.testNamed", { name: connection.name })}
                         disabled={busy}
                         onClick={only(() => onTest(connection))}
                     >
@@ -242,8 +246,8 @@ function ConnectionRow({
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                title="Edit"
-                                aria-label={`Edit ${connection.name}`}
+                                title={t("list.edit")}
+                                aria-label={t("list.editNamed", { name: connection.name })}
                                 onClick={only(() => onEdit(connection))}
                             >
                                 <Pencil className="size-4" />
@@ -251,8 +255,8 @@ function ConnectionRow({
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                title="Remove"
-                                aria-label={`Remove ${connection.name}`}
+                                title={t("view.remove")}
+                                aria-label={t("list.removeNamed", { name: connection.name })}
                                 onClick={only(() => onRemove(connection))}
                             >
                                 <Trash2 className="size-4" />
@@ -265,8 +269,8 @@ function ConnectionRow({
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                title="Save it as a connection"
-                                aria-label={`Save ${connection.name} as a connection`}
+                                title={t("list.save")}
+                                aria-label={t("list.saveNamed", { name: connection.name })}
                                 onClick={only(() => onSave(connection))}
                             >
                                 <Plus className="size-4" />

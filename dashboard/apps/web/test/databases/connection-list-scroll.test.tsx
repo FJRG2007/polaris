@@ -24,6 +24,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 /** Enough connections that the table is taller than any window. */
 const CONNECTIONS = Array.from({ length: 24 }, (_, index) => ({
@@ -72,7 +73,7 @@ function scroller(container: HTMLElement): HTMLElement {
 
 describe("the table of connections", () => {
     it("scrolls inside the screen rather than being clipped by it", async () => {
-        const { container } = render(<DatabasesView />);
+        const { container } = render(<DatabasesView />, { wrapper: MessagesWrapper });
         await screen.findByText("Database 0");
 
         const list = scroller(container);
@@ -87,7 +88,7 @@ describe("the table of connections", () => {
     });
 
     it("keeps the way to add one and the search out of the scroller", async () => {
-        const { container } = render(<DatabasesView />);
+        const { container } = render(<DatabasesView />, { wrapper: MessagesWrapper });
         const add = await screen.findByRole("button", { name: /new connection/i });
         const search = screen.getByRole("textbox", { name: /search connections/i });
 
@@ -96,7 +97,7 @@ describe("the table of connections", () => {
     });
 
     it("lets the column shrink, so the scroller has something to scroll in", async () => {
-        const { container } = render(<DatabasesView />);
+        const { container } = render(<DatabasesView />, { wrapper: MessagesWrapper });
         await screen.findByText("Database 0");
 
         const root = container.firstElementChild as HTMLElement;
@@ -105,7 +106,7 @@ describe("the table of connections", () => {
     });
 
     it("paints the table chrome before the list arrives", () => {
-        const { container } = render(<DatabasesView />);
+        const { container } = render(<DatabasesView />, { wrapper: MessagesWrapper });
 
         // Synchronously, before the action has answered: headings, search and
         // the button are there, and only the rows are placeholders.
@@ -116,11 +117,11 @@ describe("the table of connections", () => {
     });
 
     it("paints the list this tab last read at once on a return", async () => {
-        const first = render(<DatabasesView />);
+        const first = render(<DatabasesView />, { wrapper: MessagesWrapper });
         await screen.findByText("Database 0");
         first.unmount();
 
-        render(<DatabasesView />);
+        render(<DatabasesView />, { wrapper: MessagesWrapper });
 
         // No await: the kept copy is on screen before the fresh read answers.
         expect(screen.getByText("Database 0")).not.toBeNull();

@@ -145,11 +145,20 @@ export function writeStatement(state: TabState, id: string, statement: string): 
 /** The label on the tab. A table is its own name; the schema is not repeated
  *  there, because it is the same schema for almost every tab and a strip of
  *  `public.` is a strip of nothing. */
-export function tabTitle(tab: WorkbenchTab, shape: string): string {
+export function tabTitle(tab: WorkbenchTab, shape: string, words: TabWords = ENGLISH_TAB_WORDS): string {
     if (tab.kind === "table") return tab.relation;
-    if (tab.kind === "stats") return "Activity";
-    return shape === "sql" ? "SQL" : "Command";
+    if (tab.kind === "stats") return words.activity;
+    return shape === "sql" ? "SQL" : words.command;
 }
+
+/** What the non-table tabs are called, in the reader's words. */
+export interface TabWords {
+    readonly activity: string;
+    readonly command: string;
+}
+
+/** The same in English, for a caller that has no reader to ask. */
+const ENGLISH_TAB_WORDS: TabWords = { activity: "Activity", command: "Command" }; // i18n-ignore fallback
 
 /** The whole of what a tab points at, for the tooltip - where the schema does
  *  belong, because that is the question a tooltip is asked. */

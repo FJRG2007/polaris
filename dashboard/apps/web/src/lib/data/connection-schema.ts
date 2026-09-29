@@ -95,6 +95,7 @@ export const saveConnectionSchema = z
             .trim()
             .min(1, "Give the connection a name.")
             .max(80, "That name is too long."),
+        // i18n-ignore said in the reader's words by lib/data/words
         engine: z.enum(DB_ENGINES, { errorMap: () => ({ message: "Unknown engine." }) }),
         managedDatabaseId: uuid("Pick a database.")
             .nullish()
@@ -121,6 +122,7 @@ export const saveConnectionSchema = z
             context.addIssue({
                 code: "custom",
                 path: ["ssh", "passphrase"],
+                // i18n-ignore said in the reader's words by lib/data/words
                 message: "Paste the private key this passphrase is for, or clear the passphrase."
             });
         }

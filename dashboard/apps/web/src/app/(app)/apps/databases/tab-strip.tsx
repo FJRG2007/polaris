@@ -26,6 +26,7 @@
 
 import type { WorkbenchTab } from "./workbench-tabs";
 import { tabSubtitle, tabTitle } from "./workbench-tabs";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Activity, Plus, SquareTerminal, Table2, X } from "lucide-react";
 import {
     Button,
@@ -61,12 +62,14 @@ export function TabStrip({
     onNewQuery: () => void;
     onStats: () => void;
 }) {
+    const t = useTranslations("databases");
+    const words = { activity: t("tabs.activity"), command: t("tabs.command") };
     return (
         <div className="flex items-end gap-1 border-b border-border">
             <ScrollRow className="flex min-w-0 flex-1 items-end gap-0.5 pb-px">
                 {tabs.map((tab) => {
                     const active = tab.id === activeId;
-                    const title = tabTitle(tab, shape);
+                    const title = tabTitle(tab, shape, words);
                     return (
                         <ContextMenu key={tab.id}>
                             <ContextMenuTrigger asChild>
@@ -103,7 +106,7 @@ export function TabStrip({
                                     <button
                                         type="button"
                                         onClick={() => onClose(tab.id)}
-                                        aria-label={`Close ${title}`}
+                                        aria-label={t("tabs.closeNamed", { name: title })}
                                         className={cn(
                                             "mr-1 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
                                             active ? "opacity-100" : "opacity-0"
@@ -114,15 +117,15 @@ export function TabStrip({
                                 </div>
                             </ContextMenuTrigger>
                             <ContextMenuContent>
-                                <ContextMenuItem onSelect={() => onClose(tab.id)}>Close</ContextMenuItem>
+                                <ContextMenuItem onSelect={() => onClose(tab.id)}>{t("tabs.close")}</ContextMenuItem>
                                 <ContextMenuItem
                                     onSelect={() => onCloseOthers(tab.id)}
                                     disabled={tabs.length < 2}
                                 >
-                                    Close the others
+                                    {t("tabs.closeOthers")}
                                 </ContextMenuItem>
                                 <ContextMenuSeparator />
-                                <ContextMenuItem onSelect={onCloseAll}>Close everything</ContextMenuItem>
+                                <ContextMenuItem onSelect={onCloseAll}>{t("tabs.closeAll")}</ContextMenuItem>
                             </ContextMenuContent>
                         </ContextMenu>
                     );
@@ -135,11 +138,11 @@ export function TabStrip({
             <div className="flex shrink-0 items-center gap-0.5 pb-1 pl-1">
                 <Button size="sm" variant="ghost" onClick={onNewQuery}>
                     <Plus className="size-4 shrink-0" />
-                    {shape === "sql" ? "SQL" : "Command"}
+                    {shape === "sql" ? "SQL" : words.command}{/* i18n-ignore the language's name */}
                 </Button>
-                <Button size="icon-sm" variant="ghost" onClick={onStats} title="Activity">
+                <Button size="icon-sm" variant="ghost" onClick={onStats} title={words.activity}>
                     <Activity className="size-4 shrink-0" />
-                    <span className="sr-only">Activity</span>
+                    <span className="sr-only">{words.activity}</span>
                 </Button>
             </div>
         </div>

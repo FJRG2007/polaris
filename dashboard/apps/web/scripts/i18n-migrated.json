@@ -999,6 +999,19 @@
         "web/src/app/(app)/apps/containers/docker-connection-dialog.tsx",
         "web/src/app/(app)/apps/containers/page.tsx",
         "web/src/app/(app)/apps/containers/polaris-footprint.tsx",
-        "web/src/app/(app)/apps/containers/container-words.ts"
+        "web/src/app/(app)/apps/containers/container-words.ts",
+        "web/src/app/(app)/apps/databases/actions.ts",
+        "web/src/app/(app)/apps/databases/connection-dialog.tsx",
+        "web/src/app/(app)/apps/databases/connection-list.ts",
+        "web/src/app/(app)/apps/databases/connection-table.tsx",
+        "web/src/app/(app)/apps/databases/databases-view.tsx",
+        "web/src/app/(app)/apps/databases/page.tsx",
+        "web/src/app/(app)/apps/databases/stats-panel.tsx",
+        "web/src/app/(app)/apps/databases/tab-strip.tsx",
+        "web/src/app/(app)/apps/databases/workbench-tabs.ts",
+        "web/src/app/(app)/apps/databases/workbench.tsx",
+        "web/src/lib/data/connection-schema.ts",
+        "web/src/lib/data/connections.ts",
+        "web/src/lib/data/words.ts"
     ]
 }

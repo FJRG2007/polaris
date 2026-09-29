@@ -24,14 +24,9 @@ export interface TestOutcome {
     readonly detail: string;
 }
 
-/** Where a database lives, as the reader tells them apart. */
+/** Where a database lives, as the reader tells them apart; each one's name is
+ *  `list.homes.<home>` in the `databases` catalog. */
 export type ConnectionHome = "polaris" | "managed" | "external";
-
-export const HOME_LABELS: Record<ConnectionHome, string> = {
-    polaris: "Polaris itself",
-    managed: "Run by Polaris",
-    external: "External"
-};
 
 /** A saved connection that points at a database Polaris runs is still that
  *  database, so it is filed with the managed ones rather than as an outside host. */
@@ -42,7 +37,8 @@ export function homeOf(connection: DataConnectionView): ConnectionHome {
 
 export interface ConnectionStatus {
     readonly tone: "success" | "danger" | "neutral";
-    readonly label: string;
+    /** Which word the chip says: `list.status.<state>` in the catalog. */
+    readonly state: "reachable" | "unreachable" | "unchecked";
     /** The whole answer, for the title of a chip that only has room for a word. */
     readonly detail: string | null;
 }
@@ -61,13 +57,13 @@ export function statusOf(
 ): ConnectionStatus {
     if (test) {
         return test.ok
-            ? { tone: "success", label: "Reachable", detail: test.detail || null }
-            : { tone: "danger", label: "Unreachable", detail: test.detail || null };
+            ? { tone: "success", state: "reachable", detail: test.detail || null }
+            : { tone: "danger", state: "unreachable", detail: test.detail || null };
     }
     if (connection.unreachable) {
-        return { tone: "danger", label: "Unreachable", detail: connection.note };
+        return { tone: "danger", state: "unreachable", detail: connection.note };
     }
-    return { tone: "neutral", label: "Not checked", detail: null };
+    return { tone: "neutral", state: "unchecked", detail: null };
 }
 
 /**
@@ -92,9 +88,18 @@ export function enginesIn(
         .sort((a, b) => a.label.localeCompare(b.label));
 }
 
+/** Where a database lives, in English, for a caller with no reader to ask. */
+const ENGLISH_HOMES: Record<ConnectionHome, string> = {
+    polaris: "Polaris itself", // i18n-ignore fallback
+    managed: "Run by Polaris", // i18n-ignore fallback
+    external: "External" // i18n-ignore fallback
+};
+
 export function filterConnections(
     connections: readonly DataConnectionView[],
-    filters: ConnectionFilters
+    filters: ConnectionFilters,
+    /** What each home is called on screen, so the search finds the word shown. */
+    homeLabel: (home: ConnectionHome) => string = (home) => ENGLISH_HOMES[home]
 ): DataConnectionView[] {
     const needle = filters.search.trim().toLowerCase();
     return connections.filter((connection) => {
@@ -106,7 +111,7 @@ export function filterConnections(
             connection.database,
             connection.username,
             dbEngineLabel(connection.engine),
-            HOME_LABELS[homeOf(connection)]
+            homeLabel(homeOf(connection))
         ]
             .filter((value): value is string => Boolean(value))
             .some((value) => value.toLowerCase().includes(needle));

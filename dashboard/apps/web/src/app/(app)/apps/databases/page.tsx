@@ -14,11 +14,13 @@
 import { PAGE_FILL, PageHeader, cn } from "@polaris/ui";
 import { DatabasesView } from "./databases-view";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function DatabasesPage() {
     await requirePermission("deploy.read");
+    const t = await getTranslations("databases");
 
     return (
         // The screen fills the window and scrolls inside its own panes. Without
@@ -28,8 +30,8 @@ export default async function DatabasesPage() {
         // the top of the window the moment anybody looked at a wide table.
         <div className={cn(PAGE_FILL, "flex flex-col")}>
             <PageHeader
-                title="Databases"
-                description="Browse and query your databases - the ones Polaris runs and the ones it does not."
+                title={t("page.title")}
+                description={t("page.description")}
             />
             <DatabasesView />
         </div>

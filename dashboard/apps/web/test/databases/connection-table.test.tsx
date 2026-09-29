@@ -14,6 +14,7 @@
 import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 function connection(overrides: Record<string, unknown>) {
     return {
@@ -97,7 +98,7 @@ function rowOf(name: string): HTMLElement {
 }
 
 async function renderLoaded() {
-    const view = render(<DatabasesView />);
+    const view = render(<DatabasesView />, { wrapper: MessagesWrapper });
     await screen.findByRole("button", { name: "Shop" });
     return view;
 }

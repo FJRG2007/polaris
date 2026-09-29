@@ -30,6 +30,7 @@ import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
@@ -86,10 +87,7 @@ const PAGE = 100;
  * The count is an estimate the engine already keeps, never a scan, so ordering by
  * it costs nothing: the numbers are on the rows before this is offered.
  */
-const RELATION_ORDERS = [
-    { value: "name", label: "Name" },
-    { value: "rows", label: "Rows" }
-] as const;
+const RELATION_ORDERS = [{ value: "name" }, { value: "rows" }] as const;
 
 type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
 
@@ -98,6 +96,7 @@ type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
 const ORDER_KEY = "polaris.databases.order";
 
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
+    const t = useTranslations("databases");
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
     const [namespace, setNamespace] = useState<string | null>(null);
@@ -247,7 +246,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                         // the schema it was opened from, so browsing another one
                         // is browsing, not a decision to close anything.
                         onValueChange={(next) => void load(next)}
-                        aria-label="Which schema"
+                        aria-label={t("bench.schema")}
                         options={namespaces.map((entry) => ({
                             value: entry.name,
                             label:
@@ -262,8 +261,8 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         className="pl-9"
-                        placeholder="Find a table"
-                        aria-label="Find a table"
+                        placeholder={t("bench.findTable")}
+                        aria-label={t("bench.findTable")}
                         value={find}
                         onChange={(event) => setFind(event.target.value)}
                     />
@@ -273,7 +272,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                     and two controls on one line there is two controls nobody can
                     read the labels of. */}
                 <div className="flex items-center gap-2 px-1">
-                    <span className="text-xs text-muted-foreground">Order by</span>
+                    <span className="text-xs text-muted-foreground">{t("bench.orderBy")}</span>
                     <Select
                         value={order}
                         onValueChange={(next) => {
@@ -286,11 +285,11 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                 // remember, which is the right thing to lose.
                             }
                         }}
-                        aria-label="Order the tables by"
+                        aria-label={t("bench.orderTables")}
                         className="h-7 flex-1 text-xs"
                         options={RELATION_ORDERS.map((entry) => ({
                             value: entry.value,
-                            label: entry.label
+                            label: t(`bench.orders.${entry.value}`)
                         }))}
                     />
                 </div>
@@ -304,7 +303,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                         </div>
                     ) : shown.length === 0 ? (
                         <p className="p-3 text-xs text-muted-foreground">
-                            {relations.length === 0 ? "Nothing in here yet." : "Nothing matches."}
+                            {relations.length === 0 ? t("bench.emptyYet") : t("bench.noMatch")}
                         </p>
                     ) : (
                         <ul className="flex flex-col">
@@ -364,7 +363,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
 
                 {readOnly && (
                     <span className="text-xs text-muted-foreground">
-                        Read-only. Nothing here can change the database.
+                        {t("bench.readOnly")}
                     </span>
                 )}
 
@@ -380,7 +379,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 {tabs.length === 0 ? (
                     <Card>
                         <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                            Pick something on the left to see what is in it.
+                            {t("bench.pick")}
                         </CardBody>
                     </Card>
                 ) : (
@@ -477,6 +476,7 @@ function CellEditor({
     onCommit: () => void;
     onCancel: () => void;
 }) {
+    const t = useTranslations("databases");
     return (
         <span className="flex items-center gap-1">
             <input
@@ -499,15 +499,15 @@ function CellEditor({
                 }}
                 onBlur={onCancel}
                 className="min-w-0 flex-1 rounded border border-border-strong bg-background px-1 py-0.5 font-mono text-xs outline-none"
-                aria-label="New value"
+                aria-label={t("bench.newValue")}
             />
             {/* Pressed with the pointer rather than the keyboard: the field's own
                 blur would otherwise abandon the edit before the button was
                 reached, so both act on pointer-down. */}
             <button
                 type="button"
-                aria-label="Save this value"
-                title="Save"
+                aria-label={t("bench.saveValue")}
+                title={t("bench.save")}
                 disabled={saving}
                 onMouseDown={(event) => {
                     event.preventDefault();
@@ -523,8 +523,8 @@ function CellEditor({
             </button>
             <button
                 type="button"
-                aria-label="Leave it as it was"
-                title="Cancel"
+                aria-label={t("bench.leaveAsWas")}
+                title={t("bench.cancel")}
                 onMouseDown={(event) => {
                     event.preventDefault();
                     onCancel();
@@ -554,6 +554,7 @@ function RowsPanel({
      *  cell that never opened. */
     readOnly: boolean;
 }) {
+    const t = useTranslations("databases");
     const [page, setPage] = useState<DataPage | null>(null);
     const [offset, setOffset] = useState(0);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -741,7 +742,7 @@ function RowsPanel({
             // The row was there when the page was drawn and is not now, or its
             // key has moved. Said rather than swallowed: a silent no-op reads as
             // a save that worked.
-            setError("Nothing was changed - that row is no longer there.");
+            setError(t("bench.rowGone"));
         }
         await read();
     };
@@ -761,8 +762,8 @@ function RowsPanel({
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         className="pl-9"
-                        placeholder={cursorPaged ? "Match keys" : "Find in these rows"}
-                        aria-label="Filter rows"
+                        placeholder={cursorPaged ? t("bench.matchKeys") : t("bench.findRows")}
+                        aria-label={t("bench.filterRows")}
                         value={filter}
                         onChange={(event) => setFilter(event.target.value)}
                     />
@@ -770,8 +771,8 @@ function RowsPanel({
                 <Button
                     size="icon"
                     variant="ghost"
-                    title="Refresh"
-                    aria-label="Refresh"
+                    title={t("bench.refresh")}
+                    aria-label={t("bench.refresh")}
                     onClick={() => void read()}
                 >
                     {busy ? (
@@ -782,19 +783,30 @@ function RowsPanel({
                 </Button>
                 <span className="text-xs text-muted-foreground">
                     {picked.size > 0
-                        ? `${picked.size} selected`
+                        ? t("bench.selected", { count: picked.size })
                         : page
                           ? cursorPaged
-                              ? `${page.rows.length} keys${page.total === null ? "" : ` of about ${page.total}`}`
-                              : `rows ${page.rows.length === 0 ? 0 : offset + 1}-${offset + page.rows.length}${page.total === null ? "" : ` of ${page.total}`}`
+                              ? page.total === null
+                                  ? t("bench.keys", { count: page.rows.length })
+                                  : t("bench.keysOf", { count: page.rows.length, total: page.total })
+                              : page.total === null
+                                ? t("bench.rows", {
+                                      from: page.rows.length === 0 ? 0 : offset + 1,
+                                      to: offset + page.rows.length
+                                  })
+                                : t("bench.rowsOf", {
+                                      from: page.rows.length === 0 ? 0 : offset + 1,
+                                      to: offset + page.rows.length,
+                                      total: page.total
+                                  })
                           : ""}
                 </span>
                 <div className="flex items-center gap-1">
                     <Button
                         size="icon"
                         variant="ghost"
-                        title="Previous page"
-                        aria-label="Previous page"
+                        title={t("bench.previous")}
+                        aria-label={t("bench.previous")}
                         disabled={cursorPaged || offset === 0}
                         onClick={() => setOffset(Math.max(0, offset - PAGE))}
                     >
@@ -803,8 +815,8 @@ function RowsPanel({
                     <Button
                         size="icon"
                         variant="ghost"
-                        title="Next page"
-                        aria-label="Next page"
+                        title={t("bench.next")}
+                        aria-label={t("bench.next")}
                         disabled={cursorPaged ? !page?.cursor : (page?.rows.length ?? 0) < PAGE}
                         onClick={() => {
                             if (cursorPaged) setCursor(page?.cursor ?? null);
@@ -859,7 +871,7 @@ function RowsPanel({
                                         colSpan={Math.max(1, columns.length)}
                                         className="px-3 py-8 text-center text-muted-foreground"
                                     >
-                                        {applied ? "Nothing matches that." : "Nothing in here."}
+                                        {applied ? t("bench.noMatchThat") : t("bench.empty")}
                                     </td>
                                 </tr>
                             ) : (
@@ -932,7 +944,7 @@ function RowsPanel({
                                                                     }
                                                                 />
                                                             ) : (
-                                                                cell(row[column.name])
+                                                                cell(row[column.name], t("bench.emptyValue"))
                                                             )}
                                                         </td>
                                                     );
@@ -963,7 +975,7 @@ function RowsPanel({
                                                             onSelect={() => copy(cellText(value))}
                                                         >
                                                             <Copy className="size-3.5" />
-                                                            Copy this value
+                                                            {t("bench.copyValue")}
                                                         </ContextMenuItem>
                                                         <ContextMenuItem
                                                             onSelect={() =>
@@ -971,7 +983,7 @@ function RowsPanel({
                                                             }
                                                         >
                                                             <Search className="size-3.5" />
-                                                            Find rows like it
+                                                            {t("bench.findLike")}
                                                         </ContextMenuItem>
                                                         {editable && !on.primaryKey ? (
                                                             <ContextMenuItem
@@ -980,9 +992,9 @@ function RowsPanel({
                                                                 }
                                                             >
                                                                 <Pencil className="size-3.5" />
-                                                                Edit this value
+                                                                {t("bench.editValue")}
                                                                 <MenuShortcut>
-                                                                    Double-click
+                                                                    {t("bench.doubleClick")}
                                                                 </MenuShortcut>
                                                             </ContextMenuItem>
                                                         ) : null}
@@ -995,8 +1007,8 @@ function RowsPanel({
                                             >
                                                 <Copy className="size-3.5" />
                                                 {picked.size > 1
-                                                    ? `Copy ${picked.size} rows as JSON`
-                                                    : "Copy row as JSON"}
+                                                    ? t("bench.copyRowsJson", { count: picked.size })
+                                                    : t("bench.copyRowJson")}
                                             </ContextMenuItem>
                                             <ContextMenuItem
                                                 onSelect={() =>
@@ -1004,7 +1016,7 @@ function RowsPanel({
                                                 }
                                             >
                                                 <Copy className="size-3.5" />
-                                                Copy as text
+                                                {t("bench.copyText")}
                                             </ContextMenuItem>
                                         </ContextMenuContent>
                                     </ContextMenu>
@@ -1056,6 +1068,7 @@ function SortableHeader({
 
 /** What one Redis key holds, beside the list. */
 function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void }) {
+    const t = useTranslations("databases");
     return (
         <Card>
             <CardBody className="flex flex-col gap-2">
@@ -1065,10 +1078,10 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                         {value.type}
-                        {value.ttl === null ? "" : ` - expires in ${Math.round(value.ttl / 1000)}s`}
+                        {value.ttl === null ? "" : t("bench.expires", { seconds: Math.round(value.ttl / 1000) })}
                     </span>
                     <Button size="sm" variant="ghost" onClick={onClose}>
-                        Close
+                        {t("tabs.close")}
                     </Button>
                 </div>
                 {value.value !== null ? (
@@ -1097,12 +1110,12 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </div>
                 ) : (
                     <p className="text-xs text-muted-foreground">
-                        Polaris cannot read a {value.type} yet. Its type and expiry are above.
+                        {t("bench.cannotRead", { type: value.type })}
                     </p>
                 )}
                 {value.truncated && (
                     <p className="text-xs text-muted-foreground">
-                        There is more of it than is shown.
+                        {t("bench.truncated")}
                     </p>
                 )}
             </CardBody>
@@ -1124,6 +1137,7 @@ function QueryPanel({
     statement: string;
     onStatement: (statement: string) => void;
 }) {
+    const t = useTranslations("databases");
     const [statement, setStatement] = useState(kept);
     const [results, setResults] = useState<QueryResult[] | null>(null);
     const [running, setRunning] = useState(false);
@@ -1193,9 +1207,9 @@ function QueryPanel({
                     ) : (
                         <Play className="size-4" />
                     )}
-                    Run
+                    {t("bench.run")}
                 </Button>
-                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
+                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>{/* i18n-ignore a key chord */}
             </div>
 
             {error && (
@@ -1216,9 +1230,8 @@ function QueryPanel({
                             </span>
                             <span className="shrink-0">
                                 {result.affected === null
-                                    ? `${result.rows.length} rows`
-                                    : `${result.affected} changed`}{" "}
-                                - {result.ms}ms
+                                    ? t("bench.resultRows", { count: result.rows.length, ms: result.ms })
+                                    : t("bench.resultChanged", { count: result.affected, ms: result.ms })}
                             </span>
                         </div>
                         {result.rows.length > 0 && (
@@ -1245,7 +1258,7 @@ function QueryPanel({
                                                         className="max-w-xs truncate px-3 py-1 font-mono"
                                                         title={cellText(value)}
                                                     >
-                                                        {cell(value)}
+                                                        {cell(value, t("bench.emptyValue"))}
                                                     </td>
                                                 ))}
                                             </tr>
@@ -1270,11 +1283,11 @@ function placeholderFor(shape: string): string {
 /** A value as a cell draws it. Null is said rather than left blank, because an
  *  empty string and a null are different things and a grid that shows both as
  *  nothing is lying about one of them. */
-function cell(value: unknown): React.ReactNode {
+function cell(value: unknown, emptyWord: string): React.ReactNode {
     if (value === null || value === undefined) {
         return <span className="text-muted-foreground">null</span>;
     }
-    if (value === "") return <span className="text-muted-foreground">empty</span>;
+    if (value === "") return <span className="text-muted-foreground">{emptyWord}</span>;
     return cellText(value);
 }
 

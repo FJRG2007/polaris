@@ -24,6 +24,8 @@ import * as connections from "@/lib/data/connections";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
+import { getTranslations } from "@/lib/i18n/request";
+import { dataText } from "@/lib/data/words";
 import type {
     DataColumn,
     DataNamespace,
@@ -56,9 +58,10 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
             caught instanceof connections.DataConnectionError ||
             caught instanceof ReadOnlyError ||
             caught instanceof DataRequestError;
-        if (spoken) return { error: (caught as Error).message };
+        const t = await getTranslations("databases");
+        if (spoken) return { error: dataText(t, (caught as Error).message) };
         console.error("databases: an action failed", caught);
-        return { error: "That did not work. Nothing was changed." };
+        return { error: t("refusals.generic") };
     }
 }
 

@@ -32,6 +32,8 @@ import type { DataConnectionView } from "@/lib/data/connections";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { whereText } from "@/lib/data/words";
 
 /** The list as this tab last read it, so a return to the screen paints rows at once
  *  while the request that replaces them is still out. */
@@ -39,6 +41,7 @@ const CACHE_KEY = "databases.connections";
 const MAX_AGE_MS = 60_000;
 
 export function DatabasesView() {
+    const t = useTranslations("databases");
     const router = useRouter();
     const params = useSearchParams();
     const openId = params.get("c");
@@ -92,8 +95,11 @@ export function DatabasesView() {
     const open = connections?.find((entry) => entry.id === openId) ?? null;
     const engines = useMemo(() => list.enginesIn(connections ?? []), [connections]);
     const shown = useMemo(
-        () => (connections ? list.filterConnections(connections, filters) : null),
-        [connections, filters]
+        () =>
+            connections
+                ? list.filterConnections(connections, filters, (home) => t(`list.homes.${home}`))
+                : null,
+        [connections, filters, t]
     );
 
     // A connection that is gone - deleted in another tab - must not leave the
@@ -151,15 +157,15 @@ export function DatabasesView() {
                         onClick={() => router.push("/apps/databases")}
                     >
                         <ArrowLeft className="size-4" />
-                        Connections
+                        {t("view.connections")}
                     </Button>
                     <DbEngineIcon engine={open.engine} className="size-4 shrink-0" />
                     <span className="min-w-0 truncate text-sm font-medium" title={open.name}>
                         {open.name}
                     </span>
-                    {open.readOnly && <Badge>read-only</Badge>}
-                    <span className="truncate text-xs text-muted-foreground" title={open.where}>
-                        {open.where}
+                    {open.readOnly && <Badge>{t("view.readOnly")}</Badge>}
+                    <span className="truncate text-xs text-muted-foreground" title={whereText(t, open.where)}>
+                        {whereText(t, open.where)}
                     </span>
                 </div>
                 <Workbench connectionId={open.id} readOnly={open.readOnly} />
@@ -184,8 +190,8 @@ export function DatabasesView() {
                             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 className="pl-9"
-                                placeholder="Search by name, host or database"
-                                aria-label="Search connections"
+                                placeholder={t("view.searchPlaceholder")}
+                                aria-label={t("view.search")}
                                 autoComplete="off"
                                 value={filters.search}
                                 onChange={(event) =>
@@ -195,16 +201,16 @@ export function DatabasesView() {
                         </div>
                         <Select
                             className="sm:w-44"
-                            aria-label="Filter by engine"
+                            aria-label={t("view.filterEngine")}
                             value={filters.engine}
                             onValueChange={(engine) => setFilters((now) => ({ ...now, engine }))}
-                            options={[{ value: "all", label: "All engines" }, ...engines]}
+                            options={[{ value: "all", label: t("view.allEngines") }, ...engines]}
                         />
                     </>
                 )}
                 <Button className="sm:ml-auto" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
-                    New connection
+                    {t("dialog.newTitle")}
                 </Button>
             </div>
 
@@ -217,12 +223,12 @@ export function DatabasesView() {
             {connections?.length === 0 ? (
                 <EmptyState
                     icon={<Database />}
-                    title="Nothing to open yet."
-                    description="Polaris is not running a database for you, and none has been added. Point one at any PostgreSQL, MySQL, MariaDB, MongoDB or Redis you have the credentials for."
+                    title={t("view.empty")}
+                    description={t("view.emptyBody")}
                     action={
                         <Button onClick={() => setAdding(true)}>
                             <Plus className="size-4" />
-                            New connection
+                            {t("dialog.newTitle")}
                         </Button>
                     }
                 />
@@ -241,13 +247,13 @@ export function DatabasesView() {
                     }}
                     noMatch={
                         <span className="flex flex-col items-center gap-2 text-muted-foreground">
-                            No connection matches that.
+                            {t("view.noMatch")}
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setFilters(list.NO_FILTERS)}
                             >
-                                Clear filters
+                                {t("view.clear")}
                             </Button>
                         </span>
                     }
@@ -285,17 +291,19 @@ export function DatabasesView() {
                 open={confirmingRemove}
                 onOpenChange={setConfirmingRemove}
                 name={removing?.name ?? ""}
-                kind="connection"
+                kind={t("view.kind")}
                 requireTyping={false}
-                title="Remove connection"
-                question={
-                    <>
-                        Remove{" "}
-                        <span className="font-medium text-foreground">{removing?.name}</span>?
-                    </>
-                }
-                description="The connection goes; the database itself is untouched."
-                confirmLabel="Remove"
+                title={t("view.removeTitle")}
+                question={t.rich("view.removeQuestion", {
+                    name: removing?.name ?? "",
+                    b: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("view.removeBody")}
+                confirmLabel={t("view.remove")}
                 onConfirm={() => removing && void remove(removing)}
             />
         </div>

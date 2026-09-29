@@ -778,6 +778,7 @@ async function resolveTunnel(
             pinnedHostKey: [row.sshHostKey]
         },
         jump: jump ? serverOptions(jump) : null,
+        // i18n-ignore part of a refusal that lib/data/words says in the reader's words
         label: jump ? `${view.host} (through ${jump.name})` : view.host
     };
 }

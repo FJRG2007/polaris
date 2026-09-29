@@ -12,6 +12,7 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const saved: unknown[] = [];
 
@@ -53,8 +54,7 @@ afterEach(() => {
 
 function open() {
     return render(
-        <ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />
-    );
+        <ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />, { wrapper: MessagesWrapper });
 }
 
 /** A saved connection reached over SSH, as the list hands one to the form. */
@@ -84,8 +84,7 @@ function tunnelled(tunnel: Record<string, unknown>) {
             }
             onClose={() => undefined}
             onSaved={() => undefined}
-        />
-    );
+        />, { wrapper: MessagesWrapper });
 }
 
 const MANUAL_TUNNEL = {
