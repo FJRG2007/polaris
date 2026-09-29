@@ -24,6 +24,7 @@ import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import { spamReasonText } from "./spam-reason";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
 import { forwardSeed, replySeed } from "./answering";
@@ -244,8 +245,8 @@ export function ThreadView({
                 const opened = await readMessage(newest.id).catch((caught: unknown) => {
                     toast.show({
                         title:
-                            caught instanceof Error
-                                ? caught.message
+                            caught instanceof Error && caught.message
+                                ? mailRefusalText(t, caught.message)
                                 : t("thread.openFailed")
                     });
                     return null;
@@ -779,7 +780,9 @@ function MessageCard({
             } catch (caught) {
                 if (!live) return;
                 setFailed(
-                    caught instanceof Error ? caught.message : t("thread.openFailed")
+                    caught instanceof Error && caught.message
+                        ? mailRefusalText(t, caught.message)
+                        : t("thread.openFailed")
                 );
             }
         })();

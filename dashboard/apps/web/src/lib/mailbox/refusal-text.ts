@@ -59,6 +59,15 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "Not sent yet. Polaris could not reach the outgoing server, and will try again.": "refusals.sendRetrying",
     "Not sent yet. Polaris could not reach the outgoing server.": "refusals.sendUnreached",
     "It did not reach the address it was sent to.": "refusals.bounced",
+    // What the browser's own mail calls say when the answer never came back
+    // (`outbox`, `message-store`, `use-mail-list`).
+    "Polaris could not be reached. Try again.": "refusals.unreachable",
+    "That draft could not be saved.": "refusals.draftNotSaved",
+    "That message could not be sent.": "refusals.notSent",
+    "That message has already gone.": "refusals.alreadyGone",
+    "That message could not be sent now.": "refusals.notSentNow",
+    "That list could not be loaded.": "refusals.listNotLoaded",
+    "That message could not be opened.": "refusals.notOpened",
     "Not delivered yet, and the server is still trying.": "refusals.delayed",
     // core's mailbox schemas (`@polaris/core`), shared with the API and MCP tools.
     "Add something to match on": "schema.matchOn",

@@ -13,7 +13,8 @@
     "sendCheck": {
         "notStarted": "No se pudo iniciar esa comprobación.",
         "again": "Comprobar de nuevo",
-        "start": "Comprobar el envío"
+        "start": "Comprobar el envío",
+        "idle": "Envía un mensaje de este buzón a sí mismo y cuenta qué le pasa."
     },
     "nav": {
         "general": "General",

@@ -80,6 +80,8 @@ export function MailSearch() {
                         if (event.key === "Escape") setFiltersOpen(false);
                     }}
                     placeholder={t("searchBox.placeholder")}
+                    // What the list's keyboard looks for to hand "/" to the search.
+                    data-mail-search=""
                     aria-label={t("searchBox.placeholder")}
                     className="h-8 pl-7 pr-14 text-[13px]"
                 />

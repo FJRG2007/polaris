@@ -13,7 +13,8 @@
     "sendCheck": {
         "notStarted": "That check could not be started.",
         "again": "Check again",
-        "start": "Check sending"
+        "start": "Check sending",
+        "idle": "Sends a message from this mailbox to itself and reports what happens to it."
     },
     "nav": {
         "general": "General",

@@ -30,6 +30,8 @@ import { sendFile } from "@/components/transfers/move-file";
 import { useDockedCorner } from "@/components/docked-corner";
 import Link from "next/link";
 import { useBusy } from "./use-busy";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { RecipientField } from "./recipient-field";
@@ -117,6 +119,8 @@ export function Composer() {
     const { accounts, identities, composing, openComposer, refreshMailbox, viewerName, shelf } =
         useMail();
     const toast = useToast();
+    const t = useTranslations("mailCompose");
+    const tm = useTranslations("mail");
     const [sending, startSending] = useBusy();
 
     const [posture, setPosture] = useState<Posture>("docked");
@@ -267,7 +271,7 @@ export function Composer() {
             for (const file of chosen) {
                 if (file.size > core.MAIL_MAX_ATTACHMENT_BYTES) {
                     toast.show({
-                        title: `${file.name} is bigger than most mail servers will accept.`
+                        title: t("compose.tooBig", { name: file.name })
                     });
                     continue;
                 }
@@ -282,14 +286,14 @@ export function Composer() {
                     error?: string;
                 } | null;
                 if (!response.ok || !answer?.upload) {
-                    toast.show({ title: answer?.error ?? "That file could not be attached." });
+                    toast.show({ title: answer?.error ?? t("compose.attachFailed") });
                     continue;
                 }
                 const stored = answer.upload;
                 setFiles((held) => [...held, stored]);
             }
         },
-        [toast]
+        [toast, t]
     );
 
     /**
@@ -359,7 +363,7 @@ export function Composer() {
                 });
                 if (outbox.isRefused(outcome)) {
                     saves.current?.release();
-                    setProblem(outcome.error);
+                    setProblem(mailRefusalText(tm, outcome.error));
                     return;
                 }
                 saves.current?.adopt(outcome.draftId, fields);
@@ -392,21 +396,21 @@ export function Composer() {
             void (async () => {
                 const outcome = await outbox.undoSend(draftId);
                 if (outbox.isRefused(outcome)) {
-                    toast.show({ title: outcome.error });
+                    toast.show({ title: mailRefusalText(tm, outcome.error) });
                     return;
                 }
                 if (outcome.undone) {
                     setQueued(null);
                     saves.current?.release();
-                    toast.show({ title: "Brought back. Nothing was sent." });
+                    toast.show({ title: t("compose.undone") });
                     refreshMailbox();
                     return;
                 }
-                toast.show({ title: "That message has already gone." });
+                toast.show({ title: t("compose.gone") });
                 openComposer(null);
             })();
         },
-        [openComposer, refreshMailbox, toast]
+        [openComposer, refreshMailbox, toast, t]
     );
 
     /** Skip the rest of the wait. The composer closes at once: the message is
@@ -417,14 +421,14 @@ export function Composer() {
             void (async () => {
                 const outcome = await outbox.sendNow(draftId);
                 if (outbox.isRefused(outcome)) {
-                    toast.show({ title: outcome.error });
+                    toast.show({ title: mailRefusalText(tm, outcome.error) });
                     return;
                 }
-                if (outcome.sent) toast.show({ title: "Sending it now." });
+                if (outcome.sent) toast.show({ title: t("compose.sendingNow") });
                 refreshMailbox();
             })();
         },
-        [openComposer, refreshMailbox, toast]
+        [openComposer, refreshMailbox, toast, t]
     );
 
     /**
@@ -519,7 +523,7 @@ export function Composer() {
                 )}
                 ref={shell}
                 role="dialog"
-                aria-label="New message"
+                aria-label={t("compose.title")}
                 aria-hidden={queued ? true : undefined}
                 inert={queued ? true : undefined}
             >
@@ -529,15 +533,15 @@ export function Composer() {
                         className="min-w-0 flex-1 truncate text-left text-[13px] font-medium"
                         onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
                     >
-                        {subject.trim() || "New message"}
+                        {subject.trim() || t("compose.title")}
                     </button>
                     <Button
                         variant="ghost"
                         size="icon"
                         aria-label={
-                            posture === "minimized" ? "Open the composer" : "Minimize the composer"
+                            posture === "minimized" ? t("compose.open") : t("compose.minimize")
                         }
-                        title={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
+                        title={posture === "minimized" ? t("compose.open") : t("compose.minimize")}
                         onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
                     >
                         <Minus className="size-4 shrink-0" aria-hidden />
@@ -545,8 +549,8 @@ export function Composer() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={posture === "full" ? "Shrink the composer" : "Expand the composer"}
-                        title={posture === "full" ? "Shrink the composer" : "Expand the composer"}
+                        aria-label={posture === "full" ? t("compose.shrink") : t("compose.expand")}
+                        title={posture === "full" ? t("compose.shrink") : t("compose.expand")}
                         onClick={() => setPosture(posture === "full" ? "docked" : "full")}
                     >
                         {posture === "full" ? (
@@ -558,8 +562,8 @@ export function Composer() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Close the composer"
-                        title="Close the composer"
+                        aria-label={t("compose.close")}
+                        title={t("compose.close")}
                         onClick={close}
                     >
                         <X className="size-4 shrink-0" aria-hidden />
@@ -571,7 +575,7 @@ export function Composer() {
                         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
                             <div className="space-y-1.5 border-b border-border px-4 py-3">
                                 <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                    <span className="w-12 shrink-0">From</span>
+                                    <span className="w-12 shrink-0">{t("compose.from")}</span>
                                     {accounts.length > 1 || own.length > 0 ? (
                                         <Select
                                             value={
@@ -588,7 +592,7 @@ export function Composer() {
                                                 setAccountId(id ?? "");
                                                 setIdentityId("");
                                             }}
-                                            aria-label="The address this is sent from"
+                                            aria-label={t("compose.fromLabel")}
                                             className="min-w-0 flex-1"
                                             options={accounts.flatMap((one) => [
                                                 {
@@ -599,7 +603,7 @@ export function Composer() {
                                                 },
                                                 ...(identities[one.id] ?? []).map((alias) => ({
                                                     value: `identity:${alias.id}`,
-                                                    label: `${alias.address} (via ${one.address})`
+                                                    label: t("compose.via", { alias: alias.address, address: one.address })
                                                 }))
                                             ])}
                                         />
@@ -610,11 +614,11 @@ export function Composer() {
                                     )}
                                 </label>
 
-                                <RecipientField label="To" value={to} onChange={setTo} autoFocus />
+                                <RecipientField label={t("compose.to")} value={to} onChange={setTo} autoFocus />
                                 {showCopies ? (
                                     <>
-                                        <RecipientField label="Cc" value={cc} onChange={setCc} />
-                                        <RecipientField label="Bcc" value={bcc} onChange={setBcc} />
+                                        <RecipientField label={t("compose.cc")} value={cc} onChange={setCc} />
+                                        <RecipientField label={t("compose.bcc")} value={bcc} onChange={setBcc} />
                                     </>
                                 ) : (
                                     <button
@@ -622,16 +626,16 @@ export function Composer() {
                                         className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
                                         onClick={() => setShowCopies(true)}
                                     >
-                                        Add a copy or a blind copy
+                                        {t("compose.addCopies")}
                                     </button>
                                 )}
 
                                 <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                    <span className="w-12 shrink-0">Subject</span>
+                                    <span className="w-12 shrink-0">{t("compose.subject")}</span>
                                     <Input
                                         value={subject}
                                         onChange={(event) => setSubject(event.target.value)}
-                                        aria-label="Subject"
+                                        aria-label={t("compose.subject")}
                                         className="h-8 min-w-0 flex-1 text-[13px]"
                                     />
                                 </label>
@@ -648,7 +652,7 @@ export function Composer() {
                                     focusAt={focusAt}
                                     focusWhere={ownLine ? "start" : "end"}
                                     leadingBlankLine={ownLine}
-                                    placeholder="Write your message"
+                                    placeholder={t("compose.bodyPlaceholder")}
                                     className="flex min-h-[14rem] flex-1 flex-col"
                                     // A screenshot pasted in is an attachment rather
                                     // than a picture pasted into the text: a data URI
@@ -664,11 +668,11 @@ export function Composer() {
                             {carrying ? (
                                 <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
                                     <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                                    Bringing the files over from the original message
+                                    {t("compose.carrying")}
                                 </p>
                             ) : notCarried.length > 0 ? (
                                 <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
-                                    Not carried over: {notCarried.join(", ")}. Attach again if needed.
+                                    {t("compose.notCarried", { names: notCarried.join(", ") })}
                                 </p>
                             ) : null}
 
@@ -688,8 +692,8 @@ export function Composer() {
                                             </span>
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${file.name}`}
-                                                title={`Remove ${file.name}`}
+                                                aria-label={t("recipients.remove", { address: file.name })}
+                                                title={t("recipients.remove", { address: file.name })}
                                                 className="text-foreground-subtle hover:text-foreground"
                                                 onClick={() => void remove(file.id)}
                                             >
@@ -713,7 +717,7 @@ export function Composer() {
                                     ) : (
                                         <Send className="size-4 shrink-0" aria-hidden />
                                     )}
-                                    {sendAt ? "Schedule" : "Send"}
+                                    {sendAt ? t("compose.schedule") : t("compose.send")}
                                 </Button>
                                 <SendLaterMenu
                                     disabled={sending || to.length === 0 || !accountId}
@@ -728,8 +732,8 @@ export function Composer() {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Attach a file"
-                                title="Attach a file"
+                                aria-label={t("compose.attach")}
+                                title={t("compose.attach")}
                                 onClick={() => setPicking(true)}
                             >
                                 <Paperclip className="size-4 shrink-0" aria-hidden />
@@ -755,8 +759,8 @@ export function Composer() {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Insert your signature"
-                                    title="Insert your signature"
+                                    aria-label={t("compose.signature")}
+                                    title={t("compose.signature")}
                                     onClick={() =>
                                         setInsert({
                                             token: Date.now(),
@@ -779,7 +783,7 @@ export function Composer() {
 
                 {picking ? (
                     <FilePickerDialog
-                        title="Attach to this message"
+                        title={t("compose.attachTitle")}
                         onClose={() => setPicking(false)}
                         onPick={(picked) => void attachPicked(picked)}
                     />
@@ -813,6 +817,7 @@ function TemplateMenu({
     accountId: string;
     onPick: (template: MailTemplateView) => void;
 }) {
+    const t = useTranslations("mailCompose");
     const [templates, setTemplates] = useState<MailTemplateView[] | null>(null);
 
     const offered = (templates ?? []).filter(
@@ -830,8 +835,8 @@ function TemplateMenu({
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Insert a template"
-                    title="Insert a template"
+                    aria-label={t("compose.template")}
+                    title={t("compose.template")}
                 >
                     <FileText className="size-4 shrink-0" aria-hidden />
                 </Button>
@@ -840,10 +845,10 @@ function TemplateMenu({
                 {templates === null ? (
                     <DropdownMenuItem disabled>
                         <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                        Loading templates
+                        {t("compose.loadingTemplates")}
                     </DropdownMenuItem>
                 ) : offered.length === 0 ? (
-                    <DropdownMenuItem disabled>No templates for this mailbox yet</DropdownMenuItem>
+                    <DropdownMenuItem disabled>{t("compose.noTemplates")}</DropdownMenuItem>
                 ) : (
                     offered.map((template) => (
                         <DropdownMenuItem key={template.id} onSelect={() => onPick(template)}>
@@ -853,7 +858,7 @@ function TemplateMenu({
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                    <Link href="/mail/settings/templates">Manage templates</Link>
+                    <Link href="/mail/settings/templates">{t("compose.manageTemplates")}</Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -876,6 +881,8 @@ function SendLaterMenu({
     chosen: Date | null;
     onChoose: (when: Date | null) => void;
 }) {
+    const t = useTranslations("mailCompose");
+    const tc = useTranslations("common");
     const [custom, setCustom] = useState("");
     const [asking, setAsking] = useState(false);
 
@@ -887,26 +894,26 @@ function SendLaterMenu({
                         size="icon"
                         className="rounded-l-none border-l border-black/20"
                         disabled={disabled}
-                        aria-label="Send later"
-                        title="Send later"
+                        aria-label={t("compose.sendLater")}
+                        title={t("compose.sendLater")}
                     >
                         <ChevronDown className="size-4 shrink-0" aria-hidden />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     {SEND_TIMES.map((entry) => (
-                        <DropdownMenuItem key={entry.label} onSelect={() => onChoose(entry.when())}>
+                        <DropdownMenuItem key={entry.id} onSelect={() => onChoose(entry.when())}>
                             <Clock className="size-3.5 shrink-0" aria-hidden />
-                            {entry.label}
+                            {t(`compose.times.${entry.id}`)}
                         </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setAsking(true)}>
-                        Pick a time...
+                        {t("compose.pickTime")}
                     </DropdownMenuItem>
                     {chosen ? (
                         <DropdownMenuItem onSelect={() => onChoose(null)}>
-                            Send it now instead
+                            {t("compose.sendNowInstead")}
                         </DropdownMenuItem>
                     ) : null}
                 </DropdownMenuContent>
@@ -916,12 +923,12 @@ function SendLaterMenu({
                 <Dialog open onOpenChange={(next) => (next ? undefined : setAsking(false))}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Send this when?</DialogTitle>
+                            <DialogTitle>{t("compose.when")}</DialogTitle>
                         </DialogHeader>
                         <Input
                             type="datetime-local"
                             value={custom}
-                            aria-label="The time to send it"
+                            aria-label={t("compose.timeLabel")}
                             onChange={(event) => setCustom(event.target.value)}
                         />
                         <div className="mt-3 flex gap-2">
@@ -932,10 +939,10 @@ function SendLaterMenu({
                                     setAsking(false);
                                 }}
                             >
-                                Schedule it
+                                {t("compose.scheduleIt")}
                             </Button>
                             <Button variant="ghost" onClick={() => setAsking(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                         </div>
                     </DialogContent>
@@ -946,9 +953,9 @@ function SendLaterMenu({
 }
 
 /** The times worth having on a menu. Anything else is the picker. */
-const SEND_TIMES: readonly { label: string; when: () => Date }[] = [
+const SEND_TIMES: readonly { id: "laterToday" | "tomorrow" | "monday"; when: () => Date }[] = [
     {
-        label: "Later today",
+        id: "laterToday",
         when: () => {
             const when = new Date();
             when.setHours(when.getHours() + 3, 0, 0, 0);
@@ -956,7 +963,7 @@ const SEND_TIMES: readonly { label: string; when: () => Date }[] = [
         }
     },
     {
-        label: "Tomorrow morning",
+        id: "tomorrow",
         when: () => {
             const when = new Date();
             when.setDate(when.getDate() + 1);
@@ -965,7 +972,7 @@ const SEND_TIMES: readonly { label: string; when: () => Date }[] = [
         }
     },
     {
-        label: "Monday morning",
+        id: "monday",
         when: () => {
             const when = new Date();
             when.setDate(when.getDate() + ((8 - when.getDay()) % 7 || 7));
@@ -996,6 +1003,7 @@ function QueuedPill({
     onDone: () => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("mailCompose");
     const [left, setLeft] = useState(() => secondsUntil(until));
     // Anything further out than a minute is a scheduled message rather than a
     // send in progress, and counting down to Thursday would be absurd. Decided
@@ -1042,18 +1050,18 @@ function QueuedPill({
                 aria-live="polite"
             >
                 {scheduled
-                    ? `Scheduled for ${format.dateTime(new Date(until))}`
+                    ? t("compose.scheduledFor", { time: format.dateTime(new Date(until)) })
                     : left > 0
-                      ? `Sending in ${left}s`
-                      : "Sending"}
+                      ? t("compose.sendingIn", { seconds: left })
+                      : t("compose.sending")}
             </p>
             {waiting ? (
                 <>
                     <Button size="sm" variant="ghost" className="rounded-full" onClick={onUndo}>
-                        {scheduled ? "Bring it back" : "Undo"}
+                        {scheduled ? t("compose.bringBack") : t("compose.undo")}
                     </Button>
                     <Button size="sm" variant="secondary" className="rounded-full" onClick={onSendNow}>
-                        Send now
+                        {t("compose.sendNow")}
                     </Button>
                 </>
             ) : null}
@@ -1062,8 +1070,8 @@ function QueuedPill({
                     size="icon"
                     variant="ghost"
                     className="rounded-full"
-                    aria-label="Close"
-                    title="Close"
+                    aria-label={t("compose.closePill")}
+                    title={t("compose.closePill")}
                     onClick={onDone}
                 >
                     <X className="size-4 shrink-0" aria-hidden />
