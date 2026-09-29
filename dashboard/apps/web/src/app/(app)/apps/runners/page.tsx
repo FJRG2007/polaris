@@ -10,6 +10,8 @@ import { getRunnerAccess } from "@/lib/github-runners";
 import { listRunnerPools } from "@/lib/runners/runner-service";
 import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
+import { getTranslations } from "@/lib/i18n/request";
+import { runnerText } from "@/lib/runners/words";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function RunnersPage() {
     const user = await requirePermission("system.manage");
+    const t = await getTranslations("runners");
     const [pools, hosts, localName, identity] = await Promise.all([
         listRunnerPools(user.id),
         listHosts(user.id),
@@ -48,8 +51,8 @@ export default async function RunnersPage() {
     return (
         <>
             <PageHeader
-                title="Runners"
-                description="Run GitHub Actions workflows on your own servers. Each job gets a runner that registers, takes that one job, and disappears."
+                title={t("page.title")}
+                description={t("page.description")}
             />
             <RunnersView
                 pools={pools}
@@ -71,11 +74,12 @@ export default async function RunnersPage() {
 async function GithubAccess() {
     const access = await getRunnerAccess().catch(() => null);
     if (access?.ready) return null;
+    const t = await getTranslations("runners");
     return (
         <Notice>
-            {access?.advice ?? "Connect GitHub before adding runners."}{" "}
+            {access?.advice ? runnerText(t, access.advice) : t("page.connect")}{" "}
             <Link href="/admin/integrations" className="underline">
-                Open Integrations
+                {t("page.openIntegrations")}
             </Link>
         </Notice>
     );

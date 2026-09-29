@@ -1,1 +1,380 @@
-{}
+{
+    "pools": {
+        "title": "Runner pools",
+        "checkNow": "Check the pools now",
+        "intro": "A pool keeps runners waiting on one of your servers, so a job runs there instead of on GitHub's machines. Each one registers, takes a single job, and disappears - nothing is left on the machine between jobs.",
+        "snippet": "Once a pool exists, this is what sends a job to it:",
+        "guideLink": "What to set up first, and what to be careful with",
+        "paused": "Paused",
+        "contained": "Contained",
+        "shares": "Shares {host}",
+        "waiting": "{live} of {max} waiting on {host}",
+        "remove": "Remove",
+        "rereadNamed": "Re-read what {name} serves",
+        "reread": "Re-read what it serves",
+        "pauseNamed": "Pause {name}",
+        "resumeNamed": "Resume {name}",
+        "pause": "Pause",
+        "resume": "Resume",
+        "removeNamed": "Remove {name}",
+        "showMore": "Show {count} more",
+        "starting": "Starting the first runner...",
+        "pausedNone": "Paused, so no runners are waiting.",
+        "spentOf": "{spent}/{budget} min",
+        "spent": "{spent} min",
+        "jobsOf": "{ran}/{allowed} today",
+        "queued": "{count} queued",
+        "up": "{count} up",
+        "atOnce": "{count} at once each",
+        "minutesDay": "{count} min a day",
+        "minutesMonth": "{count} min a month",
+        "jobsDay": "{count} jobs a day"
+    },
+    "jobs": {
+        "states": {
+            "starting": "Starting",
+            "idle": "Waiting for a job",
+            "busy": "Running a job",
+            "finished": "Finished",
+            "failed": "Never started"
+        }
+    },
+    "scope": {
+        "organization": "{name} (organization)",
+        "anOrganization": "an organization (organization)",
+        "nothingYet": "nothing yet",
+        "repositories": "{count} repositories"
+    },
+    "notes": {
+        "couldNotReconcile": "Could not reconcile this pool",
+        "servesNothing": "This pool serves no repositories.",
+        "noLongerServed": "The pool no longer serves this repository.",
+        "didNotStart": "The machine did not start the runner",
+        "exitedEarly": "The runner exited before it registered",
+        "usersUnlinked": "None of the people chosen have linked a GitHub account yet, so there is nothing to serve.",
+        "groupUnlinked": "Nobody in that group has linked a GitHub account yet, so there is nothing to serve.",
+        "scopeEmpty": "This scope resolves to no repositories.",
+        "scopeUnread": "This pool's scope could not be read, so it is serving whatever it last resolved to.",
+        "publicRefused": "This repository is public, so anybody can open a pull request that runs on your machine. Allow public repositories on it if that is what you want.",
+        "noEvents": "Nothing is allowed to run here: no events are turned on.",
+        "publicSecrets": "This repository is public and its jobs can read the secrets set for it. Anybody who gets a workflow to run here reads them too.",
+        "forkSecrets": "Pull requests from forks run here and their jobs can read the secrets set for it. Whoever opens one chooses the code that reads them.",
+        "poolNotFound": "Pool not found",
+        "notServed": "This pool does not serve that repository",
+        "noRunnerVersion": "GitHub returned no usable runner version",
+        "minutesToday": "Used {used} of {budget} minutes today.",
+        "minutesMonth": "Used {used} of {budget} minutes this month.",
+        "jobsToday": "Ran {ran} of {allowed} jobs allowed today.",
+        "overBudget": "{count} repositories are over their budget this window.",
+        "stoppedServingMore": "Stopped serving {names} and {rest} more.",
+        "stoppedServing": "Stopped serving {names}.",
+        "tooMany": "This resolves to {count} repositories; the {max} most recently pushed are served.",
+        "noRepositoriesOn": "Polaris cannot see any repositories on {owner}. Check the GitHub App is installed there.",
+        "noRunnerFor": "GitHub publishes no runner for {platform} on {arch}",
+        "releaseUnread": "Could not read the runner release from GitHub ({status})",
+        "noRunnerBuild": "GitHub publishes no {platform} runner for {version}",
+        "noChecksum": "GitHub published no checksum for the {platform} runner {version}",
+        "scopeServesNothing": "This scope serves no repositories.",
+        "nobodyLinked": "Nobody chosen has linked a GitHub account yet, so this pool would serve nothing.",
+        "noRunnerForMachine": "GitHub publishes no runner for {platform} on {arch}."
+    },
+    "machine": {
+        "unreported": "This machine did not report what it has, so start with one job and watch it.",
+        "engineUnreachable": "Polaris cannot reach this machine's container engine, which is the only way it runs jobs here. Check that the host daemon is running.",
+        "processors": "{count, plural, one {# processor} other {# processors}}",
+        "memory": "{size} of memory",
+        "free": "{size} free",
+        "thisSystem": "this system",
+        "thisProcessor": "this processor",
+        "room": "{summary}: room for about {count, plural, one {# job} other {# jobs}} at once.",
+        "notEnough": "{summary} is not enough to run a job here. One job needs about {memory} of memory and {disk} of free disk, on top of what the machine is already doing.",
+        "worth": "This machine is worth about {count, plural, one {# job} other {# jobs}} at once ({note}).",
+        "asking": "Asking the server what it can run...",
+        "platform": "{platform} on {arch}{engine, select, yes {} local {, no container engine Polaris can reach} other {, no container engine for the Polaris login}}."
+    },
+    "access": {
+        "connect": "Connect GitHub under Integrations before adding runners.",
+        "fineGrained": "Polaris cannot read a fine-grained token's permissions. Give it Administration: read and write on the repositories you want runners for, and it will tell you if that is missing when you add one.",
+        "tokenScopes": "This token has neither the `repo` nor the `admin:org` scope, so it cannot register runners. Replace it, or connect a GitHub App instead.",
+        "appNotInstalled": "The GitHub App is not installed on any account yet.",
+        "appPermissions": "The GitHub App cannot register runners yet. On its settings page add Repository permissions > Administration: Read and write for repository runners, or Organization permissions > Self-hosted runners: Read and write for organization-wide ones, then approve the request on each installation.",
+        "notInstalledOn": "The GitHub App is not installed on {owner}.",
+        "noOrgRunners": "The connection cannot register organization runners for {owner}. Grant it Organization permissions > Self-hosted runners: Read and write.",
+        "noRepoRunners": "The connection cannot register runners on {owner}''s repositories. Grant it Repository permissions > Administration: Read and write, or register at the organization level instead."
+    },
+    "schema": {
+        "enterAccount": "Enter the GitHub account",
+        "notAccount": "Not a GitHub account name",
+        "enterRepository": "Enter the repository",
+        "notRepository": "Not a repository name",
+        "pickRepository": "Pick at least one repository",
+        "pickPerson": "Pick at least one person",
+        "pickGroup": "Pick a group",
+        "tooManyLabels": "Ten labels is plenty",
+        "needsLabel": "A pool needs at least one label",
+        "namePool": "Name this pool",
+        "oneRunner": "At least one runner",
+        "nameSecret": "Name this secret",
+        "nameTooLong": "That name is too long",
+        "nameShape": "A name can only be letters, digits and underscores, and cannot start with a digit",
+        "enterValue": "Enter the value",
+        "valueTooLong": "That value is too long for a runner to carry",
+        "valueOneLine": "A value has to be one line. For a key or a certificate, store it as base64 and decode it in the workflow step that needs it.",
+        "reservedName": "Names starting with {prefix} belong to the runner and cannot be replaced"
+    },
+    "errors": {
+        "checkPool": "Check the pool settings",
+        "create": "Could not create the pool",
+        "change": "Could not change the pool",
+        "remove": "Could not remove the pool",
+        "chooseServer": "Choose a server",
+        "unreachable": "Could not reach that server",
+        "reread": "Could not re-read the scope",
+        "checkScope": "Check the scope",
+        "readScope": "Could not read that scope",
+        "checkChoice": "Check what you chose",
+        "save": "Could not save that",
+        "checkRepository": "Check the repository",
+        "githubRefused": "GitHub would not change that setting"
+    },
+    "dialog": {
+        "defaultName": "Build",
+        "checkValue": "Check this value",
+        "isolation": {
+            "container": "Its own container",
+            "workspace": "A clean directory on the machine"
+        },
+        "summary": {
+            "noLabels": "no labels",
+            "atOnce": "{count, plural, one {# job} other {# jobs}} at once",
+            "contained": "contained",
+            "directory": "a directory on the machine",
+            "each": "{count} each",
+            "noLimits": "no limits"
+        },
+        "add": "Add a pool",
+        "title": "New runner pool",
+        "intro": "Polaris keeps runners waiting on one of your servers. Workflows reach them with<code>runs-on</code>.",
+        "runsOn": "Runs on",
+        "pickServer": "Pick a server",
+        "thisMachine": "{name} (this machine)",
+        "spread": "{repos} repositories share {count, plural, one {# runner} other {# runners}}. Whoever has a job queued gets them first; the rest wait.",
+        "advanced": "Advanced",
+        "name": "Name",
+        "labels": "Labels",
+        "labelsHint": "Comma separated. A workflow lands here when its <code>runs-on</code> asks for these.",
+        "jobsAtOnce": "Jobs at once",
+        "worthAbout": "This machine is worth about {count}",
+        "runsIn": "Each job runs in",
+        "limits": "Limits",
+        "limitsHint": "Per repository. Leave a field empty for no limit of that kind.",
+        "atOnce": "At once",
+        "any": "Any",
+        "minutes": "Minutes",
+        "per": "Per",
+        "day": "Day",
+        "month": "Month",
+        "jobsADay": "Jobs a day",
+        "runsOut": "When a repository runs out",
+        "onExhausted": {
+            "pause": "Stop serving it until the window turns over",
+            "warn": "Keep serving it, and say so on the pool"
+        },
+        "creating": "Creating...",
+        "create": "Create the pool",
+        "isolationNotes": {
+            "container": "Nothing survives the job. Steps that need a container engine of their own will not work.",
+            "localOnly": "Not available here: Polaris reaches this machine through its container engine only.",
+            "workspace": "An empty directory, not a boundary: a job can reach whatever the Polaris login can.",
+            "addEngine": "Add the container engine to this machine's Polaris login to isolate jobs properly."
+        }
+    },
+    "scopeField": {
+        "kinds": {
+            "repo": "One repository",
+            "repos": "Repositories you pick",
+            "account": "Everything in an account",
+            "org": "A whole organization",
+            "users": "People in Polaris",
+            "group": "A Polaris group"
+        },
+        "serve": "Runners serve",
+        "repoPlaceholder": "owner/repo, or a GitHub URL",
+        "notConnected": "GitHub is not connected, so only public repositories can be found. Connect it under Integrations.",
+        "organization": "Organization",
+        "account": "Account",
+        "orgHint": "One registration covers every repository in the organization. Needs the organization runner permission.",
+        "accountHint": "Every repository the account owns, re-read as it gains and loses them. Registers per repository, so it needs no organization permission.",
+        "people": "People",
+        "lookingPeople": "Looking up who has linked a GitHub account...",
+        "nobodyLinked": "Nobody has linked a GitHub account yet. They do it from their own profile.",
+        "group": "Group",
+        "lookingGroups": "Looking up groups...",
+        "groupLinked": "{name} ({count} linked)",
+        "groupHint": "Membership is read every time, so somebody added to the group is served without editing this.",
+        "working": "Working out what that comes to...",
+        "serves": "Serves {count, plural, one {# repository} other {# repositories}}."
+    },
+    "snippet": {
+        "add": "Add this to your workflow:",
+        "copyLine": "Copy this line",
+        "copy": "Copy"
+    },
+    "page": {
+        "title": "Runners",
+        "description": "Run GitHub Actions workflows on your own servers. Each job gets a runner that registers, takes that one job, and disappears.",
+        "connect": "Connect GitHub before adding runners.",
+        "openIntegrations": "Open Integrations"
+    },
+    "events": {
+        "push": {
+            "label": "Pushes",
+            "note": "A commit or tag pushed to this repository."
+        },
+        "pullRequest": {
+            "label": "Pull requests",
+            "note": "A pull request opened or updated, so it is built and tested before it is merged."
+        },
+        "workflowDispatch": {
+            "label": "Started by hand",
+            "note": "Somebody starting a workflow from the Actions tab."
+        },
+        "schedule": {
+            "label": "On a schedule",
+            "note": "A workflow on a cron, which runs whether anybody is watching or not."
+        },
+        "other": {
+            "label": "Everything else",
+            "note": "Releases, issue comments, and anything else a workflow listens for."
+        }
+    },
+    "repos": {
+        "none": "No pool is serving a repository yet.",
+        "noneHint": "A pool decides which machine runs jobs and how many at once. Once one exists, every repository it serves shows up here with its own settings.",
+        "wholeOrg": "Whole organization",
+        "save": "Save",
+        "orgNote": "This pool registers one runner for the whole organization, so what is set here applies to every repository in it. Serve repositories one at a time if they need to differ.",
+        "whatMayRun": "What may run",
+        "forks": "Pull requests from forks",
+        "forksHint": "A fork's pull request is code written by whoever opened it. Off, the job is turned down before any step of it runs.",
+        "public": "Serve this repository even though it is public",
+        "publicHint": "Anybody on GitHub can open a pull request against a public repository. GitHub recommends never pointing a self-hosted runner at one.",
+        "secrets": "Let jobs read the secrets set for this repository",
+        "secretsHint": "The values from Secrets arrive as environment variables. Off, this repository's jobs get none of them.",
+        "publicOnGithub": "Public on GitHub",
+        "private": "Private",
+        "unknownVisibility": "Polaris has not been able to read this one yet",
+        "approvalLoose": "On GitHub, only contributors new to GitHub need approval before their pull request runs a workflow here. Anybody with an older account does not.",
+        "requireApproval": "Require approval for everyone outside the repository",
+        "title": "Repositories",
+        "description": "Which repositories can use your machines, for what, and whose code is allowed to."
+    },
+    "guard": {
+        "publicRefused": "This repository is public, and public repositories are not allowed on this runner.",
+        "eventUnread": "Polaris could not read this job's event, so it could not tell whether the code comes from a fork.",
+        "forkUnknown": "Polaris could not tell whether this pull request comes from a fork, so it did not run it.",
+        "headUnread": "Polaris could not read where this pull request's code comes from, so it did not run it.",
+        "eventRefused": "Jobs started by ''{event}'' are not allowed on this runner.",
+        "forkRefused": "This pull request''s code comes from {head}, which is a fork of {base}. Pull requests from forks are not allowed on this runner."
+    },
+    "runs": {
+        "outcomes": {
+            "ran": "Ran",
+            "running": "Running",
+            "refused": "Turned down",
+            "failed": "Never started"
+        },
+        "none": "Nothing has run yet.",
+        "noneHint": "A run appears here once one of your pools is handed a job. If a workflow is waiting on GitHub instead, the pool it should land on will say what is stopping it.",
+        "openPools": "Open pools",
+        "pool": "Pool",
+        "everyPool": "Every pool",
+        "repository": "Repository",
+        "everyRepository": "Every repository",
+        "outcome": "Outcome",
+        "everyOutcome": "Every outcome",
+        "count": "{count, plural, one {# run} other {# runs}}",
+        "countOf": "{shown} of {total}",
+        "noMatch": "No run matches those filters.",
+        "neverStarted": "A job that never started",
+        "onHost": "on {host}",
+        "openRun": "Open this run on GitHub",
+        "openOnGithub": "Open on GitHub",
+        "changeAllowed": "Change what this repository allows",
+        "title": "Runs",
+        "description": "Every job your machines were handed, including the ones Polaris turned down."
+    },
+    "secrets": {
+        "noPool": "There is no pool to give secrets to yet.",
+        "noPoolHint": "Secrets belong to a pool, because a pool is what starts the runners that carry them.",
+        "intro": "These arrive as environment variables, so a step reads one as <env></env>. They are separate from GitHub's own secrets, which only GitHub can put in <github></github>. A repository that has secrets turned off under Repositories gets none of these.",
+        "add": "Add a secret",
+        "none": "Nothing yet. A registry login or an internal endpoint is the usual first one.",
+        "hideNamed": "Hide {name}",
+        "showNamed": "Show {name}",
+        "hide": "Hide",
+        "show": "Show",
+        "kind": "secret",
+        "removeBody": "The next runner to start will not carry it. A job already running keeps what it was given.",
+        "nameShape": "Letters, digits and underscores only, and not starting with a digit",
+        "reservedPrefix": "That prefix belongs to the runner",
+        "oneLine": "A value has to be one line. Store a key as base64 and decode it in the step that needs it.",
+        "addTo": "Add a secret to {name}",
+        "addHint": "Runners started from now on carry it. Ones already waiting do not.",
+        "value": "Value",
+        "readableBy": "Readable by",
+        "everyServed": "Every repository this pool serves",
+        "overrideHint": "One repository's value wins over a shared one of the same name.",
+        "errors": {
+            "check": "Check the secret",
+            "save": "Could not save that secret",
+            "notASecret": "Not a secret",
+            "remove": "Could not remove that secret",
+            "gone": "That secret is gone",
+            "unreadable": "This value could not be read. Set it again to replace it."
+        },
+        "title": "Secrets",
+        "description": "Values your runners carry into a job. Set once, readable by the repositories you choose."
+    },
+    "guide": {
+        "title": "How it works",
+        "description": "Running GitHub Actions on your own machines: what to set up, what to change in a workflow, and what to be careful with.",
+        "connect": {
+            "title": "1. Connect GitHub, with permission to register runners",
+            "body": "Polaris registers a runner on your behalf, which needs more than reading a repository. Under <link>Integrations</link>, connect GitHub and give it <strong>Administration: read and write</strong> on the repositories you want runners for, or <strong>Self-hosted runners: read and write</strong> on the organization to cover all of them at once.",
+            "app": "A GitHub App is the better of the two connections: it can hold the narrow organization permission instead of blanket repository administration, its tokens expire on their own, and it does not belong to one person's account."
+        },
+        "pool": {
+            "title": "2. Add a pool",
+            "body": "A pool is one machine plus the repositories it serves. <link>Add one</link> and pick the server, how many jobs it may take at once, and whether jobs run in a container or in a directory on the machine.",
+            "container": "Prefer the container. A job in a container is thrown away with it; a job in a directory is a clean slate but not a boundary, and it can reach whatever the Polaris login on that machine can."
+        },
+        "workflow": {
+            "title": "3. Point a workflow at it",
+            "body": "Change one line. Where a workflow says <code>runs-on: ubuntu-latest</code>, it now says the labels your pool registered with:",
+            "then": "The next run queues on GitHub, Polaris notices, starts a runner for that repository, and the job lands on it. Each runner takes a single job and disappears, so nothing is left behind between jobs."
+        },
+        "repos": {
+            "title": "4. Decide what each repository may run",
+            "body": "Under <link>Repositories</link> every repository a pool serves has its own settings: which events run here (pushes, pull requests, on a schedule, by hand), whether pull requests from forks run at all, and whether its jobs can read your secrets.",
+            "check": "The check happens on the machine, after GitHub hands the job over and before any step of it runs, so a job that is not allowed never executes anything. It shows up under <link>Runs</link> as turned down, with the reason - which is what the person waiting on a red check needs."
+        },
+        "secrets": {
+            "title": "5. Give the runners what they need to read",
+            "body": "<link>Secrets</link> are values your machines carry into a job: a registry login, an endpoint that only exists inside your network, a key you would rather not upload to GitHub. They arrive as environment variables, so a step reads one as <env></env>.",
+            "github": "These are not GitHub's secrets and do not appear in <expression></expression> - only GitHub can fill that in. A secret can apply to every repository a pool serves or to one of them, and the narrower one wins."
+        },
+        "careful": {
+            "title": "What to be careful with",
+            "public": "<lead>Public repositories.</lead> Anybody on GitHub can open a pull request against one, and a pull request can change the workflow that runs. That is why Polaris will not serve a public repository until you say so on that repository, and why GitHub recommends never pointing a self-hosted runner at one.",
+            "forks": "<lead>Pull requests from forks.</lead> The code in one was written by whoever opened it. They are turned down by default. Turning them on for a repository means strangers' code runs on that machine with whatever the environment holds - which is why the secrets switch sits next to it.",
+            "network": "<lead>A container is not a promise about the network.</lead> A contained job cannot reach the machine's files, but it can reach whatever that machine can reach on the network. A runner on a box inside your network is inside your network.",
+            "budgets": "<lead>Budgets are per repository.</lead> A pool shared between repositories can be given a minute budget and a daily job limit so one busy repository is not the only one that ever gets served."
+        },
+        "nothing": {
+            "title": "When nothing runs",
+            "card": "The pool card says what is wrong with the pool - an unreachable machine, a missing permission, a repository over its budget. A job that reached a runner and was turned down says so under Runs, with the rule that turned it down.",
+            "labels": "If the workflow is still queued on GitHub and neither screen says anything, check that its <code>runs-on</code> labels match the pool's exactly - GitHub only offers a job to a runner carrying every label the job asked for."
+        }
+    }
+}

@@ -41,6 +41,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface PoolSecrets {
     id: string;
@@ -51,17 +52,15 @@ interface PoolSecrets {
 }
 
 export function SecretsView({ pools }: { pools: PoolSecrets[] }) {
+    const t = useTranslations("runners");
     if (pools.length === 0) {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-2">
-                    <p className="text-sm">There is no pool to give secrets to yet.</p>
-                    <p className="max-w-lg text-xs text-muted-foreground">
-                        Secrets belong to a pool, because a pool is what starts the runners that
-                        carry them.
-                    </p>
+                    <p className="text-sm">{t("secrets.noPool")}</p>
+                    <p className="max-w-lg text-xs text-muted-foreground">{t("secrets.noPoolHint")}</p>
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/apps/runners">Add a pool</Link>
+                        <Link href="/apps/runners">{t("dialog.add")}</Link>
                     </Button>
                 </CardBody>
             </Card>
@@ -71,10 +70,12 @@ export function SecretsView({ pools }: { pools: PoolSecrets[] }) {
     return (
         <div className="flex flex-col gap-4">
             <p className="max-w-2xl text-xs text-muted-foreground">
-                These arrive as environment variables, so a step reads one as <code>$NAME</code>.
-                They are separate from GitHub&apos;s own secrets, which only GitHub can put in{" "}
-                <code>{"${{ secrets.NAME }}"}</code>. A repository that has secrets turned off under
-                Repositories gets none of these.
+                {t.rich("secrets.intro", {
+                    // i18n-ignore a variable name, as a workflow step writes it
+                    env: () => <code key="env">$NAME</code>,
+                    // i18n-ignore GitHub's own expression syntax
+                    github: () => <code key="github">{"${{ secrets.NAME }}"}</code>
+                })}
             </p>
             {pools.map((pool) => (
                 <PoolCard key={pool.id} pool={pool} />
@@ -84,6 +85,7 @@ export function SecretsView({ pools }: { pools: PoolSecrets[] }) {
 }
 
 function PoolCard({ pool }: { pool: PoolSecrets }) {
+    const t = useTranslations("runners");
     const [adding, setAdding] = useState(false);
 
     return (
@@ -92,15 +94,12 @@ function PoolCard({ pool }: { pool: PoolSecrets }) {
                 <CardTitle>{pool.name}</CardTitle>
                 <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
-                    Add a secret
+                    {t("secrets.add")}
                 </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
                 {pool.secrets.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        Nothing yet. A registry login or an internal endpoint is the usual first
-                        one.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("secrets.none")}</p>
                 ) : (
                     <ul className="flex flex-col">
                         {pool.secrets.map((secret) => (
@@ -115,6 +114,7 @@ function PoolCard({ pool }: { pool: PoolSecrets }) {
 }
 
 function SecretRow({ secret }: { secret: RunnerSecretView }) {
+    const t = useTranslations("runners");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [shown, setShown] = useState<string | null>(null);
@@ -130,7 +130,7 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                     {secret.scopeKey ? (
                         <Badge variant="neutral">{secret.scopeKey}</Badge>
                     ) : (
-                        <Badge variant="neutral">Every repository</Badge>
+                        <Badge variant="neutral">{t("runs.everyRepository")}</Badge>
                     )}
                 </span>
                 {shown ? (
@@ -145,8 +145,8 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                 <Button
                     size="icon"
                     variant="ghost"
-                    aria-label={shown ? `Hide ${secret.key}` : `Show ${secret.key}`}
-                    title={shown ? "Hide" : "Show"}
+                    aria-label={shown ? t("secrets.hideNamed", { name: secret.key }) : t("secrets.showNamed", { name: secret.key })}
+                    title={shown ? t("secrets.hide") : t("secrets.show")}
                     disabled={pending}
                     onClick={() => {
                         setError(null);
@@ -166,8 +166,8 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                 <Button
                     size="icon"
                     variant="ghost"
-                    aria-label={`Remove ${secret.key}`}
-                    title="Remove"
+                    aria-label={t("pools.removeNamed", { name: secret.key })}
+                    title={t("pools.remove")}
                     disabled={pending}
                     onClick={() => setConfirming(true)}
                 >
@@ -179,10 +179,10 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={secret.key}
-                kind="secret"
+                kind={t("secrets.kind")}
                 requireTyping={false}
-                description="The next runner to start will not carry it. A job already running keeps what it was given."
-                confirmLabel="Remove"
+                description={t("secrets.removeBody")}
+                confirmLabel={t("pools.remove")}
                 pending={pending}
                 onConfirm={() =>
                     startTransition(async () => {
@@ -197,6 +197,8 @@ function SecretRow({ secret }: { secret: RunnerSecretView }) {
 }
 
 function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => void }) {
+    const t = useTranslations("runners");
+    const tcommon = useTranslations("common");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [key, setKey] = useState("");
@@ -208,23 +210,19 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
     // rather than after one. The server checks them again regardless.
     const nameProblem =
         key.trim() && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key.trim())
-            ? "Letters, digits and underscores only, and not starting with a digit"
+            ? t("secrets.nameShape")
             : /^(GITHUB_|RUNNER_|ACTIONS_)/i.test(key.trim())
-              ? "That prefix belongs to the runner"
+              ? t("secrets.reservedPrefix")
               : null;
-    const valueProblem = /[\r\n]/.test(value)
-        ? "A value has to be one line. Store a key as base64 and decode it in the step that needs it."
-        : null;
+    const valueProblem = /[\r\n]/.test(value) ? t("secrets.oneLine") : null;
     const ready = key.trim().length > 0 && value.length > 0 && !nameProblem && !valueProblem;
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a secret to {pool.name}</DialogTitle>
-                    <DialogDescription>
-                        Runners started from now on carry it. Ones already waiting do not.
-                    </DialogDescription>
+                    <DialogTitle>{t("secrets.addTo", { name: pool.name })}</DialogTitle>
+                    <DialogDescription>{t("secrets.addHint")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -249,11 +247,11 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
                     }}
                 >
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("dialog.name")}
                         <Input
                             value={key}
                             onChange={(event) => setKey(event.target.value)}
-                            placeholder="REGISTRY_TOKEN"
+                            placeholder="REGISTRY_TOKEN" // i18n-ignore an example variable name
                             autoFocus
                         />
                         {nameProblem ? (
@@ -262,7 +260,7 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        Value
+                        {t("secrets.value")}
                         <Input
                             type="password"
                             value={value}
@@ -276,21 +274,19 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
 
                     {pool.perRepo && pool.targets.length > 0 ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            Readable by
+                            {t("secrets.readableBy")}
                             <Select
                                 value={scope}
                                 onValueChange={setScope}
                                 options={[
-                                    { value: "", label: "Every repository this pool serves" },
+                                    { value: "", label: t("secrets.everyServed") },
                                     ...pool.targets.map((target) => ({
                                         value: target,
                                         label: target
                                     }))
                                 ]}
                             />
-                            <span className="text-xs text-muted-foreground">
-                                One repository&apos;s value wins over a shared one of the same name.
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("secrets.overrideHint")}</span>
                         </label>
                     ) : null}
 
@@ -298,10 +294,10 @@ function SecretDialog({ pool, onClose }: { pool: PoolSecrets; onClose: () => voi
 
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={!ready || pending}>
-                            Save
+                            {t("repos.save")}
                         </Button>
                     </DialogFooter>
                 </form>

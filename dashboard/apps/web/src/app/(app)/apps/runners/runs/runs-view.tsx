@@ -20,13 +20,15 @@ import type { RunnerRunView } from "@/lib/runners/runner-runs";
 import { outcomeOf, type RunnerRunOutcome } from "@polaris/core";
 import { Badge, Button, Card, CardBody, Select, cn } from "@polaris/ui";
 import { CircleSlash, ExternalLink, GitBranch, Github, TriangleAlert, User } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { runnerText } from "@/lib/runners/words";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
-const OUTCOME_LABELS: Record<RunnerRunOutcome, string> = {
-    ran: "Ran",
-    running: "Running",
-    refused: "Turned down",
-    failed: "Never started"
-};
+const OUTCOMES: readonly RunnerRunOutcome[] = ["ran", "running", "refused", "failed"];
+
+function outcomeLabel(t: NamespaceTranslator<"runners">, outcome: RunnerRunOutcome): string {
+    return t(`runs.outcomes.${outcome}` as NamespaceKey<"runners">);
+}
 
 const OUTCOME_TONE: Record<RunnerRunOutcome, "neutral" | "primary" | "warning" | "danger"> = {
     ran: "neutral",
@@ -44,6 +46,7 @@ export function RunsView({
     pools: Array<{ id: string; name: string }>;
     targets: string[];
 }) {
+    const t = useTranslations("runners");
     const [pool, setPool] = useState("all");
     const [target, setTarget] = useState("all");
     const [outcome, setOutcome] = useState("all");
@@ -63,13 +66,10 @@ export function RunsView({
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-2">
-                    <p className="text-sm">Nothing has run yet.</p>
-                    <p className="max-w-lg text-xs text-muted-foreground">
-                        A run appears here once one of your pools is handed a job. If a workflow is waiting on GitHub
-                        instead, the pool it should land on will say what is stopping it.
-                    </p>
+                    <p className="text-sm">{t("runs.none")}</p>
+                    <p className="max-w-lg text-xs text-muted-foreground">{t("runs.noneHint")}</p>
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/apps/runners">Open pools</Link>
+                        <Link href="/apps/runners">{t("runs.openPools")}</Link>
                     </Button>
                 </CardBody>
             </Card>
@@ -81,50 +81,47 @@ export function RunsView({
             <div className="flex flex-wrap items-center gap-2">
                 {pools.length > 1 ? (
                     <Select
-                        aria-label="Pool"
+                        aria-label={t("runs.pool")}
                         value={pool}
                         onValueChange={setPool}
                         className="w-44"
                         options={[
-                            { value: "all", label: "Every pool" },
+                            { value: "all", label: t("runs.everyPool") },
                             ...pools.map((entry) => ({ value: entry.id, label: entry.name }))
                         ]}
                     />
                 ) : null}
                 {targets.length > 1 ? (
                     <Select
-                        aria-label="Repository"
+                        aria-label={t("runs.repository")}
                         value={target}
                         onValueChange={setTarget}
                         className="w-60"
                         options={[
-                            { value: "all", label: "Every repository" },
+                            { value: "all", label: t("runs.everyRepository") },
                             ...targets.map((entry) => ({ value: entry, label: entry }))
                         ]}
                     />
                 ) : null}
                 <Select
-                    aria-label="Outcome"
+                    aria-label={t("runs.outcome")}
                     value={outcome}
                     onValueChange={setOutcome}
                     className="w-44"
                     options={[
-                        { value: "all", label: "Every outcome" },
-                        { value: "ran", label: "Ran" },
-                        { value: "running", label: "Running" },
-                        { value: "refused", label: "Turned down" },
-                        { value: "failed", label: "Never started" }
+                        { value: "all", label: t("runs.everyOutcome") },
+                        ...OUTCOMES.map((entry) => ({ value: entry, label: outcomeLabel(t, entry) }))
                     ]}
                 />
                 <span className="ml-auto text-xs text-muted-foreground">
                     {shown.length === runs.length
-                        ? `${runs.length} ${runs.length === 1 ? "run" : "runs"}`
-                        : `${shown.length} of ${runs.length}`}
+                        ? t("runs.count", { count: runs.length })
+                        : t("runs.countOf", { shown: shown.length, total: runs.length })}
                 </span>
             </div>
 
             {shown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No run matches those filters.</p>
+                <p className="text-sm text-muted-foreground">{t("runs.noMatch")}</p>
             ) : (
                 <ul className="flex flex-col gap-2">
                     {shown.map((run) => (
@@ -137,6 +134,7 @@ export function RunsView({
 }
 
 function RunRow({ run, showPool }: { run: RunnerRunView; showPool: boolean }) {
+    const t = useTranslations("runners");
     const outcome = outcomeOf(run);
     const href = run.runId ? `https://github.com/${run.target}/actions/runs/${run.runId}` : null;
 
@@ -147,7 +145,7 @@ function RunRow({ run, showPool }: { run: RunnerRunView; showPool: boolean }) {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-col gap-1">
                             <span className="flex items-center gap-2 text-sm font-medium">
-                                <span className="truncate">{run.workflow ?? "A job that never started"}</span>
+                                <span className="truncate">{run.workflow ?? t("runs.neverStarted")}</span>
                                 {run.jobName ? (
                                     <span className="truncate text-xs text-muted-foreground">{run.jobName}</span>
                                 ) : null}
@@ -171,19 +169,19 @@ function RunRow({ run, showPool }: { run: RunnerRunView; showPool: boolean }) {
                                 ) : null}
                                 {run.event ? <span>{run.event}</span> : null}
                                 {showPool ? <span>{run.poolName}</span> : null}
-                                <span>on {run.hostName}</span>
+                                <span>{t("runs.onHost", { host: run.hostName })}</span>
                                 <Started at={run.startedAt} seconds={run.seconds} />
                             </span>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                            <Badge variant={OUTCOME_TONE[outcome]}>{OUTCOME_LABELS[outcome]}</Badge>
+                            <Badge variant={OUTCOME_TONE[outcome]}>{outcomeLabel(t, outcome)}</Badge>
                             {href ? (
                                 <Button
                                     asChild
                                     size="icon"
                                     variant="ghost"
-                                    aria-label="Open this run on GitHub"
-                                    title="Open on GitHub"
+                                    aria-label={t("runs.openRun")}
+                                    title={t("runs.openOnGithub")}
                                 >
                                     <a href={href} target="_blank" rel="noreferrer noopener">
                                         <ExternalLink className="size-4" />
@@ -195,15 +193,15 @@ function RunRow({ run, showPool }: { run: RunnerRunView; showPool: boolean }) {
 
                     {run.refusedReason ? (
                         <Reason tone="warning" icon={<CircleSlash className="size-3.5" />}>
-                            {run.refusedReason}{" "}
+                            {runnerText(t, run.refusedReason)}{" "}
                             <Link href="/apps/runners/repos" className="underline">
-                                Change what this repository allows
+                                {t("runs.changeAllowed")}
                             </Link>
                         </Reason>
                     ) : null}
                     {run.error ? (
                         <Reason tone="danger" icon={<TriangleAlert className="size-3.5" />}>
-                            {run.error}
+                            {runnerText(t, run.error)}
                         </Reason>
                     ) : null}
                 </CardBody>

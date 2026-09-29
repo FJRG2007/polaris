@@ -25,15 +25,11 @@ import {
     runnerPrincipalsAction,
     searchGithubReposAction
 } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
-const SCOPE_OPTIONS = [
-    { value: "repo", label: "One repository" },
-    { value: "repos", label: "Repositories you pick" },
-    { value: "account", label: "Everything in an account" },
-    { value: "org", label: "A whole organization" },
-    { value: "users", label: "People in Polaris" },
-    { value: "group", label: "A Polaris group" }
-];
+/** The kinds of scope, each said as `scopeField.kinds.<kind>`. */
+const SCOPE_KINDS = ["repo", "repos", "account", "org", "users", "group"] as const;
 
 interface Principals {
     people: Array<{ userId: string; name: string; login: string }>;
@@ -98,6 +94,7 @@ export function ScopeField({
      *  that serves nothing. */
     onPreview: (result: { count: number; note: string | null }) => void;
 }) {
+    const t = useTranslations("runners");
     const [connected, setConnected] = useState(true);
     const [principals, setPrincipals] = useState<Principals | null>(null);
     const [preview, setPreview] = useState<{ count: number; note: string | null } | null>(null);
@@ -174,13 +171,16 @@ export function ScopeField({
     return (
         <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1 text-sm">
-                Runners serve
+                {t("scopeField.serve")}
                 <Select
                     value={state.kind}
                     onValueChange={(value) =>
                         onChange({ ...EMPTY_SCOPE, kind: value as RunnerScopeInput["kind"] })
                     }
-                    options={SCOPE_OPTIONS}
+                    options={SCOPE_KINDS.map((kind) => ({
+                        value: kind,
+                        label: t(`scopeField.kinds.${kind}` as NamespaceKey<"runners">)
+                    }))}
                 />
             </label>
 
@@ -193,8 +193,8 @@ export function ScopeField({
                                     {full}
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${full}`}
-                                        title="Remove"
+                                        aria-label={t("pools.removeNamed", { name: full })}
+                                        title={t("pools.remove")}
                                         onClick={() =>
                                             onChange({
                                                 ...state,
@@ -217,14 +217,11 @@ export function ScopeField({
                                 search={searchGithubReposAction}
                                 onPick={(repo) => pick(repo.fullName)}
                                 selected={state.repos}
-                                placeholder="owner/repo, or a GitHub URL"
+                                placeholder={t("scopeField.repoPlaceholder")}
                                 maxHeightClass="max-h-40"
                             />
                             {!connected ? (
-                                <Hint>
-                                    GitHub is not connected, so only public repositories can be
-                                    found. Connect it under Integrations.
-                                </Hint>
+                                <Hint>{t("scopeField.notConnected")}</Hint>
                             ) : null}
                         </>
                     ) : null}
@@ -233,33 +230,28 @@ export function ScopeField({
 
             {state.kind === "account" || state.kind === "org" ? (
                 <label className="flex flex-col gap-1 text-sm">
-                    {state.kind === "org" ? "Organization" : "Account"}
+                    {state.kind === "org" ? t("scopeField.organization") : t("scopeField.account")}
                     <Input
                         value={state.owner}
                         onChange={(event) => onChange({ ...state, owner: event.target.value })}
-                        placeholder="acme"
+                        placeholder="acme" // i18n-ignore an example account name
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}
                     />
                     <Hint>
-                        {state.kind === "org"
-                            ? "One registration covers every repository in the organization. Needs the organization runner permission."
-                            : "Every repository the account owns, re-read as it gains and loses them. Registers per repository, so it needs no organization permission."}
+                        {state.kind === "org" ? t("scopeField.orgHint") : t("scopeField.accountHint")}
                     </Hint>
                 </label>
             ) : null}
 
             {state.kind === "users" ? (
                 <div className="flex flex-col gap-1 text-sm">
-                    People
+                    {t("scopeField.people")}
                     {principals === null ? (
-                        <Hint>Looking up who has linked a GitHub account...</Hint>
+                        <Hint>{t("scopeField.lookingPeople")}</Hint>
                     ) : principals.people.length === 0 ? (
-                        <Hint>
-                            Nobody has linked a GitHub account yet. They do it from their own
-                            profile.
-                        </Hint>
+                        <Hint>{t("scopeField.nobodyLinked")}</Hint>
                     ) : (
                         <ul className="max-h-40 overflow-y-auto overscroll-contain rounded-md border border-border/60">
                             {principals.people.map((person) => (
@@ -293,24 +285,21 @@ export function ScopeField({
 
             {state.kind === "group" ? (
                 <label className="flex flex-col gap-1 text-sm">
-                    Group
+                    {t("scopeField.group")}
                     {principals === null ? (
-                        <Hint>Looking up groups...</Hint>
+                        <Hint>{t("scopeField.lookingGroups")}</Hint>
                     ) : (
                         <Select
                             value={state.groupId}
                             onValueChange={(value) => onChange({ ...state, groupId: value })}
-                            placeholder="Pick a group"
+                            placeholder={t("schema.pickGroup")}
                             options={principals.groups.map((group) => ({
                                 value: group.id,
-                                label: `${group.name} (${group.linked} linked)`
+                                label: t("scopeField.groupLinked", { name: group.name, count: group.linked })
                             }))}
                         />
                     )}
-                    <Hint>
-                        Membership is read every time, so somebody added to the group is served
-                        without editing this.
-                    </Hint>
+                    <Hint>{t("scopeField.groupHint")}</Hint>
                 </label>
             ) : null}
 
@@ -326,10 +315,11 @@ function ScopePreview({
     checking: boolean;
     preview: { count: number; note: string | null } | null;
 }) {
+    const t = useTranslations("runners");
     if (checking) {
         return (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" /> Working out what that comes to...
+                <Loader2 className="size-3 animate-spin" /> {t("scopeField.working")}
             </span>
         );
     }
@@ -337,9 +327,7 @@ function ScopePreview({
     if (preview.note) return <span className="text-xs text-danger">{preview.note}</span>;
     if (preview.count === 0) return null;
     return (
-        <Hint>
-            Serves {preview.count} {preview.count === 1 ? "repository" : "repositories"}.
-        </Hint>
+        <Hint>{t("scopeField.serves", { count: preview.count })}</Hint>
     );
 }
 

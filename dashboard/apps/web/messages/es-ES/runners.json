@@ -1,1 +1,380 @@
-{}
+{
+    "pools": {
+        "title": "Grupos",
+        "checkNow": "Revisar los grupos ahora",
+        "intro": "Un grupo mantiene runners esperando en uno de tus servidores, para que un trabajo se ejecute ahí en vez de en las máquinas de GitHub. Cada uno se registra, toma un solo trabajo y desaparece: no queda nada en la máquina entre trabajos.",
+        "snippet": "Cuando exista un grupo, esto es lo que le envía un trabajo:",
+        "guideLink": "Qué configurar primero y con qué tener cuidado",
+        "paused": "En pausa",
+        "contained": "Aislado",
+        "shares": "Comparte {host}",
+        "waiting": "{live} de {max} esperando en {host}",
+        "remove": "Quitar",
+        "rereadNamed": "Releer a qué da servicio {name}",
+        "reread": "Releer a qué da servicio",
+        "pauseNamed": "Pausar {name}",
+        "resumeNamed": "Reanudar {name}",
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "removeNamed": "Quitar {name}",
+        "showMore": "Mostrar {count} más",
+        "starting": "Iniciando el primer runner...",
+        "pausedNone": "En pausa, así que no hay runners esperando.",
+        "spentOf": "{spent}/{budget} min",
+        "spent": "{spent} min",
+        "jobsOf": "{ran}/{allowed} hoy",
+        "queued": "{count} en cola",
+        "up": "{count, plural, one {# activo} other {# activos}}",
+        "atOnce": "{count} a la vez cada uno",
+        "minutesDay": "{count} min al día",
+        "minutesMonth": "{count} min al mes",
+        "jobsDay": "{count, plural, one {# trabajo} other {# trabajos}} al día"
+    },
+    "jobs": {
+        "states": {
+            "starting": "Iniciando",
+            "idle": "Esperando un trabajo",
+            "busy": "En un trabajo",
+            "finished": "Terminado",
+            "failed": "No se inició"
+        }
+    },
+    "scope": {
+        "organization": "{name} (organización)",
+        "anOrganization": "una organización (organización)",
+        "nothingYet": "nada aún",
+        "repositories": "{count} repositorios"
+    },
+    "notes": {
+        "couldNotReconcile": "No se pudo conciliar este grupo",
+        "servesNothing": "Este grupo no da servicio a ningún repositorio.",
+        "noLongerServed": "El grupo ya no da servicio a este repositorio.",
+        "didNotStart": "La máquina no inició el runner",
+        "exitedEarly": "El runner terminó antes de registrarse",
+        "usersUnlinked": "Ninguna de las personas elegidas ha vinculado aún una cuenta de GitHub, así que no hay nada a lo que dar servicio.",
+        "groupUnlinked": "Nadie de ese grupo ha vinculado aún una cuenta de GitHub, así que no hay nada a lo que dar servicio.",
+        "scopeEmpty": "Este alcance no incluye ningún repositorio.",
+        "scopeUnread": "No se pudo leer el alcance de este grupo, así que da servicio a lo último que incluía.",
+        "publicRefused": "Este repositorio es público, así que cualquiera puede abrir una pull request que se ejecute en tu máquina. Permite en él los repositorios públicos si es lo que quieres.",
+        "noEvents": "Aquí no se permite ejecutar nada: no hay ningún evento activado.",
+        "publicSecrets": "Este repositorio es público y sus trabajos pueden leer los secretos definidos para él. Cualquiera que consiga ejecutar aquí un workflow también los lee.",
+        "forkSecrets": "Las pull requests de forks se ejecutan aquí y sus trabajos pueden leer los secretos definidos para él. Quien abre una elige el código que los lee.",
+        "poolNotFound": "No existe el grupo",
+        "notServed": "Este grupo no da servicio a ese repositorio",
+        "noRunnerVersion": "GitHub no devolvió una versión de runner utilizable",
+        "minutesToday": "Usados {used} de {budget} minutos hoy.",
+        "minutesMonth": "Usados {used} de {budget} minutos este mes.",
+        "jobsToday": "Ejecutados {ran} de los {allowed} trabajos permitidos hoy.",
+        "overBudget": "{count} repositorios han superado su límite en este periodo.",
+        "stoppedServingMore": "Se dejó de dar servicio a {names} y {rest} más.",
+        "stoppedServing": "Se dejó de dar servicio a {names}.",
+        "tooMany": "Esto incluye {count} repositorios; se da servicio a los {max} con pushes más recientes.",
+        "noRepositoriesOn": "Polaris no ve ningún repositorio en {owner}. Comprueba que la GitHub App esté instalada ahí.",
+        "noRunnerFor": "GitHub no publica ningún runner para {platform} en {arch}",
+        "releaseUnread": "No se pudo leer la versión del runner en GitHub ({status})",
+        "noRunnerBuild": "GitHub no publica ningún runner {platform} para {version}",
+        "noChecksum": "GitHub no publicó suma de comprobación para el runner {platform} {version}",
+        "scopeServesNothing": "Este alcance no da servicio a ningún repositorio.",
+        "nobodyLinked": "Nadie de los elegidos ha vinculado aún una cuenta de GitHub, así que este grupo no daría servicio a nada.",
+        "noRunnerForMachine": "GitHub no publica ningún runner para {platform} en {arch}."
+    },
+    "machine": {
+        "unreported": "Esta máquina no informó de lo que tiene, así que empieza con un trabajo y obsérvala.",
+        "engineUnreachable": "Polaris no llega al motor de contenedores de esta máquina, que es la única forma en que ejecuta trabajos aquí. Comprueba que el daemon del host está en marcha.",
+        "processors": "{count, plural, one {# procesador} other {# procesadores}}",
+        "memory": "{size} de memoria",
+        "free": "{size} libres",
+        "thisSystem": "este sistema",
+        "thisProcessor": "este procesador",
+        "room": "{summary}: hay sitio para unos {count, plural, one {# trabajo} other {# trabajos}} a la vez.",
+        "notEnough": "{summary} no basta para ejecutar un trabajo aquí. Un trabajo necesita unos {memory} de memoria y {disk} de disco libre, además de lo que la máquina ya está haciendo.",
+        "worth": "Esta máquina da para unos {count, plural, one {# trabajo} other {# trabajos}} a la vez ({note}).",
+        "asking": "Preguntando al servidor qué puede ejecutar...",
+        "platform": "{platform} en {arch}{engine, select, yes {} local {, sin motor de contenedores al que llegue Polaris} other {, sin motor de contenedores para el usuario de Polaris}}."
+    },
+    "access": {
+        "connect": "Conecta GitHub en Integraciones antes de añadir runners.",
+        "fineGrained": "Polaris no puede leer los permisos de un token de grano fino. Dale Administration: read and write en los repositorios para los que quieras runners, y te avisará si falta al añadir uno.",
+        "tokenScopes": "Este token no tiene el scope `repo` ni el `admin:org`, así que no puede registrar runners. Sustitúyelo o conecta una GitHub App en su lugar.",
+        "appNotInstalled": "La GitHub App aún no está instalada en ninguna cuenta.",
+        "appPermissions": "La GitHub App aún no puede registrar runners. En su página de ajustes añade Repository permissions > Administration: Read and write para runners de repositorio, u Organization permissions > Self-hosted runners: Read and write para los de toda la organización, y aprueba la solicitud en cada instalación.",
+        "notInstalledOn": "La GitHub App no está instalada en {owner}.",
+        "noOrgRunners": "La conexión no puede registrar runners de organización para {owner}. Concédele Organization permissions > Self-hosted runners: Read and write.",
+        "noRepoRunners": "La conexión no puede registrar runners en los repositorios de {owner}. Concédele Repository permissions > Administration: Read and write, o regístralos a nivel de organización."
+    },
+    "schema": {
+        "enterAccount": "Escribe la cuenta de GitHub",
+        "notAccount": "No es una cuenta de GitHub",
+        "enterRepository": "Escribe el repositorio",
+        "notRepository": "No es un repositorio",
+        "pickRepository": "Elige al menos un repositorio",
+        "pickPerson": "Elige al menos una persona",
+        "pickGroup": "Elige un grupo",
+        "tooManyLabels": "Con diez etiquetas basta",
+        "needsLabel": "Un grupo necesita al menos una etiqueta",
+        "namePool": "Nombra el grupo",
+        "oneRunner": "Al menos un runner",
+        "nameSecret": "Nombra el secreto",
+        "nameTooLong": "Nombre demasiado largo",
+        "nameShape": "Un nombre solo puede tener letras, dígitos y guiones bajos, y no puede empezar por un dígito",
+        "enterValue": "Escribe el valor",
+        "valueTooLong": "Ese valor es demasiado largo para que lo lleve un runner",
+        "valueOneLine": "Un valor tiene que ser de una línea. Para una clave o un certificado, guárdalo en base64 y descodifícalo en el paso del workflow que lo necesite.",
+        "reservedName": "Los nombres que empiezan por {prefix} son del runner y no se pueden sustituir"
+    },
+    "errors": {
+        "checkPool": "Revisa los ajustes del grupo",
+        "create": "No se pudo crear el grupo",
+        "change": "No se pudo cambiar el grupo",
+        "remove": "No se pudo quitar el grupo",
+        "chooseServer": "Elige un servidor",
+        "unreachable": "No se pudo llegar a ese servidor",
+        "reread": "No se pudo releer el alcance",
+        "checkScope": "Revisa el alcance",
+        "readScope": "No se pudo leer ese alcance",
+        "checkChoice": "Revisa lo que has elegido",
+        "save": "No se pudo guardar",
+        "checkRepository": "Revisa el repositorio",
+        "githubRefused": "GitHub no quiso cambiar ese ajuste"
+    },
+    "dialog": {
+        "defaultName": "Build",
+        "checkValue": "Revisa este valor",
+        "isolation": {
+            "container": "Su propio contenedor",
+            "workspace": "Un directorio limpio en la máquina"
+        },
+        "summary": {
+            "noLabels": "sin etiquetas",
+            "atOnce": "{count, plural, one {# trabajo} other {# trabajos}} a la vez",
+            "contained": "aislado",
+            "directory": "un directorio en la máquina",
+            "each": "{count} cada uno",
+            "noLimits": "sin límites"
+        },
+        "add": "Añadir grupo",
+        "title": "Nuevo grupo",
+        "intro": "Polaris mantiene runners esperando en uno de tus servidores. Los workflows llegan a ellos con<code>runs-on</code>.",
+        "runsOn": "Servidor",
+        "pickServer": "Elige un servidor",
+        "thisMachine": "{name} (esta máquina)",
+        "spread": "{repos} repositorios comparten {count, plural, one {# runner} other {# runners}}. Quien tenga un trabajo en cola los recibe primero; el resto espera.",
+        "advanced": "Avanzado",
+        "name": "Nombre",
+        "labels": "Etiquetas",
+        "labelsHint": "Separadas por comas. Un workflow llega aquí cuando su <code>runs-on</code> las pide.",
+        "jobsAtOnce": "A la vez",
+        "worthAbout": "Esta máquina da para unos {count}",
+        "runsIn": "Cada trabajo va en",
+        "limits": "Límites",
+        "limitsHint": "Por repositorio. Deja un campo vacío para no poner límite de ese tipo.",
+        "atOnce": "A la vez",
+        "any": "Sin límite",
+        "minutes": "Minutos",
+        "per": "Por",
+        "day": "Día",
+        "month": "Mes",
+        "jobsADay": "Al día",
+        "runsOut": "Si un repositorio agota su cupo",
+        "onExhausted": {
+            "pause": "Dejar de darle servicio hasta que empiece el siguiente periodo",
+            "warn": "Seguir dándole servicio y avisarlo en el grupo"
+        },
+        "creating": "Creando...",
+        "create": "Crear el grupo",
+        "isolationNotes": {
+            "container": "Nada sobrevive al trabajo. Los pasos que necesiten su propio motor de contenedores no funcionarán.",
+            "localOnly": "No disponible aquí: Polaris solo llega a esta máquina a través de su motor de contenedores.",
+            "workspace": "Un directorio vacío, no una frontera: un trabajo puede llegar a todo lo que alcance el usuario de Polaris.",
+            "addEngine": "Añade el motor de contenedores al usuario de Polaris de esta máquina para aislar bien los trabajos."
+        }
+    },
+    "scopeField": {
+        "kinds": {
+            "repo": "Un repositorio",
+            "repos": "Repositorios que elijas",
+            "account": "Todo lo de una cuenta",
+            "org": "Toda una organización",
+            "users": "Personas de Polaris",
+            "group": "Un grupo de Polaris"
+        },
+        "serve": "Da servicio a",
+        "repoPlaceholder": "owner/repo, o una URL de GitHub",
+        "notConnected": "GitHub no está conectado, así que solo se encuentran repositorios públicos. Conéctalo en Integraciones.",
+        "organization": "Organización",
+        "account": "Cuenta",
+        "orgHint": "Un solo registro cubre todos los repositorios de la organización. Necesita el permiso de runners de organización.",
+        "accountHint": "Todos los repositorios de la cuenta, releídos según gana o pierde alguno. Se registra por repositorio, así que no necesita permiso de organización.",
+        "people": "Personas",
+        "lookingPeople": "Buscando quién ha vinculado una cuenta de GitHub...",
+        "nobodyLinked": "Nadie ha vinculado aún una cuenta de GitHub. Se hace desde el propio perfil.",
+        "group": "Grupo",
+        "lookingGroups": "Buscando grupos...",
+        "groupLinked": "{name} ({count, plural, one {# vinculada} other {# vinculadas}})",
+        "groupHint": "Los miembros se leen cada vez, así que a quien se añada al grupo se le da servicio sin editar esto.",
+        "working": "Calculando qué incluye...",
+        "serves": "Da servicio a {count, plural, one {# repositorio} other {# repositorios}}."
+    },
+    "snippet": {
+        "add": "Añade esto a tu workflow:",
+        "copyLine": "Copiar esta línea",
+        "copy": "Copiar"
+    },
+    "page": {
+        "title": "Runners",
+        "description": "Ejecuta workflows de GitHub Actions en tus propios servidores. Cada trabajo recibe un runner que se registra, toma ese trabajo y desaparece.",
+        "connect": "Conecta GitHub antes de añadir runners.",
+        "openIntegrations": "Abrir Integraciones"
+    },
+    "events": {
+        "push": {
+            "label": "Pushes",
+            "note": "Un commit o una etiqueta enviados a este repositorio."
+        },
+        "pullRequest": {
+            "label": "Pull requests",
+            "note": "Una pull request abierta o actualizada, para compilarla y probarla antes de fusionarla."
+        },
+        "workflowDispatch": {
+            "label": "Iniciados a mano",
+            "note": "Alguien que inicia un workflow desde la pestaña Actions."
+        },
+        "schedule": {
+            "label": "Programados",
+            "note": "Un workflow con cron, que se ejecuta lo esté mirando alguien o no."
+        },
+        "other": {
+            "label": "Todo lo demás",
+            "note": "Releases, comentarios en issues y cualquier otra cosa que escuche un workflow."
+        }
+    },
+    "repos": {
+        "none": "Aún no hay ningún grupo dando servicio a un repositorio.",
+        "noneHint": "Un grupo decide qué máquina ejecuta los trabajos y cuántos a la vez. Cuando exista uno, cada repositorio al que dé servicio aparecerá aquí con sus propios ajustes.",
+        "wholeOrg": "Toda la organización",
+        "save": "Guardar",
+        "orgNote": "Este grupo registra un runner para toda la organización, así que lo que se ajuste aquí se aplica a todos sus repositorios. Da servicio a los repositorios de uno en uno si tienen que ser distintos.",
+        "whatMayRun": "Qué se ejecuta",
+        "forks": "Pull requests de forks",
+        "forksHint": "La pull request de un fork es código escrito por quien la abrió. Desactivado, el trabajo se rechaza antes de que se ejecute ningún paso.",
+        "public": "Dar servicio a este repositorio aunque sea público",
+        "publicHint": "Cualquiera en GitHub puede abrir una pull request contra un repositorio público. GitHub recomienda no apuntar nunca un runner propio a uno.",
+        "secrets": "Dejar que los trabajos lean los secretos de este repositorio",
+        "secretsHint": "Los valores de Secretos llegan como variables de entorno. Desactivado, los trabajos de este repositorio no reciben ninguno.",
+        "publicOnGithub": "Público en GitHub",
+        "private": "Privado",
+        "unknownVisibility": "Polaris aún no ha podido leer este",
+        "approvalLoose": "En GitHub, solo los colaboradores nuevos en GitHub necesitan aprobación antes de que su pull request ejecute un workflow aquí. Quien tenga una cuenta más antigua no.",
+        "requireApproval": "Pedir aprobación a todos los que no sean del repositorio",
+        "title": "Repositorios",
+        "description": "Qué repositorios pueden usar tus máquinas, para qué y el código de quién se permite."
+    },
+    "guard": {
+        "publicRefused": "Este repositorio es público, y en este runner no se permiten repositorios públicos.",
+        "eventUnread": "Polaris no pudo leer el evento de este trabajo, así que no pudo saber si el código viene de un fork.",
+        "forkUnknown": "Polaris no pudo saber si esta pull request viene de un fork, así que no la ejecutó.",
+        "headUnread": "Polaris no pudo leer de dónde viene el código de esta pull request, así que no la ejecutó.",
+        "eventRefused": "En este runner no se permiten trabajos iniciados por ''{event}''.",
+        "forkRefused": "El código de esta pull request viene de {head}, que es un fork de {base}. En este runner no se permiten pull requests de forks."
+    },
+    "runs": {
+        "outcomes": {
+            "ran": "Ejecutado",
+            "running": "En curso",
+            "refused": "Rechazado",
+            "failed": "No se inició"
+        },
+        "none": "Aún no se ha ejecutado nada.",
+        "noneHint": "Una ejecución aparece aquí cuando uno de tus grupos recibe un trabajo. Si un workflow está esperando en GitHub, el grupo al que debería llegar dirá qué lo impide.",
+        "openPools": "Abrir grupos",
+        "pool": "Grupo",
+        "everyPool": "Todo grupo",
+        "repository": "Repositorio",
+        "everyRepository": "Todo repositorio",
+        "outcome": "Resultado",
+        "everyOutcome": "Todo resultado",
+        "count": "{count, plural, one {# ejecución} other {# ejecuciones}}",
+        "countOf": "{shown} de {total}",
+        "noMatch": "Ninguna ejecución coincide con esos filtros.",
+        "neverStarted": "Un trabajo que no se inició",
+        "onHost": "en {host}",
+        "openRun": "Abrir la ejecución en GitHub",
+        "openOnGithub": "Abrir en GitHub",
+        "changeAllowed": "Cambiar lo que permite este repositorio",
+        "title": "Ejecuciones",
+        "description": "Todos los trabajos que recibieron tus máquinas, incluidos los que Polaris rechazó."
+    },
+    "secrets": {
+        "noPool": "Aún no hay ningún grupo al que dar secretos.",
+        "noPoolHint": "Los secretos pertenecen a un grupo, porque un grupo es lo que inicia los runners que los llevan.",
+        "intro": "Llegan como variables de entorno, así que un paso lee uno como <env></env>. Son distintos de los secretos de GitHub, que solo GitHub puede poner en <github></github>. Un repositorio con los secretos desactivados en Repositorios no recibe ninguno de estos.",
+        "add": "Añadir secreto",
+        "none": "Nada aún. Un acceso a un registro o un endpoint interno suele ser el primero.",
+        "hideNamed": "Ocultar {name}",
+        "showNamed": "Mostrar {name}",
+        "hide": "Ocultar",
+        "show": "Mostrar",
+        "kind": "secreto",
+        "removeBody": "El próximo runner que se inicie no lo llevará. Un trabajo que ya esté en marcha conserva lo que recibió.",
+        "nameShape": "Solo letras, dígitos y guiones bajos, y sin empezar por un dígito",
+        "reservedPrefix": "Ese prefijo es del runner",
+        "oneLine": "Un valor tiene que ser de una línea. Guarda una clave en base64 y descodifícala en el paso que la necesite.",
+        "addTo": "Añadir un secreto a {name}",
+        "addHint": "Los runners que se inicien a partir de ahora lo llevan. Los que ya esperan, no.",
+        "value": "Valor",
+        "readableBy": "Lo pueden leer",
+        "everyServed": "Todos los repositorios de este grupo",
+        "overrideHint": "El valor de un repositorio prevalece sobre uno compartido con el mismo nombre.",
+        "errors": {
+            "check": "Revisa el secreto",
+            "save": "No se pudo guardar ese secreto",
+            "notASecret": "No es secreto",
+            "remove": "No se pudo quitar ese secreto",
+            "gone": "Ese secreto ya no existe",
+            "unreadable": "No se pudo leer este valor. Vuelve a definirlo para sustituirlo."
+        },
+        "title": "Secretos",
+        "description": "Valores que tus runners llevan a un trabajo. Se definen una vez y los leen los repositorios que elijas."
+    },
+    "guide": {
+        "title": "Cómo funciona",
+        "description": "Ejecutar GitHub Actions en tus propias máquinas: qué configurar, qué cambiar en un workflow y con qué tener cuidado.",
+        "connect": {
+            "title": "1. Conecta GitHub, con permiso para registrar runners",
+            "body": "Polaris registra un runner en tu nombre, y eso necesita más que leer un repositorio. En <link>Integraciones</link>, conecta GitHub y dale <strong>Administration: read and write</strong> en los repositorios para los que quieras runners, o <strong>Self-hosted runners: read and write</strong> en la organización para cubrirlos todos a la vez.",
+            "app": "Una GitHub App es la mejor de las dos conexiones: puede tener el permiso acotado de organización en vez de administración total de repositorios, sus tokens caducan solos y no pertenece a la cuenta de una persona."
+        },
+        "pool": {
+            "title": "2. Añade un grupo",
+            "body": "Un grupo es una máquina más los repositorios a los que da servicio. <link>Añade uno</link> y elige el servidor, cuántos trabajos puede tomar a la vez y si los trabajos se ejecutan en un contenedor o en un directorio de la máquina.",
+            "container": "Mejor el contenedor. Un trabajo en un contenedor se descarta con él; un trabajo en un directorio empieza de cero pero no tiene frontera, y puede llegar a todo lo que alcance el usuario de Polaris en esa máquina."
+        },
+        "workflow": {
+            "title": "3. Apunta un workflow a él",
+            "body": "Cambia una línea. Donde un workflow dice <code>runs-on: ubuntu-latest</code>, ahora dice las etiquetas con las que se registró tu grupo:",
+            "then": "La siguiente ejecución entra en cola en GitHub, Polaris lo detecta, inicia un runner para ese repositorio y el trabajo llega a él. Cada runner toma un solo trabajo y desaparece, así que no queda nada entre trabajos."
+        },
+        "repos": {
+            "title": "4. Decide qué puede ejecutar cada repositorio",
+            "body": "En <link>Repositorios</link>, cada repositorio al que da servicio un grupo tiene sus propios ajustes: qué eventos se ejecutan aquí (pushes, pull requests, programados, a mano), si las pull requests de forks se ejecutan o no, y si sus trabajos pueden leer tus secretos.",
+            "check": "La comprobación ocurre en la máquina, después de que GitHub entregue el trabajo y antes de que se ejecute ningún paso, así que un trabajo no permitido nunca ejecuta nada. Aparece en <link>Ejecuciones</link> como rechazado, con el motivo, que es lo que necesita quien espera ante una comprobación en rojo."
+        },
+        "secrets": {
+            "title": "5. Da a los runners lo que necesitan leer",
+            "body": "Los <link>Secretos</link> son valores que tus máquinas llevan a un trabajo: un acceso a un registro, un endpoint que solo existe dentro de tu red, una clave que prefieres no subir a GitHub. Llegan como variables de entorno, así que un paso lee uno como <env></env>.",
+            "github": "No son los secretos de GitHub y no aparecen en <expression></expression> - eso solo lo puede rellenar GitHub. Un secreto puede aplicarse a todos los repositorios de un grupo o a uno de ellos, y prevalece el más concreto."
+        },
+        "careful": {
+            "title": "Con qué tener cuidado",
+            "public": "<lead>Repositorios públicos.</lead> Cualquiera en GitHub puede abrir una pull request contra uno, y una pull request puede cambiar el workflow que se ejecuta. Por eso Polaris no da servicio a un repositorio público hasta que lo indiques en ese repositorio, y por eso GitHub recomienda no apuntar nunca un runner propio a uno.",
+            "forks": "<lead>Pull requests de forks.</lead> Su código lo escribió quien la abrió. Se rechazan por defecto. Activarlas en un repositorio significa que código de desconocidos se ejecuta en esa máquina con todo lo que tenga el entorno, y por eso el interruptor de secretos está al lado.",
+            "network": "<lead>Un contenedor no es una promesa sobre la red.</lead> Un trabajo aislado no llega a los archivos de la máquina, pero sí a todo lo que esa máquina alcance en la red. Un runner en un equipo dentro de tu red está dentro de tu red.",
+            "budgets": "<lead>Los límites son por repositorio.</lead> A un grupo compartido entre repositorios se le puede dar un límite de minutos y un máximo diario de trabajos, para que un repositorio muy activo no sea el único al que se da servicio."
+        },
+        "nothing": {
+            "title": "Cuando nada se ejecuta",
+            "card": "La tarjeta del grupo dice qué le pasa al grupo: una máquina inalcanzable, un permiso que falta, un repositorio que superó su límite. Un trabajo que llegó a un runner y fue rechazado lo indica en Ejecuciones, con la regla que lo rechazó.",
+            "labels": "Si el workflow sigue en cola en GitHub y ninguna de las dos pantallas dice nada, comprueba que sus etiquetas de <code>runs-on</code> coinciden exactamente con las del grupo: GitHub solo ofrece un trabajo a un runner que lleve todas las etiquetas que el trabajo pidió."
+        }
+    }
+}

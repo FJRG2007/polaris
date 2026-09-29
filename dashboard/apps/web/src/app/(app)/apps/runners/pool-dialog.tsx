@@ -26,6 +26,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { RunnerHostReadiness } from "@/lib/runners/runner-service";
 import { createRunnerPoolAction, probeRunnerHostAction } from "./actions";
 import { EMPTY_SCOPE, ScopeField, toScope, type ScopeState } from "./scope-field";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import {
     Button,
     Dialog,
@@ -63,6 +65,7 @@ function optional(value: string): number | null {
 }
 
 export function PoolDialog({ servers }: { servers: ServerOption[] }) {
+    const t = useTranslations("runners");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
@@ -93,7 +96,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     const poolLabels = normalizeRunnerLabels(labels.split(","));
     // Named after what it serves when nobody bothered: a pool called "acme/website"
     // beats one called "New pool", and it is still theirs to change under Advanced.
-    const proposedName = name.trim() || scope.repos[0]?.split("/")[1] || scope.owner || "Build";
+    const proposedName = name.trim() || scope.repos[0]?.split("/")[1] || scope.owner || t("dialog.defaultName");
     const draft = {
         serverId,
         name: proposedName,
@@ -110,10 +113,14 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         }
     };
     const checked = createRunnerPoolSchema.safeParse(draft);
-    const issue = (field: string): string | null =>
-        checked.success
-            ? null
-            : (checked.error.issues.find((entry) => entry.path[0] === field)?.message ?? null);
+    // The shared schema's sentences in the reader's words; Zod's own English for
+    // anything it did not word itself is replaced by a plain "check this".
+    const issue = (field: string): string | null => {
+        if (checked.success) return null;
+        const message = checked.error.issues.find((entry) => entry.path[0] === field)?.message;
+        if (message === undefined) return null;
+        return knownRunnerText(t, message) ?? t("dialog.checkValue");
+    };
 
     // Ask the machine what it can offer as soon as one is picked. A stale answer is
     // worse than none, so it is cleared while the next one is being fetched.
@@ -128,7 +135,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
             setProbing(false);
             const machine = result.readiness;
             if (result.error || !machine) {
-                setProbeError(result.error ?? "Could not reach that server");
+                setProbeError(result.error ?? t("errors.unreachable"));
                 return;
             }
             setReadiness(machine);
@@ -157,10 +164,10 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     // workspace is not one of its options rather than a worse one.
     const workspaceAvailable = readiness === null || readiness.reach === "login";
     const isolationOptions = [
-        { value: "container", label: "Its own container", disabled: !containersAvailable },
+        { value: "container", label: t("dialog.isolation.container"), disabled: !containersAvailable },
         {
             value: "workspace",
-            label: "A clean directory on the machine",
+            label: t("dialog.isolation.workspace"),
             disabled: !workspaceAvailable
         }
     ];
@@ -196,16 +203,20 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
      *  whether anything in there needs their attention. */
     function advancedSummary(): string {
         const parts = [
-            poolLabels.join(", ") || "no labels",
-            `${maxConcurrent} ${Number(maxConcurrent) === 1 ? "job" : "jobs"} at once`,
-            isolation === "container" ? "contained" : "a directory on the machine"
+            poolLabels.join(", ") || t("dialog.summary.noLabels"),
+            t("dialog.summary.atOnce", { count: Number(maxConcurrent) || 0 }),
+            isolation === "container" ? t("dialog.summary.contained") : t("dialog.summary.directory")
         ];
         const limits = [
-            perTarget.trim() ? `${perTarget} each` : null,
-            minutes.trim() ? `${minutes} min a ${window}` : null,
-            jobsPerDay.trim() ? `${jobsPerDay} jobs a day` : null
+            perTarget.trim() ? t("dialog.summary.each", { count: perTarget }) : null,
+            minutes.trim()
+                ? window === "day"
+                    ? t("pools.minutesDay", { count: Number(minutes) })
+                    : t("pools.minutesMonth", { count: Number(minutes) })
+                : null,
+            jobsPerDay.trim() ? t("pools.jobsDay", { count: Number(jobsPerDay) }) : null
         ].filter(Boolean);
-        parts.push(limits.length > 0 ? limits.join(", ") : "no limits");
+        parts.push(limits.length > 0 ? limits.join(", ") : t("dialog.summary.noLimits"));
         return parts.join(", ");
     }
 
@@ -233,28 +244,28 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         >
             <DialogTrigger asChild>
                 <Button size="sm" variant="secondary">
-                    <Plus className="size-4" /> Add a pool
+                    <Plus className="size-4" /> {t("dialog.add")}
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>New runner pool</DialogTitle>
+                    <DialogTitle>{t("dialog.title")}</DialogTitle>
                     <DialogDescription>
-                        Polaris keeps runners waiting on one of your servers. Workflows reach them
-                        with
-                        <code className="mx-1 font-mono text-xs">runs-on</code>.
+                        {t.rich("dialog.intro", {
+                            code: (chunks) => <code className="mx-1 font-mono text-xs">{chunks}</code>
+                        })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <Field label="Runs on" error={probeError}>
+                    <Field label={t("dialog.runsOn")} error={probeError ? runnerText(t, probeError) : null}>
                         <Select
                             value={serverId}
                             onValueChange={setServerId}
-                            placeholder="Pick a server"
+                            placeholder={t("dialog.pickServer")}
                             options={servers.map((entry) => ({
                                 value: entry.id,
-                                label: entry.local ? `${entry.name} (this machine)` : entry.name
+                                label: entry.local ? t("dialog.thisMachine", { name: entry.name }) : entry.name
                             }))}
                         />
                         <MachineNote
@@ -267,11 +278,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <ScopeField state={scope} onChange={setScope} onPreview={onPreview} />
 
                     {spread ? (
-                        <Hint>
-                            {scopeCount} repositories share {maxConcurrent}{" "}
-                            {Number(maxConcurrent) === 1 ? "runner" : "runners"}. Whoever has a job
-                            queued gets them first; the rest wait.
-                        </Hint>
+                        <Hint>{t("dialog.spread", { repos: scopeCount, count: Number(maxConcurrent) || 1 })}</Hint>
                     ) : null}
 
                     {/* Everything below is already answered from what the machine
@@ -288,7 +295,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                             <ChevronRight
                                 className={`size-4 shrink-0 transition-transform ${advanced ? "rotate-90" : ""}`}
                             />
-                            <span className="font-medium">Advanced</span>
+                            <span className="font-medium">{t("dialog.advanced")}</span>
                             {advanced ? null : (
                                 <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                                     {advancedSummary()}
@@ -298,7 +305,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
 
                         {advanced ? (
                             <div className="flex flex-col gap-3 border-t border-border/60 p-3">
-                                <Field label="Name" error={name ? issue("name") : null}>
+                                <Field label={t("dialog.name")} error={name ? issue("name") : null}>
                                     <Input
                                         value={name}
                                         onChange={(event) => setName(event.target.value)}
@@ -306,24 +313,24 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                     />
                                 </Field>
 
-                                <Field label="Labels" error={issue("labels")}>
+                                <Field label={t("dialog.labels")} error={issue("labels")}>
                                     <Input
                                         value={labels}
                                         onChange={(event) => setLabels(event.target.value)}
                                     />
                                     <Hint>
-                                        Comma separated. A workflow lands here when its{" "}
-                                        <code className="font-mono text-xs">runs-on</code> asks for
-                                        these.
+                                        {t.rich("dialog.labelsHint", {
+                                            code: (chunks) => <code className="font-mono text-xs">{chunks}</code>
+                                        })}
                                     </Hint>
                                 </Field>
 
                                 <div className="flex gap-2">
                                     <Field
-                                        label="Jobs at once"
+                                        label={t("dialog.jobsAtOnce")}
                                         error={
                                             overCapacity
-                                                ? `This machine is worth about ${readiness?.recommended}`
+                                                ? t("dialog.worthAbout", { count: readiness?.recommended ?? 0 })
                                                 : issue("maxConcurrent")
                                         }
                                         className="w-32"
@@ -340,7 +347,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                             }}
                                         />
                                     </Field>
-                                    <Field label="Each job runs in" className="flex-1">
+                                    <Field label={t("dialog.runsIn")} className="flex-1">
                                         <Select
                                             value={isolation}
                                             onValueChange={(value) =>
@@ -358,15 +365,12 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                 </div>
 
                                 <div className="flex flex-col gap-2">
-                                    <span className="text-sm font-medium">Limits</span>
-                                    <Hint>
-                                        Per repository. Leave a field empty for no limit of that
-                                        kind.
-                                    </Hint>
+                                    <span className="text-sm font-medium">{t("dialog.limits")}</span>
+                                    <Hint>{t("dialog.limitsHint")}</Hint>
 
                                     <div className="flex gap-2">
                                         <Field
-                                            label="At once"
+                                            label={t("dialog.atOnce")}
                                             className="w-24"
                                             error={issue("limits")}
                                         >
@@ -376,41 +380,41 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                                 max={MAX_RUNNER_CONCURRENCY}
                                                 inputMode="numeric"
                                                 value={perTarget}
-                                                placeholder="Any"
+                                                placeholder={t("dialog.any")}
                                                 onChange={(event) =>
                                                     setPerTarget(event.target.value)
                                                 }
                                             />
                                         </Field>
-                                        <Field label="Minutes" className="w-28">
+                                        <Field label={t("dialog.minutes")} className="w-28">
                                             <Input
                                                 type="number"
                                                 min={1}
                                                 inputMode="numeric"
                                                 value={minutes}
-                                                placeholder="Any"
+                                                placeholder={t("dialog.any")}
                                                 onChange={(event) => setMinutes(event.target.value)}
                                             />
                                         </Field>
-                                        <Field label="Per" className="w-28">
+                                        <Field label={t("dialog.per")} className="w-28">
                                             <Select
                                                 value={window}
                                                 onValueChange={(value) =>
                                                     setWindow(value as RunnerWindow)
                                                 }
                                                 options={[
-                                                    { value: "day", label: "Day" },
-                                                    { value: "month", label: "Month" }
+                                                    { value: "day", label: t("dialog.day") },
+                                                    { value: "month", label: t("dialog.month") }
                                                 ]}
                                             />
                                         </Field>
-                                        <Field label="Jobs a day" className="flex-1">
+                                        <Field label={t("dialog.jobsADay")} className="flex-1">
                                             <Input
                                                 type="number"
                                                 min={1}
                                                 inputMode="numeric"
                                                 value={jobsPerDay}
-                                                placeholder="Any"
+                                                placeholder={t("dialog.any")}
                                                 onChange={(event) =>
                                                     setJobsPerDay(event.target.value)
                                                 }
@@ -418,7 +422,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                         </Field>
                                     </div>
 
-                                    <Field label="When a repository runs out">
+                                    <Field label={t("dialog.runsOut")}>
                                         <Select
                                             value={onExhausted}
                                             onValueChange={(value) =>
@@ -427,11 +431,11 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                             options={[
                                                 {
                                                     value: "pause",
-                                                    label: "Stop serving it until the window turns over"
+                                                    label: t("dialog.onExhausted.pause")
                                                 },
                                                 {
                                                     value: "warn",
-                                                    label: "Keep serving it, and say so on the pool"
+                                                    label: t("dialog.onExhausted.warn")
                                                 }
                                             ]}
                                         />
@@ -456,7 +460,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                 scopeCount === 0
                             }
                         >
-                            {pending ? "Creating..." : "Create the pool"}
+                            {pending ? t("dialog.creating") : t("dialog.create")}
                         </Button>
                     </div>
                 </div>
@@ -501,19 +505,19 @@ function MachineNote({
     readiness: RunnerHostReadiness | null;
     local: boolean;
 }) {
-    if (probing) return <Hint>Asking the server what it can run...</Hint>;
+    const t = useTranslations("runners");
+    if (probing) return <Hint>{t("machine.asking")}</Hint>;
     if (!readiness) return null;
     if (readiness.unsupported)
-        return <span className="text-xs text-danger">{readiness.unsupported}</span>;
+        return <span className="text-xs text-danger">{runnerText(t, readiness.unsupported)}</span>;
     return (
         <Hint>
-            {readiness.platform} on {readiness.arch}
-            {readiness.containerEngine
-                ? ""
-                : local
-                  ? ", no container engine Polaris can reach"
-                  : ", no container engine for the Polaris login"}
-            . {readiness.capacityNote}
+            {t("machine.platform", {
+                platform: readiness.platform,
+                arch: readiness.arch,
+                engine: readiness.containerEngine ? "yes" : local ? "local" : "login"
+            })}{" "}
+            {runnerText(t, readiness.capacityNote)}
         </Hint>
     );
 }
@@ -527,27 +531,13 @@ function IsolationNote({
     available: boolean;
     local: boolean;
 }) {
-    if (isolation === "container") {
-        return (
-            <Hint>
-                Nothing survives the job. Steps that need a container engine of their own will not
-                work.
-            </Hint>
-        );
-    }
-    if (local) {
-        return (
-            <Hint>
-                Not available here: Polaris reaches this machine through its container engine only.
-            </Hint>
-        );
-    }
+    const t = useTranslations("runners");
+    if (isolation === "container") return <Hint>{t("dialog.isolationNotes.container")}</Hint>;
+    if (local) return <Hint>{t("dialog.isolationNotes.localOnly")}</Hint>;
     return (
         <Hint>
-            An empty directory, not a boundary: a job can reach whatever the Polaris login can.
-            {available
-                ? ""
-                : " Add the container engine to this machine's Polaris login to isolate jobs properly."}
+            {t("dialog.isolationNotes.workspace")}
+            {available ? "" : ` ${t("dialog.isolationNotes.addEngine")}`}
         </Hint>
     );
 }

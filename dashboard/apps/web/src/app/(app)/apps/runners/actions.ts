@@ -16,6 +16,9 @@ import { listConnectedAccounts } from "@/lib/connections/store";
 import { reconcileRunnerPools } from "@/lib/runners/runner-reconciler";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { createRunnerPoolSchema, runnerScopeSchema, serverIdSchema, updateRunnerPoolSchema } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import {
     createRunnerPool,
     deleteRunnerPool,
@@ -27,14 +30,35 @@ import {
 
 const RUNNERS_PATH = "/apps/runners";
 
+type RunnersKey = NamespaceKey<"runners">;
+
+/** A reply in the reader's language. */
+async function say(key: RunnersKey): Promise<string> {
+    return (await getTranslations("runners"))(key);
+}
+
+/** What went wrong, in the reader's words: a sentence the runner service wrote is
+ *  translated, anything else (GitHub's, a machine's) passes through. */
+async function failure(caught: unknown, fallback: RunnersKey): Promise<string> {
+    const t = await getTranslations("runners");
+    return caught instanceof Error ? runnerText(t, caught.message) : t(fallback);
+}
+
+/** The first thing a schema refused, in the reader's words. A sentence the shared
+ *  schemas do not write is Zod's own English, so `fallback` stands in for it. */
+async function schemaSay(message: string | undefined, fallback: RunnersKey): Promise<string> {
+    const t = await getTranslations("runners");
+    return (message ? knownRunnerText(t, message) : null) ?? t(fallback);
+}
+
 export async function createRunnerPoolAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createRunnerPoolSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the pool settings" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkPool") };
     try {
         await createRunnerPool(user.id, parsed.data);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the pool" };
+        return { error: await failure(caught, "errors.create") };
     }
     revalidatePath(RUNNERS_PATH);
     return {};
@@ -43,14 +67,14 @@ export async function createRunnerPoolAction(input: unknown): Promise<{ error?: 
 export async function updateRunnerPoolAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = updateRunnerPoolSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the pool settings" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkPool") };
     try {
         // Raising the concurrency re-checks the machine, and a changed scope is
         // re-checked against the connection, so this can refuse with something
         // worth reading rather than only "not found".
-        if (!(await updateRunnerPool(user.id, parsed.data))) return { error: "Pool not found" };
+        if (!(await updateRunnerPool(user.id, parsed.data))) return { error: await say("notes.poolNotFound") };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the pool" };
+        return { error: await failure(caught, "errors.change") };
     }
     revalidatePath(RUNNERS_PATH);
     return {};
@@ -63,7 +87,7 @@ export async function deleteRunnerPoolAction(poolId: string): Promise<{ error?: 
     try {
         await deleteRunnerPool(user.id, poolId);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove the pool" };
+        return { error: await failure(caught, "errors.remove") };
     }
     revalidatePath(RUNNERS_PATH);
     return {};
@@ -76,11 +100,11 @@ export async function probeRunnerHostAction(
     serverId: string
 ): Promise<{ readiness?: RunnerHostReadiness; error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!serverIdSchema.safeParse(serverId).success) return { error: "Choose a server" };
+    if (!serverIdSchema.safeParse(serverId).success) return { error: await say("errors.chooseServer") };
     try {
         return { readiness: await probeRunnerHost(user.id, serverId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not reach that server" };
+        return { error: await failure(caught, "errors.unreachable") };
     }
 }
 
@@ -97,9 +121,9 @@ export async function reconcileRunnersAction(): Promise<void> {
 export async function refreshPoolTargetsAction(poolId: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
-        if (!(await refreshRunnerPoolTargets(user.id, poolId))) return { error: "Pool not found" };
+        if (!(await refreshRunnerPoolTargets(user.id, poolId))) return { error: await say("notes.poolNotFound") };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not re-read the scope" };
+        return { error: await failure(caught, "errors.reread") };
     }
     revalidatePath(RUNNERS_PATH);
     return {};
@@ -117,12 +141,16 @@ export async function previewScopeAction(
 ): Promise<{ targets?: string[]; note?: string | null; error?: string }> {
     await requirePermission("system.manage");
     const parsed = runnerScopeSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the scope" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkScope") };
     try {
         const resolution = await resolveScope(parsed.data);
-        return { targets: resolution.targets.map((target) => target.key), note: resolution.note };
+        const t = await getTranslations("runners");
+        return {
+            targets: resolution.targets.map((target) => target.key),
+            note: resolution.note === null ? null : runnerText(t, resolution.note)
+        };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read that scope" };
+        return { error: await failure(caught, "errors.readScope") };
     }
 }
 

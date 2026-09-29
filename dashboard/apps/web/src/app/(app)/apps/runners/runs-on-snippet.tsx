@@ -17,6 +17,7 @@
 import { Button } from "@polaris/ui";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How `runs-on` is written for these labels. One label is a plain scalar, which
  *  is what almost every workflow has; several have to be a list, and getting that
@@ -27,8 +28,11 @@ export function runsOnLine(labels: readonly string[]): string {
     return `runs-on: [${labels.join(", ")}]`;
 }
 
-export function RunsOnSnippet({ labels, label = "Add this to your workflow:" }: { labels: readonly string[]; label?: string }) {
+export function RunsOnSnippet({ labels, label }: { labels: readonly string[]; label?: string }) {
+    const t = useTranslations("runners");
     const line = runsOnLine(labels);
+    // An empty label means none; a missing one is the usual invitation.
+    const shown = label ?? t("snippet.add");
     const [copied, setCopied] = useState(false);
 
     // The tick is feedback, not state: it goes back on its own so a card left open
@@ -51,14 +55,14 @@ export function RunsOnSnippet({ labels, label = "Add this to your workflow:" }: 
 
     return (
         <div className="flex flex-col gap-1">
-            {label ? <span className="text-xs text-muted-foreground">{label}</span> : null}
+            {shown ? <span className="text-xs text-muted-foreground">{shown}</span> : null}
             <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
                 <code className="min-w-0 flex-1 truncate font-mono text-xs">{line}</code>
                 <Button
                     size="icon"
                     variant="ghost"
-                    aria-label="Copy this line"
-                    title="Copy"
+                    aria-label={t("snippet.copyLine")}
+                    title={t("snippet.copy")}
                     onClick={() => void copy()}
                 >
                     {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}

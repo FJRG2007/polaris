@@ -21,13 +21,19 @@ import { setForkApprovalAction, setRepoPolicyAction } from "./actions";
 import type { RunnerRepoView } from "@/lib/runners/runner-repo-config";
 import { Github, Globe, Lock, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Switch, cn } from "@polaris/ui";
-import {
-    RUNNER_EVENTS,
-    RUNNER_EVENT_LABELS,
-    RUNNER_EVENT_NOTES,
-    type RunnerEvent,
-    type RunnerRepoPolicy
-} from "@polaris/core";
+import { RUNNER_EVENTS, type RunnerEvent, type RunnerRepoPolicy } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { runnerText } from "@/lib/runners/words";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** Each event as the catalog names it: `events.<key>.label` and `.note`. */
+const EVENT_KEYS: Record<RunnerEvent, string> = {
+    push: "push",
+    pull_request: "pullRequest",
+    workflow_dispatch: "workflowDispatch",
+    schedule: "schedule",
+    other: "other"
+};
 
 interface PoolRepos {
     poolId: string;
@@ -37,18 +43,16 @@ interface PoolRepos {
 }
 
 export function ReposView({ pools }: { pools: PoolRepos[] }) {
+    const t = useTranslations("runners");
     const empty = pools.every((pool) => pool.repos.length === 0);
     if (pools.length === 0 || empty) {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-2">
-                    <p className="text-sm">No pool is serving a repository yet.</p>
-                    <p className="max-w-lg text-xs text-muted-foreground">
-                        A pool decides which machine runs jobs and how many at once. Once one exists, every repository
-                        it serves shows up here with its own settings.
-                    </p>
+                    <p className="text-sm">{t("repos.none")}</p>
+                    <p className="max-w-lg text-xs text-muted-foreground">{t("repos.noneHint")}</p>
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/apps/runners">Add a pool</Link>
+                        <Link href="/apps/runners">{t("dialog.add")}</Link>
                     </Button>
                 </CardBody>
             </Card>
@@ -75,7 +79,11 @@ export function ReposView({ pools }: { pools: PoolRepos[] }) {
 }
 
 function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
+    const t = useTranslations("runners");
+    const tcommon = useTranslations("common");
     const router = useRouter();
+    const eventLabel = (event: RunnerEvent) => t(`events.${EVENT_KEYS[event]}.label` as NamespaceKey<"runners">);
+    const eventNote = (event: RunnerEvent) => t(`events.${EVENT_KEYS[event]}.note` as NamespaceKey<"runners">);
     const [pending, startTransition] = useTransition();
     const [draft, setDraft] = useState<RunnerRepoPolicy>(repo.policy);
     const [error, setError] = useState<string | null>(null);
@@ -124,17 +132,17 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                     <CardTitle className="flex items-center gap-2">
                         <Github className="size-4 text-muted-foreground" />
                         <span className="truncate">{repo.key}</span>
-                        {repo.kind === "org" ? <Badge variant="neutral">Whole organization</Badge> : null}
+                        {repo.kind === "org" ? <Badge variant="neutral">{t("repos.wholeOrg")}</Badge> : null}
                     </CardTitle>
                     <Visibility repo={repo} />
                 </div>
                 {dirty ? (
                     <div className="flex shrink-0 items-center gap-1">
                         <Button size="sm" variant="ghost" disabled={pending} onClick={() => setDraft(repo.policy)}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button size="sm" disabled={pending} onClick={save}>
-                            Save
+                            {t("repos.save")}
                         </Button>
                     </div>
                 ) : null}
@@ -144,40 +152,37 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                 {repo.refusal ? (
                     <Notice tone="warning">
                         <ShieldAlert className="size-4" />
-                        <span>{repo.refusal}</span>
+                        <span>{runnerText(t, repo.refusal)}</span>
                     </Notice>
                 ) : null}
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
 
                 {repo.kind === "org" ? (
-                    <p className="text-xs text-muted-foreground">
-                        This pool registers one runner for the whole organization, so what is set here applies to every
-                        repository in it. Serve repositories one at a time if they need to differ.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("repos.orgNote")}</p>
                 ) : null}
 
                 <fieldset className="flex flex-col gap-2">
                     <legend className="pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        What may run
+                        {t("repos.whatMayRun")}
                     </legend>
                     {RUNNER_EVENTS.map((event) => (
                         <label key={event} className="flex items-start gap-2 text-sm">
                             <Checkbox
                                 checked={draft.events.includes(event)}
                                 onChange={(changed) => toggleEvent(event, changed.target.checked)}
-                                aria-label={RUNNER_EVENT_LABELS[event]}
+                                aria-label={eventLabel(event)}
                             />
                             <span className="flex flex-col">
-                                <span>{RUNNER_EVENT_LABELS[event]}</span>
-                                <span className="text-xs text-muted-foreground">{RUNNER_EVENT_NOTES[event]}</span>
+                                <span>{eventLabel(event)}</span>
+                                <span className="text-xs text-muted-foreground">{eventNote(event)}</span>
                             </span>
                         </label>
                     ))}
                 </fieldset>
 
                 <Setting
-                    label="Pull requests from forks"
-                    hint="A fork's pull request is code written by whoever opened it. Off, the job is turned down before any step of it runs."
+                    label={t("repos.forks")}
+                    hint={t("repos.forksHint")}
                     danger={draft.allowForks}
                     checked={draft.allowForks}
                     onChange={(on) => setDraft((current) => ({ ...current, allowForks: on }))}
@@ -185,8 +190,8 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
 
                 {repo.visibility === "public" ? (
                     <Setting
-                        label="Serve this repository even though it is public"
-                        hint="Anybody on GitHub can open a pull request against a public repository. GitHub recommends never pointing a self-hosted runner at one."
+                        label={t("repos.public")}
+                        hint={t("repos.publicHint")}
                         danger={draft.allowPublic}
                         checked={draft.allowPublic}
                         onChange={(on) => setDraft((current) => ({ ...current, allowPublic: on }))}
@@ -194,8 +199,8 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                 ) : null}
 
                 <Setting
-                    label="Let jobs read the secrets set for this repository"
-                    hint="The values from Secrets arrive as environment variables. Off, this repository's jobs get none of them."
+                    label={t("repos.secrets")}
+                    hint={t("repos.secretsHint")}
                     checked={draft.secrets}
                     onChange={(on) => setDraft((current) => ({ ...current, secrets: on }))}
                 />
@@ -203,7 +208,7 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
                 {repo.warning ? (
                     <Notice tone="warning">
                         <TriangleAlert className="size-4" />
-                        <span>{repo.warning}</span>
+                        <span>{runnerText(t, repo.warning)}</span>
                     </Notice>
                 ) : null}
 
@@ -216,11 +221,12 @@ function RepoCard({ poolId, repo }: { poolId: string; repo: RunnerRepoView }) {
 /** What GitHub says the repository is. An unknown answer says so rather than
  *  implying private, because "not asked yet" is what it actually means. */
 function Visibility({ repo }: { repo: RunnerRepoView }) {
+    const t = useTranslations("runners");
     if (repo.visibility === "public") {
         return (
             <span className="flex items-center gap-1 text-xs text-warning">
                 <Globe className="size-3.5" />
-                Public on GitHub
+                {t("repos.publicOnGithub")}
             </span>
         );
     }
@@ -228,11 +234,11 @@ function Visibility({ repo }: { repo: RunnerRepoView }) {
         return (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Lock className="size-3.5" />
-                Private
+                {t("repos.private")}
             </span>
         );
     }
-    return <span className="text-xs text-muted-foreground">Polaris has not been able to read this one yet</span>;
+    return <span className="text-xs text-muted-foreground">{t("repos.unknownVisibility")}</span>;
 }
 
 /**
@@ -245,6 +251,7 @@ function Visibility({ repo }: { repo: RunnerRepoView }) {
  * should not have to.
  */
 function ForkApproval({ repo }: { repo: RunnerRepoView }) {
+    const t = useTranslations("runners");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -255,10 +262,7 @@ function ForkApproval({ repo }: { repo: RunnerRepoView }) {
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <p className="flex items-start gap-2 text-xs">
                 <ShieldCheck className="size-4 text-muted-foreground" />
-                <span>
-                    On GitHub, only contributors new to GitHub need approval before their pull request runs a workflow
-                    here. Anybody with an older account does not.
-                </span>
+                <span>{t("repos.approvalLoose")}</span>
             </p>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
             <Button
@@ -282,7 +286,7 @@ function ForkApproval({ repo }: { repo: RunnerRepoView }) {
                     });
                 }}
             >
-                Require approval for everyone outside the repository
+                {t("repos.requireApproval")}
             </Button>
         </div>
     );

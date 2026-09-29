@@ -1,3 +1,4 @@
+import { getTranslations } from "@/lib/i18n/request";
 import { PageHeader } from "@polaris/ui";
 import { ReposView } from "./repos-view";
 import { requirePermission } from "@/lib/session";
@@ -18,12 +19,13 @@ export const dynamic = "force-dynamic";
 export default async function RunnerReposPage() {
     const user = await requirePermission("system.manage");
     const pools = await listRunnerRepos(user.id);
+    const t = await getTranslations("runners");
 
     return (
         <>
             <PageHeader
-                title="Repositories"
-                description="Which repositories can use your machines, for what, and whose code is allowed to."
+                title={t("repos.title")}
+                description={t("repos.description")}
             />
             <ReposView pools={pools} />
         </>

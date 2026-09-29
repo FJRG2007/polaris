@@ -1,6 +1,7 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { SecretsView } from "./secrets-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 import { listRunnerSecrets } from "@/lib/runners/runner-secrets";
 
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function RunnerSecretsPage() {
     const user = await requirePermission("system.manage");
+    const t = await getTranslations("runners");
     const pools = await prisma.runnerPool.findMany({
         where: { ownerId: user.id },
         select: { id: true, name: true, scope: true, targets: { select: { key: true }, orderBy: { key: "asc" } } },
@@ -35,8 +37,8 @@ export default async function RunnerSecretsPage() {
     return (
         <>
             <PageHeader
-                title="Secrets"
-                description="Values your runners carry into a job. Set once, readable by the repositories you choose."
+                title={t("secrets.title")}
+                description={t("secrets.description")}
             />
             <SecretsView pools={withSecrets} />
         </>

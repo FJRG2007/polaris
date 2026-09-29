@@ -1,4 +1,5 @@
 import { RunsView } from "./runs-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
 import { listRunnerRuns, runFilterOptions } from "@/lib/runners/runner-runs";
@@ -16,12 +17,13 @@ export const dynamic = "force-dynamic";
 export default async function RunnerRunsPage() {
     const user = await requirePermission("system.manage");
     const [runs, options] = await Promise.all([listRunnerRuns(user.id), runFilterOptions(user.id)]);
+    const t = await getTranslations("runners");
 
     return (
         <>
             <PageHeader
-                title="Runs"
-                description="Every job your machines were handed, including the ones Polaris turned down."
+                title={t("runs.title")}
+                description={t("runs.description")}
             />
             <RunsView runs={runs} pools={options.pools} targets={options.targets} />
         </>

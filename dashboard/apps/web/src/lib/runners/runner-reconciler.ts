@@ -470,6 +470,7 @@ async function startRunner(
             data: {
                 state: "failed",
                 finishedAt: new Date(),
+                // i18n-ignore stored, and said in the reader's words by lib/runners/words
                 error: caught instanceof Error ? caught.message : "The machine did not start the runner"
             }
         });
