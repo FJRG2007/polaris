@@ -20,6 +20,7 @@
  */
 
 import * as Y from "yjs";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
 import { PositioningMap } from "./positioning-map";
@@ -56,6 +57,7 @@ export function ComparisonEditor({
     content: number[] | null;
     editable: boolean;
 }) {
+    const t = useTranslations("office");
     const { doc } = useOfficeDocument({ documentId, content, editable });
     const subjects = useMemo(() => doc.getArray<core.Subject>(SUBJECTS), [doc]);
     const criteria = useMemo(() => doc.getArray<core.Criterion>(CRITERIA), [doc]);
@@ -101,7 +103,7 @@ export function ComparisonEditor({
                     <ScrollRow
                         className="-mx-1 mb-3 flex items-center gap-1 px-1"
                         role="tablist"
-                        aria-label="How to read this"
+                        aria-label={t("comparison.howToReadThis")}
                     >
                         {(["table", "map"] as const).map((one) => (
                             <button
@@ -117,7 +119,7 @@ export function ComparisonEditor({
                                         : "text-muted-foreground hover:bg-card hover:text-foreground"
                                 )}
                             >
-                                {one === "table" ? "Table" : "Positioning map"}
+                                {one === "table" ? t("comparison.table") : t("comparison.positioningMap")}
                             </button>
                         ))}
                     </ScrollRow>
@@ -136,7 +138,7 @@ export function ComparisonEditor({
                             <thead>
                                 <tr className="border-b border-border bg-surface">
                                     <th className="sticky left-0 z-10 min-w-48 bg-surface px-3 py-2 text-left font-medium">
-                                        Criterion
+                                        {t("comparison.criterion")}
                                     </th>
                                     {columns.map((subject) => (
                                         <th
@@ -165,7 +167,7 @@ export function ComparisonEditor({
                                                     </span>
                                                 )}
                                                 {subject.us ? (
-                                                    <Badge variant="primary">Us</Badge>
+                                                    <Badge variant="primary">{t("comparison.us")}</Badge>
                                                 ) : null}
                                                 {editable ? (
                                                     <>
@@ -173,8 +175,8 @@ export function ComparisonEditor({
                                                             variant="ghost"
                                                             size="icon"
                                                             className="ml-auto"
-                                                            aria-label={`Describe ${subject.name}`}
-                                                            title="What they do"
+                                                            aria-label={t("comparison.describeNamed", { name: subject.name })}
+                                                            title={t("comparison.whatTheyDo")}
                                                             onClick={() =>
                                                                 setDescribing(subject.id)
                                                             }
@@ -187,8 +189,8 @@ export function ComparisonEditor({
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={`Remove ${subject.name}`}
-                                                            title="Remove"
+                                                            aria-label={t("comparison.removeNamed", { name: subject.name })}
+                                                            title={t("comparison.remove")}
                                                             onClick={() =>
                                                                 removeSubject(doc, subject.id)
                                                             }
@@ -252,8 +254,8 @@ export function ComparisonEditor({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={`Remove ${criterion.name}`}
-                                                    title="Remove"
+                                                    aria-label={t("comparison.removeNamed", { name: criterion.name })}
+                                                    title={t("comparison.remove")}
                                                     onClick={() =>
                                                         removeCriterion(doc, criterion.id)
                                                     }
@@ -320,6 +322,7 @@ function CellBox({
     editable: boolean;
     onOpen: () => void;
 }) {
+    const t = useTranslations("office");
     const format = useDisplayFormat();
     const read = core.cellReads(cell, kind);
     const stale = core.isStale(cell.checkedAt);
@@ -340,7 +343,7 @@ function CellBox({
                         {read}
                     </span>
                 ) : (
-                    <span className="block text-muted-foreground">Not answered</span>
+                    <span className="block text-muted-foreground">{t("comparison.notAnswered")}</span>
                 )}
                 {cell.evidence ? (
                     <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
@@ -354,13 +357,13 @@ function CellBox({
                 {read && !cell.checkedAt ? (
                     <span className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
                         <CircleAlert className="size-3 shrink-0" aria-hidden />
-                        Nobody has checked this
+                        {t("comparison.nobodyHasCheckedThis")}
                     </span>
                 ) : null}
                 {stale ? (
                     <span className="mt-1 flex items-center gap-1 text-[11px] text-warning">
                         <TriangleAlert className="size-3 shrink-0" aria-hidden />
-                        Checked {format.date(new Date(cell.checkedAt))}
+                        {t("comparison.checkedOn", { date: format.date(new Date(cell.checkedAt)) })}
                     </span>
                 ) : null}
                 {cell.source ? (
@@ -391,6 +394,7 @@ function SubjectDialog({
     subject: core.Subject;
     onClose: () => void;
 }) {
+    const t = useTranslations("office");
     const [name, setName] = useState(subject.name);
     const [url, setUrl] = useState(subject.url);
     const [does, setDoes] = useState(subject.does);
@@ -414,17 +418,17 @@ function SubjectDialog({
                 <DialogHeader>
                     <DialogTitle>{subject.name}</DialogTitle>
                     <DialogDescription>
-                        What they do, so this table still makes sense in six months.
+                        {t("comparison.whatTheyDoSoThis")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">Name</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("comparison.name")}</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Their site
+                            {t("comparison.theirSite")}
                         </span>
                         <Input
                             value={url}
@@ -435,20 +439,20 @@ function SubjectDialog({
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            What they do
+                            {t("comparison.whatTheyDo")}
                         </span>
                         <Textarea
                             rows={3}
                             value={does}
-                            placeholder="Sells the same thing to bigger companies, on a yearly contract."
+                            placeholder={t("comparison.sellsTheSameThingTo")}
                             onChange={(event) => setDoes(event.target.value)}
                         />
                     </label>
                     <div className="flex justify-end gap-2">
                         <Button variant="secondary" onClick={onClose}>
-                            Cancel
+                            {t("comparison.cancel")}
                         </Button>
-                        <Button onClick={save}>Save</Button>
+                        <Button onClick={save}>{t("comparison.save")}</Button>
                     </div>
                 </div>
             </DialogContent>
@@ -472,6 +476,7 @@ function CellDialog({
     cell: core.Cell;
     onClose: () => void;
 }) {
+    const t = useTranslations("office");
     const toast = useToast();
     const [value, setValue] = useState(cell.value);
     const [evidence, setEvidence] = useState(cell.evidence);
@@ -491,20 +496,20 @@ function CellDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
-                        The answer
+                        {t("comparison.theAnswer")}
                         <Answer kind={criterion.kind} value={value} onChange={setValue} />
                     </label>
                     <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
-                        Why - what you actually saw
+                        {t("comparison.whyWhatYouActuallySaw")}
                         <Textarea
                             rows={3}
                             value={evidence}
-                            placeholder="Their pricing page lists it at £35 a seat"
+                            placeholder={t("comparison.theirPricingPageListsIt")}
                             onChange={(event) => setEvidence(event.target.value)}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-[12px] text-muted-foreground">
-                        Where to check
+                        {t("comparison.whereToCheck")}
                         <Input
                             value={source}
                             placeholder="https://"
@@ -513,7 +518,7 @@ function CellDialog({
                     </label>
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {t("comparison.cancel")}
                         </Button>
                         <Button
                             onClick={() => {
@@ -529,7 +534,7 @@ function CellDialog({
                                 if (!parsed.success) {
                                     toast.show({
                                         title:
-                                            parsed.error.issues[0]?.message ?? "That did not save"
+                                            parsed.error.issues[0]?.message ?? t("comparison.thatDidNotSave")
                                     });
                                     return;
                                 }
@@ -540,7 +545,7 @@ function CellDialog({
                                 onClose();
                             }}
                         >
-                            Save
+                            {t("comparison.save")}
                         </Button>
                     </div>
                 </div>
@@ -560,12 +565,13 @@ function Answer({
     value: string;
     onChange: (next: string) => void;
 }) {
+    const t = useTranslations("office");
     if (kind === "rating") {
         return (
             <Select
                 value={value}
-                aria-label="Rating"
-                placeholder="Pick one"
+                aria-label={t("comparison.rating")}
+                placeholder={t("comparison.pickOne")}
                 onValueChange={onChange}
                 options={core.RATING_SCALE.map((score) => ({
                     value: String(score),
@@ -578,8 +584,8 @@ function Answer({
         return (
             <Select
                 value={value}
-                aria-label="Yes or no"
-                placeholder="Pick one"
+                aria-label={t("comparison.yesOrNo")}
+                placeholder={t("comparison.pickOne")}
                 onValueChange={onChange}
                 options={core.YES_NO_ANSWERS.map((one) => ({
                     value: one,
@@ -592,6 +598,7 @@ function Answer({
 }
 
 function AddSubject({ doc }: { doc: Y.Doc }) {
+    const t = useTranslations("office");
     const [name, setName] = useState("");
     const [open, setOpen] = useState(false);
     if (!open) {
@@ -599,8 +606,8 @@ function AddSubject({ doc }: { doc: Y.Doc }) {
             <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Add a competitor"
-                title="Add a competitor"
+                aria-label={t("comparison.addACompetitor")}
+                title={t("comparison.addACompetitor")}
                 onClick={() => setOpen(true)}
             >
                 <Plus className="size-4 shrink-0" aria-hidden />
@@ -626,8 +633,8 @@ function AddSubject({ doc }: { doc: Y.Doc }) {
         <Input
             autoFocus
             value={name}
-            placeholder="Competitor"
-            aria-label="Competitor's name"
+            placeholder={t("comparison.competitor")}
+            aria-label={t("comparison.competitorSName")}
             className="w-40"
             onChange={(event) => setName(event.target.value)}
             onBlur={add}
@@ -640,6 +647,7 @@ function AddSubject({ doc }: { doc: Y.Doc }) {
 }
 
 function AddCriterion({ doc }: { doc: Y.Doc }) {
+    const t = useTranslations("office");
     const [name, setName] = useState("");
     const [kind, setKind] = useState<core.CriterionKind>("rating");
     const add = (): void => {
@@ -660,15 +668,15 @@ function AddCriterion({ doc }: { doc: Y.Doc }) {
         <div className="flex flex-wrap items-center gap-2">
             <Input
                 value={name}
-                placeholder="What to compare on"
-                aria-label="What to compare on"
+                placeholder={t("comparison.whatToCompareOn")}
+                aria-label={t("comparison.whatToCompareOn")}
                 className="w-56"
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && add()}
             />
             <Select
                 value={kind}
-                aria-label="What kind of answer"
+                aria-label={t("comparison.whatKindOfAnswer")}
                 className="w-40"
                 onValueChange={(next) => setKind(next as core.CriterionKind)}
                 options={core.CRITERION_KINDS.map((one) => ({
@@ -678,24 +686,24 @@ function AddCriterion({ doc }: { doc: Y.Doc }) {
             />
             <Button size="sm" variant="secondary" disabled={!name.trim()} onClick={add}>
                 <Plus className="size-4 shrink-0" aria-hidden />
-                Add
+                {t("comparison.add")}
             </Button>
         </div>
     );
 }
 
 function Empty({ editable, onStart }: { editable: boolean; onStart: () => void }) {
+    const t = useTranslations("office");
     return (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border px-6 py-12 text-center">
-            <p className="text-[13px] font-medium">Nothing to compare yet</p>
+            <p className="text-[13px] font-medium">{t("comparison.nothingToCompareYet")}</p>
             <p className="max-w-md text-[13px] text-muted-foreground">
-                Competitors go across, the things that matter go down, and every answer carries the
-                evidence for it and the day somebody last checked.
+                {t("comparison.competitorsGoAcrossTheThings")}
             </p>
             {editable ? (
                 <Button onClick={onStart}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    Start with the usual columns
+                    {t("comparison.startWithTheUsualColumns")}
                 </Button>
             ) : null}
         </div>

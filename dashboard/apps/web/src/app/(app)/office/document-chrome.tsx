@@ -16,6 +16,8 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ROLE_KEYS } from "./office-kinds";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +42,7 @@ export function DocumentChrome({
     owned: boolean;
     children: React.ReactNode;
 }) {
+    const t = useTranslations("office");
     const router = useRouter();
     const toast = useToast();
     const [title, setTitle] = useState(row.title);
@@ -81,7 +84,7 @@ export function DocumentChrome({
     return (
         <div className={cn(PAGE_BLEED, "flex min-h-0 flex-col")}>
             <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-                <Button variant="ghost" size="icon" asChild aria-label="Back to Office" title="Back">
+                <Button variant="ghost" size="icon" asChild aria-label={t("chrome.backToOffice")} title={t("chrome.back")}>
                     <Link href="/office">
                         <ArrowLeft className="size-4 shrink-0" aria-hidden />
                     </Link>
@@ -94,7 +97,7 @@ export function DocumentChrome({
                 <input
                     value={title}
                     readOnly={!editable}
-                    aria-label="Name of this document"
+                    aria-label={t("chrome.nameOfThisDocument")}
                     className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[15px] font-medium text-foreground outline-none focus:bg-surface-hover read-only:cursor-default"
                     onChange={(event) => setTitle(event.target.value)}
                     onBlur={() => void rename()}
@@ -116,7 +119,7 @@ export function DocumentChrome({
                 {!owned ? (
                     <span className="hidden items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[12px] text-muted-foreground sm:flex">
                         <Users className="size-3.5 shrink-0" aria-hidden />
-                        {core.OFFICE_ROLE_LABELS[role]}
+                        {t(ROLE_KEYS[role])}
                     </span>
                 ) : null}
 
@@ -124,8 +127,8 @@ export function DocumentChrome({
                     variant="ghost"
                     size="icon"
                     aria-pressed={starred}
-                    aria-label={starred ? "Unstar this" : "Star this"}
-                    title={starred ? "Unstar" : "Star"}
+                    aria-label={starred ? t("chrome.unstarThis") : t("chrome.starThis")}
+                    title={starred ? t("chrome.unstar") : t("chrome.star")}
                     onClick={async () => {
                         const next = !starred;
                         setStarred(next);
@@ -147,7 +150,7 @@ export function DocumentChrome({
                 {owned ? (
                     <Button size="sm" variant="secondary" onClick={() => setSharing(true)}>
                         <Share2 className="size-4 shrink-0" aria-hidden />
-                        Share
+                        {t("chrome.share")}
                     </Button>
                 ) : null}
             </header>

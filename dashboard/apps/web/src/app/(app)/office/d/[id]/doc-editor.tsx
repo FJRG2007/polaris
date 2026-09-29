@@ -25,6 +25,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2 } from "lucide-react";
 import { Extension } from "@tiptap/core";
 import { OFFICE_FIELD } from "@/lib/office/content";
@@ -45,6 +46,7 @@ export function DocEditor({
     content: number[] | null;
     editable: boolean;
 }) {
+    const t = useTranslations("office");
     // The document and the wire under it. Shared with every other editor here:
     // none of that is about documents - see `use-office-document`.
     const { doc, saving } = useOfficeDocument({ documentId, content, editable });
@@ -112,7 +114,7 @@ export function DocEditor({
                     ) : (
                         <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
                             <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                            Opening
+                            {t("docEditor.opening")}
                         </p>
                     )}
                 </div>
@@ -126,6 +128,7 @@ export function DocEditor({
  *  permanent "saved" is a label nobody reads, and the one that matters is the
  *  one that says it did not. */
 function SavingNote({ state }: { state: OfficeSaving }) {
+    const t = useTranslations("office");
     if (state === "settled") return null;
     return (
         <p
@@ -136,8 +139,8 @@ function SavingNote({ state }: { state: OfficeSaving }) {
             )}
         >
             {state === "saving"
-                ? "Saving"
-                : "That did not save. Your work is still on screen - check your connection."}
+                ? t("docEditor.saving")
+                : t("docEditor.thatDidNotSaveYour")}
         </p>
     );
 }

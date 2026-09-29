@@ -20,6 +20,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Crosshair } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn, EmptyState, Select } from "@polaris/ui";
@@ -33,6 +34,7 @@ export function PositioningMap({
     criteria: readonly core.Criterion[];
     cells: ReadonlyMap<string, core.Cell>;
 }) {
+    const t = useTranslations("office");
     /** Only what has a position on a line. A sentence cannot be an axis, and
      *  offering it would be offering a chart that cannot be drawn. */
     const axes = useMemo(
@@ -58,8 +60,8 @@ export function PositioningMap({
         return (
             <EmptyState
                 icon={<Crosshair className="size-5 shrink-0" aria-hidden />}
-                title="Two things to measure"
-                description="A positioning map needs two criteria with a number behind them - a rating, a price, a count. Add a second and it draws itself."
+                title={t("positioning.twoThingsToMeasure")}
+                description={t("positioning.aPositioningMapNeedsTwo")}
             />
         );
     }
@@ -68,7 +70,7 @@ export function PositioningMap({
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-2">
                 <label className="min-w-0 flex-1">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">Across</span>
+                    <span className="mb-1 block text-[12px] text-muted-foreground">{t("positioning.across")}</span>
                     <Select
                         value={acrossId}
                         onValueChange={setAcross}
@@ -76,7 +78,7 @@ export function PositioningMap({
                     />
                 </label>
                 <label className="min-w-0 flex-1">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">Up</span>
+                    <span className="mb-1 block text-[12px] text-muted-foreground">{t("positioning.up")}</span>
                     <Select
                         value={upId}
                         onValueChange={setUp}
@@ -102,7 +104,7 @@ export function PositioningMap({
                     <div
                         className="relative aspect-[4/3] w-full rounded-lg border border-border bg-surface"
                         role="img"
-                        aria-label={`${subjects.length} compared on ${acrossName} and ${upName}`}
+                        aria-label={t("positioning.compared", { count: subjects.length, across: acrossName, up: upName })}
                     >
                         {/* The two lines through the middle. What makes it four
                             quadrants rather than a scatter plot, which is the
@@ -155,10 +157,7 @@ export function PositioningMap({
 
             {map.missing > 0 ? (
                 <p className="text-[12px] text-muted-foreground">
-                    {map.missing} {map.missing === 1 ? "competitor is" : "competitors are"} not on
-                    the map, because {map.missing === 1 ? "they have" : "they have"} no answer for
-                    one of these two. Nothing is placed at zero: not knowing is not the same as
-                    scoring nothing.
+                    {t("positioning.missing", { count: map.missing })}
                 </p>
             ) : null}
 

@@ -14,6 +14,7 @@
  */
 
 import * as core from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
 import * as office from "@/lib/office/documents";
 import { recordAudit } from "@/lib/audit-service";
@@ -73,7 +74,7 @@ export async function createDocumentAction(
         const user = await actor();
         const parsed = core.officeCreateSchema.safeParse(input);
         if (!parsed.success) {
-            return { error: parsed.error.issues[0]?.message ?? "That could not be created" };
+            return { error: parsed.error.issues[0]?.message ?? (await getTranslations("office"))("errors.notCreated") };
         }
         // Where they are working, unless the caller said. See `officeCreateSchema`.
         const orgId =

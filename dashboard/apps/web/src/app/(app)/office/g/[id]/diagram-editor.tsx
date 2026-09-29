@@ -23,6 +23,7 @@
 import * as Y from "yjs";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import "@excalidraw/excalidraw/index.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
@@ -30,16 +31,22 @@ import { reconcileScene, type SceneElement } from "@/lib/office/scene";
 import { useRegisterExporter } from "@/app/(app)/office/export-slot";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 
+/** What shows while the canvas code arrives. */
+function CanvasLoading() {
+    const t = useTranslations("office");
+    return (
+        <p className="flex flex-1 items-center justify-center gap-2 text-[13px] text-muted-foreground">
+            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+            {t("canvasOpening")}
+        </p>
+    );
+}
+
 const Excalidraw = dynamic(
     async () => (await import("@excalidraw/excalidraw")).Excalidraw,
     {
         ssr: false,
-        loading: () => (
-            <p className="flex flex-1 items-center justify-center gap-2 text-[13px] text-muted-foreground">
-                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                Opening the canvas
-            </p>
-        )
+        loading: () => <CanvasLoading />
     }
 );
 

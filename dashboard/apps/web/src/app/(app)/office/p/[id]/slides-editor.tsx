@@ -18,6 +18,7 @@
  */
 
 import * as Y from "yjs";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, cn } from "@polaris/ui";
 import * as deck from "@/lib/office/deck";
 import { Copy, Play, Plus, Square, Trash2, Type, X } from "lucide-react";
@@ -36,6 +37,7 @@ export function SlidesEditor({
     content: number[] | null;
     editable: boolean;
 }) {
+    const t = useTranslations("office");
     const { doc } = useOfficeDocument({ documentId, content, editable });
     const slides = useMemo(() => doc.getArray<deck.Slide>(SLIDES), [doc]);
     const boxes = useMemo(() => doc.getMap<deck.Box>(BOXES), [doc]);
@@ -67,15 +69,14 @@ export function SlidesEditor({
         return (
             <div className="flex min-h-0 flex-1 items-center justify-center p-8">
                 <div className="flex flex-col items-center gap-3 text-center">
-                    <p className="text-[13px] font-medium">No slides yet</p>
+                    <p className="text-[13px] font-medium">{t("slides.noSlidesYet")}</p>
                     <p className="max-w-sm text-[13px] text-muted-foreground">
-                        Everything on a slide is placed as a fraction of it, so what you make here
-                        looks the same on a projector as it does now.
+                        {t("slides.everythingOnASlideIs")}
                     </p>
                     {editable ? (
                         <Button onClick={addSlide}>
                             <Plus className="size-4 shrink-0" aria-hidden />
-                            Add the first slide
+                            {t("slides.addTheFirstSlide")}
                         </Button>
                     ) : null}
                 </div>
@@ -113,7 +114,7 @@ export function SlidesEditor({
                 {editable ? (
                     <Button variant="secondary" size="sm" onClick={addSlide}>
                         <Plus className="size-4 shrink-0" aria-hidden />
-                        Slide
+                        {t("slides.slide")}
                     </Button>
                 ) : null}
             </aside>
@@ -128,7 +129,7 @@ export function SlidesEditor({
                                 onClick={() => slide && addBox(doc, slide.id, "text")}
                             >
                                 <Type className="size-4 shrink-0" aria-hidden />
-                                Text
+                                {t("slides.text")}
                             </Button>
                             <Button
                                 variant="ghost"
@@ -136,7 +137,7 @@ export function SlidesEditor({
                                 onClick={() => slide && addBox(doc, slide.id, "shape")}
                             >
                                 <Square className="size-4 shrink-0" aria-hidden />
-                                Shape
+                                {t("slides.shape")}
                             </Button>
                             <Button
                                 variant="ghost"
@@ -145,7 +146,7 @@ export function SlidesEditor({
                                 onClick={() => slide && chosen && removeBox(doc, slide.id, chosen)}
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
-                                Remove
+                                {t("slides.remove")}
                             </Button>
                             <Button
                                 variant="ghost"
@@ -153,7 +154,7 @@ export function SlidesEditor({
                                 onClick={() => slide && duplicateSlide(doc, slide.id, atIndex)}
                             >
                                 <Copy className="size-4 shrink-0" aria-hidden />
-                                Duplicate slide
+                                {t("slides.duplicateSlide")}
                             </Button>
                         </>
                     ) : null}
@@ -164,7 +165,7 @@ export function SlidesEditor({
                         onClick={() => setPresenting(true)}
                     >
                         <Play className="size-4 shrink-0" aria-hidden />
-                        Present
+                        {t("slides.present")}
                     </Button>
                 </div>
 
@@ -310,12 +311,13 @@ function Present({
     from: number;
     onClose: () => void;
 }) {
+    const t = useTranslations("office");
     const [at, setAt] = useState(from);
     const slide = slides[at];
     return (
         <div
             role="dialog"
-            aria-label="Presenting"
+            aria-label={t("slides.presenting")}
             tabIndex={-1}
             autoFocus
             onKeyDown={(event) => {
@@ -330,8 +332,8 @@ function Present({
             <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Stop presenting"
-                title="Stop presenting"
+                aria-label={t("slides.stopPresenting")}
+                title={t("slides.stopPresenting")}
                 className="absolute right-3 top-3 text-white"
                 onClick={onClose}
             >

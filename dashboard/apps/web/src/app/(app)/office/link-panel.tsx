@@ -21,6 +21,9 @@
  */
 
 import * as core from "@polaris/core";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ROLE_KEYS } from "./office-kinds";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -36,15 +39,16 @@ import {
 } from "./link-actions";
 
 /** What each standing means, said as the person who made the link would say it. */
-const STANDING: Record<OfficeLinkView["standing"], string> = {
-    live: "Working",
-    revoked: "Stopped",
-    expired: "Out of date",
-    exhausted: "All its openings used",
-    scheduled: "Not started yet"
-};
+const STANDING = {
+    live: "links.standing.live",
+    revoked: "links.standing.revoked",
+    expired: "links.standing.expired",
+    exhausted: "links.standing.exhausted",
+    scheduled: "links.standing.scheduled"
+} as const satisfies Record<OfficeLinkView["standing"], NamespaceKey<"office">>;
 
 export function OfficeLinkPanel({ documentId }: { documentId: string }) {
+    const t = useTranslations("office");
     const toast = useToast();
     const [confirm, confirmDialog] = useConfirm();
     const [links, setLinks] = useState<OfficeLinkView[] | null>(null);
@@ -77,11 +81,11 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
     async function copy(url: string): Promise<void> {
         try {
             await navigator.clipboard.writeText(url);
-            toast.show({ title: "The link is on your clipboard." });
+            toast.show({ title: t("links.theLinkIsOnYour") });
         } catch {
             // A browser that refuses the clipboard is not a failure worth an
             // error: the address is on screen and can be selected.
-            toast.show({ title: "Copy it from the box above." });
+            toast.show({ title: t("links.copyItFromTheBox") });
         }
     }
 
@@ -102,7 +106,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
         if (!answer) return;
         const said = refusalOf(answer);
         if (said || !("url" in answer)) {
-            toast.show({ title: said || "That link could not be made." });
+            toast.show({ title: said || t("links.thatLinkCouldNotBe") });
             return;
         }
         setLinks(answer.links ?? []);
@@ -122,7 +126,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
         if (!answer) return;
         const said = refusalOf(answer);
         if (said || !("url" in answer)) {
-            toast.show({ title: said || "That link could not be read." });
+            toast.show({ title: said || t("links.thatLinkCouldNotBe2") });
             return;
         }
         await copy(answer.url ?? "");
@@ -130,10 +134,10 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
 
     async function revoke(link: OfficeLinkView): Promise<void> {
         const sure = await confirm({
-            title: "Stop this link?",
+            title: t("links.stopThisLink"),
             description:
-                "Anybody who has it stops being able to open the document, at once. It stays on this list so you can see it existed.",
-            confirmLabel: "Stop it",
+                t("links.anybodyWhoHasItStops"),
+            confirmLabel: t("links.stopIt"),
             danger: true
         });
         if (!sure) return;
@@ -144,7 +148,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
         if (!answer) return;
         const said = refusalOf(answer);
         if (said || !("links" in answer)) {
-            toast.show({ title: said || "That link could not be stopped." });
+            toast.show({ title: said || t("links.thatLinkCouldNotBe3") });
             return;
         }
         setLinks(answer.links ?? []);
@@ -154,10 +158,9 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
         <section className="border-t border-border pt-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <h3 className="text-[13px] font-medium">Anybody with the link</h3>
+                    <h3 className="text-[13px] font-medium">{t("links.anybodyWithTheLink")}</h3>
                     <p className="mt-0.5 text-[12px] text-muted-foreground">
-                        For somebody who has no account here. A link can never share the document
-                        on and can never delete it, whatever it lets them do.
+                        {t("links.forSomebodyWhoHasNo")}
                     </p>
                 </div>
                 <Button
@@ -170,20 +173,20 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                     }}
                 >
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    New link
+                    {t("links.newLink")}
                 </Button>
             </div>
 
             {fresh ? (
                 <div className="mt-3 rounded-md border border-primary/40 bg-primary/5 p-2">
                     <p className="mb-1 text-[12px] text-muted-foreground">
-                        Copy it now. It is not shown again on its own, though you can ask for it.
+                        {t("links.copyItNowItIs")}
                     </p>
                     <div className="flex items-center gap-2">
                         <Input readOnly value={fresh} onFocus={(event) => event.target.select()} />
                         <Button size="sm" onClick={() => void copy(fresh)}>
                             <Copy className="size-4 shrink-0" aria-hidden />
-                            Copy
+                            {t("links.copy")}
                         </Button>
                     </div>
                 </div>
@@ -193,14 +196,14 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                 <div className="mt-3 space-y-3 rounded-md border border-border p-3">
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            What it lets them do
+                            {t("links.whatItLetsThemDo")}
                         </span>
                         <Select
                             value={role}
                             onValueChange={(next) => setRole(next as core.OfficeRole)}
                             options={core.OFFICE_ROLES.map((one) => ({
                                 value: one,
-                                label: core.OFFICE_ROLE_LABELS[one]
+                                label: t(ROLE_KEYS[one])
                             }))}
                         />
                         <span className="mt-1 block text-[12px] text-foreground-subtle">
@@ -212,9 +215,9 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                         <Switch
                             checked={withPassword}
                             onChange={setWithPassword}
-                            aria-label="Ask for a password"
+                            aria-label={t("links.askForAPassword")}
                         />
-                        Ask for a password
+                        {t("links.askForAPassword")}
                     </label>
                     {withPassword ? (
                         /* enigma:allow-no-breach-check enigma:allow-identity-password -
@@ -226,14 +229,14 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                             type="password"
                             value={password}
                             autoComplete="new-password"
-                            placeholder="What they will have to type"
+                            placeholder={t("links.whatTheyWillHaveTo")}
                             onChange={(event) => setPassword(event.target.value)}
                         />
                     ) : null}
 
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Stop working on (optional)
+                            {t("links.stopWorkingOnOptional")}
                         </span>
                         <Input
                             type="date"
@@ -244,18 +247,18 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
 
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            What it is for (only you see this)
+                            {t("links.whatItIsForOnly")}
                         </span>
                         <Input
                             value={note}
-                            placeholder="The design review with Acme"
+                            placeholder={t("links.theDesignReviewWithAcme")}
                             onChange={(event) => setNote(event.target.value)}
                         />
                     </label>
 
                     <div className="flex justify-end gap-2">
                         <Button size="sm" variant="secondary" onClick={() => setMaking(false)}>
-                            Cancel
+                            {t("links.cancel")}
                         </Button>
                         <Button
                             size="sm"
@@ -265,17 +268,17 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}
-                            Make the link
+                            {t("links.makeTheLink")}
                         </Button>
                     </div>
                 </div>
             ) : null}
 
             {links === null ? (
-                <p className="mt-3 text-[12px] text-muted-foreground">Reading the links…</p>
+                <p className="mt-3 text-[12px] text-muted-foreground">{t("links.readingTheLinks")}</p>
             ) : links.length === 0 ? (
                 <p className="mt-3 text-[12px] text-muted-foreground">
-                    None yet. Everybody who opens this has an account here.
+                    {t("links.noneYetEverybodyWhoOpens")}
                 </p>
             ) : (
                 <ul className="mt-3 flex flex-col gap-1">
@@ -290,22 +293,22 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                             />
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-[13px]">
-                                    {core.OFFICE_ROLE_LABELS[link.role]}
+                                    {t(ROLE_KEYS[link.role])}
                                     {link.note ? ` - ${link.note}` : ""}
                                 </p>
                                 <p className="truncate text-[12px] text-foreground-subtle">
-                                    {STANDING[link.standing]}
-                                    {link.hasPassword ? ", password" : ""}
+                                    {t(STANDING[link.standing])}
+                                    {link.hasPassword ? t("links.password") : ""}
                                     {link.useCount > 0
-                                        ? `, opened ${link.useCount} ${link.useCount === 1 ? "time" : "times"}`
-                                        : ", never opened"}
+                                        ? t("links.opened", { count: link.useCount })
+                                        : t("links.neverOpened")}
                                 </p>
                             </div>
                             {link.standing === "live" ? (
                                 <Button
                                     size="icon-sm"
                                     variant="ghost"
-                                    title="Copy the link"
+                                    title={t("links.copyTheLink")}
                                     onClick={() => void reveal(link.id)}
                                 >
                                     <Copy className="size-4 shrink-0" aria-hidden />
@@ -315,7 +318,7 @@ export function OfficeLinkPanel({ documentId }: { documentId: string }) {
                                 <Button
                                     size="icon-sm"
                                     variant="ghost"
-                                    title="Stop this link"
+                                    title={t("links.stopThisLink2")}
                                     onClick={() => void revoke(link)}
                                 >
                                     <Trash2 className="size-4 shrink-0" aria-hidden />

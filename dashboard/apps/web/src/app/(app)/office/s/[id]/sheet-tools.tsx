@@ -20,6 +20,7 @@
  */
 
 import * as Y from "yjs";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState } from "react";
 import * as engine from "@polaris/core/sheets";
 import { ArrowDownUp, Wand2 } from "lucide-react";
@@ -58,6 +59,7 @@ export function SheetTools({
      *  has when they reach for these. */
     sheetId: string;
 }) {
+    const t = useTranslations("office");
     const toast = useToast();
     const [open, setOpen] = useState<"sort" | "fill" | null>(null);
 
@@ -66,11 +68,11 @@ export function SheetTools({
             <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1.5">
                 <Button size="sm" variant="ghost" onClick={() => setOpen("sort")}>
                     <ArrowDownUp className="size-4 shrink-0" aria-hidden />
-                    Sort a range
+                    {t("sheetTools.sortARange")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setOpen("fill")}>
                     <Wand2 className="size-4 shrink-0" aria-hidden />
-                    Fill from examples
+                    {t("sheetTools.fillFromExamples")}
                 </Button>
             </div>
 
@@ -82,7 +84,7 @@ export function SheetTools({
                     onClose={() => setOpen(null)}
                     onDone={(moved) =>
                         toast.show({
-                            title: moved ? `${moved} cells moved.` : "Nothing needed moving."
+                            title: moved ? t("sheetTools.moved", { count: moved }) : t("sheetTools.nothingNeededMoving")
                         })
                     }
                 />
@@ -94,7 +96,7 @@ export function SheetTools({
                     cells={cells}
                     sheetId={sheetId}
                     onClose={() => setOpen(null)}
-                    onDone={(filled, said) => toast.show({ title: said || `${filled} cells filled.` })}
+                    onDone={(filled, said) => toast.show({ title: said || t("sheetTools.filled", { count: filled }) })}
                 />
             ) : null}
         </>
@@ -116,6 +118,7 @@ function SortDialog({
     onClose: () => void;
     onDone: (moved: number) => void;
 }) {
+    const t = useTranslations("office");
     const [range, setRange] = useState("A1:C10");
     const [column, setColumn] = useState("A");
     const [ascending, setAscending] = useState(true);
@@ -158,27 +161,28 @@ function SortDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Sort a range</DialogTitle>
+                    <DialogTitle>{t("sheetTools.sortARange")}</DialogTitle>
                     <DialogDescription>
-                        Only what is inside the range moves. Blanks go last, and numbers sort before
-                        text - the order every spreadsheet uses.
+                        {t("sheetTools.onlyWhatIsInsideThe")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">Range</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("sheetTools.range")}</span>
                         <Input
                             value={range}
+                            // i18n-ignore: a cell range, the same in every language
                             placeholder="A1:C10"
                             onChange={(event) => setRange(event.target.value)}
                         />
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Sort by column
+                            {t("sheetTools.sortByColumn")}
                         </span>
                         <Input
                             value={column}
+                            // i18n-ignore: a column letter
                             placeholder="A"
                             className="w-24"
                             onChange={(event) => setColumn(event.target.value)}
@@ -188,24 +192,24 @@ function SortDialog({
                         <Switch
                             checked={hasHeader}
                             onChange={setHasHeader}
-                            aria-label="The first row is a header"
+                            aria-label={t("sheetTools.theFirstRowIsA")}
                         />
-                        The first row is a header
+                        {t("sheetTools.theFirstRowIsA")}
                     </label>
                     <label className="flex items-center gap-2 text-[13px]">
                         <Switch
                             checked={ascending}
                             onChange={setAscending}
-                            aria-label="Smallest first"
+                            aria-label={t("sheetTools.smallestFirst")}
                         />
-                        Smallest first
+                        {t("sheetTools.smallestFirst")}
                     </label>
                     {problem ? <p className="text-[12px] text-danger">{problem}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="secondary" onClick={onClose}>
-                            Cancel
+                            {t("sheetTools.cancel")}
                         </Button>
-                        <Button onClick={run}>Sort</Button>
+                        <Button onClick={run}>{t("sheetTools.sort")}</Button>
                     </div>
                 </div>
             </DialogContent>
@@ -234,6 +238,7 @@ function FillDialog({
     onClose: () => void;
     onDone: (filled: number, said: string) => void;
 }) {
+    const t = useTranslations("office");
     const [source, setSource] = useState("A2:B10");
     const [into, setInto] = useState("C");
     const [problem, setProblem] = useState("");
@@ -294,29 +299,30 @@ function FillDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Fill from examples</DialogTitle>
+                    <DialogTitle>{t("sheetTools.fillFromExamples")}</DialogTitle>
                     <DialogDescription>
-                        Type the answer you want on one row, and the rest of the column is filled
-                        the same way.
+                        {t("sheetTools.typeTheAnswerYouWant")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            The columns to read
+                            {t("sheetTools.theColumnsToRead")}
                         </span>
                         <Input
                             value={source}
+                            // i18n-ignore: a cell range, the same in every language
                             placeholder="A2:B10"
                             onChange={(event) => setSource(event.target.value)}
                         />
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            The column to fill
+                            {t("sheetTools.theColumnToFill")}
                         </span>
                         <Input
                             value={into}
+                            // i18n-ignore: a column letter
                             placeholder="C"
                             className="w-24"
                             onChange={(event) => setInto(event.target.value)}
@@ -325,9 +331,9 @@ function FillDialog({
                     {problem ? <p className="text-[12px] text-danger">{problem}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="secondary" onClick={onClose}>
-                            Cancel
+                            {t("sheetTools.cancel")}
                         </Button>
-                        <Button onClick={run}>Fill</Button>
+                        <Button onClick={run}>{t("sheetTools.fill")}</Button>
                     </div>
                 </div>
             </DialogContent>

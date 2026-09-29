@@ -27,6 +27,7 @@
  */
 
 import "@univerjs/preset-sheets-core/lib/index.css";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 import * as Y from "yjs";
 import { Loader2 } from "lucide-react";
@@ -71,6 +72,7 @@ export function SheetEditor({
     content: number[] | null;
     editable: boolean;
 }) {
+    const t = useTranslations("office");
     const { doc } = useOfficeDocument({ documentId, content, editable });
     const cells = useMemo(() => doc.getMap<SheetCell>(CELLS), [doc]);
     const shape = useMemo(() => doc.getMap<unknown>(SHAPE), [doc]);
@@ -230,7 +232,7 @@ export function SheetEditor({
             {!ready && !failed ? (
                 <p className="absolute inset-0 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                    Opening the spreadsheet
+                    {t("sheetEditor.openingTheSpreadsheet")}
                 </p>
             ) : null}
             {failed ? (

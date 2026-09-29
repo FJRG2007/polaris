@@ -15,6 +15,7 @@
  */
 
 import * as core from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import * as links from "@/lib/office/links";
 import { OfficeAccessError, requireShareable } from "@/lib/office/documents";
@@ -40,7 +41,7 @@ export async function createLinkAction(documentId: string, input: unknown) {
     const user = await requireUser();
     const parsed = core.officeLinkSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Check the details." };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("office"))("errors.checkDetails") };
     }
     try {
         await requireShareable(user, documentId);
@@ -64,7 +65,7 @@ export async function revealLinkAction(documentId: string, linkId: string) {
                   // The master key has moved under it. The link still works for
                   // whoever holds it; it simply cannot be shown again, and
                   // saying so is better than an empty box.
-                  error: "That link cannot be shown again. Revoke it and make another."
+                  error: (await getTranslations("office"))("errors.linkNotShown")
               };
     } catch (caught) {
         return failure(caught, "That link could not be read.");

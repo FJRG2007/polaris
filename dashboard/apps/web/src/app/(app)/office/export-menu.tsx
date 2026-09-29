@@ -17,6 +17,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Download, Printer } from "lucide-react";
 import { useBrowserExporter } from "./export-slot";
 import {
@@ -38,6 +39,7 @@ export function ExportMenu({
     kind: core.OfficeKind;
     title: string;
 }) {
+    const t = useTranslations("office");
     const toast = useToast();
     const exporter = useBrowserExporter();
     const formats = core.OFFICE_EXPORTS[kind] as readonly string[];
@@ -49,7 +51,7 @@ export function ExportMenu({
         if (!exporter) return;
         const blob = await exporter(format).catch(() => null);
         if (!blob) {
-            toast.show({ title: "That could not be made. Try again in a moment." });
+            toast.show({ title: t("export.thatCouldNotBeMade") });
             return;
         }
         const url = URL.createObjectURL(blob);
@@ -65,7 +67,7 @@ export function ExportMenu({
             <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <Download className="size-4 shrink-0" aria-hidden />
-                    Export
+                    {t("export.export")}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -92,7 +94,7 @@ export function ExportMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => window.print()}>
                     <Printer className="size-4 shrink-0" aria-hidden />
-                    Print, or save as PDF
+                    {t("export.printOrSaveAsPdf")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

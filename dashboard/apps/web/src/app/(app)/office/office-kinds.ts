@@ -35,3 +35,10 @@ export const OFFICE_KIND_HINT_KEYS = {
     diagram: "kindHints.diagram",
     comparison: "kindHints.comparison"
 } as const satisfies Record<core.OfficeKind, NamespaceKey<"office">>;
+
+/** What each role lets somebody do, in the reader's language. */
+export const ROLE_KEYS = {
+    viewer: "roles.viewer",
+    commenter: "roles.commenter",
+    editor: "roles.editor"
+} as const satisfies Record<core.OfficeRole, NamespaceKey<"office">>;
