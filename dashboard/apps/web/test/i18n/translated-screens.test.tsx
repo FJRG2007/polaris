@@ -136,7 +136,7 @@ describe("the account menu", () => {
         );
         const trigger = screen.getByRole("button", { name: "Tu cuenta" });
         fireEvent.contextMenu(trigger);
-        expect(await screen.findByText("Cerrar sesión")).toBeDefined();
+        expect(await screen.findByText("Salir")).toBeDefined();
         expect(screen.getByText("Mi cuenta")).toBeDefined();
         expect(screen.getByText("En línea")).toBeDefined();
     });

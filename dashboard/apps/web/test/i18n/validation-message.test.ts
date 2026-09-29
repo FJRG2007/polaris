@@ -22,7 +22,7 @@ describe("validationMessage", () => {
     });
 
     it("translates them into Spanish, counts included", () => {
-        expect(validationMessage(es, "Enter a valid email")).toBe("Introduce un correo válido");
+        expect(validationMessage(es, "Enter a valid email")).toBe("Correo no válido");
         expect(validationMessage(es, "At most 30 characters")).toBe("Como máximo 30 caracteres");
         expect(validationMessage(es, "Use at least 10 characters")).toBe("Usa al menos 10 caracteres");
     });

@@ -1,10 +1,10 @@
 {
     "layout": {
-        "signIn": "Iniciar sesión",
+        "signIn": "Entrar",
         "about": "Acerca de",
         "privacy": "Privacidad",
-        "terms": "Condiciones",
-        "source": "Código fuente"
+        "terms": "Términos",
+        "source": "Código"
     },
     "about": {
         "metaDescription": "Polaris es un panel de control autoalojado para archivos, tareas, despliegues y servidores de juegos.",
@@ -25,7 +25,7 @@
         "updated": "Última actualización: {date}.",
         "privacyTitle": "Privacidad - Polaris",
         "privacyDescription": "Qué guarda Polaris, dónde se queda y qué pasa con ello cuando desvinculas algo o te vas.",
-        "termsTitle": "Condiciones - Polaris",
+        "termsTitle": "Términos - Polaris",
         "termsDescription": "Las condiciones con las que se ofrece este despliegue de Polaris."
     },
     "profile": {
@@ -45,7 +45,7 @@
         "blockConfirm": "Bloquearle",
         "youBlocked": "Has bloqueado a {name}.",
         "message": "Mensaje",
-        "requestSent": "Solicitud de amistad enviada",
+        "requestSent": "Solicitud enviada",
         "answer": "Responder a su solicitud",
         "addFriend": "Añadir amigo",
         "following": "Siguiendo",
@@ -65,8 +65,8 @@
         "followingCount": "{count, plural, other {siguiendo}}",
         "followersTitle": "Personas que siguen a {name}",
         "followingTitle": "A quién sigue {name}",
-        "searchPlaceholder": "Busca por nombre o nombre de usuario",
-        "searchLabel": "Buscar entre estas personas",
+        "searchPlaceholder": "Busca por nombre o usuario",
+        "searchLabel": "Buscar personas",
         "noMatch": "Aquí nadie coincide.",
         "nobody": "Aquí no hay nadie.",
         "showMore": "Mostrar más"

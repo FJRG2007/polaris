@@ -10,14 +10,14 @@
     "pages": {
         "error": {
             "updatedTitle": "Polaris se ha actualizado mientras esta página estaba abierta",
-            "brokeTitle": "Esta página ha dejado de funcionar",
+            "brokeTitle": "Esta página ha fallado",
             "updatedBody": "Esta pestaña sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.",
             "againBody": "Ha vuelto a fallar igual, así que intentarlo otra vez no lo arreglará. Recarga para cargar una versión nueva, o envía lo de abajo a quien lo esté revisando.",
             "brokeBody": "El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta pestaña, Polaris lo indica en la esquina de la pantalla.",
             "reference": "Referencia: {digest}",
             "reload": "Recargar",
             "trying": "Intentándolo",
-            "tryAgain": "Volver a intentarlo"
+            "tryAgain": "Reintentar"
         },
         "notFound": {
             "appTitle": "Esto ya no está aquí",
@@ -31,7 +31,7 @@
     },
     "share": {
         "unreadable": "No se ha podido leer",
-        "notWritten": "No se ha podido guardar esa compartición",
+        "notWritten": "No se pudo guardar esa compartición",
         "nobodyFound": "No se ha podido buscar a nadie",
         "notTakenBack": "No se ha podido retirar esa compartición"
     },

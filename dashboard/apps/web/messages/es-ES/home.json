@@ -17,7 +17,7 @@
         "moveUp": "Subir {name}",
         "moveDown": "Bajar {name}",
         "show": "Mostrar {name}",
-        "greet": "Saludarme por mi nombre",
+        "greet": "Saludarme por nombre",
         "reset": "Restablecer"
     },
     "card": {
@@ -27,8 +27,8 @@
         "moveUp": "Subir",
         "moveDown": "Bajar",
         "width": "Ancho",
-        "clearHistory": "Borrar el historial",
-        "hide": "Ocultar tarjeta"
+        "clearHistory": "Borrar historial",
+        "hide": "Ocultar"
     },
     "sizes": {
         "sm": "Estrecha",
@@ -54,7 +54,7 @@
             "description": "Los últimos avisos, los más recientes primero."
         },
         "recent": {
-            "label": "Visitado recientemente",
+            "label": "Recientes",
             "description": "Dónde has estado en Polaris, en este dispositivo."
         },
         "tasks": {
@@ -78,7 +78,7 @@
             "description": "Qué servidores tuyos están en marcha y lo llenos que están."
         },
         "sessions": {
-            "label": "Sesiones iniciadas",
+            "label": "Sesiones",
             "description": "Los dispositivos en los que tu cuenta está abierta ahora mismo."
         },
         "activity": {
@@ -88,7 +88,7 @@
     },
     "picker": {
         "title": "Fija una página en tu resumen",
-        "find": "Busca una página o un servicio para fijar",
+        "find": "Buscar página o servicio para fijar",
         "noMatch": "Nada coincide con «{query}».",
         "empty": "Todavía no hay nada que fijar.",
         "pinned": "Fijada"
@@ -101,11 +101,11 @@
     },
     "activity": {
         "unavailable": "Ahora mismo no se ha podido leer tu actividad.",
-        "openLog": "Abrir el registro",
+        "openLog": "Abrir registro",
         "empty": "Todavía no se ha registrado nada en esta cuenta."
     },
     "shortcuts": {
-        "pin": "Fijar una página",
+        "pin": "Fijar página",
         "empty": "Fija las páginas y servicios que abres cada día.",
         "unpin": "Quitar {name}"
     },
@@ -134,7 +134,7 @@
     },
     "alarms": {
         "unavailable": "Ahora mismo no se han podido leer las alarmas.",
-        "setUp": "Configurar una",
+        "setUp": "Crear una",
         "empty": "No ha saltado nada. Y tampoco hay alarmas todavía.",
         "firing": "<big>{count}</big><rest> saltando ahora</rest>",
         "resolved": "Resuelta",
@@ -142,7 +142,7 @@
     },
     "storage": {
         "unavailable": "Ahora mismo no se ha podido leer el almacenamiento.",
-        "connect": "Conectar un dispositivo",
+        "connect": "Conectar dispositivo",
         "empty": "Todavía ningún dispositivo ha informado de su uso.",
         "usageUnknown": "Uso sin datos",
         "usageUnknownOf": "Uso sin datos de {total}",
