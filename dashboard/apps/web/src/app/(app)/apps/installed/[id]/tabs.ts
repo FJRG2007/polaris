@@ -58,6 +58,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // Competitions and happenings run on the server: the console's grant, since
     // an event talks to everybody on it and hands out items.
     { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] },
+    // Daily, weekly and monthly goals, a season pass and community goals: the
+    // same grant as events, since they talk to everybody and hand out items.
+    { slug: "challenges", label: "Challenges", permission: "games.console", games: ["minecraft"] },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },

@@ -105,6 +105,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would each write the same server's switch, and read
             // the token the other was about to write.
             "game-anticheat-default",
+            // Two passes would each close the same challenge day and pay
+            // everybody who finished something twice.
+            "game-challenges",
             // Two passes would each hand the same prize to the same player, and
             // could each start the event that had come due.
             "game-events",

@@ -1,0 +1,330 @@
+/**
+ * What players read about their challenges, in the language the server chose.
+ *
+ * Written with `&` colour codes, which the announcement writer turns into the
+ * game's own formatting. No braces anywhere: `{player}` and its kind are game
+ * variables to that writer.
+ */
+
+import * as catalog from "./catalog";
+import type { Language } from "./catalog";
+
+type Text = catalog.Text;
+
+const pick = (text: Text, language: Language) => text[language];
+const t = (en: string, es: string): Text => ({ en, es });
+
+export const TAG: Text = t("&6&l[Challenges]&r ", "&6&l[Retos]&r ");
+export const MENU_BUTTON: Text = t("[Challenges]", "[Retos]");
+
+export function tag(language: Language): string {
+    return pick(TAG, language);
+}
+
+/** `3 h 12 min`, `12 min`, `2 d 4 h`. */
+export function duration(ms: number, language: Language): string {
+    const minutes = Math.max(1, Math.round(ms / 60_000));
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const rest = minutes % 60;
+    const d = language === "es" ? "d" : "d";
+    if (days > 0) return `${days} ${d} ${hours} h`;
+    if (hours > 0) return `${hours} h ${rest} min`;
+    return `${rest} min`;
+}
+
+export const LABELS = {
+    daily: t("Daily", "Diarios"),
+    weekly: t("Weekly", "Semanales"),
+    backlog: t("Left over", "Pendientes"),
+    card: t("Bingo card", "Cartón de bingo"),
+    community: t("Community goal", "Objetivo de la comunidad"),
+    track: t("[Track]", "[Seguir]"),
+    tracking: t("[Tracking]", "[Siguiendo]"),
+    reroll: t("[Change]", "[Cambiar]"),
+    season: t("[Season]", "[Temporada]"),
+    bingo: t("[Bingo]", "[Bingo]"),
+    goal: t("[Community]", "[Comunidad]"),
+    list: t("[Challenges]", "[Retos]"),
+    untrack: t("[Stop tracking]", "[Dejar de seguir]"),
+    trackHover: t(
+        "Show it on a bar at the top of your screen",
+        "Mostrarlo en una barra arriba de tu pantalla"
+    ),
+    rerollHover: t(
+        "Swap it for another of the same difficulty",
+        "Cambiarlo por otro de la misma dificultad"
+    ),
+    listHover: t("Your challenges", "Tus retos"),
+    seasonHover: t("Your season pass", "Tu pase de temporada"),
+    bingoHover: t("This month's card", "El cartón de este mes"),
+    goalHover: t("What the whole server is working on", "En qué trabaja todo el servidor"),
+    done: t("done", "hecho"),
+    voided: t("lost to Anti X-Ray", "perdido por el Anti X-Ray")
+} as const;
+
+export function header(
+    layer: "daily" | "weekly" | "backlog",
+    left: number | null,
+    language: Language
+): string {
+    const name = pick(LABELS[layer], language);
+    if (left === null) return `${tag(language)}&e${name}`;
+    const when = duration(left, language);
+    return `${tag(language)}&e${name} &7- ${language === "es" ? `cambian en ${when}` : `new ones in ${when}`}`;
+}
+
+/** A text progress bar: `[||||||....]` in green and grey. */
+export function bar(progress: number, target: number, width = 10): string {
+    const filled = target > 0 ? Math.min(width, Math.floor((progress / target) * width)) : 0;
+    return `&8[&a${"|".repeat(filled)}&7${".".repeat(width - filled)}&8]`;
+}
+
+export function tierLabel(
+    layer: "daily" | "weekly" | "card",
+    tier: catalog.Difficulty,
+    language: Language
+): string {
+    const labels = layer === "weekly" ? catalog.WEEKLY_LABELS : catalog.DIFFICULTY_LABELS;
+    const colour = tier === "easy" ? "&a" : tier === "medium" ? "&e" : "&c";
+    return `${colour}${pick(labels[tier], language)}`;
+}
+
+/** `12/32`, in the template's unit. */
+export function figures(
+    template: catalog.Template,
+    progress: number,
+    target: number,
+    language: Language
+): string {
+    return `${catalog.formatNumber(catalog.inUnit(template, progress), language)}/${catalog.formatNumber(
+        catalog.inUnit(template, target),
+        language
+    )}`;
+}
+
+export function footer(streak: number, tier: number, points: number, language: Language): string {
+    return language === "es"
+        ? `&7Racha: &f${streak} ${streak === 1 ? "día" : "días"} &8| &7Temporada: &fnivel ${tier} &7(${points} pts)`
+        : `&7Streak: &f${streak} ${streak === 1 ? "day" : "days"} &8| &7Season: &ftier ${tier} &7(${points} pts)`;
+}
+
+export function locked(minutes: number, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Tus retos se desbloquean tras &f${minutes} min&7 de juego en este servidor.`
+        : `${tag(language)}&7Your challenges unlock after &f${minutes} min&7 of play on this server.`;
+}
+
+export function notLinked(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Los retos son para jugadores con una cuenta de Polaris vinculada.`
+        : `${tag(language)}&7Challenges are for players linked to a Polaris account.`;
+}
+
+export function nothingYet(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Los retos de hoy aún se están preparando. Prueba en un minuto.`
+        : `${tag(language)}&7Today's challenges are still being set up. Try again in a minute.`;
+}
+
+export function joinLine(left: number, language: Language): string {
+    if (left === 0)
+        return language === "es"
+            ? `${tag(language)}&aHas completado los retos de hoy.`
+            : `${tag(language)}&aYou have done today's challenges.`;
+    return language === "es"
+        ? `${tag(language)}&fTe ${left === 1 ? "queda &e1 reto" : `quedan &e${left} retos`}&f hoy.`
+        : `${tag(language)}&fYou have &e${left} ${left === 1 ? "challenge" : "challenges"}&f left today.`;
+}
+
+export function completedTitle(language: Language): string {
+    return language === "es" ? "&6¡Reto completado!" : "&6Challenge complete!";
+}
+
+export function completedLine(title: string, reward: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&a¡Completado! &f${title}${reward ? ` &7- ${reward}` : ""}`
+        : `${tag(language)}&aDone! &f${title}${reward ? ` &7- ${reward}` : ""}`;
+}
+
+/** `+20 pts, 2 levels, 3 diamond`. */
+export function rewardText(
+    payout: { points?: number; levels: number; items: readonly { id: string; count: number }[] },
+    language: Language
+): string {
+    const parts: string[] = [];
+    if (payout.points && payout.points > 0) parts.push(`+${payout.points} pts`);
+    if (payout.levels > 0)
+        parts.push(
+            language === "es"
+                ? `${payout.levels} ${payout.levels === 1 ? "nivel" : "niveles"}`
+                : `${payout.levels} ${payout.levels === 1 ? "level" : "levels"}`
+        );
+    for (const item of payout.items)
+        parts.push(`${item.count} ${item.id.replace(/^[a-z0-9_.-]+:/, "").replace(/_/g, " ")}`);
+    return parts.join(", ");
+}
+
+export function rerolled(title: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Cambiado por: &f${title}`
+        : `${tag(language)}&7Swapped for: &f${title}`;
+}
+
+export function noReroll(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7No te quedan cambios en este periodo, o no hay otro reto de esa dificultad.`
+        : `${tag(language)}&7No swaps left this period, or no other challenge of that difficulty.`;
+}
+
+export function tracking(title: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Siguiendo: &f${title}`
+        : `${tag(language)}&7Tracking: &f${title}`;
+}
+
+export function untracked(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Ya no sigues ningún reto.`
+        : `${tag(language)}&7Not tracking a challenge any more.`;
+}
+
+export function sweepLine(layer: "daily" | "weekly", reward: string, language: Language): string {
+    if (layer === "daily")
+        return language === "es"
+            ? `${tag(language)}&6¡Pleno diario! &7Los tres retos de hoy${reward ? ` &7- ${reward}` : ""}`
+            : `${tag(language)}&6Clean sweep! &7All three of today's${reward ? ` &7- ${reward}` : ""}`;
+    return language === "es"
+        ? `${tag(language)}&6¡Pleno semanal! &7Los tres retos de la semana${reward ? ` &7- ${reward}` : ""}`
+        : `${tag(language)}&6Weekly sweep! &7All three of this week's${reward ? ` &7- ${reward}` : ""}`;
+}
+
+export function streakLine(days: number, bonus: number, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&6¡Racha de ${days} días!${bonus > 0 ? ` &7+${bonus} pts` : ""}`
+        : `${tag(language)}&6${days}-day streak!${bonus > 0 ? ` &7+${bonus} pts` : ""}`;
+}
+
+export function comebackLine(bonus: number, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&6¡Bienvenido de vuelta! &7+${bonus} pts`
+        : `${tag(language)}&6Welcome back! &7+${bonus} pts`;
+}
+
+export function tierLine(tier: number, reward: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&bNivel de temporada ${tier}${reward ? ` &7- ${reward}` : ""}`
+        : `${tag(language)}&bSeason tier ${tier}${reward ? ` &7- ${reward}` : ""}`;
+}
+
+export function lineLine(lines: number, reward: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&6¡Línea de bingo!${lines > 1 ? ` (${lines})` : ""}${reward ? ` &7- ${reward}` : ""}`
+        : `${tag(language)}&6Bingo line!${lines > 1 ? ` (${lines})` : ""}${reward ? ` &7- ${reward}` : ""}`;
+}
+
+export function fullCardLine(reward: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&6&l¡Cartón completo!${reward ? ` &r&7- ${reward}` : ""}`
+        : `${tag(language)}&6&lFull card!${reward ? ` &r&7- ${reward}` : ""}`;
+}
+
+export function capLine(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Has llegado al máximo de puntos de temporada de hoy. Los retos siguen dando niveles.`
+        : `${tag(language)}&7You have reached today's most season points. Challenges still give levels.`;
+}
+
+export function seasonLines(
+    input: {
+        number: number;
+        tier: number;
+        tiers: number;
+        points: number;
+        perTier: number;
+        daysLeft: number;
+        next: string;
+    },
+    language: Language
+): string[] {
+    const toNext = input.perTier - (input.points % input.perTier);
+    return language === "es"
+        ? [
+              `${tag(language)}&bTemporada ${input.number} &7- quedan ${input.daysLeft} días`,
+              `&7Nivel &f${input.tier}&7/${input.tiers} &7- &f${input.points} pts &7- ${input.tier >= input.tiers ? "pase completo" : `${toNext} pts para el siguiente`}`,
+              ...(input.next ? [`&7Próxima recompensa: &f${input.next}`] : [])
+          ]
+        : [
+              `${tag(language)}&bSeason ${input.number} &7- ${input.daysLeft} days left`,
+              `&7Tier &f${input.tier}&7/${input.tiers} &7- &f${input.points} pts &7- ${input.tier >= input.tiers ? "pass complete" : `${toNext} pts to the next`}`,
+              ...(input.next ? [`&7Next reward: &f${input.next}`] : [])
+          ];
+}
+
+export function goalLine(
+    title: string,
+    total: number,
+    target: number,
+    share: number,
+    left: number,
+    language: Language
+): string {
+    return language === "es"
+        ? `${tag(language)}&d${title} &7- ${Math.floor((total / Math.max(1, target)) * 100)}% &7- tu parte ${share.toFixed(1)}% &7- quedan ${duration(left, language)}`
+        : `${tag(language)}&d${title} &7- ${Math.floor((total / Math.max(1, target)) * 100)}% &7- your share ${share.toFixed(1)}% &7- ${duration(left, language)} left`;
+}
+
+export function noGoal(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7No hay ningún objetivo de la comunidad ahora mismo.`
+        : `${tag(language)}&7There is no community goal right now.`;
+}
+
+export function goalBar(title: string, tier: number, language: Language): string {
+    const roman = ["", " I", " II", " III", " IV", " V"][tier] ?? "";
+    return language === "es"
+        ? `&dComunidad:&f ${title}${roman ? ` &7- nivel${roman}` : ""}`
+        : `&dCommunity:&f ${title}${roman ? ` &7- tier${roman}` : ""}`;
+}
+
+export function goalTierLine(title: string, tier: number, language: Language): string {
+    const roman = ["", "I", "II", "III", "IV", "V"][tier] ?? String(tier);
+    return language === "es"
+        ? `${tag(language)}&d¡El servidor ha alcanzado el nivel ${roman} de ${title}!`
+        : `${tag(language)}&dThe server reached tier ${roman} of ${title}!`;
+}
+
+export function goalRewardLine(reward: string, language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Por tu aportación: &f${reward}`
+        : `${tag(language)}&7For your part in it: &f${reward}`;
+}
+
+export function rewardWaiting(language: Language): string {
+    return language === "es"
+        ? `${tag(language)}&7Lo que no ha cabido te llegará la próxima vez que entres.`
+        : `${tag(language)}&7Whatever did not arrive comes the next time you join.`;
+}
+
+export function seasonEnded(
+    number: number,
+    champions: readonly string[],
+    language: Language
+): string {
+    const names = champions.join(", ");
+    return language === "es"
+        ? `${tag(language)}&bTermina la temporada ${number}.${names ? ` &6Campeones: &f${names}` : ""}`
+        : `${tag(language)}&bSeason ${number} is over.${names ? ` &6Champions: &f${names}` : ""}`;
+}
+
+export function championTitle(number: number, language: Language): string {
+    return language === "es" ? `Campeón de la temporada ${number}` : `Season ${number} champion`;
+}
+
+export function trackedName(title: string, progress: string): string {
+    return `&e${title} &7${progress}`;
+}
+
+export function actionBar(title: string, progress: string): string {
+    return `&e${title} &8| &a${progress}`;
+}

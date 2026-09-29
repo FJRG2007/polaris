@@ -503,6 +503,10 @@
         "web/src/lib/tasks/trackers/push.ts",
         "web/src/lib/tasks/trackers/service.ts",
         "web/src/lib/tasks/trackers/sync.ts",
-        "web/src/lib/tasks/view-service.ts"
+        "web/src/lib/tasks/view-service.ts",
+        "game-servers/src/screens/installed/minecraft-challenges.tsx",
+        "game-servers/src/screens/installed/minecraft-challenges-parts.tsx",
+        "game-servers/src/screens/installed/challenges-actions.ts",
+        "game-servers/src/screens/installed/challenges-text.ts"
     ]
 }

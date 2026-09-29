@@ -85,6 +85,7 @@ import {
     Terminal,
     Timer,
     Trash2,
+    Trophy,
     UserCog,
     BadgeCheck,
     Users,
@@ -2030,6 +2031,24 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "supply drop",
             "prizes",
             "rewards"
+        ]
+    },
+    challenges: {
+        label: "Challenges",
+        icon: Trophy,
+        group: TALKING_GROUP,
+        keywords: [
+            "challenge",
+            "retos",
+            "daily",
+            "weekly",
+            "quests",
+            "missions",
+            "season pass",
+            "battle pass",
+            "bingo",
+            "streak",
+            "community goal"
         ]
     },
     schedule: {

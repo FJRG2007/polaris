@@ -61,6 +61,8 @@ describe("apps in packages of their own", () => {
     for (const [name, app] of Object.entries(PACKAGES)) {
         it(`${name} imports only packages and its own files`, () => {
             const src = join(app.dir, "src");
+            // The app's own catalogs sit next to `src`, as docs/i18n.md lays them out.
+            const messages = join(app.dir, "messages");
             const escapes: string[] = [];
             for (const file of walk(src)) {
                 for (const specifier of specifiers(readFileSync(file, "utf8"))) {
@@ -68,7 +70,8 @@ describe("apps in packages of their own", () => {
                     if (specifier.startsWith("@/")) escapes.push(`${where} -> ${specifier}`);
                     if (specifier.startsWith(".")) {
                         const target = resolve(dirname(file), specifier);
-                        if (!posix(target).startsWith(posix(src))) escapes.push(`${where} -> ${specifier}`);
+                        const own = [src, messages].some((root) => posix(target) === posix(root) || posix(target).startsWith(`${posix(root)}/`));
+                        if (!own) escapes.push(`${where} -> ${specifier}`);
                     }
                 }
             }
