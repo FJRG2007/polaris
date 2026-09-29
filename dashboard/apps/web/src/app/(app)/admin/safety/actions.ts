@@ -7,13 +7,17 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { settleCaseSchema } from "@polaris/core";
 import { settleSafetyCase } from "@/lib/safety-queue";
 
 export async function settleSafetyCaseAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = settleCaseSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be read." };
+    if (!parsed.success) {
+        const t = await getTranslations("admin");
+        return { error: parsed.error.issues[0]?.message ?? t("safety.errors.unreadable") };
+    }
 
     const result = await settleSafetyCase(admin.id, parsed.data);
     if (result.error) return result;

@@ -18,7 +18,8 @@ import { useState } from "react";
 import { Ban } from "lucide-react";
 import { banUserAction } from "./actions";
 import { useRouter } from "next/navigation";
-import { BAN_LENGTHS, banVerb } from "./ban-lengths";
+import { banLengthOptions, banVerb } from "./ban-lengths";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -39,6 +40,8 @@ export function SuspendDialog({
     person: { readonly id: string; readonly name: string } | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const [reason, setReason] = useState("");
     const [length, setLength] = useState("1440");
@@ -68,31 +71,29 @@ export function SuspendDialog({
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{banVerb(minutes)} {person.name}?</DialogTitle>
-                    <DialogDescription>
-                        They are signed out everywhere at once. A suspension lifts itself when its
-                        time is up; a ban stays until somebody lifts it.
-                    </DialogDescription>
+                    <DialogTitle>
+                        {minutes > 0
+                            ? t("users.ban.suspendTitle", { name: person.name })
+                            : t("users.ban.banTitle", { name: person.name })}
+                    </DialogTitle>
+                    <DialogDescription>{t("users.ban.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Reason
+                        {t("users.ban.reason")}
                         <Input
                             value={reason}
-                            placeholder="Optional, kept for the record"
+                            placeholder={t("users.ban.reasonPlaceholder")}
                             onChange={(event) => setReason(event.target.value)}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        How long
+                        {t("users.ban.length")}
                         <Select
                             value={length}
-                            aria-label="How long"
+                            aria-label={t("users.ban.length")}
                             onValueChange={setLength}
-                            options={BAN_LENGTHS.map((entry) => ({
-                                value: String(entry.minutes),
-                                label: entry.label
-                            }))}
+                            options={banLengthOptions(t)}
                         />
                     </label>
                     {error && (
@@ -103,11 +104,11 @@ export function SuspendDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button variant="danger" disabled={busy} onClick={() => void submit()}>
                         <Ban className="size-4" />
-                        {busy ? "Working..." : banVerb(minutes)}
+                        {busy ? t("users.ban.working") : banVerb(t, minutes)}
                     </Button>
                 </DialogFooter>
             </DialogContent>

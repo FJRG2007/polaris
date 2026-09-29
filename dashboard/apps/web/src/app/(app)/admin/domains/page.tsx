@@ -15,20 +15,22 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { DomainsView } from "./domains-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function DomainsPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
 
     return (
         // Wide, because the records table needs every column it can get; the forms
         // cap their own width beside their headings (see `PageSection`).
         <div className="mx-auto flex w-full max-w-7xl flex-col">
             <PageHeader
-                title="Domains"
-                description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
+                title={t("domains.page.title")}
+                description={t("domains.page.description")}
             />
             <DomainsView />
         </div>

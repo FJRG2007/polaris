@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { getHostLanIp } from "@/lib/host-address";
 import { recordAudit } from "@/lib/audit-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
@@ -221,13 +222,14 @@ export interface DomainSetupResult {
  */
 export async function saveDomainSetupAction(input: unknown): Promise<DomainSetupResult> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     // Read once, and reuse it on every path that rejects the input: the read is not
     // free (DNS, an HTTP probe per zone, a public-IP lookup) and none of that changes
     // because the operator mistyped something.
     const current = await domainSetupState();
     const parsed = setupSchema.safeParse(input);
     if (!parsed.success) {
-        return { state: current, error: parsed.error.issues[0]?.message ?? "Invalid setup" };
+        return { state: current, error: parsed.error.issues[0]?.message ?? t("domainsSetup.errors.invalid") };
     }
     const { strategy, environment, useForDashboard } = parsed.data;
     const meta = STRATEGY_META[strategy];
@@ -265,8 +267,8 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
             return {
                 state: current,
                 error: duckSubdomain
-                    ? "Enter just the subdomain, e.g. mypolaris"
-                    : "Enter your DuckDNS subdomain"
+                    ? t("domainsSetup.errors.subdomainOnly")
+                    : t("domainsSetup.errors.subdomainMissing")
             };
         }
         // Without a token nothing can update the record, so the setup would report
@@ -275,12 +277,12 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         if (!current.domains.hasDuckdnsToken && !parsed.data.duckdnsToken.trim()) {
             return {
                 state: current,
-                error: "Enter your DuckDNS token so Polaris can keep the record updated"
+                error: t("domainsSetup.errors.tokenMissing")
             };
         }
     }
     if (meta.needsDomain && meta.wildcard && !baseDomain) {
-        return { state: current, error: "Enter the domain you want to use" };
+        return { state: current, error: t("domainsSetup.errors.domainMissing") };
     }
 
     try {
@@ -340,7 +342,7 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     } catch (caught) {
         return {
             state: await domainSetupStateAction(),
-            error: caught instanceof Error ? caught.message : "Could not save the domain setup"
+            error: caught instanceof Error ? caught.message : t("domainsSetup.errors.saveFailed")
         };
     }
 }
@@ -397,7 +399,10 @@ export async function provisionZoneDnsAction(
             unchanged: [],
             conflicts: [],
             failed: [],
-            error: caught instanceof Error ? caught.message : "Could not create the DNS records"
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("admin"))("domainsSetup.errors.createFailed")
         };
     }
 }

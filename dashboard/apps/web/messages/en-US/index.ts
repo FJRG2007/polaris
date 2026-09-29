@@ -8,7 +8,8 @@
 
 import nav from "./nav.json";
 import chat from "./chat.json";
+import admin from "./admin.json";
 import common from "./common.json";
 import account from "./account.json";
 
-export default { account, chat, common, nav };
+export default { account, admin, chat, common, nav };

@@ -8,18 +8,19 @@ import { PageHeader } from "@polaris/ui";
 import { RolesAdmin } from "./roles-admin";
 import { requireAdmin } from "@/lib/session";
 import { listRoles } from "@/lib/role-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function RolesAdminPage() {
     await requireAdmin();
-    const roles = await listRoles();
+    const [roles, t] = await Promise.all([listRoles(), getTranslations("admin")]);
 
     return (
         <>
             <PageHeader
-                title="Roles"
-                description="What each role may do. Everyone holds one, and it decides which apps they even see."
+                title={t("roles.page.title")}
+                description={t("roles.page.description")}
             />
             <RolesAdmin roles={roles} />
         </>

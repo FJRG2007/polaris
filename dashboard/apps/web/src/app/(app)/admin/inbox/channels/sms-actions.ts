@@ -18,6 +18,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { smsChannelInputSchema } from "@polaris/core";
 import { deleteSmsSender, saveSmsSender, type SmsSenderView } from "@/lib/notifications/sms-service";
 
@@ -26,7 +27,9 @@ export async function saveSmsSenderAction(
 ): Promise<{ sender?: SmsSenderView; error?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = smsChannelInputSchema.extend({ id: z.string().uuid().optional() }).safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("inboxChannels.errors.checkForm") };
+    }
     const result = await saveSmsSender(user.id, parsed.data);
     if (!result.error) revalidatePath("/admin/inbox/channels");
     return result;

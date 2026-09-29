@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import { JsonEditor, JsonView, prettyJson } from "@/components/json-view";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     attachPolicyAction,
     createPolicyAction,
@@ -54,20 +56,20 @@ const TEMPLATE = JSON.stringify(
 );
 
 /** One-line summary of a document's statements, tolerant of malformed JSON. */
-function summarize(document: string): string {
+function summarize(document: string, t: NamespaceTranslator<"admin">): string {
     try {
         const parsed = JSON.parse(document) as {
             statements?: { effect?: string; actions?: string[] }[];
         };
         const statements = parsed.statements ?? [];
-        if (statements.length === 0) return "No statements";
+        if (statements.length === 0) return t("policies.summary.none");
         return statements
             .map(
                 (statement) => `${statement.effect ?? "?"}: ${(statement.actions ?? []).join(", ")}`
             )
             .join("  -  ");
     } catch {
-        return "Invalid document";
+        return t("policies.summary.invalid");
     }
 }
 
@@ -78,6 +80,7 @@ export function PoliciesAdmin({
     policies: PolicyRow[];
     principals: PrincipalOption[];
 }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
@@ -111,37 +114,37 @@ export function PoliciesAdmin({
         <div className="flex flex-col gap-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>New policy</CardTitle>
+                    <CardTitle>{t("policies.create.title")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Input
-                            placeholder="Policy name"
+                            placeholder={t("policies.create.name")}
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                         />
                         <Input
-                            placeholder="Description (optional)"
+                            placeholder={t("policies.create.description")}
                             value={description}
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </div>
                     <JsonEditor
-                        label="Policy document"
+                        label={t("policies.create.document")}
                         className="max-h-96"
                         value={document}
                         onChange={setDocument}
                     />
                     <p className="text-xs text-muted-foreground">
-                        Actions are capability keys (e.g. <code>drive.read</code>) or Drive verbs;
-                        resources are <code>drive:CONNECTION_ID:PATH</code> or <code>*</code>. An
-                        explicit deny always wins.
+                        {t.rich("policies.create.hint", {
+                            code: (chunks) => <code key={String(chunks)}>{chunks}</code>
+                        })}
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div>
                         <Button onClick={onCreate} disabled={pending || !name.trim()}>
                             <Plus className="size-4" />
-                            Create policy
+                            {t("policies.create.submit")}
                         </Button>
                     </div>
                 </CardBody>
@@ -150,7 +153,7 @@ export function PoliciesAdmin({
             {policies.length === 0 ? (
                 <Card>
                     <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        No policies yet.
+                        {t("policies.empty")}
                     </CardBody>
                 </Card>
             ) : (
@@ -179,6 +182,7 @@ function PolicyCard({
     onMutate: (run: () => Promise<unknown>) => void;
     disabled: boolean;
 }) {
+    const t = useTranslations("admin");
     const [open, setOpen] = useState(false);
     const [name, setName] = useState(policy.name);
     const [description, setDescription] = useState(policy.description ?? "");
@@ -224,17 +228,17 @@ function PolicyCard({
                     <div className="min-w-0">
                         <CardTitle className="flex items-center gap-2">
                             {policy.name}
-                            {policy.isSystem ? <Badge>system</Badge> : null}
+                            {policy.isSystem ? <Badge>{t("policies.card.system")}</Badge> : null}
                         </CardTitle>
                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {summarize(policy.document)}
+                            {summarize(policy.document, t)}
                         </p>
                     </div>
                     <div className="flex items-center gap-1">
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label="Toggle details"
+                            aria-label={t("policies.card.toggle")}
                             onClick={() => setOpen((value) => !value)}
                         >
                             <ChevronDown
@@ -245,7 +249,7 @@ function PolicyCard({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={`Delete policy ${policy.name}`}
+                                aria-label={t("policies.card.delete", { name: policy.name })}
                                 disabled={disabled}
                                 onClick={() => onMutate(() => deletePolicyAction(policy.id))}
                             >
@@ -257,9 +261,9 @@ function PolicyCard({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Attached to:</span>
+                    <span className="text-xs text-muted-foreground">{t("policies.card.attachedTo")}</span>
                     {policy.attachments.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">nobody</span>
+                        <span className="text-xs text-muted-foreground">{t("policies.card.nobody")}</span>
                     ) : (
                         policy.attachments.map((attachment) => (
                             <span
@@ -269,7 +273,7 @@ function PolicyCard({
                                 {attachment.label}
                                 <button
                                     type="button"
-                                    aria-label={`Detach ${attachment.label}`}
+                                    aria-label={t("policies.card.detach", { label: attachment.label })}
                                     disabled={disabled}
                                     onClick={() =>
                                         onMutate(() =>
@@ -293,7 +297,7 @@ function PolicyCard({
                         className="flex-1"
                         value={attach}
                         onValueChange={setAttach}
-                        placeholder="Attach to..."
+                        placeholder={t("policies.card.attachPlaceholder")}
                         options={principals.map((principal) => ({
                             value: `${principal.type}:${principal.id}`,
                             label: principal.label
@@ -306,7 +310,7 @@ function PolicyCard({
                         onClick={onAttach}
                     >
                         <Plus className="size-4" />
-                        Attach
+                        {t("policies.card.attach")}
                     </Button>
                 </div>
 
@@ -320,13 +324,13 @@ function PolicyCard({
                                         onChange={(event) => setName(event.target.value)}
                                     />
                                     <Input
-                                        placeholder="Description"
+                                        placeholder={t("policies.card.description")}
                                         value={description}
                                         onChange={(event) => setDescription(event.target.value)}
                                     />
                                 </div>
                                 <JsonEditor
-                                    label={`${policy.name} document`}
+                                    label={t("policies.card.document", { name: policy.name })}
                                     className="max-h-96"
                                     value={document}
                                     onChange={setDocument}
@@ -334,12 +338,12 @@ function PolicyCard({
                                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                                 <div>
                                     <Button size="sm" disabled={disabled || unchanged} onClick={onSave}>
-                                        Save changes
+                                        {t("policies.card.save")}
                                     </Button>
                                 </div>
                             </>
                         ) : (
-                            <JsonView value={document} label={`${policy.name} document`} className="max-h-96" />
+                            <JsonView value={document} label={t("policies.card.document", { name: policy.name })} className="max-h-96" />
                         )}
                     </div>
                 ) : null}

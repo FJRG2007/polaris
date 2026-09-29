@@ -24,10 +24,12 @@ import type { CapabilityState } from "./actions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { setUserPermissionAction, userCapabilitiesAction } from "./actions";
 import { Card, CardBody, SegmentedControl, Skeleton, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type State = "inherit" | "allow" | "deny";
 
 export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved: () => void }) {
+    const t = useTranslations("admin");
     const [capabilities, setCapabilities] = useState<readonly CapabilityState[] | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [error, setError] = useState("");
@@ -73,17 +75,15 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Capabilities</h2>
+                    <h2 className="text-sm font-medium">{t("usersDetail.capabilities.title")}</h2>
                     <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-                        What this account may do, one thing at a time. Each follows their role
-                        unless it is set here.
+                        {t("usersDetail.capabilities.hint")}
                     </p>
                 </div>
 
                 {isAdmin && (
                     <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                        This account is an administrator, which allows everything. Anything switched
-                        off here takes effect only if that is taken away first.
+                        {t("usersDetail.capabilities.admin")}
                     </p>
                 )}
 
@@ -129,33 +129,33 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                                                 )}
                                             >
                                                 {capability.inherited
-                                                    ? "role allows"
-                                                    : "role does not"}
+                                                    ? t("usersDetail.capabilities.roleAllows")
+                                                    : t("usersDetail.capabilities.roleDoesNot")}
                                             </span>
                                             <SegmentedControl
                                                 size="sm"
                                                 value={capability.override ?? "inherit"}
-                                                aria-label={`${capability.label} for this account`}
+                                                aria-label={t("usersDetail.capabilities.label", { label: capability.label })}
                                                 onValueChange={(next) =>
                                                     void set(capability.permission, next as State)
                                                 }
                                                 options={[
                                                     {
                                                         value: "inherit",
-                                                        label: "Role",
-                                                        title: "Follow their role and policies",
+                                                        label: t("usersDetail.capabilities.inherit"),
+                                                        title: t("usersDetail.capabilities.inheritTitle"),
                                                         disabled: busy === capability.permission
                                                     },
                                                     {
                                                         value: "allow",
-                                                        label: "On",
-                                                        title: "Always on for this account",
+                                                        label: t("usersDetail.capabilities.allow"),
+                                                        title: t("usersDetail.capabilities.allowTitle"),
                                                         disabled: busy === capability.permission
                                                     },
                                                     {
                                                         value: "deny",
-                                                        label: "Off",
-                                                        title: "Always off, whatever their role says",
+                                                        label: t("usersDetail.capabilities.deny"),
+                                                        title: t("usersDetail.capabilities.denyTitle"),
                                                         disabled: busy === capability.permission
                                                     }
                                                 ]}

@@ -6,6 +6,7 @@ import { getAuthMailStatus } from "@/lib/auth-mail";
 import { sharingPolicy } from "@/lib/sharing-policy";
 import { listRoleOptions } from "@/lib/role-service";
 import { getSetting } from "@/lib/setting-store";
+import { getTranslations } from "@/lib/i18n/request";
 import { SharingPolicyForm } from "./sharing-policy-form";
 import { UsernameCooldownForm } from "./username-cooldown-form";
 import { PublicProfilesForm } from "./public-profiles-form";
@@ -27,6 +28,7 @@ export default async function UsersAdminPage({
 }) {
     const { user } = await searchParams;
     const admin = await requireAdmin();
+    const t = await getTranslations("admin");
     const [
         users,
         invites,
@@ -56,8 +58,8 @@ export default async function UsersAdminPage({
     return (
         <>
             <PageHeader
-                title="People"
-                description="Registration is invite-only. Invite people, and manage what their accounts may do."
+                title={t("users.page.title")}
+                description={t("users.page.description")}
             />
             <UsersAdmin
                 users={users}

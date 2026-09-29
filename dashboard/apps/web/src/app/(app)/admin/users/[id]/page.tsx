@@ -26,12 +26,14 @@ import { IdentityCard } from "./identity-card";
 import { UserAccessView } from "./access-view";
 import { Badge, PageHeader } from "@polaris/ui";
 import { listRoleOptions } from "@/lib/role-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { getDirectoryUser, listImposableGroups } from "@/lib/user-admin-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function UserAccessPage({ params }: { params: Promise<{ id: string }> }) {
     const admin = await requireAdmin();
+    const t = await getTranslations("admin");
     const { id } = await params;
     const account = await getDirectoryUser(id);
     if (!account) notFound();
@@ -59,15 +61,15 @@ export default async function UserAccessPage({ params }: { params: Promise<{ id:
                 className="mb-2 flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
-                People
+                {t("usersDetail.back")}
             </Link>
             <PageHeader
                 title={account.name}
                 description={account.email}
                 actions={
                     <>
-                        {account.isAdmin ? <Badge variant="primary">admin</Badge> : null}
-                        {account.banned ? <Badge variant="danger">banned</Badge> : null}
+                        {account.isAdmin ? <Badge variant="primary">{t("usersDetail.badges.admin")}</Badge> : null}
+                        {account.banned ? <Badge variant="danger">{t("usersDetail.badges.banned")}</Badge> : null}
                     </>
                 }
             />

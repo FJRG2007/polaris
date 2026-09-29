@@ -15,15 +15,8 @@ import { runAction } from "@/lib/run-action";
 import { saveOwnerDomainPolicyAction } from "./actions";
 import { Button, Input, Select } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
-import {
-    OWNER_DOMAIN_HINTS,
-    OWNER_DOMAIN_LABELS,
-    OWNER_DOMAIN_MODES,
-    type OwnerDomainMode,
-    type OwnerDomainPolicy
-} from "@/lib/owner-domains-policy";
-
-const OPTIONS = OWNER_DOMAIN_MODES.map((mode) => ({ value: mode, label: OWNER_DOMAIN_LABELS[mode] }));
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { OWNER_DOMAIN_MODES, type OwnerDomainMode, type OwnerDomainPolicy } from "@/lib/owner-domains-policy";
 
 export function OwnerDomainsCard({
     policy,
@@ -36,6 +29,8 @@ export function OwnerDomainsCard({
      *  and reading as unsaved. */
     onSaved: (next: OwnerDomainPolicy) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [mode, setMode] = useState<OwnerDomainMode>(policy.mode);
     const [cap, setCap] = useState(String(policy.maxPerOwner));
     const [busy, setBusy] = useState(false);
@@ -44,11 +39,12 @@ export function OwnerDomainsCard({
     const parsedCap = Number(cap);
     const capValid = Number.isInteger(parsedCap) && parsedCap >= 0 && parsedCap <= 1000;
     const changed = mode !== policy.mode || parsedCap !== policy.maxPerOwner;
+    const options = OWNER_DOMAIN_MODES.map((value) => ({ value, label: t(`domains.owner.modes.${value}`) }));
 
     return (
         <PageSection
-            title="Domains of their own"
-            description="An account or an organization can add a domain it owns, prove it with a DNS record, and have its services answer on it. Polaris orders certificates for those hostnames, so this decides who may point a name at this server."
+            title={t("domains.owner.title")}
+            description={t("domains.owner.description")}
         >
             <form
                 className="flex flex-wrap items-end gap-2"
@@ -70,31 +66,31 @@ export function OwnerDomainsCard({
                 }}
             >
                 <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
-                    Who may add one
+                    {t("domains.owner.who")}
                     <Select
                         value={mode}
-                        options={OPTIONS}
-                        aria-label="Who may add a domain of their own"
+                        options={options}
+                        aria-label={t("domains.owner.whoAria")}
                         className="h-9"
                         onValueChange={(next) => setMode(next as OwnerDomainMode)}
                     />
                 </label>
                 <label className="text-muted-foreground flex w-32 flex-col gap-1 text-xs">
-                    Limit each to
+                    {t("domains.owner.limit")}
                     <Input
                         value={cap}
                         inputMode="numeric"
                         className="h-9"
-                        aria-label="Domains per owner"
+                        aria-label={t("domains.owner.limitAria")}
                         onChange={(event) => setCap(event.target.value)}
                     />
                 </label>
                 <Button type="submit" size="sm" disabled={busy || !changed || !capValid}>
-                    Save
+                    {tc("actions.save")}
                 </Button>
                 <p className="text-muted-foreground w-full text-xs">
-                    {!capValid ? "Enter a whole number, or 0 for no limit." : OWNER_DOMAIN_HINTS[mode]}
-                    {capValid && parsedCap === 0 ? " No limit on how many each may hold." : ""}
+                    {!capValid ? t("domains.owner.invalidCap") : t(`domains.owner.hints.${mode}`)}
+                    {capValid && parsedCap === 0 ? ` ${t("domains.owner.noLimit")}` : ""}
                 </p>
                 {error && (
                     <p role="alert" className="text-danger w-full text-xs">

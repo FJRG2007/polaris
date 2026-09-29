@@ -13,13 +13,14 @@ import { DiscordPeerFields } from "./discord-peer-fields";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { ConnectChannelDialog } from "./connect-channel-dialog";
 import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
-    PEER_HINT,
-    PLATFORM_LABEL,
     PLATFORM_LOGO,
     editablePeer,
-    humanPeerId
+    humanPeerId,
+    peerHint,
+    platformLabel
 } from "./platform-meta";
 import type {
     AgentView,
@@ -65,6 +66,7 @@ export function InboxView({
     initialConversations: ConversationView[];
     bridgeReady: boolean;
 }) {
+    const t = useTranslations("admin");
     const [channels, setChannels] = useState(initialChannels);
     const [conversations, setConversations] = useState(initialConversations);
     const [activeId, setActiveId] = useState<string | null>(initialConversations[0]?.id ?? null);
@@ -106,7 +108,7 @@ export function InboxView({
     return (
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Inbox</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inbox.view.title")}</h1>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"
@@ -114,10 +116,10 @@ export function InboxView({
                         onClick={() => setNewChat(true)}
                         disabled={connectedChannels.length === 0}
                     >
-                        <Plus className="size-4" /> New chat
+                        <Plus className="size-4" /> {t("inbox.view.newChat")}
                     </Button>
                     <Button size="sm" onClick={() => setConnecting(true)}>
-                        <Plus className="size-4" /> Connect channel
+                        <Plus className="size-4" /> {t("inbox.view.connectChannel")}
                     </Button>
                 </div>
             </div>
@@ -136,8 +138,7 @@ export function InboxView({
                         {conversations.length === 0 ? (
                             <div className="flex flex-col items-start gap-2 p-3">
                                 <p className="text-sm text-muted-foreground">
-                                    No conversations yet. Start one, or wait for an incoming
-                                    message.
+                                    {t("inbox.view.empty")}
                                 </p>
                                 <Button
                                     size="sm"
@@ -145,7 +146,7 @@ export function InboxView({
                                     onClick={() => setNewChat(true)}
                                     disabled={connectedChannels.length === 0}
                                 >
-                                    <Plus className="size-4" /> New chat
+                                    <Plus className="size-4" /> {t("inbox.view.newChat")}
                                 </Button>
                             </div>
                         ) : (
@@ -170,10 +171,7 @@ export function InboxView({
                                                     ? `${meta.color}1a`
                                                     : undefined
                                             }}
-                                            title={
-                                                PLATFORM_LABEL[conversation.platform] ??
-                                                conversation.platform
-                                            }
+                                            title={platformLabel(t, conversation.platform)}
                                         >
                                             {Logo ? (
                                                 <Logo className="size-4" />
@@ -227,7 +225,7 @@ export function InboxView({
                         <CardBody className="grid flex-1 place-items-center text-sm text-muted-foreground">
                             <span className="flex flex-col items-center gap-2">
                                 <MessagesSquare className="size-6" />
-                                Select a conversation
+                                {t("inbox.view.selectConversation")}
                             </span>
                         </CardBody>
                     )}
@@ -273,6 +271,8 @@ function Thread({
     onSent: () => void;
     onDeleted: () => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [messages, setMessages] = useState<MessageView[]>([]);
     const [text, setText] = useState("");
     const [optionsMode, setOptionsMode] = useState(false);
@@ -320,13 +320,13 @@ function Thread({
         const interactive =
             optionsMode && options.length > 0
                 ? {
-                      text: text.trim() || "Choose an option",
+                      text: text.trim() || t("inbox.thread.chooseOption"),
                       options: options.map((label, index) => ({ id: `opt${index}`, label }))
                   }
                 : undefined;
         const body = text.trim();
         if (!body && !interactive) {
-            setError("Type a message first");
+            setError(t("inbox.errors.typeMessage"));
             return;
         }
         // Optimistic UI: show the message immediately with a "sending" state, clear the
@@ -376,8 +376,8 @@ function Thread({
                         size="icon"
                         variant="ghost"
                         onClick={onBack}
-                        aria-label="Back to conversations"
-                        title="Back to conversations"
+                        aria-label={t("inbox.thread.back")}
+                        title={t("inbox.thread.back")}
                         className="-ml-1 shrink-0 md:hidden"
                     >
                         <ChevronLeft className="size-4" />
@@ -407,11 +407,11 @@ function Thread({
                             }).then(onSent);
                         }}
                         options={[
-                            { value: "none", label: "Unassigned" },
+                            { value: "none", label: t("inbox.thread.unassigned") },
                             ...agents.map((agent) => ({ value: agent.id, label: agent.name }))
                         ]}
                         className="h-8 w-32 sm:w-40"
-                        aria-label="Assign agent"
+                        aria-label={t("inbox.thread.assign")}
                     />
                     <Button
                         size="sm"
@@ -423,13 +423,15 @@ function Thread({
                             }).then(onSent)
                         }
                     >
-                        {conversation.status === "closed" ? "Reopen" : "Close"}
+                        {conversation.status === "closed"
+                            ? t("inbox.thread.reopen")
+                            : t("inbox.thread.close")}
                     </Button>
                     <Button
                         size="sm"
                         variant="ghost"
-                        aria-label="Delete conversation"
-                        title="Delete conversation"
+                        aria-label={t("inbox.thread.delete")}
+                        title={t("inbox.thread.delete")}
                         onClick={() => setConfirmDelete(true)}
                     >
                         <Trash2 className="size-4" />
@@ -451,7 +453,7 @@ function Thread({
                     <Textarea
                         value={optionsText}
                         onChange={(event) => setOptionsText(event.target.value)}
-                        placeholder={"One option per line"}
+                        placeholder={t("inbox.thread.optionsPlaceholder")}
                         rows={3}
                         className="w-full rounded-md border border-border bg-surface p-2 text-sm "
                     />
@@ -467,7 +469,9 @@ function Thread({
                             }
                         }}
                         placeholder={
-                            optionsMode ? "Prompt shown above the options" : "Type a message"
+                            optionsMode
+                                ? t("inbox.thread.promptPlaceholder")
+                                : t("inbox.thread.messagePlaceholder")
                         }
                     />
                     <Button
@@ -475,9 +479,9 @@ function Thread({
                         variant={optionsMode ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setOptionsMode((value) => !value)}
-                        title="Send selectable options"
+                        title={t("inbox.thread.optionsTitle")}
                     >
-                        Options
+                        {t("inbox.thread.options")}
                     </Button>
                     <Button size="sm" onClick={send} disabled={pending}>
                         {pending ? (
@@ -492,12 +496,11 @@ function Thread({
                 <Dialog open onOpenChange={(open) => !open && !deleting && setConfirmDelete(false)}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Delete conversation</DialogTitle>
+                            <DialogTitle>{t("inbox.thread.delete")}</DialogTitle>
                             <DialogDescription>
-                                This removes the conversation and its messages from Polaris. The
-                                chat on{" "}
-                                {PLATFORM_LABEL[conversation.platform] ?? conversation.platform}{" "}
-                                itself is not affected.
+                                {t("inbox.thread.deleteDescription", {
+                                    platform: platformLabel(t, conversation.platform)
+                                })}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex justify-end gap-2">
@@ -506,7 +509,7 @@ function Thread({
                                 onClick={() => setConfirmDelete(false)}
                                 disabled={deleting}
                             >
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button
                                 variant="danger"
@@ -524,7 +527,7 @@ function Thread({
                                 }}
                             >
                                 {deleting && <Loader2 className="size-4 animate-spin" />}
-                                Delete
+                                {t("inbox.thread.deleteConfirm")}
                             </Button>
                         </div>
                     </DialogContent>
@@ -535,6 +538,7 @@ function Thread({
 }
 
 function MessageBubble({ message }: { message: MessageView }) {
+    const t = useTranslations("admin");
     const outbound = message.direction === "outbound";
     return (
         <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
@@ -545,18 +549,20 @@ function MessageBubble({ message }: { message: MessageView }) {
                 )}
             >
                 {message.kind === "interactive" && message.selection ? (
-                    <span className="italic">chose: {message.selection}</span>
+                    <span className="italic">
+                        {t("inbox.thread.chose", { selection: message.selection })}
+                    </span>
                 ) : (
                     <span className="whitespace-pre-wrap break-words">{message.body}</span>
                 )}
                 {outbound && message.ack === "sending" && (
                     <span className="mt-1 block text-xs text-primary-foreground/70">
-                        sending...
+                        {t("inbox.thread.sending")}
                     </span>
                 )}
                 {outbound && message.ack === "failed" && (
                     <span className="mt-1 block text-xs text-danger-foreground/80">
-                        failed to send
+                        {t("inbox.thread.failed")}
                     </span>
                 )}
             </div>
@@ -577,6 +583,8 @@ function NewChatDialog({
     onClose: () => void;
     onStarted: (conversationId: string) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
     const [contacts, setContacts] = useState<ContactView[]>([]);
     const [contactId, setContactId] = useState("");
@@ -633,9 +641,7 @@ function NewChatDialog({
     // A saved handle must be sent over a channel of its own platform. If none is
     // connected, or the selected channel is on another platform, block the send so a
     // recipient is never delivered over a mismatched network.
-    const pickedPlatformLabel = pickedPlatform
-        ? (PLATFORM_LABEL[pickedPlatform] ?? pickedPlatform)
-        : "";
+    const pickedPlatformLabel = pickedPlatform ? platformLabel(t, pickedPlatform) : "";
     const noChannelForPicked =
         pickedPlatform !== null && !channels.some((item) => item.platform === pickedPlatform);
     const platformMismatch = pickedPlatform !== null && pickedPlatform !== platform;
@@ -674,19 +680,17 @@ function NewChatDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New chat</DialogTitle>
-                    <DialogDescription>
-                        Message someone on a connected channel to start a conversation.
-                    </DialogDescription>
+                    <DialogTitle>{t("inbox.view.newChat")}</DialogTitle>
+                    <DialogDescription>{t("inbox.newChat.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {usableContacts.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Contact</span>
+                            <span className="font-medium">{t("inbox.newChat.contact")}</span>
                             <Select
                                 value={contactId}
                                 onValueChange={pickContact}
-                                placeholder="Pick a saved contact (optional)"
+                                placeholder={t("inbox.newChat.contactPlaceholder")}
                                 options={usableContacts.map((item) => ({
                                     value: item.id,
                                     label: item.name
@@ -696,7 +700,7 @@ function NewChatDialog({
                     )}
                     {selectedContact && selectedContact.identities.length > 1 && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Handle</span>
+                            <span className="font-medium">{t("inbox.newChat.handle")}</span>
                             <Select
                                 value={identityId}
                                 onValueChange={(value) => {
@@ -707,24 +711,24 @@ function NewChatDialog({
                                 }}
                                 options={selectedContact.identities.map((item) => ({
                                     value: item.id,
-                                    label: `${PLATFORM_LABEL[item.platform] ?? item.platform} - ${humanPeerId(item.platform, item.peerId)}`
+                                    label: `${platformLabel(t, item.platform)} - ${humanPeerId(item.platform, item.peerId)}`
                                 }))}
                             />
                         </label>
                     )}
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Channel</span>
+                        <span className="font-medium">{t("inbox.newChat.channel")}</span>
                         <Select
                             value={channelId}
                             onValueChange={setChannelId}
                             options={channels.map((item) => ({
                                 value: item.id,
-                                label: `${item.name} - ${PLATFORM_LABEL[item.platform] ?? item.platform}`
+                                label: `${item.name} - ${platformLabel(t, item.platform)}`
                             }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">To</span>
+                        <span className="font-medium">{t("inbox.newChat.to")}</span>
                         {identityId ? (
                             // A saved contact handle is chosen - use it as-is; no need to
                             // retype a number or id (that is the point of saving the contact).
@@ -737,7 +741,7 @@ function NewChatDialog({
                                     className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
                                     onClick={() => editPeerId(peerId)}
                                 >
-                                    Enter manually
+                                    {t("inbox.newChat.enterManually")}
                                 </button>
                             </div>
                         ) : platform === "discord" ? (
@@ -752,12 +756,14 @@ function NewChatDialog({
                                     value={peerId}
                                     onChange={(event) => editPeerId(event.target.value)}
                                     placeholder={
-                                        platform === "whatsapp" ? "34600111222" : "Recipient id"
+                                        platform === "whatsapp"
+                                            ? "34600111222"
+                                            : t("inbox.newChat.recipientPlaceholder")
                                     }
                                 />
-                                {PEER_HINT[platform] && (
+                                {peerHint(t, platform) && (
                                     <span className="text-xs text-muted-foreground">
-                                        {PEER_HINT[platform]}
+                                        {peerHint(t, platform)}
                                     </span>
                                 )}
                             </>
@@ -765,42 +771,40 @@ function NewChatDialog({
                     </label>
                     {noChannelForPicked && (
                         <p className="text-xs text-danger">
-                            No {pickedPlatformLabel} channel is connected. Connect one to message
-                            this handle.
+                            {t("inbox.newChat.noChannel", { platform: pickedPlatformLabel })}
                         </p>
                     )}
                     {platformMismatch && !noChannelForPicked && (
                         <p className="text-xs text-danger">
-                            This handle is on {pickedPlatformLabel}. Pick a {pickedPlatformLabel}{" "}
-                            channel to send it.
+                            {t("inbox.newChat.mismatch", { platform: pickedPlatformLabel })}
                         </p>
                     )}
                     {platform === "telegram" && (
                         <p className="rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-foreground">
-                            Telegram bots can't start a chat. Ask the person to open your bot and
-                            send <code>/start</code> - the conversation appears in your inbox and
-                            you reply there.
+                            {t.rich("inbox.newChat.telegramNote", {
+                                code: (chunks) => <code key="code">{chunks}</code>
+                            })}
                         </p>
                     )}
                     {telegramInvalid && (
                         <p className="text-xs text-danger">
-                            Enter a numeric chat id, not a @username.
+                            {t("inbox.newChat.telegramInvalid")}
                         </p>
                     )}
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name (optional)</span>
+                        <span className="font-medium">{t("inbox.newChat.name")}</span>
                         <Input
                             value={peerName}
                             onChange={(event) => setPeerName(event.target.value)}
-                            placeholder="Display name"
+                            placeholder={t("inbox.newChat.namePlaceholder")}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Message</span>
+                        <span className="font-medium">{t("inbox.newChat.message")}</span>
                         <Input
                             value={text}
                             onChange={(event) => setText(event.target.value)}
-                            placeholder="First message"
+                            placeholder={t("inbox.newChat.messagePlaceholder")}
                         />
                     </label>
                     {!selectedContact && (
@@ -810,17 +814,17 @@ function NewChatDialog({
                                 checked={save}
                                 onChange={(event) => setSave(event.target.checked)}
                             />
-                            <span>Save as contact</span>
+                            <span>{t("inbox.newChat.saveContact")}</span>
                         </label>
                     )}
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Send
+                            {t("inbox.newChat.send")}
                         </Button>
                     </div>
                 </div>

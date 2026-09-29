@@ -25,6 +25,8 @@ import { formatBytes } from "@polaris/core";
 import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { PolarisFootprintCard } from "@/app/(app)/apps/containers/polaris-footprint";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, cn, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
 import {
     consumedMemBytes,
@@ -50,7 +52,45 @@ const TONE: Record<ConsumptionGroup["id"], string> = {
     other: "bg-foreground-subtle"
 };
 
+type Translate = NamespaceTranslator<"admin">;
+
+/**
+ * A group's name and description in the reader's language.
+ *
+ * The server sends them in English (`lib/consumption.ts`); the group's id is what
+ * the words are looked up by, so the screen reads them in any language.
+ */
+function groupLabel(t: Translate, id: ConsumptionGroup["id"]): string {
+    return t(`consumption.groups.${id}.label`);
+}
+
+/**
+ * A row's state in the reader's language.
+ *
+ * The server's English label carries the counts ("2 of 3 running", "3
+ * restarting"), and those are read back out of it here; a label that does not
+ * have them is shown as it came.
+ */
+function stateLabel(t: Translate, row: ConsumptionRow): string {
+    const counts = (row.stateLabel.match(/\d+/g) ?? []).map(Number);
+    switch (row.state) {
+        case "elsewhere":
+            return t("consumption.states.elsewhere");
+        case "stopped":
+            return t("consumption.states.stopped");
+        case "running":
+            return t("consumption.states.running");
+        case "restarting":
+            return t("consumption.states.restarting", { count: counts[0] ?? 1 });
+        case "partial":
+            return counts.length === 2
+                ? t("consumption.running", { running: counts[0], containers: counts[1] })
+                : row.stateLabel;
+    }
+}
+
 export function ConsumptionView() {
+    const t = useTranslations("admin");
     const { data, loading, error, stale, refreshing, refresh } = useLiveResource<Consumption>({
         url: "/api/admin/consumption",
         cacheKey: "admin.consumption",
@@ -61,16 +101,16 @@ export function ConsumptionView() {
     return (
         <>
             <PageHeader
-                title="Consumption"
-                description="What the machine Polaris runs on is being spent on: the control plane itself, the apps installed on it, and everything else."
+                title={t("consumption.title")}
+                description={t("consumption.description")}
                 actions={
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={refresh}
                         disabled={refreshing}
-                        aria-label="Refresh"
-                        title="Refresh"
+                        aria-label={t("consumption.refresh")}
+                        title={t("consumption.refresh")}
                     >
                         <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
                     </Button>
@@ -79,8 +119,8 @@ export function ConsumptionView() {
 
             {error ? (
                 <EmptyState
-                    title="Nothing to measure"
-                    description={`Polaris could not read what this machine is using. ${error}`}
+                    title={t("consumption.error.title")}
+                    description={t("consumption.error.description", { reason: error })}
                 />
             ) : (
                 <div className="flex flex-col gap-4">
@@ -105,6 +145,7 @@ export function ConsumptionView() {
  *  processes are outside every container measured here, so the remainder is
  *  everything this screen cannot see plus whatever is genuinely unused. */
 export function ConsumptionSplit({ consumption }: { consumption: Consumption | null }) {
+    const t = useTranslations("admin");
     if (!consumption) {
         return (
             <Card>
@@ -127,14 +168,14 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     <span className="text-sm font-medium">{consumption.machine.name}</span>
                     <span className="text-xs text-muted-foreground">
                         {total
-                            ? `${formatBytes(used)} of ${formatBytes(total)} in containers`
+                            ? t("consumption.split.inContainers", { used: formatBytes(used), total: formatBytes(total) })
                             : formatBytes(used)}
                         {consumption.machine.ncpu > 0
-                            ? ` - ${consumption.machine.ncpu} core${consumption.machine.ncpu === 1 ? "" : "s"}`
+                            ? ` - ${t("consumption.split.cores", { count: consumption.machine.ncpu })}`
                             : ""}
                         {consumption.sampledAt === null
-                            ? " - measuring"
-                            : ` - measured ${formatAge(Date.now() - consumption.sampledAt)} ago`}
+                            ? ` - ${t("consumption.split.measuring")}`
+                            : ` - ${t("consumption.split.measured", { age: formatAge(Date.now() - consumption.sampledAt) })}`}
                     </span>
                 </div>
 
@@ -143,6 +184,7 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     role="presentation"
                 >
                     {groups.map((group) => {
+                        const label = groupLabel(t, group.id);
                         const share = total ? (group.memUsedBytes / total) * 100 : 0;
                         if (share <= 0) return null;
                         return (
@@ -150,7 +192,7 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                                 key={group.id}
                                 className={cn("h-full", TONE[group.id])}
                                 style={{ width: `${Math.max(0.5, share)}%` }}
-                                title={`${group.label}: ${formatBytes(group.memUsedBytes)}`}
+                                title={t("consumption.split.segment", { label, size: formatBytes(group.memUsedBytes) })}
                             />
                         );
                     })}
@@ -163,35 +205,33 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                                 <span
                                     className={cn("size-2 shrink-0 rounded-full", TONE[group.id])}
                                 />
-                                <span className="truncate" title={group.label}>
-                                    {group.label}
+                                <span className="truncate" title={groupLabel(t, group.id)}>
+                                    {groupLabel(t, group.id)}
                                 </span>
                             </dt>
                             <dd className="text-sm font-medium tabular-nums">
                                 {formatBytes(group.memUsedBytes)}
                                 <span className="ml-1.5 text-xs font-normal text-muted-foreground tabular-nums">
-                                    {group.cpuPercent}% CPU
+                                    {t("consumption.cpu", { percent: group.cpuPercent })}
                                 </span>
                             </dd>
                             <dd className="text-xs text-foreground-subtle">
                                 {group.running < group.containers
-                                    ? `${group.running} of ${group.containers} running`
-                                    : `${group.containers} container${group.containers === 1 ? "" : "s"}`}
+                                    ? t("consumption.running", { running: group.running, containers: group.containers })
+                                    : t("consumption.containers", { count: group.containers })}
                             </dd>
                         </div>
                     ))}
                 </dl>
 
-                <p className="text-xs text-muted-foreground">
-                    Only this machine. Memory and CPU are what the containers hold right now; a
-                    service counts the releases it keeps and the tunnel publishing it.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("consumption.split.note")}</p>
             </CardBody>
         </Card>
     );
 }
 
 export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
+    const t = useTranslations("admin");
     // Shut to begin with. An app with nine servers under it would otherwise be
     // nine rows of a table somebody opened to read four, and the app's own line
     // already carries what the nine cost between them.
@@ -210,29 +250,31 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                     <div className="flex min-w-0 flex-col">
                         <span className="flex items-center gap-2 text-sm font-medium">
                             <span className={cn("size-2 shrink-0 rounded-full", TONE[group.id])} />
-                            {group.label}
+                            {groupLabel(t, group.id)}
                         </span>
-                        <span className="text-xs text-muted-foreground">{group.description}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t(`consumption.groups.${group.id}.description`)}
+                        </span>
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                        {formatBytes(group.memUsedBytes)} - {group.cpuPercent}% CPU
+                        {formatBytes(group.memUsedBytes)} - {t("consumption.cpu", { percent: group.cpuPercent })}
                         {group.running < group.containers
-                            ? ` - ${group.running} of ${group.containers} running`
+                            ? ` - ${t("consumption.running", { running: group.running, containers: group.containers })}`
                             : ""}
                     </span>
                 </div>
 
                 {group.rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{emptyLine(group.id)}</p>
+                    <p className="text-sm text-muted-foreground">{t(`consumption.empty.${group.id === "polaris" ? "other" : group.id}`)}</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[34rem] text-sm">
                             <thead>
                                 <tr className="text-left">
-                                    <th className="w-full max-w-0 py-1 pr-3">Name</th>
-                                    <th className="py-1 pr-3">Owner</th>
-                                    <th className="py-1 pr-3 text-right">CPU</th>
-                                    <th className="py-1 text-right">Memory</th>
+                                    <th className="w-full max-w-0 py-1 pr-3">{t("consumption.columns.name")}</th>
+                                    <th className="py-1 pr-3">{t("consumption.columns.owner")}</th>
+                                    <th className="py-1 pr-3 text-right">{t("consumption.columns.cpu")}</th>
+                                    <th className="py-1 text-right">{t("consumption.columns.memory")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -266,13 +308,6 @@ function badge(state: ConsumptionRow["state"]): "neutral" | "warning" | "danger"
     return state === "stopped" || state === "elsewhere" ? "neutral" : "warning";
 }
 
-function emptyLine(id: ConsumptionGroup["id"]): string {
-    if (id === "apps") return "Nothing installed from the marketplace yet.";
-    if (id === "services") return "Nothing deployed here yet.";
-    if (id === "leftover") return "Nothing has been left behind.";
-    return "Nothing else is running on this machine.";
-}
-
 function Row({
     row,
     open,
@@ -286,6 +321,7 @@ function Row({
     /** One of the things a row above owns, drawn under it. */
     inside?: boolean;
 }) {
+    const t = useTranslations("admin");
     const name = row.href ? (
         <Link href={row.href} className="font-medium hover:text-primary hover:underline">
             {row.name}
@@ -304,8 +340,8 @@ function Row({
                             type="button"
                             onClick={onToggle}
                             aria-expanded={open}
-                            aria-label={`What ${row.name} runs`}
-                            title={`What ${row.name} runs`}
+                            aria-label={t("consumption.parts", { name: row.name })}
+                            title={t("consumption.parts", { name: row.name })}
                             className="-my-1 flex shrink-0 items-center gap-1 rounded px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
                         >
                             <ChevronRight
@@ -318,12 +354,14 @@ function Row({
                         {name}
                     </span>
                     {row.state === "running" ? null : (
-                        <Badge variant={badge(row.state)}>{row.stateLabel}</Badge>
+                        <Badge variant={badge(row.state)}>{stateLabel(t, row)}</Badge>
                     )}
                 </div>
                 <div className="truncate text-xs text-muted-foreground" title={row.detail}>
                     {row.detail}
-                    {row.containers > 1 ? `${row.detail ? " - " : ""}${row.containers} containers` : ""}
+                    {row.containers > 1
+                        ? `${row.detail ? " - " : ""}${t("consumption.containers", { count: row.containers })}`
+                        : ""}
                 </div>
             </td>
             <td className="py-2 pr-3 text-xs text-muted-foreground">{row.owner ?? "-"}</td>

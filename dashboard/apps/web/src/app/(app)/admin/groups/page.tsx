@@ -7,12 +7,14 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { GroupsAdmin, type GroupRow, type UserOption } from "./groups-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function GroupsAdminPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
     const [groups, users] = await Promise.all([
         prisma.group.findMany({
             orderBy: { name: "asc" },
@@ -38,7 +40,7 @@ export default async function GroupsAdminPage() {
 
     return (
         <>
-            <PageHeader title="Groups" description="Bundle people into groups, then grant access to the group." />
+            <PageHeader title={t("groups.page.title")} description={t("groups.page.description")} />
             <GroupsAdmin groups={rows} users={userOptions} />
         </>
     );

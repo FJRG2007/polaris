@@ -12,6 +12,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
 import { setRetentionPolicy, sweepRetention } from "@/lib/retention-service";
@@ -20,7 +21,7 @@ import { MAIL_BODY_KEEP_KEY, MAIL_BODY_KEEP_MAX, retentionPolicySchema } from "@
 export async function saveRetentionAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = retentionPolicySchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not a period Polaris offers" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("retention.errors.notAPeriod") };
 
     await setRetentionPolicy(parsed.data);
     await recordAudit({
@@ -66,7 +67,7 @@ export async function sweepRetentionAction(): Promise<{
         return { removed, more: result.more };
     } catch (error) {
         console.error("polaris: the retention sweep failed:", error);
-        return { error: "That could not be run just now" };
+        return { error: (await getTranslations("admin"))("retention.errors.sweepFailed") };
     }
 }
 
@@ -100,13 +101,14 @@ export async function mailBodyHeldAction(): Promise<{ held: number }> {
  */
 export async function saveMailBodyKeepAction(kept: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
+    const t = await getTranslations("admin");
     const parsed = z
         .number()
-        .int("Whole messages only.")
-        .min(0, "Use 0 to fetch every message when it is opened.")
-        .max(MAIL_BODY_KEEP_MAX, `That is more than ${MAIL_BODY_KEEP_MAX} messages.`)
+        .int(t("retention.mail.errors.whole"))
+        .min(0, t("retention.mail.errors.min"))
+        .max(MAIL_BODY_KEEP_MAX, t("retention.mail.errors.max", { max: String(MAIL_BODY_KEEP_MAX) }))
         .safeParse(kept);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the number." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("retention.mail.errors.check") };
 
     await setSetting(MAIL_BODY_KEEP_KEY, String(parsed.data));
     await recordAudit({

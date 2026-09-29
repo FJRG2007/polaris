@@ -19,17 +19,13 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { savePortPolicyAction } from "./actions";
 import { Button, Input, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { describeBlock, parseBlockInput, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
 
-const OPTIONS: readonly { value: PortPolicy; label: string }[] = [
-    { value: "range", label: "One range, opened once" },
-    { value: "per-port", label: "One rule per server" }
-];
+/** The catalog key each policy's option and hint live under. */
+const POLICY_KEYS = { range: "range", "per-port": "perPort" } as const satisfies Record<PortPolicy, string>;
 
-const HINTS: Record<PortPolicy, string> = {
-    range: "Two rules cover every server here, now and later. Nothing outside these ranges is opened.",
-    "per-port": "Exact, but every new server needs another rule in the router."
-};
+const POLICIES: readonly PortPolicy[] = ["range", "per-port"];
 
 export function PortPolicyForm({
     policy,
@@ -43,6 +39,8 @@ export function PortPolicyForm({
      *  previous block would be sending somebody to their router for the wrong rule. */
     onSaved: () => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [mode, setMode] = useState<PortPolicy>(policy);
     const [tcp, setTcp] = useState(describeBlock(blocks.tcp));
     const [udp, setUdp] = useState(describeBlock(blocks.udp));
@@ -55,6 +53,10 @@ export function PortPolicyForm({
     // Compared against what was loaded rather than against having been touched, so
     // a range edited and put back leaves Save disabled.
     const changed = mode !== policy || tcp !== describeBlock(blocks.tcp) || udp !== describeBlock(blocks.udp);
+    const options = POLICIES.map((value) => ({
+        value,
+        label: t(`domainsPorts.policy.options.${POLICY_KEYS[value]}`)
+    }));
 
     return (
         <form
@@ -74,44 +76,42 @@ export function PortPolicyForm({
             }}
         >
             <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                How the router is asked
+                {t("domainsPorts.policy.how")}
                 <Select
                     value={mode}
-                    options={[...OPTIONS]}
-                    aria-label="How the router is asked to open game ports"
+                    options={options}
+                    aria-label={t("domainsPorts.policy.howAria")}
                     className="h-9"
                     onValueChange={(next) => setMode(next as PortPolicy)}
                 />
             </label>
             <label className="flex w-36 flex-col gap-1 text-xs text-muted-foreground">
-                TCP range
+                {t("domainsPorts.policy.tcp")}
                 <Input
                     value={tcp}
                     className="h-9 font-mono"
                     inputMode="numeric"
-                    aria-label="TCP port range"
+                    aria-label={t("domainsPorts.policy.tcpAria")}
                     aria-invalid={!tcpValid}
                     onChange={(event) => setTcp(event.target.value)}
                 />
             </label>
             <label className="flex w-36 flex-col gap-1 text-xs text-muted-foreground">
-                UDP range
+                {t("domainsPorts.policy.udp")}
                 <Input
                     value={udp}
                     className="h-9 font-mono"
                     inputMode="numeric"
-                    aria-label="UDP port range"
+                    aria-label={t("domainsPorts.policy.udpAria")}
                     aria-invalid={!udpValid}
                     onChange={(event) => setUdp(event.target.value)}
                 />
             </label>
             <Button type="submit" size="sm" disabled={busy || !changed || !valid}>
-                Save
+                {tc("actions.save")}
             </Button>
             <p className="w-full text-xs text-muted-foreground">
-                {valid
-                    ? HINTS[mode]
-                    : "A range reads like 25565-25664, stays above 1024, and cannot contain 80 or 443."}
+                {valid ? t(`domainsPorts.policy.hints.${POLICY_KEYS[mode]}`) : t("domainsPorts.policy.invalid")}
             </p>
             {error && (
                 <p role="alert" className="w-full text-xs text-danger">

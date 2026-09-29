@@ -15,6 +15,7 @@ import { MAIL_PROVIDER_INFO } from "@polaris/core";
 import { setAuthMailChannelAction } from "./actions";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { Button, Card, CardBody, PageHeader, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const NONE = "none";
 
@@ -25,6 +26,8 @@ export function AccountMailView({
     channels: EmailChannelView[];
     selectedId: string | null;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [choice, setChoice] = useState(selectedId ?? NONE);
     const [saved, setSaved] = useState(selectedId ?? NONE);
     const [error, setError] = useState<string | null>(null);
@@ -32,12 +35,13 @@ export function AccountMailView({
     const [saving, startSave] = useTransition();
 
     const options = [
-        { value: NONE, label: "Do not send account mail" },
+        { value: NONE, label: t("email.none") },
         ...channels.map((channel) => ({
             value: channel.id,
-            label: `${channel.name} - ${MAIL_PROVIDER_INFO[channel.provider].label}${
-                channel.status === "connected" ? "" : " (not working)"
-            }`
+            label: t(channel.status === "connected" ? "email.channel" : "email.channelBroken", {
+                name: channel.name,
+                provider: MAIL_PROVIDER_INFO[channel.provider].label
+            })
         }))
     ];
 
@@ -51,7 +55,7 @@ export function AccountMailView({
                 return;
             }
             setSaved(choice);
-            setNotice("Saved.");
+            setNotice(t("email.saved"));
         });
     }
 
@@ -59,35 +63,33 @@ export function AccountMailView({
         // Narrow page: centre the column in the content area, header included.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Account mail"
-                description="The email channel Polaris sends account messages through."
+                title={t("email.title")}
+                description={t("email.description")}
             />
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     {channels.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No email channel has been set up yet. Add one under{" "}
-                            <Link href="/admin/inbox/channels" className="text-primary hover:underline">
-                                Inbox &gt; Channels
-                            </Link>
-                            , then come back and pick it here.
+                            {t.rich("email.empty", {
+                                link: (chunks) => (
+                                    <Link key="link" href="/admin/inbox/channels" className="text-primary hover:underline">
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
                         </p>
                     ) : (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Send through</span>
+                                <span className="font-medium">{t("email.sendThrough")}</span>
                                 <Select value={choice} onValueChange={setChoice} options={options} />
                             </label>
-                            <p className="text-xs text-muted-foreground">
-                                Address verification, password resets and emailed sign-in codes all
-                                go through this channel. With none chosen, Polaris sends no mail and
-                                those are unavailable.
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("email.hint")}</p>
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
                             {notice ? <p className="text-sm text-success">{notice}</p> : null}
                             <div className="flex justify-end">
                                 <Button onClick={save} disabled={saving || choice === saved}>
-                                    {saving ? "Saving..." : "Save"}
+                                    {saving ? tc("actions.saving") : tc("actions.save")}
                                 </Button>
                             </div>
                         </>

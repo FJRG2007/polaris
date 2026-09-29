@@ -14,15 +14,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactElement } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { EmailChannelDialog } from "../email-channel-dialog";
 import { EMAIL_CHANNEL_MARK } from "@/app/(app)/admin/inbox/platform-meta";
 import { ConnectChannelDialog } from "@/app/(app)/admin/inbox/connect-channel-dialog";
-import { CHANNEL_CATALOG, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
+import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
 import { MAIL_PROVIDER_INFO, MAIL_PROVIDERS, type MailProvider } from "@polaris/core";
 
 export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [kind, setKind] = useState<ChannelKind | null>(null);
     const [provider, setProvider] = useState<MailProvider | null>(null);
@@ -45,33 +47,33 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                     href="/admin/inbox/channels"
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                    <ArrowLeft className="size-3" /> Channels
+                    <ArrowLeft className="size-3" /> {t("inboxChannels.title")}
                 </Link>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Connect a channel</h1>
-                <p className="text-sm text-muted-foreground">
-                    Pick what to connect. Add as many as you like and handle them all from one inbox.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxChannels.connect")}</h1>
+                <p className="text-sm text-muted-foreground">{t("inboxChannels.connectPage.intro")}</p>
             </div>
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Messaging</h2>
+                    <h2 className="text-sm font-medium">{t("inboxChannels.connectPage.messaging")}</h2>
                     <p className="text-xs text-muted-foreground">
-                        Two-way chat in the Inbox, and where Watch sends its alerts.
-                        {bridgeReady ? null : (
-                            <>
-                                {" "}
-                                Needs the messaging bridge, which installs from the{" "}
-                                <Link href="/apps/marketplace" className="text-primary hover:underline">
-                                    Apps marketplace
-                                </Link>
-                                .
-                            </>
-                        )}
+                        {bridgeReady
+                            ? t("inboxChannels.connectPage.messagingHint")
+                            : t.rich("inboxChannels.connectPage.messagingHintNoBridge", {
+                                  link: (chunks) => (
+                                      <Link
+                                          key="link"
+                                          href="/apps/marketplace"
+                                          className="text-primary hover:underline"
+                                      >
+                                          {chunks}
+                                      </Link>
+                                  )
+                              })}
                     </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {CHANNEL_CATALOG.map((entry) => (
+                    {channelCatalog(t).map((entry) => (
                         <MarketplaceCard
                             key={entry.kind}
                             Logo={entry.Logo}
@@ -88,10 +90,9 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Email</h2>
+                    <h2 className="text-sm font-medium">{t("inboxChannels.connectPage.email")}</h2>
                     <p className="text-xs text-muted-foreground">
-                        How Polaris sends its own mail: address verification, password resets,
-                        sign-in links and codes.
+                        {t("inboxChannels.connectPage.emailHint")}
                     </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -155,6 +156,7 @@ function MarketplaceCard({
     disabled?: boolean;
     onPick: () => void;
 }) {
+    const t = useTranslations("admin");
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -181,12 +183,12 @@ function MarketplaceCard({
                             rel="noreferrer noopener"
                             className="mr-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                         >
-                            Docs
+                            {t("inboxChannels.connectPage.docs")}
                             <ExternalLink className="size-3" />
                         </a>
                     ) : null}
                     <Button size="sm" variant="secondary" onClick={onPick} disabled={disabled}>
-                        Set up
+                        {t("inboxChannels.connectPage.setUp")}
                     </Button>
                 </div>
             </CardBody>

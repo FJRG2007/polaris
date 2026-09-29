@@ -15,14 +15,16 @@ import { useRouter } from "next/navigation";
 import { saveInstanceSecurityAction } from "./actions";
 import { Button, Card, CardBody, Switch } from "@polaris/ui";
 import { Feedback } from "@/app/(app)/account/security/setting-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
-    SECOND_FACTOR_ENROLLMENT_INFO,
     SECOND_FACTOR_ENROLLMENTS,
     type InstanceSecurityPolicy,
     type SecondFactorEnrollment
 } from "@polaris/core";
 
 export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityPolicy; mailReady: boolean }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const [required, setRequired] = useState(policy.requireSecondFactor);
     const [accepted, setAccepted] = useState<SecondFactorEnrollment[]>(policy.acceptedFactors);
@@ -64,11 +66,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h2 className="text-sm font-medium">Require a second step to sign in</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Every account adds one before it can use Polaris. Accounts that already exist
-                                are asked the next time they sign in.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("security.require.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("security.require.hint")}</p>
                         </div>
                         <Switch
                             checked={required}
@@ -76,14 +75,11 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                                 setResult(null);
                                 setRequired(next);
                             }}
-                            aria-label="Require a second step to sign in"
+                            aria-label={t("security.require.title")}
                         />
                     </div>
                     {!required ? (
-                        <p className="text-xs text-muted-foreground">
-                            With this off, a password is all an account needs. People can still turn on a
-                            second step for themselves under their own security settings.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("security.require.off")}</p>
                     ) : null}
                 </CardBody>
             </Card>
@@ -91,39 +87,30 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <h2 className="text-sm font-medium">What counts as a second step</h2>
-                        <p className="text-xs text-muted-foreground">
-                            People pick from whichever of these works on this deployment.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("security.factors.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("security.factors.hint")}</p>
                     </div>
                     {SECOND_FACTOR_ENROLLMENTS.map((factor) => {
-                        const info = SECOND_FACTOR_ENROLLMENT_INFO[factor];
+                        const label = t(`security.factors.${factor}.label`);
                         const fixed = factor === "totp";
                         const unavailable = factor === "email" && !mailReady;
                         return (
                             <div key={factor} className="flex items-start justify-between gap-4 border-t border-border pt-3 first:border-0 first:pt-0">
                                 <div className="min-w-0">
-                                    <p className="text-sm">{info.label}</p>
-                                    <p className="text-xs text-muted-foreground">{info.description}</p>
+                                    <p className="text-sm">{label}</p>
+                                    <p className="text-xs text-muted-foreground">{t(`security.factors.${factor}.description`)}</p>
                                     {fixed ? (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Always accepted. It needs nothing from this deployment, so it is
-                                            what people can still use when everything else is unreachable.
-                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">{t("security.factors.fixed")}</p>
                                     ) : null}
                                     {unavailable ? (
-                                        <p className="mt-1 text-xs text-danger">
-                                            No email channel carries account mail yet, so nobody can pick this.
-                                            Connect a sender under Inbox &gt; Channels, then nominate it under
-                                            Management &gt; Email.
-                                        </p>
+                                        <p className="mt-1 text-xs text-danger">{t("security.factors.noMail")}</p>
                                     ) : null}
                                 </div>
                                 <Switch
                                     checked={fixed || accepted.includes(factor)}
                                     disabled={fixed}
                                     onChange={(next) => toggle(factor, next)}
-                                    aria-label={info.label}
+                                    aria-label={label}
                                 />
                             </div>
                         );
@@ -135,11 +122,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h2 className="text-sm font-medium">Ask again after a connected account</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Signing in with GitHub or Google answers that service first. With this on,
-                                Polaris asks for the second step afterwards as well.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("security.connection.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("security.connection.hint")}</p>
                         </div>
                         <Switch
                             checked={connectionChallenge}
@@ -147,21 +131,18 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                                 setResult(null);
                                 setConnectionChallenge(next);
                             }}
-                            aria-label="Ask again after a connected account"
+                            aria-label={t("security.connection.title")}
                         />
                     </div>
                     {!connectionChallenge ? (
-                        <p className="text-xs text-muted-foreground">
-                            With this off, the service that signed them in is the whole sign-in. Anyone who
-                            wants the extra step can still turn it on for their own account.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("security.connection.off")}</p>
                     ) : null}
                 </CardBody>
             </Card>
 
             <div className="flex items-center gap-3">
                 <Button onClick={() => void save()} disabled={!dirty || busy}>
-                    {busy ? "Saving..." : "Save"}
+                    {busy ? tc("actions.saving") : tc("actions.save")}
                 </Button>
                 <Feedback error={result?.error} ok={result?.ok} />
             </div>

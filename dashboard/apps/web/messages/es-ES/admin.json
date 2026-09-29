@@ -1,0 +1,2348 @@
+{
+    "activity": {
+        "page": {
+            "title": "Actividad",
+            "description": "Todo lo que se hace en Polaris, quién y desde dónde. Sellado en una cadena para que se note una entrada editada o borrada."
+        },
+        "feed": {
+            "who": "Quién",
+            "empty": "Aún no hay actividad registrada."
+        },
+        "integrity": {
+            "intact": "Cadena intacta en {count, plural, one {{shown} entrada} other {{shown} entradas}}.",
+            "brokenToast": "La cadena está rota. El panel indica dónde.",
+            "broken": "{reason, select, missing {Falta una entrada en la cadena} altered {Una entrada se cambió después de sellarse} other {Una entrada ya no apunta a la anterior}} en la entrada {seq}{recorded, select, yes {, registrada el {at}} other {}}.",
+            "sealed": "{sealed, plural, one {{sealedShown} entrada sellada} other {{sealedShown} entradas selladas}}{waiting, select, yes {, {pending} pendientes de sellar} other {}}.",
+            "lastChecked": "Última comprobación: {when}.",
+            "notChecked": "Aún sin comprobar.",
+            "head": "Cabeza #{seq} {hash}",
+            "copyLabel": "Copiar la cabeza de la cadena",
+            "copyTitle": "Copiar la cabeza de la cadena, para guardarla fuera de Polaris",
+            "copied": "Cabeza de la cadena copiada.",
+            "checking": "Comprobando",
+            "check": "Comprobar ahora"
+        },
+        "errors": {
+            "verifyFailed": "Ahora mismo no se ha podido comprobar la cadena. Vuelve a intentarlo en un minuto."
+        }
+    },
+    "agents": {
+        "page": {
+            "title": "Ajustes de agentes",
+            "description": "Lo que hacen las ejecuciones de agentes en todo el despliegue. Cada cuenta puede acotarlo en Apps > Agentes, y un repositorio puede sobrescribirlo de nuevo."
+        },
+        "defaults": {
+            "title": "Todos los repositorios de este despliegue",
+            "inheritedFrom": "los valores integrados"
+        },
+        "keySharing": {
+            "label": "Compartir las claves de proveedor de este despliegue",
+            "on": "Quien no tenga clave propia usa las claves guardadas en Integraciones, y esas cuentas se te facturan a ti.",
+            "off": "Las ejecuciones solo usan claves que cada persona añade en Cuenta > Claves de proveedores de IA. Nadie gasta los proveedores de este despliegue.",
+            "switch": "Compartir claves de proveedor"
+        },
+        "sharedMachine": {
+            "label": "Ofrecer una máquina compartida por todos",
+            "on": "Cualquiera que pueda iniciar una sesión puede abrir la máquina compartida. Tiene un solo directorio personal: lo que tiene la sesión iniciada allí la tiene para todos, y los archivos que deja una persona son los que encuentra la siguiente.",
+            "off": "Cada sesión se abre en una máquina de su propia cuenta, con sus propios inicios de sesión y archivos. Nadie puede acceder a los de otro.",
+            "switch": "Ofrecer una máquina compartida",
+            "warning": "Inicia sesión con una clave de API o un plan de equipo. Una suscripción personal de Claude o ChatGPT es para una sola persona, y que varias trabajen con ella es lo que hace que la suspendan."
+        },
+        "catalog": {
+            "title": "Catálogo de modelos",
+            "empty": "Aún no se ha descargado nada, así que los selectores de modelo solo ofrecen lo que escribas. Se actualiza solo una vez al día.",
+            "count": "{count, plural, one {{shown} modelo} other {{shown} modelos}} de los proveedores que admite Polaris. Se actualiza solo una vez al día.",
+            "refresh": "Actualizar",
+            "lastRead": "Última lectura: <time>{when}</time>."
+        },
+        "limits": {
+            "title": "Límites de uso",
+            "intro": "Una ejecución que superaría algún límite que le aplica se rechaza antes de empezar, indicando el motivo. No hay nada limitado hasta que añadas uno.",
+            "add": "Añadir",
+            "remove": "Quitar",
+            "removeLabel": "Quitar este límite",
+            "rule": "{amount} {metric, select, runs {ejecuciones} other {tokens}} / {period, select, day {1 día} week {1 semana} other {30 días}}",
+            "metrics": {
+                "runs": "ejecuciones",
+                "tokens": "tokens"
+            },
+            "per": {
+                "day": "por día",
+                "week": "por semana",
+                "month": "cada 30 días"
+            },
+            "subjects": {
+                "everyone": {
+                    "label": "Todos",
+                    "note": "Se aplica a cada cuenta, contada por separado."
+                },
+                "user": {
+                    "label": "Una persona",
+                    "placeholder": "id de cuenta"
+                },
+                "role": {
+                    "label": "Un rol",
+                    "placeholder": "id de rol",
+                    "note": "Cada miembro del rol tiene esta cantidad."
+                },
+                "group": {
+                    "label": "Un grupo",
+                    "placeholder": "id de grupo",
+                    "note": "Cada miembro del grupo tiene esta cantidad."
+                },
+                "repo": {
+                    "label": "Un repositorio",
+                    "placeholder": "propietario/nombre"
+                },
+                "org": {
+                    "label": "Una cuenta de GitHub",
+                    "placeholder": "usuario",
+                    "note": "Todos sus repositorios, contados juntos."
+                }
+            }
+        },
+        "errors": {
+            "pickSetting": "Elige una opción",
+            "subjectRequired": "Indica a quién o a qué se aplica el límite",
+            "checkLimit": "Revisa el límite",
+            "pickLimit": "Elige un límite",
+            "catalogUnread": "No se ha podido leer el catálogo.",
+            "checkSettings": "Revisa los ajustes",
+            "providerNotConnected": "Conecta {provider} en Integraciones antes de usar este modelo por defecto.",
+            "poolGone": "Ese grupo de runners ya no existe."
+        }
+    },
+    "billing": {
+        "title": "Facturación",
+        "description": "Lo que usó cada proyecto y organización, mes a mes, con los precios que tú fijas. No se cobra nada en ningún sitio: es para tus propios extractos.",
+        "refresh": "Actualizar",
+        "stale": "Mostrando el último extracto leído. {reason}",
+        "projects": "Proyectos",
+        "noProjects": "Aún no hay proyectos en este Polaris.",
+        "owners": {
+            "title": "Por propietario",
+            "owner": "Propietario",
+            "projects": "Proyectos",
+            "cpu": "CPU",
+            "cost": "Coste",
+            "budget": "Presupuesto",
+            "cpuHours": "{hours} vCPU-h",
+            "budgetUsed": "{percent} % de {budget}",
+            "organization": "Organización",
+            "personal": "Personal"
+        },
+        "rates": {
+            "title": "Precios",
+            "hint": "Lo que cuesta cada cosa medida. Deja un precio en blanco para no cobrarlo.",
+            "none": "No hay precios, así que los extractos solo muestran el uso. Fija cualquiera para ponerle precio.",
+            "currency": "Moneda",
+            "currencyOption": "{code} - {name}",
+            "notCharged": "Sin cobrar",
+            "save": "Guardar precios",
+            "clear": "Quitar precios",
+            "clearTitle": "¿Quitar los precios?",
+            "clearBody": "Todos los extractos vuelven a mostrar el uso sin dinero y los presupuestos dejan de medirse.",
+            "setOne": "Fija al menos un precio para guardar.",
+            "keys": {
+                "cpuHour": {
+                    "label": "CPU",
+                    "unit": "por hora de vCPU"
+                },
+                "memoryGbHour": {
+                    "label": "Memoria",
+                    "unit": "por GB-hora"
+                },
+                "storageGbMonth": {
+                    "label": "Almacenamiento",
+                    "unit": "por GB-mes"
+                },
+                "egressGb": {
+                    "label": "Tráfico de salida",
+                    "unit": "por GB"
+                }
+            }
+        },
+        "errors": {
+            "checkPrices": "Revisa los precios e inténtalo de nuevo",
+            "saveFailed": "No se han podido guardar los precios. Inténtalo de nuevo.",
+            "clearFailed": "No se han podido quitar los precios. Inténtalo de nuevo."
+        }
+    },
+    "chat": {
+        "page": {
+            "title": "Chat",
+            "description": "Cuánto puede ocupar un mensaje, qué puede llevar, cuánto tiempo se puede editar y qué deja al borrarse. Se decide por separado para espacios, chats de grupo y mensajes directos."
+        },
+        "errors": {
+            "notAScope": "Ese no es un tipo de conversación",
+            "rulesNotSaved": "No se han podido guardar esos límites",
+            "notAShare": "Esa no es una forma de compartir un archivo",
+            "notSaved": "No se ha podido guardar"
+        },
+        "rules": {
+            "scopePicker": "A qué conversaciones se aplican estas reglas",
+            "unsaved": "Cambios sin guardar",
+            "scopes": {
+                "space": {
+                    "label": "Espacios",
+                    "note": "Canales dentro de un espacio: las salas donde trabaja un equipo y el registro que dejan.",
+                    "save": "Guardar espacios"
+                },
+                "group": {
+                    "label": "Chats de grupo",
+                    "note": "Tres o más personas en una conversación, fuera de cualquier espacio.",
+                    "save": "Guardar chats de grupo"
+                },
+                "dm": {
+                    "label": "Mensajes directos",
+                    "note": "Una persona y otra.",
+                    "save": "Guardar mensajes directos"
+                }
+            },
+            "noLimit": "Sin límite.",
+            "saved": "Guardado.",
+            "range": "Un número entero entre {min} y {max}.",
+            "fields": {
+                "maxMessageLength": {
+                    "label": "Mensaje más largo",
+                    "hint": "Caracteres. Quien tenga más que decir tiene las notas o los fragmentos.",
+                    "suffix": "caracteres"
+                },
+                "maxPerMinute": {
+                    "label": "Mensajes por minuto",
+                    "hint": "Por persona y conversación. Treinta frena una avalancha sin molestar nunca a quien escribe. Cero para todos los que pueda escribir.",
+                    "suffix": "por minuto"
+                },
+                "spamGuard": {
+                    "label": "Protección contra spam",
+                    "hint": "Límites tan holgados que nadie que hable con normalidad llega a ellos, pensados para frenar abusos claros: avisar a toda la sala una y otra vez, mencionar a la misma persona sin parar, pegar la misma línea repetidamente. Cada uno cuenta a una persona en una conversación; cero desactiva ese límite."
+                },
+                "maxRoomMentionsPerHour": {
+                    "label": "@everyone y @here",
+                    "hint": "Mensajes con cualquiera de los dos que una persona puede enviar en una hora. No afecta a quien modera la sala.",
+                    "suffix": "por hora"
+                },
+                "maxMentionsPerMessage": {
+                    "label": "Personas mencionadas en un mensaje",
+                    "hint": "Personas o equipos distintos que puede mencionar un mensaje.",
+                    "suffix": "personas"
+                },
+                "maxSamePersonMentions": {
+                    "label": "Mencionar a la misma persona",
+                    "hint": "Mensajes que mencionan a la misma persona que una cuenta puede enviar en diez minutos.",
+                    "suffix": "en 10 minutos"
+                },
+                "maxRepeatedMessages": {
+                    "label": "El mismo mensaje otra vez",
+                    "hint": "Cuántas veces se puede enviar exactamente el mismo mensaje en dos minutos.",
+                    "suffix": "en 2 minutos"
+                },
+                "maxAttachments": {
+                    "label": "Archivos por mensaje",
+                    "hint": "Cero impide enviar archivos en este tipo de conversación.",
+                    "suffix": "archivos",
+                    "zero": "Aquí no se pueden enviar archivos."
+                },
+                "maxAttachmentMib": {
+                    "label": "Archivo más grande",
+                    "hint": "Un archivo de este tamaño va directo al almacenamiento donde Polaris guarda las subidas, así que esto fija cuánto de tus discos puede ocupar un mensaje. Quien comparte un archivo que ya tiene en Drive no está sujeto a esto cuando esta instancia comparte por enlace."
+                },
+                "editWindowMinutes": {
+                    "label": "Cuánto tiempo se puede editar un mensaje",
+                    "hint": "Minutos desde que se envió. Cero significa siempre, que es lo que la gente espera. También cuenta para borrar, y nunca limita a quien modera la sala.",
+                    "suffix": "minutos",
+                    "zero": "Siempre se puede editar."
+                },
+                "deleteLeavesTrace": {
+                    "label": "Al borrar queda una línea que lo indica",
+                    "hint": "Activado, un mensaje borrado dice 'Este mensaje se ha eliminado' y las respuestas siguen teniendo sentido. Desactivado, el mensaje y sus archivos desaparecen sin rastro, salvo uno con respuestas, que se las llevaría consigo."
+                },
+                "keepEditHistory": {
+                    "label": "Guardar lo que decía un mensaje antes de editarlo",
+                    "hint": "Activado, '(editado)' abre las versiones anteriores para quien pueda leer el mensaje. Desactivado, a partir de entonces no se guarda ninguna versión anterior."
+                }
+            }
+        },
+        "driveShare": {
+            "title": "Un archivo enviado desde Drive",
+            "picker": "Qué pasa con un archivo enviado desde Drive",
+            "copy": {
+                "label": "Copiado",
+                "title": "Una copia propia, en el almacén de la conversación",
+                "hint": "Se copia en la conversación, así que nada puede cambiarlo ni quitarlo. La instancia guarda una segunda copia de cada archivo que se comparte, y se le aplica el límite de tamaño de arriba."
+            },
+            "link": {
+                "label": "Enlazado",
+                "title": "Se queda donde está y se abre desde el mensaje",
+                "hint": "Se comparte donde ya está. No se copia nada, así que vale cualquier tamaño y no se aplica el límite de arriba, pero quien sea dueño del archivo puede editarlo o borrarlo bajo un mensaje ya leído, y la conversación lo indica en el archivo."
+            }
+        },
+        "orgChat": {
+            "label": "Las organizaciones pueden tener su propio chat",
+            "hint": "Una organización que lo active tiene un segundo chat para su gente, al que se llega desde el selector de la cabecera. Desactivado, todos comparten un chat, y las organizaciones que ya tenían el suyo ven esas conversaciones integradas en él en lugar de ocultas."
+        },
+        "calls": {
+            "title": "Dónde se hacen las llamadas",
+            "intro": "Cada llamada pasa por un servidor multimedia, así que cada navegador envía su cámara una vez y no una por persona. Polaris arranca uno con el stack y le da su propia clave, así que no hay nada que configurar; hasta que responde, Chat indica que las llamadas no están disponibles en lugar de ofrecer una que no llega a nadie.",
+            "status": {
+                "unprepared": "No se ha podido preparar el servidor de llamadas.",
+                "running": "En marcha {where, select, shipped {en este servidor} other {en la dirección de abajo}}.",
+                "missing": "El servidor de llamadas no forma parte de este despliegue.",
+                "stopped": "El servidor de llamadas está detenido.",
+                "notAnswering": "No responde {where, select, shipped {en este servidor} other {en la dirección de abajo}}.",
+                "starting": "Arrancando {where, select, shipped {en este servidor} other {en la dirección de abajo}}."
+            },
+            "detail": {
+                "unprepared": "Las llamadas aún no tienen dónde ejecutarse en este despliegue. No hay nada que hacer: se repara solo la próxima vez que arranque Polaris, y aquí se indicará en cuanto ocurra.",
+                "missing": "Su contenedor nunca se creó aquí, por eso decía que arrancaba y nunca terminaba. Actualizar de nuevo lo levanta: <link>Ajustes</link>, Actualizar.",
+                "stopped": "Su contenedor existe pero no está en marcha. Arráncalo desde <link>Contenedores</link>, en la fila {container}.",
+                "running": "Las llamadas entre dispositivos de esta red ya funcionan. Para llamadas desde fuera, dos puertos tienen que llegar a esta máquina: <link>Dominios</link> los muestra e indica cuándo responden.",
+                "waited": "Lleva un par de minutos y no ha arrancado. Sigue intentándolo, y las llamadas vuelven solas en cuanto responda.",
+                "starting": "Arranca unos segundos después del stack."
+            },
+            "checkAgain": "Comprobar de nuevo",
+            "unused": {
+                "environment": "Este despliegue se arrancó apuntando a otro servidor de llamadas, así que las llamadas van allí y la dirección de abajo no se usa.",
+                "noSecret": "La dirección de abajo no tiene secreto guardado, así que no firma nada y no se usa. Pégalo y guarda.",
+                "noKey": "La dirección de abajo no tiene clave guardada, así que no firma nada y no se usa. Rellénala y guarda.",
+                "neither": "La dirección de abajo no tiene clave ni secreto guardados, así que no firma nada y no se usa. Rellena ambos y guarda."
+            },
+            "fields": {
+                "address": "Dirección",
+                "addressLabel": "Dirección del servidor de llamadas",
+                "key": "Clave",
+                "keyLabel": "Clave del servidor de llamadas",
+                "keyPlaceholder": "El nombre de su clave",
+                "secret": "Secreto",
+                "secretLabel": "Secreto del servidor de llamadas",
+                "secretStored": "Guardado. Escribe para reemplazarlo.",
+                "secretPaste": "Pégalo"
+            },
+            "saved": "Guardado",
+            "ownServer": "Ya tengo el mío"
+        }
+    },
+    "consumption": {
+        "title": "Consumo",
+        "description": "En qué se gasta la máquina en la que corre Polaris: el propio plano de control, las apps instaladas y todo lo demás.",
+        "refresh": "Actualizar",
+        "error": {
+            "title": "Nada que medir",
+            "description": "Polaris no ha podido leer qué está usando esta máquina. {reason}"
+        },
+        "split": {
+            "inContainers": "{used} de {total} en contenedores",
+            "cores": "{count, plural, one {# núcleo} other {# núcleos}}",
+            "measuring": "midiendo",
+            "measured": "medido hace {age}",
+            "segment": "{label}: {size}",
+            "note": "Solo esta máquina. La memoria y la CPU son lo que ocupan ahora los contenedores; un servicio incluye las versiones que guarda y el túnel que lo publica."
+        },
+        "cpu": "{percent} % CPU",
+        "running": "{running} de {containers} en marcha",
+        "containers": "{count, plural, one {# contenedor} other {# contenedores}}",
+        "parts": "Qué ejecuta {name}",
+        "columns": {
+            "name": "Nombre",
+            "owner": "Propietario",
+            "cpu": "CPU",
+            "memory": "Memoria"
+        },
+        "empty": {
+            "apps": "Aún no hay nada instalado desde el marketplace.",
+            "services": "Aún no hay nada desplegado aquí.",
+            "leftover": "No ha quedado nada abandonado.",
+            "other": "No hay nada más en marcha en esta máquina."
+        },
+        "states": {
+            "elsewhere": "No está en esta máquina",
+            "stopped": "Detenido",
+            "running": "En marcha",
+            "restarting": "{count, plural, one {Reiniciándose} other {# reiniciándose}}"
+        },
+        "groups": {
+            "polaris": {
+                "label": "El propio Polaris",
+                "description": "El plano de control: el panel, la base de datos, el edge y el resto del stack."
+            },
+            "apps": {
+                "label": "Apps del marketplace",
+                "description": "Todo lo instalado desde el marketplace, servidores de juego incluidos."
+            },
+            "services": {
+                "label": "Servicios desplegados",
+                "description": "Servicios y bases de datos desplegados aquí, con las versiones y túneles que guardan."
+            },
+            "leftover": {
+                "label": "Abandonado por Polaris",
+                "description": "Iniciado por Polaris para algo que ya no existe. Nada volverá a iniciarlos, y quitar uno libera lo que ocupa."
+            },
+            "other": {
+                "label": "Todo lo demás",
+                "description": "Contenedores de esta máquina que Polaris no inició."
+            }
+        }
+    },
+    "display": {
+        "title": "Visualización predeterminada",
+        "description": "El tema, las unidades y los formatos de todo el despliegue. Cada cuenta puede cambiarlos en Cuenta > Preferencias.",
+        "themePolicy": {
+            "title": "Dejar que cada persona elija su tema",
+            "hint": "Desactivado, todas las cuentas siguen el tema de arriba. Lo que cada uno ya eligió se guarda y vuelve si lo activas de nuevo."
+        },
+        "errors": {
+            "unsupportedChoice": "Opción no admitida.",
+            "notABoolean": "Eso no es un sí o un no."
+        }
+    },
+    "domains": {
+        "page": {
+            "title": "Dominios",
+            "description": "Elige los dominios que usa Polaris para el panel y para los enlaces que reparte."
+        },
+        "tryAgain": "Reintentar",
+        "saved": "Guardado.",
+        "errors": {
+            "invalidSettings": "Ajustes de dominio no válidos",
+            "invalidList": "Lista de dominios no válida",
+            "invalidNetwork": "Ajustes de red no válidos",
+            "couldNotSave": "No se ha podido guardar"
+        },
+        "removal": {
+            "noAddress": "No se ha indicado ninguna dirección.",
+            "unknown": "Esa dirección ya no está en la lista.",
+            "builtIn": "Es la dirección con la que se instaló el despliegue. Cambia con la instalación, no aquí.",
+            "managed": "Este nombre viene de la configuración guiada de arriba. Cambia allí la distribución de zonas para dejar de usarlo."
+        },
+        "advancedToggle": "Avanzado: modo de exposición y DuckDNS",
+        "own": {
+            "title": "Direcciones propias de Polaris",
+            "appDomain": "Dominio de la aplicación",
+            "appDomainHint": "La dirección fija del panel. Déjalo vacío para usar la del despliegue ({url}).",
+            "sharingDomain": "Dominio para compartir",
+            "sharingDomainHint": "Se usa en los enlaces que reparte Polaris (enlaces compartidos y puntos de entrega). Apunta aquí un subdominio gratuito desechable (p. ej. uno de dokploy / traefik.me) para enlaces de usar y tirar. Si está vacío, se usa el dominio de la aplicación.",
+            "saveFailed": "No se han podido guardar los dominios",
+            "use": "Usar {suggestion}"
+        },
+        "answers": {
+            "title": "Dónde responde Polaris",
+            "addLabel": "Añadir un dominio",
+            "add": "Añadir",
+            "addHint": "Primero apunta el nombre a este servidor. Después Polaris lo enruta, pide un certificado para él y acepta inicios de sesión en él.",
+            "notADomain": "Eso no es un nombre de dominio.",
+            "known": "Ya está en la lista.",
+            "addFailed": "No se ha podido añadir el dominio"
+        },
+        "certificate": {
+            "title": "Confiar en este dispositivo (polaris.local)",
+            "body": "Los nombres de la red local no pueden tener un certificado público, así que Polaris firma el suyo. Instala este certificado raíz una vez en tus dispositivos para que <code>https://polaris.local</code> sea de confianza sin avisos del navegador. macOS/iOS: ábrelo y confía en él en Llavero / Perfiles. Windows: impórtalo en \"Entidades de certificación raíz de confianza\". Firefox: impórtalo en Autoridades.",
+            "download": "Descargar certificado raíz"
+        },
+        "duckdns": {
+            "configured": "Configurado",
+            "syncing": "Sincronizando...",
+            "sync": "Sincronizar IP ahora",
+            "description": "DNS dinámico gratuito. Polaris mantiene tu registro de DuckDNS apuntando a la IP pública actual de este equipo y lo sincroniza cada pocos minutos. Usa {base} como base comodín en la configuración guiada (DuckDNS también resuelve {wildcard}) para tener subdominios públicos gratuitos con Let's Encrypt.",
+            "subdomain": "Subdominio",
+            "subdomainHint": "La parte antes de <code>.duckdns.org</code>.",
+            "token": "Token",
+            "tokenSaved": "Guardado - escribe un token nuevo para sustituirlo",
+            "tokenPlaceholder": "Token de DuckDNS",
+            "removeToken": "Quitar el token guardado",
+            "updated": "DuckDNS actualizado.",
+            "saveFailed": "No se han podido guardar los ajustes de DuckDNS",
+            "syncFailed": "No se ha podido contactar con DuckDNS",
+            "removeFailed": "No se ha podido quitar el token guardado"
+        },
+        "network": {
+            "title": "Red y exposición",
+            "readFailed": "No se ha podido leer el estado de la red",
+            "redetectFailed": "No se ha podido volver a detectar la red",
+            "saveFailed": "No se ha podido guardar el modo de exposición",
+            "redetect": "Volver a detectar",
+            "modes": {
+                "auto": "Automático (detectar)",
+                "lan": "Solo red local",
+                "public": "IP pública (directa)",
+                "wildcard": "Dominio comodín propio",
+                "tunnel": "Túnel de Cloudflare / ngrok"
+            },
+            "status": {
+                "hosting": "Alojamiento",
+                "cloud": "Nube / centro de datos",
+                "home": "Casa / local",
+                "unknownPlacement": "Desconocido",
+                "publicIp": "IP pública",
+                "notDetected": "no detectada",
+                "serverIp": "IP del servidor",
+                "unknown": "desconocida",
+                "behindNat": "Tras NAT",
+                "yes": "Sí",
+                "no": "No",
+                "activeMode": "Modo activo",
+                "configured": "Configurado",
+                "notSet": "Sin configurar"
+            },
+            "natWarning": "Parece un servidor tras NAT: los subdominios gratuitos apuntan a la IP local ({ip}) y solo funcionan en tu red. Para tener acceso público, elige abajo un dominio comodín o un túnel.",
+            "homeAdvice": "Recomendado para un servidor en casa o local: configura <b>DuckDNS</b> abajo (gratis) y usa <code>{base}</code> como base comodín. Polaris servirá subdominios públicos con Let's Encrypt y mantendrá la IP actualizada solo.",
+            "exposureMode": "Modo de exposición",
+            "wildcardBase": "Dominio base comodín",
+            "wildcardManaged": "Sale de tu distribución de zonas. Cámbialo en la configuración guiada de arriba.",
+            "wildcardNotReady": "Aún no se usa: no se ha visto que el comodín resuelva a este servidor. Los servicios nuevos mantienen un subdominio gratuito hasta que pase la comprobación de DNS de la configuración guiada.",
+            "saveExposure": "Guardar exposición"
+        },
+        "guidance": {
+            "public": "Tu equipo es accesible desde internet en {ip}. Los subdominios gratuitos tienen un certificado real de Let's Encrypt y funcionan desde cualquier sitio.",
+            "wildcardTitle": "Apunta un comodín a tu servidor y Polaris gestionará todos los subdominios:",
+            "wildcardRecord": "Crea este registro en tu proveedor de DNS:",
+            "yourPublicIp": "tu IP pública",
+            "wildcardForward": "Redirige los puertos <code>80</code> y <code>443</code> de tu router a este servidor.",
+            "wildcardForwardIp": "Redirige los puertos <code>80</code> y <code>443</code> de tu router a este servidor ({ip}).",
+            "wildcardSave": "Guarda. Los servicios nuevos reciben <code>{host}</code> con un certificado automático de Let's Encrypt.",
+            "wildcardNoDomain": "¿No tienes dominio? Usa un subdominio gratuito de <b>DuckDNS</b> (<code>{base}</code>) como base; Polaris mantiene su IP actualizada solo. Pon el token en la tarjeta de DuckDNS de abajo.",
+            "tunnel": "El acceso público pasa por un túnel de Cloudflare/ngrok, sin abrir puertos ni necesitar IP pública. Configura uno en <link>Integraciones</link> o usa el botón <b>Túnel público</b> de cada servicio. Los subdominios automáticos se quedan en la red local.",
+            "lan": "Los subdominios gratuitos resuelven a tu IP local ({ip}) y solo funcionan en tu red, servidos con la CA interna (un aviso del navegador la primera vez). Elige un dominio comodín o un túnel para publicar los servicios."
+        },
+        "owner": {
+            "title": "Dominios propios",
+            "description": "Una cuenta o una organización puede añadir un dominio suyo, demostrarlo con un registro DNS y hacer que sus servicios respondan en él. Polaris pide certificados para esos nombres, así que esto decide quién puede apuntar un nombre a este servidor.",
+            "who": "Quién puede añadirlos",
+            "whoAria": "Quién puede añadir un dominio propio",
+            "limit": "Límite por titular",
+            "limitAria": "Dominios por titular",
+            "invalidCap": "Escribe un número entero, o 0 para no poner límite.",
+            "noLimit": "Sin límite de dominios por titular.",
+            "modes": {
+                "everyone": "Cualquiera con cuenta",
+                "admins": "Solo administradores",
+                "off": "Nadie"
+            },
+            "hints": {
+                "everyone": "Las cuentas y organizaciones pueden añadir un dominio suyo y desplegar en él.",
+                "admins": "Solo los administradores. El resto despliega en los dominios de este Polaris.",
+                "off": "Los dominios ya añadidos siguen funcionando; no se pueden añadir más."
+            }
+        },
+        "records": {
+            "title": "Registros DNS",
+            "description": "Las zonas que puede editar el token de Cloudflare de este Polaris. Comprueba hasta dónde ha llegado un cambio antes de contar con él.",
+            "zone": "Zona",
+            "readFailed": "No se han podido leer las zonas",
+            "emptyTitle": "No hay zonas que editar",
+            "emptyDescription": "Conecta un token de Cloudflare que pueda editar DNS y sus zonas aparecerán aquí.",
+            "openIntegrations": "Abrir Integraciones"
+        }
+    },
+    "domainsPorts": {
+        "checkNow": "Comprobar los puertos ahora",
+        "lastAnswered": "Respondió desde fuera por última vez el {time}",
+        "reached": "Accesible desde fuera",
+        "notConfirmed": "Sin confirmar",
+        "errors": {
+            "invalid": "Ajustes de puertos no válidos",
+            "range": "El rango {protocol} tiene que tener la forma 25565-25664, quedar por encima de 1024 y no incluir 80 ni 443."
+        },
+        "call": {
+            "title": "Puertos de llamadas",
+            "description": "Establecer una llamada pasa por el 443 como todo lo demás. El sonido no: llega por los dos puertos de abajo. La mayoría de las llamadas no necesitan redirigir ninguno: el servidor de llamadas sale primero y la respuesta vuelve por el mismo camino. Redirígelos para las redes en las que eso no funciona.",
+            "checking": "Se comprueba mientras esta página está abierta: el puerto TCP se marca en cuanto responde desde fuera.",
+            "notAnswering": "El servidor de llamadas no responde, así que aún no se puede comprobar nada.",
+            "unprobeableTitle": "Nada responde a un paquete no solicitado en este puerto, así que no se puede probar desde aquí. Las llamadas no dependen de él: el servidor de llamadas sale primero, y redirigirlo solo ayuda en redes donde eso no funciona",
+            "unprobeable": "No se puede comprobar",
+            "stoppedTitle": "Un servidor de llamadas que no responde está en silencio en todos los puertos, así que esto no se puede comprobar desde aquí",
+            "stopped": "Se comprobará cuando responda",
+            "stoppedNote": "El servidor de llamadas no responde, así que estos puertos aún no transportan nada y no se pueden comprobar. Los ajustes del chat dicen qué está haciendo.",
+            "onlyLocal": "Por ahora las llamadas solo llegan a esta red",
+            "nothingArrived": "Todavía no ha llegado nada desde fuera a los puertos de llamadas. Redirigirlos en el router lo arregla, y esto se marcará solo en cuanto funcionen.",
+            "addressStale": "El servidor de llamadas está dando una dirección antigua",
+            "address": "La dirección a la que se envía a quien llama",
+            "addressStaleBody": "La dirección pública de esta línea ha cambiado desde que se inició el servidor de llamadas, así que el sonido va a una dirección que ya no es esta. La redirección de puertos no es el problema. Reiniciarlo es la solución.",
+            "addressBody": "El servidor de llamadas la pide una vez, al iniciarse, y la reparte hasta que se reinicia. Si cambia la dirección de esta línea, las llamadas desde fuera se quedan sin sonido aunque aquí todo siga en verde.",
+            "askedAt": "La pidió por última vez el {time}.",
+            "repairFailed": "No se ha podido hacer desde aquí.",
+            "restarting": "Reiniciando...",
+            "repair": "Volver a pedir la dirección de esta red"
+        },
+        "game": {
+            "title": "Puertos de servidores de juegos",
+            "description": "Los puertos 80 y 443 llevan todas las webs que sirve Polaris y ningún cliente de juego. Cada servidor de abajo responde en su propio puerto y con su propio transporte, y nada de lo de arriba los abre.",
+            "range": "Polaris los mantiene dentro de <tcp>TCP {tcpRange}</tcp> y <udp>UDP {udpRange}</udp>, así que redirigir esos dos rangos cubre los servidores que tienes y los que aún no has creado.",
+            "checking": "Se comprueba mientras esta página está abierta, en los servidores en marcha: un puerto se marca en cuanto responde desde fuera o en cuanto alguien entra por él.",
+            "stoppedTitle": "Un servidor detenido no responde, así que su puerto no se puede comprobar desde aquí",
+            "stopped": "Se comprobará cuando arranque",
+            "outside": "{count, plural, one {Un servidor responde} other {# servidores responden}} fuera de esos rangos ({names}), así que {count, plural, one {mantiene} other {mantienen}} una regla propia arriba. Ampliar un rango no mueve un servidor que ya está en marcha; volver a crearlo sí."
+        },
+        "policy": {
+            "how": "Cómo se pide al router",
+            "howAria": "Cómo se pide al router que abra los puertos de juegos",
+            "tcp": "Rango TCP",
+            "tcpAria": "Rango de puertos TCP",
+            "udp": "Rango UDP",
+            "udpAria": "Rango de puertos UDP",
+            "invalid": "Un rango tiene la forma 25565-25664, queda por encima de 1024 y no puede incluir 80 ni 443.",
+            "options": {
+                "range": "Un rango, abierto una vez",
+                "perPort": "Una regla por servidor"
+            },
+            "hints": {
+                "range": "Dos reglas cubren todos los servidores, ahora y después. No se abre nada fuera de estos rangos.",
+                "perPort": "Exacto, pero cada servidor nuevo necesita otra regla en el router."
+            }
+        }
+    },
+    "domainsRouter": {
+        "fields": {
+            "name": "Nombre",
+            "protocol": "Protocolo",
+            "externalPort": "Puerto externo (WAN)",
+            "internalPort": "Puerto interno (LAN)",
+            "internalIp": "IP interna (dispositivo)"
+        },
+        "thisServer": "este servidor",
+        "thisServerAddress": "la dirección de este servidor",
+        "itsAddress": "su dirección",
+        "brand": "Marca del router",
+        "open": "Abrir el router",
+        "hideSteps": "Ocultar los pasos",
+        "showSteps": "Muéstrame exactamente qué hacer en el router",
+        "steps": {
+            "openAdmin": "Abre la página de administración del router.",
+            "adminGateway": "En {brand} es <link>{url}</link>, la puerta de enlace de esta red.",
+            "adminKnown": "En {brand} es <link>{url}</link>, o la puerta de enlace que usan tus dispositivos.",
+            "adminUnknown": "Responde en la puerta de enlace que usan tus dispositivos, que suele acabar en .1.",
+            "signIn": "Inicia sesión.",
+            "reserve": "Dale a este servidor una dirección fija para que la redirección siga apuntando a él; si no, una nueva concesión podría dar {address} a otra máquina.",
+            "goTo": "Ve a <b>{path}</b>.",
+            "findDevice": "Busca este servidor en la lista (es el que tiene {address}) y después {action}.",
+            "press": "Pulsa <b>{button}</b>.",
+            "fillIn": "Rellénalo y guarda con <b>{button}</b>:",
+            "mac": "la MAC que aparece junto a {server} en la lista de dispositivos del router",
+            "createRules": "Crea {count, plural, one {una regla} other {estas # reglas}} en <b>{path}</b>, exactamente con estos valores:",
+            "createRulesSaving": "Crea {count, plural, one {una regla} other {estas # reglas}} en <b>{path}</b>, exactamente con estos valores (guardando cada una con <save>{button}</save>):",
+            "field": "Campo",
+            "rule": "Regla {number}",
+            "noLanIp": "Polaris no ve su propia dirección local en esta instalación. Elige este servidor en la lista de dispositivos del router o consulta la dirección en la propia máquina.",
+            "switchOn": "Activa {count, plural, one {la regla} other {cada regla}}.",
+            "checkAgain": "Guarda y vuelve a hacer la comprobación de DNS: avisa en cuanto los puertos lleguen a Polaris.",
+            "remote": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a <b>{path}</b> y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443.",
+            "remoteGeneric": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a los ajustes de administración remota y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443."
+        }
+    },
+    "domainsSetup": {
+        "title": "Configuración guiada",
+        "steps": {
+            "server": "Servidor",
+            "exposure": "Exposición",
+            "domain": "Dominio",
+            "dns": "DNS"
+        },
+        "errors": {
+            "invalid": "Configuración no válida",
+            "subdomainOnly": "Escribe solo el subdominio, p. ej. mypolaris",
+            "subdomainMissing": "Escribe tu subdominio de DuckDNS",
+            "tokenMissing": "Escribe tu token de DuckDNS para que Polaris pueda mantener el registro actualizado",
+            "domainMissing": "Escribe el dominio que quieres usar",
+            "saveFailed": "No se ha podido guardar la configuración del dominio",
+            "createFailed": "No se han podido crear los registros DNS",
+            "readFailed": "No se ha podido leer tu configuración",
+            "rereadFailed": "No se ha podido volver a leer tu configuración",
+            "checkFailed": "No se han podido comprobar los registros DNS",
+            "connectFailed": "No se ha podido conectar el token de Cloudflare"
+        },
+        "resumed": "Seguimos donde lo dejaste.",
+        "startOver": "Empezar de nuevo",
+        "back": "Atrás",
+        "continue": "Continuar",
+        "saveAndContinue": "Guardar y continuar",
+        "saved": "Configuración guardada.",
+        "recommended": "Recomendado",
+        "environment": {
+            "title": "¿Dónde se ejecuta este servidor?",
+            "hintPick": "Elige uno para continuar. Decide qué formas de llegar a él pueden funcionar.",
+            "hint": "Decide qué formas de llegar a él pueden funcionar.",
+            "detected": "Detectado"
+        },
+        "strategy": {
+            "title": "¿Cómo debe llegar el tráfico a este servidor?",
+            "hint": "Todo lo de abajo depende de esta respuesta, y cualquiera de las dos se puede cambiar después.",
+            "routerTitle": "Lo que tienes que hacer en el router",
+            "routerBody": "Redirige los puertos 80 y 443 a este servidor{games, select, range {, además del rango en el que responden tus servidores de juegos} port {, además del puerto en el que responden tus servidores de juegos} ports {, además de los puertos en los que responden tus servidores de juegos} other {}}. Elige tu marca para ver los nombres exactos de los menús y los valores que escribir; el resto de la configuración funciona igual, así que puedes hacerlo después.",
+            "whichTunnel": "¿Qué túnel?",
+            "whichDomain": "¿De qué dominio salen los nombres?",
+            "ordered": "Ordenado por lo que menos cuesta y de menos terceros depende.",
+            "best": "El mejor de estos",
+            "wildcard": "Comodín",
+            "tokenConnected": "Token conectado",
+            "dependsOn": "Depende de: {value}",
+            "needs": "Necesita: {value}"
+        },
+        "domain": {
+            "integrationsTitle": "Configúralo en Integraciones",
+            "nothingTitle": "Nada que configurar",
+            "integrationsHint": "El túnel publica cada servicio por sí mismo.",
+            "nothingHint": "Esta opción no necesita dominio ni DNS.",
+            "openIntegrations": "Abrir Integraciones",
+            "comeBack": "Puedes volver y apuntar un dominio aquí cuando quieras.",
+            "title": "Dominio y zonas",
+            "hint": "Una zona es un registro comodín. Todo lo que crea Polaris vive bajo ella, así que el DNS se configura una sola vez.",
+            "duckSubdomain": "Subdominio de DuckDNS",
+            "token": "Token",
+            "baseDomain": "Dominio base",
+            "baseDomainHint": "Cualquier dominio o subdominio que controles: example.com, plr.com o plr.example.com.",
+            "zones": "Zonas",
+            "addZone": "Añadir zona",
+            "scopePolaris": "El propio Polaris",
+            "scopeDeploy": "Servicios desplegados",
+            "enterDomain": "Escribe un dominio arriba",
+            "default": "Predeterminada",
+            "makeDefault": "Hacer predeterminada",
+            "removeZone": "Quitar zona",
+            "zonesHint": "Deja una etiqueta vacía para usar el propio dominio base. Los servicios nuevos reciben un nombre en la zona de despliegue predeterminada.",
+            "useForDashboard": "Usar también la zona de Polaris para el panel",
+            "useForDashboardHint": "Se aplica cuando se ve que la zona resuelve a este servidor, así que ningún enlace se rompe mientras tanto."
+        },
+        "dns": {
+            "created": "{count, plural, one {# creado} other {# creados}}",
+            "repointed": "{count, plural, one {# redirigido} other {# redirigidos}}",
+            "alreadyCorrect": "{count, plural, one {# ya correcto} other {# ya correctos}}",
+            "leftAlone": "{count, plural, one {# sin tocar} other {# sin tocar}}",
+            "failed": "fallaron: {names}",
+            "summary": "{parts}.",
+            "nothingToDo": "Nada que hacer: los registros ya están en su sitio.",
+            "doneTitle": "Listo",
+            "duckdnsHint": "DuckDNS responde por todos los nombres bajo tu subdominio.",
+            "noRecordsHint": "Esta configuración no necesita registros DNS.",
+            "duckdnsBody": "Nada que crear: {domain} ya resuelve todos los subdominios, y Polaris lo mantiene apuntando a este servidor cuando cambia tu IP.",
+            "noRecordsBody": "Los servicios reciben su nombre en cuanto se despliegan.",
+            "check": "Comprobar DNS",
+            "inPlace": "El DNS está listo",
+            "create": "Crea estos registros DNS",
+            "inPlaceHint": "{domain} apunta a este servidor, así que cada servicio recibe un nombre bajo él.",
+            "pointAt": "Apúntalos a este servidor: {ip}",
+            "noPublicIp": "Polaris no ha podido detectar la IP pública de este servidor.",
+            "yourPublicIp": "tu IP pública",
+            "gameNote": "Cubre todos los servidores de {game}, así que ninguno necesita un registro DNS.",
+            "createOnCloudflare": "Crearlos en Cloudflare",
+            "createForMe": "Crearlos por mí",
+            "conflicts": "Estos registros ya existen y apuntan a otro sitio. Polaris no los ha tocado: sustituir uno deja sin servicio lo que responda hoy en él.",
+            "unknownAddress": "dirección desconocida",
+            "overwrite": "Apuntarlos a este servidor"
+        },
+        "cloudflare": {
+            "intro": "Polaris escribe los registros con la API de Cloudflare, que necesita un token. El enlace abre Cloudflare con los dos permisos necesarios ya marcados: crea el token, pégalo aquí y {zone} quedará configurado sin tocar ningún panel de DNS.",
+            "yourDomain": "tu dominio",
+            "createToken": "Crear el token en Cloudflare",
+            "tokenPlaceholder": "Pega tu token de la API de Cloudflare",
+            "pickAccount": "El token llega a varias cuentas: elige la que tiene este dominio",
+            "useAccount": "Usar esta cuenta",
+            "connect": "Conectar y crear los registros"
+        },
+        "provider": {
+            "automated": "<b>{provider}</b> responde por <code>{zone}</code> y tu token está conectado: Polaris crea los registros por ti.",
+            "automatable": "<b>{provider}</b> responde por <code>{zone}</code>: Polaris puede crear los registros por ti en el último paso, sin ningún panel de DNS.",
+            "manual": "<b>{provider}</b> responde por <code>{zone}</code>.",
+            "unknown": "{zone} lo sirve {nameserver}. Crea los registros donde lo gestiones.",
+            "open": "Abrir {provider}"
+        }
+    },
+    "email": {
+        "title": "Correo de cuenta",
+        "description": "El canal de correo por el que Polaris envía los mensajes de cuenta.",
+        "none": "No enviar correo de cuenta",
+        "channel": "{name} - {provider}",
+        "channelBroken": "{name} - {provider} (no funciona)",
+        "saved": "Guardado.",
+        "empty": "Aún no hay ningún canal de correo. Añade uno en <link>Bandeja > Canales</link> y vuelve para elegirlo aquí.",
+        "sendThrough": "Enviar por",
+        "hint": "La verificación de direcciones, el restablecimiento de contraseñas y los códigos de inicio de sesión por correo pasan por este canal. Sin ninguno elegido, Polaris no envía correo y no están disponibles.",
+        "errors": {
+            "unknownChannel": "Canal desconocido."
+        }
+    },
+    "evidence": {
+        "title": "Evidencias",
+        "description": "Los controles vigentes en este Polaris, leídos de sus ajustes, con dónde se configura cada uno y quién lo cambió por última vez.",
+        "certification": "Polaris no está certificado en SOC 2 ni en ISO 27001. La certificación es una auditoría de la organización que lo gestiona; esto es la evidencia de cómo está configurada esta instancia.",
+        "readFrom": "Leído el {at} de {url}.",
+        "readFromBuild": "Leído el {at} de {url}, compilación {build}.",
+        "outside": "Fuera de lo que Polaris puede ver",
+        "reading": "Leyendo las evidencias",
+        "readFailed": "No se han podido leer las evidencias.",
+        "tryAgain": "Reintentar",
+        "review": "Revisar",
+        "setIn": "Se configura en {places}",
+        "rowsShown": "- {shown} de {total} mostrados",
+        "name": "Nombre",
+        "lastChanged": "Último cambio el {at} por {actor} {action}",
+        "noChange": "El registro de auditoría no tiene ningún cambio de esto.",
+        "export": {
+            "button": "Exportar",
+            "running": "Exportando",
+            "failed": "La exportación no ha funcionado",
+            "done": "Exportado y anotado en Actividad.",
+            "unreachable": "No se ha podido contactar con Polaris. Comprueba la conexión e inténtalo de nuevo.",
+            "summary": "Exportado el {at}. El SHA-256 del JSON queda anotado en Actividad, para poder comprobar una copia más adelante.",
+            "hash": "SHA-256",
+            "copyHash": "el SHA-256",
+            "json": "JSON",
+            "printable": "Informe imprimible"
+        }
+    },
+    "groups": {
+        "page": {
+            "title": "Grupos",
+            "description": "Agrupa a personas y da acceso al grupo."
+        },
+        "errors": {
+            "createFailed": "No se pudo crear el grupo"
+        },
+        "search": {
+            "placeholder": "Buscar por grupo, descripción o miembro",
+            "label": "Buscar grupos"
+        },
+        "newGroup": "Nuevo grupo",
+        "table": {
+            "group": "Grupo",
+            "members": "Miembros",
+            "people": "Personas"
+        },
+        "empty": {
+            "none": "Aún no hay grupos.",
+            "noMatch": "Ningún grupo coincide."
+        },
+        "open": "Abrir {name}",
+        "system": "sistema",
+        "noDescription": "Sin descripción.",
+        "nobodyYet": "Nadie todavía",
+        "peopleCount": "{count, plural, one {# persona} other {# personas}}",
+        "deleteDialog": {
+            "title": "Eliminar grupo",
+            "question": "¿Eliminar <strong>{name}</strong>?",
+            "confirm": "Eliminar grupo",
+            "description": "Todo lo concedido al grupo llega a través de él, así que eliminarlo quita ese acceso a todos sus miembros. Las cuentas no se tocan."
+        },
+        "create": {
+            "title": "Nuevo grupo",
+            "description": "Agrupa a personas y da acceso al grupo en lugar de a cada una.",
+            "name": "Nombre del grupo",
+            "descriptionPlaceholder": "Descripción (opcional)",
+            "descriptionLabel": "Descripción",
+            "submit": "Crear grupo"
+        },
+        "dialog": {
+            "defaultDescription": "Quien esté en este grupo recibe todo lo que se conceda al grupo.",
+            "noMembers": "Aún no hay nadie.",
+            "removeTitle": "Quitar del grupo",
+            "removeLabel": "Quitar a {member} de {group}",
+            "addLabel": "Añadir a alguien a este grupo",
+            "addPlaceholder": "Añadir un miembro...",
+            "add": "Añadir",
+            "everybodyIn": "Todas las personas de esta instancia ya están en el grupo.",
+            "delete": "Eliminar grupo",
+            "done": "Listo"
+        }
+    },
+    "inbox": {
+        "view": {
+            "title": "Bandeja de entrada",
+            "newChat": "Nuevo chat",
+            "connectChannel": "Conectar canal",
+            "empty": "Aún no hay conversaciones. Empieza una o espera a que llegue un mensaje.",
+            "selectConversation": "Selecciona una conversación"
+        },
+        "thread": {
+            "back": "Volver a las conversaciones",
+            "unassigned": "Sin asignar",
+            "assign": "Asignar agente",
+            "reopen": "Reabrir",
+            "close": "Cerrar",
+            "delete": "Eliminar conversación",
+            "deleteDescription": "Se eliminan de Polaris la conversación y sus mensajes. El chat en {platform} no se ve afectado.",
+            "deleteConfirm": "Eliminar",
+            "chooseOption": "Elige una opción",
+            "optionsPlaceholder": "Una opción por línea",
+            "promptPlaceholder": "Texto que aparece sobre las opciones",
+            "messagePlaceholder": "Escribe un mensaje",
+            "optionsTitle": "Enviar opciones para elegir",
+            "options": "Opciones",
+            "chose": "eligió: {selection}",
+            "sending": "enviando...",
+            "failed": "no se pudo enviar"
+        },
+        "newChat": {
+            "description": "Escribe a alguien en un canal conectado para empezar una conversación.",
+            "contact": "Contacto",
+            "contactPlaceholder": "Elige un contacto guardado (opcional)",
+            "handle": "Identificador",
+            "channel": "Canal",
+            "to": "Para",
+            "enterManually": "Introducir a mano",
+            "recipientPlaceholder": "Id del destinatario",
+            "noChannel": "No hay ningún canal de {platform} conectado. Conecta uno para escribir a este identificador.",
+            "mismatch": "Este identificador es de {platform}. Elige un canal de {platform} para enviarlo.",
+            "telegramNote": "Los bots de Telegram no pueden iniciar un chat. Pide a la persona que abra tu bot y envíe <code>/start</code>: la conversación aparece en tu bandeja y respondes desde ahí.",
+            "telegramInvalid": "Introduce un id de chat numérico, no un @usuario.",
+            "name": "Nombre (opcional)",
+            "namePlaceholder": "Nombre visible",
+            "message": "Mensaje",
+            "messagePlaceholder": "Primer mensaje",
+            "saveContact": "Guardar como contacto",
+            "send": "Enviar"
+        },
+        "connect": {
+            "connected": "{name} está conectado",
+            "connectedDescription": "El token funciona. Termina la configuración para que el bot pueda llegar a la gente.",
+            "done": "Listo",
+            "close": "Cerrar",
+            "qrTitle": "Escanea para vincular WhatsApp",
+            "qrConnected": "Conectado.",
+            "qrFailed": "La conexión ha fallado. Inténtalo de nuevo.",
+            "qrWaiting": "Esperando el escaneo...",
+            "addTitle": "Añadir un canal",
+            "addDescription": "Elige una plataforma y cómo conectarla. Añade todas las que quieras y gestiónalas desde una sola bandeja.",
+            "bridgeMissing": "El puente de mensajería aún no está instalado. Instálalo desde el <link>marketplace</link> para activar los canales.",
+            "connectTitle": "Conectar {name}",
+            "variantDescription": "Elige cómo conectar {name}.",
+            "back": "Atrás",
+            "name": "Nombre",
+            "namePlaceholder": "Bot de soporte",
+            "phoneNumberId": "Id del número de teléfono",
+            "phoneNumberIdPlaceholder": "De la página WhatsApp > API setup",
+            "showQr": "Mostrar QR",
+            "connect": "Conectar"
+        },
+        "qr": {
+            "steps": "En tu teléfono: WhatsApp > Dispositivos vinculados > Vincular un dispositivo, y escanea este código.",
+            "alt": "Código QR de WhatsApp"
+        },
+        "catalog": {
+            "badges": {
+                "free": "Gratis",
+                "official": "Oficial",
+                "sendOnly": "Solo envío"
+            },
+            "tokens": {
+                "accessToken": "Token de acceso",
+                "botToken": "Token del bot",
+                "webhookUrl": "URL del webhook"
+            },
+            "whatsappWeb": {
+                "name": "WhatsApp (QR)",
+                "tagline": "Gratis. Vincula tu teléfono por QR; no es oficial y hay riesgo de bloqueo.",
+                "help": "Escanea un QR con tu teléfono para vincularlo. Gratis pero no oficial: usa un número de repuesto, no el principal."
+            },
+            "whatsappCloud": {
+                "name": "WhatsApp Cloud",
+                "tagline": "API oficial de Meta. Botones y plantillas nativos, de pago.",
+                "help": "Token de acceso de Meta + id del número de teléfono de la página API setup de WhatsApp. Apunta su webhook a este Polaris."
+            },
+            "telegram": {
+                "tagline": "Un bot de @BotFather. Botones y menús integrados.",
+                "help": "Crea un bot con @BotFather en Telegram y pega el token que te dé."
+            },
+            "discord": {
+                "tagline": "Una aplicación bot. Botones y menús de selección.",
+                "tokenPlaceholder": "Token del bot del Developer Portal",
+                "help": "Crea una app y un bot en el Discord Developer Portal y pega el token del bot. Polaris te muestra luego lo que falta por activar."
+            },
+            "discordWebhook": {
+                "name": "Webhook de Discord",
+                "tagline": "Alertas de un solo sentido a un canal, sin bot.",
+                "help": "En Discord: Editar canal > Integraciones > Webhooks > Nuevo webhook > Copiar URL del webhook."
+            },
+            "slack": {
+                "tagline": "Una app del espacio de trabajo. Bloques y acciones interactivas.",
+                "help": "Instala una app de Slack en tu espacio de trabajo y pega su Bot User OAuth token (empieza por xoxb-)."
+            },
+            "slackWebhook": {
+                "name": "Webhook de Slack",
+                "tagline": "Alertas de un solo sentido a un canal, sin token de app.",
+                "help": "Crea un Incoming Webhook en tu app de Slack y pega su URL."
+            },
+            "groups": {
+                "whatsapp": "Tu número por QR, o la API oficial Cloud.",
+                "telegram": "Un bot de @BotFather con botones y menús.",
+                "discord": "Un bot para chatear en ambos sentidos, o un webhook para alertas.",
+                "slack": "Un bot del espacio de trabajo, o un webhook para alertas."
+            }
+        },
+        "platforms": {
+            "email": "Correo"
+        },
+        "peerHints": {
+            "whatsapp": "Número de teléfono con prefijo del país, p. ej. 34600111222",
+            "telegram": "Id de chat numérico, no un @usuario. La persona tiene que haber escrito antes al bot (los bots de Telegram no pueden iniciar un chat).",
+            "discord": "Un id de canal del servidor en el que el bot pueda publicar, o un id de usuario para un MD (antepón user: a un MD)",
+            "slack": "Un id de canal o de usuario"
+        },
+        "discordPeer": {
+            "serverChannel": "Canal del servidor",
+            "directMessage": "Mensaje directo",
+            "userPlaceholder": "Id o nombre de usuario al que escribir",
+            "pickChannel": "Elige un canal",
+            "channelPlaceholder": "Id de un canal en el que el bot pueda publicar",
+            "userHint": "MD por User ID numérico (lo más fiable: activa el modo desarrollador, clic derecho en un usuario > Copiar ID de usuario), o un nombre de usuario si el bot comparte servidor y el intent Server Members está activado.",
+            "pickHint": "Elige un servidor y un canal en el que el bot pueda publicar.",
+            "channelHint": "Un id de canal de texto en el que el bot pueda publicar (clic derecho en el canal > Copiar ID del canal)."
+        },
+        "discordSetup": {
+            "checking": "Comprobando a qué puede llegar el bot...",
+            "notRunning": "El puente no está ejecutando este bot ahora mismo, así que no hay nada que comprobar.",
+            "noServer": "El bot aún no está en ningún servidor",
+            "inServers": "{count, plural, one {En # servidor} other {En # servidores}}",
+            "noServerHint": "Solo podrá enviar cuando alguien lo añada a uno.",
+            "serversHint": "Puedes elegir los canales del servidor al escribir un mensaje.",
+            "checkAgain": "Volver a comprobar",
+            "addBot": "Añadir el bot a un servidor",
+            "addBotHint": "Discord te pregunta en cuál de tus servidores y luego pide confirmar: {permissions}.",
+            "noAppId": "El bot no ha informado de su id de aplicación, así que no se puede crear el enlace de invitación. Vuelve a conectarlo y comprueba de nuevo.",
+            "intents": "Intents privilegiados",
+            "intentsOn": "Los dos están activados.",
+            "intentOff": "{intent} está desactivado. {effect}",
+            "effects": {
+                "serverMembers": "Hace falta para llegar a alguien por nombre de usuario. Su User ID numérico funciona sin él.",
+                "messageContent": "Sin él, los mensajes que recibe el bot en canales del servidor llegan vacíos."
+            },
+            "switchOn": "Actívalos en Bot > Privileged Gateway Intents",
+            "reconnectAfter": "Después vuelve a conectar el canal: los intents se eligen cuando el bot inicia sesión."
+        },
+        "errors": {
+            "checkForm": "Revisa el formulario",
+            "connectFailed": "No se pudo conectar el canal",
+            "stateFailed": "No se pudo leer el estado del canal",
+            "removeChannelFailed": "No se pudo quitar el canal",
+            "nothingToUpdate": "No hay nada que actualizar",
+            "updateChannelFailed": "No se pudo actualizar el canal",
+            "reconnectFailed": "No se pudo volver a conectar el canal",
+            "invalidRequest": "Solicitud no válida",
+            "deleteConversationFailed": "No se pudo eliminar la conversación",
+            "updateConversationFailed": "No se pudo actualizar la conversación",
+            "nothingToSend": "No hay nada que enviar",
+            "typeMessage": "Escribe primero un mensaje",
+            "sendFailed": "No se pudo enviar el mensaje",
+            "startFailed": "No se pudo iniciar el chat",
+            "saveContactFailed": "No se pudo guardar el contacto",
+            "updateContactFailed": "No se pudo actualizar el contacto",
+            "addHandleFailed": "No se pudo añadir el identificador",
+            "updateHandleFailed": "No se pudo actualizar el identificador",
+            "removeHandleFailed": "No se pudo quitar el identificador",
+            "removeContactFailed": "No se pudo quitar el contacto"
+        }
+    },
+    "inboxChannels": {
+        "title": "Canales",
+        "intro": "Todo lo que usa Polaris para comunicarse: los canales de mensajería por los que envían la Bandeja de entrada y las alertas de Watch, y los remitentes de su correo.",
+        "connect": "Conectar un canal",
+        "bridgeMissing": "El puente de mensajería aún no está en marcha. Instálalo desde el <link>marketplace de apps</link> para conectar canales de mensajería. Los remitentes de correo funcionan sin él.",
+        "empty": "Aún no hay nada conectado. Conecta un canal de mensajería para empezar a chatear, o un remitente de correo para que Polaris pueda enviar el correo de inicio de sesión.",
+        "status": "{status, select, connected {conectado} connecting {conectando} qr {QR} error {error} disconnected {desconectado} ready {listo} other {{status}}}",
+        "connected": "Conectado",
+        "readyToSend": "Listo para enviar",
+        "edit": {
+            "telegram": "De @BotFather. Deja el token en blanco para mantener el actual.",
+            "discord": "Del Discord Developer Portal (Bot > Token). Déjalo en blanco para mantener el actual.",
+            "slack": "El Bot User OAuth token (xoxb-...). Déjalo en blanco para mantener el actual.",
+            "whatsappCloud": "Token de acceso de Meta e id del número de teléfono. Deja un campo en blanco para mantenerlo.",
+            "whatsappWeb": "Vinculado por QR. Usa Volver a vincular para mostrar un QR y escanearlo de nuevo si la sesión se ha caído; quítalo y vuelve a añadirlo para vincular otro número."
+        },
+        "manage": {
+            "button": "Gestionar",
+            "title": "Gestionar {name}",
+            "status": "Estado: <tone>{status}</tone>",
+            "relink": "Volver a vincular",
+            "reconnect": "Volver a conectar",
+            "linkFailed": "La conexión ha fallado. Prueba de nuevo con Volver a vincular.",
+            "tokenPlaceholder": "Guardado: introduce un token nuevo para sustituirlo",
+            "keepCurrent": "Déjalo en blanco para mantener el actual",
+            "remove": "Quitar",
+            "removeTitle": "¿Quitar {name}?",
+            "removeDescription": "Se desconecta el canal y se eliminan sus conversaciones y mensajes. No se puede deshacer."
+        },
+        "connectPage": {
+            "intro": "Elige qué conectar. Añade todos los que quieras y gestiónalos desde una sola bandeja.",
+            "messaging": "Mensajería",
+            "messagingHint": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas.",
+            "messagingHintNoBridge": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas. Necesita el puente de mensajería, que se instala desde el <link>marketplace de apps</link>.",
+            "email": "Correo",
+            "emailHint": "Cómo envía Polaris su propio correo: verificación de direcciones, restablecimiento de contraseñas, enlaces y códigos de inicio de sesión.",
+            "docs": "Documentación",
+            "setUp": "Configurar"
+        },
+        "email": {
+            "saveFailed": "No se pudo guardar el canal.",
+            "saved": "Guardado. Envía un mensaje de prueba para confirmar que la dirección funciona.",
+            "sent": "Enviado a {to}. Revisa la bandeja de entrada y la carpeta de spam.",
+            "removeDescription": "Polaris deja de enviar por él. Lo que esté configurado para usarlo en el correo de inicio de sesión necesitará otro canal.",
+            "removeNamed": "Quitar {name}",
+            "addTitle": "Añadir un remitente de correo",
+            "provider": "Proveedor",
+            "sendingAddress": "Dirección de envío: {requirement} <docs>Documentación del proveedor</docs>",
+            "namePlaceholder": "Correo de la cuenta",
+            "secretPlaceholder": "Guardada: introduce una nueva para sustituirla",
+            "testTitle": "Enviar un mensaje de prueba",
+            "send": "Enviar",
+            "testHint": "La única comprobación que demuestra que el proveedor enviará desde la dirección From.",
+            "add": "Añadir",
+            "optional": "(opcional)",
+            "testSubject": "Mensaje de prueba de Polaris",
+            "testBody": "Esta es una prueba de Polaris. Si te ha llegado, este canal puede enviar correo."
+        },
+        "sms": {
+            "title": "Remitente de SMS",
+            "hint": "Solo hace falta para enviar SMS. {summary}",
+            "empty": "No hay ningún remitente conectado. Las alertas a un número de teléfono no se enviarán hasta que haya uno; el resto de destinos funcionan sin él.",
+            "sendsFrom": "{provider} - envía desde {from}",
+            "working": "Funciona",
+            "notWorking": "No funciona",
+            "edit": "Editar",
+            "remove": "Quitar remitente",
+            "editTitle": "Editar remitente de SMS",
+            "connectTitle": "Conectar un remitente de SMS",
+            "docs": "Documentación de {provider}",
+            "defaultName": "SMS",
+            "keepSecret": "Déjalo en blanco para mantener el guardado"
+        },
+        "errors": {
+            "checkForm": "Revisa el formulario.",
+            "gone": "Ese canal ya no existe.",
+            "unknown": "Canal desconocido.",
+            "testAddress": "Introduce la dirección a la que enviar la prueba.",
+            "tooManyTests": "{minutes, plural, one {Demasiados mensajes de prueba. Vuelve a intentarlo en # minuto.} other {Demasiados mensajes de prueba. Vuelve a intentarlo en # minutos.}}"
+        }
+    },
+    "inboxContacts": {
+        "title": "Contactos",
+        "intro": "Una ficha por persona, con todas las plataformas que usa. Elígela al empezar un chat.",
+        "newContact": "Nuevo contacto",
+        "fullName": "Nombre completo",
+        "add": "Añadir",
+        "createFailed": "No se pudo crear el contacto",
+        "search": "Buscar personas",
+        "noContacts": "Aún no hay contactos.",
+        "noMatches": "Sin resultados.",
+        "noHandles": "Sin identificadores",
+        "selectPrompt": "Selecciona un contacto o añade uno.",
+        "handleCount": "{count, plural, one {# identificador} other {# identificadores}}",
+        "delete": "Eliminar",
+        "note": "Nota",
+        "optional": "Opcional",
+        "saveDetails": "Guardar datos",
+        "handles": "Identificadores",
+        "noHandlesYet": "Aún no hay identificadores. Añade uno abajo para empezar chats.",
+        "peerPlaceholder": "Número o id",
+        "removeHandle": "Quitar identificador"
+    },
+    "inboxLogs": {
+        "title": "Registros",
+        "intro": "Mensajes recientes de todos los canales: entrantes, salientes y estado de entrega. Se actualiza en directo.",
+        "empty": "Aún no hay actividad de mensajería.",
+        "noText": "(sin texto)",
+        "ack": "{ack, select, pending {pendiente} sending {enviando} sent {enviado} delivered {entregado} read {leído} failed {fallido} other {{ack}}}"
+    },
+    "integrations": {
+        "page": {
+            "title": "Integraciones",
+            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Proveedores de IA</link>."
+        },
+        "grid": {
+            "search": "Buscar integraciones",
+            "count": "{connected} de {total} configuradas",
+            "emptyTitle": "Nada coincide",
+            "emptyDescription": "Polaris se conecta a los servicios de esta lista y a ningún otro.",
+            "needsAttention": "Requiere atención",
+            "on": "Activada",
+            "off": "Desactivada",
+            "docs": "Documentación",
+            "configure": "Configurar",
+            "setUp": "Configurar"
+        },
+        "proven": {
+            "done": "Ya se ha conectado una cuenta a través de esta aplicación, así que se ofrece a todo el mundo aquí.",
+            "title": "Aún sin comprobar",
+            "body": "Nadie más puede conectar {name} ni iniciar sesión con él hasta que una autorización haya salido bien aquí. Conecta tu propia cuenta para comprobarlo: si {name} rechaza algo, eres tú quien puede cambiarlo.",
+            "connect": "Conectar mi cuenta de {name}"
+        },
+        "accountLimit": {
+            "label": "Cuentas por persona",
+            "hint": "Cuántas de estas cuentas puede conectar una persona. Con cero no se puede conectar ninguna; bajarlo nunca desconecta a quien ya supere el límite."
+        },
+        "setupValue": {
+            "label": {
+                "redirectUri": "URI de redirección",
+                "homeUrl": "URL de la página de inicio",
+                "privacyUrl": "URL de la política de privacidad",
+                "termsUrl": "URL de las condiciones del servicio",
+                "logoUrl": "Logotipo, 128x128",
+                "domain": "Dominio"
+            },
+            "copy": {
+                "redirectUri": "Copiar la URI de redirección",
+                "homeUrl": "Copiar la URL de la página de inicio",
+                "privacyUrl": "Copiar la URL de la política de privacidad",
+                "termsUrl": "Copiar la URL de las condiciones del servicio",
+                "logoUrl": "Copiar el logotipo, 128x128",
+                "domain": "Copiar el dominio"
+            },
+            "download": "Descargar"
+        },
+        "attention": {
+            "title": "Alguien no ha podido conectar su cuenta",
+            "reason": "Se rechazó el último intento. {name} dijo: {reason}",
+            "clears": "Desaparece en cuanto una autorización se complete."
+        },
+        "signIn": {
+            "label": "Permitir iniciar sesión con {name}",
+            "hint": "Quien haya conectado una cuenta de {name} tiene un botón para iniciar sesión con ella. Nunca crea una cuenta: solo puede usarlo quien ya tenga una y la haya conectado por su cuenta."
+        },
+        "emailTrust": {
+            "label": "Fiarse de {name} para el correo electrónico",
+            "hint": "Una dirección de una cuenta de {name} conectada se añade a la cuenta de Polaris de esa persona ya confirmada, en vez de enviarle un enlace para confirmarla.",
+            "warning": "Una dirección confirmada es adonde se envían los restablecimientos de contraseña y los códigos de inicio de sesión. Con esto desactivado, la dirección sigue reservada para quien la conectó, así que nadie más puede recibir una cuenta con ella."
+        },
+        "dialog": {
+            "apiKey": "Clave de API",
+            "token": "Token",
+            "clientSecret": "Secreto de cliente",
+            "webApiKey": "Clave de Web API",
+            "savedKey": "Guardada - escribe una nueva para sustituirla",
+            "savedOne": "Guardado - escribe uno nuevo para sustituirlo",
+            "savedSecret": "Guardado - escribe uno nuevo para sustituirlo",
+            "savedToken": "Guardado - escribe uno nuevo para sustituirlo",
+            "pasteKey": "Pega tu clave",
+            "pasteSecret": "Pega el secreto",
+            "pasteToken": "Pega el token",
+            "optional": "Opcional",
+            "enable": "Activar {name}",
+            "enabled": "Activada",
+            "test": "Probar",
+            "keyWorks": "La clave funciona.",
+            "keyRejected": "La clave se ha rechazado",
+            "applying": "Aplicando...",
+            "close": "Cerrar",
+            "connect": "Conectar",
+            "disconnect": "Desconectar",
+            "refresh": "Actualizar"
+        },
+        "criminalIp": {
+            "block": "Bloquear direcciones marcadas como",
+            "hint": "Hosting y VPN abarcan mucho tráfico normal. Las consultas se hacen en segundo plano y la respuesta se guarda como un bloqueo normal, así que nada de esto ralentiza una petición."
+        },
+        "filter": {
+            "moduleUrl": "Desde dónde se sirve el filtro",
+            "moduleHint": "Un módulo que exporta <code>createNode(context, options)</code>, que devuelve el nodo de audio por el que pasa el micrófono. Polaris lo carga en la llamada y envía lo que salga.",
+            "tokenHint": "Se entrega al filtro en el navegador, y solo a un navegador que esté en una llamada. Un filtro trabaja sobre el micrófono, así que no puede ir a ningún otro sitio.",
+            "use": "Usarlo en las llamadas",
+            "useHint": "Lo añade al ajuste de ruido de las llamadas, junto a los dos modelos gratuitos. Quien no pueda cargarlo en su navegador usa el gratuito."
+        },
+        "tenor": {
+            "search": "Buscar GIF y stickers",
+            "hint": "Añade la búsqueda al selector de Chat. Un GIF elegido se guarda aquí como cualquier otro adjunto, así que nadie que lea una conversación queda expuesto a terceros."
+        },
+        "oauth": {
+            "idLabel": {
+                "clientId": "ID de cliente",
+                "applicationId": "ID de aplicación (cliente)",
+                "appKey": "Clave de la app"
+            },
+            "redirectTitle": "URI de redirección autorizada",
+            "copyRedirect": "Copiar la URI de redirección",
+            "redirectHint": "Pégala en la app, en sus URI de redirección. {name} rechaza cualquier autorización que llegue desde otra dirección."
+        },
+        "steam": {
+            "enabledHint": "Todo el mundo tiene un botón Conectar para su propia cuenta de Steam."
+        },
+        "cloudflare": {
+            "scope": {
+                "all": {
+                    "label": "Todo",
+                    "hint": "Un token para registros y túneles."
+                },
+                "dns": {
+                    "label": "Solo DNS",
+                    "hint": "Apunta tus dominios a este servidor."
+                },
+                "tunnel": {
+                    "label": "Solo túneles",
+                    "hint": "Publica apps sin abrir puertos."
+                }
+            },
+            "dnsOnlyNote": "Conectado para DNS. El token no llega a ninguna cuenta, así que los túneles aún necesitan una.",
+            "apiAccess": "Acceso a la API",
+            "apiAccessHint": "Permite a Polaris crear tus registros DNS y el túnel de cada app por ti. Un token puede hacer las dos cosas, o puedes conectarlas por separado.",
+            "dnsLabel": "Registros DNS",
+            "dnsDetail": "Apunta tus zonas a este servidor.",
+            "tunnelsLabel": "Túneles con nombre",
+            "tunnelsAccount": "Cuenta: {name}",
+            "tunnelsDetail": "Un túnel por app, sin puertos abiertos.",
+            "scopeHint": "{hint} El enlace abre Cloudflare con {permissions} ya seleccionados.",
+            "tokenPlaceholder": "Pega un token de API de Cloudflare",
+            "pickAccount": "El token llega a varias cuentas - elige cuál usar",
+            "createToken": "Crear el token en Cloudflare",
+            "useAccount": "Usar esta cuenta",
+            "notConnected": "Sin conectar. {detail}"
+        },
+        "duckdns": {
+            "subdomain": "Subdominio",
+            "pasteToken": "Pega tu token de DuckDNS",
+            "syncHint": "Apunta ahora el registro a la IP pública actual de este servidor.",
+            "syncNow": "Sincronizar ahora"
+        },
+        "dymo": {
+            "verify": "Verificar las IP de los visitantes al acceder",
+            "verifyHint": "Comprueba la IP cuando alguien abre un enlace compartido o un punto de entrega, y bloquea las que coincidan con tus reglas.",
+            "block": "Bloquear IP que sean",
+            "premium": "{label} (premium)"
+        },
+        "runners": {
+            "ready": "Esta conexión también puede registrar runners autoalojados.",
+            "title": "Runners autoalojados"
+        },
+        "github": {
+            "connectedVia": "Conectado mediante {method, select, app {GitHub App} other {token}} como <strong>{login}</strong>",
+            "installations": "Instalaciones",
+            "notInstalled": "Aún no está instalada en ninguna cuenta. Instala la app para dar acceso a los repositorios.",
+            "installManage": "Instalar / gestionar",
+            "connectTitle": "Conectar GitHub",
+            "howToConnect": "Cómo conectar",
+            "createApp": "Crear app",
+            "existingApp": "App existente",
+            "createIntro": "Crea una GitHub App para esta instancia de Polaris en un paso. GitHub te pedirá que lo confirmes y luego que elijas a qué repositorios puede acceder.",
+            "noWebhook": "Esta instancia no tiene una dirección a la que GitHub pueda llegar, así que la app se crea sin webhook. Los despliegues y los grupos de runners consultan periódicamente; los disparadores de agentes necesitan el webhook, que puedes añadir en GitHub cuando haya un dominio.",
+            "createGithubApp": "Crear GitHub App",
+            "appId": "ID de la app",
+            "privateKey": "Clave privada (PEM)",
+            "pemPlaceholder": "Pega el contenido del archivo .pem de la app",
+            "clientId": "ID de cliente",
+            "clientSecretHint": "Solo hace falta para que la gente pueda vincular su propia cuenta de GitHub con la de Polaris. Una app creada arriba ya los incluye.",
+            "connectApp": "Conectar app"
+        },
+        "virusTotal": {
+            "scan": "Analizar lo que se sube a puntos de entrega",
+            "scanHint": "Cada archivo subido a un punto de entrega se analiza antes de aceptarlo.",
+            "whenFlagged": "Cuando se marca un archivo"
+        },
+        "errors": {
+            "unknownService": "Servicio desconocido",
+            "limitRange": "Elige un número entre 0 y {max}",
+            "noAddress": "{name} no facilita ninguna dirección.",
+            "notOAuthApp": "Esa integración no usa una aplicación OAuth",
+            "clientIdFirst": "Añade el ID de cliente antes de activarla",
+            "clientSecretFirst": "Añade el secreto de cliente antes de activarla",
+            "applicationNotSaved": "No se ha podido guardar la aplicación",
+            "steamNotSaved": "No se han podido guardar los ajustes de Steam",
+            "notAnAddress": "Eso no es una dirección",
+            "httpsOnly": "La dirección tiene que ser https",
+            "notSaved": "No se ha podido guardar",
+            "apiKeyFirst": "Añade la clave de API antes de activarla",
+            "unknownTunnel": "Proveedor de túnel desconocido",
+            "tokenFirst": "Añade el token antes de activarlo",
+            "tunnelNotSaved": "No se han podido guardar los ajustes del túnel",
+            "tunnelNotStarted": "Guardado, pero el túnel no ha podido arrancar: {detail}",
+            "tunnelNotStartedDetail": "el túnel no ha podido arrancar",
+            "duckdnsSubdomain": "Escribe tu subdominio de DuckDNS",
+            "cloudflareNotConnected": "No se ha podido conectar el token de Cloudflare",
+            "virusTotalKeyFirst": "Añade una clave de API de VirusTotal antes de activarlo",
+            "keyRejected": "La clave de API se ha rechazado",
+            "dymoKeyFirst": "Añade una clave de API de Dymo antes de activarlo",
+            "criminalIpKeyFirst": "Añade una clave de API de Criminal IP antes de activarlo",
+            "pickVerdict": "Elige al menos un veredicto por el que bloquear",
+            "criminalIpNotSaved": "No se han podido guardar los ajustes de Criminal IP",
+            "enterKeyFirst": "Escribe primero una clave de API",
+            "unknownIntegration": "Integración desconocida",
+            "configureFirst": "Configura la integración antes de activarla",
+            "githubNotConnected": "No se ha podido conectar la GitHub App",
+            "installationsNotRefreshed": "No se han podido actualizar las instalaciones"
+        }
+    },
+    "integrationsModels": {
+        "title": "Proveedores de IA",
+        "intro": "Las cuentas propias de este despliegue con los proveedores de modelos. Una clave se entrega a una ejecución mediante una llamada autenticada y nunca se escribe en un repositorio, así que al sustituirla aquí el cambio se aplica en todas partes a la vez. Cada proveedor te factura directamente: Polaris no añade nada.",
+        "keys": {
+            "title": "Las claves de proveedor del despliegue",
+            "hint": "Se prueban de arriba abajo. La primera clave cuyo proveedor sirve el modelo es la que usa una ejecución.",
+            "empty": "Aún no hay claves. Sin ninguna, solo puede ejecutar algo quien traiga la suya.",
+            "adding": "La cuenta del proveedor a la que se facturan las ejecuciones de este despliegue."
+        },
+        "accounts": {
+            "title": "Las cuentas de agente del despliegue",
+            "action": "Añadir cuenta",
+            "hint": "Inicia sesión con un agente para quien no lo haga con su propia cuenta. Primero se prueba la de cada cuenta.",
+            "empty": "Aún no hay ninguna. Sin una, solo puede iniciar una sesión aquí quien traiga la suya.",
+            "adding": "La cuenta con la que las sesiones de este despliegue inician sesión en un agente."
+        },
+        "elsewhere": "Todo lo demás a lo que se conecta Polaris está en <link>Integraciones</link>.",
+        "sharing": {
+            "title": "Para quién funcionan estas claves",
+            "shared": "Quien no tenga claves propias para un proveedor usa estas, y la factura es tuya. Primero se usan las claves propias de cada cuenta. <link>Cámbialo en Ajustes de agentes</link>.",
+            "private": "Solo para ti. Las ejecuciones usan solo las claves que cada persona añade, así que no se puede usar un proveedor para el que nadie tenga clave. <link>Cámbialo en Ajustes de agentes</link>."
+        }
+    },
+    "organizations": {
+        "page": {
+            "title": "Organizaciones",
+            "description": "Trabajo que pertenece a un grupo y no a una sola persona. Desactívalas del todo, limita quién puede crearlas o cuánto pueden crecer."
+        },
+        "errors": {
+            "checkLimits": "Revisa los límites e inténtalo de nuevo"
+        },
+        "search": {
+            "placeholder": "Buscar por nombre, identificador o propietario",
+            "label": "Buscar organizaciones"
+        },
+        "table": {
+            "organization": "Organización",
+            "owner": "Propietario",
+            "members": "Miembros",
+            "teams": "Equipos",
+            "spaces": "Espacios"
+        },
+        "empty": {
+            "none": "Nadie ha creado ninguna todavía.",
+            "noMatch": "Ninguna organización coincide."
+        },
+        "open": "Abrir {name}",
+        "policy": {
+            "title": "Política",
+            "noLimit": "Sin límite.",
+            "lowering": "Bajar un límite nunca expulsa a nadie. Una organización que ya lo supera conserva todo lo que tiene y simplemente no puede añadir más.",
+            "saved": "Guardado"
+        },
+        "creation": {
+            "label": "Quién puede crear una organización",
+            "options": {
+                "everyone": "Cualquiera con una cuenta",
+                "admins": "Solo administradores",
+                "off": "Nadie"
+            },
+            "hints": {
+                "everyone": "Cualquiera con la sesión iniciada puede crear una organización.",
+                "admins": "Solo los administradores pueden, y ellos añaden a las personas.",
+                "off": "Las organizaciones existentes siguen funcionando; no se crean nuevas."
+            }
+        },
+        "newPeople": {
+            "label": "Quién puede invitar a alguien sin cuenta",
+            "options": {
+                "admins": "Solo administradores",
+                "managers": "Quien gestione las personas de una organización",
+                "off": "Nadie"
+            },
+            "hints": {
+                "admins": "Los administradores pueden invitar por correo desde cualquier organización. El resto invita a personas que ya tienen cuenta.",
+                "managers": "La invitación crea la cuenta cuando se acepta, así que las organizaciones pueden incorporar a gente nueva.",
+                "off": "Las organizaciones solo invitan a personas que ya tienen cuenta."
+            }
+        },
+        "limits": {
+            "perUser": {
+                "label": "Organizaciones por cuenta",
+                "hint": "Solo cuentan las que posee."
+            },
+            "members": {
+                "label": "Miembros por organización",
+                "hint": "Incluye al propietario."
+            },
+            "teams": {
+                "label": "Equipos por organización",
+                "hint": "En toda la organización."
+            },
+            "invites": {
+                "label": "Invitaciones por persona y hora",
+                "hint": "Desde una organización, contadas en la última hora."
+            }
+        }
+    },
+    "overview": {
+        "title": "Administración",
+        "description": "Administra Polaris: usuarios y acceso, políticas, dominios, integraciones y actualizaciones.",
+        "sections": {
+            "users": {
+                "title": "Usuarios",
+                "description": "Cuentas, permisos de administrador e invitaciones."
+            },
+            "groups": {
+                "title": "Grupos",
+                "description": "Miembros de grupos para compartir acceso."
+            },
+            "roles": {
+                "title": "Roles",
+                "description": "Qué puede hacer un miembro, un lector o un invitado, y qué apps ve."
+            },
+            "policies": {
+                "title": "Políticas",
+                "description": "Políticas de permisos detalladas para usuarios y grupos."
+            },
+            "security": {
+                "title": "Seguridad",
+                "description": "Si una cuenta tiene que usar un segundo factor, y cuáles valen."
+            },
+            "activity": {
+                "title": "Actividad",
+                "description": "Registro de auditoría de las acciones en Polaris."
+            },
+            "evidence": {
+                "title": "Pruebas",
+                "description": "Los controles vigentes, para una auditoría, en un informe fechado que puedes exportar."
+            },
+            "inbox": {
+                "title": "Bandeja de entrada",
+                "description": "Conversaciones, los canales por los que llegan y con quién son."
+            },
+            "chat": {
+                "title": "Chat",
+                "description": "Límites de mensajes y archivos, cuánto tiempo se puede editar uno y qué deja al borrarse."
+            },
+            "email": {
+                "title": "Correo electrónico",
+                "description": "Como quién envía correo Polaris, y el canal que lleva los mensajes de inicio de sesión."
+            },
+            "domains": {
+                "title": "Dominios",
+                "description": "Dominios de apps y para compartir, sincronización con DuckDNS."
+            },
+            "consumption": {
+                "title": "Consumo",
+                "description": "En qué se gasta esta máquina: Polaris, las apps instaladas y todo lo demás que se ejecuta."
+            },
+            "billing": {
+                "title": "Facturación",
+                "description": "Lo que usó cada proyecto y organización cada mes, con tus tarifas, presupuestos y exportaciones."
+            },
+            "organizations": {
+                "title": "Organizaciones",
+                "description": "Qué organizaciones existen, qué pueden ejecutar y sus límites."
+            },
+            "display": {
+                "title": "Formatos por defecto",
+                "description": "Las unidades, fechas y formatos de número con los que empiezan las cuentas nuevas."
+            },
+            "agents": {
+                "title": "Ajustes de agentes",
+                "description": "Dónde pueden ejecutarse los agentes de código y qué pueden abrir por su cuenta."
+            },
+            "uploads": {
+                "title": "Subidas",
+                "description": "Dónde se guardan los archivos adjuntos al trabajo y cuánto puede ocupar uno."
+            },
+            "integrations": {
+                "title": "Integraciones",
+                "description": "Servicios de terceros (impresión de etiquetas, análisis de archivos)."
+            },
+            "integrationsModels": {
+                "title": "Proveedores de IA",
+                "description": "Los proveedores de modelos que usan los agentes y las claves que guarda este despliegue."
+            },
+            "settings": {
+                "title": "Actualizaciones y ajustes",
+                "description": "Versión, actualización automática y ajustes del despliegue."
+            }
+        }
+    },
+    "policies": {
+        "page": {
+            "title": "Políticas",
+            "description": "Reglas detalladas de permitir/denegar. Asigna una política a un usuario, grupo o rol."
+        },
+        "principal": {
+            "group": "{name} (grupo)",
+            "role": "{name} (rol)"
+        },
+        "errors": {
+            "invalidJson": "El documento de la política no es JSON válido",
+            "createFailed": "No se pudo crear la política",
+            "updateFailed": "No se pudo actualizar la política"
+        },
+        "summary": {
+            "none": "Sin declaraciones",
+            "invalid": "Documento no válido"
+        },
+        "create": {
+            "title": "Nueva política",
+            "name": "Nombre de la política",
+            "description": "Descripción (opcional)",
+            "document": "Documento de la política",
+            "hint": "Las acciones son claves de capacidad (p. ej. <code>drive.read</code>) o verbos de Drive; los recursos son <code>drive:CONNECTION_ID:PATH</code> o <code>*</code>. Una denegación explícita siempre gana.",
+            "submit": "Crear política"
+        },
+        "empty": "Aún no hay políticas.",
+        "card": {
+            "system": "sistema",
+            "toggle": "Mostrar u ocultar detalles",
+            "delete": "Eliminar la política {name}",
+            "attachedTo": "Asignada a:",
+            "nobody": "nadie",
+            "detach": "Quitar {label}",
+            "attachPlaceholder": "Asignar a...",
+            "attach": "Asignar",
+            "description": "Descripción",
+            "document": "Documento de {name}",
+            "save": "Guardar cambios"
+        }
+    },
+    "reports": {
+        "filterLabel": "Qué denuncias mostrar",
+        "filters": {
+            "open": "Pendientes",
+            "removed": "Eliminadas",
+            "kept": "Conservadas",
+            "all": "Todas"
+        },
+        "empty": "No hay nada.",
+        "count": "{count, plural, one {# denuncia} other {# denuncias}}",
+        "reasons": {
+            "spam": "Spam o estafa",
+            "abuse": "Acoso u odio",
+            "sexual": "Contenido sexual",
+            "violence": "Violencia o autolesiones",
+            "illegal": "Algo ilegal",
+            "other": "Otra cosa"
+        },
+        "reportedBy": "denunciado por {name}",
+        "noText": "Sin texto",
+        "noTextSeeBelow": "Sin texto, mira abajo",
+        "writtenBy": "Escrito por {name}{live, select, true {} other {; el mensaje ya no está}}",
+        "writtenByGone": "Escrito por una cuenta que ya no existe{live, select, true {} other {; el mensaje ya no está}}",
+        "remove": "Eliminar el mensaje",
+        "keep": "Conservarlo",
+        "handled": "{status, select, removed {Eliminado} other {Conservado}}{withBy, select, yes { por {by}} other {}}{withOn, select, yes { el {on}} other {}}",
+        "open": "Abrirlo en la conversación",
+        "fileHeld": "{name}: conservado tras borrar el mensaje",
+        "errors": {
+            "notADecision": "Esa no es una decisión",
+            "notSettled": "No se ha podido resolver"
+        }
+    },
+    "retention": {
+        "title": "Conservación de registros",
+        "description": "Cuánto tiempo guarda Polaris lo que anota sobre quienes lo usan. Lo más antiguo se elimina de forma programada.",
+        "saved": "Guardado. La próxima pasada lo aplicará.",
+        "howLong": "Cuánto tiempo guardar: {subject}",
+        "subjects": {
+            "notifications": {
+                "label": "Notificaciones",
+                "note": "Lo que llega a la campana. Un aviso sirve el día que llega y casi nunca después, y es la tabla que más rápido crece."
+            },
+            "activity": {
+                "label": "Actividad",
+                "note": "Lo que cada pantalla registra sobre el trabajo en ella: un estado cambiado, una tarea movida, un servidor reiniciado. Es lo que alguien lee para saber qué pasó el mes pasado, así que conviene guardarlo más que un aviso."
+            },
+            "audit": {
+                "label": "Registro de auditoría",
+                "note": "Lo que se hizo con las cuentas, los accesos y el propio despliegue, y desde qué dispositivo. Es lo que se consulta cuando una cuenta hizo algo que nadie sabe explicar: ponle el periodo más largo que estés dispuesto a guardar."
+            }
+        },
+        "periods": {
+            "d1": "Un día",
+            "d7": "Una semana",
+            "d30": "30 días",
+            "d90": "3 meses",
+            "d180": "6 meses",
+            "d365": "Un año",
+            "d0": "Siempre"
+        },
+        "periodsInline": {
+            "d1": "un día",
+            "d7": "una semana",
+            "d30": "30 días",
+            "d90": "3 meses",
+            "d180": "6 meses",
+            "d365": "un año",
+            "d0": "siempre"
+        },
+        "counts": {
+            "forever": "{total} {count, plural, one {registro guardado} other {registros guardados}}. Nunca se elimina nada.",
+            "noneDue": "{total} {count, plural, one {registro guardado} other {registros guardados}}. Ninguno tiene más de {period}.",
+            "due": "{total} {count, plural, one {registro guardado} other {registros guardados}}. {due} con más de {period}, a la espera de la próxima pasada."
+        },
+        "sweep": {
+            "nothingDue": "No había nada pendiente.",
+            "removed": "{count, plural, one {Eliminado {removed} registro} other {Eliminados {removed} registros}}. No queda nada pendiente.",
+            "removedMore": "{count, plural, one {Eliminado {removed} registro} other {Eliminados {removed} registros}}. Queda más: la programación seguirá eliminándolo.",
+            "saveFirst": "Guarda primero, para que la pasada use lo que has elegido",
+            "run": "Hacer una pasada ahora",
+            "hint": "Cada hora se hace una pasada que elimina una cantidad limitada, así que un despliegue con años de historial se pone al día en varias en lugar de en un solo bloqueo largo."
+        },
+        "mail": {
+            "title": "Correo guardado para leer",
+            "intro": "Los mensajes recientes se descargan completos al llegar, así que abrir uno es instantáneo en lugar de un viaje al servidor de correo. Los más antiguos guardan aquí su encabezado y se descargan cuando alguien los abre.",
+            "label": "Mensajes guardados por buzón",
+            "ariaLabel": "Mensajes completos guardados por buzón",
+            "zeroHint": "Con cero, cada mensaje se descarga en el momento de abrirlo.",
+            "hint": "Los más recientes de cada buzón. El resto se descarta en la próxima sincronización.",
+            "saved": "Guardado.",
+            "held": {
+                "failed": "Ahora mismo no se ha podido leer cuánto se guarda.",
+                "counting": "Contando lo que se guarda ahora mismo.",
+                "none": "Ahora mismo no se guarda ningún mensaje completo.",
+                "some": "{count, plural, one {{held} mensaje se guarda completo} other {{held} mensajes se guardan completos}} ahora mismo."
+            },
+            "errors": {
+                "whole": "Solo mensajes enteros.",
+                "min": "Usa 0 para descargar cada mensaje al abrirlo.",
+                "max": "Son más de {max} mensajes.",
+                "check": "Revisa el número."
+            }
+        },
+        "errors": {
+            "notAPeriod": "Ese no es un periodo que ofrezca Polaris",
+            "sweepFailed": "Ahora mismo no se ha podido ejecutar"
+        }
+    },
+    "roles": {
+        "page": {
+            "title": "Roles",
+            "description": "Lo que puede hacer cada rol. Todo el mundo tiene uno, y decide qué apps llega a ver."
+        },
+        "errors": {
+            "invalidRole": "Rol no válido",
+            "invalidPermissions": "Permisos no válidos",
+            "unknownRole": "Rol desconocido."
+        },
+        "newRole": "Nuevo rol",
+        "builtIn": "predefinido",
+        "peopleCount": "{count, plural, one {# persona} other {# personas}}",
+        "viewAs": {
+            "label": "Ver Polaris como el rol {name}",
+            "button": "Ver como"
+        },
+        "delete": {
+            "label": "Eliminar el rol {name}",
+            "title": "¿Eliminar el rol {name}?",
+            "description": "Nadie lo tiene, así que nadie pierde acceso. No se puede recuperar.",
+            "confirm": "Eliminar rol"
+        },
+        "locked": "Lo tiene todo, incluidos los permisos que lleguen en versiones futuras. Es el rol que mantiene la instancia accesible, así que no se puede restringir.",
+        "held": {
+            "none": "No llega a ninguna app: la cuenta existe solo para identificarse.",
+            "count": "{held} de {total} permisos."
+        },
+        "create": {
+            "title": "Nuevo rol",
+            "description": "Un rol sin nada marcado sigue siendo útil: la cuenta existe y puede iniciar sesión, pero no llega a ninguna app.",
+            "name": "Nombre",
+            "namePlaceholder": "colaborador",
+            "submit": "Crear rol",
+            "creating": "Creando..."
+        },
+        "areas": {
+            "drive": "Drive",
+            "sharing": "Compartir",
+            "snippets": "Fragmentos",
+            "vault": "Vault",
+            "notes": "Notas",
+            "office": "Office",
+            "mail": "Correo",
+            "chat": "Chat",
+            "apps": "Apps",
+            "gameServers": "Servidores de juegos",
+            "home": "Casa",
+            "tools": "Herramientas",
+            "tasks": "Tareas",
+            "inbox": "Bandeja de entrada",
+            "management": "Administración"
+        },
+        "permissions": {
+            "drive": {
+                "read": "Ver archivos y descargarlos",
+                "write": "Subir, renombrar y mover archivos",
+                "delete": "Eliminar archivos"
+            },
+            "connections": {
+                "manage": "Añadir y configurar conexiones de almacenamiento"
+            },
+            "shares": {
+                "create": "Crear enlaces para compartir",
+                "manage": "Gestionar los enlaces para compartir de todos"
+            },
+            "requests": {
+                "create": "Crear puntos de entrega",
+                "manage": "Gestionar los puntos de entrega de todos"
+            },
+            "snippets": {
+                "read": "Ver fragmentos y abrir los compartidos",
+                "write": "Escribir fragmentos y compartirlos por enlace"
+            },
+            "vault": {
+                "use": "Tener una bóveda de contraseñas y conectarle un cliente"
+            },
+            "notes": {
+                "use": "Tener notas privadas"
+            },
+            "office": {
+                "use": "Escribir documentos, hojas de cálculo, presentaciones y diagramas"
+            },
+            "mail": {
+                "use": "Vincular buzones y leer el correo aquí"
+            },
+            "mailserver": {
+                "manage": "Ejecutar un servidor de correo y gestionar sus dominios y buzones"
+            },
+            "chat": {
+                "use": "Hablar en canales y mensajes directos",
+                "spaces": "Crear servidores y sus canales",
+                "groups": "Iniciar conversaciones de grupo",
+                "attach": "Adjuntar archivos y enviar mensajes de voz",
+                "call": "Iniciar llamadas y unirse a ellas",
+                "meetings": "Crear enlaces de reunión a los que puede unirse gente de fuera de Polaris"
+            },
+            "deploy": {
+                "read": "Ver despliegues, servidores y contenedores",
+                "manage": "Desplegar, reiniciar y configurar apps"
+            },
+            "games": {
+                "read": "Ver servidores de juegos y quién está jugando",
+                "moderate": "Dar op, expulsar, banear y añadir jugadores a la lista blanca",
+                "console": "Ejecutar comandos en la consola del servidor",
+                "manage": "Crear servidores, cambiar ajustes y reconstruir"
+            },
+            "agents": {
+                "read": "Ver repositorios y ejecuciones de agentes de código",
+                "manage": "Activar repositorios e iniciar ejecuciones de agentes"
+            },
+            "home": {
+                "read": "Ver las cámaras y lo que han detectado",
+                "control": "Mover cámaras y actuar ante alertas",
+                "manage": "Añadir cámaras y ajustar cómo detectan y graban"
+            },
+            "tools": {
+                "use": "Usar las herramientas: convertir, redimensionar, traducir",
+                "manage": "Crear enlaces cortos y ver quién los ha seguido"
+            },
+            "tasks": {
+                "read": "Ver espacios, listas y tareas",
+                "manage": "Crear y cambiar tareas"
+            },
+            "inbox": {
+                "read": "Leer conversaciones",
+                "manage": "Responder y gestionar canales"
+            },
+            "users": {
+                "manage": "Invitar a personas y cambiar cuentas"
+            },
+            "settings": {
+                "manage": "Cambiar los ajustes de la instancia"
+            },
+            "system": {
+                "manage": "Actualizaciones, copias de seguridad y mantenimiento"
+            }
+        }
+    },
+    "safety": {
+        "page": {
+            "title": "Seguridad",
+            "description": "Todo lo que se ha pedido revisar en esta instancia: cuentas que se han bloqueado a sí mismas, personas denunciadas y mensajes que alguien ha objetado."
+        },
+        "errors": {
+            "unreadable": "No se pudo leer."
+        },
+        "filters": {
+            "label": "Qué casos mostrar",
+            "open": "Pendientes",
+            "resolved": "Resueltos",
+            "dismissed": "Descartados",
+            "all": "Todo"
+        },
+        "accounts": "Cuentas",
+        "messages": "Mensajes",
+        "empty": "No hay nada pendiente sobre ninguna cuenta.",
+        "kinds": {
+            "lockdown": "Cuenta bloqueada",
+            "user": "Cuenta denunciada"
+        },
+        "statuses": {
+            "open": "Abierto",
+            "resolved": "Resuelto",
+            "dismissed": "Descartado"
+        },
+        "reasons": {
+            "spam": "Spam o estafas",
+            "abuse": "Acoso o abuso",
+            "impersonation": "Se hace pasar por otra persona",
+            "sexual": "Contenido sexual",
+            "illegal": "Algo ilegal",
+            "other": "Otra cosa"
+        },
+        "case": {
+            "stillLocked": "Sigue bloqueada",
+            "lifted": "Desbloqueada",
+            "reportedBy": "Denunciado por {name} - {time}",
+            "raisedBySelf": "Lo abrió la propia cuenta - {time}",
+            "noNoteLockdown": "No dijo nada sobre el motivo.",
+            "noNoteReport": "Quien denunció no añadió nada.",
+            "outcomeLabel": "Qué has encontrado",
+            "outcomeLockdown": "Qué has encontrado. Se le comunica al titular de la cuenta.",
+            "outcomeReport": "Qué has decidido. Queda como registro.",
+            "resolve": "Revisado",
+            "dismiss": "Nada que hacer",
+            "settled": "{who, select, named {{name} lo resolvió} other {Resuelto}}{when, select, yes { el {time}} other {}}{outcome, select, yes {: {text}} other {.}}",
+            "ownerLifts": "Solo el titular puede quitar el bloqueo, desde un dispositivo con la sesión ya iniciada."
+        }
+    },
+    "security": {
+        "title": "Seguridad",
+        "description": "Lo que cada cuenta de este Polaris necesita antes de poder usarse.",
+        "saved": "Guardado.",
+        "require": {
+            "title": "Exigir un segundo paso para iniciar sesión",
+            "hint": "Cada cuenta añade uno antes de poder usar Polaris. A las cuentas que ya existen se les pide la próxima vez que inicien sesión.",
+            "off": "Desactivado, a una cuenta le basta con la contraseña. Cada persona puede activar un segundo paso en sus propios ajustes de seguridad."
+        },
+        "factors": {
+            "title": "Qué cuenta como segundo paso",
+            "hint": "Cada persona elige entre los que funcionan en este despliegue.",
+            "fixed": "Siempre aceptada. No necesita nada de este despliegue, así que es lo que se puede seguir usando cuando todo lo demás falla.",
+            "noMail": "Todavía ningún canal de correo envía el correo de cuenta, así que nadie puede elegir esta opción. Conecta un remitente en Bandeja > Canales y luego elígelo en Administración > Correo.",
+            "totp": {
+                "label": "App de autenticación",
+                "description": "Un código que el móvil genera por sí solo, sin conexión."
+            },
+            "email": {
+                "label": "Código por correo",
+                "description": "Un código enviado a la dirección de la cuenta, que de paso confirma la dirección."
+            }
+        },
+        "connection": {
+            "title": "Volver a preguntar tras una cuenta conectada",
+            "hint": "Al iniciar sesión con GitHub o Google, primero responde ese servicio. Activado, Polaris pide también el segundo paso después.",
+            "off": "Desactivado, el servicio que inició la sesión es todo el inicio de sesión. Quien quiera el paso extra puede activarlo en su propia cuenta."
+        },
+        "playerAddresses": {
+            "title": "Mostrar las direcciones de los jugadores a quienes gestionan servidores de juego",
+            "hint": "Cuando alguien que gestiona un servidor de juego busca una cuenta de Polaris para añadirla como jugador, ve las direcciones desde las que inicia sesión. Desactivado, solo las ven los administradores."
+        },
+        "errors": {
+            "checkForm": "Revisa el formulario.",
+            "onOrOff": "Elige activado o desactivado.",
+            "saveFailed": "No se ha podido guardar. Inténtalo de nuevo."
+        }
+    },
+    "uploads": {
+        "title": "Subidas",
+        "description": "Dónde se guardan las unidades de cada persona, los estantes de las organizaciones, los archivos, las fotos, lo que se envía por chat y las grabaciones de las cámaras, y cuánto puede ocupar cada cosa.",
+        "saved": "Guardado.",
+        "whereThem": "Dónde guardarlos",
+        "automatic": {
+            "files": "Se decide según lo que tiene conectado esta instancia. Conecta un NAS y los archivos nuevos irán allí.",
+            "photos": "Se decide según lo que tiene conectado esta instancia. Conecta un NAS y las fotos nuevas irán allí.",
+            "drives": "Se decide según lo que tiene conectado esta instancia. Conecta un NAS y las unidades nuevas irán allí.",
+            "shelves": "Se decide según lo que tiene conectado esta instancia. Conecta un NAS y los estantes nuevos irán allí.",
+            "footage": "Se decide según lo que tiene conectado esta instancia. Conecta un NAS y las grabaciones nuevas irán allí."
+        },
+        "picker": {
+            "keptOn": "Se guarda en {name}",
+            "chosenHere": "Elegido aquí.",
+            "automatic": "Elegir por mí ({name})",
+            "local": "Este servidor",
+            "connection": "{name} ({kind})"
+        },
+        "check": {
+            "button": "Comprobar que funciona",
+            "failed": "No se ha podido hacer la comprobación.",
+            "result": "{where}: {detail}"
+        },
+        "tidy": {
+            "button": "Limpiar",
+            "tooltip": "Elimina las carpetas de conversaciones que ya no existen y las vacías.",
+            "failed": "No se ha podido ejecutar.",
+            "nothing": "No hay nada que eliminar.",
+            "took": "{count, plural, one {Eliminada # carpeta.} other {Eliminadas # carpetas.}}",
+            "refused": "{took} {count} no se han podido eliminar: el almacenamiento las rechazó o no responde.",
+            "name": "almacenamiento del chat",
+            "kind": "carpetas",
+            "title": "Limpiar el almacenamiento del chat",
+            "description": "Elimina cada carpeta de la raíz del chat cuya conversación ya no existe, con todo lo que contiene, y cualquier carpeta que haya quedado vacía. Los archivos no se recuperan.",
+            "question": "¿Limpiar todos los almacenamientos en los que esta instancia ha guardado archivos del chat?"
+        },
+        "attachments": {
+            "title": "Archivos adjuntos al trabajo",
+            "intro": "Capturas, grabaciones y documentos que se adjuntan a una tarea.",
+            "hint": "Los archivos ya adjuntos se quedan donde se guardaron; esto decide dónde van los siguientes.",
+            "biggest": "Tamaño máximo por archivo",
+            "range": "Entre 1 MB y 10 GB."
+        },
+        "photos": {
+            "title": "Fotos de perfil",
+            "intro": "La imagen de la cuenta de cada persona. Máximo 2 MB y el navegador la recorta en cuadrado antes de enviarla, así que ocupan poco vayan donde vayan.",
+            "hint": "Las fotos ya subidas se quedan donde se guardaron; esto decide dónde van las siguientes.",
+            "gravatar": "Usar Gravatar",
+            "gravatarHint": "Para las cuentas sin foto propia, muestra la que su dirección de correo tiene en Gravatar. La pide Polaris, no el navegador, así que ninguna dirección sale de este servidor y nadie sabe quién mira. Desactivado, se muestran las iniciales hasta que alguien suba una foto."
+        },
+        "drives": {
+            "title": "Unidades personales",
+            "intro": "Cada persona tiene una carpeta privada en Drive, que se crea la primera vez que la abre. Puede ocupar lo que quede libre en el disco donde está.",
+            "hint": "Las unidades que ya existen se quedan en el disco donde se crearon; esto decide dónde van las siguientes.",
+            "made": "{count, plural, one {Se ha creado una unidad.} other {Se han creado # unidades.}}",
+            "madeElsewhere": "{count, plural, one {Se ha creado una unidad} other {Se han creado # unidades}}, {elsewhere} de ellas en un disco distinto del de arriba."
+        },
+        "shelves": {
+            "title": "Estantes de las organizaciones",
+            "intro": "Cada organización tiene su propio estante en Drive, que se crea la primera vez que alguien de ella lo abre. Es donde una empresa guarda lo que es de la empresa y no de una persona.",
+            "hint": "Los estantes que ya existen se quedan en el disco donde se crearon; esto decide dónde van los siguientes.",
+            "made": "{count, plural, one {Se ha creado un estante.} other {Se han creado # estantes.}}",
+            "madeElsewhere": "{count, plural, one {Se ha creado un estante} other {Se han creado # estantes}}, {elsewhere} de ellos en un disco distinto del de arriba."
+        },
+        "chat": {
+            "title": "Archivos enviados por chat",
+            "intro": "Capturas y documentos que se adjuntan a un mensaje. Máximo 25 MB cada uno: lo más grande va en Drive, con un enlace en la conversación.",
+            "hint": "Los archivos ya enviados se quedan donde se guardaron; esto decide dónde van los siguientes."
+        },
+        "footage": {
+            "title": "Grabaciones de cámaras",
+            "intro": "Las grabaciones y las imágenes de lo que detectan las cámaras. Si tienes un NAS, es la mejor opción: es lo único aquí que crece lo use alguien o no.",
+            "where": "Dónde guardarlas",
+            "hint": "Las grabaciones ya hechas se quedan donde se guardaron. Cada cámara puede cambiarlo en sus propios ajustes."
+        },
+        "errors": {
+            "checkSettings": "Revisa los ajustes e inténtalo de nuevo",
+            "saveFailed": "No se ha podido guardar",
+            "notSaved": "No se ha podido guardar",
+            "tidyFailed": "No se ha podido limpiar ese almacenamiento"
+        }
+    },
+    "users": {
+        "page": {
+            "title": "Personas",
+            "description": "El registro es solo por invitación. Invita a gente y gestiona lo que pueden hacer sus cuentas."
+        },
+        "filters": {
+            "all": "Todos",
+            "admins": "Administradores",
+            "limited": "Limitados",
+            "banned": "Bloqueados"
+        },
+        "methods": {
+            "link": "Enlace",
+            "magic": "Enlace por correo",
+            "code": "Código"
+        },
+        "directory": {
+            "searchPlaceholder": "Busca por nombre, dirección, usuario, rol o grupo",
+            "searchLabel": "Buscar personas",
+            "filterLabel": "Filtrar personas",
+            "invite": "Invitar",
+            "columns": {
+                "person": "Persona",
+                "access": "Acceso",
+                "lastSeen": "Última vez",
+                "joined": "Alta"
+            },
+            "empty": "Aún no hay nadie.",
+            "noMatch": "No hay coincidencias.",
+            "open": "Abrir {name}",
+            "you": "(tú)",
+            "badges": {
+                "admin": "admin",
+                "limited": "limitado",
+                "banned": "bloqueado"
+            },
+            "online": "En línea",
+            "never": "Nunca",
+            "country": " - {country}"
+        },
+        "menu": {
+            "openRecord": "Abrir su ficha",
+            "emailUnverify": "Marcar el correo como no verificado",
+            "emailVerify": "Marcar el correo como verificado",
+            "phoneUnverify": "Marcar el número como no verificado",
+            "phoneVerify": "Marcar el número como verificado",
+            "openAccount": "Entrar en su cuenta",
+            "liftSuspension": "Levantar la suspensión",
+            "suspend": "Suspender la cuenta",
+            "delete": "Eliminar la cuenta"
+        },
+        "verify": {
+            "title": "¿Marcar {hasLabel, select, yes {{label}} other {su número}} como verificado?",
+            "description": "Polaris lo dará por comprobado aunque {name} no lo haya confirmado. Queda registrado a tu nombre en el registro de auditoría.",
+            "confirm": "Marcar como verificado"
+        },
+        "remove": {
+            "title": "¿Eliminar a {name}?",
+            "description": "Su cuenta y todo lo que tiene (conexiones, despliegues, enlaces compartidos y archivos subidos) se eliminan con ella. No se puede deshacer.",
+            "confirm": "Eliminar cuenta"
+        },
+        "invites": {
+            "title": "Invitaciones pendientes",
+            "hint": "Invitaciones que aún no se han usado. Al revocar una, deja de funcionar al momento.",
+            "none": "No hay ninguna pendiente.",
+            "oneTimePassword": "contraseña de un solo uso",
+            "limited": "limitada",
+            "expires": "Caduca el {expires}",
+            "expiresEmailed": "Caduca el {expires} - enviada el {sent}",
+            "revokeLabel": "Revocar la invitación de {email}",
+            "revoke": "Revocar",
+            "noMail": "No hay ningún canal de correo designado, así que Polaris no puede enviar invitaciones por sí mismo."
+        },
+        "ban": {
+            "lengths": {
+                "hour": "Durante 1 hora",
+                "day": "Durante 1 día",
+                "threeDays": "Durante 3 días",
+                "week": "Durante 1 semana",
+                "thirtyDays": "Durante 30 días",
+                "untilLifted": "Hasta que se levante"
+            },
+            "suspend": "Suspender",
+            "ban": "Bloquear",
+            "suspendTitle": "¿Suspender a {name}?",
+            "banTitle": "¿Bloquear a {name}?",
+            "description": "Se cierran todas sus sesiones a la vez. Una suspensión se levanta sola cuando se cumple el plazo; un bloqueo sigue hasta que alguien lo levante.",
+            "reason": "Motivo",
+            "reasonPlaceholder": "Opcional, queda registrado",
+            "length": "Duración",
+            "working": "Procesando..."
+        },
+        "recovery": {
+            "title": "Sin acceso",
+            "hint": "Al aprobar, podrán elegir una contraseña nueva y se cerrarán todas las sesiones abiertas en la cuenta. Asegúrate de saber quién lo pide.",
+            "verified": "respondió a sus preguntas",
+            "unverified": "nada verificado",
+            "asked": "Pedido el {asked} - caduca el {expires}",
+            "askedFrom": "Pedido el {asked} desde {ip} - caduca el {expires}",
+            "deny": "Denegar",
+            "approve": "Aprobar"
+        },
+        "sharing": {
+            "title": "Quién puede invitar",
+            "label": "Compartir",
+            "selectLabel": "Quién puede dar acceso a otras personas",
+            "modes": {
+                "off": {
+                    "label": "Solo administradores",
+                    "hint": "Solo un administrador da acceso a cualquier cosa."
+                },
+                "existing": {
+                    "label": "Los propietarios pueden compartir con cuentas existentes",
+                    "hint": "Quien gestiona un servidor puede dar acceso a personas que ya tienen cuenta aquí."
+                },
+                "invite": {
+                    "label": "Los propietarios pueden invitar por correo",
+                    "hint": "Lo mismo, y además pueden invitar a una dirección que aún no tiene cuenta."
+                }
+            },
+            "roleLabel": "Rol de las cuentas nuevas",
+            "roleSelectLabel": "El rol con el que se crea una cuenta invitada así",
+            "roleHint": "Se aplica a las cuentas creadas así. guest no abre ninguna app por sí solo, así que solo llegan a aquello a lo que se les invitó.",
+            "saved": "Guardado."
+        },
+        "cooldown": {
+            "title": "Cambiar el nombre de usuario",
+            "hint": "La gente se encuentra y se menciona por su nombre de usuario, así que cambiarlo tiene una espera. Las cuentas que nunca lo han cambiado pueden hacerlo una vez al momento.",
+            "label": "Espera entre cambios",
+            "inputLabel": "Días que espera una cuenta entre cambios de nombre de usuario",
+            "daysZero": "Días. Con cero, cualquiera puede cambiarlo cuando quiera.",
+            "days": "Días.",
+            "saved": "Guardado."
+        },
+        "profiles": {
+            "title": "Perfiles sin iniciar sesión",
+            "hint": "La página de cada persona está en <code>/u/su-usuario</code> y se puede compartir. Desactivado, solo la ve quien ha iniciado sesión aquí, que es lo que suele querer una empresa. Activado, un desconocido solo ve lo que la cuenta ha dejado para “todo el mundo”, y una cuenta con algo más restringido le resulta invisible.",
+            "switchLabel": "Mostrar perfiles a quien no ha iniciado sesión",
+            "followersLabel": "A quién se muestran los seguidores de una cuenta nueva",
+            "followersSelectLabel": "A quién se muestran los seguidores de una cuenta nueva",
+            "followersHint": "Quién sigue a alguien y a quién sigue es un mismo dato y un solo ajuste en su pantalla de privacidad. Esto es lo que indica antes de que nadie lo toque: el directorio de una empresa y un sitio donde la gente se sigue quieren respuestas opuestas, y solo tú sabes cuál es este. Cambiarlo no afecta a las cuentas que ya han elegido.",
+            "audiences": {
+                "everyone": "Todo el mundo",
+                "friends": "Amigos",
+                "nobody": "Nadie"
+            }
+        },
+        "errors": {
+            "invalidInput": "Datos no válidos",
+            "unknownAccount": "Cuenta desconocida.",
+            "unknownSession": "Sesión desconocida.",
+            "invalidRules": "Reglas no válidas",
+            "wholeDays": "Solo días completos.",
+            "zeroForNoWait": "Usa 0 para no esperar.",
+            "tooLong": "Es más de {max} días.",
+            "checkDays": "Revisa el número de días.",
+            "audience": "Ese público no puede ser el predeterminado.",
+            "checkSettings": "Revisa los ajustes y vuelve a intentarlo"
+        }
+    },
+    "usersDetail": {
+        "back": "Personas",
+        "badges": {
+            "admin": "admin",
+            "banned": "bloqueado"
+        },
+        "identity": {
+            "name": "Nombre",
+            "fullName": "Nombre completo",
+            "handle": "Usuario",
+            "pronouns": "Pronombres",
+            "email": "Correo",
+            "verified": "verificado",
+            "unverified": "sin verificar",
+            "company": "Empresa",
+            "headline": "Titular",
+            "joined": "Alta",
+            "secondFactor": "Segundo factor",
+            "on": "Activado",
+            "off": "Desactivado",
+            "organizations": "Organizaciones",
+            "none": "Ninguna",
+            "org": "{name} - {role}",
+            "signsInWith": "Inicia sesión con",
+            "nothingRecorded": "Nada registrado",
+            "password": "Contraseña"
+        },
+        "account": {
+            "facts": {
+                "username": "Usuario",
+                "company": "Empresa",
+                "joined": "Alta",
+                "email": "Correo",
+                "verified": "Verificado",
+                "unverified": "Sin verificar",
+                "twoFactor": "Doble factor",
+                "on": "Activado",
+                "off": "Desactivado",
+                "groups": "Grupos"
+            },
+            "access": {
+                "title": "Acceso",
+                "role": "Rol",
+                "roleHint": "Lo que puede hacer en Polaris, antes de cualquier política que tenga asignada.",
+                "roleLabel": "Rol de {name}",
+                "noRole": "Sin rol",
+                "openAccount": "Entrar en su cuenta",
+                "openHint": "Usa Polaris como {name} para ver lo que ve y arreglarlo donde está. No se inicia sesión en su lado y queda en el registro de actividad.",
+                "open": "Entrar",
+                "admin": "Administrador",
+                "adminHint": "Abre las pantallas de operador: personas, políticas, dominios y actividad.",
+                "adminLabel": "Acceso de administrador para {name}"
+            },
+            "limits": {
+                "title": "Desde dónde puede iniciar sesión",
+                "hint": "Se suma a lo que haya configurado por su cuenta y no puede quitarlo. Al guardar se cierran todas sus sesiones.",
+                "none": "Sin límite: puede iniciar sesión desde cualquier sitio.",
+                "some": "Solo puede iniciar sesión desde lo indicado.",
+                "save": "Guardar límites"
+            },
+            "sessions": {
+                "title": "Sesiones",
+                "hint": "Cada dispositivo con sesión iniciada como {name}, y por cuál de las direcciones de esta instancia entró.",
+                "signOutAll": "Cerrar todas las sesiones",
+                "empty": "No hay ninguna sesión iniciada.",
+                "lastSeen": "{seen, select, yes {Visto por última vez el {time}} other {Nunca visto.}}{hasIp, select, yes { desde {ip}} other {}}{hasCountry, select, yes { ({country})} other {}}"
+            },
+            "danger": {
+                "title": "Zona de peligro",
+                "status": "{kind, select, suspended {Suspendido el {at}, vuelve el {until}} other {Bloqueado el {at}}}{hasReason, select, yes {: {reason}} other {}}",
+                "liftBan": "Levantar el bloqueo",
+                "reasonPlaceholder": "Motivo (opcional, queda registrado)",
+                "hint": "Cualquiera de los dos cierra todas sus sesiones a la vez. Una suspensión se levanta sola cuando se cumple el plazo; un bloqueo sigue hasta que alguien lo levante.",
+                "deleteHint": "Al eliminarla se borra todo lo que tiene la cuenta.",
+                "delete": "Eliminar cuenta"
+            }
+        },
+        "accessView": {
+            "sessionsLink": "Sesiones, límites y lo demás",
+            "role": {
+                "title": "Rol",
+                "hint": "Lo que puede hacer en Polaris. Un rol por persona; lo más concreto es una política o un acceso a algo en particular.",
+                "label": "Su rol",
+                "define": "Definir qué incluye un rol"
+            },
+            "groups": {
+                "title": "Grupos",
+                "hint": "Solo pertenencia. Lo que puede hacer un grupo viene de las políticas que tiene asignadas.",
+                "empty": "Aún no hay grupos definidos.",
+                "manage": "Gestionar grupos"
+            },
+            "policies": {
+                "title": "Políticas",
+                "hint": "Asignadas directamente a esta cuenta. Los documentos se redactan en Políticas.",
+                "empty": "Aún no hay políticas definidas.",
+                "manage": "Gestionar políticas"
+            },
+            "resources": {
+                "title": "En elementos concretos",
+                "hint": "Acceso a un servidor, proyecto o espacio concreto, dado al margen de su rol.",
+                "empty": "Nada. Llega a lo que permitan su rol, sus grupos y sus políticas.",
+                "deny": "denegado",
+                "ended": "terminado",
+                "canShare": "puede invitar a otros",
+                "detail": "{actions}{via, select, yes { - a través de {principal}} other {}}{until, select, yes { - hasta el {date}} other {}}",
+                "open": "Abrir {name}",
+                "remove": "Quitarle el acceso a {name}",
+                "confirmTitle": "Quitar este acceso",
+                "confirmDescription": "Pierde el acceso a {name} la próxima vez que cargue una página. Nada más cambia en su cuenta.",
+                "confirm": "Quitar",
+                "noAnswer": "Polaris no ha respondido. Recarga la página y vuelve a intentarlo."
+            }
+        },
+        "capabilities": {
+            "title": "Capacidades",
+            "hint": "Lo que puede hacer esta cuenta, una cosa cada vez. Cada una sigue a su rol salvo que se fije aquí.",
+            "admin": "Esta cuenta es de administrador, que lo permite todo. Lo que se desactive aquí solo tiene efecto si antes se le quita eso.",
+            "roleAllows": "el rol lo permite",
+            "roleDoesNot": "el rol no lo permite",
+            "label": "{label} para esta cuenta",
+            "inherit": "Rol",
+            "inheritTitle": "Seguir su rol y sus políticas",
+            "allow": "Sí",
+            "allowTitle": "Siempre activado para esta cuenta",
+            "deny": "No",
+            "denyTitle": "Siempre desactivado, diga lo que diga su rol"
+        },
+        "errors": {
+            "unknownAccount": "Cuenta desconocida.",
+            "accessFailed": "No se ha podido calcular su acceso",
+            "unknownGroup": "Grupo desconocido.",
+            "unknownPolicy": "Política desconocida.",
+            "notCapability": "Eso no es una capacidad.",
+            "unknownAccess": "Acceso desconocido."
+        }
+    },
+    "usersInvite": {
+        "methods": {
+            "link": {
+                "label": "Enlace de invitación",
+                "hint": "Copias el enlace y lo envías como quieras."
+            },
+            "magic": {
+                "label": "Enlace mágico por correo",
+                "hint": "Polaris envía el enlace a la dirección que has invitado."
+            },
+            "code": {
+                "label": "Código de invitación",
+                "hint": "Un código corto que escriben en la página de inicio de sesión."
+            }
+        },
+        "title": "Invitar a alguien",
+        "description": "Eligen su nombre y contraseña al unirse. La invitación vale 7 días.",
+        "email": "Correo",
+        "emailPlaceholder": "companero@example.com",
+        "role": "Rol",
+        "roleNoApp": "No abre ninguna app. La cuenta existe para poder identificarle: en un enlace compartido, un punto de entrega o donde se pida iniciar sesión en Polaris.",
+        "roleHint": "Lo que puede hacer cada rol se define en Gestión > Roles.",
+        "method": "Cómo le llega",
+        "noMail": "Necesita un canal de correo: designa uno en Integraciones.",
+        "advanced": "Opciones avanzadas",
+        "otp": {
+            "title": "Contraseña de un solo uso",
+            "hint": "Se pide además del enlace o el código. Envíala por otra vía, para que una invitación mal entregada no baste por sí sola.",
+            "switchLabel": "Exigir una contraseña de un solo uso",
+            "placeholder": "Al menos 6 caracteres"
+        },
+        "where": {
+            "title": "Desde dónde puede conectarse",
+            "hint": "Limita la invitación y se queda en la cuenta después, como un límite que no puede quitarse. Déjalo vacío para no restringir."
+        },
+        "summaryNone": "Sin contraseña de un solo uso ni límites de dirección o país.",
+        "summarySet": "Hay contraseña de un solo uso o límites de conexión.",
+        "creating": "Creando...",
+        "create": "Crear invitación",
+        "issued": {
+            "readCode": "Díctale este código:",
+            "codeLabel": "código de invitación",
+            "sendYourself": "Envíalo tú:",
+            "link": "El enlace de invitación:",
+            "linkLabel": "enlace de invitación",
+            "sendError": "La invitación se ha creado, pero Polaris no ha podido enviarla por correo: {error}",
+            "shownOnce": "Solo se muestra una vez. Polaris guarda únicamente un hash, así que no se puede volver a consultar.",
+            "done": "Hecho"
+        }
+    }
+}

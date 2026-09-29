@@ -22,6 +22,8 @@ import { Avatar } from "@/components/avatar";
 import { RelativeTime } from "@/components/relative-time";
 import { Badge, Card, CardBody } from "@polaris/ui";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** One label and its value. Absent values are left out rather than drawn as a
  *  dash: a card of dashes says nothing and takes the height of one that does. */
@@ -35,15 +37,16 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** What a provider is called, in the words the rest of Polaris uses for it. */
-function providerName(providerId: string): string {
+function providerName(t: NamespaceTranslator<"admin">, providerId: string): string {
     const known = CONNECTION_PROVIDERS.find((provider) => provider.slug === providerId);
     if (known) return known.name;
     // "credential" is better-auth's word for a password, which is not a
     // connection at all - and the only other thing this column ever holds.
-    return providerId === "credential" ? "Password" : providerId;
+    return providerId === "credential" ? t("usersDetail.identity.password") : providerId;
 }
 
 export async function IdentityCard({ userId }: { userId: string }) {
+    const t = await getTranslations("admin");
     const [user, memberships, accounts, ownedOrgs] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
@@ -100,52 +103,56 @@ export async function IdentityCard({ userId }: { userId: string }) {
                 </div>
 
                 <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Fact label="Name">{user.name}</Fact>
-                    {fullName && fullName !== user.name && <Fact label="Full name">{fullName}</Fact>}
-                    {user.username && <Fact label="Handle">@{user.username}</Fact>}
-                    {user.pronouns && <Fact label="Pronouns">{user.pronouns}</Fact>}
+                    <Fact label={t("usersDetail.identity.name")}>{user.name}</Fact>
+                    {fullName && fullName !== user.name && (
+                        <Fact label={t("usersDetail.identity.fullName")}>{fullName}</Fact>
+                    )}
+                    {user.username && <Fact label={t("usersDetail.identity.handle")}>@{user.username}</Fact>}
+                    {user.pronouns && <Fact label={t("usersDetail.identity.pronouns")}>{user.pronouns}</Fact>}
 
-                    <Fact label="Email">
+                    <Fact label={t("usersDetail.identity.email")}>
                         <span className="flex flex-wrap items-center gap-1.5">
                             {user.email}
                             {user.emailVerified ? (
-                                <Badge variant="success">verified</Badge>
+                                <Badge variant="success">{t("usersDetail.identity.verified")}</Badge>
                             ) : (
-                                <Badge variant="warning">unverified</Badge>
+                                <Badge variant="warning">{t("usersDetail.identity.unverified")}</Badge>
                             )}
                         </span>
                     </Fact>
 
-                    {user.company && <Fact label="Company">{user.company}</Fact>}
-                    {user.headline && <Fact label="Headline">{user.headline}</Fact>}
+                    {user.company && <Fact label={t("usersDetail.identity.company")}>{user.company}</Fact>}
+                    {user.headline && <Fact label={t("usersDetail.identity.headline")}>{user.headline}</Fact>}
 
-                    <Fact label="Joined">
+                    <Fact label={t("usersDetail.identity.joined")}>
                         <RelativeTime iso={user.createdAt.toISOString()} />
                     </Fact>
-                    <Fact label="Second factor">{user.twoFactorEnabled ? "On" : "Off"}</Fact>
+                    <Fact label={t("usersDetail.identity.secondFactor")}>
+                        {user.twoFactorEnabled ? t("usersDetail.identity.on") : t("usersDetail.identity.off")}
+                    </Fact>
 
-                    <Fact label="Organizations">
+                    <Fact label={t("usersDetail.identity.organizations")}>
                         {orgs.length === 0 ? (
-                            <span className="text-muted-foreground">None</span>
+                            <span className="text-muted-foreground">{t("usersDetail.identity.none")}</span>
                         ) : (
                             <span className="flex flex-wrap gap-1.5">
                                 {orgs.map((org) => (
                                     <Badge key={org.id} variant="neutral">
-                                        {org.name} - {org.role}
+                                        {t("usersDetail.identity.org", { name: org.name, role: org.role })}
                                     </Badge>
                                 ))}
                             </span>
                         )}
                     </Fact>
 
-                    <Fact label="Signs in with">
+                    <Fact label={t("usersDetail.identity.signsInWith")}>
                         {accounts.length === 0 ? (
-                            <span className="text-muted-foreground">Nothing recorded</span>
+                            <span className="text-muted-foreground">{t("usersDetail.identity.nothingRecorded")}</span>
                         ) : (
                             <span className="flex flex-wrap gap-1.5">
                                 {accounts.map((account, index) => (
                                     <Badge key={`${account.providerId}-${index}`} variant="neutral">
-                                        {providerName(account.providerId)}
+                                        {providerName(t, account.providerId)}
                                     </Badge>
                                 ))}
                             </span>

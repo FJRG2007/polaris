@@ -19,6 +19,7 @@ import { EvidenceSectionCard } from "./evidence-section";
 import { useDisplayFormat } from "@/components/display-format";
 import type { EvidenceReport } from "@/lib/compliance/evidence";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EvidenceExport } from "@/lib/compliance/evidence-export";
 import { Button, Card, CardBody, CopyButton, PageHeader, Skeleton, useToast } from "@polaris/ui";
 
@@ -31,6 +32,7 @@ function save(file: { name: string; body: string }, type: string): void {
 }
 
 export function EvidenceView() {
+    const t = useTranslations("admin");
     const format = useDisplayFormat();
     const toast = useToast();
     const [exporting, setExporting] = useState(false);
@@ -50,15 +52,15 @@ export function EvidenceView() {
             const body: unknown = await res.json().catch(() => null);
             if (!res.ok || !body || typeof body !== "object" || !("sha256" in body)) {
                 const message =
-                    body && typeof body === "object" && "error" in body ? String(body.error) : "The export did not work";
+                    body && typeof body === "object" && "error" in body ? String(body.error) : t("evidence.export.failed");
                 toast.show({ title: message });
                 return;
             }
             setExported(body as EvidenceExport);
-            toast.show({ title: "Exported, and recorded in Activity." });
+            toast.show({ title: t("evidence.export.done") });
             refresh();
         } catch {
-            toast.show({ title: "Polaris could not be reached. Check the connection and try again." });
+            toast.show({ title: t("evidence.export.unreachable") });
         } finally {
             setExporting(false);
         }
@@ -67,43 +69,37 @@ export function EvidenceView() {
     return (
         <>
             <PageHeader
-                title="Evidence"
-                description="The controls in force on this Polaris, read from its settings, with where each is set and who last changed it."
+                title={t("evidence.title")}
+                description={t("evidence.description")}
                 actions={
                     <Button size="sm" onClick={() => void exportNow()} disabled={exporting}>
                         {exporting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                        {exporting ? "Exporting" : "Export"}
+                        {exporting ? t("evidence.export.running") : t("evidence.export.button")}
                     </Button>
                 }
             />
             <div className="flex flex-col gap-4">
-                <p className="text-xs text-muted-foreground">
-                    Polaris is not certified against SOC 2 or ISO 27001. Certification is an audit of the organization
-                    that runs it; this is the evidence of how this instance is configured.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("evidence.certification")}</p>
 
                 {exported ? (
                     <Card>
                         <CardBody className="flex flex-col gap-3 text-sm">
-                            <p>
-                                Exported {format.dateTime(exported.generatedAt)}. The JSON&apos;s SHA-256 is recorded
-                                in Activity, so a copy can be checked later.
-                            </p>
+                            <p>{t("evidence.export.summary", { at: format.dateTime(exported.generatedAt) })}</p>
                             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-                                <span className="shrink-0 text-xs text-muted-foreground">SHA-256</span>
+                                <span className="shrink-0 text-xs text-muted-foreground">{t("evidence.export.hash")}</span>
                                 <code className="min-w-0 flex-1 truncate font-mono text-xs" title={exported.sha256}>
                                     {exported.sha256}
                                 </code>
-                                <CopyButton value={exported.sha256} label="the SHA-256" />
+                                <CopyButton value={exported.sha256} label={t("evidence.export.copyHash")} />
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <Button size="sm" variant="outline" onClick={() => save(exported.json, "application/json")}>
                                     <Download className="size-4" aria-hidden />
-                                    JSON
+                                    {t("evidence.export.json")}
                                 </Button>
                                 <Button size="sm" variant="outline" onClick={() => save(exported.markdown, "text/markdown")}>
                                     <Download className="size-4" aria-hidden />
-                                    Printable report
+                                    {t("evidence.export.printable")}
                                 </Button>
                             </div>
                         </CardBody>
@@ -113,15 +109,20 @@ export function EvidenceView() {
                 {data ? (
                     <>
                         <p className="text-xs text-muted-foreground">
-                            Read {format.dateTime(data.generatedAt)} from {data.instance.url}
-                            {data.instance.build ? `, build ${data.instance.build}` : ""}.
+                            {data.instance.build
+                                ? t("evidence.readFromBuild", {
+                                      at: format.dateTime(data.generatedAt),
+                                      url: data.instance.url,
+                                      build: data.instance.build
+                                  })
+                                : t("evidence.readFrom", { at: format.dateTime(data.generatedAt), url: data.instance.url })}
                         </p>
                         {data.sections.map((section) => (
                             <EvidenceSectionCard key={section.id} section={section} formatDate={formatDate} />
                         ))}
                         <Card>
                             <CardBody className="flex flex-col gap-2 text-sm">
-                                <h2 className="text-[0.8125rem] font-semibold tracking-tight">Outside what Polaris can see</h2>
+                                <h2 className="text-[0.8125rem] font-semibold tracking-tight">{t("evidence.outside")}</h2>
                                 <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
                                     {data.outsidePolaris.map((item) => (
                                         <li key={item}>{item}</li>
@@ -131,7 +132,7 @@ export function EvidenceView() {
                         </Card>
                     </>
                 ) : loading ? (
-                    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Reading the evidence">
+                    <div className="flex flex-col gap-4" aria-busy="true" aria-label={t("evidence.reading")}>
                         {[0, 1, 2].map((index) => (
                             <Skeleton key={index} className="h-56 w-full rounded-lg" />
                         ))}
@@ -139,9 +140,9 @@ export function EvidenceView() {
                 ) : (
                     <Card>
                         <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                            <p className="text-danger">{error ?? "The evidence could not be read."}</p>
+                            <p className="text-danger">{error ?? t("evidence.readFailed")}</p>
                             <Button size="sm" variant="outline" onClick={refresh}>
-                                Try again
+                                {t("evidence.tryAgain")}
                             </Button>
                         </CardBody>
                     </Card>

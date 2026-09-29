@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { SMS_PROVIDER_INFO } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import { deleteSmsSenderAction, saveSmsSenderAction } from "./sms-actions";
 import {
@@ -39,6 +40,7 @@ import {
 const PROVIDER = SMS_PROVIDER_INFO.twilio;
 
 export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [editing, setEditing] = useState<SmsSenderView | "new" | null>(null);
     const [, startTransition] = useTransition();
@@ -47,23 +49,22 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div>
-                    <CardTitle>SMS sender</CardTitle>
+                    <CardTitle>{t("inboxChannels.sms.title")}</CardTitle>
                     <p className="text-xs text-muted-foreground">
-                        Needed only to send texts. {PROVIDER.summary}
+                        {t("inboxChannels.sms.hint", { summary: PROVIDER.summary })}
                     </p>
                 </div>
                 {senders.length === 0 ? (
                     <Button size="sm" variant="secondary" onClick={() => setEditing("new")}>
                         <Plus className="size-4" />
-                        Connect
+                        {t("inbox.connect.connect")}
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="p-0">
                 {senders.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                        No sender connected. Alerts to a phone number will not send until there
-                        is one; every other destination works without it.
+                        {t("inboxChannels.sms.empty")}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">
@@ -73,20 +74,22 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium">{sender.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {PROVIDER.label} - sends from {sender.from}
+                                            {t("inboxChannels.sms.sendsFrom", { provider: PROVIDER.label, from: sender.from })}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
                                         <Badge variant={sender.status === "connected" ? "success" : "danger"}>
-                                            {sender.status === "connected" ? "Working" : "Not working"}
+                                            {sender.status === "connected"
+                                                ? t("inboxChannels.sms.working")
+                                                : t("inboxChannels.sms.notWorking")}
                                         </Badge>
                                         <Button size="sm" variant="ghost" onClick={() => setEditing(sender)}>
-                                            Edit
+                                            {t("inboxChannels.sms.edit")}
                                         </Button>
                                         <button
                                             type="button"
-                                            aria-label="Remove sender"
-                                            title="Remove sender"
+                                            aria-label={t("inboxChannels.sms.remove")}
+                                            title={t("inboxChannels.sms.remove")}
                                             onClick={() =>
                                                 startTransition(async () => {
                                                     await deleteSmsSenderAction(sender.id);
@@ -129,8 +132,10 @@ function SmsSenderDialog({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [pending, startTransition] = useTransition();
-    const [name, setName] = useState(sender?.name ?? "Texts");
+    const [name, setName] = useState(sender?.name ?? t("inboxChannels.sms.defaultName"));
     const [settings, setSettings] = useState<Record<string, string>>(() => ({
         accountSid: sender?.settings.accountSid ?? "",
         from: sender?.from ?? ""
@@ -160,7 +165,7 @@ function SmsSenderDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{sender ? "Edit SMS sender" : "Connect an SMS sender"}</DialogTitle>
+                    <DialogTitle>{sender ? t("inboxChannels.sms.editTitle") : t("inboxChannels.sms.connectTitle")}</DialogTitle>
                     <DialogDescription>
                         <a
                             href={PROVIDER.docsUrl}
@@ -168,13 +173,13 @@ function SmsSenderDialog({
                             rel="noreferrer noopener"
                             className="underline"
                         >
-                            {PROVIDER.label} documentation
+                            {t("inboxChannels.sms.docs", { provider: PROVIDER.label })}
                         </a>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     {PROVIDER.fields.map((field) => (
@@ -197,7 +202,7 @@ function SmsSenderDialog({
                         <Input
                             type="password"
                             value={secret}
-                            placeholder={sender ? "Leave blank to keep the stored one" : ""}
+                            placeholder={sender ? t("inboxChannels.sms.keepSecret") : ""}
                             onChange={(event) => setSecret(event.target.value)}
                         />
                         <span className="text-xs text-muted-foreground">{PROVIDER.secretHint}</span>
@@ -205,10 +210,10 @@ function SmsSenderDialog({
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending}>
-                            Save
+                            {tc("actions.save")}
                         </Button>
                     </div>
                 </div>

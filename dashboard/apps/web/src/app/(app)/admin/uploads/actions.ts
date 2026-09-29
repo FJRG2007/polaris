@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { chatTarget } from "@/lib/chat/attachments";
 import { avatarSettings } from "@/lib/avatar-service";
@@ -37,7 +38,7 @@ const avatarSchema = z.object({ target, gravatar: z.boolean() });
 export async function setUploadSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = settingsSchema.safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setUploadSettings(parsed.data);
         await recordAudit({
@@ -50,14 +51,14 @@ export async function setUploadSettingsAction(input: unknown): Promise<{ error?:
         return {};
     } catch (caught) {
         console.error(caught);
-        return { error: "Could not save that" };
+        return { error: (await getTranslations("admin"))("uploads.errors.saveFailed") };
     }
 }
 
 export async function setAvatarSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = avatarSchema.safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setAvatarSettings(parsed.data);
         await recordAudit({
@@ -72,7 +73,7 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
         return {};
     } catch (caught) {
         console.error(caught);
-        return { error: "Could not save that" };
+        return { error: (await getTranslations("admin"))("uploads.errors.saveFailed") };
     }
 }
 
@@ -91,7 +92,7 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
 export async function setFootageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setFootageTarget(parsed.data.target);
         await recordAudit({
@@ -103,14 +104,14 @@ export async function setFootageTargetAction(input: unknown): Promise<{ error?: 
         });
         return {};
     } catch {
-        return { error: "That could not be saved" };
+        return { error: (await getTranslations("admin"))("uploads.errors.notSaved") };
     }
 }
 
 export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setChatStorageTarget(parsed.data.target);
         await recordAudit({
@@ -123,7 +124,7 @@ export async function setChatStorageTargetAction(input: unknown): Promise<{ erro
         return {};
     } catch (caught) {
         console.error(caught);
-        return { error: "Could not save that" };
+        return { error: (await getTranslations("admin"))("uploads.errors.saveFailed") };
     }
 }
 
@@ -152,14 +153,14 @@ export async function tidyChatStorageAction(): Promise<{
         return result;
     } catch (caught) {
         console.error(caught);
-        return { error: "That storage could not be tidied" };
+        return { error: (await getTranslations("admin"))("uploads.errors.tidyFailed") };
     }
 }
 
 export async function setPersonalDriveTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setPersonalDriveTarget(parsed.data.target);
         await recordAudit({
@@ -172,7 +173,7 @@ export async function setPersonalDriveTargetAction(input: unknown): Promise<{ er
         return {};
     } catch (caught) {
         console.error(caught);
-        return { error: "Could not save that" };
+        return { error: (await getTranslations("admin"))("uploads.errors.saveFailed") };
     }
 }
 
@@ -181,7 +182,7 @@ export async function setOrganizationDriveTargetAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: "Check the settings and try again" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setOrganizationDriveTarget(parsed.data.target);
         await recordAudit({
@@ -194,7 +195,7 @@ export async function setOrganizationDriveTargetAction(
         return {};
     } catch (caught) {
         console.error(caught);
-        return { error: "Could not save that" };
+        return { error: (await getTranslations("admin"))("uploads.errors.saveFailed") };
     }
 }
 

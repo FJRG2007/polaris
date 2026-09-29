@@ -15,6 +15,7 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { Button, Card, CardBody, Switch } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     refreshModelCatalogAction,
     setInstanceKeySharingAction,
@@ -31,6 +32,7 @@ import {
  * their own AI provider keys screen.
  */
 export function KeySharingCard({ shared }: { shared: boolean }) {
+    const t = useTranslations("admin");
     const [on, setOn] = useState(shared);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -55,20 +57,18 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">
-                            Share this deployment&apos;s provider keys
-                        </p>
+                        <p className="text-sm font-medium">{t("agents.keySharing.label")}</p>
                         <p className="text-muted-foreground text-xs">
                             {on
-                                ? "Anybody without a key of their own runs on the keys stored under Integrations, and those accounts are billed to you."
-                                : "Runs only use keys people add themselves, under Account > AI provider keys. Nobody spends this deployment's providers."}
+                                ? t("agents.keySharing.on")
+                                : t("agents.keySharing.off")}
                         </p>
                     </div>
                     <Switch
                         checked={on}
                         onChange={toggle}
                         disabled={pending}
-                        aria-label="Share provider keys"
+                        aria-label={t("agents.keySharing.switch")}
                     />
                 </div>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
@@ -95,6 +95,7 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
  * reads terms before flipping a switch, so the switch says it.
  */
 export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
+    const t = useTranslations("admin");
     const [on, setOn] = useState(allowed);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -118,18 +119,18 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">Offer a machine everybody shares</p>
+                        <p className="text-sm font-medium">{t("agents.sharedMachine.label")}</p>
                         <p className="text-muted-foreground text-xs">
                             {on
-                                ? "Anybody who can start a session can open the shared machine. It has one home: what is signed in there is signed in for all of them, and the files one person leaves are the files the next one finds."
-                                : "Every session opens on a machine of its own account, with its own logins and its own files. Nobody can reach anybody else's."}
+                                ? t("agents.sharedMachine.on")
+                                : t("agents.sharedMachine.off")}
                         </p>
                     </div>
                     <Switch
                         checked={on}
                         onChange={toggle}
                         disabled={pending}
-                        aria-label="Offer a shared machine"
+                        aria-label={t("agents.sharedMachine.switch")}
                     />
                 </div>
                 {/* The part that costs the subscription rather than the privacy,
@@ -138,11 +139,7 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                     account-sharing enforcement exists for - and it ends in a
                     suspension, not a warning. */}
                 {on ? (
-                    <p className="text-xs text-warning">
-                        Sign it in with an API key or a team plan. A personal Claude or ChatGPT
-                        subscription is licensed to one person, and several people working through
-                        one is what gets it suspended.
-                    </p>
+                    <p className="text-xs text-warning">{t("agents.sharedMachine.warning")}</p>
                 ) : null}
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
@@ -157,6 +154,7 @@ export function CatalogCard({
     models: number;
     refreshedAt: string | null;
 }) {
+    const t = useTranslations("admin");
     const [count, setCount] = useState(models);
     const [at, setAt] = useState(refreshedAt);
     const [error, setError] = useState<string | null>(null);
@@ -181,21 +179,28 @@ export function CatalogCard({
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">Model catalog</p>
+                        <p className="text-sm font-medium">{t("agents.catalog.title")}</p>
                         <p className="text-muted-foreground text-xs">
                             {count === 0
-                                ? "Nothing downloaded yet, so the model pickers offer only what you type. It refreshes itself once a day."
-                                : `${count} models across the providers Polaris supports. Refreshes itself once a day.`}
+                                ? t("agents.catalog.empty")
+                                : t("agents.catalog.count", { count, shown: String(count) })}
                         </p>
                     </div>
                     <Button variant="secondary" size="sm" onClick={refresh} disabled={pending}>
                         <RefreshCw className={`size-4 shrink-0 ${pending ? "animate-spin" : ""}`} />
-                        Refresh
+                        {t("agents.catalog.refresh")}
                     </Button>
                 </div>
                 {at ? (
                     <p className="text-muted-foreground text-xs">
-                        Last read <time dateTime={at}>{format.dateTime(at)}</time>.
+                        {t.rich("agents.catalog.lastRead", {
+                            when: format.dateTime(at),
+                            time: (chunks) => (
+                                <time key="time" dateTime={at}>
+                                    {chunks}
+                                </time>
+                            )
+                        })}
                     </p>
                 ) : null}
                 {error ? <p className="text-xs text-danger">{error}</p> : null}

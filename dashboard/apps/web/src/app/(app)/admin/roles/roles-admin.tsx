@@ -20,8 +20,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Plus, Trash2 } from "lucide-react";
 import type { RoleView } from "@/lib/role-service";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useConfirm } from "@/components/confirm-dialog";
 import { viewAsRoleAction } from "@/app/(app)/view-as-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createRoleAction, deleteRoleAction, setRolePermissionsAction } from "./actions";
 import {
     impliedBy,
@@ -58,6 +60,23 @@ const AREAS: { area: string; permissions: Permission[] }[] = (() => {
     return [...grouped].map(([area, permissions]) => ({ area, permissions }));
 })();
 
+type Translate = NamespaceTranslator<"admin">;
+
+/** An area's name in the reader's language. Keyed by the English name made
+ *  camelCase ("Game servers" -> "gameServers"); an area added to the core list
+ *  before the catalog knows it keeps its English name rather than a key. */
+function areaLabel(t: Translate, area: string): string {
+    const key = `roles.areas.${area.toLowerCase().replace(/\s+(\w)/g, (_, next: string) => next.toUpperCase())}`;
+    return t.has(key) ? t(key) : area;
+}
+
+/** A permission's name in the reader's language, falling back to the core's
+ *  English for one the catalog does not know yet. */
+function permissionLabel(t: Translate, permission: Permission): string {
+    const key = `roles.permissions.${permission}`;
+    return t.has(key) ? t(key) : PERMISSION_META[permission].label;
+}
+
 /** Everything that cannot be held without `permission`. */
 function dependents(permission: Permission): Permission[] {
     return PERMISSIONS.filter((candidate) => impliedBy(candidate).includes(permission));
@@ -81,6 +100,7 @@ function sameSet(a: Set<Permission>, b: readonly Permission[]): boolean {
 }
 
 export function RolesAdmin({ roles }: { roles: RoleView[] }) {
+    const t = useTranslations("admin");
     const [creating, setCreating] = useState(false);
 
     return (
@@ -88,7 +108,7 @@ export function RolesAdmin({ roles }: { roles: RoleView[] }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setCreating(true)}>
                     <Plus className="size-4" />
-                    New role
+                    {t("roles.newRole")}
                 </Button>
             </div>
             {roles.map((role) => (
@@ -100,6 +120,8 @@ export function RolesAdmin({ roles }: { roles: RoleView[] }) {
 }
 
 function RoleCard({ role }: { role: RoleView }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [held, setHeld] = useState<Set<Permission>>(() => new Set(role.permissions));
@@ -124,9 +146,10 @@ function RoleCard({ role }: { role: RoleView }) {
 
     async function onDelete() {
         const ok = await confirm({
-            title: `Delete the ${role.name} role?`,
-            description: "Nothing holds it, so nobody loses access. It cannot be brought back.",
-            confirmLabel: "Delete role",
+            title: t("roles.delete.title", { name: role.name }),
+            description: t("roles.delete.description"),
+            confirmLabel: t("roles.delete.confirm"),
+            cancelLabel: tc("actions.cancel"),
             danger: true
         });
         if (ok) await run(() => deleteRoleAction(role.id));
@@ -141,29 +164,29 @@ function RoleCard({ role }: { role: RoleView }) {
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <CardTitle>{role.name}</CardTitle>
-                    {role.isSystem ? <Badge>built-in</Badge> : null}
+                    {role.isSystem ? <Badge>{t("roles.builtIn")}</Badge> : null}
                     <span className="text-xs text-muted-foreground">
-                        {role.memberCount === 1 ? "1 person" : `${role.memberCount} people`}
+                        {t("roles.peopleCount", { count: role.memberCount })}
                     </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                     <Button
                         size="sm"
                         variant="ghost"
-                        aria-label={`See Polaris as the ${role.name} role`}
-                        title={`See Polaris as the ${role.name} role`}
+                        aria-label={t("roles.viewAs.label", { name: role.name })}
+                        title={t("roles.viewAs.label", { name: role.name })}
                         disabled={busy}
                         onClick={() => void onViewAs()}
                     >
                         <Eye className="size-4" />
-                        View as
+                        {t("roles.viewAs.button")}
                     </Button>
                     {role.isSystem ? null : (
                         <Button
                             size="sm"
                             variant="ghost"
-                            aria-label={`Delete the ${role.name} role`}
-                            title={`Delete the ${role.name} role`}
+                            aria-label={t("roles.delete.label", { name: role.name })}
+                            title={t("roles.delete.label", { name: role.name })}
                             disabled={busy}
                             onClick={() => void onDelete()}
                         >
@@ -174,18 +197,18 @@ function RoleCard({ role }: { role: RoleView }) {
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 {locked ? (
-                    <p className="text-sm text-muted-foreground">
-                        Holds everything, including permissions added in future versions. This is
-                        the role that keeps the instance reachable, so it cannot be narrowed.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("roles.locked")}</p>
                 ) : (
                     <>
                         <PermissionGrid held={held} disabled={busy} onChange={setHeld} />
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
                                 {held.size === 0
-                                    ? "Reaches no app at all - the account exists to be identified, nothing more."
-                                    : `${held.size} of ${PERMISSIONS.length} permissions.`}
+                                    ? t("roles.held.none")
+                                    : t("roles.held.count", {
+                                          held: held.size,
+                                          total: PERMISSIONS.length
+                                      })}
                             </p>
                             <Button
                                 size="sm"
@@ -198,7 +221,7 @@ function RoleCard({ role }: { role: RoleView }) {
                                     )
                                 }
                             >
-                                Save
+                                {tc("actions.save")}
                             </Button>
                         </div>
                     </>
@@ -219,11 +242,12 @@ function PermissionGrid({
     disabled: boolean;
     onChange: (next: Set<Permission>) => void;
 }) {
+    const t = useTranslations("admin");
     return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {AREAS.map(({ area, permissions }) => (
                 <div key={area} className="flex flex-col gap-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">{area}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{areaLabel(t, area)}</p>
                     {permissions.map((permission) => (
                         <label
                             key={permission}
@@ -233,12 +257,12 @@ function PermissionGrid({
                                 className="mt-0.5"
                                 checked={held.has(permission)}
                                 disabled={disabled}
-                                aria-label={PERMISSION_META[permission].label}
+                                aria-label={permissionLabel(t, permission)}
                                 onChange={(event) =>
                                     onChange(toggle(held, permission, event.target.checked))
                                 }
                             />
-                            <span className="min-w-0">{PERMISSION_META[permission].label}</span>
+                            <span className="min-w-0">{permissionLabel(t, permission)}</span>
                         </label>
                     ))}
                 </div>
@@ -248,6 +272,8 @@ function PermissionGrid({
 }
 
 function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const [name, setName] = useState("");
     const [held, setHeld] = useState<Set<Permission>>(new Set());
@@ -271,20 +297,17 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>New role</DialogTitle>
-                    <DialogDescription>
-                        A role with nothing ticked is still useful: the account exists and can sign
-                        in, but reaches no app.
-                    </DialogDescription>
+                    <DialogTitle>{t("roles.create.title")}</DialogTitle>
+                    <DialogDescription>{t("roles.create.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1">
                         <label className="text-sm" htmlFor="role-name">
-                            Name
+                            {t("roles.create.name")}
                         </label>
                         <Input
                             id="role-name"
-                            placeholder="contractor"
+                            placeholder={t("roles.create.namePlaceholder")}
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                         />
@@ -293,13 +316,13 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button
                             disabled={busy || name.trim().length === 0}
                             onClick={() => void create()}
                         >
-                            {busy ? "Creating..." : "Create role"}
+                            {busy ? t("roles.create.creating") : t("roles.create.submit")}
                         </Button>
                     </div>
                 </div>

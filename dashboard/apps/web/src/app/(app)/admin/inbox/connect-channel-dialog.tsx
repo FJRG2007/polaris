@@ -11,7 +11,7 @@
  * intent, and that is far easier to fix while it is still in front of you.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import {
     Badge,
@@ -26,11 +26,12 @@ import {
 } from "@polaris/ui";
 import type { ChannelView } from "@/lib/messaging-service";
 import { channelStateAction, connectChannelAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
-    CHANNEL_META,
     CHANNEL_PLATFORM,
     CHANNEL_PROVIDER,
-    PLATFORM_GROUPS,
+    channelMeta,
+    platformGroups,
     type ChannelKind,
     type PlatformGroup
 } from "./channel-catalog";
@@ -48,16 +49,20 @@ export function ConnectChannelDialog({
     onClose: () => void;
     onConnected: (channel: ChannelView) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+    const kinds = useMemo(() => channelMeta(t), [t]);
+    const platforms = useMemo(() => platformGroups(t), [t]);
     const [phase, setPhase] = useState<"platform" | "variant" | "form" | "qr" | "setup">(
         initialKind ? "form" : "platform"
     );
     const [kind, setKind] = useState<ChannelKind>(initialKind ?? "telegram");
     const [group, setGroup] = useState<PlatformGroup | null>(
         initialKind
-            ? (PLATFORM_GROUPS.find((item) => item.variants.includes(initialKind)) ?? null)
+            ? (platforms.find((item) => item.variants.includes(initialKind)) ?? null)
             : null
     );
-    const [name, setName] = useState(initialKind ? CHANNEL_META[initialKind].name : "");
+    const [name, setName] = useState(initialKind ? kinds[initialKind].name : "");
     const [token, setToken] = useState("");
     const [phoneNumberId, setPhoneNumberId] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -66,7 +71,7 @@ export function ConnectChannelDialog({
     const [qr, setQr] = useState<string | null>(null);
     const [qrStatus, setQrStatus] = useState("connecting");
 
-    const meta = CHANNEL_META[kind];
+    const meta = kinds[kind];
     const isWeb = kind === "whatsapp-web";
     const isDiscordBot = kind === "discord";
     const needsToken = Boolean(meta.tokenLabel);
@@ -104,7 +109,7 @@ export function ConnectChannelDialog({
     // Pick a variant: seed the name and clear prior input, then show the form.
     function pick(next: ChannelKind) {
         setKind(next);
-        setName(CHANNEL_META[next].name);
+        setName(kinds[next].name);
         setToken("");
         setPhoneNumberId("");
         setError(null);
@@ -178,27 +183,24 @@ export function ConnectChannelDialog({
                                 >
                                     <meta.Logo className="size-4" />
                                 </span>
-                                {name.trim()} is connected
+                                {t("inbox.connect.connected", { name: name.trim() })}
                             </DialogTitle>
                             <DialogDescription>
-                                The token works. Finish the setup so the bot can reach people.
+                                {t("inbox.connect.connectedDescription")}
                             </DialogDescription>
                         </DialogHeader>
                         <DiscordSetupPanel channelId={connectedId} />
                         <DialogFooter>
                             <Button onClick={() => onConnected(connectedChannel(connectedId))}>
-                                Done
+                                {t("inbox.connect.done")}
                             </Button>
                         </DialogFooter>
                     </>
                 ) : phase === "qr" ? (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Scan to link WhatsApp</DialogTitle>
-                            <DialogDescription>
-                                On your phone: WhatsApp {">"} Linked devices {">"} Link a device,
-                                then scan this code.
-                            </DialogDescription>
+                            <DialogTitle>{t("inbox.connect.qrTitle")}</DialogTitle>
+                            <DialogDescription>{t("inbox.qr.steps")}</DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col items-center gap-3 py-2">
                             {qr ? (
@@ -206,7 +208,7 @@ export function ConnectChannelDialog({
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                     src={qr}
-                                    alt="WhatsApp QR code"
+                                    alt={t("inbox.qr.alt")}
                                     className="size-56 rounded-md border border-border"
                                 />
                             ) : (
@@ -216,38 +218,37 @@ export function ConnectChannelDialog({
                             )}
                             <p className="text-xs text-muted-foreground">
                                 {qrStatus === "connected"
-                                    ? "Connected."
+                                    ? t("inbox.connect.qrConnected")
                                     : qrStatus === "error"
-                                      ? "Connection failed - try again."
-                                      : "Waiting for the scan..."}
+                                      ? t("inbox.connect.qrFailed")
+                                      : t("inbox.connect.qrWaiting")}
                             </p>
                         </div>
                         <DialogFooter>
                             <Button variant="ghost" onClick={onClose}>
-                                {qrStatus === "connected" ? "Done" : "Close"}
+                                {qrStatus === "connected" ? t("inbox.connect.done") : t("inbox.connect.close")}
                             </Button>
                         </DialogFooter>
                     </>
                 ) : phase === "platform" ? (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Add a channel</DialogTitle>
-                            <DialogDescription>
-                                Pick a platform, then how to connect it. Add as many as you like and
-                                handle them all from one inbox.
-                            </DialogDescription>
+                            <DialogTitle>{t("inbox.connect.addTitle")}</DialogTitle>
+                            <DialogDescription>{t("inbox.connect.addDescription")}</DialogDescription>
                         </DialogHeader>
                         {!bridgeReady && (
                             <p className="text-sm text-danger">
-                                The messaging bridge is not installed yet. Install it from the{" "}
-                                <a className="underline" href="/apps/marketplace">
-                                    marketplace
-                                </a>{" "}
-                                to enable channels.
+                                {t.rich("inbox.connect.bridgeMissing", {
+                                    link: (chunks) => (
+                                        <a key="link" className="underline" href="/apps/marketplace">
+                                            {chunks}
+                                        </a>
+                                    )
+                                })}
                             </p>
                         )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {PLATFORM_GROUPS.map((item) => {
+                            {platforms.map((item) => {
                                 const Logo = item.Logo;
                                 return (
                                     <button
@@ -278,7 +279,7 @@ export function ConnectChannelDialog({
                         </div>
                         <DialogFooter>
                             <Button variant="ghost" onClick={onClose}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                         </DialogFooter>
                     </>
@@ -297,15 +298,15 @@ export function ConnectChannelDialog({
                                         <group.Logo className="size-4" />
                                     </span>
                                 )}
-                                Connect {group?.name}
+                                {t("inbox.connect.connectTitle", { name: group?.name ?? "" })}
                             </DialogTitle>
                             <DialogDescription>
-                                Pick how to connect {group?.name}.
+                                {t("inbox.connect.variantDescription", { name: group?.name ?? "" })}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {(group?.variants ?? []).map((variantKind) => {
-                                const item = CHANNEL_META[variantKind];
+                                const item = kinds[variantKind];
                                 const Logo = item.Logo;
                                 return (
                                     <button
@@ -340,7 +341,7 @@ export function ConnectChannelDialog({
                         </div>
                         <div className="flex justify-start">
                             <Button variant="ghost" onClick={() => setPhase("platform")}>
-                                Back
+                                {t("inbox.connect.back")}
                             </Button>
                         </div>
                     </>
@@ -357,17 +358,17 @@ export function ConnectChannelDialog({
                                 >
                                     <meta.Logo className="size-4" />
                                 </span>
-                                Connect {meta.name}
+                                {t("inbox.connect.connectTitle", { name: meta.name })}
                             </DialogTitle>
                             <DialogDescription>{meta.help}</DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Name</span>
+                                <span className="font-medium">{t("inbox.connect.name")}</span>
                                 <Input
                                     value={name}
                                     onChange={(event) => setName(event.target.value)}
-                                    placeholder="Support bot"
+                                    placeholder={t("inbox.connect.namePlaceholder")}
                                 />
                             </label>
                             {needsToken && (
@@ -383,11 +384,11 @@ export function ConnectChannelDialog({
                             )}
                             {meta.needsPhoneNumberId && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Phone number id</span>
+                                    <span className="font-medium">{t("inbox.connect.phoneNumberId")}</span>
                                     <Input
                                         value={phoneNumberId}
                                         onChange={(event) => setPhoneNumberId(event.target.value)}
-                                        placeholder="From the WhatsApp > API setup page"
+                                        placeholder={t("inbox.connect.phoneNumberIdPlaceholder")}
                                     />
                                 </label>
                             )}
@@ -409,11 +410,11 @@ export function ConnectChannelDialog({
                                     }}
                                     disabled={pending}
                                 >
-                                    {initialKind ? "Cancel" : "Back"}
+                                    {initialKind ? tc("actions.cancel") : t("inbox.connect.back")}
                                 </Button>
                                 <Button onClick={submit} disabled={pending || !ready}>
                                     {pending && <Loader2 className="size-4 animate-spin" />}
-                                    {isWeb ? "Show QR" : "Connect"}
+                                    {isWeb ? t("inbox.connect.showQr") : t("inbox.connect.connect")}
                                 </Button>
                             </div>
                         </div>

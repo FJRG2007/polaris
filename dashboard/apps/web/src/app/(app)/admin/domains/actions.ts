@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
@@ -65,7 +66,7 @@ const domainsSchema = z.object({
 export async function saveDomainsAction(input: z.input<typeof domainsSchema>): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
     const parsed = domainsSchema.safeParse(input);
-    if (!parsed.success) throw new Error("Invalid domain settings");
+    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidSettings"));
     await setDomainConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
     revalidatePath("/admin/domains");
@@ -86,7 +87,7 @@ const extraDomainsSchema = z.array(z.string().max(253)).max(64);
 export async function saveExtraDomainsAction(input: unknown): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
     const parsed = extraDomainsSchema.safeParse(input);
-    if (!parsed.success) throw new Error("Invalid domain list");
+    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidList"));
     await setExtraDomains(parsed.data);
     await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
     revalidatePath("/admin/domains");
@@ -101,11 +102,11 @@ export async function deploymentAddressesAction(): Promise<CheckedAddress[]> {
 
 /** What went wrong when an address could not be taken off the list, in the words the
  *  page shows. Each case is a different thing to do next, so none of them is "failed". */
-const REMOVAL_ERRORS: Record<string, string> = {
-    unknown: "That address is no longer listed.",
-    "built-in": "This is the address the deployment was installed with. It changes with the installation, not here.",
-    managed: "This name comes from the guided setup above. Change the zone layout there to stop using it."
-};
+const REMOVAL_ERRORS = {
+    unknown: "domains.removal.unknown",
+    "built-in": "domains.removal.builtIn",
+    managed: "domains.removal.managed"
+} as const;
 
 /**
  * Stop listing an address: tear a tunnel down, or clear a configured domain from
@@ -114,15 +115,16 @@ const REMOVAL_ERRORS: Record<string, string> = {
  */
 export async function removeAddressAction(host: unknown): Promise<{ addresses: CheckedAddress[]; error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     if (typeof host !== "string" || !host.trim()) {
-        return { addresses: await checkedAddresses(), error: "No address given." };
+        return { addresses: await checkedAddresses(), error: t("domains.removal.noAddress") };
     }
     const result = await removeAddress(host);
     if (result === "removed") {
         await recordAudit({ actorId: user.id, action: "domains.remove", targetType: "setting", targetId: host });
         revalidatePath("/admin/domains");
     }
-    return { addresses: await checkedAddresses(), error: REMOVAL_ERRORS[result] };
+    return { addresses: await checkedAddresses(), error: result === "removed" ? undefined : t(REMOVAL_ERRORS[result]) };
 }
 
 /**
@@ -147,7 +149,9 @@ export async function saveOwnerDomainPolicyAction(input: unknown): Promise<{ pol
         revalidatePath("/admin/domains");
         return { policy };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save that" };
+        return {
+            error: caught instanceof Error ? caught.message : (await getTranslations("admin"))("domains.errors.couldNotSave")
+        };
     }
 }
 
@@ -171,17 +175,16 @@ export async function savePortPolicyAction(
     input: z.input<typeof portPolicyInputSchema>
 ): Promise<{ policy?: PortPolicy; blocks?: PortBlocks; error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const parsed = portPolicyInputSchema.safeParse(input);
-    if (!parsed.success) return { error: "Invalid port settings" };
+    if (!parsed.success) return { error: t("domainsPorts.errors.invalid") };
     const blocks: Partial<Record<PortProtocol, PortBlock>> = {};
     for (const protocol of ["tcp", "udp"] as const) {
         const text = parsed.data[protocol];
         if (text === undefined) continue;
         const block = parseBlockInput(text);
         if (!block) {
-            return {
-                error: `The ${protocol.toUpperCase()} range has to read like 25565-25664, stay above 1024, and leave 80 and 443 alone.`
-            };
+            return { error: t("domainsPorts.errors.range", { protocol: protocol.toUpperCase() }) };
         }
         blocks[protocol] = block;
     }
@@ -191,7 +194,9 @@ export async function savePortPolicyAction(
             await setPortBlock(protocol as PortProtocol, block);
         }
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save that" };
+        return {
+            error: caught instanceof Error ? caught.message : (await getTranslations("admin"))("domains.errors.couldNotSave")
+        };
     }
     await recordAudit({
         actorId: user.id,
@@ -242,7 +247,7 @@ const networkSchema = z.object({
 export async function saveNetworkConfigAction(input: z.input<typeof networkSchema>): Promise<NetworkStatus> {
     const user = await requireAdmin();
     const parsed = networkSchema.safeParse(input);
-    if (!parsed.success) throw new Error("Invalid network settings");
+    if (!parsed.success) throw new Error((await getTranslations("admin"))("domains.errors.invalidNetwork"));
     await setNetworkConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
     revalidatePath("/admin/domains");

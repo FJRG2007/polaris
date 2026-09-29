@@ -18,8 +18,10 @@
  */
 
 import { Button, Select } from "@polaris/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import {
     detectRouterBrand,
@@ -45,16 +47,28 @@ function Value({ text }: { text: string }) {
 }
 
 /** The generic labels, for the brands whose form asks for the usual five things. */
-const GENERIC_FORWARD_FIELDS: readonly RouterFormField[] = [
-    { label: "Name", value: "name" },
-    { label: "Protocol", value: "protocol" },
-    { label: "External port (WAN)", value: "port" },
-    { label: "Internal port (LAN)", value: "port" },
-    { label: "Internal IP (device)", value: "ip" }
-];
+function genericForwardFields(t: NamespaceTranslator<"admin">): readonly RouterFormField[] {
+    return [
+        { label: t("domainsRouter.fields.name"), value: "name" },
+        { label: t("domainsRouter.fields.protocol"), value: "protocol" },
+        { label: t("domainsRouter.fields.externalPort"), value: "port" },
+        { label: t("domainsRouter.fields.internalPort"), value: "port" },
+        { label: t("domainsRouter.fields.internalIp"), value: "ip" }
+    ];
+}
+
+/** A value from the router's own menus, as it is shown there. */
+function bold(chunks: ReactNode[]) {
+    return (
+        <b key="b" className="font-medium text-foreground">
+            {chunks}
+        </b>
+    );
+}
 
 /** One cell of the forwarding table: what to put in this field for this rule. */
 function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: RouterForwardRule; lanIp: string | null }) {
+    const t = useTranslations("admin");
     switch (field.value) {
         case "name":
             return <Value text={rule.name} />;
@@ -75,7 +89,7 @@ function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: Ro
             // the rule, and Polaris has to answer the whole internet.
             return <code className="text-foreground">0.0.0.0 ~ 0.0.0.0</code>;
         case "ip":
-            return lanIp ? <Value text={lanIp} /> : <span>this server</span>;
+            return lanIp ? <Value text={lanIp} /> : <span>{t("domainsRouter.thisServer")}</span>;
     }
 }
 
@@ -91,6 +105,7 @@ export function RouterSteps({
      *  in the setup ever asks for those. */
     rules?: readonly RouterForwardRule[];
 }) {
+    const t = useTranslations("admin");
     const [open, setOpen] = useState(false);
     const [brand, setBrand] = useState<RouterBrand>(() => detectRouterBrand(server));
     // A brand the operator chose outranks anything a later probe recognizes. They
@@ -120,7 +135,7 @@ export function RouterSteps({
                 the admin page is the one thing the operator can act on right now. */}
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-40 flex-1 flex-col gap-1">
-                    Router brand
+                    {t("domainsRouter.brand")}
                     <Select
                         value={brand}
                         onValueChange={(value) => {
@@ -133,7 +148,7 @@ export function RouterSteps({
                 {adminUrl && (
                     <Button size="sm" variant="secondary" asChild>
                         <a href={adminUrl} target="_blank" rel="noreferrer noopener">
-                            Open the router <ExternalLink className="size-3.5" />
+                            {t("domainsRouter.open")} <ExternalLink className="size-3.5" />
                         </a>
                     </Button>
                 )}
@@ -144,54 +159,63 @@ export function RouterSteps({
                 onClick={() => setOpen((value) => !value)}
             >
                 <ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
-                {open ? "Hide the steps" : "Show me exactly what to do in the router"}
+                {open ? t("domainsRouter.hideSteps") : t("domainsRouter.showSteps")}
             </button>
             {!open ? null : (
                 <div className="flex flex-col gap-3">
                     <ol className="ml-4 flex list-decimal flex-col gap-2">
                         <li>
-                            Open the router&apos;s admin page.{" "}
-                            {adminUrl ? (
-                                <>
-                                    On {guide.label} this is{" "}
-                                    <a
-                                        href={adminUrl}
-                                        target="_blank"
-                                        rel="noreferrer noopener"
-                                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                                    >
-                                        {adminUrl} <ExternalLink className="size-3" />
-                                    </a>
-                                    {guide.admin === null
-                                        ? " - the gateway address for this network."
-                                        : ", or the gateway address your devices use."}
-                                </>
-                            ) : (
-                                <>It answers on the gateway address your devices use, usually ending in .1.</>
-                            )}
+                            {t("domainsRouter.steps.openAdmin")}{" "}
+                            {adminUrl
+                                ? t.rich(
+                                      guide.admin === null
+                                          ? "domainsRouter.steps.adminGateway"
+                                          : "domainsRouter.steps.adminKnown",
+                                      {
+                                          brand: guide.label,
+                                          url: adminUrl,
+                                          link: (chunks) => (
+                                              <a
+                                                  key="link"
+                                                  href={adminUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer noopener"
+                                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                              >
+                                                  {chunks} <ExternalLink className="size-3" />
+                                              </a>
+                                          )
+                                      }
+                                  )
+                                : t("domainsRouter.steps.adminUnknown")}
                         </li>
-                        <li>Sign in. {guide.signIn}</li>
                         <li>
-                            Give this server a fixed address, so the forward keeps pointing at it - a new lease would
-                            otherwise hand {lanIp ? <Value text={lanIp} /> : "its address"} to another machine.
+                            {t("domainsRouter.steps.signIn")} {guide.signIn}
+                        </li>
+                        <li>
+                            {t.rich("domainsRouter.steps.reserve", {
+                                address: lanIp ? <Value key="ip" text={lanIp} /> : t("domainsRouter.itsAddress")
+                            })}
                             <ol className="ml-4 mt-1 flex list-decimal flex-col gap-1">
-                                <li>
-                                    Go to <b className="font-medium text-foreground">{guide.reserve.path}</b>.
-                                </li>
+                                <li>{t.rich("domainsRouter.steps.goTo", { path: guide.reserve.path, b: bold })}</li>
                                 {guide.reserve.kind === "device" ? (
                                     <li>
-                                        Find this server in the list - it is the one holding{" "}
-                                        {lanIp ? <Value text={lanIp} /> : "this server's address"} - then{" "}
-                                        {guide.reserve.action}.
+                                        {t.rich("domainsRouter.steps.findDevice", {
+                                            address: lanIp ? (
+                                                <Value key="ip" text={lanIp} />
+                                            ) : (
+                                                t("domainsRouter.thisServerAddress")
+                                            ),
+                                            action: guide.reserve.action
+                                        })}
                                     </li>
                                 ) : (
                                     <>
                                         <li>
-                                            Press <b className="font-medium text-foreground">{guide.reserve.add}</b>.
+                                            {t.rich("domainsRouter.steps.press", { button: guide.reserve.add, b: bold })}
                                         </li>
                                         <li>
-                                            Fill it in and save with{" "}
-                                            <b className="font-medium text-foreground">{guide.reserve.save}</b>:
+                                            {t.rich("domainsRouter.steps.fillIn", { button: guide.reserve.save, b: bold })}
                                             <div className="mt-1 overflow-x-auto">
                                                 <table className="w-full min-w-72 border-separate border-spacing-x-3 text-left">
                                                     <tbody className="align-top">
@@ -205,20 +229,18 @@ export function RouterSteps({
                                                                         lanIp ? (
                                                                             <Value text={lanIp} />
                                                                         ) : (
-                                                                            "this server's address"
+                                                                            t("domainsRouter.thisServerAddress")
                                                                         )
                                                                     ) : (
-                                                                        <>
-                                                                            the MAC shown next to{" "}
-                                                                            {lanIp ? (
-                                                                                <code className="text-foreground">
+                                                                        t.rich("domainsRouter.steps.mac", {
+                                                                            server: lanIp ? (
+                                                                                <code key="ip" className="text-foreground">
                                                                                     {lanIp}
                                                                                 </code>
                                                                             ) : (
-                                                                                "this server"
-                                                                            )}{" "}
-                                                                            in the router&apos;s own device list
-                                                                        </>
+                                                                                t("domainsRouter.thisServer")
+                                                                            )
+                                                                        })
                                                                     )}
                                                                 </td>
                                                             </tr>
@@ -232,31 +254,37 @@ export function RouterSteps({
                             </ol>
                         </li>
                         <li>
-                            Create {named.length === 1 ? "one rule" : `these ${named.length} rules`} in{" "}
-                            <b className="font-medium text-foreground">{guide.forwardPath}</b>, with exactly these
-                            values
-                            {guide.forwardSave ? (
-                                <>
-                                    {" "}
-                                    (saving each with{" "}
-                                    <b className="font-medium text-foreground">{guide.forwardSave}</b>)
-                                </>
-                            ) : null}
-                            :
+                            {guide.forwardSave
+                                ? t.rich("domainsRouter.steps.createRulesSaving", {
+                                      count: named.length,
+                                      path: guide.forwardPath,
+                                      button: guide.forwardSave,
+                                      b: bold,
+                                      save: (chunks) => (
+                                          <b key="save" className="font-medium text-foreground">
+                                              {chunks}
+                                          </b>
+                                      )
+                                  })
+                                : t.rich("domainsRouter.steps.createRules", {
+                                      count: named.length,
+                                      path: guide.forwardPath,
+                                      b: bold
+                                  })}
                             <div className="mt-1 overflow-x-auto">
                                 <table className="w-full min-w-80 border-separate border-spacing-x-3 text-left">
                                     <thead>
                                         <tr className="text-muted-foreground">
-                                            <th className="font-normal">Field</th>
+                                            <th className="font-normal">{t("domainsRouter.steps.field")}</th>
                                             {named.map((rule, index) => (
                                                 <th key={rule.name} className="font-normal">
-                                                    Rule {index + 1}
+                                                    {t("domainsRouter.steps.rule", { number: index + 1 })}
                                                 </th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="align-top">
-                                        {(guide.forwardFields ?? GENERIC_FORWARD_FIELDS).map((field, index) => (
+                                        {(guide.forwardFields ?? genericForwardFields(t)).map((field, index) => (
                                             <tr key={`${field.label}-${index}`}>
                                                 <td>{field.label}</td>
                                                 {named.map((rule) => (
@@ -270,29 +298,21 @@ export function RouterSteps({
                                 </table>
                             </div>
                             {!lanIp && (
-                                <p className="mt-1">
-                                    Polaris cannot see its own LAN address on this install. Pick this server from the
-                                    router&apos;s device list, or read the address from the machine itself.
-                                </p>
+                                <p className="mt-1">{t("domainsRouter.steps.noLanIp")}</p>
                             )}
                         </li>
                         {/* A rule saved but left off is the failure with nothing to see:
                             it is listed, its values are right, and no packet moves. */}
                         {guide.forwardEnable && (
                             <li>
-                                Switch {named.length === 1 ? "the rule" : "each rule"} on. {guide.forwardEnable}
+                                {t("domainsRouter.steps.switchOn", { count: named.length })} {guide.forwardEnable}
                             </li>
                         )}
-                        <li>Save, then run the DNS check again - it reports the moment the ports reach Polaris.</li>
+                        <li>{t("domainsRouter.steps.checkAgain")}</li>
                         <li>
-                            Only if the router still answers after that: it is keeping the ports for its own admin
-                            page. Go to{" "}
-                            {guide.remotePath ? (
-                                <b className="font-medium text-foreground">{guide.remotePath}</b>
-                            ) : (
-                                "the remote-management settings"
-                            )}{" "}
-                            and turn off management from the internet (WAN), or move it to a port such as 8443.
+                            {guide.remotePath
+                                ? t.rich("domainsRouter.steps.remote", { path: guide.remotePath, b: bold })
+                                : t("domainsRouter.steps.remoteGeneric")}
                         </li>
                     </ol>
 

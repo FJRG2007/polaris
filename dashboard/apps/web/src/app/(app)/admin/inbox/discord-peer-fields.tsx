@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Input, Select } from "@polaris/ui";
 import type { TargetGroup } from "@polaris/messaging";
 import { firstDiscordChannelAction, listChannelTargetsAction } from "./actions";
@@ -27,6 +28,7 @@ export function DiscordPeerFields({
     draft: string;
     onDraft: (value: string) => void;
 }) {
+    const t = useTranslations("admin");
     const { id } = parseDiscordPeer(draft);
     const [bot, setBot] = useState<string | null>(botChannelId ?? null);
     const [groups, setGroups] = useState<TargetGroup[] | null>(null);
@@ -94,8 +96,8 @@ export function DiscordPeerFields({
                             onDraft(encodeDiscordPeer(next, ""));
                         }}
                         options={[
-                            { value: "channel", label: "Server channel" },
-                            { value: "user", label: "Direct message" }
+                            { value: "channel", label: t("inbox.discordPeer.serverChannel") },
+                            { value: "user", label: t("inbox.discordPeer.directMessage") }
                         ]}
                     />
                 </div>
@@ -104,7 +106,7 @@ export function DiscordPeerFields({
                         className="flex-1"
                         value={id}
                         onChange={(event) => onDraft(encodeDiscordPeer("user", event.target.value))}
-                        placeholder="User id or username to DM"
+                        placeholder={t("inbox.discordPeer.userPlaceholder")}
                     />
                 )}
             </div>
@@ -131,7 +133,7 @@ export function DiscordPeerFields({
                                 onValueChange={(value) =>
                                     onDraft(encodeDiscordPeer("channel", value))
                                 }
-                                placeholder="Pick a channel"
+                                placeholder={t("inbox.discordPeer.pickChannel")}
                                 options={(guild?.targets ?? []).map((item) => ({
                                     value: item.id,
                                     label: item.name
@@ -145,16 +147,16 @@ export function DiscordPeerFields({
                         onChange={(event) =>
                             onDraft(encodeDiscordPeer("channel", event.target.value))
                         }
-                        placeholder="Channel id the bot can post to"
+                        placeholder={t("inbox.discordPeer.channelPlaceholder")}
                     />
                 ))}
 
             <span className="text-xs text-muted-foreground">
                 {target === "user"
-                    ? "DM by numeric User ID (most reliable: developer mode on, right-click a user > Copy User ID), or a username if the bot shares a server and the Server Members intent is on."
+                    ? t("inbox.discordPeer.userHint")
                     : groups && groups.length > 0
-                      ? "Pick a server and a channel the bot can post to."
-                      : "A text channel id the bot can post to (right-click the channel > Copy Channel ID)."}
+                      ? t("inbox.discordPeer.pickHint")
+                      : t("inbox.discordPeer.channelHint")}
             </span>
         </div>
     );

@@ -23,14 +23,10 @@ import type { ChatReportView } from "@/lib/chat/reports";
 import type { SafetyCaseView } from "@/lib/safety-queue";
 import { ShieldAlert, Flag, Check, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
 
-const FILTERS = [
-    { value: "open", label: "Waiting" },
-    { value: "resolved", label: "Resolved" },
-    { value: "dismissed", label: "Dismissed" },
-    { value: "all", label: "Everything" }
-] as const;
+const FILTERS = ["open", "resolved", "dismissed", "all"] as const;
 
 export function SafetyView({
     cases,
@@ -41,16 +37,20 @@ export function SafetyView({
     reports: readonly ChatReportView[];
     status: string;
 }) {
+    const t = useTranslations("admin");
     return (
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium">Accounts</h2>
+                    <h2 className="text-sm font-medium">{t("safety.accounts")}</h2>
                     <Select
                         value={status}
                         className="w-44"
-                        aria-label="Which cases to show"
-                        options={FILTERS.map((filter) => ({ ...filter }))}
+                        aria-label={t("safety.filters.label")}
+                        options={FILTERS.map((filter) => ({
+                            value: filter,
+                            label: t(`safety.filters.${filter}`)
+                        }))}
                         onValueChange={(value) => {
                             window.location.href = `/admin/safety?status=${value}`;
                         }}
@@ -59,7 +59,7 @@ export function SafetyView({
                 {cases.length === 0 ? (
                     <Card>
                         <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                            Nothing about an account is waiting.
+                            {t("safety.empty")}
                         </CardBody>
                     </Card>
                 ) : (
@@ -74,7 +74,7 @@ export function SafetyView({
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium">Messages</h2>
+                <h2 className="text-sm font-medium">{t("safety.messages")}</h2>
                 {/* The message queue, unchanged and still its own thing: what
                     "removed" means for a message is a decision with a message
                     behind it, and none of that applies to a person. */}
@@ -85,11 +85,15 @@ export function SafetyView({
 }
 
 function CaseCard({ entry }: { entry: SafetyCaseView }) {
+    const t = useTranslations("admin");
     const format = useDisplayFormat();
     const [outcome, setOutcome] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const lockdown = entry.kind === "lockdown";
+    // A reason the catalog does not know (one retired from the list) is shown
+    // as it was stored.
+    const reasonKey = `safety.reasons.${entry.reason}`;
 
     async function settle(next: "resolved" | "dismissed"): Promise<void> {
         setBusy(true);
@@ -113,7 +117,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                     <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-center gap-1.5 text-sm">
                             <span className="font-medium">
-                                {core.SAFETY_CASE_KIND_LABELS[entry.kind]}
+                                {t(`safety.kinds.${entry.kind}`)}
                             </span>
                             <Link
                                 href={`/admin/users?q=${encodeURIComponent(entry.subject.email)}`}
@@ -123,26 +127,28 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                             </Link>
                             {lockdown ? (
                                 <Badge variant={entry.stillLocked ? "danger" : "neutral"}>
-                                    {entry.stillLocked ? "Still locked down" : "Lifted"}
+                                    {entry.stillLocked ? t("safety.case.stillLocked") : t("safety.case.lifted")}
                                 </Badge>
                             ) : (
                                 <Badge>
-                                    {core.USER_REPORT_REASON_LABELS[
-                                        entry.reason as core.UserReportReason
-                                    ] ?? entry.reason}
+                                    {t.has(reasonKey) ? t(reasonKey) : entry.reason}
                                 </Badge>
                             )}
                             {entry.status !== "open" ? (
                                 <Badge variant="neutral">
-                                    {core.SAFETY_CASE_STATUS_LABELS[entry.status]}
+                                    {t(`safety.statuses.${entry.status}`)}
                                 </Badge>
                             ) : null}
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {entry.reporter
-                                ? `Reported by ${entry.reporter.name}`
-                                : "Raised by the account itself"}{" "}
-                            - {format.dateTime(entry.createdAt)}
+                                ? t("safety.case.reportedBy", {
+                                      name: entry.reporter.name,
+                                      time: format.dateTime(entry.createdAt)
+                                  })
+                                : t("safety.case.raisedBySelf", {
+                                      time: format.dateTime(entry.createdAt)
+                                  })}
                         </p>
                     </div>
                 </div>
@@ -154,8 +160,8 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                 ) : (
                     <p className="text-xs text-muted-foreground">
                         {lockdown
-                            ? "They said nothing about why."
-                            : "The reporter added nothing."}
+                            ? t("safety.case.noNoteLockdown")
+                            : t("safety.case.noNoteReport")}
                     </p>
                 )}
 
@@ -165,17 +171,17 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                             value={outcome}
                             maxLength={core.MAX_REPORT_NOTE}
                             className="min-w-0 flex-1"
-                            aria-label="What you found"
+                            aria-label={t("safety.case.outcomeLabel")}
                             placeholder={
                                 lockdown
-                                    ? "What you found. The account owner is told this."
-                                    : "What you decided. Kept as the record."
+                                    ? t("safety.case.outcomeLockdown")
+                                    : t("safety.case.outcomeReport")
                             }
                             onChange={(event) => setOutcome(event.target.value)}
                         />
                         <Button size="sm" disabled={busy} onClick={() => void settle("resolved")}>
                             <Check className="size-3.5" />
-                            Looked at it
+                            {t("safety.case.resolve")}
                         </Button>
                         <Button
                             size="sm"
@@ -184,14 +190,19 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                             onClick={() => void settle("dismissed")}
                         >
                             <X className="size-3.5" />
-                            Nothing to do
+                            {t("safety.case.dismiss")}
                         </Button>
                     </div>
                 ) : (
                     <p className="text-xs text-muted-foreground">
-                        {entry.handledBy ? `${entry.handledBy.name} settled it` : "Settled"}
-                        {entry.handledAt ? ` on ${format.dateTime(entry.handledAt)}` : ""}
-                        {entry.outcome ? `: ${entry.outcome}` : "."}
+                        {t("safety.case.settled", {
+                            who: entry.handledBy ? "named" : "nobody",
+                            name: entry.handledBy?.name ?? "",
+                            when: entry.handledAt ? "yes" : "no",
+                            time: entry.handledAt ? format.dateTime(entry.handledAt) : "",
+                            outcome: entry.outcome ? "yes" : "no",
+                            text: entry.outcome ?? ""
+                        })}
                     </p>
                 )}
 
@@ -201,7 +212,7 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                     button that should not exist. */}
                 {lockdown && entry.stillLocked ? (
                     <p className="text-xs text-muted-foreground">
-                        Only they can lift the lockdown, from a device already signed in.
+                        {t("safety.case.ownerLifts")}
                     </p>
                 ) : null}
 

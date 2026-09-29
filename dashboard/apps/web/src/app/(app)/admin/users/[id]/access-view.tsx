@@ -14,6 +14,7 @@ import { setUserRoleAction } from "../actions";
 import { CapabilitiesCard } from "./capabilities-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AccessExplanation, ResourceGrantView } from "@/lib/access-explain-service";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -48,6 +49,7 @@ export function UserAccessView({
     policies: Named[];
     attachedPolicies: string[];
 }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [access, setAccess] = useState<AccessExplanation | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function UserAccessView({
                     href={`/admin/users?user=${userId}`}
                     className="ml-auto text-sm text-primary hover:underline"
                 >
-                    Sessions, limits and the rest
+                    {t("usersDetail.accessView.sessionsLink")}
                 </Link>
             </div>
 
@@ -84,11 +86,12 @@ export function UserAccessView({
             <RoleCard userId={userId} role={role} roles={roles} onSaved={load} />
             <CapabilitiesCard userId={userId} onSaved={load} />
             <MembershipCard
-                title="Groups"
-                hint="Membership only. What a group may do comes from the policies attached to it."
+                title={t("usersDetail.accessView.groups.title")}
+                hint={t("usersDetail.accessView.groups.hint")}
                 items={groups}
                 selected={memberOf}
-                emptyText="No groups are defined yet."
+                emptyText={t("usersDetail.accessView.groups.empty")}
+                manageLabel={t("usersDetail.accessView.groups.manage")}
                 manageHref="/admin/groups"
                 onToggle={(id, next) => setUserGroupAction(userId, id, next)}
                 onSaved={() => {
@@ -97,11 +100,12 @@ export function UserAccessView({
                 }}
             />
             <MembershipCard
-                title="Policies"
-                hint="Attached directly to this account. The documents themselves are written under Policies."
+                title={t("usersDetail.accessView.policies.title")}
+                hint={t("usersDetail.accessView.policies.hint")}
                 items={policies}
                 selected={attachedPolicies}
-                emptyText="No policies are defined yet."
+                emptyText={t("usersDetail.accessView.policies.empty")}
+                manageLabel={t("usersDetail.accessView.policies.manage")}
                 manageHref="/admin/policies"
                 onToggle={(id, next) => setUserPolicyAction(userId, id, next)}
                 onSaved={() => {
@@ -125,6 +129,7 @@ function RoleCard({
     roles: string[];
     onSaved: () => void;
 }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [value, setValue] = useState(role ?? "");
     const [error, setError] = useState<string | null>(null);
@@ -134,11 +139,8 @@ function RoleCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">Role</h2>
-                    <p className="text-sm text-muted-foreground">
-                        What they may do across Polaris. One role each, and anything narrower is a
-                        policy or access to one particular thing.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("usersDetail.accessView.role.title")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("usersDetail.accessView.role.hint")}</p>
                 </div>
                 <div className="flex max-w-sm items-center gap-2">
                     <Select
@@ -159,13 +161,13 @@ function RoleCard({
                         }}
                         options={roles.map((name) => ({ value: name, label: name }))}
                         disabled={pending}
-                        aria-label="Their role"
+                        aria-label={t("usersDetail.accessView.role.label")}
                     />
                     {pending && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
                 </div>
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <Link href="/admin/roles" className="w-fit text-sm text-primary hover:underline">
-                    Define what a role holds
+                    {t("usersDetail.accessView.role.define")}
                 </Link>
             </CardBody>
         </Card>
@@ -178,6 +180,7 @@ function MembershipCard({
     items,
     selected,
     emptyText,
+    manageLabel,
     manageHref,
     onToggle,
     onSaved
@@ -187,6 +190,7 @@ function MembershipCard({
     items: Named[];
     selected: string[];
     emptyText: string;
+    manageLabel: string;
     manageHref: string;
     onToggle: (id: string, next: boolean) => Promise<{ error?: string }>;
     onSaved: () => void;
@@ -245,7 +249,7 @@ function MembershipCard({
                 )}
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <Link href={manageHref} className="w-fit text-sm text-primary hover:underline">
-                    Manage {title.toLowerCase()}
+                    {manageLabel}
                 </Link>
             </CardBody>
         </Card>
@@ -261,6 +265,7 @@ function ResourcesCard({
     access: AccessExplanation | null;
     onChanged: () => void;
 }) {
+    const t = useTranslations("admin");
     const display = useDisplayFormat();
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState<string | null>(null);
@@ -271,9 +276,9 @@ function ResourcesCard({
         setPending(true);
         try {
             const ok = await confirm({
-                title: "Remove this access",
-                description: `They lose ${grant.resourceLabel} the next time a page loads. Nothing else about their account changes.`,
-                confirmLabel: "Remove",
+                title: t("usersDetail.accessView.resources.confirmTitle"),
+                description: t("usersDetail.accessView.resources.confirmDescription", { name: grant.resourceLabel }),
+                confirmLabel: t("usersDetail.accessView.resources.confirm"),
                 danger: true
             });
             if (!ok) return;
@@ -289,7 +294,7 @@ function ResourcesCard({
             onChanged();
         } catch (cause) {
             console.error(cause);
-            setError("Polaris did not answer. Reload the page and try again.");
+            setError(t("usersDetail.accessView.resources.noAnswer"));
         } finally {
             setPending(false);
         }
@@ -299,16 +304,14 @@ function ResourcesCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">On specific things</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Access to one server, project or space, given outside their role.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("usersDetail.accessView.resources.title")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("usersDetail.accessView.resources.hint")}</p>
                 </div>
                 {access === null ? (
                     <Skeleton className="h-10 w-full" />
                 ) : access.resources.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        Nothing. What they reach is whatever their role, groups and policies allow.
+                        {t("usersDetail.accessView.resources.empty")}
                     </p>
                 ) : (
                     <div className="flex flex-col divide-y divide-border/60">
@@ -328,22 +331,24 @@ function ResourcesCard({
                                         <Badge>{grant.kindLabel}</Badge>
                                         {grant.effect === "deny" && (
                                             <Badge className="border-danger-edge text-danger">
-                                                deny
+                                                {t("usersDetail.accessView.resources.deny")}
                                             </Badge>
                                         )}
                                         {grant.expired && (
                                             <Badge className="border-danger-edge text-danger">
-                                                ended
+                                                {t("usersDetail.accessView.resources.ended")}
                                             </Badge>
                                         )}
-                                        {grant.canShare && <Badge>can invite others</Badge>}
+                                        {grant.canShare && <Badge>{t("usersDetail.accessView.resources.canShare")}</Badge>}
                                     </div>
                                     <span className="text-xs text-muted-foreground">
-                                        {grant.actions.join(", ")}
-                                        {grant.principalType !== "user" &&
-                                            ` - via ${grant.principalLabel}`}
-                                        {grant.expiresAt &&
-                                            ` - until ${display.date(grant.expiresAt)}`}
+                                        {t("usersDetail.accessView.resources.detail", {
+                                            actions: grant.actions.join(", "),
+                                            via: grant.principalType !== "user" ? "yes" : "no",
+                                            principal: grant.principalLabel,
+                                            until: grant.expiresAt ? "yes" : "no",
+                                            date: grant.expiresAt ? display.date(grant.expiresAt) : ""
+                                        })}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -352,8 +357,8 @@ function ResourcesCard({
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                aria-label={`Open ${grant.resourceLabel}`}
-                                                title={`Open ${grant.resourceLabel}`}
+                                                aria-label={t("usersDetail.accessView.resources.open", { name: grant.resourceLabel })}
+                                                title={t("usersDetail.accessView.resources.open", { name: grant.resourceLabel })}
                                             >
                                                 <ExternalLink className="size-4" />
                                             </Button>
@@ -363,8 +368,8 @@ function ResourcesCard({
                                         size="icon"
                                         variant="ghost"
                                         disabled={pending}
-                                        aria-label={`Remove their access to ${grant.resourceLabel}`}
-                                        title={`Remove their access to ${grant.resourceLabel}`}
+                                        aria-label={t("usersDetail.accessView.resources.remove", { name: grant.resourceLabel })}
+                                        title={t("usersDetail.accessView.resources.remove", { name: grant.resourceLabel })}
                                         onClick={() => void remove(grant)}
                                     >
                                         <Trash2 className="size-4" />

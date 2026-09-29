@@ -10,6 +10,7 @@
  */
 
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { verifyAuditChain, type ChainVerification } from "@/lib/audit-chain";
 
@@ -28,6 +29,6 @@ export async function verifyAuditChainAction(): Promise<{
         return { result };
     } catch (caught) {
         console.error("polaris: the audit chain could not be verified:", caught);
-        return { error: "The chain could not be checked just now. Try again in a minute." };
+        return { error: (await getTranslations("admin"))("activity.errors.verifyFailed") };
     }
 }

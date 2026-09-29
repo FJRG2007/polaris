@@ -17,6 +17,7 @@ import { useZodForm } from "@/lib/use-zod-form";
 import { useState, type FormEvent } from "react";
 import type { RoleOption } from "@/lib/role-service";
 import { CopyButton } from "@/components/copy-button";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, Mail, Wand2 } from "lucide-react";
 import { createInviteSchema, formatInviteCode, type InviteMethod } from "@polaris/core";
 import {
@@ -40,23 +41,7 @@ import {
 } from "@/components/access-rules-editor";
 
 /** How an invite can travel, in the order an operator is likely to want them. */
-const METHODS: { value: InviteMethod; label: string; hint: string }[] = [
-    {
-        value: "link",
-        label: "Invite link",
-        hint: "You copy the link and send it however you like."
-    },
-    {
-        value: "magic",
-        label: "Magic link by email",
-        hint: "Polaris emails the link to the address you invited."
-    },
-    {
-        value: "code",
-        label: "Invitation code",
-        hint: "A short code they type in at the sign-in page."
-    }
-];
+const METHODS: readonly InviteMethod[] = ["link", "magic", "code"];
 
 /** What was created, held only until the dialog closes. */
 interface Issued {
@@ -78,6 +63,8 @@ export function InviteDialog({
     canSendMail: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const form = useZodForm(createInviteSchema);
     const [values, setValues] = useState({ email: "", role: "member" });
@@ -125,11 +112,8 @@ export function InviteDialog({
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>Invite someone</DialogTitle>
-                    <DialogDescription>
-                        They set their own name and password when they join. The invite is good for
-                        7 days.
-                    </DialogDescription>
+                    <DialogTitle>{t("usersInvite.title")}</DialogTitle>
+                    <DialogDescription>{t("usersInvite.description")}</DialogDescription>
                 </DialogHeader>
 
                 {issued ? (
@@ -138,10 +122,10 @@ export function InviteDialog({
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm">Email</label>
+                                <label className="text-sm">{t("usersInvite.email")}</label>
                                 <Input
                                     type="email"
-                                    placeholder="teammate@example.com"
+                                    placeholder={t("usersInvite.emailPlaceholder")}
                                     value={values.email}
                                     onChange={(event) => update("email", event.target.value)}
                                     onBlur={() => form.markTouched("email")}
@@ -152,9 +136,9 @@ export function InviteDialog({
                                 ) : null}
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-sm">Role</label>
+                                <label className="text-sm">{t("usersInvite.role")}</label>
                                 <Select
-                                    aria-label="Role"
+                                    aria-label={t("usersInvite.role")}
                                     value={values.role}
                                     onValueChange={(value) => update("role", value)}
                                     options={roles.map((role) => ({
@@ -164,22 +148,22 @@ export function InviteDialog({
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     {roles.find((role) => role.name === values.role)?.grants === 0
-                                        ? "Opens no app. The account exists so they can be identified - at a share link, a drop point, or anywhere that asks for a Polaris sign-in."
-                                        : "What each role may do is set under Management > Roles."}
+                                        ? t("usersInvite.roleNoApp")
+                                        : t("usersInvite.roleHint")}
                                 </p>
                             </div>
                         </div>
 
                         <fieldset className="flex flex-col gap-2">
-                            <legend className="pb-1 text-sm">How it reaches them</legend>
+                            <legend className="pb-1 text-sm">{t("usersInvite.method")}</legend>
                             {METHODS.map((option) => {
-                                const unavailable = option.value === "magic" && !canSendMail;
+                                const unavailable = option === "magic" && !canSendMail;
                                 return (
                                     <label
-                                        key={option.value}
+                                        key={option}
                                         className={cn(
                                             "flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm transition-colors",
-                                            method === option.value
+                                            method === option
                                                 ? "border-primary bg-primary/5"
                                                 : "border-border hover:bg-muted",
                                             unavailable && "cursor-not-allowed opacity-60"
@@ -189,16 +173,18 @@ export function InviteDialog({
                                             type="radio"
                                             name="invite-method"
                                             className="mt-1"
-                                            checked={method === option.value}
+                                            checked={method === option}
                                             disabled={unavailable}
-                                            onChange={() => setMethod(option.value)}
+                                            onChange={() => setMethod(option)}
                                         />
                                         <span className="min-w-0">
-                                            <span className="block">{option.label}</span>
+                                            <span className="block">
+                                                {t(`usersInvite.methods.${option}.label`)}
+                                            </span>
                                             <span className="block text-xs text-muted-foreground">
                                                 {unavailable
-                                                    ? "Needs an email channel: nominate one under Integrations."
-                                                    : option.hint}
+                                                    ? t("usersInvite.noMail")
+                                                    : t(`usersInvite.methods.${option}.hint`)}
                                             </span>
                                         </span>
                                     </label>
@@ -219,7 +205,7 @@ export function InviteDialog({
                                         advanced && "rotate-180"
                                     )}
                                 />
-                                Advanced options
+                                {t("usersInvite.advanced")}
                             </button>
 
                             {advanced ? (
@@ -227,16 +213,14 @@ export function InviteDialog({
                                     <div className="flex flex-col gap-2">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="text-sm">One-time password</p>
+                                                <p className="text-sm">{t("usersInvite.otp.title")}</p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Asked for on top of the link or code. Send it
-                                                    another way, so a misdelivered invite is not
-                                                    enough on its own.
+                                                    {t("usersInvite.otp.hint")}
                                                 </p>
                                             </div>
                                             <Switch
                                                 checked={usePassword}
-                                                aria-label="Require a one-time password"
+                                                aria-label={t("usersInvite.otp.switchLabel")}
                                                 onChange={setUsePassword}
                                             />
                                         </div>
@@ -244,7 +228,7 @@ export function InviteDialog({
                                             <Input
                                                 type="text"
                                                 autoComplete="off"
-                                                placeholder="At least 6 characters"
+                                                placeholder={t("usersInvite.otp.placeholder")}
                                                 value={oneTimePassword}
                                                 onChange={(event) =>
                                                     setOneTimePassword(event.target.value)
@@ -255,11 +239,9 @@ export function InviteDialog({
 
                                     <div className="flex flex-col gap-2">
                                         <div>
-                                            <p className="text-sm">Where they may connect from</p>
+                                            <p className="text-sm">{t("usersInvite.where.title")}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                Bounds the invite and stays on the account
-                                                afterwards, as a limit they cannot lift themselves.
-                                                Leave empty for no restriction.
+                                                {t("usersInvite.where.hint")}
                                             </p>
                                         </div>
                                         <AccessRulesEditor
@@ -272,8 +254,8 @@ export function InviteDialog({
                             ) : (
                                 <p className="text-xs text-muted-foreground">
                                     {accessRulesAreEmpty(rules) && !usePassword
-                                        ? "No one-time password, no address or country limits."
-                                        : "One-time password or connection limits are set."}
+                                        ? t("usersInvite.summaryNone")
+                                        : t("usersInvite.summarySet")}
                                 </p>
                             )}
                         </div>
@@ -285,7 +267,7 @@ export function InviteDialog({
                                 variant="ghost"
                                 onClick={() => onOpenChange(false)}
                             >
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button
                                 type="submit"
@@ -293,7 +275,7 @@ export function InviteDialog({
                                     pending || (usePassword && oneTimePassword.trim().length < 6)
                                 }
                             >
-                                {pending ? "Creating..." : "Create invite"}
+                                {pending ? t("usersInvite.creating") : t("usersInvite.create")}
                             </Button>
                         </div>
                     </form>
@@ -305,18 +287,19 @@ export function InviteDialog({
 
 /** The one and only sight of what was issued. */
 function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }) {
+    const t = useTranslations("admin");
     return (
         <div className="flex flex-col gap-3">
             {issued.code ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3">
                     <p className="mb-1 text-xs text-muted-foreground">
-                        Read this code out to them:
+                        {t("usersInvite.issued.readCode")}
                     </p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 font-mono text-lg tracking-widest">
                             {issued.code}
                         </code>
-                        <CopyButton value={issued.code} label="invitation code" />
+                        <CopyButton value={issued.code} label={t("usersInvite.issued.codeLabel")} />
                     </div>
                 </div>
             ) : null}
@@ -328,25 +311,26 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
                         ) : (
                             <Wand2 className="size-3.5" />
                         )}
-                        {issued.sendError ? "Send it yourself:" : "The invite link:"}
+                        {issued.sendError
+                            ? t("usersInvite.issued.sendYourself")
+                            : t("usersInvite.issued.link")}
                     </p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 truncate text-xs">{issued.url}</code>
-                        <CopyButton value={issued.url} label="invite link" />
+                        <CopyButton value={issued.url} label={t("usersInvite.issued.linkLabel")} />
                     </div>
                 </div>
             ) : null}
             {issued.sendError ? (
                 <p className="text-sm text-warning">
-                    The invite was created, but Polaris could not email it: {issued.sendError}
+                    {t("usersInvite.issued.sendError", { error: issued.sendError })}
                 </p>
             ) : null}
             <p className="text-xs text-muted-foreground">
-                This is shown once. Polaris keeps only a hash of it, so it cannot be looked up
-                again.
+                {t("usersInvite.issued.shownOnce")}
             </p>
             <div className="flex justify-end">
-                <Button onClick={onDone}>Done</Button>
+                <Button onClick={onDone}>{t("usersInvite.issued.done")}</Button>
             </div>
         </div>
     );

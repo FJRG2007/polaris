@@ -10,15 +10,18 @@
  */
 
 import Link from "next/link";
+import { Fragment } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { factText, type EvidenceFact, type EvidenceSection } from "@/lib/compliance/evidence";
 
 /** A value, with the flag that says it is worth a second look. */
 function FactValue({ fact, formatDate }: { fact: EvidenceFact; formatDate: (iso: string) => string }) {
+    const t = useTranslations("admin");
     return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
             <span className={fact.attention ? "text-warning-ink" : undefined}>{factText(fact, formatDate)}</span>
-            {fact.attention ? <Badge variant="warning">Review</Badge> : null}
+            {fact.attention ? <Badge variant="warning">{t("evidence.review")}</Badge> : null}
         </span>
     );
 }
@@ -30,6 +33,7 @@ export function EvidenceSectionCard({
     section: EvidenceSection;
     formatDate: (iso: string) => string;
 }) {
+    const t = useTranslations("admin");
     const change = section.lastChange;
     const rows = section.rows;
     const columns = rows?.items[0]?.facts.map((fact) => fact.label) ?? [];
@@ -39,15 +43,20 @@ export function EvidenceSectionCard({
             <CardHeader>
                 <CardTitle>{section.title}</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                    Set in{" "}
-                    {section.where.map((where, index) => (
-                        <span key={where.label}>
-                            {index > 0 ? ", " : null}
-                            <Link href={where.href} className="text-foreground underline-offset-2 hover:underline">
-                                {where.label}
-                            </Link>
-                        </span>
-                    ))}
+                    {t.rich("evidence.setIn", {
+                        places: (
+                            <Fragment key="places">
+                                {section.where.map((where, index) => (
+                                    <span key={where.label}>
+                                        {index > 0 ? ", " : null}
+                                        <Link href={where.href} className="text-foreground underline-offset-2 hover:underline">
+                                            {where.label}
+                                        </Link>
+                                    </span>
+                                ))}
+                            </Fragment>
+                        )
+                    })}
                 </p>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
@@ -72,7 +81,7 @@ export function EvidenceSectionCard({
                             {rows.items.length < rows.total ? (
                                 <span className="font-normal text-muted-foreground">
                                     {" "}
-                                    - {rows.items.length} of {rows.total} shown
+                                    {t("evidence.rowsShown", { shown: rows.items.length, total: rows.total })}
                                 </span>
                             ) : null}
                         </p>
@@ -80,7 +89,7 @@ export function EvidenceSectionCard({
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-border">
-                                        <th className="px-3 py-2 text-left">Name</th>
+                                        <th className="px-3 py-2 text-left">{t("evidence.name")}</th>
                                         {columns.map((column) => (
                                             <th key={column} className="px-3 py-2 text-left">
                                                 {column}
@@ -112,18 +121,31 @@ export function EvidenceSectionCard({
                 <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted-foreground">
                     {change ? (
                         <p>
-                            Last changed {formatDate(change.at)} by{" "}
-                            {change.actorId && change.actorExists ? (
-                                <Link href={`/admin/users/${change.actorId}`} className="text-foreground hover:underline">
-                                    {change.actorName}
-                                </Link>
-                            ) : (
-                                <span className="text-foreground">{change.actorName}</span>
-                            )}{" "}
-                            <span className="font-mono text-foreground-subtle">{change.action}</span>
+                            {t.rich("evidence.lastChanged", {
+                                at: formatDate(change.at),
+                                actor:
+                                    change.actorId && change.actorExists ? (
+                                        <Link
+                                            key="actor"
+                                            href={`/admin/users/${change.actorId}`}
+                                            className="text-foreground hover:underline"
+                                        >
+                                            {change.actorName}
+                                        </Link>
+                                    ) : (
+                                        <span key="actor" className="text-foreground">
+                                            {change.actorName}
+                                        </span>
+                                    ),
+                                action: (
+                                    <span key="action" className="font-mono text-foreground-subtle">
+                                        {change.action}
+                                    </span>
+                                )
+                            })}
                         </p>
                     ) : (
-                        <p>No change to this is recorded in the audit trail.</p>
+                        <p>{t("evidence.noChange")}</p>
                     )}
                     {section.notes.map((note) => (
                         <p key={note}>{note}</p>

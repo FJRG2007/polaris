@@ -8,6 +8,7 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { organizationPolicy } from "@/lib/orgs/policy";
 import { saveOrganizationPolicyAction } from "./actions";
 import { OrganizationsAdmin } from "./organizations-admin";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function OrganizationsAdminPage() {
     await requireAdmin();
 
-    const [policy, orgs] = await Promise.all([
+    const [policy, orgs, t] = await Promise.all([
         organizationPolicy(),
         prisma.organization.findMany({
             orderBy: { name: "asc" },
@@ -28,7 +29,8 @@ export default async function OrganizationsAdminPage() {
                 owner: { select: { name: true } },
                 _count: { select: { members: true, teams: true, spaces: true } }
             }
-        })
+        }),
+        getTranslations("admin")
     ]);
 
     return (
@@ -36,8 +38,8 @@ export default async function OrganizationsAdminPage() {
         // table and reads as one.
         <>
             <PageHeader
-                title="Organizations"
-                description="Work owned by a group rather than by one person. Turn them off entirely, restrict who can start one, or cap how large they get."
+                title={t("organizations.page.title")}
+                description={t("organizations.page.description")}
             />
             <OrganizationsAdmin
                 initial={policy}

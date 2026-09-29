@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({
@@ -25,7 +26,7 @@ const { OrganizationsAdmin } = await import("@/app/(app)/admin/organizations/org
 
 describe("the groups directory", () => {
     const markup = renderToStaticMarkup(
-        <GroupsAdmin
+        withMessages(<GroupsAdmin
             groups={[
                 {
                     id: "g1",
@@ -37,7 +38,7 @@ describe("the groups directory", () => {
                 { id: "g2", name: "Everyone", description: null, isSystem: true, members: [] }
             ]}
             users={[{ id: "u2", name: "Alan Turing", email: "alan@example.com" }]}
-        />
+        />)
     );
 
     it("puts each group in a row of one table", () => {
@@ -63,7 +64,7 @@ describe("the groups directory", () => {
 
 describe("the organizations directory", () => {
     const markup = renderToStaticMarkup(
-        <OrganizationsAdmin
+        withMessages(<OrganizationsAdmin
             initial={{ creation: "anyone", maxPerUser: 0, maxMembers: 0, maxTeams: 0 }}
             save={async () => ({})}
             orgs={[
@@ -77,7 +78,7 @@ describe("the organizations directory", () => {
                     spaceCount: 1
                 }
             ]}
-        />
+        />)
     );
 
     it("lists what exists before the policy about it", () => {

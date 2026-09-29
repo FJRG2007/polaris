@@ -11,6 +11,7 @@
 import { requireAdmin } from "@/lib/session";
 import { BillingView } from "./billing-view";
 import { getBillingRates } from "@/lib/billing/rates";
+import { Messages } from "@/components/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ export default async function BillingPage() {
     const rates = await getBillingRates();
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
-            <BillingView rates={rates} />
+            {/* The currency names are the account page's, and its words are there. */}
+            <Messages namespaces={["account"]}>
+                <BillingView rates={rates} />
+            </Messages>
         </div>
     );
 }

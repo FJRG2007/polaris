@@ -10,6 +10,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { setSetting } from "@/lib/setting-store";
 import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
@@ -59,7 +60,7 @@ export async function platformModelChoices(): Promise<PickerModel[]> {
 export async function setInstanceKeySharingAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ shared: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a setting" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
 
     await setInstanceKeysShared(parsed.data.shared);
     await recordAudit({
@@ -83,7 +84,7 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
 export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ allowed: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a setting" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
 
     await setSetting(SHARED_WORKSPACE_KEY, parsed.data.allowed ? "true" : "false");
     await recordAudit({
@@ -109,14 +110,20 @@ const limitSchema = z
         amount: z.number().int().min(0).max(1_000_000_000)
     })
     .refine((value) => value.subjectType === "everyone" || value.subjectId.length > 0, {
-        message: "Say who or what the limit is for",
+        // A key in the `admin` namespace, translated where the issue is shown.
+        message: "agents.errors.subjectRequired",
         path: ["subjectId"]
     });
 
 export async function saveUsageLimitAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = limitSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the limit" };
+    if (!parsed.success) {
+        const t = await getTranslations("admin");
+        const issue = parsed.error.issues[0];
+        if (issue?.code === "custom") return { error: t("agents.errors.subjectRequired") };
+        return { error: issue?.message ?? t("agents.errors.checkLimit") };
+    }
 
     await saveUsageLimit(parsed.data);
     await recordAudit({
@@ -137,7 +144,7 @@ export async function saveUsageLimitAction(input: unknown): Promise<{ error?: st
 export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a limit" };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickLimit") };
 
     await deleteUsageLimit(parsed.data.id);
     await recordAudit({
@@ -163,7 +170,7 @@ export async function refreshModelCatalogAction(): Promise<{
 }> {
     const admin = await requireAdmin();
     const result = await refreshModelCatalog();
-    if (!result.ok) return { error: result.error ?? "The catalog could not be read." };
+    if (!result.ok) return { error: result.error ?? (await getTranslations("admin"))("agents.errors.catalogUnread") };
     await recordAudit({
         actorId: admin.id,
         action: "agents.catalog.refresh",
@@ -176,7 +183,9 @@ export async function refreshModelCatalogAction(): Promise<{
 export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = agentDefaultsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("agents.errors.checkSettings") };
+    }
 
     // Same refusal as the per-person tiers, and it matters more here: a model
     // whose provider has no stored key would produce runs that start, ask for
@@ -184,9 +193,8 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     if (parsed.data.model) {
         const provider = providerForModel(parsed.data.model);
         if (provider && !(await connectedProviders()).includes(provider.slug)) {
-            return {
-                error: `Connect ${provider.name} under Integrations before defaulting to this model.`
-            };
+            const t = await getTranslations("admin");
+            return { error: t("agents.errors.providerNotConnected", { provider: provider.name }) };
         }
     }
 
@@ -198,7 +206,7 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
             where: { id: parsed.data.poolId, enabled: true },
             select: { id: true }
         });
-        if (!pool) return { error: "That runner pool no longer exists." };
+        if (!pool) return { error: (await getTranslations("admin"))("agents.errors.poolGone") };
     }
 
     await savePlatformAgentDefaults(parsed.data);

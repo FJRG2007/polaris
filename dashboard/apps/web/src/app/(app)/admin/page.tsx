@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import {
     Activity,
     Blocks,
@@ -28,119 +29,41 @@ import {
 /**
  * The Management app's home: one card per administration area. The areas
  * themselves are the existing admin pages; this page (and the app's sidebar)
- * gather them into a single place instead of the account menu.
+ * gather them into a single place instead of the account menu. Each card's
+ * words are `overview.sections.<key>` in the `admin` catalog.
  */
 const SECTIONS = [
-    { href: "/admin/users", icon: Users, title: "Users", description: "Accounts, admin rights, and invites." },
-    { href: "/admin/groups", icon: UsersRound, title: "Groups", description: "Group membership for shared access." },
-    {
-        href: "/admin/roles",
-        icon: IdCard,
-        title: "Roles",
-        description: "What a member, a viewer or a guest may do, and which apps they see."
-    },
-    {
-        href: "/admin/policies",
-        icon: Scale,
-        title: "Policies",
-        description: "Fine-grained permission policies for users and groups."
-    },
-    {
-        href: "/admin/security",
-        icon: ShieldCheck,
-        title: "Security",
-        description: "Whether an account has to carry a second factor, and which ones count."
-    },
-    { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
-    {
-        href: "/admin/evidence",
-        icon: ClipboardCheck,
-        title: "Evidence",
-        description: "The controls in force, for an audit, as a dated report you can export."
-    },
-    {
-        href: "/admin/inbox",
-        icon: MessagesSquare,
-        title: "Inbox",
-        description: "Conversations, the channels they arrive on, and who they are with."
-    },
-    {
-        href: "/admin/chat",
-        icon: MessageSquare,
-        title: "Chat",
-        description: "Message and file limits, how long one stays editable, and what a deleted one leaves."
-    },
-    {
-        href: "/admin/email",
-        icon: Mail,
-        title: "Email",
-        description: "Who Polaris sends mail as, and the channel that carries sign-in messages."
-    },
-    { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
-    {
-        href: "/admin/consumption",
-        icon: Gauge,
-        title: "Consumption",
-        description: "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
-    },
-    {
-        href: "/admin/billing",
-        icon: Wallet,
-        title: "Billing",
-        description: "What each project and organization used each month, priced at your rates, with budgets and exports."
-    },
-    {
-        href: "/admin/organizations",
-        icon: Building2,
-        title: "Organizations",
-        description: "Which organizations exist, what they may run, and their limits."
-    },
-    {
-        href: "/admin/display",
-        icon: SlidersHorizontal,
-        title: "Display defaults",
-        description: "The units, dates and number formats new accounts start on."
-    },
-    {
-        href: "/admin/agents",
-        icon: Bot,
-        title: "Agent defaults",
-        description: "Where coding agents may run, and what they may open on their own."
-    },
-    {
-        href: "/admin/uploads",
-        icon: HardDrive,
-        title: "Uploads",
-        description: "Where files attached to work are kept, and how big one may be."
-    },
-    {
-        href: "/admin/integrations",
-        icon: Blocks,
-        title: "Integrations",
-        description: "Third-party services (label printing, file scanning)."
-    },
-    {
-        href: "/admin/integrations/models",
-        icon: Sparkles,
-        title: "AI providers",
-        description: "The model providers agents run on, and the keys this deployment holds."
-    },
-    {
-        href: "/admin/settings",
-        icon: Settings,
-        title: "Updates & settings",
-        description: "Version, in-band self-update, and deployment settings."
-    }
-];
+    { key: "users", href: "/admin/users", icon: Users },
+    { key: "groups", href: "/admin/groups", icon: UsersRound },
+    { key: "roles", href: "/admin/roles", icon: IdCard },
+    { key: "policies", href: "/admin/policies", icon: Scale },
+    { key: "security", href: "/admin/security", icon: ShieldCheck },
+    { key: "activity", href: "/admin/activity", icon: Activity },
+    { key: "evidence", href: "/admin/evidence", icon: ClipboardCheck },
+    { key: "inbox", href: "/admin/inbox", icon: MessagesSquare },
+    { key: "chat", href: "/admin/chat", icon: MessageSquare },
+    { key: "email", href: "/admin/email", icon: Mail },
+    { key: "domains", href: "/admin/domains", icon: Globe },
+    { key: "consumption", href: "/admin/consumption", icon: Gauge },
+    { key: "billing", href: "/admin/billing", icon: Wallet },
+    { key: "organizations", href: "/admin/organizations", icon: Building2 },
+    { key: "display", href: "/admin/display", icon: SlidersHorizontal },
+    { key: "agents", href: "/admin/agents", icon: Bot },
+    { key: "uploads", href: "/admin/uploads", icon: HardDrive },
+    { key: "integrations", href: "/admin/integrations", icon: Blocks },
+    { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
+    { key: "settings", href: "/admin/settings", icon: Settings }
+] as const;
 
 export default async function ManagementPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
 
     return (
         <>
             <PageHeader
-                title="Management"
-                description="Administer Polaris: users and access, policies, domains, integrations, and updates."
+                title={t("overview.title")}
+                description={t("overview.description")}
             />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {SECTIONS.map((section) => {
@@ -156,10 +79,12 @@ export default async function ManagementPage() {
                             </span>
                             <span className="flex min-w-0 flex-col">
                                 <span className="flex items-center gap-1 text-sm font-medium">
-                                    {section.title}
+                                    {t(`overview.sections.${section.key}.title`)}
                                     <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                                 </span>
-                                <span className="text-xs text-muted-foreground">{section.description}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t(`overview.sections.${section.key}.description`)}
+                                </span>
                             </span>
                         </Link>
                     );

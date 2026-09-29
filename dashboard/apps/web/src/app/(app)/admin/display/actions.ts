@@ -9,13 +9,14 @@
 import { revalidatePath } from "next/cache";
 import { displayPreferencesSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { savePlatformDisplayPreferences, setUsersMayChooseTheme } from "@/lib/display-prefs-service";
 
 export async function savePlatformDisplayAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = displayPreferencesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Unsupported choice." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("display.errors.unsupportedChoice") };
     await savePlatformDisplayPreferences(parsed.data);
     await recordAudit({ actorId: admin.id, action: "admin.display.updated" });
     // Accounts that inherit these follow the change from their next render on.
@@ -32,7 +33,7 @@ export async function savePlatformDisplayAction(input: unknown): Promise<{ error
  */
 export async function setThemePolicyAction(allowed: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (typeof allowed !== "boolean") return { error: "That is not a yes or a no." };
+    if (typeof allowed !== "boolean") return { error: (await getTranslations("admin"))("display.errors.notABoolean") };
     await setUsersMayChooseTheme(allowed);
     await recordAudit({
         actorId: admin.id,

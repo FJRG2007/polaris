@@ -15,32 +15,24 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
 import { deleteUsageLimitAction, saveUsageLimitAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { UsageLimitView } from "@/lib/agents/agent-usage-limits";
 import {
     LIMIT_METRICS,
     LIMIT_PERIODS,
-    LIMIT_PERIOD_LABELS,
-    LIMIT_PERIOD_PER,
     LIMIT_SUBJECTS,
     type LimitMetric,
     type LimitPeriod,
     type LimitSubject
 } from "@polaris/core";
 
-/** What each kind of subject is called, and what its id looks like, so the field
- *  can say what to type instead of leaving somebody to guess. */
-const SUBJECTS: Record<LimitSubject, { label: string; placeholder: string; note: string }> = {
-    everyone: { label: "Everyone", placeholder: "", note: "Applies to every account, each counted on its own." },
-    user: { label: "One person", placeholder: "account id", note: "" },
-    role: { label: "A role", placeholder: "role id", note: "Each member of the role gets this much." },
-    group: { label: "A group", placeholder: "group id", note: "Each member of the group gets this much." },
-    repo: { label: "One repository", placeholder: "owner/name", note: "" },
-    org: { label: "A GitHub account", placeholder: "login", note: "Every repository under it, counted together." }
-};
-
-const METRICS: Record<LimitMetric, string> = { runs: "runs", tokens: "tokens" };
+/** Which kinds of subject say more about how the limit is counted. What each is
+ *  called, what its id looks like and that note are `agents.limits.subjects.*`,
+ *  so the field can say what to type instead of leaving somebody to guess. */
+const NOTED: ReadonlySet<LimitSubject> = new Set(["everyone", "role", "group", "org"]);
 
 export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
+    const t = useTranslations("admin");
     const [rows, setRows] = useState(limits);
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -61,15 +53,12 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">Usage limits</p>
-                        <p className="text-muted-foreground text-xs">
-                            A run that would cross any limit that applies to it is refused before it starts, with the
-                            reason. Nothing is limited until you add one.
-                        </p>
+                        <p className="text-sm font-medium">{t("agents.limits.title")}</p>
+                        <p className="text-muted-foreground text-xs">{t("agents.limits.intro")}</p>
                     </div>
                     <Button variant="secondary" size="sm" onClick={() => setAdding(true)} disabled={adding}>
                         <Plus className="size-4 shrink-0" />
-                        Add
+                        {t("agents.limits.add")}
                     </Button>
                 </div>
 
@@ -79,19 +68,23 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                         className="border-border/60 flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm"
                     >
                         <span className="min-w-0 flex-1 truncate">
-                            {SUBJECTS[row.subjectType].label}
+                            {t(`agents.limits.subjects.${row.subjectType}.label`)}
                             {row.subjectId ? ` - ${row.subjectId}` : ""}
                         </span>
                         <span className="text-muted-foreground shrink-0 text-xs">
-                            {row.amount} {METRICS[row.metric]} / {LIMIT_PERIOD_LABELS[row.period]}
+                            {t("agents.limits.rule", {
+                                amount: String(row.amount),
+                                metric: row.metric,
+                                period: row.period
+                            })}
                         </span>
                         <Button
                             variant="ghost"
                             size="icon"
                             disabled={pending}
                             onClick={() => remove(row.id)}
-                            aria-label="Remove this limit"
-                            title="Remove"
+                            aria-label={t("agents.limits.removeLabel")}
+                            title={t("agents.limits.remove")}
                         >
                             <Trash2 className="size-4 shrink-0" />
                         </Button>
@@ -138,6 +131,8 @@ function AddLimit({
     onSaved: (row: UsageLimitView) => void;
     onError: (message: string | null) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [subjectType, setSubjectType] = useState<LimitSubject>("everyone");
     const [subjectId, setSubjectId] = useState("");
     const [metric, setMetric] = useState<LimitMetric>("runs");
@@ -170,12 +165,15 @@ function AddLimit({
                 <Select
                     value={subjectType}
                     onValueChange={(next) => setSubjectType(next as LimitSubject)}
-                    options={LIMIT_SUBJECTS.map((slug) => ({ value: slug, label: SUBJECTS[slug].label }))}
+                    options={LIMIT_SUBJECTS.map((slug) => ({
+                        value: slug,
+                        label: t(`agents.limits.subjects.${slug}.label`)
+                    }))}
                 />
                 {subjectType === "everyone" ? null : (
                     <Input
                         value={subjectId}
-                        placeholder={SUBJECTS[subjectType].placeholder}
+                        placeholder={t(`agents.limits.subjects.${subjectType}.placeholder`)}
                         onChange={(event) => setSubjectId(event.target.value)}
                     />
                 )}
@@ -183,25 +181,27 @@ function AddLimit({
                 <Select
                     value={metric}
                     onValueChange={(next) => setMetric(next as LimitMetric)}
-                    options={LIMIT_METRICS.map((slug) => ({ value: slug, label: METRICS[slug] }))}
+                    options={LIMIT_METRICS.map((slug) => ({ value: slug, label: t(`agents.limits.metrics.${slug}`) }))}
                 />
                 <Select
                     value={period}
                     onValueChange={(next) => setPeriod(next as LimitPeriod)}
-                    options={LIMIT_PERIODS.map((slug) => ({ value: slug, label: LIMIT_PERIOD_PER[slug] }))}
+                    options={LIMIT_PERIODS.map((slug) => ({ value: slug, label: t(`agents.limits.per.${slug}`) }))}
                 />
             </div>
 
-            {SUBJECTS[subjectType].note ? (
-                <p className="text-muted-foreground text-xs">{SUBJECTS[subjectType].note}</p>
+            {NOTED.has(subjectType) ? (
+                <p className="text-muted-foreground text-xs">
+                    {t(`agents.limits.subjects.${subjectType as "everyone" | "role" | "group" | "org"}.note`)}
+                </p>
             ) : null}
 
             <div className="flex items-center gap-2">
                 <Button size="sm" onClick={save} disabled={pending}>
-                    Save
+                    {tc("actions.save")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
-                    Cancel
+                    {tc("actions.cancel")}
                 </Button>
             </div>
         </div>

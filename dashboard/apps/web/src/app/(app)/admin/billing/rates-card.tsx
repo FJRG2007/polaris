@@ -18,10 +18,10 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
 import { clearBillingRatesAction, saveBillingRatesAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     BILLING_CURRENCIES,
     BILLING_RATE_KEYS,
-    BILLING_RATE_LABELS,
     billingRatesInputSchema,
     type BillingRateKey,
     type BillingRates
@@ -46,6 +46,8 @@ function sameRates(left: BillingRates | null, right: BillingRates | null): boole
 }
 
 export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onChange: () => void }) {
+    const t = useTranslations("admin");
+    const ta = useTranslations("account");
     const [saved, setSaved] = useState<BillingRates | null>(rates);
     const [draft, setDraft] = useState<Draft>(() => draftOf(rates));
     const [busy, setBusy] = useState(false);
@@ -84,9 +86,9 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
 
     const clear = async () => {
         const ok = await confirm({
-            title: "Remove the prices?",
-            description: "Every statement goes back to showing usage without money, and budgets stop being measured.",
-            confirmLabel: "Remove prices",
+            title: t("billing.rates.clearTitle"),
+            description: t("billing.rates.clearBody"),
+            confirmLabel: t("billing.rates.clear"),
             danger: true
         });
         if (!ok) return;
@@ -112,21 +114,22 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <h2 className="text-sm font-medium">Prices</h2>
+                        <h2 className="text-sm font-medium">{t("billing.rates.title")}</h2>
                         <p className="text-muted-foreground text-xs">
-                            {saved
-                                ? "What each measured thing costs. Leave a price blank to not charge for it."
-                                : "No prices are set, so statements show usage only. Set any of them to price it."}
+                            {saved ? t("billing.rates.hint") : t("billing.rates.none")}
                         </p>
                     </div>
                     <Select
-                        aria-label="Currency"
+                        aria-label={t("billing.rates.currency")}
                         className="w-48 shrink-0"
                         value={draft.currency}
                         onValueChange={(currency) => setDraft({ ...draft, currency })}
                         options={BILLING_CURRENCIES.map((entry) => ({
                             value: entry.code,
-                            label: `${entry.code} - ${entry.label}`
+                            label: t("billing.rates.currencyOption", {
+                                code: entry.code,
+                                name: ta(`display.currency.names.${entry.code}`)
+                            })
                         }))}
                     />
                 </div>
@@ -138,16 +141,16 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                         return (
                             <div key={key} className="flex min-w-0 flex-col gap-1">
                                 <label htmlFor={id} className="text-xs font-medium">
-                                    {BILLING_RATE_LABELS[key].label}{" "}
+                                    {t(`billing.rates.keys.${key}.label`)}{" "}
                                     <span className="text-muted-foreground font-normal">
-                                        {BILLING_RATE_LABELS[key].unit}
+                                        {t(`billing.rates.keys.${key}.unit`)}
                                     </span>
                                 </label>
                                 <Input
                                     id={id}
                                     inputMode="decimal"
                                     autoComplete="off"
-                                    placeholder="Not charged"
+                                    placeholder={t("billing.rates.notCharged")}
                                     value={draft[key]}
                                     aria-invalid={message ? true : undefined}
                                     aria-describedby={message ? `${id}-error` : undefined}
@@ -173,16 +176,16 @@ export function RatesCard({ rates, onChange }: { rates: BillingRates | null; onC
                         aria-disabled={busy || !parsed.success || unchanged}
                     >
                         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Save prices
+                        {t("billing.rates.save")}
                     </Button>
                     {saved ? (
                         <Button size="sm" variant="ghost" onClick={() => void clear()} disabled={busy}>
                             <Trash2 className="size-4" aria-hidden />
-                            Remove prices
+                            {t("billing.rates.clear")}
                         </Button>
                     ) : null}
                     {blank ? (
-                        <p className="text-muted-foreground text-xs">Set at least one price to save.</p>
+                        <p className="text-muted-foreground text-xs">{t("billing.rates.setOne")}</p>
                     ) : null}
                 </div>
             </CardBody>

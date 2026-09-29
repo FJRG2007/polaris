@@ -11,6 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { settleReport } from "@/lib/chat/reports";
 
@@ -21,12 +22,15 @@ export async function settleReportAction(
     decision: "kept" | "removed"
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (decision !== "kept" && decision !== "removed") return { error: "That is not a decision" };
+    if (decision !== "kept" && decision !== "removed") {
+        return { error: (await getTranslations("admin"))("reports.errors.notADecision") };
+    }
 
     try {
         await settleReport({ id: admin.id }, reportId, decision);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be settled" };
+        const t = await getTranslations("admin");
+        return { error: caught instanceof Error ? caught.message : t("reports.errors.notSettled") };
     }
 
     // Deleting somebody's message on the instance's authority is exactly the

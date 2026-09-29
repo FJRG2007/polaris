@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { recordAudit } from "@/lib/audit-service";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { setAuthMailChannel } from "@/lib/auth-mail";
 
 const choiceSchema = z.string().uuid().nullable();
@@ -16,7 +17,7 @@ const choiceSchema = z.string().uuid().nullable();
 export async function setAuthMailChannelAction(channelId: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = choiceSchema.safeParse(channelId === "" ? null : channelId);
-    if (!parsed.success) return { error: "Unknown channel." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("email.errors.unknownChannel") };
     const result = await setAuthMailChannel(parsed.data);
     if (!result.error) {
         await recordAudit({

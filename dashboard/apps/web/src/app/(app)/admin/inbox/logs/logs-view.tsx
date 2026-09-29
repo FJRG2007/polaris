@@ -11,6 +11,7 @@ import { listActivityAction } from "../actions";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { ActivityView } from "@/lib/messaging-service";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const PLATFORM_LABEL: Record<string, string> = {
     whatsapp: "WhatsApp",
@@ -31,6 +32,7 @@ function stamp(iso: string): string {
 }
 
 export function LogsView({ initialActivity }: { initialActivity: ActivityView[] }) {
+    const t = useTranslations("admin");
     const [activity, setActivity] = useState(initialActivity);
 
     const load = useCallback(() => {
@@ -47,15 +49,13 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Logs</h1>
-                <p className="text-sm text-muted-foreground">
-                    Recent messages across every channel - inbound, outbound, and delivery state. Updates live.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxLogs.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("inboxLogs.intro")}</p>
             </div>
             <Card>
                 <CardBody className="p-0">
                     {activity.length === 0 ? (
-                        <p className="p-4 text-sm text-muted-foreground">No messaging activity yet.</p>
+                        <p className="p-4 text-sm text-muted-foreground">{t("inboxLogs.empty")}</p>
                     ) : (
                         <ul className="divide-y divide-border">
                             {activity.map((item) => {
@@ -73,7 +73,7 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
                                                 <span className="font-medium">{item.peer}</span>
                                                 <span className="text-muted-foreground">
                                                     {" - "}
-                                                    {item.body ?? item.selection ?? "(no text)"}
+                                                    {item.body ?? item.selection ?? t("inboxLogs.noText")}
                                                 </span>
                                             </p>
                                             <p className="text-xs text-muted-foreground">
@@ -81,7 +81,9 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
                                                 {" - "}
                                                 {stamp(item.createdAt)}
                                                 {outbound && item.ack ? (
-                                                    <span className={`ml-1 ${ackTone(item.ack)}`}>- {item.ack}</span>
+                                                    <span className={`ml-1 ${ackTone(item.ack)}`}>
+                                                        - {t("inboxLogs.ack", { ack: item.ack })}
+                                                    </span>
                                                 ) : null}
                                             </p>
                                         </div>

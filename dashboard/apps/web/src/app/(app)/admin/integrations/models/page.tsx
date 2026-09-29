@@ -12,8 +12,10 @@
  */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Card, CardBody } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
@@ -29,6 +31,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ModelProvidersPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
     // Two listings rather than one filtered afterwards: agent sign-ins share this
     // table and would otherwise appear in the provider list as a credential for a
     // provider that does not exist.
@@ -41,12 +44,10 @@ export default async function ModelProvidersPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">AI providers</h1>
-                <p className="text-muted-foreground text-sm">
-                    This deployment&apos;s own accounts with the model providers. A key is handed to a run over
-                    an authenticated call and never written into a repository, so replacing it here takes effect
-                    everywhere at once. Every provider bills you directly - Polaris adds nothing.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("integrationsModels.title")}
+                </h1>
+                <p className="text-muted-foreground text-sm">{t("integrationsModels.intro")}</p>
             </div>
             <ModelKeysView
                 providers={modelProviderRows()}
@@ -58,12 +59,26 @@ export default async function ModelProvidersPage() {
                     reorder: reorderInstanceModelKeysAction
                 }}
                 copy={{
-                    title: "The deployment's provider keys",
-                    hint: "Tried from the top. The first key whose provider serves the model is the one a run uses.",
-                    empty: "No keys yet. Without one, only people who bring their own can run anything.",
-                    adding: "The provider account this deployment's runs bill to."
+                    title: t("integrationsModels.keys.title"),
+                    hint: t("integrationsModels.keys.hint"),
+                    empty: t("integrationsModels.keys.empty"),
+                    adding: t("integrationsModels.keys.adding")
                 }}
-                footer={<SharingCard shared={shared} />}
+                footer={
+                    <SharingCard
+                        title={t("integrationsModels.sharing.title")}
+                        body={t.rich(
+                            shared ? "integrationsModels.sharing.shared" : "integrationsModels.sharing.private",
+                            {
+                                link: (chunks) => (
+                                    <Link key="link" href="/admin/agents" className="text-primary hover:underline">
+                                        {chunks}
+                                    </Link>
+                                )
+                            }
+                        )}
+                    />
+                }
             />
 
             {/* The deployment's own agent accounts, in the same table and for the
@@ -83,40 +98,35 @@ export default async function ModelProvidersPage() {
                     reorder: reorderInstanceModelKeysAction
                 }}
                 copy={{
-                    title: "The deployment's agent accounts",
-                    action: "Add account",
-                    hint: "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
-                    empty: "None yet. Without one, only people who bring their own can start a session here.",
-                    adding: "The account this deployment's sessions sign an agent in with."
+                    title: t("integrationsModels.accounts.title"),
+                    action: t("integrationsModels.accounts.action"),
+                    hint: t("integrationsModels.accounts.hint"),
+                    empty: t("integrationsModels.accounts.empty"),
+                    adding: t("integrationsModels.accounts.adding")
                 }}
             />
             <p className="text-muted-foreground text-sm">
-                Everything else Polaris connects to lives under{" "}
-                <Link href="/admin/integrations" className="text-primary hover:underline">
-                    Integrations
-                </Link>
-                .
+                {t.rich("integrationsModels.elsewhere", {
+                    link: (chunks) => (
+                        <Link key="link" href="/admin/integrations" className="text-primary hover:underline">
+                            {chunks}
+                        </Link>
+                    )
+                })}
             </p>
         </div>
     );
 }
 
 /** Who actually spends these. The switch itself is one of the agent defaults, so
- *  it is named here rather than offered twice. */
-function SharingCard({ shared }: { shared: boolean }) {
+ *  it is named here rather than offered twice. Its words are drawn by the page,
+ *  which has the translator. */
+function SharingCard({ title, body }: { title: string; body: ReactNode }) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-1">
-                <h2 className="text-sm font-medium">Who these keys run for</h2>
-                <p className="text-muted-foreground text-xs">
-                    {shared
-                        ? "Anybody whose own keys do not cover a provider runs on these, and the bill is yours. Each account's own keys are used first."
-                        : "Nobody but you. Runs use only the keys people add themselves, so a provider nobody has a key for cannot be reached."}{" "}
-                    <Link href="/admin/agents" className="text-primary hover:underline">
-                        Change this under Agent defaults
-                    </Link>
-                    .
-                </p>
+                <h2 className="text-sm font-medium">{title}</h2>
+                <p className="text-muted-foreground text-xs">{body}</p>
             </CardBody>
         </Card>
     );

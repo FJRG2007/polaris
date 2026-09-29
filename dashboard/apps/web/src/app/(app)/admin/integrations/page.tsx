@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionProven } from "@/lib/connections/proven";
@@ -71,6 +72,7 @@ async function provenApplications(): Promise<Map<string, boolean>> {
 
 export default async function IntegrationsPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
@@ -228,18 +230,21 @@ export default async function IntegrationsPage() {
     return (
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Integrations</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("integrations.page.title")}
+                </h1>
                 <p className="text-muted-foreground text-sm">
-                    The outside services Polaris can use, grouped by the job connecting one does.
-                    Whatever is set up here works everywhere at once - there is nothing to switch on
-                    per screen. The model providers agents run on have their own list under{" "}
-                    <Link
-                        href="/admin/integrations/models"
-                        className="text-primary hover:underline"
-                    >
-                        AI providers
-                    </Link>
-                    .
+                    {t.rich("integrations.page.intro", {
+                        link: (chunks) => (
+                            <Link
+                                key="link"
+                                href="/admin/integrations/models"
+                                className="text-primary hover:underline"
+                            >
+                                {chunks}
+                            </Link>
+                        )
+                    })}
                 </p>
             </div>
             <IntegrationsView cards={cards} runnerAccess={runners} />

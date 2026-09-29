@@ -1,0 +1,2348 @@
+{
+    "activity": {
+        "page": {
+            "title": "Activity",
+            "description": "Everything done across Polaris, by whom and from where. Sealed into a chain so an edited or deleted entry shows."
+        },
+        "feed": {
+            "who": "Who",
+            "empty": "No activity recorded yet."
+        },
+        "integrity": {
+            "intact": "Chain intact across {count, plural, one {{shown} entry} other {{shown} entries}}.",
+            "brokenToast": "The chain is broken. The panel says where.",
+            "broken": "{reason, select, missing {An entry is missing from the chain} altered {An entry was changed after it was sealed} other {An entry no longer points at the one before it}} at entry {seq}{recorded, select, yes {, recorded {at}} other {}}.",
+            "sealed": "{sealed, plural, one {{sealedShown} entry sealed} other {{sealedShown} entries sealed}}{waiting, select, yes {, {pending} waiting to be} other {}}.",
+            "lastChecked": "Last checked {when}.",
+            "notChecked": "Not checked yet.",
+            "head": "Head #{seq} {hash}",
+            "copyLabel": "Copy the chain head",
+            "copyTitle": "Copy the chain head, to keep outside Polaris",
+            "copied": "Chain head copied.",
+            "checking": "Checking",
+            "check": "Check now"
+        },
+        "errors": {
+            "verifyFailed": "The chain could not be checked just now. Try again in a minute."
+        }
+    },
+    "agents": {
+        "page": {
+            "title": "Agent defaults",
+            "description": "What agent runs do across the whole deployment. Each account can narrow it under Apps > Agents, and a repository can override it again."
+        },
+        "defaults": {
+            "title": "Every repository on this deployment",
+            "inheritedFrom": "the built-in defaults"
+        },
+        "keySharing": {
+            "label": "Share this deployment's provider keys",
+            "on": "Anybody without a key of their own runs on the keys stored under Integrations, and those accounts are billed to you.",
+            "off": "Runs only use keys people add themselves, under Account > AI provider keys. Nobody spends this deployment's providers.",
+            "switch": "Share provider keys"
+        },
+        "sharedMachine": {
+            "label": "Offer a machine everybody shares",
+            "on": "Anybody who can start a session can open the shared machine. It has one home: what is signed in there is signed in for all of them, and the files one person leaves are the files the next one finds.",
+            "off": "Every session opens on a machine of its own account, with its own logins and its own files. Nobody can reach anybody else's.",
+            "switch": "Offer a shared machine",
+            "warning": "Sign it in with an API key or a team plan. A personal Claude or ChatGPT subscription is licensed to one person, and several people working through one is what gets it suspended."
+        },
+        "catalog": {
+            "title": "Model catalog",
+            "empty": "Nothing downloaded yet, so the model pickers offer only what you type. It refreshes itself once a day.",
+            "count": "{count, plural, one {{shown} model} other {{shown} models}} across the providers Polaris supports. Refreshes itself once a day.",
+            "refresh": "Refresh",
+            "lastRead": "Last read <time>{when}</time>."
+        },
+        "limits": {
+            "title": "Usage limits",
+            "intro": "A run that would cross any limit that applies to it is refused before it starts, with the reason. Nothing is limited until you add one.",
+            "add": "Add",
+            "remove": "Remove",
+            "removeLabel": "Remove this limit",
+            "rule": "{amount} {metric, select, runs {runs} other {tokens}} / {period, select, day {1 day} week {1 week} other {30 days}}",
+            "metrics": {
+                "runs": "runs",
+                "tokens": "tokens"
+            },
+            "per": {
+                "day": "per day",
+                "week": "per week",
+                "month": "per 30 days"
+            },
+            "subjects": {
+                "everyone": {
+                    "label": "Everyone",
+                    "note": "Applies to every account, each counted on its own."
+                },
+                "user": {
+                    "label": "One person",
+                    "placeholder": "account id"
+                },
+                "role": {
+                    "label": "A role",
+                    "placeholder": "role id",
+                    "note": "Each member of the role gets this much."
+                },
+                "group": {
+                    "label": "A group",
+                    "placeholder": "group id",
+                    "note": "Each member of the group gets this much."
+                },
+                "repo": {
+                    "label": "One repository",
+                    "placeholder": "owner/name"
+                },
+                "org": {
+                    "label": "A GitHub account",
+                    "placeholder": "login",
+                    "note": "Every repository under it, counted together."
+                }
+            }
+        },
+        "errors": {
+            "pickSetting": "Pick a setting",
+            "subjectRequired": "Say who or what the limit is for",
+            "checkLimit": "Check the limit",
+            "pickLimit": "Pick a limit",
+            "catalogUnread": "The catalog could not be read.",
+            "checkSettings": "Check the settings",
+            "providerNotConnected": "Connect {provider} under Integrations before defaulting to this model.",
+            "poolGone": "That runner pool no longer exists."
+        }
+    },
+    "billing": {
+        "title": "Billing",
+        "description": "What each project and organization used, month by month, priced at the rates you set. Nothing is charged anywhere - this is for your own statements.",
+        "refresh": "Refresh",
+        "stale": "Showing the last statement read. {reason}",
+        "projects": "Projects",
+        "noProjects": "There are no projects on this Polaris yet.",
+        "owners": {
+            "title": "By owner",
+            "owner": "Owner",
+            "projects": "Projects",
+            "cpu": "CPU",
+            "cost": "Cost",
+            "budget": "Budget",
+            "cpuHours": "{hours} vCPU-h",
+            "budgetUsed": "{percent}% of {budget}",
+            "organization": "Organization",
+            "personal": "Personal"
+        },
+        "rates": {
+            "title": "Prices",
+            "hint": "What each measured thing costs. Leave a price blank to not charge for it.",
+            "none": "No prices are set, so statements show usage only. Set any of them to price it.",
+            "currency": "Currency",
+            "currencyOption": "{code} - {name}",
+            "notCharged": "Not charged",
+            "save": "Save prices",
+            "clear": "Remove prices",
+            "clearTitle": "Remove the prices?",
+            "clearBody": "Every statement goes back to showing usage without money, and budgets stop being measured.",
+            "setOne": "Set at least one price to save.",
+            "keys": {
+                "cpuHour": {
+                    "label": "CPU",
+                    "unit": "per vCPU-hour"
+                },
+                "memoryGbHour": {
+                    "label": "Memory",
+                    "unit": "per GB-hour"
+                },
+                "storageGbMonth": {
+                    "label": "Storage",
+                    "unit": "per GB-month"
+                },
+                "egressGb": {
+                    "label": "Network out",
+                    "unit": "per GB"
+                }
+            }
+        },
+        "errors": {
+            "checkPrices": "Check the prices and try again",
+            "saveFailed": "The prices could not be saved. Try again.",
+            "clearFailed": "The prices could not be removed. Try again."
+        }
+    },
+    "chat": {
+        "page": {
+            "title": "Chat",
+            "description": "How long a message may be, what it may carry, how long it stays editable, and what a deleted one leaves behind. Answered separately for spaces, group chats and direct messages."
+        },
+        "errors": {
+            "notAScope": "That is not a kind of conversation",
+            "rulesNotSaved": "Those limits could not be saved",
+            "notAShare": "That is not a way to share a file",
+            "notSaved": "That could not be saved"
+        },
+        "rules": {
+            "scopePicker": "Which conversations these rules cover",
+            "unsaved": "Unsaved changes",
+            "scopes": {
+                "space": {
+                    "label": "Spaces",
+                    "note": "Channels inside a space - the rooms a team works in, and the record they leave.",
+                    "save": "Save spaces"
+                },
+                "group": {
+                    "label": "Group chats",
+                    "note": "Three or more people in one conversation, outside any space.",
+                    "save": "Save group chats"
+                },
+                "dm": {
+                    "label": "Direct messages",
+                    "note": "One person and one other.",
+                    "save": "Save direct messages"
+                }
+            },
+            "noLimit": "No limit.",
+            "saved": "Saved.",
+            "range": "A whole number between {min} and {max}.",
+            "fields": {
+                "maxMessageLength": {
+                    "label": "Longest message",
+                    "hint": "Characters. Somebody with more to say than this has a note or a snippet.",
+                    "suffix": "characters"
+                },
+                "maxPerMinute": {
+                    "label": "Messages a minute",
+                    "hint": "Per person, per conversation. Thirty stops a flood without ever meeting somebody typing. Zero for as many as they can type.",
+                    "suffix": "a minute"
+                },
+                "spamGuard": {
+                    "label": "Spam protection",
+                    "hint": "Limits loose enough that nobody talking normally meets them, there to stop clear abuse: the whole room pinged again and again, one person mentioned over and over, the same line pasted repeatedly. Each counts one person in one conversation; zero turns a single limit off."
+                },
+                "maxRoomMentionsPerHour": {
+                    "label": "@everyone and @here",
+                    "hint": "Messages carrying either that one person may send in an hour. Whoever moderates the room is not held by it.",
+                    "suffix": "an hour"
+                },
+                "maxMentionsPerMessage": {
+                    "label": "People mentioned in one message",
+                    "hint": "Different people or teams one message may mention.",
+                    "suffix": "people"
+                },
+                "maxSamePersonMentions": {
+                    "label": "Mentioning the same person",
+                    "hint": "Messages mentioning the same person that one account may send in ten minutes.",
+                    "suffix": "in 10 minutes"
+                },
+                "maxRepeatedMessages": {
+                    "label": "The same message again",
+                    "hint": "How many times the very same message may be sent in two minutes.",
+                    "suffix": "in 2 minutes"
+                },
+                "maxAttachments": {
+                    "label": "Files on one message",
+                    "hint": "Zero stops files being sent in this kind of conversation at all.",
+                    "suffix": "files",
+                    "zero": "Files cannot be sent here."
+                },
+                "maxAttachmentMib": {
+                    "label": "Biggest single file",
+                    "hint": "A file this big is streamed straight to the storage Polaris writes uploads to, so what this really sets is how much of your disks one message may take. Somebody sharing a file they already have in Drive is not bound by it at all when this instance shares by link."
+                },
+                "editWindowMinutes": {
+                    "label": "How long a message stays editable",
+                    "hint": "Minutes after it was sent. Zero means always, which is what people expect. It covers deleting too, and never binds somebody moderating the room.",
+                    "suffix": "minutes",
+                    "zero": "Always editable."
+                },
+                "deleteLeavesTrace": {
+                    "label": "Deleting leaves a line saying so",
+                    "hint": "On, a deleted message reads 'This message was deleted' and replies under it still make sense. Off, the message and its files go without trace - except for one that has replies hanging off it, which would take them with it."
+                },
+                "keepEditHistory": {
+                    "label": "Keep what a message said before it was edited",
+                    "hint": "On, '(edited)' opens the earlier versions for anybody who can read the message. Off, no earlier version is recorded from then on."
+                }
+            }
+        },
+        "driveShare": {
+            "title": "A file sent from Drive",
+            "picker": "What happens to a file sent from Drive",
+            "copy": {
+                "label": "Copied",
+                "title": "A copy of its own, in the conversation's store",
+                "hint": "Copied into the conversation, so nothing can change it and nothing can take it away. The instance keeps a second copy of every file anybody shares, and the size limit above applies to it."
+            },
+            "link": {
+                "label": "Linked",
+                "title": "Left where it is, and reached from the message",
+                "hint": "Shared where it already is. Nothing is copied, so any size works and the limit above does not apply - but whoever owns the file can edit it or delete it under a message that has already been read, and the conversation says so on the file."
+            }
+        },
+        "orgChat": {
+            "label": "Organizations may keep their own chat",
+            "hint": "An organization that takes this gets a second chat for the people in it, reached from the shelf switch in the header. Turned off, everybody shares one chat - and any organization already keeping its own has those conversations folded back into it rather than hidden."
+        },
+        "calls": {
+            "title": "Where calls run",
+            "intro": "Every call goes through a media server, so each browser sends its camera once instead of once per person. Polaris starts one with the stack and hands it its own key, so there is nothing to set up; until it answers, Chat says calls are unavailable rather than offering one that reaches nobody.",
+            "status": {
+                "unprepared": "The call server could not be prepared.",
+                "running": "Running {where, select, shipped {on this server} other {at the address below}}.",
+                "missing": "The call server is not part of this deployment.",
+                "stopped": "The call server is stopped.",
+                "notAnswering": "Not answering {where, select, shipped {on this server} other {at the address below}}.",
+                "starting": "Starting {where, select, shipped {on this server} other {at the address below}}."
+            },
+            "detail": {
+                "unprepared": "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has.",
+                "missing": "Its container was never created here, which is why this said it was starting and never finished. Updating again brings it up - <link>Settings</link>, Update.",
+                "stopped": "Its container exists and is not running. Start it from <link>Containers</link>, on the row named {container}.",
+                "running": "Calls between devices on this network work now. For calls from outside, two ports have to reach this machine - <link>Domains</link> lists them and reports when they answer.",
+                "waited": "It has had a couple of minutes and has not come up. It keeps trying, and calls come back on their own the moment it answers.",
+                "starting": "It comes up a few seconds after the stack does."
+            },
+            "checkAgain": "Check again",
+            "unused": {
+                "environment": "This deployment was started pointing at another call server, so calls go there and the address below is not in use.",
+                "noSecret": "The address below has no secret saved with it, so it signs nothing and is not in use. Paste it and save.",
+                "noKey": "The address below has no key saved with it, so it signs nothing and is not in use. Fill it in and save.",
+                "neither": "The address below has no key and secret saved with it, so it signs nothing and is not in use. Fill both in and save."
+            },
+            "fields": {
+                "address": "Address",
+                "addressLabel": "Call server address",
+                "key": "Key",
+                "keyLabel": "Call server key",
+                "keyPlaceholder": "Its key name",
+                "secret": "Secret",
+                "secretLabel": "Call server secret",
+                "secretStored": "Stored. Type to replace it.",
+                "secretPaste": "Paste it"
+            },
+            "saved": "Saved",
+            "ownServer": "I already run my own"
+        }
+    },
+    "consumption": {
+        "title": "Consumption",
+        "description": "What the machine Polaris runs on is being spent on: the control plane itself, the apps installed on it, and everything else.",
+        "refresh": "Refresh",
+        "error": {
+            "title": "Nothing to measure",
+            "description": "Polaris could not read what this machine is using. {reason}"
+        },
+        "split": {
+            "inContainers": "{used} of {total} in containers",
+            "cores": "{count, plural, one {# core} other {# cores}}",
+            "measuring": "measuring",
+            "measured": "measured {age} ago",
+            "segment": "{label}: {size}",
+            "note": "Only this machine. Memory and CPU are what the containers hold right now; a service counts the releases it keeps and the tunnel publishing it."
+        },
+        "cpu": "{percent}% CPU",
+        "running": "{running} of {containers} running",
+        "containers": "{count, plural, one {# container} other {# containers}}",
+        "parts": "What {name} runs",
+        "columns": {
+            "name": "Name",
+            "owner": "Owner",
+            "cpu": "CPU",
+            "memory": "Memory"
+        },
+        "empty": {
+            "apps": "Nothing installed from the marketplace yet.",
+            "services": "Nothing deployed here yet.",
+            "leftover": "Nothing has been left behind.",
+            "other": "Nothing else is running on this machine."
+        },
+        "states": {
+            "elsewhere": "Not on this machine",
+            "stopped": "Stopped",
+            "running": "Running",
+            "restarting": "{count, plural, one {Restarting} other {# restarting}}"
+        },
+        "groups": {
+            "polaris": {
+                "label": "Polaris itself",
+                "description": "The control plane: the dashboard, the database, the edge, and the rest of the stack."
+            },
+            "apps": {
+                "label": "Marketplace apps",
+                "description": "Everything installed from the marketplace, game servers included."
+            },
+            "services": {
+                "label": "Deployed services",
+                "description": "Services and databases deployed here, with the releases and tunnels they keep."
+            },
+            "leftover": {
+                "label": "Left behind by Polaris",
+                "description": "Started by Polaris for something that no longer exists. Nothing will start them again, and removing one frees what it holds."
+            },
+            "other": {
+                "label": "Everything else",
+                "description": "Containers on this machine that Polaris did not start."
+            }
+        }
+    },
+    "display": {
+        "title": "Display defaults",
+        "description": "The theme, units and formats for the whole deployment. Each account can override them under Account > Preferences.",
+        "themePolicy": {
+            "title": "Let people choose their own theme",
+            "hint": "Off, every account follows the theme above. What anybody already chose is kept and comes back if you turn this on again."
+        },
+        "errors": {
+            "unsupportedChoice": "Unsupported choice.",
+            "notABoolean": "That is not a yes or a no."
+        }
+    },
+    "domains": {
+        "page": {
+            "title": "Domains",
+            "description": "Choose the domains Polaris uses for the dashboard and for the links it hands out."
+        },
+        "tryAgain": "Try again",
+        "saved": "Saved.",
+        "errors": {
+            "invalidSettings": "Invalid domain settings",
+            "invalidList": "Invalid domain list",
+            "invalidNetwork": "Invalid network settings",
+            "couldNotSave": "Could not save that"
+        },
+        "removal": {
+            "noAddress": "No address given.",
+            "unknown": "That address is no longer listed.",
+            "builtIn": "This is the address the deployment was installed with. It changes with the installation, not here.",
+            "managed": "This name comes from the guided setup above. Change the zone layout there to stop using it."
+        },
+        "advancedToggle": "Advanced: exposure mode and DuckDNS",
+        "own": {
+            "title": "Polaris's own addresses",
+            "appDomain": "App domain",
+            "appDomainHint": "The dashboard's stable address. Leave empty to use the deployment default ({url}).",
+            "sharingDomain": "Sharing domain",
+            "sharingDomainHint": "Used for the links Polaris hands out (share links and drop points). Point a throwaway free subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app domain.",
+            "saveFailed": "Could not save the domains",
+            "use": "Use {suggestion}"
+        },
+        "answers": {
+            "title": "Where Polaris answers",
+            "addLabel": "Add a domain",
+            "add": "Add",
+            "addHint": "Point the name at this server first. Polaris then routes it, orders a certificate for it, and accepts sign-ins on it.",
+            "notADomain": "That is not a domain name.",
+            "known": "Already on the list.",
+            "addFailed": "Could not add the domain"
+        },
+        "certificate": {
+            "title": "Trust this device (polaris.local)",
+            "body": "LAN hostnames can't get a public certificate, so Polaris signs its own. Install this root certificate on your devices once to make <code>https://polaris.local</code> trusted with no browser warning. macOS/iOS: open it and trust it in Keychain / Profiles. Windows: import into \"Trusted Root Certification Authorities\". Firefox: import under Authorities.",
+            "download": "Download root certificate"
+        },
+        "duckdns": {
+            "configured": "Configured",
+            "syncing": "Syncing...",
+            "sync": "Sync IP now",
+            "description": "Free dynamic DNS. Polaris keeps your DuckDNS record pointed at this host's current public IP, auto-synced every few minutes. Use {base} as the wildcard base in the guided setup (DuckDNS resolves {wildcard} too) for free public subdomains with Let's Encrypt.",
+            "subdomain": "Subdomain",
+            "subdomainHint": "The part before <code>.duckdns.org</code>.",
+            "token": "Token",
+            "tokenSaved": "Saved - enter a new token to replace it",
+            "tokenPlaceholder": "DuckDNS token",
+            "removeToken": "Remove stored token",
+            "updated": "DuckDNS updated.",
+            "saveFailed": "Could not save the DuckDNS settings",
+            "syncFailed": "Could not reach DuckDNS",
+            "removeFailed": "Could not remove the stored token"
+        },
+        "network": {
+            "title": "Network & exposure",
+            "readFailed": "Could not read the network status",
+            "redetectFailed": "Could not re-detect the network",
+            "saveFailed": "Could not save the exposure mode",
+            "redetect": "Re-detect",
+            "modes": {
+                "auto": "Automatic (detect)",
+                "lan": "LAN only",
+                "public": "Public IP (direct)",
+                "wildcard": "Custom wildcard domain",
+                "tunnel": "Cloudflare / ngrok tunnel"
+            },
+            "status": {
+                "hosting": "Hosting",
+                "cloud": "Cloud / data center",
+                "home": "Home / local",
+                "unknownPlacement": "Unknown",
+                "publicIp": "Public IP",
+                "notDetected": "not detected",
+                "serverIp": "Server IP",
+                "unknown": "unknown",
+                "behindNat": "Behind NAT",
+                "yes": "Yes",
+                "no": "No",
+                "activeMode": "Active mode",
+                "configured": "Configured",
+                "notSet": "Not set"
+            },
+            "natWarning": "This looks like a server behind NAT: free subdomains point at the LAN IP ({ip}) and only work on your network. For public access, choose a wildcard domain or a tunnel below.",
+            "homeAdvice": "Recommended for a home/local server: set up <b>DuckDNS</b> below (free) and use <code>{base}</code> as the wildcard base - Polaris then serves public subdomains with Let's Encrypt and keeps the IP updated automatically.",
+            "exposureMode": "Exposure mode",
+            "wildcardBase": "Wildcard base domain",
+            "wildcardManaged": "Taken from your zone layout. Change it in the guided setup above.",
+            "wildcardNotReady": "Not in use yet: the wildcard has not been seen resolving to this server. New services keep a free subdomain until the DNS check in the guided setup passes.",
+            "saveExposure": "Save exposure"
+        },
+        "guidance": {
+            "public": "Your box is internet-reachable at {ip}. Free subdomains get a real Let's Encrypt certificate and work from anywhere.",
+            "wildcardTitle": "Point a wildcard at your server, then Polaris manages every subdomain:",
+            "wildcardRecord": "Create this record at your DNS provider:",
+            "yourPublicIp": "your public IP",
+            "wildcardForward": "Forward ports <code>80</code> and <code>443</code> on your router to this server.",
+            "wildcardForwardIp": "Forward ports <code>80</code> and <code>443</code> on your router to this server ({ip}).",
+            "wildcardSave": "Save. New services get <code>{host}</code> with an automatic Let's Encrypt certificate.",
+            "wildcardNoDomain": "No domain? Use a free <b>DuckDNS</b> subdomain (<code>{base}</code>) as the base - Polaris keeps its IP updated automatically. Set the token in the DuckDNS card below.",
+            "tunnel": "Public access runs through a Cloudflare/ngrok tunnel - no open ports or public IP needed. Set one up in <link>Integrations</link>, or use the per-service <b>Public tunnel</b> button. Auto subdomains stay LAN-only.",
+            "lan": "Free subdomains resolve to your LAN IP ({ip}) and work only on your local network, served with the internal CA (a one-time browser warning). Pick a wildcard domain or a tunnel to expose services publicly."
+        },
+        "owner": {
+            "title": "Domains of their own",
+            "description": "An account or an organization can add a domain it owns, prove it with a DNS record, and have its services answer on it. Polaris orders certificates for those hostnames, so this decides who may point a name at this server.",
+            "who": "Who may add one",
+            "whoAria": "Who may add a domain of their own",
+            "limit": "Limit each to",
+            "limitAria": "Domains per owner",
+            "invalidCap": "Enter a whole number, or 0 for no limit.",
+            "noLimit": "No limit on how many each may hold.",
+            "modes": {
+                "everyone": "Anyone with an account",
+                "admins": "Administrators only",
+                "off": "Nobody"
+            },
+            "hints": {
+                "everyone": "Accounts and organizations can add a domain they own and deploy on it.",
+                "admins": "Only administrators can. Everybody else deploys on this Polaris's own domains.",
+                "off": "Domains already added keep working; no new ones can be added."
+            }
+        },
+        "records": {
+            "title": "DNS records",
+            "description": "The zones this Polaris's Cloudflare token can edit. Check where a change has reached before relying on it.",
+            "zone": "Zone",
+            "readFailed": "Could not read the zones",
+            "emptyTitle": "No zone to edit",
+            "emptyDescription": "Connect a Cloudflare token that can edit DNS, and its zones appear here.",
+            "openIntegrations": "Open Integrations"
+        }
+    },
+    "domainsPorts": {
+        "checkNow": "Check the ports now",
+        "lastAnswered": "Last answered from outside on {time}",
+        "reached": "Reached from outside",
+        "notConfirmed": "Not confirmed",
+        "errors": {
+            "invalid": "Invalid port settings",
+            "range": "The {protocol} range has to read like 25565-25664, stay above 1024, and leave 80 and 443 alone."
+        },
+        "call": {
+            "title": "Call ports",
+            "description": "Setting a call up goes through 443 with everything else. The sound does not: it arrives on the two ports below. Most calls need neither forwarded: the call server reaches out first and the reply comes back the way it went. Forward them for the networks where that does not hold.",
+            "checking": "Checked while this page is open: the TCP port is ticked as soon as it answers from outside.",
+            "notAnswering": "The call server is not answering, so nothing here can be checked yet.",
+            "unprobeableTitle": "Nothing answers an unsolicited packet on this port, so it cannot be tested from here. Calls do not depend on it: the call server reaches out first, and forwarding it only helps on networks where that does not work",
+            "unprobeable": "Cannot be checked",
+            "stoppedTitle": "A call server that is not answering is silent on every port, so this cannot be checked from here",
+            "stopped": "Checked once it answers",
+            "stoppedNote": "The call server is not answering, so these ports carry nothing yet and cannot be checked. Chat settings says what it is doing.",
+            "onlyLocal": "Calls only reach this network so far",
+            "nothingArrived": "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work.",
+            "addressStale": "The call server is handing out an old address",
+            "address": "The address callers are sent to",
+            "addressStaleBody": "This line's public address has changed since the call server last started, so the sound is being sent to an address that is no longer this one. The port forwarding is not the problem. Restarting it is.",
+            "addressBody": "The call server asks for it once, when it starts, and hands it out until it restarts. If this line's address changes, calls from outside go quiet while everything here stays green.",
+            "askedAt": "It last asked on {time}.",
+            "repairFailed": "That could not be done from here.",
+            "restarting": "Restarting...",
+            "repair": "Ask for this network's address again"
+        },
+        "game": {
+            "title": "Game server ports",
+            "description": "Ports 80 and 443 carry every website Polaris serves and not one game client. Each server below answers on its own port, on its own transport, and nothing above this opens them.",
+            "range": "Polaris keeps them inside <tcp>TCP {tcpRange}</tcp> and <udp>UDP {udpRange}</udp>, so forwarding those two ranges covers the servers you have and the ones you have not created yet.",
+            "checking": "Checked while this page is open, on the servers that are running: a port is ticked as soon as it answers from outside, or as soon as somebody joins on it.",
+            "stoppedTitle": "A stopped server answers nothing, so its port cannot be checked from here",
+            "stopped": "Checked once it starts",
+            "outside": "{count, plural, one {One server answers} other {# servers answer}} outside those ranges - {names} - so {count, plural, one {it keeps} other {they keep}} a rule of their own above. Widening a range does not move a server that is already running; recreating it does."
+        },
+        "policy": {
+            "how": "How the router is asked",
+            "howAria": "How the router is asked to open game ports",
+            "tcp": "TCP range",
+            "tcpAria": "TCP port range",
+            "udp": "UDP range",
+            "udpAria": "UDP port range",
+            "invalid": "A range reads like 25565-25664, stays above 1024, and cannot contain 80 or 443.",
+            "options": {
+                "range": "One range, opened once",
+                "perPort": "One rule per server"
+            },
+            "hints": {
+                "range": "Two rules cover every server here, now and later. Nothing outside these ranges is opened.",
+                "perPort": "Exact, but every new server needs another rule in the router."
+            }
+        }
+    },
+    "domainsRouter": {
+        "fields": {
+            "name": "Name",
+            "protocol": "Protocol",
+            "externalPort": "External port (WAN)",
+            "internalPort": "Internal port (LAN)",
+            "internalIp": "Internal IP (device)"
+        },
+        "thisServer": "this server",
+        "thisServerAddress": "this server's address",
+        "itsAddress": "its address",
+        "brand": "Router brand",
+        "open": "Open the router",
+        "hideSteps": "Hide the steps",
+        "showSteps": "Show me exactly what to do in the router",
+        "steps": {
+            "openAdmin": "Open the router's admin page.",
+            "adminGateway": "On {brand} this is <link>{url}</link> - the gateway address for this network.",
+            "adminKnown": "On {brand} this is <link>{url}</link>, or the gateway address your devices use.",
+            "adminUnknown": "It answers on the gateway address your devices use, usually ending in .1.",
+            "signIn": "Sign in.",
+            "reserve": "Give this server a fixed address, so the forward keeps pointing at it - a new lease would otherwise hand {address} to another machine.",
+            "goTo": "Go to <b>{path}</b>.",
+            "findDevice": "Find this server in the list - it is the one holding {address} - then {action}.",
+            "press": "Press <b>{button}</b>.",
+            "fillIn": "Fill it in and save with <b>{button}</b>:",
+            "mac": "the MAC shown next to {server} in the router's own device list",
+            "createRules": "Create {count, plural, one {one rule} other {these # rules}} in <b>{path}</b>, with exactly these values:",
+            "createRulesSaving": "Create {count, plural, one {one rule} other {these # rules}} in <b>{path}</b>, with exactly these values (saving each with <save>{button}</save>):",
+            "field": "Field",
+            "rule": "Rule {number}",
+            "noLanIp": "Polaris cannot see its own LAN address on this install. Pick this server from the router's device list, or read the address from the machine itself.",
+            "switchOn": "Switch {count, plural, one {the rule} other {each rule}} on.",
+            "checkAgain": "Save, then run the DNS check again - it reports the moment the ports reach Polaris.",
+            "remote": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to <b>{path}</b> and turn off management from the internet (WAN), or move it to a port such as 8443.",
+            "remoteGeneric": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to the remote-management settings and turn off management from the internet (WAN), or move it to a port such as 8443."
+        }
+    },
+    "domainsSetup": {
+        "title": "Guided setup",
+        "steps": {
+            "server": "Server",
+            "exposure": "Exposure",
+            "domain": "Domain",
+            "dns": "DNS"
+        },
+        "errors": {
+            "invalid": "Invalid setup",
+            "subdomainOnly": "Enter just the subdomain, e.g. mypolaris",
+            "subdomainMissing": "Enter your DuckDNS subdomain",
+            "tokenMissing": "Enter your DuckDNS token so Polaris can keep the record updated",
+            "domainMissing": "Enter the domain you want to use",
+            "saveFailed": "Could not save the domain setup",
+            "createFailed": "Could not create the DNS records",
+            "readFailed": "Could not read your setup",
+            "rereadFailed": "Could not re-read your setup",
+            "checkFailed": "Could not check the DNS records",
+            "connectFailed": "Could not connect the Cloudflare token"
+        },
+        "resumed": "Picked up where you left off.",
+        "startOver": "Start over",
+        "back": "Back",
+        "continue": "Continue",
+        "saveAndContinue": "Save and continue",
+        "saved": "Setup saved.",
+        "recommended": "Recommended",
+        "environment": {
+            "title": "Where does this server run?",
+            "hintPick": "Pick one to continue. It decides which ways of reaching it can work at all.",
+            "hint": "It decides which ways of reaching it can work at all.",
+            "detected": "Detected"
+        },
+        "strategy": {
+            "title": "How should traffic reach this server?",
+            "hint": "Everything below follows from this answer, and either way can be changed later.",
+            "routerTitle": "What you have to do in the router",
+            "routerBody": "Forward ports 80 and 443 to this server{games, select, range {, plus the range your game servers answer in} port {, plus the port your game servers answer on} ports {, plus the ports your game servers answer on} other {}}. Pick your brand for the exact menu names and the values to type - the rest of the setup works either way, so this can be done afterwards.",
+            "whichTunnel": "Which tunnel?",
+            "whichDomain": "Which domain do the hostnames come from?",
+            "ordered": "Ordered by what costs least and depends on the fewest others.",
+            "best": "Best of these",
+            "wildcard": "Wildcard",
+            "tokenConnected": "Token connected",
+            "dependsOn": "Depends on: {value}",
+            "needs": "Needs: {value}"
+        },
+        "domain": {
+            "integrationsTitle": "Set this up under Integrations",
+            "nothingTitle": "Nothing to configure",
+            "integrationsHint": "The tunnel publishes each service itself.",
+            "nothingHint": "This option needs no domain and no DNS.",
+            "openIntegrations": "Open Integrations",
+            "comeBack": "You can come back and point a domain here at any time.",
+            "title": "Domain and zones",
+            "hint": "A zone is one wildcard record. Everything Polaris mints lives under it, so DNS is a one-time job.",
+            "duckSubdomain": "DuckDNS subdomain",
+            "token": "Token",
+            "baseDomain": "Base domain",
+            "baseDomainHint": "Any domain or subdomain you control - example.com, plr.com, or plr.example.com.",
+            "zones": "Zones",
+            "addZone": "Add zone",
+            "scopePolaris": "Polaris itself",
+            "scopeDeploy": "Deployed services",
+            "enterDomain": "Enter a domain above",
+            "default": "Default",
+            "makeDefault": "Make default",
+            "removeZone": "Remove zone",
+            "zonesHint": "Leave a label empty to use the base domain itself. New services get a name in the default deploy zone.",
+            "useForDashboard": "Use the Polaris zone for the dashboard too",
+            "useForDashboardHint": "Applied once the zone is seen resolving to this server, so no link breaks in the meantime."
+        },
+        "dns": {
+            "created": "{count, plural, other {# created}}",
+            "repointed": "{count, plural, other {# repointed}}",
+            "alreadyCorrect": "{count, plural, other {# already correct}}",
+            "leftAlone": "{count, plural, other {# left alone}}",
+            "failed": "failed: {names}",
+            "summary": "{parts}.",
+            "nothingToDo": "Nothing to do - the records are already in place.",
+            "doneTitle": "Done",
+            "duckdnsHint": "DuckDNS answers for every name under your subdomain.",
+            "noRecordsHint": "This setup needs no DNS records.",
+            "duckdnsBody": "Nothing to create: {domain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.",
+            "noRecordsBody": "Services get their hostname the moment they are deployed.",
+            "check": "Check DNS",
+            "inPlace": "The DNS is in place",
+            "create": "Create these DNS records",
+            "inPlaceHint": "{domain} points at this server, so every service gets a hostname under it.",
+            "pointAt": "Point them at this server: {ip}",
+            "noPublicIp": "Polaris could not detect this server's public IP.",
+            "yourPublicIp": "your public IP",
+            "gameNote": "Covers every {game} server, so each one costs no DNS record.",
+            "createOnCloudflare": "Create them on Cloudflare",
+            "createForMe": "Create them for me",
+            "conflicts": "These records already exist and point somewhere else. Polaris left them alone - replacing one takes whatever answers on it today offline.",
+            "unknownAddress": "unknown address",
+            "overwrite": "Point them at this server"
+        },
+        "cloudflare": {
+            "intro": "Polaris writes the records through Cloudflare's API, which needs a token. The link opens Cloudflare with the two permissions it needs already selected - create the token, paste it here, and {zone} is set up without touching a DNS panel.",
+            "yourDomain": "your domain",
+            "createToken": "Create the token on Cloudflare",
+            "tokenPlaceholder": "Paste your Cloudflare API token",
+            "pickAccount": "The token reaches several accounts - pick the one holding this domain",
+            "useAccount": "Use this account",
+            "connect": "Connect and create the records"
+        },
+        "provider": {
+            "automated": "<b>{provider}</b> answers for <code>{zone}</code> and your token is connected - Polaris creates the records for you.",
+            "automatable": "<b>{provider}</b> answers for <code>{zone}</code> - Polaris can create the records for you on the last step, with no DNS panel at all.",
+            "manual": "<b>{provider}</b> answers for <code>{zone}</code>.",
+            "unknown": "{zone} is served by {nameserver}. Create the records where you manage it.",
+            "open": "Open {provider}"
+        }
+    },
+    "email": {
+        "title": "Account mail",
+        "description": "The email channel Polaris sends account messages through.",
+        "none": "Do not send account mail",
+        "channel": "{name} - {provider}",
+        "channelBroken": "{name} - {provider} (not working)",
+        "saved": "Saved.",
+        "empty": "No email channel has been set up yet. Add one under <link>Inbox > Channels</link>, then come back and pick it here.",
+        "sendThrough": "Send through",
+        "hint": "Address verification, password resets and emailed sign-in codes all go through this channel. With none chosen, Polaris sends no mail and those are unavailable.",
+        "errors": {
+            "unknownChannel": "Unknown channel."
+        }
+    },
+    "evidence": {
+        "title": "Evidence",
+        "description": "The controls in force on this Polaris, read from its settings, with where each is set and who last changed it.",
+        "certification": "Polaris is not certified against SOC 2 or ISO 27001. Certification is an audit of the organization that runs it; this is the evidence of how this instance is configured.",
+        "readFrom": "Read {at} from {url}.",
+        "readFromBuild": "Read {at} from {url}, build {build}.",
+        "outside": "Outside what Polaris can see",
+        "reading": "Reading the evidence",
+        "readFailed": "The evidence could not be read.",
+        "tryAgain": "Try again",
+        "review": "Review",
+        "setIn": "Set in {places}",
+        "rowsShown": "- {shown} of {total} shown",
+        "name": "Name",
+        "lastChanged": "Last changed {at} by {actor} {action}",
+        "noChange": "No change to this is recorded in the audit trail.",
+        "export": {
+            "button": "Export",
+            "running": "Exporting",
+            "failed": "The export did not work",
+            "done": "Exported, and recorded in Activity.",
+            "unreachable": "Polaris could not be reached. Check the connection and try again.",
+            "summary": "Exported {at}. The JSON's SHA-256 is recorded in Activity, so a copy can be checked later.",
+            "hash": "SHA-256",
+            "copyHash": "the SHA-256",
+            "json": "JSON",
+            "printable": "Printable report"
+        }
+    },
+    "groups": {
+        "page": {
+            "title": "Groups",
+            "description": "Bundle people into groups, then grant access to the group."
+        },
+        "errors": {
+            "createFailed": "Could not create the group"
+        },
+        "search": {
+            "placeholder": "Search by group, description or member",
+            "label": "Search groups"
+        },
+        "newGroup": "New group",
+        "table": {
+            "group": "Group",
+            "members": "Members",
+            "people": "People"
+        },
+        "empty": {
+            "none": "No groups yet.",
+            "noMatch": "No group matches that."
+        },
+        "open": "Open {name}",
+        "system": "system",
+        "noDescription": "No description.",
+        "nobodyYet": "Nobody yet",
+        "peopleCount": "{count, plural, one {# person} other {# people}}",
+        "deleteDialog": {
+            "title": "Delete group",
+            "question": "Delete <strong>{name}</strong>?",
+            "confirm": "Delete group",
+            "description": "Anything granted to the group is granted through it, so deleting it takes that access away from everybody in it. The accounts themselves are untouched."
+        },
+        "create": {
+            "title": "New group",
+            "description": "Bundle people together, then grant access to the group rather than to each of them.",
+            "name": "Group name",
+            "descriptionPlaceholder": "Description (optional)",
+            "descriptionLabel": "Description",
+            "submit": "Create group"
+        },
+        "dialog": {
+            "defaultDescription": "Whoever is in this group is granted whatever the group is granted.",
+            "noMembers": "Nobody is in it yet.",
+            "removeTitle": "Remove from the group",
+            "removeLabel": "Remove {member} from {group}",
+            "addLabel": "Add somebody to this group",
+            "addPlaceholder": "Add a member...",
+            "add": "Add",
+            "everybodyIn": "Everybody on this deployment is already in it.",
+            "delete": "Delete group",
+            "done": "Done"
+        }
+    },
+    "inbox": {
+        "view": {
+            "title": "Inbox",
+            "newChat": "New chat",
+            "connectChannel": "Connect channel",
+            "empty": "No conversations yet. Start one, or wait for an incoming message.",
+            "selectConversation": "Select a conversation"
+        },
+        "thread": {
+            "back": "Back to conversations",
+            "unassigned": "Unassigned",
+            "assign": "Assign agent",
+            "reopen": "Reopen",
+            "close": "Close",
+            "delete": "Delete conversation",
+            "deleteDescription": "This removes the conversation and its messages from Polaris. The chat on {platform} itself is not affected.",
+            "deleteConfirm": "Delete",
+            "chooseOption": "Choose an option",
+            "optionsPlaceholder": "One option per line",
+            "promptPlaceholder": "Prompt shown above the options",
+            "messagePlaceholder": "Type a message",
+            "optionsTitle": "Send selectable options",
+            "options": "Options",
+            "chose": "chose: {selection}",
+            "sending": "sending...",
+            "failed": "failed to send"
+        },
+        "newChat": {
+            "description": "Message someone on a connected channel to start a conversation.",
+            "contact": "Contact",
+            "contactPlaceholder": "Pick a saved contact (optional)",
+            "handle": "Handle",
+            "channel": "Channel",
+            "to": "To",
+            "enterManually": "Enter manually",
+            "recipientPlaceholder": "Recipient id",
+            "noChannel": "No {platform} channel is connected. Connect one to message this handle.",
+            "mismatch": "This handle is on {platform}. Pick a {platform} channel to send it.",
+            "telegramNote": "Telegram bots can't start a chat. Ask the person to open your bot and send <code>/start</code> - the conversation appears in your inbox and you reply there.",
+            "telegramInvalid": "Enter a numeric chat id, not a @username.",
+            "name": "Name (optional)",
+            "namePlaceholder": "Display name",
+            "message": "Message",
+            "messagePlaceholder": "First message",
+            "saveContact": "Save as contact",
+            "send": "Send"
+        },
+        "connect": {
+            "connected": "{name} is connected",
+            "connectedDescription": "The token works. Finish the setup so the bot can reach people.",
+            "done": "Done",
+            "close": "Close",
+            "qrTitle": "Scan to link WhatsApp",
+            "qrConnected": "Connected.",
+            "qrFailed": "Connection failed - try again.",
+            "qrWaiting": "Waiting for the scan...",
+            "addTitle": "Add a channel",
+            "addDescription": "Pick a platform, then how to connect it. Add as many as you like and handle them all from one inbox.",
+            "bridgeMissing": "The messaging bridge is not installed yet. Install it from the <link>marketplace</link> to enable channels.",
+            "connectTitle": "Connect {name}",
+            "variantDescription": "Pick how to connect {name}.",
+            "back": "Back",
+            "name": "Name",
+            "namePlaceholder": "Support bot",
+            "phoneNumberId": "Phone number id",
+            "phoneNumberIdPlaceholder": "From the WhatsApp > API setup page",
+            "showQr": "Show QR",
+            "connect": "Connect"
+        },
+        "qr": {
+            "steps": "On your phone: WhatsApp > Linked devices > Link a device, then scan this code.",
+            "alt": "WhatsApp QR code"
+        },
+        "catalog": {
+            "badges": {
+                "free": "Free",
+                "official": "Official",
+                "sendOnly": "Send-only"
+            },
+            "tokens": {
+                "accessToken": "Access token",
+                "botToken": "Bot token",
+                "webhookUrl": "Webhook URL"
+            },
+            "whatsappWeb": {
+                "name": "WhatsApp (QR)",
+                "tagline": "Free. Links your phone by QR - unofficial, carries a ban risk.",
+                "help": "Scan a QR with your phone to link it. Free but unofficial - use a spare number, not your main one."
+            },
+            "whatsappCloud": {
+                "name": "WhatsApp Cloud",
+                "tagline": "Official Meta API. Native buttons and templates, paid.",
+                "help": "Meta access token + phone-number id from the WhatsApp API setup page. Point its webhook at this Polaris."
+            },
+            "telegram": {
+                "tagline": "A @BotFather bot. Buttons and inline menus.",
+                "help": "Create a bot with @BotFather in Telegram and paste the token it gives you."
+            },
+            "discord": {
+                "tagline": "A bot application. Buttons and select menus.",
+                "tokenPlaceholder": "Bot token from the Developer Portal",
+                "help": "Create an app and bot in the Discord Developer Portal and paste the bot token. Polaris then shows you what is left to switch on."
+            },
+            "discordWebhook": {
+                "name": "Discord webhook",
+                "tagline": "One-way alerts to a channel, no bot needed.",
+                "help": "In Discord: the channel's Edit > Integrations > Webhooks > New Webhook > Copy Webhook URL."
+            },
+            "slack": {
+                "tagline": "A workspace app. Blocks and interactive actions.",
+                "help": "Install a Slack app to your workspace and paste its Bot User OAuth token (starts with xoxb-)."
+            },
+            "slackWebhook": {
+                "name": "Slack webhook",
+                "tagline": "One-way alerts to a channel, no app token.",
+                "help": "Create an Incoming Webhook in your Slack app and paste its URL."
+            },
+            "groups": {
+                "whatsapp": "Your number by QR, or the official Cloud API.",
+                "telegram": "A @BotFather bot with buttons and menus.",
+                "discord": "A bot for two-way chat, or a webhook for alerts.",
+                "slack": "A workspace bot, or a webhook for alerts."
+            }
+        },
+        "platforms": {
+            "email": "Email"
+        },
+        "peerHints": {
+            "whatsapp": "Phone number with country code, e.g. 34600111222",
+            "telegram": "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
+            "discord": "A server channel id the bot can post to, or a user id to DM (prefix a DM with user:)",
+            "slack": "A channel or user id"
+        },
+        "discordPeer": {
+            "serverChannel": "Server channel",
+            "directMessage": "Direct message",
+            "userPlaceholder": "User id or username to DM",
+            "pickChannel": "Pick a channel",
+            "channelPlaceholder": "Channel id the bot can post to",
+            "userHint": "DM by numeric User ID (most reliable: developer mode on, right-click a user > Copy User ID), or a username if the bot shares a server and the Server Members intent is on.",
+            "pickHint": "Pick a server and a channel the bot can post to.",
+            "channelHint": "A text channel id the bot can post to (right-click the channel > Copy Channel ID)."
+        },
+        "discordSetup": {
+            "checking": "Checking what the bot can reach...",
+            "notRunning": "The bridge is not running this bot right now, so there is nothing to check.",
+            "noServer": "The bot is in no server yet",
+            "inServers": "{count, plural, one {In # server} other {In # servers}}",
+            "noServerHint": "It can only send once somebody adds it to one.",
+            "serversHint": "Server channels are pickable when you write a message.",
+            "checkAgain": "Check again",
+            "addBot": "Add the bot to a server",
+            "addBotHint": "Discord asks which of your servers, then to confirm: {permissions}.",
+            "noAppId": "The bot has not reported its application id, so there is no invite link to build. Reconnect it and check again.",
+            "intents": "Privileged intents",
+            "intentsOn": "Both are on.",
+            "intentOff": "{intent} is off. {effect}",
+            "effects": {
+                "serverMembers": "Needed to reach someone by username. Their numeric User ID works without it.",
+                "messageContent": "Without it, messages the bot receives in server channels arrive empty."
+            },
+            "switchOn": "Switch them on under Bot > Privileged Gateway Intents",
+            "reconnectAfter": "Reconnect the channel afterwards - the intents are chosen when the bot logs in."
+        },
+        "errors": {
+            "checkForm": "Check the form",
+            "connectFailed": "Could not connect the channel",
+            "stateFailed": "Could not read channel state",
+            "removeChannelFailed": "Could not remove the channel",
+            "nothingToUpdate": "Nothing to update",
+            "updateChannelFailed": "Could not update the channel",
+            "reconnectFailed": "Could not reconnect the channel",
+            "invalidRequest": "Invalid request",
+            "deleteConversationFailed": "Could not delete the conversation",
+            "updateConversationFailed": "Could not update the conversation",
+            "nothingToSend": "Nothing to send",
+            "typeMessage": "Type a message first",
+            "sendFailed": "Could not send the message",
+            "startFailed": "Could not start the chat",
+            "saveContactFailed": "Could not save the contact",
+            "updateContactFailed": "Could not update the contact",
+            "addHandleFailed": "Could not add the handle",
+            "updateHandleFailed": "Could not update the handle",
+            "removeHandleFailed": "Could not remove the handle",
+            "removeContactFailed": "Could not remove the contact"
+        }
+    },
+    "inboxChannels": {
+        "title": "Channels",
+        "intro": "Everything Polaris talks through: the messaging channels the Inbox and Watch alerts send over, and the senders that carry its mail.",
+        "connect": "Connect a channel",
+        "bridgeMissing": "The messaging bridge is not running yet. Install it from the <link>Apps marketplace</link> to connect messaging channels. Email senders work without it.",
+        "empty": "Nothing connected yet. Connect a messaging channel to start chatting, or an email sender so Polaris can send sign-in mail.",
+        "status": "{status, select, connected {connected} connecting {connecting} qr {qr} error {error} disconnected {disconnected} ready {ready} other {{status}}}",
+        "connected": "Connected",
+        "readyToSend": "Ready to send",
+        "edit": {
+            "telegram": "From @BotFather. Leave the token blank to keep the current one.",
+            "discord": "From the Discord Developer Portal (Bot > Token). Leave blank to keep the current one.",
+            "slack": "The Bot User OAuth token (xoxb-...). Leave blank to keep the current one.",
+            "whatsappCloud": "Meta access token and phone-number id. Leave a field blank to keep it.",
+            "whatsappWeb": "Linked by QR. Use Re-link to show a QR and scan again if the session dropped; remove and re-add to link a different number."
+        },
+        "manage": {
+            "button": "Manage",
+            "title": "Manage {name}",
+            "status": "Status: <tone>{status}</tone>",
+            "relink": "Re-link",
+            "reconnect": "Reconnect",
+            "linkFailed": "Connection failed - try Re-link again.",
+            "tokenPlaceholder": "Saved - enter a new token to replace it",
+            "keepCurrent": "Leave blank to keep the current one",
+            "remove": "Remove",
+            "removeTitle": "Remove {name}?",
+            "removeDescription": "This disconnects the channel and deletes its conversations and messages. It cannot be undone."
+        },
+        "connectPage": {
+            "intro": "Pick what to connect. Add as many as you like and handle them all from one inbox.",
+            "messaging": "Messaging",
+            "messagingHint": "Two-way chat in the Inbox, and where Watch sends its alerts.",
+            "messagingHintNoBridge": "Two-way chat in the Inbox, and where Watch sends its alerts. Needs the messaging bridge, which installs from the <link>Apps marketplace</link>.",
+            "email": "Email",
+            "emailHint": "How Polaris sends its own mail: address verification, password resets, sign-in links and codes.",
+            "docs": "Docs",
+            "setUp": "Set up"
+        },
+        "email": {
+            "saveFailed": "Could not save the channel.",
+            "saved": "Saved. Send a test message to confirm the address works.",
+            "sent": "Sent to {to}. Check the inbox, and the spam folder.",
+            "removeDescription": "Polaris stops sending through it. Anything set to use it for sign-in mail will need another channel.",
+            "removeNamed": "Remove {name}",
+            "addTitle": "Add an email sender",
+            "provider": "Provider",
+            "sendingAddress": "Sending address: {requirement} <docs>Provider docs</docs>",
+            "namePlaceholder": "Account mail",
+            "secretPlaceholder": "Saved - enter a new one to replace it",
+            "testTitle": "Send a test message",
+            "send": "Send",
+            "testHint": "The only check that proves the From address is one the provider will send as.",
+            "add": "Add",
+            "optional": "(optional)",
+            "testSubject": "Polaris test message",
+            "testBody": "This is a test from Polaris. If it reached you, this channel can send mail."
+        },
+        "sms": {
+            "title": "SMS sender",
+            "hint": "Needed only to send texts. {summary}",
+            "empty": "No sender connected. Alerts to a phone number will not send until there is one; every other destination works without it.",
+            "sendsFrom": "{provider} - sends from {from}",
+            "working": "Working",
+            "notWorking": "Not working",
+            "edit": "Edit",
+            "remove": "Remove sender",
+            "editTitle": "Edit SMS sender",
+            "connectTitle": "Connect an SMS sender",
+            "docs": "{provider} documentation",
+            "defaultName": "Texts",
+            "keepSecret": "Leave blank to keep the stored one"
+        },
+        "errors": {
+            "checkForm": "Check the form.",
+            "gone": "That channel no longer exists.",
+            "unknown": "Unknown channel.",
+            "testAddress": "Enter the address to send the test to.",
+            "tooManyTests": "{minutes, plural, one {Too many test messages. Try again in # minute.} other {Too many test messages. Try again in # minutes.}}"
+        }
+    },
+    "inboxContacts": {
+        "title": "Contacts",
+        "intro": "One entry per person, unified across every platform they use. Pick them when starting a chat.",
+        "newContact": "New contact",
+        "fullName": "Full name",
+        "add": "Add",
+        "createFailed": "Could not create the contact",
+        "search": "Search people",
+        "noContacts": "No contacts yet.",
+        "noMatches": "No matches.",
+        "noHandles": "No handles",
+        "selectPrompt": "Select a contact, or add one.",
+        "handleCount": "{count, plural, one {# handle} other {# handles}}",
+        "delete": "Delete",
+        "note": "Note",
+        "optional": "Optional",
+        "saveDetails": "Save details",
+        "handles": "Handles",
+        "noHandlesYet": "No handles yet. Add one below to start chats.",
+        "peerPlaceholder": "Number or id",
+        "removeHandle": "Remove handle"
+    },
+    "inboxLogs": {
+        "title": "Logs",
+        "intro": "Recent messages across every channel - inbound, outbound, and delivery state. Updates live.",
+        "empty": "No messaging activity yet.",
+        "noText": "(no text)",
+        "ack": "{ack, select, pending {pending} sending {sending} sent {sent} delivered {delivered} read {read} failed {failed} other {{ack}}}"
+    },
+    "integrations": {
+        "page": {
+            "title": "Integrations",
+            "intro": "The outside services Polaris can use, grouped by the job connecting one does. Whatever is set up here works everywhere at once - there is nothing to switch on per screen. The model providers agents run on have their own list under <link>AI providers</link>."
+        },
+        "grid": {
+            "search": "Search integrations",
+            "count": "{connected} of {total} set up",
+            "emptyTitle": "Nothing matches",
+            "emptyDescription": "Polaris connects to the services in this list and no others.",
+            "needsAttention": "Needs attention",
+            "on": "On",
+            "off": "Off",
+            "docs": "Docs",
+            "configure": "Configure",
+            "setUp": "Set up"
+        },
+        "proven": {
+            "done": "An account has been connected through this application, so everybody here is offered it.",
+            "title": "Not proven yet",
+            "body": "Nobody else can connect {name} or sign in with it until one authorization has gone through here. Connect your own account to check it - whatever {name} refuses, you are the one who can change it.",
+            "connect": "Connect my {name} account"
+        },
+        "accountLimit": {
+            "label": "Accounts per person",
+            "hint": "How many of these accounts one person may connect. Zero turns connecting off; lowering it never disconnects anybody already over the limit."
+        },
+        "setupValue": {
+            "label": {
+                "redirectUri": "Redirect URI",
+                "homeUrl": "Home page URL",
+                "privacyUrl": "Privacy policy URL",
+                "termsUrl": "Terms of service URL",
+                "logoUrl": "Logo, 128x128",
+                "domain": "Domain"
+            },
+            "copy": {
+                "redirectUri": "Copy the redirect URI",
+                "homeUrl": "Copy the home page URL",
+                "privacyUrl": "Copy the privacy policy URL",
+                "termsUrl": "Copy the terms of service URL",
+                "logoUrl": "Copy the logo, 128x128",
+                "domain": "Copy the domain"
+            },
+            "download": "Download"
+        },
+        "attention": {
+            "title": "Somebody could not connect their account",
+            "reason": "The last attempt was refused. {name} said: {reason}",
+            "clears": "It clears itself as soon as one authorization completes."
+        },
+        "signIn": {
+            "label": "Allow signing in with {name}",
+            "hint": "People who have connected a {name} account get a sign-in button for it. It never creates an account: only someone who already has one, and connected it themselves, can use it."
+        },
+        "emailTrust": {
+            "label": "Take {name}'s word for an email address",
+            "hint": "An address on a connected {name} account is added to that person's Polaris account already confirmed, instead of them being sent a link to confirm it.",
+            "warning": "A confirmed address is where a password reset and a sign-in code are sent. With this off the address is still held for whoever connected it, so nobody else can be given an account under it."
+        },
+        "dialog": {
+            "apiKey": "API key",
+            "token": "Token",
+            "clientSecret": "Client secret",
+            "webApiKey": "Web API key",
+            "savedKey": "Saved - enter a new key to replace it",
+            "savedOne": "Saved - enter a new one to replace it",
+            "savedSecret": "Saved - enter a new secret to replace it",
+            "savedToken": "Saved - enter a new token to replace it",
+            "pasteKey": "Paste your key",
+            "pasteSecret": "Paste the secret",
+            "pasteToken": "Paste the token",
+            "optional": "Optional",
+            "enable": "Enable {name}",
+            "enabled": "Enabled",
+            "test": "Test",
+            "keyWorks": "The key works.",
+            "keyRejected": "The key was rejected",
+            "applying": "Applying...",
+            "close": "Close",
+            "connect": "Connect",
+            "disconnect": "Disconnect",
+            "refresh": "Refresh"
+        },
+        "criminalIp": {
+            "block": "Block addresses reported as",
+            "hint": "Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the background and the answer is cached as an ordinary ban, so nothing here slows a request down."
+        },
+        "filter": {
+            "moduleUrl": "Where the filter is served from",
+            "moduleHint": "A module exporting <code>createNode(context, options)</code>, which returns the audio node the microphone is played through. Polaris loads it in the call and sends whatever comes out.",
+            "tokenHint": "Handed to the filter in the browser, and only to a browser sitting in a call. A filter runs on the microphone, so there is nowhere else for it to go.",
+            "use": "Use it in calls",
+            "useHint": "Adds it to the noise setting in a call, beside the two free models. Anyone whose browser cannot load it gets the free one."
+        },
+        "tenor": {
+            "search": "Search for GIFs and stickers",
+            "hint": "Adds the search to the picker in Chat. A chosen GIF is stored here like any other attachment, so nobody reading a conversation is announced to anyone."
+        },
+        "oauth": {
+            "idLabel": {
+                "clientId": "Client ID",
+                "applicationId": "Application (client) ID",
+                "appKey": "App key"
+            },
+            "redirectTitle": "Authorized redirect URI",
+            "copyRedirect": "Copy the redirect URI",
+            "redirectHint": "Paste this into the app under its redirect URIs. {name} refuses an authorization that arrives from any other address."
+        },
+        "steam": {
+            "enabledHint": "Everybody gets a Connect button for their own Steam account."
+        },
+        "cloudflare": {
+            "scope": {
+                "all": {
+                    "label": "Everything",
+                    "hint": "One token for records and tunnels."
+                },
+                "dns": {
+                    "label": "DNS only",
+                    "hint": "Points your domains at this server."
+                },
+                "tunnel": {
+                    "label": "Tunnels only",
+                    "hint": "Publishes apps with no ports open."
+                }
+            },
+            "dnsOnlyNote": "Connected for DNS. The token reaches no account, so tunnels still need one.",
+            "apiAccess": "API access",
+            "apiAccessHint": "Lets Polaris create your DNS records and each app's tunnel for you. One token can do both, or connect them separately.",
+            "dnsLabel": "DNS records",
+            "dnsDetail": "Points your zones at this server.",
+            "tunnelsLabel": "Named tunnels",
+            "tunnelsAccount": "Account: {name}",
+            "tunnelsDetail": "One tunnel per app, no open ports.",
+            "scopeHint": "{hint} The link opens Cloudflare with {permissions} already selected.",
+            "tokenPlaceholder": "Paste a Cloudflare API token",
+            "pickAccount": "The token reaches several accounts - pick the one to use",
+            "createToken": "Create the token on Cloudflare",
+            "useAccount": "Use this account",
+            "notConnected": "Not connected. {detail}"
+        },
+        "duckdns": {
+            "subdomain": "Subdomain",
+            "pasteToken": "Paste your DuckDNS token",
+            "syncHint": "Point the record at this server's current public IP now.",
+            "syncNow": "Sync now"
+        },
+        "dymo": {
+            "verify": "Verify visitor IPs on access",
+            "verifyHint": "Check the IP when someone opens a share link or drop point, and block the ones that match your rules.",
+            "block": "Block IPs that are",
+            "premium": "{label} (premium)"
+        },
+        "runners": {
+            "ready": "This connection can also register self-hosted runners.",
+            "title": "Self-hosted runners"
+        },
+        "github": {
+            "connectedVia": "Connected via {method, select, app {GitHub App} other {token}} as <strong>{login}</strong>",
+            "installations": "Installations",
+            "notInstalled": "Not installed on any account yet. Install the app to grant repository access.",
+            "installManage": "Install / manage",
+            "connectTitle": "Connect GitHub",
+            "howToConnect": "How to connect",
+            "createApp": "Create app",
+            "existingApp": "Existing app",
+            "createIntro": "Create a GitHub App for this Polaris instance in one step. GitHub will ask you to confirm, then to choose which repositories it can access.",
+            "noWebhook": "This instance has no address GitHub can reach, so the app is created without a webhook. Deploys and runner pools poll instead; agent triggers need the webhook, which you can add on GitHub once a domain is set.",
+            "createGithubApp": "Create GitHub App",
+            "appId": "App ID",
+            "privateKey": "Private key (PEM)",
+            "pemPlaceholder": "Paste the contents of the app's .pem file",
+            "clientId": "Client ID",
+            "clientSecretHint": "Only needed so people can link their own GitHub account to their Polaris one. An app created above already carries these.",
+            "connectApp": "Connect app"
+        },
+        "virusTotal": {
+            "scan": "Scan drop-point uploads",
+            "scanHint": "Every file uploaded to a drop point is scanned before it is accepted.",
+            "whenFlagged": "When a file is flagged"
+        },
+        "errors": {
+            "unknownService": "Unknown service",
+            "limitRange": "Choose a number between 0 and {max}",
+            "noAddress": "{name} does not hand over an address.",
+            "notOAuthApp": "That integration does not take an OAuth application",
+            "clientIdFirst": "Add the client ID before enabling it",
+            "clientSecretFirst": "Add the client secret before enabling it",
+            "applicationNotSaved": "The application could not be saved",
+            "steamNotSaved": "The Steam settings could not be saved",
+            "notAnAddress": "That is not an address",
+            "httpsOnly": "The address has to be https",
+            "notSaved": "That could not be saved",
+            "apiKeyFirst": "Add the API key before turning it on",
+            "unknownTunnel": "Unknown tunnel provider",
+            "tokenFirst": "Add the token before enabling it",
+            "tunnelNotSaved": "The tunnel settings could not be saved",
+            "tunnelNotStarted": "Saved, but the tunnel could not start: {detail}",
+            "tunnelNotStartedDetail": "the tunnel could not start",
+            "duckdnsSubdomain": "Enter your DuckDNS subdomain",
+            "cloudflareNotConnected": "Could not connect the Cloudflare token",
+            "virusTotalKeyFirst": "Add a VirusTotal API key before enabling it",
+            "keyRejected": "The API key was rejected",
+            "dymoKeyFirst": "Add a Dymo API key before enabling it",
+            "criminalIpKeyFirst": "Add a Criminal IP API key before enabling it",
+            "pickVerdict": "Pick at least one verdict to block on",
+            "criminalIpNotSaved": "The Criminal IP settings could not be saved",
+            "enterKeyFirst": "Enter an API key first",
+            "unknownIntegration": "Unknown integration",
+            "configureFirst": "Configure the integration before enabling it",
+            "githubNotConnected": "Could not connect the GitHub App",
+            "installationsNotRefreshed": "Could not refresh installations"
+        }
+    },
+    "integrationsModels": {
+        "title": "AI providers",
+        "intro": "This deployment's own accounts with the model providers. A key is handed to a run over an authenticated call and never written into a repository, so replacing it here takes effect everywhere at once. Every provider bills you directly - Polaris adds nothing.",
+        "keys": {
+            "title": "The deployment's provider keys",
+            "hint": "Tried from the top. The first key whose provider serves the model is the one a run uses.",
+            "empty": "No keys yet. Without one, only people who bring their own can run anything.",
+            "adding": "The provider account this deployment's runs bill to."
+        },
+        "accounts": {
+            "title": "The deployment's agent accounts",
+            "action": "Add account",
+            "hint": "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
+            "empty": "None yet. Without one, only people who bring their own can start a session here.",
+            "adding": "The account this deployment's sessions sign an agent in with."
+        },
+        "elsewhere": "Everything else Polaris connects to lives under <link>Integrations</link>.",
+        "sharing": {
+            "title": "Who these keys run for",
+            "shared": "Anybody whose own keys do not cover a provider runs on these, and the bill is yours. Each account's own keys are used first. <link>Change this under Agent defaults</link>.",
+            "private": "Nobody but you. Runs use only the keys people add themselves, so a provider nobody has a key for cannot be reached. <link>Change this under Agent defaults</link>."
+        }
+    },
+    "organizations": {
+        "page": {
+            "title": "Organizations",
+            "description": "Work owned by a group rather than by one person. Turn them off entirely, restrict who can start one, or cap how large they get."
+        },
+        "errors": {
+            "checkLimits": "Check the limits and try again"
+        },
+        "search": {
+            "placeholder": "Search by name, handle or owner",
+            "label": "Search organizations"
+        },
+        "table": {
+            "organization": "Organization",
+            "owner": "Owner",
+            "members": "Members",
+            "teams": "Teams",
+            "spaces": "Spaces"
+        },
+        "empty": {
+            "none": "Nobody has created one yet.",
+            "noMatch": "No organization matches that."
+        },
+        "open": "Open {name}",
+        "policy": {
+            "title": "Policy",
+            "noLimit": "No limit.",
+            "lowering": "Lowering a limit never removes anybody. An organization already over it keeps everything it has and simply cannot add more.",
+            "saved": "Saved"
+        },
+        "creation": {
+            "label": "Who can create an organization",
+            "options": {
+                "everyone": "Anyone with an account",
+                "admins": "Administrators only",
+                "off": "Nobody"
+            },
+            "hints": {
+                "everyone": "Everybody signed in can start an organization.",
+                "admins": "Only administrators can, and they add people to it.",
+                "off": "Organizations already here keep working; no new ones are made."
+            }
+        },
+        "newPeople": {
+            "label": "Who can invite somebody with no account",
+            "options": {
+                "admins": "Administrators only",
+                "managers": "Anyone who manages an organization's people",
+                "off": "Nobody"
+            },
+            "hints": {
+                "admins": "Administrators can invite by email from any organization. Everybody else invites people who already have an account.",
+                "managers": "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
+                "off": "Organizations only invite people who already have an account."
+            }
+        },
+        "limits": {
+            "perUser": {
+                "label": "Organizations per account",
+                "hint": "Counts only the ones they own."
+            },
+            "members": {
+                "label": "Members per organization",
+                "hint": "Includes the owner."
+            },
+            "teams": {
+                "label": "Teams per organization",
+                "hint": "Across the organization."
+            },
+            "invites": {
+                "label": "Invitations per person per hour",
+                "hint": "From one organization, counted over the last hour."
+            }
+        }
+    },
+    "overview": {
+        "title": "Management",
+        "description": "Administer Polaris: users and access, policies, domains, integrations, and updates.",
+        "sections": {
+            "users": {
+                "title": "Users",
+                "description": "Accounts, admin rights, and invites."
+            },
+            "groups": {
+                "title": "Groups",
+                "description": "Group membership for shared access."
+            },
+            "roles": {
+                "title": "Roles",
+                "description": "What a member, a viewer or a guest may do, and which apps they see."
+            },
+            "policies": {
+                "title": "Policies",
+                "description": "Fine-grained permission policies for users and groups."
+            },
+            "security": {
+                "title": "Security",
+                "description": "Whether an account has to carry a second factor, and which ones count."
+            },
+            "activity": {
+                "title": "Activity",
+                "description": "Audit log of actions across Polaris."
+            },
+            "evidence": {
+                "title": "Evidence",
+                "description": "The controls in force, for an audit, as a dated report you can export."
+            },
+            "inbox": {
+                "title": "Inbox",
+                "description": "Conversations, the channels they arrive on, and who they are with."
+            },
+            "chat": {
+                "title": "Chat",
+                "description": "Message and file limits, how long one stays editable, and what a deleted one leaves."
+            },
+            "email": {
+                "title": "Email",
+                "description": "Who Polaris sends mail as, and the channel that carries sign-in messages."
+            },
+            "domains": {
+                "title": "Domains",
+                "description": "App and sharing domains, DuckDNS sync."
+            },
+            "consumption": {
+                "title": "Consumption",
+                "description": "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
+            },
+            "billing": {
+                "title": "Billing",
+                "description": "What each project and organization used each month, priced at your rates, with budgets and exports."
+            },
+            "organizations": {
+                "title": "Organizations",
+                "description": "Which organizations exist, what they may run, and their limits."
+            },
+            "display": {
+                "title": "Display defaults",
+                "description": "The units, dates and number formats new accounts start on."
+            },
+            "agents": {
+                "title": "Agent defaults",
+                "description": "Where coding agents may run, and what they may open on their own."
+            },
+            "uploads": {
+                "title": "Uploads",
+                "description": "Where files attached to work are kept, and how big one may be."
+            },
+            "integrations": {
+                "title": "Integrations",
+                "description": "Third-party services (label printing, file scanning)."
+            },
+            "integrationsModels": {
+                "title": "AI providers",
+                "description": "The model providers agents run on, and the keys this deployment holds."
+            },
+            "settings": {
+                "title": "Updates & settings",
+                "description": "Version, in-band self-update, and deployment settings."
+            }
+        }
+    },
+    "policies": {
+        "page": {
+            "title": "Policies",
+            "description": "Fine-grained allow/deny rules. Attach a policy to a user, group, or role."
+        },
+        "principal": {
+            "group": "{name} (group)",
+            "role": "{name} (role)"
+        },
+        "errors": {
+            "invalidJson": "The policy document is not valid JSON",
+            "createFailed": "Could not create the policy",
+            "updateFailed": "Could not update the policy"
+        },
+        "summary": {
+            "none": "No statements",
+            "invalid": "Invalid document"
+        },
+        "create": {
+            "title": "New policy",
+            "name": "Policy name",
+            "description": "Description (optional)",
+            "document": "Policy document",
+            "hint": "Actions are capability keys (e.g. <code>drive.read</code>) or Drive verbs; resources are <code>drive:CONNECTION_ID:PATH</code> or <code>*</code>. An explicit deny always wins.",
+            "submit": "Create policy"
+        },
+        "empty": "No policies yet.",
+        "card": {
+            "system": "system",
+            "toggle": "Toggle details",
+            "delete": "Delete policy {name}",
+            "attachedTo": "Attached to:",
+            "nobody": "nobody",
+            "detach": "Detach {label}",
+            "attachPlaceholder": "Attach to...",
+            "attach": "Attach",
+            "description": "Description",
+            "document": "{name} document",
+            "save": "Save changes"
+        }
+    },
+    "reports": {
+        "filterLabel": "Which reports to show",
+        "filters": {
+            "open": "Waiting",
+            "removed": "Removed",
+            "kept": "Kept",
+            "all": "Everything"
+        },
+        "empty": "Nothing here.",
+        "count": "{count, plural, one {# report} other {# reports}}",
+        "reasons": {
+            "spam": "Spam or a scam",
+            "abuse": "Harassment or hate",
+            "sexual": "Sexual content",
+            "violence": "Violence or self-harm",
+            "illegal": "Something illegal",
+            "other": "Something else"
+        },
+        "reportedBy": "reported by {name}",
+        "noText": "No text",
+        "noTextSeeBelow": "No text - see below",
+        "writtenBy": "Written by {name}{live, select, true {} other { - the message is no longer there}}",
+        "writtenByGone": "Written by an account that is gone{live, select, true {} other { - the message is no longer there}}",
+        "remove": "Remove the message",
+        "keep": "Keep it",
+        "handled": "{status, select, removed {Removed} other {Kept}}{withBy, select, yes { by {by}} other {}}{withOn, select, yes { on {on}} other {}}",
+        "open": "Open it in the conversation",
+        "fileHeld": "{name} - kept after the message was deleted",
+        "errors": {
+            "notADecision": "That is not a decision",
+            "notSettled": "That could not be settled"
+        }
+    },
+    "retention": {
+        "title": "Keeping records",
+        "description": "How long Polaris keeps what it writes down about people using it. Anything older is taken away on a schedule.",
+        "saved": "Saved. The next pass will apply it.",
+        "howLong": "How long to keep {subject}",
+        "subjects": {
+            "notifications": {
+                "label": "Notifications",
+                "note": "What arrives in the bell. A nudge is useful the day it lands and almost never after that, and this is the table that grows fastest."
+            },
+            "activity": {
+                "label": "Activity",
+                "note": "What each screen records about the work on it - a status changed, a task moved, a server restarted. This is what somebody reads to work out what happened last month, so it is worth keeping longer than a nudge."
+            },
+            "audit": {
+                "label": "Audit log",
+                "note": "What was done with accounts, access and the deployment itself, and from which device. The one somebody reaches for when an account did something nobody can account for - set it to the longest period you are willing to hold."
+            }
+        },
+        "periods": {
+            "d1": "A day",
+            "d7": "A week",
+            "d30": "30 days",
+            "d90": "3 months",
+            "d180": "6 months",
+            "d365": "A year",
+            "d0": "Forever"
+        },
+        "periodsInline": {
+            "d1": "a day",
+            "d7": "a week",
+            "d30": "30 days",
+            "d90": "3 months",
+            "d180": "6 months",
+            "d365": "a year",
+            "d0": "forever"
+        },
+        "counts": {
+            "forever": "{total} {count, plural, one {record} other {records}} kept. Nothing is ever removed.",
+            "noneDue": "{total} {count, plural, one {record} other {records}} kept. None of them is older than {period}.",
+            "due": "{total} {count, plural, one {record} other {records}} kept. {due} older than {period}, waiting for the next pass."
+        },
+        "sweep": {
+            "nothingDue": "Nothing was due.",
+            "removed": "Removed {removed} {count, plural, one {record} other {records}}. Nothing else is due.",
+            "removedMore": "Removed {removed} {count, plural, one {record} other {records}}. There is more to go - the schedule will keep taking it.",
+            "saveFirst": "Save first, so the pass uses what you chose",
+            "run": "Run a pass now",
+            "hint": "A pass runs on its own every hour and takes a bounded bite, so a deployment with years of history catches up over several rather than in one long lock."
+        },
+        "mail": {
+            "title": "Holding mail to read",
+            "intro": "Recent messages are brought down whole as they arrive, so opening one is instant rather than a round trip to the mail server. Older messages keep their headline here and are fetched when somebody opens them.",
+            "label": "Messages held per mailbox",
+            "ariaLabel": "Messages per mailbox kept whole",
+            "zeroHint": "Zero fetches every message the moment it is opened.",
+            "hint": "The newest of each mailbox. The rest are let go on the next sync.",
+            "saved": "Saved.",
+            "held": {
+                "failed": "How much is held could not be read just now.",
+                "counting": "Counting what is held right now.",
+                "none": "No message is being held whole right now.",
+                "some": "{count, plural, one {{held} message is} other {{held} messages are}} being held whole right now."
+            },
+            "errors": {
+                "whole": "Whole messages only.",
+                "min": "Use 0 to fetch every message when it is opened.",
+                "max": "That is more than {max} messages.",
+                "check": "Check the number."
+            }
+        },
+        "errors": {
+            "notAPeriod": "That is not a period Polaris offers",
+            "sweepFailed": "That could not be run just now"
+        }
+    },
+    "roles": {
+        "page": {
+            "title": "Roles",
+            "description": "What each role may do. Everyone holds one, and it decides which apps they even see."
+        },
+        "errors": {
+            "invalidRole": "Invalid role",
+            "invalidPermissions": "Invalid permissions",
+            "unknownRole": "Unknown role."
+        },
+        "newRole": "New role",
+        "builtIn": "built-in",
+        "peopleCount": "{count, plural, one {# person} other {# people}}",
+        "viewAs": {
+            "label": "See Polaris as the {name} role",
+            "button": "View as"
+        },
+        "delete": {
+            "label": "Delete the {name} role",
+            "title": "Delete the {name} role?",
+            "description": "Nothing holds it, so nobody loses access. It cannot be brought back.",
+            "confirm": "Delete role"
+        },
+        "locked": "Holds everything, including permissions added in future versions. This is the role that keeps the instance reachable, so it cannot be narrowed.",
+        "held": {
+            "none": "Reaches no app at all - the account exists to be identified, nothing more.",
+            "count": "{held} of {total} permissions."
+        },
+        "create": {
+            "title": "New role",
+            "description": "A role with nothing ticked is still useful: the account exists and can sign in, but reaches no app.",
+            "name": "Name",
+            "namePlaceholder": "contractor",
+            "submit": "Create role",
+            "creating": "Creating..."
+        },
+        "areas": {
+            "drive": "Drive",
+            "sharing": "Sharing",
+            "snippets": "Snippets",
+            "vault": "Vault",
+            "notes": "Notes",
+            "office": "Office",
+            "mail": "Mail",
+            "chat": "Chat",
+            "apps": "Apps",
+            "gameServers": "Game servers",
+            "home": "Home",
+            "tools": "Tools",
+            "tasks": "Tasks",
+            "inbox": "Inbox",
+            "management": "Management"
+        },
+        "permissions": {
+            "drive": {
+                "read": "See files and download them",
+                "write": "Upload, rename and move files",
+                "delete": "Delete files"
+            },
+            "connections": {
+                "manage": "Add and configure storage connections"
+            },
+            "shares": {
+                "create": "Create share links",
+                "manage": "Manage everyone's share links"
+            },
+            "requests": {
+                "create": "Create drop points",
+                "manage": "Manage everyone's drop points"
+            },
+            "snippets": {
+                "read": "See snippets and open shared ones",
+                "write": "Write snippets and share them by link"
+            },
+            "vault": {
+                "use": "Keep a password vault and connect a client to it"
+            },
+            "notes": {
+                "use": "Keep private notes"
+            },
+            "office": {
+                "use": "Write documents, spreadsheets, slides and diagrams"
+            },
+            "mail": {
+                "use": "Link mailboxes and read mail here"
+            },
+            "mailserver": {
+                "manage": "Run a mail server, and manage its domains and mailboxes"
+            },
+            "chat": {
+                "use": "Talk in channels and direct messages",
+                "spaces": "Create servers and their channels",
+                "groups": "Start group conversations",
+                "attach": "Attach files and send voice messages",
+                "call": "Start and join calls",
+                "meetings": "Create meeting links people outside Polaris can join"
+            },
+            "deploy": {
+                "read": "See deployments, servers and containers",
+                "manage": "Deploy, restart and configure apps"
+            },
+            "games": {
+                "read": "See game servers and who is playing",
+                "moderate": "Op, kick, ban and whitelist players",
+                "console": "Run commands on the server console",
+                "manage": "Create servers, change settings and rebuild"
+            },
+            "agents": {
+                "read": "See coding-agent repositories and runs",
+                "manage": "Enable repositories and start agent runs"
+            },
+            "home": {
+                "read": "Watch the cameras and read what they saw",
+                "control": "Move cameras and act on alerts",
+                "manage": "Add cameras, and set how they detect and record"
+            },
+            "tools": {
+                "use": "Use the tools: convert, resize, translate",
+                "manage": "Create short links and see who followed them"
+            },
+            "tasks": {
+                "read": "See spaces, lists and tasks",
+                "manage": "Create and change tasks"
+            },
+            "inbox": {
+                "read": "Read conversations",
+                "manage": "Reply and manage channels"
+            },
+            "users": {
+                "manage": "Invite people and change accounts"
+            },
+            "settings": {
+                "manage": "Change instance settings"
+            },
+            "system": {
+                "manage": "Updates, backups and maintenance"
+            }
+        }
+    },
+    "safety": {
+        "page": {
+            "title": "Safety",
+            "description": "Everything this instance has been asked to look at: accounts that have locked themselves down, people who have been reported, and messages somebody objected to."
+        },
+        "errors": {
+            "unreadable": "That could not be read."
+        },
+        "filters": {
+            "label": "Which cases to show",
+            "open": "Waiting",
+            "resolved": "Resolved",
+            "dismissed": "Dismissed",
+            "all": "Everything"
+        },
+        "accounts": "Accounts",
+        "messages": "Messages",
+        "empty": "Nothing about an account is waiting.",
+        "kinds": {
+            "lockdown": "Account locked down",
+            "user": "Reported account"
+        },
+        "statuses": {
+            "open": "Open",
+            "resolved": "Resolved",
+            "dismissed": "Dismissed"
+        },
+        "reasons": {
+            "spam": "Spam or scams",
+            "abuse": "Harassment or abuse",
+            "impersonation": "Pretending to be somebody else",
+            "sexual": "Sexual content",
+            "illegal": "Something illegal",
+            "other": "Something else"
+        },
+        "case": {
+            "stillLocked": "Still locked down",
+            "lifted": "Lifted",
+            "reportedBy": "Reported by {name} - {time}",
+            "raisedBySelf": "Raised by the account itself - {time}",
+            "noNoteLockdown": "They said nothing about why.",
+            "noNoteReport": "The reporter added nothing.",
+            "outcomeLabel": "What you found",
+            "outcomeLockdown": "What you found. The account owner is told this.",
+            "outcomeReport": "What you decided. Kept as the record.",
+            "resolve": "Looked at it",
+            "dismiss": "Nothing to do",
+            "settled": "{who, select, named {{name} settled it} other {Settled}}{when, select, yes { on {time}} other {}}{outcome, select, yes {: {text}} other {.}}",
+            "ownerLifts": "Only they can lift the lockdown, from a device already signed in."
+        }
+    },
+    "security": {
+        "title": "Security",
+        "description": "What every account on this Polaris has to carry before it can be used.",
+        "saved": "Saved.",
+        "require": {
+            "title": "Require a second step to sign in",
+            "hint": "Every account adds one before it can use Polaris. Accounts that already exist are asked the next time they sign in.",
+            "off": "With this off, a password is all an account needs. People can still turn on a second step for themselves under their own security settings."
+        },
+        "factors": {
+            "title": "What counts as a second step",
+            "hint": "People pick from whichever of these works on this deployment.",
+            "fixed": "Always accepted. It needs nothing from this deployment, so it is what people can still use when everything else is unreachable.",
+            "noMail": "No email channel carries account mail yet, so nobody can pick this. Connect a sender under Inbox > Channels, then nominate it under Management > Email.",
+            "totp": {
+                "label": "Authenticator app",
+                "description": "A code the phone generates on its own, with no network involved."
+            },
+            "email": {
+                "label": "Email code",
+                "description": "A code sent to the address on the account, which confirms the address as it goes."
+            }
+        },
+        "connection": {
+            "title": "Ask again after a connected account",
+            "hint": "Signing in with GitHub or Google answers that service first. With this on, Polaris asks for the second step afterwards as well.",
+            "off": "With this off, the service that signed them in is the whole sign-in. Anyone who wants the extra step can still turn it on for their own account."
+        },
+        "playerAddresses": {
+            "title": "Show player addresses to game server managers",
+            "hint": "When someone managing a game server looks up a Polaris account to add it as a player, they see the addresses that account signs in from. Turned off, only administrators see them."
+        },
+        "errors": {
+            "checkForm": "Check the form.",
+            "onOrOff": "Choose on or off.",
+            "saveFailed": "Could not save that. Try again."
+        }
+    },
+    "uploads": {
+        "title": "Uploads",
+        "description": "Where people’s own drives, organizations’ shelves, files, photos, things sent in chat and camera footage are stored, and how big one may be.",
+        "saved": "Saved.",
+        "whereThem": "Where to keep them",
+        "automatic": {
+            "files": "Worked out from what this instance has connected. Connect a NAS and new files follow it.",
+            "photos": "Worked out from what this instance has connected. Connect a NAS and new photos follow it.",
+            "drives": "Worked out from what this instance has connected. Connect a NAS and new drives follow it.",
+            "shelves": "Worked out from what this instance has connected. Connect a NAS and new shelves follow it.",
+            "footage": "Worked out from what this instance has connected. Connect a NAS and new footage follows it."
+        },
+        "picker": {
+            "keptOn": "Kept on {name}",
+            "chosenHere": "Chosen here.",
+            "automatic": "Choose for me ({name})",
+            "local": "This server",
+            "connection": "{name} ({kind})"
+        },
+        "check": {
+            "button": "Check it works",
+            "failed": "That check could not be run.",
+            "result": "{where}: {detail}"
+        },
+        "tidy": {
+            "button": "Tidy up",
+            "tooltip": "Removes folders for conversations that no longer exist, and empty ones.",
+            "failed": "That could not be run.",
+            "nothing": "Nothing to take out.",
+            "took": "{count, plural, one {Took out # folder.} other {Took out # folders.}}",
+            "refused": "{took} {count} could not be removed - the storage refused, or it is not answering.",
+            "name": "chat storage",
+            "kind": "folders",
+            "title": "Tidy the chat storage",
+            "description": "Deletes every folder under the chat root whose conversation no longer exists, with everything inside it, and any folder left empty. The files do not come back.",
+            "question": "Tidy every storage this instance has written chat files to?"
+        },
+        "attachments": {
+            "title": "Files attached to work",
+            "intro": "Screenshots, recordings and documents people staple to a task.",
+            "hint": "Files already attached stay where they were written; this decides where the next ones go.",
+            "biggest": "Biggest single file",
+            "range": "Between 1 MB and 10 GB."
+        },
+        "photos": {
+            "title": "Profile photos",
+            "intro": "The picture on somebody’s account. Capped at 2 MB and squared by the browser before it is sent, so these stay small wherever they go.",
+            "hint": "Photos already uploaded stay where they were written; this decides where the next ones go.",
+            "gravatar": "Use Gravatar",
+            "gravatarHint": "For accounts with no photo of their own, show the one their email address has on Gravatar. Polaris asks for it, not the browser, so no address leaves this server and nobody is told who is looking. Off means initials until somebody uploads a photo."
+        },
+        "drives": {
+            "title": "People's own drives",
+            "intro": "Everybody gets a private folder of their own in Drive, made the first time they open it. What it can hold is whatever is free on the disk it is on.",
+            "hint": "Drives that already exist stay on the disk they were made on; this decides where the next ones go.",
+            "made": "{count, plural, one {One drive has been made.} other {# drives have been made.}}",
+            "madeElsewhere": "{count, plural, one {One drive has been made} other {# drives have been made}}, {elsewhere} of them on a different disk from the one above."
+        },
+        "shelves": {
+            "title": "Organizations' shelves",
+            "intro": "Every organization gets a shelf of its own in Drive, made the first time somebody there opens it. It is where a company keeps what belongs to the company rather than to one person.",
+            "hint": "Shelves that already exist stay on the disk they were made on; this decides where the next ones go.",
+            "made": "{count, plural, one {One shelf has been made.} other {# shelves have been made.}}",
+            "madeElsewhere": "{count, plural, one {One shelf has been made} other {# shelves have been made}}, {elsewhere} of them on a different disk from the one above."
+        },
+        "chat": {
+            "title": "Files sent in chat",
+            "intro": "Screenshots and documents people put on a message. Capped at 25 MB each - anything bigger belongs in Drive, with a link to it in the conversation.",
+            "hint": "Files already sent stay where they were written; this decides where the next ones go."
+        },
+        "footage": {
+            "title": "Camera footage",
+            "intro": "Recordings and the pictures that go with what the cameras notice. A NAS is the right answer if you have one: this is the only thing here that grows whether or not anybody uses it.",
+            "where": "Where to keep it",
+            "hint": "Footage already recorded stays where it was written. A camera can override this on its own settings."
+        },
+        "errors": {
+            "checkSettings": "Check the settings and try again",
+            "saveFailed": "Could not save that",
+            "notSaved": "That could not be saved",
+            "tidyFailed": "That storage could not be tidied"
+        }
+    },
+    "users": {
+        "page": {
+            "title": "People",
+            "description": "Registration is invite-only. Invite people, and manage what their accounts may do."
+        },
+        "filters": {
+            "all": "Everyone",
+            "admins": "Administrators",
+            "limited": "Limited",
+            "banned": "Banned"
+        },
+        "methods": {
+            "link": "Link",
+            "magic": "Emailed link",
+            "code": "Code"
+        },
+        "directory": {
+            "searchPlaceholder": "Search by name, address, username, role or group",
+            "searchLabel": "Search people",
+            "filterLabel": "Filter people",
+            "invite": "Invite",
+            "columns": {
+                "person": "Person",
+                "access": "Access",
+                "lastSeen": "Last seen",
+                "joined": "Joined"
+            },
+            "empty": "Nobody here yet.",
+            "noMatch": "Nobody matches that.",
+            "open": "Open {name}",
+            "you": "(you)",
+            "badges": {
+                "admin": "admin",
+                "limited": "limited",
+                "banned": "banned"
+            },
+            "online": "Online",
+            "never": "Never",
+            "country": " - {country}"
+        },
+        "menu": {
+            "openRecord": "Open their record",
+            "emailUnverify": "Mark the email unverified",
+            "emailVerify": "Mark the email verified",
+            "phoneUnverify": "Mark the number unverified",
+            "phoneVerify": "Mark the number verified",
+            "openAccount": "Open their account",
+            "liftSuspension": "Lift the suspension",
+            "suspend": "Suspend the account",
+            "delete": "Delete the account"
+        },
+        "verify": {
+            "title": "Mark {hasLabel, select, yes {{label}} other {their number}} as verified?",
+            "description": "Polaris will treat it as proved even though {name} has not confirmed it. This is recorded against your account in the audit trail.",
+            "confirm": "Mark verified"
+        },
+        "remove": {
+            "title": "Delete {name}?",
+            "description": "Their account and everything it owns - connections, deployments, shares and uploads - goes with it. This cannot be undone.",
+            "confirm": "Delete account"
+        },
+        "invites": {
+            "title": "Pending invites",
+            "hint": "Invites that have not been claimed yet. Revoking one stops it working immediately.",
+            "none": "None outstanding.",
+            "oneTimePassword": "one-time password",
+            "limited": "limited",
+            "expires": "Expires {expires}",
+            "expiresEmailed": "Expires {expires} - emailed {sent}",
+            "revokeLabel": "Revoke the invite for {email}",
+            "revoke": "Revoke",
+            "noMail": "No email channel is nominated, so Polaris cannot send invites itself."
+        },
+        "ban": {
+            "lengths": {
+                "hour": "For 1 hour",
+                "day": "For 1 day",
+                "threeDays": "For 3 days",
+                "week": "For 1 week",
+                "thirtyDays": "For 30 days",
+                "untilLifted": "Until lifted"
+            },
+            "suspend": "Suspend",
+            "ban": "Ban",
+            "suspendTitle": "Suspend {name}?",
+            "banTitle": "Ban {name}?",
+            "description": "They are signed out everywhere at once. A suspension lifts itself when its time is up; a ban stays until somebody lifts it.",
+            "reason": "Reason",
+            "reasonPlaceholder": "Optional, kept for the record",
+            "length": "How long",
+            "working": "Working..."
+        },
+        "recovery": {
+            "title": "Locked out",
+            "hint": "Approving lets them set a new password themselves and signs out everything already on the account. Make sure you know who is asking.",
+            "verified": "answered their questions",
+            "unverified": "nothing verified",
+            "asked": "Asked {asked} - expires {expires}",
+            "askedFrom": "Asked {asked} from {ip} - expires {expires}",
+            "deny": "Deny",
+            "approve": "Approve"
+        },
+        "sharing": {
+            "title": "Who can invite",
+            "label": "Sharing",
+            "selectLabel": "Who can give other people access",
+            "modes": {
+                "off": {
+                    "label": "Administrators only",
+                    "hint": "Only an administrator gives anybody access to anything."
+                },
+                "existing": {
+                    "label": "Owners can share with existing accounts",
+                    "hint": "Somebody who runs a server can give access to people who already have an account here."
+                },
+                "invite": {
+                    "label": "Owners can invite by email",
+                    "hint": "The same, and they can send an invite to an address with no account yet."
+                }
+            },
+            "roleLabel": "New accounts get the role",
+            "roleSelectLabel": "The role an account invited this way is created with",
+            "roleHint": "Applies to accounts made this way. guest opens no app on its own, so what they reach is the one thing they were invited to.",
+            "saved": "Saved."
+        },
+        "cooldown": {
+            "title": "Changing a username",
+            "hint": "Other people find and address each other by their username, so changing one costs a wait. Accounts that have never changed theirs can do it once straight away.",
+            "label": "Wait between changes",
+            "inputLabel": "Days an account waits between username changes",
+            "daysZero": "Days. Zero lets anybody change theirs whenever they like.",
+            "days": "Days.",
+            "saved": "Saved."
+        },
+        "profiles": {
+            "title": "Profiles without signing in",
+            "hint": "A person’s page lives at <code>/u/their-username</code> and can be handed out. With this off it is only readable by people signed in here, which is what a deployment for one company usually wants. With it on, a stranger still sees only what an account has set to “everybody” - and an account set to anything narrower stays invisible to them.",
+            "switchLabel": "Show profiles to people who are not signed in",
+            "followersLabel": "Who a new account's followers are shown to",
+            "followersSelectLabel": "Who a new account's followers are shown to",
+            "followersHint": "Who follows somebody and who they follow are one disclosure and one setting on their own privacy screen. This is what it says before anybody touches it - a directory for one company and a place where people follow each other want opposite answers, and only you can say which this is. Changing it never reaches back into an account that has already chosen.",
+            "audiences": {
+                "everyone": "Everybody",
+                "friends": "Friends",
+                "nobody": "Nobody"
+            }
+        },
+        "errors": {
+            "invalidInput": "Invalid input",
+            "unknownAccount": "Unknown account.",
+            "unknownSession": "Unknown session.",
+            "invalidRules": "Invalid rules",
+            "wholeDays": "Whole days only.",
+            "zeroForNoWait": "Use 0 for no wait at all.",
+            "tooLong": "That is longer than {max} days.",
+            "checkDays": "Check the number of days.",
+            "audience": "That is not an audience a default can be.",
+            "checkSettings": "Check the settings and try again"
+        }
+    },
+    "usersDetail": {
+        "back": "People",
+        "badges": {
+            "admin": "admin",
+            "banned": "banned"
+        },
+        "identity": {
+            "name": "Name",
+            "fullName": "Full name",
+            "handle": "Handle",
+            "pronouns": "Pronouns",
+            "email": "Email",
+            "verified": "verified",
+            "unverified": "unverified",
+            "company": "Company",
+            "headline": "Headline",
+            "joined": "Joined",
+            "secondFactor": "Second factor",
+            "on": "On",
+            "off": "Off",
+            "organizations": "Organizations",
+            "none": "None",
+            "org": "{name} - {role}",
+            "signsInWith": "Signs in with",
+            "nothingRecorded": "Nothing recorded",
+            "password": "Password"
+        },
+        "account": {
+            "facts": {
+                "username": "Username",
+                "company": "Company",
+                "joined": "Joined",
+                "email": "Email",
+                "verified": "Verified",
+                "unverified": "Unverified",
+                "twoFactor": "Two-factor",
+                "on": "On",
+                "off": "Off",
+                "groups": "Groups"
+            },
+            "access": {
+                "title": "Access",
+                "role": "Role",
+                "roleHint": "What they may do across Polaris, before any policy attached to them.",
+                "roleLabel": "Role for {name}",
+                "noRole": "No role",
+                "openAccount": "Open their account",
+                "openHint": "Use Polaris as {name}, to see what they see and fix it where they are. Nothing is signed in on their side and it is written to the activity log.",
+                "open": "Open",
+                "admin": "Administrator",
+                "adminHint": "Opens the operator surfaces: people, policies, domains and activity.",
+                "adminLabel": "Administrator access for {name}"
+            },
+            "limits": {
+                "title": "Where they may sign in from",
+                "hint": "Applies on top of whatever they set for themselves, and they cannot remove it. Saving signs them out everywhere.",
+                "none": "No limit - they may sign in from anywhere.",
+                "some": "They may only sign in from what is listed.",
+                "save": "Save limits"
+            },
+            "sessions": {
+                "title": "Sessions",
+                "hint": "Every device signed in as {name}, and which of this instance's addresses each one came in on.",
+                "signOutAll": "Sign out everywhere",
+                "empty": "Nothing is signed in.",
+                "lastSeen": "{seen, select, yes {Last seen {time}} other {Never seen.}}{hasIp, select, yes { from {ip}} other {}}{hasCountry, select, yes { ({country})} other {}}"
+            },
+            "danger": {
+                "title": "Danger zone",
+                "status": "{kind, select, suspended {Suspended {at}, back {until}} other {Banned {at}}}{hasReason, select, yes {: {reason}} other {}}",
+                "liftBan": "Lift the ban",
+                "reasonPlaceholder": "Reason (optional, kept for the record)",
+                "hint": "Either one signs them out everywhere at once. A suspension lifts itself when its time is up; a ban stays until somebody lifts it.",
+                "deleteHint": "Deleting takes everything the account owns with it.",
+                "delete": "Delete account"
+            }
+        },
+        "accessView": {
+            "sessionsLink": "Sessions, limits and the rest",
+            "role": {
+                "title": "Role",
+                "hint": "What they may do across Polaris. One role each, and anything narrower is a policy or access to one particular thing.",
+                "label": "Their role",
+                "define": "Define what a role holds"
+            },
+            "groups": {
+                "title": "Groups",
+                "hint": "Membership only. What a group may do comes from the policies attached to it.",
+                "empty": "No groups are defined yet.",
+                "manage": "Manage groups"
+            },
+            "policies": {
+                "title": "Policies",
+                "hint": "Attached directly to this account. The documents themselves are written under Policies.",
+                "empty": "No policies are defined yet.",
+                "manage": "Manage policies"
+            },
+            "resources": {
+                "title": "On specific things",
+                "hint": "Access to one server, project or space, given outside their role.",
+                "empty": "Nothing. What they reach is whatever their role, groups and policies allow.",
+                "deny": "deny",
+                "ended": "ended",
+                "canShare": "can invite others",
+                "detail": "{actions}{via, select, yes { - via {principal}} other {}}{until, select, yes { - until {date}} other {}}",
+                "open": "Open {name}",
+                "remove": "Remove their access to {name}",
+                "confirmTitle": "Remove this access",
+                "confirmDescription": "They lose {name} the next time a page loads. Nothing else about their account changes.",
+                "confirm": "Remove",
+                "noAnswer": "Polaris did not answer. Reload the page and try again."
+            }
+        },
+        "capabilities": {
+            "title": "Capabilities",
+            "hint": "What this account may do, one thing at a time. Each follows their role unless it is set here.",
+            "admin": "This account is an administrator, which allows everything. Anything switched off here takes effect only if that is taken away first.",
+            "roleAllows": "role allows",
+            "roleDoesNot": "role does not",
+            "label": "{label} for this account",
+            "inherit": "Role",
+            "inheritTitle": "Follow their role and policies",
+            "allow": "On",
+            "allowTitle": "Always on for this account",
+            "deny": "Off",
+            "denyTitle": "Always off, whatever their role says"
+        },
+        "errors": {
+            "unknownAccount": "Unknown account.",
+            "accessFailed": "Could not work out their access",
+            "unknownGroup": "Unknown group.",
+            "unknownPolicy": "Unknown policy.",
+            "notCapability": "That is not a capability.",
+            "unknownAccess": "Unknown access."
+        }
+    },
+    "usersInvite": {
+        "methods": {
+            "link": {
+                "label": "Invite link",
+                "hint": "You copy the link and send it however you like."
+            },
+            "magic": {
+                "label": "Magic link by email",
+                "hint": "Polaris emails the link to the address you invited."
+            },
+            "code": {
+                "label": "Invitation code",
+                "hint": "A short code they type in at the sign-in page."
+            }
+        },
+        "title": "Invite someone",
+        "description": "They set their own name and password when they join. The invite is good for 7 days.",
+        "email": "Email",
+        "emailPlaceholder": "teammate@example.com",
+        "role": "Role",
+        "roleNoApp": "Opens no app. The account exists so they can be identified - at a share link, a drop point, or anywhere that asks for a Polaris sign-in.",
+        "roleHint": "What each role may do is set under Management > Roles.",
+        "method": "How it reaches them",
+        "noMail": "Needs an email channel: nominate one under Integrations.",
+        "advanced": "Advanced options",
+        "otp": {
+            "title": "One-time password",
+            "hint": "Asked for on top of the link or code. Send it another way, so a misdelivered invite is not enough on its own.",
+            "switchLabel": "Require a one-time password",
+            "placeholder": "At least 6 characters"
+        },
+        "where": {
+            "title": "Where they may connect from",
+            "hint": "Bounds the invite and stays on the account afterwards, as a limit they cannot lift themselves. Leave empty for no restriction."
+        },
+        "summaryNone": "No one-time password, no address or country limits.",
+        "summarySet": "One-time password or connection limits are set.",
+        "creating": "Creating...",
+        "create": "Create invite",
+        "issued": {
+            "readCode": "Read this code out to them:",
+            "codeLabel": "invitation code",
+            "sendYourself": "Send it yourself:",
+            "link": "The invite link:",
+            "linkLabel": "invite link",
+            "sendError": "The invite was created, but Polaris could not email it: {error}",
+            "shownOnce": "This is shown once. Polaris keeps only a hash of it, so it cannot be looked up again.",
+            "done": "Done"
+        }
+    }
+}

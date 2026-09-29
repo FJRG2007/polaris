@@ -11,6 +11,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { setChatRules } from "@/lib/chat/rules";
 import { setOrgChatOffered } from "@/lib/chat/isolation";
 import { isDriveShare, setDriveShare } from "@/lib/chat/drive-share";
@@ -25,11 +26,12 @@ export async function setChatRulesAction(
     const admin = await requireAdmin();
 
     const chosen = core.CHAT_RULE_SCOPES.find((entry) => entry === scope);
-    if (!chosen) return { error: "That is not a kind of conversation" };
+    if (!chosen) return { error: (await getTranslations("admin"))("chat.errors.notAScope") };
 
     const parsed = core.chatRulesSchema.safeParse(rules);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those limits could not be saved" };
+        const t = await getTranslations("admin");
+        return { error: parsed.error.issues[0]?.message ?? t("chat.errors.rulesNotSaved") };
     }
 
     await setChatRules(chosen, parsed.data);
@@ -53,7 +55,7 @@ export async function setChatRulesAction(
  */
 export async function setDriveShareAction(how: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (!isDriveShare(how)) return { error: "That is not a way to share a file" };
+    if (!isDriveShare(how)) return { error: (await getTranslations("admin"))("chat.errors.notAShare") };
     await setDriveShare(how);
     await recordAudit({
         actorId: admin.id,
@@ -113,7 +115,8 @@ export async function setCallServerAction(
     try {
         await calls.setCallServer(String(url ?? ""), String(apiKey ?? ""), String(apiSecret ?? ""));
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be saved" };
+        const t = await getTranslations("admin");
+        return { error: caught instanceof Error ? caught.message : t("chat.errors.notSaved") };
     }
     // Pointing calls elsewhere takes the shipped server's path off the edge, and
     // clearing the address puts it back. Left alone, an instance that switched

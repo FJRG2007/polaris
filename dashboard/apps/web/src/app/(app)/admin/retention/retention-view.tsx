@@ -20,12 +20,10 @@ import { grouped } from "@/app/(app)/apps/firewall/page-parts";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { saveRetentionAction, sweepRetentionAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     RETENTION_DAYS,
-    RETENTION_LABELS,
     RETENTION_SUBJECTS,
-    RETENTION_SUBJECT_LABELS,
-    RETENTION_SUBJECT_NOTES,
     type RetentionDays,
     type RetentionPolicy,
     type RetentionSubject
@@ -38,6 +36,8 @@ export function RetentionView({
     policy: RetentionPolicy;
     totals: Record<RetentionSubject, { total: number; due: number }>;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [draft, setDraft] = useState<RetentionPolicy>(policy);
     const [busy, setBusy] = useState(false);
     const [sweeping, setSweeping] = useState(false);
@@ -56,7 +56,7 @@ export function RetentionView({
             if (result?.error) setError(result.error);
             return;
         }
-        setNote("Saved. The next pass will apply it.");
+        setNote(t("retention.saved"));
     };
 
     const sweepNow = async () => {
@@ -72,10 +72,10 @@ export function RetentionView({
         const removed = result.removed ?? 0;
         setNote(
             removed === 0
-                ? "Nothing was due."
+                ? t("retention.sweep.nothingDue")
                 : result.more
-                  ? `Removed ${grouped(removed)} records. There is more to go - the schedule will keep taking it.`
-                  : `Removed ${grouped(removed)} records. Nothing else is due.`
+                  ? t("retention.sweep.removedMore", { count: removed, removed: grouped(removed) })
+                  : t("retention.sweep.removed", { count: removed, removed: grouped(removed) })
         );
     };
 
@@ -84,20 +84,20 @@ export function RetentionView({
             {RETENTION_SUBJECTS.map((subject) => {
                 const counts = totals[subject];
                 const keeping = policy[subject];
+                const label = t(`retention.subjects.${subject}.label`);
+                const record = { count: counts.total, total: grouped(counts.total) };
                 return (
                     <Card key={subject}>
                         <CardBody className="flex flex-col gap-3">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                    <h2 className="text-sm font-medium">
-                                        {RETENTION_SUBJECT_LABELS[subject]}
-                                    </h2>
+                                    <h2 className="text-sm font-medium">{label}</h2>
                                     <p className="text-muted-foreground text-xs">
-                                        {RETENTION_SUBJECT_NOTES[subject]}
+                                        {t(`retention.subjects.${subject}.note`)}
                                     </p>
                                 </div>
                                 <Select
-                                    aria-label={`How long to keep ${RETENTION_SUBJECT_LABELS[subject]}`}
+                                    aria-label={t("retention.howLong", { subject: label })}
                                     className="w-40 shrink-0"
                                     value={String(draft[subject])}
                                     onValueChange={(next) =>
@@ -108,7 +108,7 @@ export function RetentionView({
                                     }
                                     options={RETENTION_DAYS.map((days) => ({
                                         value: String(days),
-                                        label: RETENTION_LABELS[days]
+                                        label: t(`retention.periods.d${days}`)
                                     }))}
                                 />
                             </div>
@@ -117,19 +117,18 @@ export function RetentionView({
                                 than against what is on the selector - so the
                                 number does not change while somebody is deciding. */}
                             <p className="text-muted-foreground border-t border-border pt-3 text-xs">
-                                {grouped(counts.total)}{" "}
-                                {counts.total === 1 ? "record" : "records"} kept.{" "}
-                                {keeping === 0 ? (
-                                    <>Nothing is ever removed.</>
-                                ) : counts.due === 0 ? (
-                                    <>None of them is older than {RETENTION_LABELS[keeping].toLowerCase()}.</>
-                                ) : (
-                                    <>
-                                        {grouped(counts.due)} older than{" "}
-                                        {RETENTION_LABELS[keeping].toLowerCase()}, waiting for the next
-                                        pass.
-                                    </>
-                                )}
+                                {keeping === 0
+                                    ? t("retention.counts.forever", record)
+                                    : counts.due === 0
+                                      ? t("retention.counts.noneDue", {
+                                            ...record,
+                                            period: t(`retention.periodsInline.d${keeping}`)
+                                        })
+                                      : t("retention.counts.due", {
+                                            ...record,
+                                            due: grouped(counts.due),
+                                            period: t(`retention.periodsInline.d${keeping}`)
+                                        })}
                             </p>
                         </CardBody>
                     </Card>
@@ -142,7 +141,7 @@ export function RetentionView({
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" disabled={busy || !changed} onClick={() => void save()}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                    Save
+                    {tc("actions.save")}
                 </Button>
                 {/* For the operator who has just shortened a period and wants to
                     watch the number move, rather than wait an hour to find out
@@ -151,7 +150,7 @@ export function RetentionView({
                     size="sm"
                     variant="outline"
                     disabled={sweeping || changed}
-                    title={changed ? "Save first, so the pass uses what you chose" : undefined}
+                    title={changed ? t("retention.sweep.saveFirst") : undefined}
                     onClick={() => void sweepNow()}
                 >
                     {sweeping ? (
@@ -159,12 +158,9 @@ export function RetentionView({
                     ) : (
                         <Trash2 className="size-4" />
                     )}
-                    Run a pass now
+                    {t("retention.sweep.run")}
                 </Button>
-                <p className="text-muted-foreground text-xs">
-                    A pass runs on its own every hour and takes a bounded bite, so a deployment with
-                    years of history catches up over several rather than in one long lock.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("retention.sweep.hint")}</p>
             </div>
         </div>
     );

@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
@@ -64,9 +65,10 @@ export async function saveConnectionLimitAction(
     limit: number
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
-    if (!findConnectionProvider(provider)) return { error: "Unknown service" };
+    const t = await getTranslations("admin");
+    if (!findConnectionProvider(provider)) return { error: t("integrations.errors.unknownService") };
     if (!Number.isInteger(limit) || limit < 0 || limit > MAX_ACCOUNTS_PER_USER) {
-        return { error: `Choose a number between 0 and ${MAX_ACCOUNTS_PER_USER}` };
+        return { error: t("integrations.errors.limitRange", { max: MAX_ACCOUNTS_PER_USER }) };
     }
 
     await setSetting(connectionLimitKey(provider), String(limit));
@@ -95,7 +97,8 @@ export async function saveConnectionSignInAction(
     allowed: boolean
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
-    if (!findConnectionProvider(provider)) return { error: "Unknown service" };
+    const t = await getTranslations("admin");
+    if (!findConnectionProvider(provider)) return { error: t("integrations.errors.unknownService") };
 
     await setSetting(connectionSignInKey(provider), allowed === true ? "true" : "false");
     await recordAudit({
@@ -123,10 +126,11 @@ export async function saveConnectionEmailTrustAction(
     trusted: boolean
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const entry = findConnectionProvider(provider);
-    if (!entry) return { error: "Unknown service" };
+    if (!entry) return { error: t("integrations.errors.unknownService") };
     if (entry.emailTrustDefault === undefined)
-        return { error: `${entry.name} does not hand over an address.` };
+        return { error: t("integrations.errors.noAddress", { name: entry.name }) };
 
     await setSetting(connectionEmailTrustKey(provider), trusted === true ? "true" : "false");
     await recordAudit({
@@ -172,18 +176,19 @@ export async function saveOAuthAppAction(input: {
     clientSecret?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const slug = input.slug;
     if (!OAUTH_APP_SLUGS.includes(slug)) {
-        return { error: "That integration does not take an OAuth application" };
+        return { error: t("integrations.errors.notOAuthApp") };
     }
     const clientId = input.clientId.trim();
     const clientSecret = input.clientSecret?.trim() ? input.clientSecret.trim() : undefined;
 
     try {
         const existing = await getIntegrationState(slug);
-        if (input.enabled && !clientId) return { error: "Add the client ID before enabling it" };
+        if (input.enabled && !clientId) return { error: t("integrations.errors.clientIdFirst") };
         if (input.enabled && !clientSecret && !existing?.hasSecret) {
-            return { error: "Add the client secret before enabling it" };
+            return { error: t("integrations.errors.clientSecretFirst") };
         }
         if (input.enabled) {
             // The stored one when the field was left blank, which is how an
@@ -213,7 +218,10 @@ export async function saveOAuthAppAction(input: {
         });
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The application could not be saved"
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : t("integrations.errors.applicationNotSaved")
         };
     }
 
@@ -239,6 +247,7 @@ export async function saveSteamAction(input: {
     apiKey?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
     try {
         const existing = await getIntegrationState(STEAM_PROVIDER);
@@ -258,7 +267,7 @@ export async function saveSteamAction(input: {
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "The Steam settings could not be saved"
+                caught instanceof Error ? caught.message : t("integrations.errors.steamNotSaved")
         };
     }
 
@@ -280,6 +289,7 @@ export async function saveLicensedFilterAction(input: {
     token?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const moduleUrl = input.moduleUrl.trim();
 
     if (input.enabled) {
@@ -287,9 +297,9 @@ export async function saveLicensedFilterAction(input: {
         try {
             parsed = new URL(moduleUrl);
         } catch {
-            return { error: "That is not an address" };
+            return { error: t("integrations.errors.notAnAddress") };
         }
-        if (parsed.protocol !== "https:") return { error: "The address has to be https" };
+        if (parsed.protocol !== "https:") return { error: t("integrations.errors.httpsOnly") };
     }
 
     try {
@@ -308,7 +318,7 @@ export async function saveLicensedFilterAction(input: {
         });
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "That could not be saved"
+            error: caught instanceof Error ? caught.message : t("integrations.errors.notSaved")
         };
     }
 
@@ -335,12 +345,13 @@ export async function saveTenorAction(input: {
     slug?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const slug = input.slug === "giphy" ? "giphy" : "tenor";
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
     try {
         const existing = await getIntegrationState(slug);
         if (input.enabled && !apiKey && !existing?.hasSecret) {
-            return { error: "Add the API key before turning it on" };
+            return { error: t("integrations.errors.apiKeyFirst") };
         }
         await upsertIntegration(slug, {
             enabled: input.enabled,
@@ -356,7 +367,7 @@ export async function saveTenorAction(input: {
         });
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "That could not be saved"
+            error: caught instanceof Error ? caught.message : t("integrations.errors.notSaved")
         };
     }
 
@@ -379,16 +390,17 @@ export async function saveTunnelAction(input: {
 }): Promise<{ error?: string }> {
     // Outside the try - it redirects an unauthorized caller by throwing.
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const provider = input.provider;
     if (provider !== "cloudflare" && provider !== "ngrok")
-        return { error: "Unknown tunnel provider" };
+        return { error: t("integrations.errors.unknownTunnel") };
     const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
     if (newToken && !isTunnelToken(provider, newToken)) return { error: tunnelTokenHint(provider) };
 
     try {
         const existing = await getIntegrationState(provider);
         const willHaveToken = Boolean(newToken) || Boolean(existing?.hasSecret);
-        if (input.enabled && !willHaveToken) return { error: "Add the token before enabling it" };
+        if (input.enabled && !willHaveToken) return { error: t("integrations.errors.tokenFirst") };
 
         if (input.enabled) {
             // Only one tunnel per server - turn the other provider off.
@@ -410,7 +422,7 @@ export async function saveTunnelAction(input: {
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "The tunnel settings could not be saved"
+                caught instanceof Error ? caught.message : t("integrations.errors.tunnelNotSaved")
         };
     }
 
@@ -420,8 +432,11 @@ export async function saveTunnelAction(input: {
     try {
         await applyTunnel();
     } catch (caught) {
-        const detail = caught instanceof Error ? caught.message : "the tunnel could not start";
-        return { error: `Saved, but the tunnel could not start: ${detail}` };
+        const detail =
+            caught instanceof Error
+                ? caught.message
+                : t("integrations.errors.tunnelNotStartedDetail");
+        return { error: t("integrations.errors.tunnelNotStarted", { detail }) };
     }
     return {};
 }
@@ -437,7 +452,10 @@ export async function saveDuckdnsAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const subdomain = input.subdomain.trim();
-    if (!subdomain) return { error: "Enter your DuckDNS subdomain" };
+    if (!subdomain) {
+        const t = await getTranslations("admin");
+        return { error: t("integrations.errors.duckdnsSubdomain") };
+    }
     await setDomainConfig({ duckdnsSubdomain: subdomain, duckdnsToken: input.token });
     await recordAudit({
         actorId: user.id,
@@ -502,9 +520,12 @@ export async function connectCloudflareAccountAction(input: {
             stored: result.stored
         };
     } catch (caught) {
+        const t = await getTranslations("admin");
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not connect the Cloudflare token"
+                caught instanceof Error
+                    ? caught.message
+                    : t("integrations.errors.cloudflareNotConnected")
         };
     }
 }
@@ -535,6 +556,7 @@ export async function saveVirusTotalAction(input: {
     apiKey?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const provider = "virustotal";
     const onDetection: ScanAction = SCAN_ACTIONS.has(input.onDetection as ScanAction)
         ? (input.onDetection as ScanAction)
@@ -544,12 +566,12 @@ export async function saveVirusTotalAction(input: {
     const newKey = input.apiKey && input.apiKey.trim() ? input.apiKey.trim() : undefined;
     const willHaveKey = Boolean(newKey) || Boolean(existing?.hasSecret);
     if (input.enabled && !willHaveKey)
-        return { error: "Add a VirusTotal API key before enabling it" };
+        return { error: t("integrations.errors.virusTotalKeyFirst") };
 
     // Validate a newly supplied key so a typo does not silently disable scanning.
     if (newKey) {
         const check = await verifyKey(newKey);
-        if (!check.ok) return { error: check.error ?? "The API key was rejected" };
+        if (!check.ok) return { error: check.error ?? t("integrations.errors.keyRejected") };
     }
 
     await upsertIntegration(provider, {
@@ -575,9 +597,10 @@ async function testDymoKey(apiKey: string): Promise<{ ok: boolean; error?: strin
         await verifyIp(apiKey, "8.8.8.8", ["FRAUD"]);
         return { ok: true };
     } catch (caught) {
+        const t = await getTranslations("admin");
         return {
             ok: false,
-            error: caught instanceof Error ? caught.message : "The API key was rejected"
+            error: caught instanceof Error ? caught.message : t("integrations.errors.keyRejected")
         };
     }
 }
@@ -590,18 +613,19 @@ export async function saveDymoAction(input: {
     apiKey?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const provider = "dymo";
     const existing = await getIntegrationState(provider);
     const newKey = input.apiKey && input.apiKey.trim() ? input.apiKey.trim() : undefined;
     const willHaveKey = Boolean(newKey) || Boolean(existing?.hasSecret);
-    if (input.enabled && !willHaveKey) return { error: "Add a Dymo API key before enabling it" };
+    if (input.enabled && !willHaveKey) return { error: t("integrations.errors.dymoKeyFirst") };
 
     const known = new Set(DYMO_IP_RULES.map((rule) => rule.value));
     const deny = input.deny.filter((value) => known.has(value));
 
     if (newKey) {
         const check = await testDymoKey(newKey);
-        if (!check.ok) return { error: check.error ?? "The API key was rejected" };
+        if (!check.ok) return { error: check.error ?? t("integrations.errors.keyRejected") };
     }
 
     await upsertIntegration(provider, {
@@ -634,19 +658,20 @@ export async function saveCriminalIpAction(input: {
     apiKey?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
+    const t = await getTranslations("admin");
     const provider = "criminalip";
     const newKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
 
     try {
         const existing = await getIntegrationState(provider);
         if (input.enabled && !newKey && !existing?.hasSecret) {
-            return { error: "Add a Criminal IP API key before enabling it" };
+            return { error: t("integrations.errors.criminalIpKeyFirst") };
         }
 
         const known = new Set<string>(CRIMINALIP_RULES.map((rule) => rule.value));
         const deny = input.deny.filter((value) => known.has(value));
         if (input.enabled && deny.length === 0)
-            return { error: "Pick at least one verdict to block on" };
+            return { error: t("integrations.errors.pickVerdict") };
 
         await upsertIntegration(provider, {
             enabled: input.enabled,
@@ -666,7 +691,7 @@ export async function saveCriminalIpAction(input: {
             error:
                 caught instanceof Error
                     ? caught.message
-                    : "The Criminal IP settings could not be saved"
+                    : t("integrations.errors.criminalIpNotSaved")
         };
     }
 
@@ -677,7 +702,10 @@ export async function saveCriminalIpAction(input: {
 /** Verify a Dymo API key without saving it (the configure dialog's Test button). */
 export async function testDymoKeyAction(apiKey: string): Promise<{ ok: boolean; error?: string }> {
     await requireAdmin();
-    if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
+    if (!apiKey.trim()) {
+        const t = await getTranslations("admin");
+        return { ok: false, error: t("integrations.errors.enterKeyFirst") };
+    }
     return testDymoKey(apiKey.trim());
 }
 
@@ -687,10 +715,11 @@ export async function setIntegrationEnabledAction(
     enabled: boolean
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
-    if (!findIntegration(provider)) return { error: "Unknown integration" };
+    const t = await getTranslations("admin");
+    if (!findIntegration(provider)) return { error: t("integrations.errors.unknownIntegration") };
     if (enabled) {
         const state = await getIntegrationState(provider);
-        if (!state?.hasSecret) return { error: "Configure the integration before enabling it" };
+        if (!state?.hasSecret) return { error: t("integrations.errors.configureFirst") };
     }
     await upsertIntegration(provider, { enabled });
     await recordAudit({
@@ -708,7 +737,10 @@ export async function testVirusTotalKeyAction(
     apiKey: string
 ): Promise<{ ok: boolean; error?: string }> {
     await requireAdmin();
-    if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
+    if (!apiKey.trim()) {
+        const t = await getTranslations("admin");
+        return { ok: false, error: t("integrations.errors.enterKeyFirst") };
+    }
     return verifyKey(apiKey.trim());
 }
 
@@ -735,8 +767,12 @@ export async function connectGithubAppAction(input: {
         revalidatePath("/admin/integrations");
         return { installations };
     } catch (caught) {
+        const t = await getTranslations("admin");
         return {
-            error: caught instanceof Error ? caught.message : "Could not connect the GitHub App"
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : t("integrations.errors.githubNotConnected")
         };
     }
 }
@@ -749,8 +785,12 @@ export async function refreshGithubInstallationsAction(): Promise<{ error?: stri
         revalidatePath("/admin/integrations");
         return {};
     } catch (caught) {
+        const t = await getTranslations("admin");
         return {
-            error: caught instanceof Error ? caught.message : "Could not refresh installations"
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : t("integrations.errors.installationsNotRefreshed")
         };
     }
 }

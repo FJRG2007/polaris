@@ -13,18 +13,8 @@
 import { useState, useTransition } from "react";
 import { setSharingPolicyAction } from "./actions";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
-import {
-    DELEGATED_SHARING_HINTS,
-    DELEGATED_SHARING_LABELS,
-    DELEGATED_SHARING_MODES,
-    type DelegatedSharingMode,
-    type SharingPolicy
-} from "@polaris/core";
-
-const MODE_OPTIONS = DELEGATED_SHARING_MODES.map((mode) => ({
-    value: mode,
-    label: DELEGATED_SHARING_LABELS[mode]
-}));
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { DELEGATED_SHARING_MODES, type DelegatedSharingMode, type SharingPolicy } from "@polaris/core";
 
 export function SharingPolicyForm({
     policy,
@@ -34,6 +24,8 @@ export function SharingPolicyForm({
     /** Role names this instance defines, for the one a new account is made with. */
     roles: { value: string; label: string }[];
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [mode, setMode] = useState<DelegatedSharingMode>(policy.delegated);
     const [inviteRole, setInviteRole] = useState(policy.inviteRole);
     const [error, setError] = useState<string | null>(null);
@@ -59,41 +51,41 @@ export function SharingPolicyForm({
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">Who can invite</h2>
-                    <p className="max-w-xl text-sm text-muted-foreground">{DELEGATED_SHARING_HINTS[mode]}</p>
+                    <h2 className="text-sm font-medium">{t("users.sharing.title")}</h2>
+                    <p className="max-w-xl text-sm text-muted-foreground">{t(`users.sharing.modes.${mode}.hint`)}</p>
                 </div>
 
                 <label className="flex max-w-sm flex-col gap-1 text-sm">
-                    <span className="font-medium">Sharing</span>
+                    <span className="font-medium">{t("users.sharing.label")}</span>
                     <Select
                         value={mode}
                         onValueChange={(value) => setMode(value as DelegatedSharingMode)}
-                        options={MODE_OPTIONS}
-                        aria-label="Who can give other people access"
+                        options={DELEGATED_SHARING_MODES.map((value) => ({
+                            value,
+                            label: t(`users.sharing.modes.${value}.label`)
+                        }))}
+                        aria-label={t("users.sharing.selectLabel")}
                     />
                 </label>
 
                 {mode === "invite" && (
                     <label className="flex max-w-sm flex-col gap-1 text-sm">
-                        <span className="font-medium">New accounts get the role</span>
+                        <span className="font-medium">{t("users.sharing.roleLabel")}</span>
                         <Select
                             value={inviteRole}
                             onValueChange={setInviteRole}
                             options={roles}
-                            aria-label="The role an account invited this way is created with"
+                            aria-label={t("users.sharing.roleSelectLabel")}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            Applies to accounts made this way. guest opens no app on its own, so what they reach is the
-                            one thing they were invited to.
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("users.sharing.roleHint")}</span>
                     </label>
                 )}
 
                 {error && <p className="text-sm text-danger">{error}</p>}
-                {saved && !dirty && <p className="text-sm text-muted-foreground">Saved.</p>}
+                {saved && !dirty && <p className="text-sm text-muted-foreground">{t("users.sharing.saved")}</p>}
 
                 <Button className="self-start" size="sm" disabled={!dirty || pending} onClick={save}>
-                    Save
+                    {tc("actions.save")}
                 </Button>
             </CardBody>
         </Card>

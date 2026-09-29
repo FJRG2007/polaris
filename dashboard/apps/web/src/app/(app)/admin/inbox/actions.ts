@@ -11,6 +11,8 @@ import { z } from "zod";
 import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
 import type { TargetGroup } from "@polaris/messaging";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
     addContactIdentity,
@@ -43,6 +45,11 @@ import {
     type ConversationView,
     type MessageView
 } from "@/lib/messaging-service";
+
+/** A reply in the language of whoever pressed the button. */
+async function say(key: NamespaceKey<"admin">): Promise<string> {
+    return (await getTranslations("admin"))(key);
+}
 
 const connectChannelSchema = z.object({
     platform: z.enum(PLATFORMS),
@@ -78,14 +85,14 @@ export async function connectChannelAction(
 ): Promise<{ error?: string; channelId?: string; status?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = connectChannelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         const channel = await connectChannel(user.id, parsed.data);
         revalidatePath("/admin/inbox");
         return { channelId: channel.id, status: channel.status };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not connect the channel"
+            error: caught instanceof Error ? caught.message : await say("inbox.errors.connectFailed")
         };
     }
 }
@@ -100,7 +107,7 @@ export async function channelStateAction(
     } catch (caught) {
         return {
             status: "error",
-            error: caught instanceof Error ? caught.message : "Could not read channel state"
+            error: caught instanceof Error ? caught.message : await say("inbox.errors.stateFailed")
         };
     }
 }
@@ -112,7 +119,7 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
         revalidatePath("/admin/inbox");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove the channel" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.removeChannelFailed") };
     }
 }
 
@@ -132,15 +139,15 @@ export async function updateChannelAction(
 ): Promise<{ error?: string; status?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = updateChannelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     const { channelId, ...patch } = parsed.data;
-    if (!patch.name && !patch.token && !patch.config) return { error: "Nothing to update" };
+    if (!patch.name && !patch.token && !patch.config) return { error: await say("inbox.errors.nothingToUpdate") };
     try {
         const { status } = await updateChannelCredentials(user.id, channelId, patch);
         revalidatePath("/admin/inbox");
         return { status };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the channel" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.updateChannelFailed") };
     }
 }
 
@@ -156,7 +163,7 @@ export async function reconnectChannelAction(
         return { status };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not reconnect the channel"
+            error: caught instanceof Error ? caught.message : await say("inbox.errors.reconnectFailed")
         };
     }
 }
@@ -203,14 +210,14 @@ export async function deleteConversationAction(
     conversationId: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
-    if (!z.string().uuid().safeParse(conversationId).success) return { error: "Invalid request" };
+    if (!z.string().uuid().safeParse(conversationId).success) return { error: await say("inbox.errors.invalidRequest") };
     try {
         await deleteConversation(user.id, conversationId);
         revalidatePath("/admin/inbox");
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not delete the conversation"
+            error: caught instanceof Error ? caught.message : await say("inbox.errors.deleteConversationFailed")
         };
     }
 }
@@ -233,7 +240,7 @@ export async function assignConversationAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = assignSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.invalidRequest") };
     try {
         await assignConversation(user.id, parsed.data.conversationId, {
             assigneeId: parsed.data.assigneeId,
@@ -242,7 +249,7 @@ export async function assignConversationAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not update the conversation"
+            error: caught instanceof Error ? caught.message : await say("inbox.errors.updateConversationFailed")
         };
     }
 }
@@ -252,8 +259,8 @@ export async function sendMessageAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = sendSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nothing to send" };
-    if (!parsed.data.text && !parsed.data.interactive) return { error: "Type a message first" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.nothingToSend") };
+    if (!parsed.data.text && !parsed.data.interactive) return { error: await say("inbox.errors.typeMessage") };
     try {
         await sendConversationMessage(user.id, parsed.data.conversationId, user.id, {
             text: parsed.data.text,
@@ -261,7 +268,7 @@ export async function sendMessageAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not send the message" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.sendFailed") };
     }
 }
 
@@ -278,13 +285,13 @@ export async function startConversationAction(
 ): Promise<{ error?: string; conversationId?: string }> {
     const user = await requirePermission("inbox.manage");
     const parsed = startConversationSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         const { conversationId } = await startConversation(user.id, user.id, parsed.data);
         revalidatePath("/admin/inbox");
         return { conversationId };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the chat" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.startFailed") };
     }
 }
 
@@ -307,11 +314,11 @@ export async function createContactAction(
 ): Promise<{ error?: string; contact?: ContactView }> {
     const user = await requirePermission("inbox.manage");
     const parsed = createContactSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         return { contact: await createContact(user.id, parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the contact" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.saveContactFailed") };
     }
 }
 
@@ -327,12 +334,12 @@ export async function updateContactAction(
 ): Promise<{ error?: string; contact?: ContactView }> {
     const user = await requirePermission("inbox.manage");
     const parsed = updateContactSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         const { id, ...patch } = parsed.data;
         return { contact: await updateContact(user.id, id, patch) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the contact" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.updateContactFailed") };
     }
 }
 
@@ -348,12 +355,12 @@ export async function addContactIdentityAction(
 ): Promise<{ error?: string; contact?: ContactView }> {
     const user = await requirePermission("inbox.manage");
     const parsed = addIdentitySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         const { contactId, ...identity } = parsed.data;
         return { contact: await addContactIdentity(user.id, contactId, identity) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not add the handle" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.addHandleFailed") };
     }
 }
 
@@ -369,12 +376,12 @@ export async function updateContactIdentityAction(
 ): Promise<{ error?: string; contact?: ContactView }> {
     const user = await requirePermission("inbox.manage");
     const parsed = updateIdentitySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? await say("inbox.errors.checkForm") };
     try {
         const { identityId, ...patch } = parsed.data;
         return { contact: await updateContactIdentity(user.id, identityId, patch) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the handle" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.updateHandleFailed") };
     }
 }
 
@@ -383,11 +390,11 @@ export async function deleteContactIdentityAction(
     identityId: string
 ): Promise<{ error?: string; contact?: ContactView }> {
     const user = await requirePermission("inbox.manage");
-    if (!z.string().uuid().safeParse(identityId).success) return { error: "Invalid request" };
+    if (!z.string().uuid().safeParse(identityId).success) return { error: await say("inbox.errors.invalidRequest") };
     try {
         return { contact: await deleteContactIdentity(user.id, identityId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove the handle" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.removeHandleFailed") };
     }
 }
 
@@ -397,6 +404,6 @@ export async function deleteContactAction(id: string): Promise<{ error?: string 
         await deleteContact(user.id, id);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove the contact" };
+        return { error: caught instanceof Error ? caught.message : await say("inbox.errors.removeContactFailed") };
     }
 }

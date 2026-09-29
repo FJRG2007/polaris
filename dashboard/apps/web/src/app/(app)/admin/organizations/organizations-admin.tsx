@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { OrgAvatar } from "@/components/avatar";
 import { Building2, Search } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 
 interface OrgRow {
@@ -41,16 +42,6 @@ interface OrgRow {
     teamCount: number;
     spaceCount: number;
 }
-
-const CREATION_OPTIONS = core.ORG_CREATION_MODES.map((mode) => ({
-    value: mode,
-    label: core.ORG_CREATION_LABELS[mode]
-}));
-
-const NEW_PEOPLE_OPTIONS = core.ORG_NEW_PEOPLE_MODES.map((mode) => ({
-    value: mode,
-    label: core.ORG_NEW_PEOPLE_LABELS[mode]
-}));
 
 export function OrganizationsAdmin({
     initial,
@@ -71,6 +62,7 @@ export function OrganizationsAdmin({
 
 /** What is living on this deployment right now. */
 function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [query, setQuery] = useState("");
 
@@ -102,8 +94,8 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     className="pl-9"
-                    placeholder="Search by name, handle or owner"
-                    aria-label="Search organizations"
+                    placeholder={t("organizations.search.placeholder")}
+                    aria-label={t("organizations.search.label")}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                 />
@@ -113,11 +105,11 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">Organization</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">Owner</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">Members</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">Teams</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">Spaces</th>
+                            <th className="px-3 py-2 font-medium">{t("organizations.table.organization")}</th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">{t("organizations.table.owner")}</th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.members")}</th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.teams")}</th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.spaces")}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -130,10 +122,10 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                     {orgs.length === 0 ? (
                                         <span className="flex items-center justify-center gap-2">
                                             <Building2 className="size-4 shrink-0" />
-                                            Nobody has created one yet.
+                                            {t("organizations.empty.none")}
                                         </span>
                                     ) : (
-                                        "No organization matches that."
+                                        t("organizations.empty.noMatch")
                                     )}
                                 </td>
                             </tr>
@@ -143,7 +135,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                     key={org.id}
                                     tabIndex={0}
                                     role="button"
-                                    aria-label={`Open ${org.name}`}
+                                    aria-label={t("organizations.open", { name: org.name })}
                                     onClick={() => open(org)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
@@ -197,6 +189,8 @@ function OrganizationPolicyForm({
     initial: core.OrganizationPolicy;
     save: (input: unknown) => Promise<{ error?: string }>;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     // Numbers stay as typed until submit: a half-typed "10" must not be read as
     // a cap of 1 while somebody is still on the first keystroke.
@@ -209,6 +203,18 @@ function OrganizationPolicyForm({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [saved, setSaved] = useState(false);
+
+    // A policy stored before a mode existed can carry none; its hint is then
+    // whatever the core has for it, as it always was.
+    const known = (key: string, fallback: string) => (t.has(key) ? t(key) : fallback);
+    const creationOptions = core.ORG_CREATION_MODES.map((mode) => ({
+        value: mode,
+        label: t(`organizations.creation.options.${mode}`)
+    }));
+    const newPeopleOptions = core.ORG_NEW_PEOPLE_MODES.map((mode) => ({
+        value: mode,
+        label: t(`organizations.newPeople.options.${mode}`)
+    }));
 
     const draft = { creation, maxPerUser, maxMembers, maxTeams, newPeople, invitesPerHour };
     const parsed = core.organizationPolicySchema.safeParse(draft);
@@ -235,14 +241,14 @@ function OrganizationPolicyForm({
                 className="h-9 w-32"
                 onChange={(event) => set(event.target.value)}
             />
-            <span>{Number(value) === 0 ? "No limit." : hint}</span>
+            <span>{Number(value) === 0 ? t("organizations.policy.noLimit") : hint}</span>
         </label>
     );
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Policy</CardTitle>
+                <CardTitle>{t("organizations.policy.title")}</CardTitle>
             </CardHeader>
             <CardBody>
                 <form
@@ -264,63 +270,70 @@ function OrganizationPolicyForm({
                     }}
                 >
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        Who can create an organization
+                        {t("organizations.creation.label")}
                         <Select
                             value={creation}
-                            options={CREATION_OPTIONS}
+                            options={creationOptions}
                             className="h-9 w-64"
-                            aria-label="Who can create an organization"
+                            aria-label={t("organizations.creation.label")}
                             onValueChange={(next) => setCreation(next as core.OrgCreationMode)}
                         />
-                        <span>{core.ORG_CREATION_HINTS[creation]}</span>
+                        <span>
+                            {known(
+                                `organizations.creation.hints.${creation}`,
+                                core.ORG_CREATION_HINTS[creation]
+                            )}
+                        </span>
                     </label>
 
                     <div className="flex flex-wrap gap-6">
                         {limitField(
-                            "Organizations per account",
+                            t("organizations.limits.perUser.label"),
                             maxPerUser,
                             setMaxPerUser,
-                            "Counts only the ones they own."
+                            t("organizations.limits.perUser.hint")
                         )}
                         {limitField(
-                            "Members per organization",
+                            t("organizations.limits.members.label"),
                             maxMembers,
                             setMaxMembers,
-                            "Includes the owner."
+                            t("organizations.limits.members.hint")
                         )}
                         {limitField(
-                            "Teams per organization",
+                            t("organizations.limits.teams.label"),
                             maxTeams,
                             setMaxTeams,
-                            "Across the organization."
+                            t("organizations.limits.teams.hint")
                         )}
                     </div>
 
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        Who can invite somebody with no account
+                        {t("organizations.newPeople.label")}
                         <Select
                             value={newPeople}
-                            options={NEW_PEOPLE_OPTIONS}
+                            options={newPeopleOptions}
                             className="h-9 w-72"
-                            aria-label="Who can invite somebody with no account"
+                            aria-label={t("organizations.newPeople.label")}
                             onValueChange={(next) => setNewPeople(next as core.OrgNewPeopleMode)}
                         />
-                        <span>{core.ORG_NEW_PEOPLE_HINTS[newPeople]}</span>
+                        <span>
+                            {known(
+                                `organizations.newPeople.hints.${newPeople}`,
+                                core.ORG_NEW_PEOPLE_HINTS[newPeople]
+                            )}
+                        </span>
                     </label>
 
                     <div className="flex flex-wrap gap-6">
                         {limitField(
-                            "Invitations per person per hour",
+                            t("organizations.limits.invites.label"),
                             invitesPerHour,
                             setInvitesPerHour,
-                            "From one organization, counted over the last hour."
+                            t("organizations.limits.invites.hint")
                         )}
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
-                        Lowering a limit never removes anybody. An organization already over it
-                        keeps everything it has and simply cannot add more.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("organizations.policy.lowering")}</p>
 
                     {error && (
                         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
@@ -330,14 +343,14 @@ function OrganizationPolicyForm({
 
                     <div className="flex items-center justify-end gap-3">
                         {saved && !changed && (
-                            <span className="text-xs text-muted-foreground">Saved</span>
+                            <span className="text-xs text-muted-foreground">{t("organizations.policy.saved")}</span>
                         )}
                         <Button
                             type="submit"
                             size="sm"
                             disabled={!changed || !parsed.success || saving}
                         >
-                            Save
+                            {tc("actions.save")}
                         </Button>
                     </div>
                 </form>

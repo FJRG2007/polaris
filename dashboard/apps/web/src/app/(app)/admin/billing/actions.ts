@@ -10,6 +10,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { getBillingRates, setBillingRates } from "@/lib/billing/rates";
 import { billingRatesInputSchema, type BillingRates } from "@polaris/core";
@@ -17,7 +18,7 @@ import { billingRatesInputSchema, type BillingRates } from "@polaris/core";
 export async function saveBillingRatesAction(input: unknown): Promise<{ rates?: BillingRates; error?: string }> {
     const admin = await requireAdmin();
     const parsed = billingRatesInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the prices and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("billing.errors.checkPrices") };
 
     try {
         const before = await getBillingRates();
@@ -32,7 +33,7 @@ export async function saveBillingRatesAction(input: unknown): Promise<{ rates?: 
         return { rates: parsed.data };
     } catch (caught) {
         console.error("polaris: the prices could not be saved:", caught);
-        return { error: "The prices could not be saved. Try again." };
+        return { error: (await getTranslations("admin"))("billing.errors.saveFailed") };
     }
 }
 
@@ -46,6 +47,6 @@ export async function clearBillingRatesAction(): Promise<{ error?: string }> {
         return {};
     } catch (caught) {
         console.error("polaris: the prices could not be cleared:", caught);
-        return { error: "The prices could not be removed. Try again." };
+        return { error: (await getTranslations("admin"))("billing.errors.clearFailed") };
     }
 }

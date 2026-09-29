@@ -5,6 +5,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { UploadsView } from "./uploads-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { avatarSettings } from "@/lib/avatar-service";
 import { footageSettings } from "@/lib/footage-storage";
@@ -17,13 +18,14 @@ export const dynamic = "force-dynamic";
 
 export default async function UploadsPage() {
     await requireAdmin();
-    const [uploads, avatars, chat, drives, orgDrives, house] = await Promise.all([
+    const [uploads, avatars, chat, drives, orgDrives, house, t] = await Promise.all([
         uploadSettings(),
         avatarSettings(),
         chatStorageSettings(),
         personalDriveSettings(),
         organizationDriveSettings(),
-        isAppInstalled("home")
+        isAppInstalled("home"),
+        getTranslations("admin")
     ]);
     // Only asked for when there is a house: on an instance with no cameras it is
     // a setting for something that does not exist.
@@ -35,8 +37,8 @@ export default async function UploadsPage() {
         // the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Uploads"
-                description="Where people’s own drives, organizations’ shelves, files, photos, things sent in chat and camera footage are stored, and how big one may be."
+                title={t("uploads.title")}
+                description={t("uploads.description")}
             />
             <UploadsView
                 uploads={uploads}

@@ -16,6 +16,7 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { publishAccessChange } from "@/lib/access-live";
 import { setSetting } from "@/lib/setting-store";
+import { getTranslations } from "@/lib/i18n/request";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
 import { setSharingPolicy } from "@/lib/sharing-policy";
@@ -48,7 +49,10 @@ const idSchema = z.string().uuid();
 export async function createInviteAction(input: unknown): Promise<CreatedInvite & { error?: string }> {
     const admin = await requireAdmin();
     const parsed = createInviteSchema.safeParse(input);
-    if (!parsed.success) return { id: "", error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    if (!parsed.success) {
+        const t = await getTranslations("admin");
+        return { id: "", error: parsed.error.issues[0]?.message ?? t("users.errors.invalidInput") };
+    }
 
     const created = await createInvite(admin.id, parsed.data);
     // A refused invite created nothing, so there is nothing to record and nothing
@@ -158,7 +162,10 @@ export async function setUserRoleAction(userId: string, role: string): Promise<{
 export async function setUserLimitsAction(userId: string, input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = accessRulesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid rules" };
+    if (!parsed.success) {
+        const t = await getTranslations("admin");
+        return { error: parsed.error.issues[0]?.message ?? t("users.errors.invalidRules") };
+    }
     const result = await setUserLimits(admin.id, userId, parsed.data);
     revalidatePath("/admin/users");
     return result;
@@ -181,7 +188,7 @@ export async function revokeUserSessionsAction(userId: string): Promise<{ error?
 export async function userSessionsAction(userId: unknown): Promise<{ sessions?: SessionView[]; error?: string }> {
     await requireAdmin();
     const parsed = idSchema.safeParse(userId);
-    if (!parsed.success) return { error: "Unknown account." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("users.errors.unknownAccount") };
     return { sessions: await listUserSessions(parsed.data, "") };
 }
 
@@ -190,7 +197,9 @@ export async function revokeUserSessionAction(userId: unknown, sessionId: unknow
     const admin = await requireAdmin();
     const target = idSchema.safeParse(userId);
     const session = idSchema.safeParse(sessionId);
-    if (!target.success || !session.success) return { error: "Unknown session." };
+    if (!target.success || !session.success) {
+        return { error: (await getTranslations("admin"))("users.errors.unknownSession") };
+    }
     const result = await revokeSessionForUser(admin.id, target.data, session.data);
     revalidatePath("/admin/users");
     return result;
@@ -213,13 +222,14 @@ export async function deleteUserAction(userId: string): Promise<{ error?: string
  */
 export async function setUsernameCooldownAction(days: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
+    const t = await getTranslations("admin");
     const parsed = z
         .number()
-        .int("Whole days only.")
-        .min(0, "Use 0 for no wait at all.")
-        .max(USERNAME_COOLDOWN_MAX_DAYS, `That is longer than ${USERNAME_COOLDOWN_MAX_DAYS} days.`)
+        .int(t("users.errors.wholeDays"))
+        .min(0, t("users.errors.zeroForNoWait"))
+        .max(USERNAME_COOLDOWN_MAX_DAYS, t("users.errors.tooLong", { max: USERNAME_COOLDOWN_MAX_DAYS }))
         .safeParse(days);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the number of days." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("users.errors.checkDays") };
 
     await setSetting(USERNAME_COOLDOWN_KEY, String(parsed.data));
     await recordAudit({
@@ -266,7 +276,7 @@ export async function setPublicProfilesAction(allowed: unknown): Promise<{ error
 export async function setFollowerDefaultAction(audience: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.enum(["everyone", "friends", "nobody"]).safeParse(audience);
-    if (!parsed.success) return { error: "That is not an audience a default can be." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("users.errors.audience") };
     await setDefaultFollowerAudience(parsed.data);
     await recordAudit({
         actorId: admin.id,
@@ -282,7 +292,10 @@ export async function setFollowerDefaultAction(audience: unknown): Promise<{ err
 export async function setSharingPolicyAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = sharingPolicySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+    if (!parsed.success) {
+        const t = await getTranslations("admin");
+        return { error: parsed.error.issues[0]?.message ?? t("users.errors.checkSettings") };
+    }
     await setSharingPolicy(parsed.data);
     await recordAudit({
         actorId: admin.id,

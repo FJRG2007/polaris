@@ -18,8 +18,10 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { setThemePolicyAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ThemePolicyCard({ allowed }: { allowed: boolean }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [on, setOn] = useState(allowed);
     const [error, setError] = useState("");
@@ -28,11 +30,8 @@ export function ThemePolicyCard({ allowed }: { allowed: boolean }) {
         <Card className="mt-4">
             <CardBody className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">Let people choose their own theme</p>
-                    <p className="text-xs text-muted-foreground">
-                        Off, every account follows the theme above. What anybody already chose is
-                        kept and comes back if you turn this on again.
-                    </p>
+                    <p className="text-sm font-medium">{t("display.themePolicy.title")}</p>
+                    <p className="text-xs text-muted-foreground">{t("display.themePolicy.hint")}</p>
                     {error && (
                         <p role="alert" className="mt-1 text-xs text-danger">
                             {error}
@@ -41,7 +40,7 @@ export function ThemePolicyCard({ allowed }: { allowed: boolean }) {
                 </div>
                 <Switch
                     checked={on}
-                    aria-label="Let people choose their own theme"
+                    aria-label={t("display.themePolicy.title")}
                     onChange={(next) => {
                         // Moved now and rolled back if the write is refused: a
                         // switch that waits for a round trip reads as broken.

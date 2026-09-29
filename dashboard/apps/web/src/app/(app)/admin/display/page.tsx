@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/session";
 import { savePlatformDisplayAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { ThemePolicyCard } from "./theme-policy";
+import { getTranslations } from "@/lib/i18n/request";
 import { getPlatformDisplayPreferences, usersMayChooseTheme } from "@/lib/display-prefs-service";
 import { Messages } from "@/components/i18n/messages";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
@@ -16,9 +17,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DisplayAdminPage() {
     await requireAdmin();
-    const [platform, mayChooseTheme] = await Promise.all([
+    const [platform, mayChooseTheme, t] = await Promise.all([
         getPlatformDisplayPreferences(),
-        usersMayChooseTheme()
+        usersMayChooseTheme(),
+        getTranslations("admin")
     ]);
 
     return (
@@ -26,8 +28,8 @@ export default async function DisplayAdminPage() {
         // the form does not sit against the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Display defaults"
-                description="The theme, units and formats for the whole deployment. Each account can override them under Account > Preferences."
+                title={t("display.title")}
+                description={t("display.description")}
             />
             {/* The form is the account page's too, and its words are there. */}
             <Messages namespaces={["account"]}>

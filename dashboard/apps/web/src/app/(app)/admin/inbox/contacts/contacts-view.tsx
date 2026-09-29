@@ -13,6 +13,7 @@ import { Loader2, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
 import type { Platform } from "@polaris/messaging";
 import type { ContactIdentityView, ContactView } from "@/lib/messaging-service";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     addContactIdentityAction,
     createContactAction,
@@ -23,11 +24,11 @@ import {
     updateContactIdentityAction
 } from "../actions";
 import {
-    PEER_HINT,
-    PLATFORM_LABEL,
     PLATFORM_LOGO,
     PLATFORM_OPTIONS,
-    editablePeer
+    editablePeer,
+    peerHint,
+    platformLabel
 } from "../platform-meta";
 import { DiscordPeerFields } from "../discord-peer-fields";
 
@@ -72,6 +73,8 @@ function Avatar({ name, className }: { name: string; className?: string }) {
 }
 
 export function ContactsView({ initialContacts }: { initialContacts: ContactView[] }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [contacts, setContacts] = useState(initialContacts);
     const [query, setQuery] = useState("");
     const [selectedId, setSelectedId] = useState<string | null>(initialContacts[0]?.id ?? null);
@@ -115,7 +118,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
         startTransition(async () => {
             const result = await createContactAction({ name });
             if (result.error || !result.contact) {
-                setError(result.error ?? "Could not create the contact");
+                setError(result.error ?? t("inboxContacts.createFailed"));
                 return;
             }
             setContacts((prev) => [...prev, result.contact!]);
@@ -129,14 +132,11 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Contacts</h1>
-                    <p className="text-sm text-muted-foreground">
-                        One entry per person, unified across every platform they use. Pick them when
-                        starting a chat.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxContacts.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("inboxContacts.intro")}</p>
                 </div>
                 <Button onClick={() => setCreating((value) => !value)}>
-                    <UserPlus className="size-4" /> New contact
+                    <UserPlus className="size-4" /> {t("inboxContacts.newContact")}
                 </Button>
             </div>
 
@@ -149,18 +149,18 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                             value={newName}
                             onChange={(event) => setNewName(event.target.value)}
                             onKeyDown={(event) => event.key === "Enter" && createContact()}
-                            placeholder="Full name"
+                            placeholder={t("inboxContacts.fullName")}
                         />
                         <Button onClick={createContact} disabled={pending || newName.trim() === ""}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Add
+                            {t("inboxContacts.add")}
                         </Button>
                         <Button
                             variant="ghost"
                             onClick={() => setCreating(false)}
                             disabled={pending}
                         >
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         {error && <p className="w-full text-sm text-danger">{error}</p>}
                     </CardBody>
@@ -175,7 +175,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                             <input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search people"
+                                placeholder={t("inboxContacts.search")}
                                 className="w-full bg-transparent py-1.5 text-sm outline-none"
                             />
                         </div>
@@ -183,7 +183,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                         {filtered.length === 0 ? (
                             <p className="p-4 text-sm text-muted-foreground">
-                                {contacts.length === 0 ? "No contacts yet." : "No matches."}
+                                {contacts.length === 0 ? t("inboxContacts.noContacts") : t("inboxContacts.noMatches")}
                             </p>
                         ) : (
                             <ul className="divide-y divide-border">
@@ -205,7 +205,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                                                 <span className="flex flex-wrap items-center gap-1">
                                                     {contact.identities.length === 0 ? (
                                                         <span className="text-xs text-muted-foreground">
-                                                            No handles
+                                                            {t("inboxContacts.noHandles")}
                                                         </span>
                                                     ) : (
                                                         contact.identities.map((identity) => (
@@ -238,7 +238,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                 ) : (
                     <Card>
                         <CardBody className="grid min-h-48 place-items-center text-sm text-muted-foreground">
-                            Select a contact, or add one.
+                            {t("inboxContacts.selectPrompt")}
                         </CardBody>
                     </Card>
                 )}
@@ -248,13 +248,14 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
 }
 
 function PlatformDot({ platform }: { platform: string }) {
+    const t = useTranslations("admin");
     const meta = PLATFORM_LOGO[platform];
     const Logo = meta?.Logo;
     return (
         <span
             className="grid size-4 place-items-center"
             style={{ color: meta?.color }}
-            title={PLATFORM_LABEL[platform] ?? platform}
+            title={platformLabel(t, platform)}
         >
             {Logo ? <Logo className="size-3.5" /> : null}
         </span>
@@ -270,6 +271,7 @@ function ContactDetail({
     onChange: (contact: ContactView) => void;
     onRemoved: (id: string) => void;
 }) {
+    const t = useTranslations("admin");
     const [name, setName] = useState(contact.name);
     const [note, setNote] = useState(contact.note ?? "");
     const [error, setError] = useState<string | null>(null);
@@ -303,8 +305,7 @@ function ContactDetail({
                     <div className="min-w-0 flex-1">
                         <h2 className="truncate text-base font-semibold">{contact.name}</h2>
                         <p className="text-xs text-muted-foreground">
-                            {contact.identities.length} handle
-                            {contact.identities.length === 1 ? "" : "s"}
+                            {t("inboxContacts.handleCount", { count: contact.identities.length })}
                         </p>
                     </div>
                     <Button
@@ -320,21 +321,21 @@ function ContactDetail({
                             })
                         }
                     >
-                        <Trash2 className="size-4" /> Delete
+                        <Trash2 className="size-4" /> {t("inboxContacts.delete")}
                     </Button>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Note</span>
+                        <span className="font-medium">{t("inboxContacts.note")}</span>
                         <Input
                             value={note}
                             onChange={(event) => setNote(event.target.value)}
-                            placeholder="Optional"
+                            placeholder={t("inboxContacts.optional")}
                         />
                     </label>
                 </div>
@@ -353,16 +354,16 @@ function ContactDetail({
                                 )
                             }
                         >
-                            Save details
+                            {t("inboxContacts.saveDetails")}
                         </Button>
                     </div>
                 )}
 
                 <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">Handles</span>
+                    <span className="text-sm font-medium">{t("inboxContacts.handles")}</span>
                     {contact.identities.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            No handles yet. Add one below to start chats.
+                            {t("inboxContacts.noHandlesYet")}
                         </p>
                     ) : (
                         contact.identities.map((identity) => (
@@ -415,6 +416,7 @@ function PeerFields({
     draft: string;
     onDraft: (value: string) => void;
 }) {
+    const t = useTranslations("admin");
     if (platform === "discord") {
         return <DiscordPeerFields draft={draft} onDraft={onDraft} />;
     }
@@ -423,7 +425,7 @@ function PeerFields({
             <Input
                 value={draft}
                 onChange={(event) => onDraft(event.target.value)}
-                placeholder={PEER_HINT[platform] ?? "Number or id"}
+                placeholder={peerHint(t, platform) ?? t("inboxContacts.peerPlaceholder")}
             />
         </div>
     );
@@ -440,6 +442,8 @@ function HandleRow({
     onSave: (platform: Platform, peerId: string) => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [platform, setPlatform] = useState<Platform>(identity.platform as Platform);
     const [draft, setDraft] = useState(editablePeer(identity.platform, identity.peerId));
 
@@ -471,12 +475,12 @@ function HandleRow({
                     disabled={disabled || draft.trim() === ""}
                     onClick={() => onSave(platform, draft.trim())}
                 >
-                    Save
+                    {tc("actions.save")}
                 </Button>
             )}
             <button
                 type="button"
-                aria-label="Remove handle"
+                aria-label={t("inboxContacts.removeHandle")}
                 className="mt-1.5 text-muted-foreground hover:text-danger disabled:opacity-50"
                 disabled={disabled}
                 onClick={onRemove}
@@ -494,6 +498,7 @@ function AddHandle({
     disabled: boolean;
     onAdd: (platform: Platform, peerId: string) => void;
 }) {
+    const t = useTranslations("admin");
     const [platform, setPlatform] = useState<Platform>("whatsapp");
     const [draft, setDraft] = useState("");
 
@@ -519,7 +524,7 @@ function AddHandle({
                     setDraft("");
                 }}
             >
-                <Plus className="size-4" /> Add
+                <Plus className="size-4" /> {t("inboxContacts.add")}
             </Button>
         </div>
     );

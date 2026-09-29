@@ -16,6 +16,7 @@ import { runAction } from "@/lib/run-action";
 import type { FootageSettings } from "@/lib/footage-storage";
 import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { PersonalDriveSettings } from "@/lib/personal-drive";
 import type { OrganizationDriveSettings } from "@/lib/organization-drive";
@@ -47,6 +48,7 @@ function toMegabytes(bytes: number): number {
  * three calls an upload and a download make - and says what happened.
  */
 function CheckButton({ which }: { which: StorageCheck }) {
+    const t = useTranslations("admin");
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState<{ ok: boolean; detail: string; where: string } | null>(null);
 
@@ -68,20 +70,19 @@ function CheckButton({ which }: { which: StorageCheck }) {
                         setSaid(
                             result ?? {
                                 ok: false,
-                                detail: "That check could not be run.",
+                                detail: t("uploads.check.failed"),
                                 where: ""
                             }
                         );
                     }}
                 >
                     {busy && <Loader2 className="size-4 animate-spin" />}
-                    Check it works
+                    {t("uploads.check.button")}
                 </Button>
             </div>
             {said && (
                 <p className={cn("text-xs", said.ok ? "text-muted-foreground" : "text-danger")}>
-                    {said.where ? `${said.where}: ` : ""}
-                    {said.detail}
+                    {said.where ? t("uploads.check.result", { where: said.where, detail: said.detail }) : said.detail}
                 </p>
             )}
         </div>
@@ -107,6 +108,7 @@ function CheckButton({ which }: { which: StorageCheck }) {
  * sweep, which is how a full disk stays full.
  */
 function TidyButton() {
+    const t = useTranslations("admin");
     const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState<{ detail: string; failed: boolean } | null>(null);
@@ -121,20 +123,14 @@ function TidyButton() {
         setBusy(false);
         setAsking(false);
         if (!result || result.error) {
-            setSaid({ detail: result?.error ?? "That could not be run.", failed: true });
+            setSaid({ detail: result?.error ?? t("uploads.tidy.failed"), failed: true });
             return;
         }
         const removed = result.removed ?? 0;
         const failed = result.failed ?? 0;
-        const took =
-            removed === 0
-                ? "Nothing to take out."
-                : `Took out ${removed} folder${removed === 1 ? "" : "s"}.`;
+        const took = removed === 0 ? t("uploads.tidy.nothing") : t("uploads.tidy.took", { count: removed });
         setSaid({
-            detail:
-                failed === 0
-                    ? took
-                    : `${took} ${failed} could not be removed - the storage refused, or it is not answering.`,
+            detail: failed === 0 ? took : t("uploads.tidy.refused", { took, count: failed }),
             failed: failed > 0
         });
     };
@@ -146,14 +142,14 @@ function TidyButton() {
                     size="sm"
                     variant="secondary"
                     disabled={busy}
-                    title="Removes folders for conversations that no longer exist, and empty ones."
+                    title={t("uploads.tidy.tooltip")}
                     onClick={() => {
                         setSaid(null);
                         setAsking(true);
                     }}
                 >
                     {busy && <Loader2 className="size-4 animate-spin" />}
-                    Tidy up
+                    {t("uploads.tidy.button")}
                 </Button>
             </div>
             {said && (
@@ -166,19 +162,13 @@ function TidyButton() {
                 open={asking}
                 onOpenChange={(open) => !busy && setAsking(open)}
                 requireTyping={false}
-                name="chat storage"
-                kind="folders"
-                title="Tidy the chat storage"
-                confirmLabel="Tidy up"
+                name={t("uploads.tidy.name")}
+                kind={t("uploads.tidy.kind")}
+                title={t("uploads.tidy.title")}
+                confirmLabel={t("uploads.tidy.button")}
                 pending={busy}
-                description={
-                    <>
-                        Deletes every folder under the chat root whose conversation no longer
-                        exists, with everything inside it, and any folder left empty. The files do
-                        not come back.
-                    </>
-                }
-                question="Tidy every storage this instance has written chat files to?"
+                description={t("uploads.tidy.description")}
+                question={t("uploads.tidy.question")}
                 onConfirm={() => void tidy()}
             />
         </div>
@@ -201,21 +191,24 @@ function SaveRow({
     error: string;
     onSave: () => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     return (
         <>
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex items-center gap-3">
                 <Button onClick={onSave} disabled={!dirty || !valid || saving}>
                     {saving && <Loader2 className="size-4 animate-spin" />}
-                    Save
+                    {tc("actions.save")}
                 </Button>
-                {saved && !dirty && <span className="text-xs text-muted-foreground">Saved.</span>}
+                {saved && !dirty && <span className="text-xs text-muted-foreground">{t("uploads.saved")}</span>}
             </div>
         </>
     );
 }
 
 function AttachmentsCard({ settings }: { settings: UploadSettings }) {
+    const t = useTranslations("admin");
     const [target, setTarget] = useState(settings.choice);
     const [megabytes, setMegabytes] = useState(String(toMegabytes(settings.maxBytes)));
     const [saving, setSaving] = useState(false);
@@ -246,20 +239,18 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">Files attached to work</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Screenshots, recordings and documents people staple to a task.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.attachments.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.attachments.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new files follow it."
+                    automatic={t("uploads.automatic.files")}
                 />
 
                 <TargetPicker
-                    label="Where to keep them"
-                    hint="Files already attached stay where they were written; this decides where the next ones go."
+                    label={t("uploads.whereThem")}
+                    hint={t("uploads.attachments.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -270,19 +261,19 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                 />
 
                 <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium">Biggest single file</span>
+                    <span className="text-sm font-medium">{t("uploads.attachments.biggest")}</span>
                     <SizeField
                         value={Number(megabytes) || 0}
                         stored="MB"
                         min={1}
                         max={10240}
-                        aria-label="Biggest single file"
+                        aria-label={t("uploads.attachments.biggest")}
                         onChange={(value) => {
                             setMegabytes(String(value));
                             setSaved(false);
                         }}
                     />
-                    {!limitValid && <span className="text-xs text-danger">Between 1 MB and 10 GB.</span>}
+                    {!limitValid && <span className="text-xs text-danger">{t("uploads.attachments.range")}</span>}
                 </label>
 
                 <CheckButton which="tasks" />
@@ -300,6 +291,7 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
 }
 
 function PhotosCard({ settings }: { settings: AvatarSettings }) {
+    const t = useTranslations("admin");
     const [target, setTarget] = useState(settings.choice);
     const [gravatar, setGravatar] = useState(settings.gravatar);
     const [saving, setSaving] = useState(false);
@@ -328,21 +320,18 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">Profile photos</h2>
-                    <p className="text-xs text-muted-foreground">
-                        The picture on somebody&rsquo;s account. Capped at 2 MB and squared by the
-                        browser before it is sent, so these stay small wherever they go.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.photos.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.photos.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new photos follow it."
+                    automatic={t("uploads.automatic.photos")}
                 />
 
                 <TargetPicker
-                    label="Where to keep them"
-                    hint="Photos already uploaded stay where they were written; this decides where the next ones go."
+                    label={t("uploads.whereThem")}
+                    hint={t("uploads.photos.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -354,17 +343,12 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
 
                 <label className="flex items-start justify-between gap-4">
                     <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">Use Gravatar</span>
-                        <span className="text-xs text-muted-foreground">
-                            For accounts with no photo of their own, show the one their email
-                            address has on Gravatar. Polaris asks for it, not the browser, so no
-                            address leaves this server and nobody is told who is looking. Off means
-                            initials until somebody uploads a photo.
-                        </span>
+                        <span className="text-sm font-medium">{t("uploads.photos.gravatar")}</span>
+                        <span className="text-xs text-muted-foreground">{t("uploads.photos.gravatarHint")}</span>
                     </span>
                     <Switch
                         checked={gravatar}
-                        aria-label="Use Gravatar"
+                        aria-label={t("uploads.photos.gravatar")}
                         onChange={(value) => {
                             setGravatar(value);
                             setSaved(false);
@@ -397,6 +381,7 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
  * theirs where it is.
  */
 function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
+    const t = useTranslations("admin");
     const initial = settings.choice;
     const [target, setTarget] = useState(initial);
     const [saving, setSaving] = useState(false);
@@ -426,21 +411,18 @@ function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">People&apos;s own drives</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Everybody gets a private folder of their own in Drive, made the first time
-                        they open it. What it can hold is whatever is free on the disk it is on.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.drives.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.drives.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new drives follow it."
+                    automatic={t("uploads.automatic.drives")}
                 />
 
                 <TargetPicker
-                    label="Where to keep them"
-                    hint="Drives that already exist stay on the disk they were made on; this decides where the next ones go."
+                    label={t("uploads.whereThem")}
+                    hint={t("uploads.drives.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -452,10 +434,12 @@ function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
 
                 {made > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        {made === 1 ? "One drive has been made" : `${made} drives have been made`}
                         {elsewhere.length > 0
-                            ? `, ${elsewhere.reduce((total, row) => total + row.count, 0)} of them on a different disk from the one above.`
-                            : "."}
+                            ? t("uploads.drives.madeElsewhere", {
+                                  count: made,
+                                  elsewhere: elsewhere.reduce((total, row) => total + row.count, 0)
+                              })
+                            : t("uploads.drives.made", { count: made })}
                     </p>
                 )}
 
@@ -476,6 +460,7 @@ function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
 }
 
 function ChatCard({ settings }: { settings: ChatStorageSettings }) {
+    const t = useTranslations("admin");
     const initial = settings.choice;
     const [target, setTarget] = useState(initial);
     const [saving, setSaving] = useState(false);
@@ -501,21 +486,18 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">Files sent in chat</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Screenshots and documents people put on a message. Capped at 25 MB each -
-                        anything bigger belongs in Drive, with a link to it in the conversation.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.chat.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.chat.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new files follow it."
+                    automatic={t("uploads.automatic.files")}
                 />
 
                 <TargetPicker
-                    label="Where to keep them"
-                    hint="Files already sent stay where they were written; this decides where the next ones go."
+                    label={t("uploads.whereThem")}
+                    hint={t("uploads.chat.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -552,6 +534,7 @@ function ChatCard({ settings }: { settings: ChatStorageSettings }) {
  * every camera that has not been is written to.
  */
 function FootageCard({ settings }: { settings: FootageSettings }) {
+    const t = useTranslations("admin");
     const initial = settings.choice;
     const [target, setTarget] = useState(initial);
     const [saving, setSaving] = useState(false);
@@ -577,22 +560,18 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">Camera footage</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Recordings and the pictures that go with what the cameras notice. A NAS is
-                        the right answer if you have one: this is the only thing here that grows
-                        whether or not anybody uses it.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.footage.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.footage.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new footage follows it."
+                    automatic={t("uploads.automatic.footage")}
                 />
 
                 <TargetPicker
-                    label="Where to keep it"
-                    hint="Footage already recorded stays where it was written. A camera can override this on its own settings."
+                    label={t("uploads.footage.where")}
+                    hint={t("uploads.footage.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -625,6 +604,7 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
  * company's documents on the NAS and everybody's own on the box.
  */
 function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSettings }) {
+    const t = useTranslations("admin");
     const initial = settings.choice;
     const [target, setTarget] = useState(initial);
     const [saving, setSaving] = useState(false);
@@ -654,22 +634,18 @@ function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSetti
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
-                    <h2 className="text-sm font-medium">Organizations&apos; shelves</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Every organization gets a shelf of its own in Drive, made the first time
-                        somebody there opens it. It is where a company keeps what belongs to the
-                        company rather than to one person.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("uploads.shelves.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("uploads.shelves.intro")}</p>
                 </div>
 
                 <ResolvedTarget
                     resolved={settings.resolved}
-                    automatic="Worked out from what this instance has connected. Connect a NAS and new shelves follow it."
+                    automatic={t("uploads.automatic.shelves")}
                 />
 
                 <TargetPicker
-                    label="Where to keep them"
-                    hint="Shelves that already exist stay on the disk they were made on; this decides where the next ones go."
+                    label={t("uploads.whereThem")}
+                    hint={t("uploads.shelves.hint")}
                     value={target}
                     options={settings.options}
                     resolvedName={settings.resolved.name}
@@ -681,10 +657,12 @@ function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSetti
 
                 {made > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        {made === 1 ? "One shelf has been made" : `${made} shelves have been made`}
                         {elsewhere.length > 0
-                            ? `, ${elsewhere.reduce((total, row) => total + row.count, 0)} of them on a different disk from the one above.`
-                            : "."}
+                            ? t("uploads.shelves.madeElsewhere", {
+                                  count: made,
+                                  elsewhere: elsewhere.reduce((total, row) => total + row.count, 0)
+                              })
+                            : t("uploads.shelves.made", { count: made })}
                     </p>
                 )}
 

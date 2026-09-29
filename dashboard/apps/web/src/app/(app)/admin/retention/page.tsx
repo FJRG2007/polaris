@@ -26,6 +26,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { MailBodyForm } from "./mail-body-form";
+import { getTranslations } from "@/lib/i18n/request";
 import { RetentionView } from "./retention-view";
 import { getSetting } from "@/lib/setting-store";
 import { MAIL_BODY_KEEP_KEY, mailBodyKeep } from "@polaris/core";
@@ -35,6 +36,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RetentionPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
     const policy = await retentionPolicy();
     const totals = await retentionTotals(policy);
     // What the window is set to. What it is actually holding - the number that
@@ -46,8 +48,8 @@ export default async function RetentionPage() {
         // the content area rather than left against the rail.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Keeping records"
-                description="How long Polaris keeps what it writes down about people using it. Anything older is taken away on a schedule."
+                title={t("retention.title")}
+                description={t("retention.description")}
             />
             <RetentionView policy={policy} totals={totals} />
             <div className="mt-4">

@@ -8,12 +8,14 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { PoliciesAdmin, type PolicyRow, type PrincipalOption } from "./policies-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function PoliciesAdminPage() {
     await requireAdmin();
+    const t = await getTranslations("admin");
     const [policies, users, groups, roles] = await Promise.all([
         prisma.policy.findMany({
             orderBy: { name: "asc" },
@@ -34,8 +36,8 @@ export default async function PoliciesAdminPage() {
     // A lookup so an attachment (type + id) can be shown as a readable label.
     const label = new Map<string, string>();
     for (const user of users) label.set(`user:${user.id}`, user.name);
-    for (const group of groups) label.set(`group:${group.id}`, `${group.name} (group)`);
-    for (const role of roles) label.set(`role:${role.id}`, `${role.name} (role)`);
+    for (const group of groups) label.set(`group:${group.id}`, t("policies.principal.group", { name: group.name }));
+    for (const role of roles) label.set(`role:${role.id}`, t("policies.principal.role", { name: role.name }));
 
     const rows: PolicyRow[] = policies.map((policy) => ({
         id: policy.id,
@@ -51,16 +53,16 @@ export default async function PoliciesAdminPage() {
     }));
 
     const principals: PrincipalOption[] = [
-        ...roles.map((role) => ({ type: "role" as const, id: role.id, label: `${role.name} (role)` })),
-        ...groups.map((group) => ({ type: "group" as const, id: group.id, label: `${group.name} (group)` })),
+        ...roles.map((role) => ({ type: "role" as const, id: role.id, label: t("policies.principal.role", { name: role.name }) })),
+        ...groups.map((group) => ({ type: "group" as const, id: group.id, label: t("policies.principal.group", { name: group.name }) })),
         ...users.map((user) => ({ type: "user" as const, id: user.id, label: `${user.name} (${user.email})` }))
     ];
 
     return (
         <>
             <PageHeader
-                title="Policies"
-                description="Fine-grained allow/deny rules. Attach a policy to a user, group, or role."
+                title={t("policies.page.title")}
+                description={t("policies.page.description")}
             />
             <PoliciesAdmin policies={rows} principals={principals} />
         </>

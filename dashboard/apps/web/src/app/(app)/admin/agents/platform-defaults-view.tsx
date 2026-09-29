@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { DEFAULT_AGENT_POLICY } from "@polaris/core";
 import { AgentDefaultsCard } from "@/components/agent-defaults-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { platformModelChoices, savePlatformAgentDefaultsAction } from "./actions";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 
@@ -22,6 +23,7 @@ export function PlatformDefaultsView({
     pools: Array<{ id: string; name: string }>;
     providers: string[];
 }) {
+    const t = useTranslations("admin");
     const [tier, setTier] = useState(platform);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,9 +32,9 @@ export function PlatformDefaultsView({
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <AgentDefaultsCard
                 tier={tier}
-                title="Every repository on this deployment"
+                title={t("agents.defaults.title")}
                 inherited={DEFAULT_AGENT_POLICY}
-                inheritedFrom="the built-in defaults"
+                inheritedFrom={t("agents.defaults.inheritedFrom")}
                 pools={pools}
                 providers={providers}
                 loadModels={platformModelChoices}

@@ -9,8 +9,10 @@
  * another server saying so instead of reading as idle.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { cleanup, fireEvent, render as draw, screen } from "@testing-library/react";
 import type {
     Consumption,
     ConsumptionGroup,
@@ -54,6 +56,9 @@ function group(
         ...overrides
     };
 }
+
+/** Drawn with the catalogs, the way the admin layout hands them down. */
+const render = (ui: ReactElement) => draw(ui, { wrapper: MessagesWrapper });
 
 // Nothing here configures automatic cleanup, so a render left standing would be
 // found by the next test's query.

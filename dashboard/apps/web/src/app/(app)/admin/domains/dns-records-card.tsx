@@ -17,6 +17,7 @@ import { PageSection } from "@/components/page-section";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { Button, EmptyState, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { listDnsZonesAction } from "@/app/(app)/account/domains/dns-actions";
 
 type Zone = { id: string; name: string };
@@ -26,6 +27,7 @@ const ZONES_KEY = "admin.dnsZones";
 const ZONES_MAX_AGE_MS = 24 * 3_600_000;
 
 export function DnsRecordsCard() {
+    const t = useTranslations("admin");
     const [zones, setZones] = useState<Zone[] | null>(null);
     const [zoneId, setZoneId] = useState("");
     const [error, setError] = useState("");
@@ -43,14 +45,14 @@ export function DnsRecordsCard() {
         const kept = readSnapshot<Zone[]>(ZONES_KEY, ZONES_MAX_AGE_MS);
         if (kept) adopt(kept.value);
         void listDnsZonesAction()
-            .catch(() => ({ error: "Could not read the zones", zones: undefined }))
+            .catch(() => ({ error: t("domains.records.readFailed"), zones: undefined }))
             .then((result) => {
                 if (!live) return;
                 if (result.zones) {
                     writeSnapshot(ZONES_KEY, result.zones);
                     adopt(result.zones);
                     setError("");
-                } else setError(result.error ?? "Could not read the zones");
+                } else setError(result.error ?? t("domains.records.readFailed"));
             });
         return () => {
             live = false;
@@ -61,8 +63,8 @@ export function DnsRecordsCard() {
         <PageSection
             id="dns-records"
             wide
-            title="DNS records"
-            description="The zones this Polaris's Cloudflare token can edit. Check where a change has reached before relying on it."
+            title={t("domains.records.title")}
+            description={t("domains.records.description")}
             actions={
                 zones && zones.length > 1 ? (
                     <Select
@@ -70,7 +72,7 @@ export function DnsRecordsCard() {
                         onValueChange={setZoneId}
                         options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
                         className="w-full sm:w-64"
-                        aria-label="Zone"
+                        aria-label={t("domains.records.zone")}
                     />
                 ) : null
             }
@@ -88,7 +90,7 @@ export function DnsRecordsCard() {
                             setAttempt((count) => count + 1);
                         }}
                     >
-                        <RefreshCw className="size-4" /> Try again
+                        <RefreshCw className="size-4" /> {t("domains.tryAgain")}
                     </Button>
                 </div>
             ) : zones === null ? (
@@ -97,11 +99,11 @@ export function DnsRecordsCard() {
                 <DnsZoneEditor scope={null} />
             ) : zones.length === 0 ? (
                 <EmptyState
-                    title="No zone to edit"
-                    description="Connect a Cloudflare token that can edit DNS, and its zones appear here."
+                    title={t("domains.records.emptyTitle")}
+                    description={t("domains.records.emptyDescription")}
                     action={
                         <Button asChild size="sm" variant="secondary">
-                            <Link href="/admin/integrations">Open Integrations</Link>
+                            <Link href="/admin/integrations">{t("domains.records.openIntegrations")}</Link>
                         </Button>
                     }
                 />

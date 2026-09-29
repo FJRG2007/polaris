@@ -6,15 +6,23 @@
  */
 
 import type { ReactElement } from "react";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { DiscordLogo, EmailLogo, SlackLogo, TelegramLogo, WhatsAppLogo } from "./channel-logos";
 
+/** The brand names, which read the same in every language. */
 export const PLATFORM_LABEL: Record<string, string> = {
     whatsapp: "WhatsApp",
     telegram: "Telegram",
     discord: "Discord",
-    slack: "Slack",
-    email: "Email"
+    slack: "Slack"
 };
+
+/** A platform's name for display: the brand, or the word for email in the
+ *  reader's language; an unknown platform shows as stored. */
+export function platformLabel(t: NamespaceTranslator<"admin">, platform: string): string {
+    if (platform === "email") return t("inbox.platforms.email");
+    return PLATFORM_LABEL[platform] ?? platform;
+}
 
 /** The email sender's mark, named separately so the Channels page can render it
  *  without a lookup that may miss. */
@@ -36,24 +44,32 @@ export const CHANNEL_STATUS_TONE: Record<string, string> = {
     connected: "border-success-edge text-success",
     connecting: "border-warning-edge text-warning",
     qr: "border-warning-edge text-warning",
-    error: "border-danger-edge text-danger",
+    error: "border-danger-edge text-danger", // i18n-ignore
     disconnected: "border-danger-edge text-danger"
 };
 
 /** Per-platform hint for the recipient id when starting a chat or saving a handle. */
-export const PEER_HINT: Record<string, string> = {
-    whatsapp: "Phone number with country code, e.g. 34600111222",
-    telegram:
-        "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
-    discord: "A server channel id the bot can post to, or a user id to DM (prefix a DM with user:)",
-    slack: "A channel or user id"
-};
+export function peerHint(t: NamespaceTranslator<"admin">, platform: string): string | undefined {
+    switch (platform) {
+        case "whatsapp":
+            return t("inbox.peerHints.whatsapp");
+        case "telegram":
+            return t("inbox.peerHints.telegram");
+        case "discord":
+            return t("inbox.peerHints.discord");
+        case "slack":
+            return t("inbox.peerHints.slack");
+        default:
+            return undefined;
+    }
+}
 
+// Brand names only, the same in every language.
 export const PLATFORM_OPTIONS = [
-    { value: "whatsapp", label: "WhatsApp" },
-    { value: "telegram", label: "Telegram" },
-    { value: "discord", label: "Discord" },
-    { value: "slack", label: "Slack" }
+    { value: "whatsapp", label: "WhatsApp" }, // i18n-ignore
+    { value: "telegram", label: "Telegram" }, // i18n-ignore
+    { value: "discord", label: "Discord" }, // i18n-ignore
+    { value: "slack", label: "Slack" } // i18n-ignore
 ];
 
 /** How a Discord handle is targeted: a server text channel or a user DM. The wire

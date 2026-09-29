@@ -18,6 +18,7 @@ import Link from "next/link";
 import * as actions from "./actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Input, Skeleton } from "@polaris/ui";
 import { CircleAlert, CircleCheck, Loader2 } from "lucide-react";
 
@@ -53,6 +54,8 @@ const NOTHING: Settings = {
 };
 
 export function CallServerView() {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [settings, setSettings] = useState<Settings | null>(null);
     const [url, setUrl] = useState("");
     const [key, setKey] = useState("");
@@ -134,7 +137,7 @@ export function CallServerView() {
         if (fresh.settings) setSettings(fresh.settings);
     };
 
-    const where = settings?.shipped ? "on this server" : "at the address below";
+    const where = settings?.shipped ? "shipped" : "address";
     // Never created, which is a different thing from slow to start and the only
     // one of the two anybody can act on. Asked of the container engine rather
     // than inferred from the key file - see `shippedContainer`.
@@ -143,12 +146,9 @@ export function CallServerView() {
     return (
         <section className="flex flex-col gap-3">
             <div>
-                <h2 className="text-[0.8125rem] font-semibold text-foreground">Where calls run</h2>
+                <h2 className="text-[0.8125rem] font-semibold text-foreground">{t("chat.calls.title")}</h2>
                 <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
-                    Every call goes through a media server, so each browser sends its camera once
-                    instead of once per person. Polaris starts one with the stack and hands it its
-                    own key, so there is nothing to set up; until it answers, Chat says calls are
-                    unavailable rather than offering one that reaches nobody.
+                    {t("chat.calls.intro")}
                 </p>
             </div>
 
@@ -166,50 +166,49 @@ export function CallServerView() {
                                 <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                             )}
                             {!settings.ready
-                                ? "The call server could not be prepared."
+                                ? t("chat.calls.status.unprepared")
                                 : settings.answering
-                                  ? `Running ${where}.`
+                                  ? t("chat.calls.status.running", { where })
                                   : missing
-                                    ? "The call server is not part of this deployment."
+                                    ? t("chat.calls.status.missing")
                                     : settings.container === "stopped"
-                                      ? "The call server is stopped."
+                                      ? t("chat.calls.status.stopped")
                                       : waited
-                                        ? `Not answering ${where}.`
-                                        : `Starting ${where}.`}
+                                        ? t("chat.calls.status.notAnswering", { where })
+                                        : t("chat.calls.status.starting", { where })}
                         </p>
                         <p className="text-[0.6875rem] text-foreground-subtle">
                             {!settings.ready ? (
-                                "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
+                                t("chat.calls.detail.unprepared")
                             ) : missing ? (
-                                <>
-                                    Its container was never created here, which is why this said it
-                                    was starting and never finished. Updating again brings it up -{" "}
-                                    <Link href="/admin/settings" className="text-primary hover:underline">
-                                        Settings
-                                    </Link>
-                                    , Update.
-                                </>
+                                t.rich("chat.calls.detail.missing", {
+                                    link: (chunks) => (
+                                        <Link key="link" href="/admin/settings" className="text-primary hover:underline">
+                                            {chunks}
+                                        </Link>
+                                    )
+                                })
                             ) : settings.container === "stopped" ? (
-                                <>
-                                    Its container exists and is not running. Start it from{" "}
-                                    <Link href="/apps/containers" className="text-primary hover:underline">
-                                        Containers
-                                    </Link>
-                                    , on the row named polaris-livekit-1.
-                                </>
+                                t.rich("chat.calls.detail.stopped", {
+                                    container: "polaris-livekit-1",
+                                    link: (chunks) => (
+                                        <Link key="link" href="/apps/containers" className="text-primary hover:underline">
+                                            {chunks}
+                                        </Link>
+                                    )
+                                })
                             ) : settings.answering ? (
-                                      <>
-                                          Calls between devices on this network work now. For calls
-                                          from outside, two ports have to reach this machine -{" "}
-                                          <Link href="/admin/domains" className="text-primary hover:underline">
-                                              Domains
-                                          </Link>{" "}
-                                          lists them and reports when they answer.
-                                      </>
+                                      t.rich("chat.calls.detail.running", {
+                                          link: (chunks) => (
+                                              <Link key="link" href="/admin/domains" className="text-primary hover:underline">
+                                                  {chunks}
+                                              </Link>
+                                          )
+                                      })
                                   ) : waited ? (
-                                      "It has had a couple of minutes and has not come up. It keeps trying, and calls come back on their own the moment it answers."
+                                      t("chat.calls.detail.waited")
                                   ) : (
-                                      "It comes up a few seconds after the stack does."
+                                      t("chat.calls.detail.starting")
                                   )}
                         </p>
                         {waited ? (
@@ -219,7 +218,7 @@ export function CallServerView() {
                                 className="self-start"
                                 onClick={() => setWaited(false)}
                             >
-                                Check again
+                                {t("chat.calls.checkAgain")}
                             </Button>
                         ) : null}
                     </div>
@@ -231,8 +230,7 @@ export function CallServerView() {
                         // here rather than left to be discovered on a call that
                         // keeps going somewhere else.
                         <p className="text-[0.6875rem] text-warning">
-                            This deployment was started pointing at another call server, so calls go
-                            there and the address below is not in use.
+                            {t("chat.calls.unused.environment")}
                         </p>
                     ) : settings.unused === "incomplete" ? (
                         // Half a pairing signs nothing, so it is skipped. Nothing
@@ -240,10 +238,10 @@ export function CallServerView() {
                         // like the one calls were going to.
                         <p className="text-[0.6875rem] text-warning">
                             {settings.key
-                                ? "The address below has no secret saved with it, so it signs nothing and is not in use. Paste it and save."
+                                ? t("chat.calls.unused.noSecret")
                                 : settings.hasSecret
-                                  ? "The address below has no key saved with it, so it signs nothing and is not in use. Fill it in and save."
-                                  : "The address below has no key and secret saved with it, so it signs nothing and is not in use. Fill both in and save."}
+                                  ? t("chat.calls.unused.noKey")
+                                  : t("chat.calls.unused.neither")}
                         </p>
                     ) : null}
 
@@ -251,32 +249,32 @@ export function CallServerView() {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    Address
+                                    {t("chat.calls.fields.address")}
                                 </span>
                                 <Input
                                     value={url}
                                     onChange={(event) => setUrl(event.target.value)}
                                     className="w-64"
                                     placeholder="wss://calls.example.com"
-                                    aria-label="Call server address"
+                                    aria-label={t("chat.calls.fields.addressLabel")}
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    Key
+                                    {t("chat.calls.fields.key")}
                                 </span>
                                 <Input
                                     value={key}
                                     onChange={(event) => setKey(event.target.value)}
                                     className="w-40"
                                     autoComplete="off"
-                                    aria-label="Call server key"
-                                    placeholder="Its key name"
+                                    aria-label={t("chat.calls.fields.keyLabel")}
+                                    placeholder={t("chat.calls.fields.keyPlaceholder")}
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    Secret
+                                    {t("chat.calls.fields.secret")}
                                 </span>
                                 {/* enigma:allow-no-breach-check - this is a secret
                                     the call server was configured with, not a
@@ -290,18 +288,18 @@ export function CallServerView() {
                                     className="w-64"
                                     type="password"
                                     autoComplete="off"
-                                    aria-label="Call server secret"
-                                    placeholder={settings.hasSecret ? "Stored. Type to replace it." : "Paste it"}
+                                    aria-label={t("chat.calls.fields.secretLabel")}
+                                    placeholder={settings.hasSecret ? t("chat.calls.fields.secretStored") : t("chat.calls.fields.secretPaste")}
                                 />
                             </label>
                             <Button variant="secondary" onClick={save} disabled={saving}>
                                 {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                                Save
+                                {tc("actions.save")}
                             </Button>
                             {saved ? (
                                 <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
-                                    Saved
+                                    {t("chat.calls.saved")}
                                 </span>
                             ) : null}
                         </div>
@@ -312,7 +310,7 @@ export function CallServerView() {
                             className="self-start"
                             onClick={() => setManual(true)}
                         >
-                            I already run my own
+                            {t("chat.calls.ownServer")}
                         </Button>
                     )}
                 </>

@@ -19,13 +19,18 @@ import {
 import { requireAdmin } from "@/lib/session";
 import { publishAccessChange } from "@/lib/access-live";
 import { recordAudit } from "@/lib/audit-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** Parse the document text an admin typed into a value, or return an error. */
-function parseDocument(documentText: string): { value?: unknown; error?: string } {
+function parseDocument(
+    documentText: string,
+    t: NamespaceTranslator<"admin">
+): { value?: unknown; error?: string } {
     try {
         return { value: JSON.parse(documentText) };
     } catch {
-        return { error: "The policy document is not valid JSON" };
+        return { error: t("policies.errors.invalidJson") };
     }
 }
 
@@ -35,13 +40,14 @@ export async function createPolicyAction(
     documentText: string
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = parseDocument(documentText);
+    const t = await getTranslations("admin");
+    const parsed = parseDocument(documentText, t);
     if (parsed.error) return { error: parsed.error };
     try {
         const { id } = await createPolicy(name, description || undefined, parsed.value);
         await recordAudit({ actorId: admin.id, action: "policy.create", targetType: "policy", targetId: id, metadata: { name } });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the policy" };
+        return { error: caught instanceof Error ? caught.message : t("policies.errors.createFailed") };
     }
     revalidatePath("/admin/policies");
     return {};
@@ -54,7 +60,8 @@ export async function updatePolicyAction(
     documentText: string
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = parseDocument(documentText);
+    const t = await getTranslations("admin");
+    const parsed = parseDocument(documentText, t);
     if (parsed.error) return { error: parsed.error };
     try {
         await updatePolicy(id, { name, description, document: parsed.value });
@@ -62,7 +69,7 @@ export async function updatePolicyAction(
         publishAccessChange();
         await recordAudit({ actorId: admin.id, action: "policy.update", targetType: "policy", targetId: id });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the policy" };
+        return { error: caught instanceof Error ? caught.message : t("policies.errors.updateFailed") };
     }
     revalidatePath("/admin/policies");
     return {};

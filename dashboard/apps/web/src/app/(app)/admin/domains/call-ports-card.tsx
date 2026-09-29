@@ -23,6 +23,7 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { PageSection } from "@/components/page-section";
 import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CALL_FORWARD_RULES, type CallPortsReading } from "@/lib/chat/call-ports";
 
 /** How often the card re-reads. The knock behind it is rate limited to one every
@@ -32,6 +33,7 @@ const POLL_MS = 15_000;
 const PORTS_URL = "/api/admin/domains/call-ports";
 
 export function CallPortsCard() {
+    const t = useTranslations("admin");
     // Off for the first read and on for every one after: knocking on a closed
     // port waits out a timeout, so the card is on screen before it starts.
     const [url, setUrl] = useState(PORTS_URL);
@@ -54,24 +56,24 @@ export function CallPortsCard() {
     return (
         <PageSection
             id="call-ports"
-            title="Call ports"
-            description="Setting a call up goes through 443 with everything else. The sound does not: it arrives on the two ports below. Most calls need neither forwarded: the call server reaches out first and the reply comes back the way it went. Forward them for the networks where that does not hold."
+            title={t("domainsPorts.call.title")}
+            description={t("domainsPorts.call.description")}
         >
 
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                     {live.stale ??
                         (reading.running
-                            ? "Checked while this page is open: the TCP port is ticked as soon as it answers from outside."
-                            : "The call server is not answering, so nothing here can be checked yet.")}
+                            ? t("domainsPorts.call.checking")
+                            : t("domainsPorts.call.notAnswering"))}
                 </p>
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={live.refresh}
                     disabled={live.refreshing}
-                    aria-label="Check the ports now"
-                    title="Check the ports now"
+                    aria-label={t("domainsPorts.checkNow")}
+                    title={t("domainsPorts.checkNow")}
                 >
                     <RefreshCw className={live.refreshing ? "size-4 animate-spin" : "size-4"} />
                 </Button>
@@ -97,8 +99,8 @@ export function CallPortsCard() {
                             // connects anyway, because the call server
                             // reaches out first and the reply comes back the
                             // way it went.
-                            <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be tested from here. Calls do not depend on it: the call server reaches out first, and forwarding it only helps on networks where that does not work">
-                                Cannot be checked
+                            <Badge title={t("domainsPorts.call.unprobeableTitle")}>
+                                {t("domainsPorts.call.unprobeable")}
                             </Badge>
                         ) : !reading.running ? (
                             // Three states, not two, for the reason the game
@@ -106,22 +108,24 @@ export function CallPortsCard() {
                             // nothing on any port, so "not confirmed" would
                             // put a warning on a rule that is very likely
                             // right and send somebody into their router.
-                            <Badge title="A call server that is not answering is silent on every port, so this cannot be checked from here">
-                                Checked once it answers
+                            <Badge title={t("domainsPorts.call.stoppedTitle")}>
+                                {t("domainsPorts.call.stopped")}
                             </Badge>
                         ) : reading.confirmed ? (
                             <Badge
                                 className="border-success-edge text-success"
                                 title={
                                     reading.confirmedAt
-                                        ? `Last answered from outside on ${new Date(reading.confirmedAt).toLocaleString()}`
+                                        ? t("domainsPorts.lastAnswered", {
+                                              time: new Date(reading.confirmedAt).toLocaleString()
+                                          })
                                         : undefined
                                 }
                             >
-                                Reached from outside
+                                {t("domainsPorts.reached")}
                             </Badge>
                         ) : (
-                            <Badge className="border-warning-edge text-warning">Not confirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">{t("domainsPorts.notConfirmed")}</Badge>
                         )}
                     </li>
                 ))}
@@ -141,17 +145,13 @@ export function CallPortsCard() {
                 already right. */}
             {!reading.running ? (
                 <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    The call server is not answering, so these ports carry nothing yet and
-                    cannot be checked. Chat settings says what it is doing.
+                    {t("domainsPorts.call.stoppedNote")}
                 </p>
             ) : reading.confirmed ? null : (
                 <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
-                    <p className="font-medium text-foreground">
-                        Calls only reach this network so far
-                    </p>
+                    <p className="font-medium text-foreground">{t("domainsPorts.call.onlyLocal")}</p>
                     <p className="text-muted-foreground">
-                        {reading.cannotProbe ??
-                            "Nothing has arrived on the call ports from outside yet. Forwarding them in the router fixes it, and this ticks itself the moment they work."}
+                        {reading.cannotProbe ?? t("domainsPorts.call.nothingArrived")}
                     </p>
                     <div className="text-muted-foreground">
                         <RouterSteps server={null} lanIp={reading.lanIp} rules={CALL_FORWARD_RULES} />
@@ -183,6 +183,7 @@ function AddressRow({
     reading: CallPortsReading;
     onDone: () => void;
 }) {
+    const t = useTranslations("admin");
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState("");
 
@@ -195,20 +196,16 @@ function AddressRow({
         >
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium text-foreground">
-                    {reading.addressStale
-                        ? "The call server is handing out an old address"
-                        : "The address callers are sent to"}
+                    {reading.addressStale ? t("domainsPorts.call.addressStale") : t("domainsPorts.call.address")}
                 </p>
                 {reading.publicIp && (
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{reading.publicIp}</code>
                 )}
             </div>
             <p className="text-muted-foreground">
-                {reading.addressStale
-                    ? "This line's public address has changed since the call server last started, so the sound is being sent to an address that is no longer this one. The port forwarding is not the problem. Restarting it is."
-                    : "The call server asks for it once, when it starts, and hands it out until it restarts. If this line's address changes, calls from outside go quiet while everything here stays green."}
+                {reading.addressStale ? t("domainsPorts.call.addressStaleBody") : t("domainsPorts.call.addressBody")}
                 {reading.askedAt
-                    ? ` It last asked on ${new Date(reading.askedAt).toLocaleString()}.`
+                    ? ` ${t("domainsPorts.call.askedAt", { time: new Date(reading.askedAt).toLocaleString() })}`
                     : ""}
             </p>
             {said && <p className="text-muted-foreground">{said}</p>}
@@ -222,14 +219,14 @@ function AddressRow({
                         setSaid("");
                         const result = await repairCallAddressAction().catch(() => ({
                             ok: false,
-                            message: "That could not be done from here."
+                            message: t("domainsPorts.call.repairFailed")
                         }));
                         setSaid(result.message);
                         setBusy(false);
                         onDone();
                     }}
                 >
-                    {busy ? "Restarting..." : "Ask for this network's address again"}
+                    {busy ? t("domainsPorts.call.restarting") : t("domainsPorts.call.repair")}
                 </Button>
             </div>
         </div>

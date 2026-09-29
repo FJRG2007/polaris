@@ -29,6 +29,7 @@ import type { DirectoryUser } from "@/lib/user-admin-service";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
@@ -68,21 +69,9 @@ import {
 } from "@polaris/ui";
 
 /** The cuts an operator reaches for; anything finer is what search is for. */
-const FILTERS = [
-    { value: "all", label: "Everyone" },
-    { value: "admins", label: "Administrators" },
-    { value: "limited", label: "Limited" },
-    { value: "banned", label: "Banned" }
-] as const;
+const FILTERS = ["all", "admins", "limited", "banned"] as const;
 
-type Filter = (typeof FILTERS)[number]["value"];
-
-/** How an invite is described in the pending list. */
-const METHOD_LABELS: Record<InviteListItem["method"], string> = {
-    link: "Link",
-    magic: "Emailed link",
-    code: "Code"
-};
+type Filter = (typeof FILTERS)[number];
 
 function hasLimits(user: DirectoryUser): boolean {
     const { enforced } = user;
@@ -116,6 +105,7 @@ export function UsersAdmin({
      *  opens nothing, which is what a link to a deleted account should do. */
     openUserId?: string | null;
 }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const now = useNow();
     const format = useDisplayFormat();
@@ -186,12 +176,12 @@ export function UsersAdmin({
      */
     const verify = useCallback(
         async (user: DirectoryUser, what: "email" | "phone", on: boolean) => {
-            const label = what === "email" ? user.email : (user.phone ?? "their number");
+            const label = what === "email" ? user.email : user.phone;
             if (on) {
                 const ok = await confirm({
-                    title: `Mark ${label} as verified?`,
-                    description: `Polaris will treat it as proved even though ${user.name} has not confirmed it. This is recorded against your account in the audit trail.`,
-                    confirmLabel: "Mark verified"
+                    title: t("users.verify.title", { hasLabel: label ? "yes" : "no", label: label ?? "" }),
+                    description: t("users.verify.description", { name: user.name }),
+                    confirmLabel: t("users.verify.confirm")
                 });
                 if (!ok) return;
             }
@@ -203,16 +193,15 @@ export function UsersAdmin({
             }
             router.refresh();
         },
-        [confirm, router]
+        [confirm, router, t]
     );
 
     const remove = useCallback(
         async (user: DirectoryUser) => {
             const ok = await confirm({
-                title: `Delete ${user.name}?`,
-                description:
-                    "Their account and everything it owns - connections, deployments, shares and uploads - goes with it. This cannot be undone.",
-                confirmLabel: "Delete account",
+                title: t("users.remove.title", { name: user.name }),
+                description: t("users.remove.description"),
+                confirmLabel: t("users.remove.confirm"),
                 danger: true
             });
             if (!ok) return;
@@ -224,7 +213,7 @@ export function UsersAdmin({
             }
             router.refresh();
         },
-        [confirm, router]
+        [confirm, router, t]
     );
 
     const shown = useMemo(() => {
@@ -255,22 +244,22 @@ export function UsersAdmin({
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         className="pl-9"
-                        placeholder="Search by name, address, username, role or group"
-                        aria-label="Search people"
+                        placeholder={t("users.directory.searchPlaceholder")}
+                        aria-label={t("users.directory.searchLabel")}
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </div>
                 <Select
                     className="sm:w-48"
-                    aria-label="Filter people"
+                    aria-label={t("users.directory.filterLabel")}
                     value={filter}
                     onValueChange={(value) => setFilter(value as Filter)}
-                    options={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                    options={FILTERS.map((value) => ({ value, label: t(`users.filters.${value}`) }))}
                 />
                 <Button onClick={() => setInviting(true)}>
                     <UserPlus className="size-4" />
-                    Invite
+                    {t("users.directory.invite")}
                 </Button>
             </div>
 
@@ -278,12 +267,16 @@ export function UsersAdmin({
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">Person</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">Access</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                Last seen
+                            <th className="px-3 py-2 font-medium">{t("users.directory.columns.person")}</th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                                {t("users.directory.columns.access")}
                             </th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">Joined</th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("users.directory.columns.lastSeen")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("users.directory.columns.joined")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -294,8 +287,8 @@ export function UsersAdmin({
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
                                     {users.length === 0
-                                        ? "Nobody here yet."
-                                        : "Nobody matches that."}
+                                        ? t("users.directory.empty")
+                                        : t("users.directory.noMatch")}
                                 </td>
                             </tr>
                         ) : (
@@ -305,7 +298,7 @@ export function UsersAdmin({
                                 <tr
                                     tabIndex={0}
                                     role="button"
-                                    aria-label={`Open ${user.name}`}
+                                    aria-label={t("users.directory.open", { name: user.name })}
                                     onClick={() => router.push(`/admin/users/${user.id}`)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
@@ -333,7 +326,7 @@ export function UsersAdmin({
                                                     <PersonName id={user.id} name={user.name} />
                                                     {user.id === viewerId ? (
                                                         <span className="text-xs text-muted-foreground">
-                                                            (you)
+                                                            {t("users.directory.you")}
                                                         </span>
                                                     ) : null}
                                                 </p>
@@ -348,7 +341,7 @@ export function UsersAdmin({
                                             {user.isAdmin ? (
                                                 <Badge variant="primary">
                                                     <Shield className="size-3" />
-                                                    admin
+                                                    {t("users.directory.badges.admin")}
                                                 </Badge>
                                             ) : null}
                                             {user.roles.map((role) => (
@@ -357,17 +350,17 @@ export function UsersAdmin({
                                             {hasLimits(user) ? (
                                                 <Badge variant="warning">
                                                     <MapPin className="size-3" />
-                                                    limited
+                                                    {t("users.directory.badges.limited")}
                                                 </Badge>
                                             ) : null}
                                             {user.banned ? (
                                                 <Badge variant="danger">
                                                     <Ban className="size-3" />
-                                                    banned
+                                                    {t("users.directory.badges.banned")}
                                                 </Badge>
                                             ) : null}
                                             {user.twoFactorEnabled ? (
-                                                <Badge variant="success">2FA</Badge>
+                                                <Badge variant="success">2FA</Badge> // i18n-ignore: the same abbreviation in every language
                                             ) : null}
                                         </div>
                                     </td>
@@ -382,16 +375,18 @@ export function UsersAdmin({
                                                 }
                                             >
                                                 <OnlineDot />
-                                                Online
+                                                {t("users.directory.online")}
                                             </span>
                                         ) : user.lastSeenAt ? (
                                             <span title={format.dateTime(user.lastSeenAt)}>
                                                 <RelativeTime iso={user.lastSeenAt} />
                                             </span>
                                         ) : (
-                                            "Never"
+                                            t("users.directory.never")
                                         )}
-                                        {user.lastCountry ? ` - ${user.lastCountry}` : ""}
+                                        {user.lastCountry
+                                            ? t("users.directory.country", { country: user.lastCountry })
+                                            : ""}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                         {format.date(user.createdAt)}
@@ -403,7 +398,7 @@ export function UsersAdmin({
                                             onSelect={() => router.push(`/admin/users/${user.id}`)}
                                         >
                                             <Shield className="size-4" />
-                                            Open their record
+                                            {t("users.menu.openRecord")}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
                                         {/* Asserting it rather than proving it,
@@ -424,8 +419,8 @@ export function UsersAdmin({
                                         >
                                             <MailCheck className="size-4" />
                                             {user.emailVerified
-                                                ? "Mark the email unverified"
-                                                : "Mark the email verified"}
+                                                ? t("users.menu.emailUnverify")
+                                                : t("users.menu.emailVerify")}
                                         </ContextMenuItem>
                                         {/* Nothing to verify where there is no
                                             number: a factor confirmed and absent
@@ -438,8 +433,8 @@ export function UsersAdmin({
                                             >
                                                 <PhoneCall className="size-4" />
                                                 {user.phoneVerified
-                                                    ? "Mark the number unverified"
-                                                    : "Mark the number verified"}
+                                                    ? t("users.menu.phoneUnverify")
+                                                    : t("users.menu.phoneVerify")}
                                             </ContextMenuItem>
                                         )}
                                         {/* Not offered on your own row: viewing
@@ -451,13 +446,13 @@ export function UsersAdmin({
                                             <>
                                                 <ContextMenuItem onSelect={() => void openAccount(user)}>
                                                     <Eye className="size-4" />
-                                                    Open their account
+                                                    {t("users.menu.openAccount")}
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
                                                 {user.banned ? (
                                                     <ContextMenuItem onSelect={() => void liftBan(user)}>
                                                         <Undo2 className="size-4" />
-                                                        Lift the suspension
+                                                        {t("users.menu.liftSuspension")}
                                                     </ContextMenuItem>
                                                 ) : (
                                                     <ContextMenuItem
@@ -465,7 +460,7 @@ export function UsersAdmin({
                                                         onSelect={() => setSuspending(user)}
                                                     >
                                                         <Ban className="size-4" />
-                                                        Suspend the account
+                                                        {t("users.menu.suspend")}
                                                     </ContextMenuItem>
                                                 )}
                                                 <ContextMenuItem
@@ -473,7 +468,7 @@ export function UsersAdmin({
                                                     onSelect={() => void remove(user)}
                                                 >
                                                     <Trash2 className="size-4" />
-                                                    Delete the account
+                                                    {t("users.menu.delete")}
                                                 </ContextMenuItem>
                                             </>
                                         )}
@@ -488,14 +483,11 @@ export function UsersAdmin({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <h2 className="text-sm font-medium">Pending invites</h2>
-                        <p className="text-xs text-muted-foreground">
-                            Invites that have not been claimed yet. Revoking one stops it working
-                            immediately.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("users.invites.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("users.invites.hint")}</p>
                     </div>
                     {invites.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">None outstanding.</p>
+                        <p className="text-sm text-muted-foreground">{t("users.invites.none")}</p>
                     ) : (
                         invites.map((invite) => (
                             <div
@@ -505,27 +497,31 @@ export function UsersAdmin({
                                 <div className="min-w-0">
                                     <p className="flex flex-wrap items-center gap-1.5 text-sm">
                                         <span className="truncate">{invite.email}</span>
-                                        <Badge>{METHOD_LABELS[invite.method]}</Badge>
+                                        <Badge>{t(`users.methods.${invite.method}`)}</Badge>
                                         {invite.role ? <Badge>{invite.role}</Badge> : null}
                                         {invite.needsPassword ? (
-                                            <Badge variant="warning">one-time password</Badge>
+                                            <Badge variant="warning">{t("users.invites.oneTimePassword")}</Badge>
                                         ) : null}
                                         {invite.restricted ? (
-                                            <Badge variant="warning">limited</Badge>
+                                            <Badge variant="warning">{t("users.invites.limited")}</Badge>
                                         ) : null}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Expires {format.dateTime(invite.expiresAt)}
                                         {invite.sentAt
-                                            ? ` - emailed ${format.dateTime(invite.sentAt)}`
-                                            : ""}
+                                            ? t("users.invites.expiresEmailed", {
+                                                  expires: format.dateTime(invite.expiresAt),
+                                                  sent: format.dateTime(invite.sentAt)
+                                              })
+                                            : t("users.invites.expires", {
+                                                  expires: format.dateTime(invite.expiresAt)
+                                              })}
                                     </p>
                                 </div>
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    aria-label={`Revoke the invite for ${invite.email}`}
-                                    title="Revoke"
+                                    aria-label={t("users.invites.revokeLabel", { email: invite.email })}
+                                    title={t("users.invites.revoke")}
                                     onClick={() =>
                                         void revokeInviteAction(invite.id).then(() =>
                                             router.refresh()
@@ -540,7 +536,7 @@ export function UsersAdmin({
                     {!canSendMail ? (
                         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Mail className="size-3.5" />
-                            No email channel is nominated, so Polaris cannot send invites itself.
+                            {t("users.invites.noMail")}
                         </p>
                     ) : null}
                 </CardBody>

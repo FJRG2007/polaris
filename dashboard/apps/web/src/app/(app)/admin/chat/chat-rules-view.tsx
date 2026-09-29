@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setChatRulesAction } from "./actions";
 import {
     Button,
@@ -31,6 +32,7 @@ type Rules = core.ChatRules;
 type Scope = core.ChatRuleScope;
 
 export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
+    const t = useTranslations("admin");
     const [scope, setScope] = useState<Scope>("space");
     const [draft, setDraft] = useState<Record<Scope, Rules>>(initial);
     const [saved, setSaved] = useState<Record<Scope, Rules>>(initial);
@@ -65,27 +67,27 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                 // picker is stretched to the whole content area and three short
                 // words sit in a track as wide as the screen.
                 className="self-start"
-                aria-label="Which conversations these rules cover"
+                aria-label={t("chat.rules.scopePicker")}
                 value={scope}
                 onValueChange={(next) => setScope(next)}
                 options={core.CHAT_RULE_SCOPES.map((entry) => ({
                     value: entry,
                     label: (
                         <span className="flex items-center gap-1.5">
-                            {core.CHAT_RULE_SCOPE_LABELS[entry]}
+                            {t(`chat.rules.scopes.${entry}.label`)}
                             {JSON.stringify(draft[entry]) !== JSON.stringify(saved[entry]) && (
                                 <span
-                                    aria-label="Unsaved changes"
+                                    aria-label={t("chat.rules.unsaved")}
                                     className="size-1.5 rounded-full bg-primary"
                                 />
                             )}
                         </span>
                     ),
-                    title: core.CHAT_RULE_SCOPE_NOTES[entry]
+                    title: t(`chat.rules.scopes.${entry}.note`)
                 }))}
             />
 
-            <p className="text-sm text-muted-foreground">{core.CHAT_RULE_SCOPE_NOTES[scope]}</p>
+            <p className="text-sm text-muted-foreground">{t(`chat.rules.scopes.${scope}.note`)}</p>
 
             <Card>
                 {/* Keyed by scope, which is what makes the fields belong to the
@@ -99,9 +101,9 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     scope's own draft rather than losing anything. */}
                 <CardBody key={scope} className="flex flex-col gap-5 p-4">
                     <Limit
-                        label="Longest message"
-                        hint="Characters. Somebody with more to say than this has a note or a snippet."
-                        suffix="characters"
+                        label={t("chat.rules.fields.maxMessageLength.label")}
+                        hint={t("chat.rules.fields.maxMessageLength.hint")}
+                        suffix={t("chat.rules.fields.maxMessageLength.suffix")}
                         value={rules.maxMessageLength}
                         min={1}
                         max={core.MAX_CHAT_MESSAGE}
@@ -109,10 +111,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     />
 
                     <Limit
-                        label="Messages a minute"
-                        hint="Per person, per conversation. Thirty stops a flood without ever meeting somebody typing. Zero for as many as they can type."
-                        suffix="a minute"
-                        zeroLabel="No limit."
+                        label={t("chat.rules.fields.maxPerMinute.label")}
+                        hint={t("chat.rules.fields.maxPerMinute.hint")}
+                        suffix={t("chat.rules.fields.maxPerMinute.suffix")}
+                        zeroLabel={t("chat.rules.noLimit")}
                         value={rules.maxPerMinute}
                         min={0}
                         max={core.CHAT_RATE_CEILING}
@@ -121,16 +123,16 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
 
                     <div className="flex flex-col gap-4 rounded-md border border-border p-3">
                         <Toggle
-                            label="Spam protection"
-                            hint="Limits loose enough that nobody talking normally meets them, there to stop clear abuse: the whole room pinged again and again, one person mentioned over and over, the same line pasted repeatedly. Each counts one person in one conversation; zero turns a single limit off."
+                            label={t("chat.rules.fields.spamGuard.label")}
+                            hint={t("chat.rules.fields.spamGuard.hint")}
                             checked={rules.spamGuard}
                             onChange={(value) => set("spamGuard", value)}
                         />
                         <Limit
-                            label="@everyone and @here"
-                            hint="Messages carrying either that one person may send in an hour. Whoever moderates the room is not held by it."
-                            suffix="an hour"
-                            zeroLabel="No limit."
+                            label={t("chat.rules.fields.maxRoomMentionsPerHour.label")}
+                            hint={t("chat.rules.fields.maxRoomMentionsPerHour.hint")}
+                            suffix={t("chat.rules.fields.maxRoomMentionsPerHour.suffix")}
+                            zeroLabel={t("chat.rules.noLimit")}
                             value={rules.maxRoomMentionsPerHour}
                             min={0}
                             max={core.CHAT_SPAM_CEILINGS.roomMentionsPerHour}
@@ -138,10 +140,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             onChange={(value) => set("maxRoomMentionsPerHour", value)}
                         />
                         <Limit
-                            label="People mentioned in one message"
-                            hint="Different people or teams one message may mention."
-                            suffix="people"
-                            zeroLabel="No limit."
+                            label={t("chat.rules.fields.maxMentionsPerMessage.label")}
+                            hint={t("chat.rules.fields.maxMentionsPerMessage.hint")}
+                            suffix={t("chat.rules.fields.maxMentionsPerMessage.suffix")}
+                            zeroLabel={t("chat.rules.noLimit")}
                             value={rules.maxMentionsPerMessage}
                             min={0}
                             max={core.CHAT_SPAM_CEILINGS.mentionsPerMessage}
@@ -149,10 +151,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             onChange={(value) => set("maxMentionsPerMessage", value)}
                         />
                         <Limit
-                            label="Mentioning the same person"
-                            hint="Messages mentioning the same person that one account may send in ten minutes."
-                            suffix="in 10 minutes"
-                            zeroLabel="No limit."
+                            label={t("chat.rules.fields.maxSamePersonMentions.label")}
+                            hint={t("chat.rules.fields.maxSamePersonMentions.hint")}
+                            suffix={t("chat.rules.fields.maxSamePersonMentions.suffix")}
+                            zeroLabel={t("chat.rules.noLimit")}
                             value={rules.maxSamePersonMentions}
                             min={0}
                             max={core.CHAT_SPAM_CEILINGS.samePersonMentions}
@@ -160,10 +162,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             onChange={(value) => set("maxSamePersonMentions", value)}
                         />
                         <Limit
-                            label="The same message again"
-                            hint="How many times the very same message may be sent in two minutes."
-                            suffix="in 2 minutes"
-                            zeroLabel="No limit."
+                            label={t("chat.rules.fields.maxRepeatedMessages.label")}
+                            hint={t("chat.rules.fields.maxRepeatedMessages.hint")}
+                            suffix={t("chat.rules.fields.maxRepeatedMessages.suffix")}
+                            zeroLabel={t("chat.rules.noLimit")}
                             value={rules.maxRepeatedMessages}
                             min={0}
                             max={core.CHAT_SPAM_CEILINGS.repeatedMessages}
@@ -173,10 +175,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     </div>
 
                     <Limit
-                        label="Files on one message"
-                        hint="Zero stops files being sent in this kind of conversation at all."
-                        suffix="files"
-                        zeroLabel="Files cannot be sent here."
+                        label={t("chat.rules.fields.maxAttachments.label")}
+                        hint={t("chat.rules.fields.maxAttachments.hint")}
+                        suffix={t("chat.rules.fields.maxAttachments.suffix")}
+                        zeroLabel={t("chat.rules.fields.maxAttachments.zero")}
                         value={rules.maxAttachments}
                         min={0}
                         max={core.CHAT_ATTACHMENT_COUNT_CEILING}
@@ -189,29 +191,26 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             rules.maxAttachments === 0 && "opacity-50"
                         )}
                     >
-                        <span className="text-sm font-medium">Biggest single file</span>
+                        <span className="text-sm font-medium">{t("chat.rules.fields.maxAttachmentMib.label")}</span>
                         <SizeField
                             value={rules.maxAttachmentMib}
                             stored="MB"
                             min={1}
                             max={core.CHAT_ATTACHMENT_CEILING_MIB}
                             disabled={rules.maxAttachments === 0}
-                            aria-label="Biggest single file"
+                            aria-label={t("chat.rules.fields.maxAttachmentMib.label")}
                             onChange={(value) => set("maxAttachmentMib", value)}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A file this big is streamed straight to the storage Polaris writes
-                            uploads to, so what this really sets is how much of your disks one
-                            message may take. Somebody sharing a file they already have in Drive is
-                            not bound by it at all when this instance shares by link.
+                            {t("chat.rules.fields.maxAttachmentMib.hint")}
                         </span>
                     </label>
 
                     <Limit
-                        label="How long a message stays editable"
-                        hint="Minutes after it was sent. Zero means always, which is what people expect. It covers deleting too, and never binds somebody moderating the room."
-                        suffix="minutes"
-                        zeroLabel="Always editable."
+                        label={t("chat.rules.fields.editWindowMinutes.label")}
+                        hint={t("chat.rules.fields.editWindowMinutes.hint")}
+                        suffix={t("chat.rules.fields.editWindowMinutes.suffix")}
+                        zeroLabel={t("chat.rules.fields.editWindowMinutes.zero")}
                         value={rules.editWindowMinutes}
                         min={0}
                         max={core.CHAT_EDIT_WINDOW_CEILING_MINUTES}
@@ -219,15 +218,15 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     />
 
                     <Toggle
-                        label="Deleting leaves a line saying so"
-                        hint="On, a deleted message reads 'This message was deleted' and replies under it still make sense. Off, the message and its files go without trace - except for one that has replies hanging off it, which would take them with it."
+                        label={t("chat.rules.fields.deleteLeavesTrace.label")}
+                        hint={t("chat.rules.fields.deleteLeavesTrace.hint")}
                         checked={rules.deleteLeavesTrace}
                         onChange={(value) => set("deleteLeavesTrace", value)}
                     />
 
                     <Toggle
-                        label="Keep what a message said before it was edited"
-                        hint="On, '(edited)' opens the earlier versions for anybody who can read the message. Off, no earlier version is recorded from then on."
+                        label={t("chat.rules.fields.keepEditHistory.label")}
+                        hint={t("chat.rules.fields.keepEditHistory.hint")}
                         checked={rules.keepEditHistory}
                         onChange={(value) => set("keepEditHistory", value)}
                     />
@@ -241,9 +240,9 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                     <div className="flex items-center gap-3">
                         <Button onClick={() => void save()} disabled={!dirty || saving}>
                             {saving && <Loader2 className="size-4 animate-spin" />}
-                            Save {core.CHAT_RULE_SCOPE_LABELS[scope].toLowerCase()}
+                            {t(`chat.rules.scopes.${scope}.save`)}
                         </Button>
-                        {!dirty && <span className="text-xs text-muted-foreground">Saved.</span>}
+                        {!dirty && <span className="text-xs text-muted-foreground">{t("chat.rules.saved")}</span>}
                     </div>
                 </CardBody>
             </Card>
@@ -280,6 +279,7 @@ function Limit({
     disabled?: boolean;
     onChange: (value: number) => void;
 }) {
+    const t = useTranslations("admin");
     const [text, setText] = useState(String(value));
     const typed = Number(text);
     const valid = Number.isInteger(typed) && typed >= min && typed <= max;
@@ -308,7 +308,7 @@ function Limit({
                 )}
             </div>
             <span className={cn("text-xs", valid ? "text-muted-foreground" : "text-danger")}>
-                {valid ? hint : `A whole number between ${min} and ${max}.`}
+                {valid ? hint : t("chat.rules.range", { min: String(min), max: String(max) })}
             </span>
         </label>
     );

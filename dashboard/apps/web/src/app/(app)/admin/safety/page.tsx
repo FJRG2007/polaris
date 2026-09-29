@@ -17,6 +17,7 @@ import { SafetyView } from "./safety-view";
 import { requireAdmin } from "@/lib/session";
 import { listReports } from "@/lib/chat/reports";
 import { listSafetyCases } from "@/lib/safety-queue";
+import { getTranslations } from "@/lib/i18n/request";
 import type { ChatReportStatus, SafetyCaseStatus } from "@polaris/core";
 import { CHAT_REPORT_STATUSES, SAFETY_CASE_STATUSES } from "@polaris/core";
 
@@ -49,16 +50,17 @@ export default async function SafetyPage({
     await requireAdmin();
     const status = (await searchParams).status;
     const wanted = statusFrom(status);
-    const [cases, reports] = await Promise.all([
+    const [cases, reports, t] = await Promise.all([
         listSafetyCases(wanted.cases),
-        listReports(wanted.reports)
+        listReports(wanted.reports),
+        getTranslations("admin")
     ]);
 
     return (
         <>
             <PageHeader
-                title="Safety"
-                description="Everything this instance has been asked to look at: accounts that have locked themselves down, people who have been reported, and messages somebody objected to."
+                title={t("safety.page.title")}
+                description={t("safety.page.description")}
             />
             <SafetyView
                 cases={cases}

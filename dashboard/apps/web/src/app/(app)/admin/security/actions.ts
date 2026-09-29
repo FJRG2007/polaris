@@ -10,6 +10,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { instanceSecuritySchema } from "@polaris/core";
 import { setInstanceSecurity } from "@/lib/instance-security";
@@ -20,7 +21,7 @@ export async function saveInstanceSecurityAction(
 ): Promise<{ error?: string; ok?: string }> {
     const admin = await requireAdmin();
     const parsed = instanceSecuritySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("security.errors.checkForm") };
 
     await setInstanceSecurity(parsed.data);
     await recordAudit({
@@ -33,13 +34,13 @@ export async function saveInstanceSecurityAction(
         }
     });
     revalidatePath("/admin/security");
-    return { ok: "Saved." };
+    return { ok: (await getTranslations("admin"))("security.saved") };
 }
 
 /** Whether the people running a game server are shown where other accounts sign in from. */
 export async function savePlayerAddressesSharedAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (typeof input !== "boolean") return { error: "Choose on or off." };
+    if (typeof input !== "boolean") return { error: (await getTranslations("admin"))("security.errors.onOrOff") };
     await setPlayerAddressesShared(input);
     await recordAudit({
         actorId: admin.id,

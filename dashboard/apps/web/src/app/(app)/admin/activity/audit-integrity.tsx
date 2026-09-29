@@ -9,19 +9,20 @@
  * the button is for needing the answer now.
  */
 
-import * as core from "@polaris/core";
 import { useTransition } from "react";
 import { verifyAuditChainAction } from "./actions";
 import type { ChainStatus } from "@/lib/audit-chain";
 import { Button, Skeleton, useToast } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Copy, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 
 /** Re-read gently: the backlog shrinks over minutes, not seconds. */
 const POLL_MS = 60_000;
 
 export function AuditIntegrity() {
+    const t = useTranslations("admin");
     const format = useDisplayFormat();
     const toast = useToast();
     const [checking, startChecking] = useTransition();
@@ -36,8 +37,10 @@ export function AuditIntegrity() {
         startChecking(async () => {
             const outcome = await verifyAuditChainAction();
             if (outcome.error) toast.show({ title: outcome.error });
-            else if (outcome.result?.ok) toast.show({ title: `Chain intact across ${outcome.result.checked} entries.` });
-            else toast.show({ title: "The chain is broken. The panel says where." });
+            else if (outcome.result?.ok) {
+                const checked = outcome.result.checked;
+                toast.show({ title: t("activity.integrity.intact", { count: checked, shown: String(checked) }) });
+            } else toast.show({ title: t("activity.integrity.brokenToast") });
             refresh();
         });
 
@@ -61,21 +64,34 @@ export function AuditIntegrity() {
             <div className="min-w-0 flex-1">
                 {broken ? (
                     <p className="font-medium text-danger">
-                        {core.AUDIT_CHAIN_BREAK_LABELS[broken.reason]} at entry {broken.seq}
-                        {broken.entryAt ? `, recorded ${format.dateTime(broken.entryAt)}` : ""}.
+                        {t("activity.integrity.broken", {
+                            reason: broken.reason,
+                            seq: String(broken.seq),
+                            recorded: broken.entryAt ? "yes" : "no",
+                            at: broken.entryAt ? format.dateTime(broken.entryAt) : ""
+                        })}
                     </p>
                 ) : (
                     <p>
-                        {data.sealed} entries sealed
-                        {data.pending > 0 ? `, ${data.pending} waiting to be` : ""}.{" "}
+                        {t("activity.integrity.sealed", {
+                            sealed: data.sealed,
+                            sealedShown: String(data.sealed),
+                            waiting: data.pending > 0 ? "yes" : "no",
+                            pending: String(data.pending)
+                        })}{" "}
                         <span className="text-muted-foreground">
-                            {last ? `Last checked ${format.dateTime(last.at)}.` : "Not checked yet."}
+                            {last
+                                ? t("activity.integrity.lastChecked", { when: format.dateTime(last.at) })
+                                : t("activity.integrity.notChecked")}
                         </span>
                     </p>
                 )}
                 {data.head ? (
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={data.head.hash}>
-                        Head #{data.head.seq} {data.head.hash.slice(0, 16)}
+                        {t("activity.integrity.head", {
+                            seq: String(data.head.seq),
+                            hash: data.head.hash.slice(0, 16)
+                        })}
                     </p>
                 ) : null}
             </div>
@@ -83,12 +99,12 @@ export function AuditIntegrity() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Copy the chain head"
-                    title="Copy the chain head, to keep outside Polaris"
+                    aria-label={t("activity.integrity.copyLabel")}
+                    title={t("activity.integrity.copyTitle")}
                     onClick={() => {
                         void navigator.clipboard
                             .writeText(`${data.head?.seq} ${data.head?.hash}`)
-                            .then(() => toast.show({ title: "Chain head copied." }));
+                            .then(() => toast.show({ title: t("activity.integrity.copied") }));
                     }}
                 >
                     <Copy className="size-4" aria-hidden />
@@ -96,7 +112,7 @@ export function AuditIntegrity() {
             ) : null}
             <Button variant="outline" size="sm" onClick={verify} disabled={checking}>
                 {checking ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-                {checking ? "Checking" : "Check now"}
+                {checking ? t("activity.integrity.checking") : t("activity.integrity.check")}
             </Button>
         </div>
     );

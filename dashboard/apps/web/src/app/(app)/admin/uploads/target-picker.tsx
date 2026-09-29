@@ -21,20 +21,22 @@
 import { Select } from "@polaris/ui";
 import { HardDrive, Server } from "lucide-react";
 import type { TargetOption, UploadTarget } from "@/lib/storage-target";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export const AUTOMATIC = "auto";
 export const LOCAL = "local";
 
 /** Where this kind of upload is going right now, and why. */
 export function ResolvedTarget({ resolved, automatic }: { resolved: UploadTarget; automatic: string }) {
+    const t = useTranslations("admin");
     return (
         <div className="flex items-center gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                 {resolved.id === LOCAL ? <Server className="size-5" /> : <HardDrive className="size-5" />}
             </span>
             <div className="min-w-0">
-                <p className="text-sm font-medium">Kept on {resolved.name}</p>
-                <p className="text-xs text-muted-foreground">{resolved.automatic ? automatic : "Chosen here."}</p>
+                <p className="text-sm font-medium">{t("uploads.picker.keptOn", { name: resolved.name })}</p>
+                <p className="text-xs text-muted-foreground">{resolved.automatic ? automatic : t("uploads.picker.chosenHere")}</p>
             </div>
         </div>
     );
@@ -60,6 +62,7 @@ export function TargetPicker({
      *  can defer to another kind rather than answer for itself. */
     lead?: { value: string; label: string };
 }) {
+    const t = useTranslations("admin");
     return (
         <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">{label}</span>
@@ -68,11 +71,11 @@ export function TargetPicker({
                 onValueChange={onChange}
                 options={[
                     ...(lead ? [lead] : []),
-                    { value: AUTOMATIC, label: `Choose for me (${resolvedName})` },
-                    { value: LOCAL, label: "This server" },
+                    { value: AUTOMATIC, label: t("uploads.picker.automatic", { name: resolvedName }) },
+                    { value: LOCAL, label: t("uploads.picker.local") },
                     ...options.map((connection) => ({
                         value: connection.id,
-                        label: `${connection.name} (${connection.kind})`
+                        label: t("uploads.picker.connection", { name: connection.name, kind: connection.kind })
                     }))
                 ]}
                 aria-label={label}

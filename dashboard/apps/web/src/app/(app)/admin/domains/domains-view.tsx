@@ -29,6 +29,8 @@ import { DnsRecordsCard } from "./dns-records-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
 import { PageSection } from "@/components/page-section";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DomainConfig } from "@/lib/domain-service";
 import type { CheckedAddress } from "@/lib/address-health";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -69,6 +71,7 @@ const CACHE_KEY = "admin.domainsOverview";
 type SetupState = Pick<DomainsOverview, "config" | "zones">;
 
 export function DomainsView() {
+    const t = useTranslations("admin");
     const [overview, setOverview] = useState<DomainsOverview | null>(null);
     // Why there is nothing to draw, when that is the answer. Kept apart from the data
     // so a failed refresh does not blank what is already on screen, and shown rather
@@ -125,7 +128,7 @@ export function DomainsView() {
                 <div className="flex flex-col items-start gap-2">
                     <ErrorNote message={unread} />
                     <Button size="sm" variant="secondary" onClick={() => void load()}>
-                        <RefreshCw className="size-4" /> Try again
+                        <RefreshCw className="size-4" /> {t("domains.tryAgain")}
                     </Button>
                 </div>
             ) : null}
@@ -146,7 +149,7 @@ export function DomainsView() {
                     onSaved={(config) => apply({ config })}
                 />
             ) : (
-                <PendingCard title="Polaris's own addresses">
+                <PendingCard title={t("domains.own.title")}>
                     <FieldSkeleton />
                     <FieldSkeleton />
                 </PendingCard>
@@ -160,7 +163,7 @@ export function DomainsView() {
                     onAddresses={(addresses) => apply({ addresses })}
                 />
             ) : (
-                <PendingCard title="Where Polaris answers" wide>
+                <PendingCard title={t("domains.answers.title")} wide>
                     <AddressesSkeleton />
                     <div className="max-w-2xl">
                         <FieldSkeleton />
@@ -180,7 +183,7 @@ export function DomainsView() {
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                     {advanced ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                    Advanced: exposure mode and DuckDNS
+                    {t("domains.advancedToggle")}
                 </button>
                 {advanced && (
                     <>
@@ -188,6 +191,7 @@ export function DomainsView() {
                         {overview ? (
                             <DuckDns config={overview.config} onConfig={(config) => apply({ config })} />
                         ) : (
+                            // i18n-ignore: a brand name
                             <PendingCard title="DuckDNS">
                                 <FieldSkeleton />
                                 <FieldSkeleton />
@@ -217,7 +221,7 @@ export function DomainsView() {
                     onSaved={(ownerPolicy) => apply({ ownerPolicy })}
                 />
             ) : (
-                <PendingCard title="Domains of their own">
+                <PendingCard title={t("domains.owner.title")}>
                     <div className="flex flex-col gap-1.5">
                         <Skeleton className="h-3.5 w-full" />
                         <Skeleton className="h-3.5 w-4/5" />
@@ -320,6 +324,8 @@ function AppDomains({
     effectiveAppUrl: string;
     onSaved: (next: DomainConfig) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     // The guided setup moves the dashboard onto the Polaris zone once it resolves, so
     // the app domain can change without this card being touched.
     const appDomain = useStoredField(config.appDomain);
@@ -346,16 +352,16 @@ function AppDomains({
             sharingDomain.adopt(result.config.sharingDomain);
             setSaved(true);
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not save the domains");
+            setError(caught instanceof Error ? caught.message : t("domains.own.saveFailed"));
         } finally {
             setSaving(false);
         }
     }
 
     return (
-        <PageSection title="Polaris's own addresses">
+        <PageSection title={t("domains.own.title")}>
             <label className="flex flex-col gap-1 text-sm">
-                App domain
+                {t("domains.own.appDomain")}
                 <Input
                     value={appDomain.value}
                     onChange={(event) => appDomain.setValue(event.target.value)}
@@ -363,8 +369,7 @@ function AppDomains({
                     autoComplete="off"
                 />
                 <span className="text-xs text-muted-foreground">
-                    The dashboard&apos;s stable address. Leave empty to use the deployment default (
-                    {effectiveAppUrl}).
+                    {t("domains.own.appDomainHint", { url: effectiveAppUrl })}
                 </span>
                 <Suggestion value={appDomain.value} suggestion={suggestions.app} onUse={appDomain.setValue} />
             </label>
@@ -372,7 +377,7 @@ function AppDomains({
             <label className="flex flex-col gap-1 text-sm">
                 <span className="flex items-center gap-1.5">
                     <Link2 className="size-3.5 text-muted-foreground" />
-                    Sharing domain
+                    {t("domains.own.sharingDomain")}
                 </span>
                 <Input
                     value={sharingDomain.value}
@@ -380,11 +385,7 @@ function AppDomains({
                     placeholder={suggestions.sharing ?? "share.example.com"}
                     autoComplete="off"
                 />
-                <span className="text-xs text-muted-foreground">
-                    Used for the links Polaris hands out (share links and drop points). Point a throwaway free
-                    subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app
-                    domain.
-                </span>
+                <span className="text-xs text-muted-foreground">{t("domains.own.sharingDomainHint")}</span>
                 <Suggestion
                     value={sharingDomain.value}
                     suggestion={suggestions.sharing}
@@ -395,9 +396,9 @@ function AppDomains({
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
                 <Button onClick={save} disabled={saving || !changed}>
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
             </div>
         </PageSection>
@@ -429,6 +430,7 @@ function DashboardDomains({
     onConfig: (next: DomainConfig) => void;
     onAddresses: (next: CheckedAddress[]) => void;
 }) {
+    const t = useTranslations("admin");
     const [draft, setDraft] = useState("");
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -452,18 +454,18 @@ function DashboardDomains({
             setDraft("");
             onAddresses(await deploymentAddressesAction());
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not add the domain");
+            setError(caught instanceof Error ? caught.message : t("domains.answers.addFailed"));
         } finally {
             setAdding(false);
         }
     }
 
     return (
-        <PageSection title="Where Polaris answers" wide>
+        <PageSection title={t("domains.answers.title")} wide>
             <AddressList addresses={addresses} onChanged={onAddresses} />
 
             <div className="flex max-w-2xl flex-col gap-1 text-sm">
-                Add a domain
+                {t("domains.answers.addLabel")}
                 <div className="flex gap-2">
                     <Input
                         value={draft}
@@ -476,17 +478,14 @@ function DashboardDomains({
                         aria-invalid={draft.trim() !== "" && !valid}
                     />
                     <Button onClick={() => void add()} disabled={adding || !valid || known}>
-                        {adding ? <Loader2 className="size-4 animate-spin" /> : null} Add
+                        {adding ? <Loader2 className="size-4 animate-spin" /> : null} {t("domains.answers.add")}
                     </Button>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                    Point the name at this server first. Polaris then routes it, orders a certificate for it, and
-                    accepts sign-ins on it.
-                </span>
+                <span className="text-xs text-muted-foreground">{t("domains.answers.addHint")}</span>
                 {draft.trim() !== "" && !valid ? (
-                    <span className="text-xs text-danger">That is not a domain name.</span>
+                    <span className="text-xs text-danger">{t("domains.answers.notADomain")}</span>
                 ) : null}
-                {known ? <span className="text-xs text-muted-foreground">Already on the list.</span> : null}
+                {known ? <span className="text-xs text-muted-foreground">{t("domains.answers.known")}</span> : null}
             </div>
 
             {error ? <ErrorNote message={error} /> : null}
@@ -509,6 +508,7 @@ function Suggestion({
     suggestion: string | null;
     onUse: (next: string) => void;
 }) {
+    const t = useTranslations("admin");
     if (!suggestion || value.trim()) return null;
     return (
         <button
@@ -516,7 +516,7 @@ function Suggestion({
             onClick={() => onUse(suggestion)}
             className="w-fit text-xs text-primary underline-offset-2 hover:underline"
         >
-            Use {suggestion}
+            {t("domains.own.use", { suggestion })}
         </button>
     );
 }
@@ -536,19 +536,15 @@ function ErrorNote({ message }: { message: string }) {
 
 /** The root certificate that makes the LAN hostname trusted, once, per device. */
 function LocalCertificate() {
+    const t = useTranslations("admin");
     return (
-        <PageSection title="Trust this device (polaris.local)">
-            <p className="text-xs text-muted-foreground">
-                LAN hostnames can&apos;t get a public certificate, so Polaris signs its own. Install this root
-                certificate on your devices once to make <code>https://polaris.local</code> trusted with no browser
-                warning. macOS/iOS: open it and trust it in Keychain / Profiles. Windows: import into &quot;Trusted
-                Root Certification Authorities&quot;. Firefox: import under Authorities.
-            </p>
+        <PageSection title={t("domains.certificate.title")}>
+            <p className="text-xs text-muted-foreground">{t.rich("domains.certificate.body", { code })}</p>
             <a
                 href="/api/system/local-ca"
                 className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
             >
-                <Download className="size-3.5" /> Download root certificate
+                <Download className="size-3.5" /> {t("domains.certificate.download")}
             </a>
         </PageSection>
     );
@@ -560,6 +556,8 @@ function LocalCertificate() {
  * or who only wants to replace the token - edits it.
  */
 function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: DomainConfig) => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     // The guided setup asks for the same subdomain, so a save there has to land here
     // rather than leaving this card claiming the field is empty.
     const duckSub = useStoredField(config.duckdnsSubdomain);
@@ -587,7 +585,7 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
             setDuckToken("");
             setSaved(true);
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not save the DuckDNS settings");
+            setError(caught instanceof Error ? caught.message : t("domains.duckdns.saveFailed"));
         } finally {
             setSaving(false);
         }
@@ -599,7 +597,7 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
         try {
             setSyncResult(await syncDuckDnsAction());
         } catch (caught) {
-            setSyncResult({ ok: false, detail: caught instanceof Error ? caught.message : "Could not reach DuckDNS" });
+            setSyncResult({ ok: false, detail: caught instanceof Error ? caught.message : t("domains.duckdns.syncFailed") });
         } finally {
             setSyncing(false);
         }
@@ -611,7 +609,7 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
             const result = await clearDuckdnsTokenAction();
             onConfig(result.config);
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not remove the stored token");
+            setError(caught instanceof Error ? caught.message : t("domains.duckdns.removeFailed"));
         }
     }
 
@@ -619,42 +617,41 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
         <PageSection
             title={
                 <>
+                    {/* i18n-ignore: a brand name */}
                     DuckDNS
-                    {config.hasDuckdnsToken ? <Badge variant="success">Configured</Badge> : null}
+                    {config.hasDuckdnsToken ? <Badge variant="success">{t("domains.duckdns.configured")}</Badge> : null}
                 </>
             }
             actions={
                 <Button size="sm" variant="secondary" onClick={sync} disabled={syncing || !config.hasDuckdnsToken}>
                     <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} />
-                    {syncing ? "Syncing..." : "Sync IP now"}
+                    {syncing ? t("domains.duckdns.syncing") : t("domains.duckdns.sync")}
                 </Button>
             }
         >
             <p className="text-xs text-muted-foreground">
-                Free dynamic DNS. Polaris keeps your DuckDNS record pointed at this host&apos;s current public IP,
-                auto-synced every few minutes. Use <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base in the
-                guided setup (DuckDNS resolves <code>*.&lt;sub&gt;.duckdns.org</code> too) for free public
-                subdomains with Let&apos;s Encrypt.
+                {t.rich("domains.duckdns.description", {
+                    base: <code key="base">{DUCKDNS_BASE}</code>,
+                    wildcard: <code key="wildcard">*.{DUCKDNS_BASE}</code>
+                })}
             </p>
             <label className="flex flex-col gap-1 text-sm">
-                Subdomain
+                {t("domains.duckdns.subdomain")}
                 <Input
                     value={duckSub.value}
                     onChange={(event) => duckSub.setValue(event.target.value)}
                     placeholder="mypolaris"
                     autoComplete="off"
                 />
-                <span className="text-xs text-muted-foreground">
-                    The part before <code>.duckdns.org</code>.
-                </span>
+                <span className="text-xs text-muted-foreground">{t.rich("domains.duckdns.subdomainHint", { code })}</span>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-                Token
+                {t("domains.duckdns.token")}
                 <Input
                     type="password"
                     value={duckToken}
                     onChange={(event) => setDuckToken(event.target.value)}
-                    placeholder={config.hasDuckdnsToken ? "Saved - enter a new token to replace it" : "DuckDNS token"}
+                    placeholder={config.hasDuckdnsToken ? t("domains.duckdns.tokenSaved") : t("domains.duckdns.tokenPlaceholder")}
                     autoComplete="off"
                 />
             </label>
@@ -664,34 +661,35 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                     onClick={clearToken}
                     className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                 >
-                    Remove stored token
+                    {t("domains.duckdns.removeToken")}
                 </button>
             ) : null}
             {syncResult ? (
                 <p className={`flex items-center gap-1.5 text-sm ${syncResult.ok ? "text-success" : "text-danger"}`}>
                     {syncResult.ok ? <CheckCircle2 className="size-4" /> : <TriangleAlert className="size-4" />}
-                    {syncResult.ok ? "DuckDNS updated." : syncResult.detail}
+                    {syncResult.ok ? t("domains.duckdns.updated") : syncResult.detail}
                 </p>
             ) : null}
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
                 <Button onClick={save} disabled={saving || !changed}>
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
             </div>
         </PageSection>
     );
 }
 
-const MODE_OPTIONS = [
-    { value: "auto", label: "Automatic (detect)" },
-    { value: "lan", label: "LAN only" },
-    { value: "public", label: "Public IP (direct)" },
-    { value: "wildcard", label: "Custom wildcard domain" },
-    { value: "tunnel", label: "Cloudflare / ngrok tunnel" }
-];
+/** The DuckDNS name as the help writes it: a placeholder, not a hostname. */
+const DUCKDNS_BASE = "<sub>.duckdns.org";
+
+const MODES: readonly NetworkMode[] = ["auto", "lan", "public", "wildcard", "tunnel"];
+
+function modeOptions(t: NamespaceTranslator<"admin">) {
+    return MODES.map((value) => ({ value, label: t(`domains.network.modes.${value}`) }));
+}
 
 /**
  * Network topology + exposure control: the manual view behind the guided setup.
@@ -701,6 +699,8 @@ const MODE_OPTIONS = [
  * worked everywhere.
  */
 function NetworkExposure({ nonce }: { nonce: number }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [status, setStatus] = useState<NetworkStatus | null>(null);
     const [mode, setMode] = useState<NetworkMode>("auto");
     const [wildcard, setWildcard] = useState("");
@@ -733,7 +733,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 setWildcard((current) => (current === previous.wildcard ? next.wildcardDomain : current));
             })
             .catch((caught: unknown) => {
-                setError(caught instanceof Error ? caught.message : "Could not read the network status");
+                setError(caught instanceof Error ? caught.message : t("domains.network.readFailed"));
             })
             .finally(() => setLoading(false));
     }
@@ -748,7 +748,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         try {
             setStatus(await networkStatusAction(true));
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not re-detect the network");
+            setError(caught instanceof Error ? caught.message : t("domains.network.redetectFailed"));
         } finally {
             setBusy(false);
         }
@@ -772,7 +772,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             setWildcard(next.wildcardDomain);
             setSaved(true);
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not save the exposure mode");
+            setError(caught instanceof Error ? caught.message : t("domains.network.saveFailed"));
         } finally {
             setBusy(false);
         }
@@ -780,7 +780,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
     if (loading) {
         return (
-            <PendingCard title="Network & exposure">
+            <PendingCard title={t("domains.network.title")}>
                 {/* The six facts it reports, in the grid they land in. */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3">
                     {[0, 1, 2, 3, 4, 5].map((row) => (
@@ -797,10 +797,10 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
     if (!status) {
         return (
-            <PageSection title="Network & exposure">
-                <ErrorNote message={error ?? "Could not read the network status"} />
+            <PageSection title={t("domains.network.title")}>
+                <ErrorNote message={error ?? t("domains.network.readFailed")} />
                 <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
-                    <RefreshCw className="size-4" /> Try again
+                    <RefreshCw className="size-4" /> {t("domains.tryAgain")}
                 </Button>
             </PageSection>
         );
@@ -816,50 +816,72 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
     return (
         <PageSection
-            title="Network & exposure"
+            title={t("domains.network.title")}
             actions={
                 <Button size="sm" variant="secondary" onClick={redetect} disabled={busy}>
-                    <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} /> Re-detect
+                    <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} /> {t("domains.network.redetect")}
                 </Button>
             }
         >
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3 text-xs">
                 <StatusRow
-                    label="Hosting"
-                    value={status.placement === "cloud" ? "Cloud / data center" : status.placement === "home" ? "Home / local" : "Unknown"}
+                    label={t("domains.network.status.hosting")}
+                    value={
+                        status.placement === "cloud"
+                            ? t("domains.network.status.cloud")
+                            : status.placement === "home"
+                              ? t("domains.network.status.home")
+                              : t("domains.network.status.unknownPlacement")
+                    }
                 />
-                <StatusRow label="Public IP" value={status.publicIp ?? "not detected"} />
-                <StatusRow label="Server IP" value={status.subdomainIp ?? "unknown"} />
-                <StatusRow label="Behind NAT" value={status.natted ? "Yes" : "No"} tone={status.natted ? "warn" : "ok"} />
-                <StatusRow label="Active mode" value={effective} tone={publiclyReachable ? "ok" : "warn"} />
-                <StatusRow label="DuckDNS" value={status.duckdns ? "Configured" : "Not set"} tone={status.duckdns ? "ok" : undefined} />
+                <StatusRow
+                    label={t("domains.network.status.publicIp")}
+                    value={status.publicIp ?? t("domains.network.status.notDetected")}
+                />
+                <StatusRow
+                    label={t("domains.network.status.serverIp")}
+                    value={status.subdomainIp ?? t("domains.network.status.unknown")}
+                />
+                <StatusRow
+                    label={t("domains.network.status.behindNat")}
+                    value={status.natted ? t("domains.network.status.yes") : t("domains.network.status.no")}
+                    tone={status.natted ? "warn" : "ok"}
+                />
+                <StatusRow
+                    label={t("domains.network.status.activeMode")}
+                    value={effective}
+                    tone={publiclyReachable ? "ok" : "warn"}
+                />
+                <StatusRow
+                    // i18n-ignore: a brand name
+                    label="DuckDNS"
+                    value={status.duckdns ? t("domains.network.status.configured") : t("domains.network.status.notSet")}
+                    tone={status.duckdns ? "ok" : undefined}
+                />
             </div>
 
             {status.natted && status.mode === "auto" && (
                 <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                    This looks like a server behind NAT: free subdomains point at the LAN IP ({status.subdomainIp}) and
-                    only work on your network. For public access, choose a wildcard domain or a tunnel below.
+                    {t("domains.network.natWarning", { ip: status.subdomainIp ?? "" })}
                 </p>
             )}
 
             {status.placement === "home" && !status.duckdns && status.effectiveMode !== "wildcard" && (
                 <p className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                    Recommended for a home/local server: set up <b>DuckDNS</b> below (free) and use{" "}
-                    <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base - Polaris then serves public subdomains
-                    with Let&apos;s Encrypt and keeps the IP updated automatically.
+                    <span>{t.rich("domains.network.homeAdvice", { base: DUCKDNS_BASE, b: bold, code })}</span>
                 </p>
             )}
 
             <label className="flex flex-col gap-1 text-sm">
-                Exposure mode
-                <Select value={mode} onValueChange={(value) => setMode(value as NetworkMode)} options={MODE_OPTIONS} />
+                {t("domains.network.exposureMode")}
+                <Select value={mode} onValueChange={(value) => setMode(value as NetworkMode)} options={modeOptions(t)} />
             </label>
 
             {mode === "wildcard" && (
                 <label className="flex flex-col gap-1 text-sm">
-                    Wildcard base domain
+                    {t("domains.network.wildcardBase")}
                     <Input
                         value={wildcard}
                         onChange={(event) => setWildcard(event.target.value)}
@@ -868,15 +890,10 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                         disabled={status.wildcardManaged}
                     />
                     {status.wildcardManaged && (
-                        <span className="text-xs text-muted-foreground">
-                            Taken from your zone layout. Change it in the guided setup above.
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("domains.network.wildcardManaged")}</span>
                     )}
                     {status.wildcardManaged && !status.wildcardReady && (
-                        <span className="text-xs text-warning">
-                            Not in use yet: the wildcard has not been seen resolving to this server. New services
-                            keep a free subdomain until the DNS check in the guided setup passes.
-                        </span>
+                        <span className="text-xs text-warning">{t("domains.network.wildcardNotReady")}</span>
                     )}
                 </label>
             )}
@@ -886,9 +903,9 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             {error ? <ErrorNote message={error} /> : null}
 
             <div className="flex items-center justify-end gap-3">
-                {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                {saved && !changed ? <span className="text-sm text-success">{t("domains.saved")}</span> : null}
                 <Button onClick={save} disabled={busy || !changed}>
-                    {busy ? "Saving..." : "Save exposure"}
+                    {busy ? tc("actions.saving") : t("domains.network.saveExposure")}
                 </Button>
             </div>
         </PageSection>
@@ -906,65 +923,73 @@ function StatusRow({ label, value, tone }: { label: string; value: string; tone?
 }
 
 function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; mode: NetworkMode; wildcard: string }) {
+    const t = useTranslations("admin");
     const effective = mode === "auto" ? status.effectiveMode : mode;
     const base = wildcard.trim() || "apps.example.com";
 
     if (effective === "public") {
         return (
-            <GuidanceNote ok>
-                Your box is internet-reachable at {status.publicIp ?? status.subdomainIp}. Free subdomains get a real
-                Let&apos;s Encrypt certificate and work from anywhere.
-            </GuidanceNote>
+            <GuidanceNote ok>{t("domains.guidance.public", { ip: status.publicIp ?? status.subdomainIp ?? "" })}</GuidanceNote>
         );
     }
     if (effective === "wildcard") {
         return (
             <GuidanceNote>
-                <b>Point a wildcard at your server, then Polaris manages every subdomain:</b>
+                <b>{t("domains.guidance.wildcardTitle")}</b>
                 <ol className="mt-1 list-decimal space-y-1 pl-4">
                     <li>
-                        Create this record at your DNS provider:
+                        {t("domains.guidance.wildcardRecord")}
                         <DnsRecordTable
                             records={[
-                                { type: "A", name: `*.${base}`, value: status.publicIp, valueFallback: "your public IP" }
+                                {
+                                    type: "A",
+                                    name: `*.${base}`,
+                                    value: status.publicIp,
+                                    valueFallback: t("domains.guidance.yourPublicIp")
+                                }
                             ]}
                             className="mt-1.5"
                         />
                     </li>
                     <li>
-                        Forward ports <code>80</code> and <code>443</code> on your router to this server
-                        {status.subdomainIp ? ` (${status.subdomainIp})` : ""}.
+                        {status.subdomainIp
+                            ? t.rich("domains.guidance.wildcardForwardIp", { ip: status.subdomainIp, code })
+                            : t.rich("domains.guidance.wildcardForward", { code })}
                     </li>
-                    <li>
-                        Save. New services get <code>&lt;app&gt;.{base}</code> with an automatic Let&apos;s Encrypt
-                        certificate.
-                    </li>
+                    <li>{t.rich("domains.guidance.wildcardSave", { host: `<app>.${base}`, code })}</li>
                 </ol>
-                <p className="mt-2">
-                    No domain? Use a free <b>DuckDNS</b> subdomain (<code>&lt;sub&gt;.duckdns.org</code>) as the base -
-                    Polaris keeps its IP updated automatically. Set the token in the DuckDNS card below.
-                </p>
+                <p className="mt-2">{t.rich("domains.guidance.wildcardNoDomain", { base: DUCKDNS_BASE, b: bold, code })}</p>
             </GuidanceNote>
         );
     }
     if (effective === "tunnel") {
         return (
             <GuidanceNote>
-                Public access runs through a Cloudflare/ngrok tunnel - no open ports or public IP needed. Set one up in{" "}
-                <a className="text-primary hover:underline" href="/admin/integrations">
-                    Integrations
-                </a>
-                , or use the per-service <b>Public tunnel</b> button. Auto subdomains stay LAN-only.
+                {t.rich("domains.guidance.tunnel", {
+                    link: (chunks) => (
+                        <a key="link" className="text-primary hover:underline" href="/admin/integrations">
+                            {chunks}
+                        </a>
+                    ),
+                    b: bold
+                })}
             </GuidanceNote>
         );
     }
     return (
         <GuidanceNote>
-            Free subdomains resolve to your LAN IP ({status.subdomainIp ?? "unknown"}) and work only on your local
-            network, served with the internal CA (a one-time browser warning). Pick a wildcard domain or a tunnel to
-            expose services publicly.
+            {t("domains.guidance.lan", { ip: status.subdomainIp ?? t("domains.network.status.unknown") })}
         </GuidanceNote>
     );
+}
+
+/** The `<code>` and `<b>` tags in a translated sentence. */
+function code(chunks: ReactNode[]) {
+    return <code key="code">{chunks}</code>;
+}
+
+function bold(chunks: ReactNode[]) {
+    return <b key="b">{chunks}</b>;
 }
 
 function GuidanceNote({ children, ok }: { children: ReactNode; ok?: boolean }) {

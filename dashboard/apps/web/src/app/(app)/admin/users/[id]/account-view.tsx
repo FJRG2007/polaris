@@ -20,13 +20,14 @@
 
 import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
-import { BAN_LENGTHS } from "../ban-lengths";
+import { banLengthOptions } from "../ban-lengths";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Ban, Eye, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch } from "@polaris/ui";
@@ -71,6 +72,7 @@ export function AccountView({
     roles: RoleOption[];
     isSelf: boolean;
 }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const format = useDisplayFormat();
     const [confirm, confirmElement] = useConfirm();
@@ -119,10 +121,9 @@ export function AccountView({
 
     async function onDelete() {
         const ok = await confirm({
-            title: `Delete ${user.name}?`,
-            description:
-                "Their account and everything it owns - connections, deployments, shares and uploads - goes with it. This cannot be undone.",
-            confirmLabel: "Delete account",
+            title: t("users.remove.title", { name: user.name }),
+            description: t("users.remove.description"),
+            confirmLabel: t("users.remove.confirm"),
             danger: true
         });
         if (!ok) return;
@@ -138,28 +139,36 @@ export function AccountView({
             <Card>
                 <CardBody className="flex flex-col gap-5">
                     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        <Fact label="Username">{user.username ?? "-"}</Fact>
-                        <Fact label="Company">{user.company ?? "-"}</Fact>
-                        <Fact label="Joined">{format.date(user.createdAt)}</Fact>
-                        <Fact label="Email">{user.emailVerified ? "Verified" : "Unverified"}</Fact>
-                        <Fact label="Two-factor">{user.twoFactorEnabled ? "On" : "Off"}</Fact>
-                        <Fact label="Groups">{user.groups.length > 0 ? user.groups.join(", ") : "-"}</Fact>
+                        <Fact label={t("usersDetail.account.facts.username")}>{user.username ?? "-"}</Fact>
+                        <Fact label={t("usersDetail.account.facts.company")}>{user.company ?? "-"}</Fact>
+                        <Fact label={t("usersDetail.account.facts.joined")}>{format.date(user.createdAt)}</Fact>
+                        <Fact label={t("usersDetail.account.facts.email")}>
+                            {user.emailVerified
+                                ? t("usersDetail.account.facts.verified")
+                                : t("usersDetail.account.facts.unverified")}
+                        </Fact>
+                        <Fact label={t("usersDetail.account.facts.twoFactor")}>
+                            {user.twoFactorEnabled ? t("usersDetail.account.facts.on") : t("usersDetail.account.facts.off")}
+                        </Fact>
+                        <Fact label={t("usersDetail.account.facts.groups")}>
+                            {user.groups.length > 0 ? user.groups.join(", ") : "-"}
+                        </Fact>
                     </dl>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
-                        <h2 className="text-sm font-medium">Access</h2>
+                        <h2 className="text-sm font-medium">{t("usersDetail.account.access.title")}</h2>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="text-sm">Role</p>
+                                <p className="text-sm">{t("usersDetail.account.access.role")}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    What they may do across Polaris, before any policy attached to them.
+                                    {t("usersDetail.account.access.roleHint")}
                                 </p>
                             </div>
                             <Select
                                 className="w-40"
-                                aria-label={`Role for ${user.name}`}
+                                aria-label={t("usersDetail.account.access.roleLabel", { name: user.name })}
                                 value={role}
-                                placeholder="No role"
+                                placeholder={t("usersDetail.account.access.noRole")}
                                 disabled={busy}
                                 onValueChange={(next) => void run(() => setUserRoleAction(user.id, next))}
                                 options={roles.map((option) => ({ value: option.name, label: option.name }))}
@@ -169,32 +178,31 @@ export function AccountView({
                             <div className="min-w-0">
                                 <p className="flex items-center gap-1.5 text-sm">
                                     <Eye className="size-4 text-muted-foreground" />
-                                    Open their account
+                                    {t("usersDetail.account.access.openAccount")}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    Use Polaris as {user.name}, to see what they see and fix it where they are.
-                                    Nothing is signed in on their side and it is written to the activity log.
+                                    {t("usersDetail.account.access.openHint", { name: user.name })}
                                 </p>
                             </div>
                             <Button size="sm" variant="ghost" disabled={busy || isSelf} onClick={() => void onViewAs()}>
                                 <Eye className="size-4" />
-                                Open
+                                {t("usersDetail.account.access.open")}
                             </Button>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="flex items-center gap-1.5 text-sm">
                                     <Shield className="size-4 text-muted-foreground" />
-                                    Administrator
+                                    {t("usersDetail.account.access.admin")}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    Opens the operator surfaces: people, policies, domains and activity.
+                                    {t("usersDetail.account.access.adminHint")}
                                 </p>
                             </div>
                             <Switch
                                 checked={user.isAdmin}
                                 disabled={busy || isSelf}
-                                aria-label={`Administrator access for ${user.name}`}
+                                aria-label={t("usersDetail.account.access.adminLabel", { name: user.name })}
                                 onChange={(checked) => void run(() => setAdminAccessAction(user.id, checked))}
                             />
                         </div>
@@ -202,25 +210,22 @@ export function AccountView({
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div>
-                            <h2 className="text-sm font-medium">Where they may sign in from</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Applies on top of whatever they set for themselves, and they cannot remove it. Saving
-                                signs them out everywhere.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("usersDetail.account.limits.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("usersDetail.account.limits.hint")}</p>
                         </div>
                         <AccessRulesEditor value={limits} groups={groups} onChange={setLimits} />
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
                                 {accessRulesAreEmpty(limits)
-                                    ? "No limit - they may sign in from anywhere."
-                                    : "They may only sign in from what is listed."}
+                                    ? t("usersDetail.account.limits.none")
+                                    : t("usersDetail.account.limits.some")}
                             </p>
                             <Button
                                 size="sm"
                                 disabled={busy || accessRulesEqual(limits, user.enforced)}
                                 onClick={() => void run(() => setUserLimitsAction(user.id, limits))}
                             >
-                                Save limits
+                                {t("usersDetail.account.limits.save")}
                             </Button>
                         </div>
                     </section>
@@ -228,10 +233,9 @@ export function AccountView({
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <h2 className="text-sm font-medium">Sessions</h2>
+                                <h2 className="text-sm font-medium">{t("usersDetail.account.sessions.title")}</h2>
                                 <p className="text-xs text-muted-foreground">
-                                    Every device signed in as {user.name}, and which of this instance&apos;s addresses
-                                    each one came in on.
+                                    {t("usersDetail.account.sessions.hint", { name: user.name })}
                                 </p>
                             </div>
                             <Button
@@ -241,7 +245,7 @@ export function AccountView({
                                 onClick={() => void run(() => revokeUserSessionsAction(user.id))}
                             >
                                 <LogOut className="size-4" />
-                                Sign out everywhere
+                                {t("usersDetail.account.sessions.signOutAll")}
                             </Button>
                         </div>
                         {sessions ? (
@@ -249,16 +253,21 @@ export function AccountView({
                                 compact
                                 sessions={sessions}
                                 busyId={busy ? "all" : null}
-                                emptyLabel="Nothing is signed in."
+                                emptyLabel={t("usersDetail.account.sessions.empty")}
                                 onRevoke={(session) => void run(() => revokeUserSessionAction(user.id, session.id))}
                             />
                         ) : (
                             <Skeleton className="h-24 w-full rounded-lg" />
                         )}
                         <p className="text-xs text-muted-foreground">
-                            {user.lastSeenAt ? `Last seen ${format.dateTime(user.lastSeenAt)}` : "Never seen."}
-                            {user.lastIp ? ` from ${user.lastIp}` : ""}
-                            {user.lastCountry ? ` (${user.lastCountry})` : ""}
+                            {t("usersDetail.account.sessions.lastSeen", {
+                                seen: user.lastSeenAt ? "yes" : "no",
+                                time: user.lastSeenAt ? format.dateTime(user.lastSeenAt) : "",
+                                hasIp: user.lastIp ? "yes" : "no",
+                                ip: user.lastIp ?? "",
+                                hasCountry: user.lastCountry ? "yes" : "no",
+                                country: user.lastCountry ?? ""
+                            })}
                         </p>
                     </section>
 
@@ -268,20 +277,21 @@ export function AccountView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <h2 className="text-sm font-medium text-danger">Danger zone</h2>
+                    <h2 className="text-sm font-medium text-danger">{t("usersDetail.account.danger.title")}</h2>
                     {user.banned ? (
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">
-                                {user.bannedUntil ? "Suspended" : "Banned"}{" "}
-                                {user.bannedAt ? format.dateTime(user.bannedAt) : ""}
                                 {/* When it ends, for one that does. Said here
                                     because "banned" and "back on Tuesday" are
                                     different answers to what an administrator
                                     opened this page to ask. */}
-                                {user.bannedUntil
-                                    ? `, back ${format.dateTime(user.bannedUntil)}`
-                                    : ""}
-                                {user.banReason ? `: ${user.banReason}` : ""}
+                                {t("usersDetail.account.danger.status", {
+                                    kind: user.bannedUntil ? "suspended" : "banned",
+                                    at: user.bannedAt ? format.dateTime(user.bannedAt) : "",
+                                    until: user.bannedUntil ? format.dateTime(user.bannedUntil) : "",
+                                    hasReason: user.banReason ? "yes" : "no",
+                                    reason: user.banReason ?? ""
+                                })}
                             </p>
                             <Button
                                 size="sm"
@@ -290,7 +300,7 @@ export function AccountView({
                                 onClick={() => void run(() => unbanUserAction(user.id))}
                             >
                                 <Undo2 className="size-4" />
-                                Lift the ban
+                                {t("usersDetail.account.danger.liftBan")}
                             </Button>
                         </div>
                     ) : (
@@ -298,7 +308,7 @@ export function AccountView({
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <Input
                                     className="flex-1"
-                                    placeholder="Reason (optional, kept for the record)"
+                                    placeholder={t("usersDetail.account.danger.reasonPlaceholder")}
                                     value={banReason}
                                     disabled={isSelf}
                                     onChange={(event) => setBanReason(event.target.value)}
@@ -311,13 +321,10 @@ export function AccountView({
                                 <Select
                                     value={banFor}
                                     className="sm:w-44"
-                                    aria-label="How long"
+                                    aria-label={t("users.ban.length")}
                                     disabled={isSelf}
                                     onValueChange={setBanFor}
-                                    options={BAN_LENGTHS.map((length) => ({
-                                        value: String(length.minutes),
-                                        label: length.label
-                                    }))}
+                                    options={banLengthOptions(t)}
                                 />
                                 <Button
                                     size="sm"
@@ -330,22 +337,21 @@ export function AccountView({
                                     }
                                 >
                                     <Ban className="size-4" />
-                                    {Number(banFor) > 0 ? "Suspend" : "Ban"}
+                                    {Number(banFor) > 0 ? t("users.ban.suspend") : t("users.ban.ban")}
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Either one signs them out everywhere at once. A suspension lifts
-                                itself when its time is up; a ban stays until somebody lifts it.
+                                {t("usersDetail.account.danger.hint")}
                             </p>
                         </div>
                     )}
                     <div className="flex items-center justify-between gap-3">
                         <p className="text-xs text-muted-foreground">
-                            Deleting takes everything the account owns with it.
+                            {t("usersDetail.account.danger.deleteHint")}
                         </p>
                         <Button size="sm" variant="danger" disabled={busy || isSelf} onClick={() => void onDelete()}>
                             <Trash2 className="size-4" />
-                            Delete account
+                            {t("usersDetail.account.danger.delete")}
                         </Button>
                     </div>
                 </CardBody>

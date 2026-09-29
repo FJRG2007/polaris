@@ -16,6 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatRulesView } from "@/app/(app)/admin/chat/chat-rules-view";
+import { MessagesWrapper } from "../setup/i18n";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { DEFAULT_CHAT_RULES, type ChatRuleScope, type ChatRules } from "@polaris/core";
 
@@ -41,7 +42,7 @@ afterEach(cleanup);
 
 describe("switching which conversations the rules are about", () => {
     it("shows that scope's own limits", () => {
-        render(<ChatRulesView initial={INITIAL} />);
+        render(<ChatRulesView initial={INITIAL} />, { wrapper: MessagesWrapper });
         expect(fieldUnder("Biggest single file")).toBe("90");
 
         fireEvent.click(screen.getByText("Group chats"));
@@ -57,7 +58,7 @@ describe("switching which conversations the rules are about", () => {
     it("keeps what was typed under a tab that was left", () => {
         // The drafts live above the fields on purpose: an admin who wants the
         // same limits everywhere types them, saves, switches and saves again.
-        render(<ChatRulesView initial={INITIAL} />);
+        render(<ChatRulesView initial={INITIAL} />, { wrapper: MessagesWrapper });
         const input = screen.getByText("Biggest single file").parentElement?.querySelector("input");
         fireEvent.change(input as HTMLInputElement, { target: { value: "64" } });
 

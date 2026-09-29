@@ -7,6 +7,7 @@ import { addGroupMember, createGroup, deleteGroup, removeGroupMember } from "@po
 import { requireAdmin } from "@/lib/session";
 import { publishAccessChange } from "@/lib/access-live";
 import { recordAudit } from "@/lib/audit-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 export async function createGroupAction(name: string, description?: string): Promise<{ error?: string }> {
     const admin = await requireAdmin();
@@ -14,7 +15,8 @@ export async function createGroupAction(name: string, description?: string): Pro
         const { id } = await createGroup(name, description);
         await recordAudit({ actorId: admin.id, action: "group.create", targetType: "group", targetId: id, metadata: { name } });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the group" };
+        const t = await getTranslations("admin");
+        return { error: caught instanceof Error ? caught.message : t("groups.errors.createFailed") };
     }
     revalidatePath("/admin/groups");
     return {};

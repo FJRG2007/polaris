@@ -22,8 +22,13 @@
 
 import { useState, useTransition } from "react";
 import { Card, CardBody, Select, Switch } from "@polaris/ui";
-import { PRIVACY_AUDIENCES, PRIVACY_AUDIENCE_LABELS, type PrivacyAudience } from "@polaris/core";
 import { setFollowerDefaultAction, setPublicProfilesAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { PrivacyAudience } from "@polaris/core";
+
+/** The audiences a default can be. The ones that name a list of people cannot:
+ *  the list belongs to an account, and there is no account yet to have one. */
+const DEFAULT_AUDIENCES = ["everyone", "friends", "nobody"] as const;
 
 export function PublicProfilesForm({
     enabled,
@@ -34,6 +39,7 @@ export function PublicProfilesForm({
      *  otherwise. */
     followerDefault: PrivacyAudience;
 }) {
+    const t = useTranslations("admin");
     const [on, setOn] = useState(enabled);
     const [audience, setAudience] = useState<PrivacyAudience>(followerDefault);
     const [error, setError] = useState<string | null>(null);
@@ -44,19 +50,15 @@ export function PublicProfilesForm({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex flex-col gap-1">
-                        <h2 className="text-sm font-medium">Profiles without signing in</h2>
+                        <h2 className="text-sm font-medium">{t("users.profiles.title")}</h2>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            A person&rsquo;s page lives at <code>/u/their-username</code> and can be handed out.
-                            With this off it is only readable by people signed in here, which is what a
-                            deployment for one company usually wants. With it on, a stranger still sees only
-                            what an account has set to &ldquo;everybody&rdquo; - and an account set to anything
-                            narrower stays invisible to them.
+                            {t.rich("users.profiles.hint", { code: (chunks) => <code key="code">{chunks}</code> })}
                         </p>
                     </div>
                     <Switch
                         checked={on}
                         disabled={pending}
-                        aria-label="Show profiles to people who are not signed in"
+                        aria-label={t("users.profiles.switchLabel")}
                         onChange={(next: boolean) => {
                             // Applied on the press and put back if the server
                             // refuses it, so the switch never reads as saved when
@@ -75,17 +77,15 @@ export function PublicProfilesForm({
                 </div>
                 <div className="flex flex-col gap-1 border-t border-border pt-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Who a new account&rsquo;s followers are shown to
+                        {t("users.profiles.followersLabel")}
                         <Select
                             value={audience}
                             disabled={pending}
-                            aria-label="Who a new account's followers are shown to"
-                            options={PRIVACY_AUDIENCES.filter(
-                                // The two that name a list of people cannot be a
-                                // default: the list belongs to an account, and
-                                // there is no account yet to have one.
-                                (value) => value === "everyone" || value === "friends" || value === "nobody"
-                            ).map((value) => ({ value, label: PRIVACY_AUDIENCE_LABELS[value] }))}
+                            aria-label={t("users.profiles.followersSelectLabel")}
+                            options={DEFAULT_AUDIENCES.map((value) => ({
+                                value,
+                                label: t(`users.profiles.audiences.${value}`)
+                            }))}
                             onValueChange={(value) => {
                                 const next = value as PrivacyAudience;
                                 const before = audience;
@@ -101,13 +101,7 @@ export function PublicProfilesForm({
                             }}
                         />
                     </label>
-                    <p className="max-w-xl text-xs text-muted-foreground">
-                        Who follows somebody and who they follow are one disclosure and one setting on their
-                        own privacy screen. This is what it says before anybody touches it - a directory for
-                        one company and a place where people follow each other want opposite answers, and
-                        only you can say which this is. Changing it never reaches back into an account that
-                        has already chosen.
-                    </p>
+                    <p className="max-w-xl text-xs text-muted-foreground">{t("users.profiles.followersHint")}</p>
                 </div>
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}

@@ -12,16 +12,23 @@
  * to keep in step.
  */
 
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
 export const BAN_LENGTHS = [
-    { minutes: 60, label: "For 1 hour" },
-    { minutes: 1440, label: "For 1 day" },
-    { minutes: 4320, label: "For 3 days" },
-    { minutes: 10080, label: "For 1 week" },
-    { minutes: 43200, label: "For 30 days" },
-    { minutes: 0, label: "Until lifted" }
+    { minutes: 60, key: "hour" },
+    { minutes: 1440, key: "day" },
+    { minutes: 4320, key: "threeDays" },
+    { minutes: 10080, key: "week" },
+    { minutes: 43200, key: "thirtyDays" },
+    { minutes: 0, key: "untilLifted" }
 ] as const;
 
+/** The lengths as picker options, in the reader's language. */
+export function banLengthOptions(t: NamespaceTranslator<"admin">): { value: string; label: string }[] {
+    return BAN_LENGTHS.map((entry) => ({ value: String(entry.minutes), label: t(`users.ban.lengths.${entry.key}`) }));
+}
+
 /** What the button says: a length is a suspension, no length is a ban. */
-export function banVerb(minutes: number): string {
-    return minutes > 0 ? "Suspend" : "Ban";
+export function banVerb(t: NamespaceTranslator<"admin">, minutes: number): string {
+    return minutes > 0 ? t("users.ban.suspend") : t("users.ban.ban");
 }

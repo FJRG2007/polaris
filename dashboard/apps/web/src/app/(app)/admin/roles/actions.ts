@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { createRoleSchema, roleGrantsSchema } from "@polaris/core";
 import { publishAccessChange } from "@/lib/access-live";
 import { createRole, deleteRole, setRolePermissions } from "@/lib/role-service";
@@ -27,7 +28,8 @@ function refresh(): void {
 export async function createRoleAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = createRoleSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid role" };
+    const t = await getTranslations("admin");
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("roles.errors.invalidRole") };
 
     const result = await createRole(admin.id, parsed.data);
     if (result.error) return { error: result.error };
@@ -39,8 +41,9 @@ export async function setRolePermissionsAction(roleId: unknown, input: unknown):
     const admin = await requireAdmin();
     const id = idSchema.safeParse(roleId);
     const parsed = roleGrantsSchema.safeParse(input);
-    if (!id.success) return { error: "Unknown role." };
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid permissions" };
+    const t = await getTranslations("admin");
+    if (!id.success) return { error: t("roles.errors.unknownRole") };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("roles.errors.invalidPermissions") };
 
     const result = await setRolePermissions(admin.id, id.data, parsed.data.permissions);
     if (result.error) return result;
@@ -55,7 +58,7 @@ export async function setRolePermissionsAction(roleId: unknown, input: unknown):
 export async function deleteRoleAction(roleId: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const id = idSchema.safeParse(roleId);
-    if (!id.success) return { error: "Unknown role." };
+    if (!id.success) return { error: (await getTranslations("admin"))("roles.errors.unknownRole") };
 
     const result = await deleteRole(admin.id, id.data);
     if (result.error) return result;

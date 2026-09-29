@@ -15,6 +15,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { SecurityAdmin } from "./security-admin";
+import { getTranslations } from "@/lib/i18n/request";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { PlayerAddressesCard } from "./player-addresses-card";
@@ -24,17 +25,18 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminSecurityPage() {
     await requireAdmin();
-    const [policy, mail, addressesShared] = await Promise.all([
+    const [policy, mail, addressesShared, t] = await Promise.all([
         getInstanceSecurity(),
         getAuthMailStatus(),
-        playerAddressesShared()
+        playerAddressesShared(),
+        getTranslations("admin")
     ]);
 
     return (
         <>
             <PageHeader
-                title="Security"
-                description="What every account on this Polaris has to carry before it can be used."
+                title={t("security.title")}
+                description={t("security.description")}
             />
             <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
             <div className="mt-3 max-w-2xl">

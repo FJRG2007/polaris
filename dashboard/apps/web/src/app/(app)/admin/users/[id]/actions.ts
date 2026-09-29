@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { PERMISSIONS, PERMISSION_META, isAllowed, parseResource, type Permission } from "@polaris/core";
 import { explainUserAccess, type AccessExplanation } from "@/lib/access-explain-service";
 import {
@@ -31,12 +32,13 @@ const idSchema = z.string().uuid();
  *  a resolution per source per permission, and the shell has nothing to wait for. */
 export async function userAccessAction(userId: string): Promise<{ access?: AccessExplanation; error?: string }> {
     await requireAdmin();
+    const t = await getTranslations("admin");
     const parsed = idSchema.safeParse(userId);
-    if (!parsed.success) return { error: "Unknown account." };
+    if (!parsed.success) return { error: t("usersDetail.errors.unknownAccount") };
     try {
         return { access: await explainUserAccess(parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not work out their access" };
+        return { error: caught instanceof Error ? caught.message : t("usersDetail.errors.accessFailed") };
     }
 }
 
@@ -48,7 +50,7 @@ export async function setUserGroupAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ userId: idSchema, groupId: idSchema }).safeParse({ userId, groupId });
-    if (!parsed.success) return { error: "Unknown group." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.unknownGroup") };
     if (member) await addGroupMember(parsed.data.groupId, parsed.data.userId);
     else await removeGroupMember(parsed.data.groupId, parsed.data.userId);
     await recordAudit({
@@ -71,7 +73,7 @@ export async function setUserPolicyAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ userId: idSchema, policyId: idSchema }).safeParse({ userId, policyId });
-    if (!parsed.success) return { error: "Unknown policy." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.unknownPolicy") };
     if (attached) await attachPolicy(parsed.data.policyId, "user", parsed.data.userId);
     else await detachPolicy(parsed.data.policyId, "user", parsed.data.userId);
     await recordAudit({
@@ -109,8 +111,9 @@ export async function userCapabilitiesAction(
     userId: string
 ): Promise<{ capabilities?: CapabilityState[]; isAdmin?: boolean; error?: string }> {
     await requireAdmin();
+    const t = await getTranslations("admin");
     const parsed = idSchema.safeParse(userId);
-    if (!parsed.success) return { error: "Unknown account." };
+    if (!parsed.success) return { error: t("usersDetail.errors.unknownAccount") };
 
     const [account, sourced, overrides] = await Promise.all([
         prisma.user.findUnique({ where: { id: parsed.data }, select: { isAdmin: true } }),
@@ -120,7 +123,7 @@ export async function userCapabilitiesAction(
             select: { permission: true, effect: true }
         })
     ]);
-    if (!account) return { error: "Unknown account." };
+    if (!account) return { error: t("usersDetail.errors.unknownAccount") };
 
     // Everything except the overrides, which is exactly what switching one back
     // to "follow their role" would leave in force.
@@ -162,7 +165,7 @@ export async function setUserPermissionAction(
             state: z.enum(["inherit", "allow", "deny"])
         })
         .safeParse({ userId, permission, state });
-    if (!parsed.success) return { error: "That is not a capability." };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("usersDetail.errors.notCapability") };
 
     if (parsed.data.state === "inherit") {
         await prisma.userPermission.deleteMany({
@@ -205,9 +208,10 @@ export async function removeUserGrantAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ userId: idSchema, grantId: idSchema }).safeParse({ userId, grantId });
-    if (!parsed.success) return { error: "Unknown access." };
+    const t = await getTranslations("admin");
+    if (!parsed.success) return { error: t("usersDetail.errors.unknownAccess") };
     const ref = parseResource(resource);
-    if (!ref) return { error: "Unknown access." };
+    if (!ref) return { error: t("usersDetail.errors.unknownAccess") };
     await removeResourceGrant(ref, parsed.data.grantId);
     await recordAudit({
         actorId: admin.id,

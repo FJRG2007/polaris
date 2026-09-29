@@ -17,12 +17,14 @@ import type { EmailChannelView } from "@/lib/mail-service";
 import { DiscordSetupPanel } from "../discord-setup-panel";
 import { EmailChannelDialog } from "./email-channel-dialog";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition, type ComponentType } from "react";
 import {
     CHANNEL_STATUS_TONE,
     EMAIL_CHANNEL_MARK,
-    PLATFORM_LABEL,
-    PLATFORM_LOGO
+    PLATFORM_LOGO,
+    platformLabel
 } from "../platform-meta";
 import {
     channelStateAction,
@@ -65,32 +67,37 @@ interface EditSpec {
     help: string;
 }
 
-const EDIT_SPEC: Record<ChannelKind, EditSpec> = {
-    telegram: {
-        tokenLabel: "Bot token",
-        tokenPlaceholder: "123456:ABC-DEF...",
-        help: "From @BotFather. Leave the token blank to keep the current one."
-    },
-    discord: {
-        tokenLabel: "Bot token",
-        tokenPlaceholder: "Bot token from the Developer Portal",
-        help: "From the Discord Developer Portal (Bot > Token). Leave blank to keep the current one."
-    },
-    slack: {
-        tokenLabel: "Bot token",
-        tokenPlaceholder: "xoxb-...",
-        help: "The Bot User OAuth token (xoxb-...). Leave blank to keep the current one."
-    },
-    "whatsapp-cloud": {
-        tokenLabel: "Access token",
-        tokenPlaceholder: "EAAG...",
-        needsPhoneNumberId: true,
-        help: "Meta access token and phone-number id. Leave a field blank to keep it."
-    },
-    "whatsapp-web": {
-        help: "Linked by QR. Use Re-link to show a QR and scan again if the session dropped; remove and re-add to link a different number."
+function editSpec(t: NamespaceTranslator<"admin">, kind: ChannelKind): EditSpec {
+    switch (kind) {
+        case "telegram":
+            return {
+                tokenLabel: t("inbox.catalog.tokens.botToken"),
+                tokenPlaceholder: "123456:ABC-DEF...",
+                help: t("inboxChannels.edit.telegram")
+            };
+        case "discord":
+            return {
+                tokenLabel: t("inbox.catalog.tokens.botToken"),
+                tokenPlaceholder: t("inbox.catalog.discord.tokenPlaceholder"),
+                help: t("inboxChannels.edit.discord")
+            };
+        case "slack":
+            return {
+                tokenLabel: t("inbox.catalog.tokens.botToken"),
+                tokenPlaceholder: "xoxb-...",
+                help: t("inboxChannels.edit.slack")
+            };
+        case "whatsapp-cloud":
+            return {
+                tokenLabel: t("inbox.catalog.tokens.accessToken"),
+                tokenPlaceholder: "EAAG...",
+                needsPhoneNumberId: true,
+                help: t("inboxChannels.edit.whatsappCloud")
+            };
+        case "whatsapp-web":
+            return { help: t("inboxChannels.edit.whatsappWeb") };
     }
-};
+}
 
 function channelKind(channel: ChannelView): ChannelKind {
     if (channel.platform === "whatsapp") {
@@ -110,6 +117,7 @@ export function ChannelsView({
     smsSenders: SmsSenderView[];
     bridgeReady: boolean;
 }) {
+    const t = useTranslations("admin");
     const [channels, setChannels] = useState(initialChannels);
     const [managing, setManaging] = useState<ChannelView | null>(null);
     const [emailChannels, setEmailChannels] = useState(initialEmailChannels);
@@ -125,15 +133,12 @@ export function ChannelsView({
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Channels</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Everything Polaris talks through: the messaging channels the Inbox and Watch
-                        alerts send over, and the senders that carry its mail.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxChannels.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("inboxChannels.intro")}</p>
                 </div>
                 <Button asChild>
                     <Link href="/admin/inbox/channels/connect">
-                        <Plus className="size-4" /> Connect a channel
+                        <Plus className="size-4" /> {t("inboxChannels.connect")}
                     </Link>
                 </Button>
             </div>
@@ -141,11 +146,17 @@ export function ChannelsView({
             {!bridgeReady && (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
-                        The messaging bridge is not running yet. Install it from the{" "}
-                        <Link href="/apps/marketplace" className="text-primary hover:underline">
-                            Apps marketplace
-                        </Link>{" "}
-                        to connect messaging channels. Email senders work without it.
+                        {t.rich("inboxChannels.bridgeMissing", {
+                            link: (chunks) => (
+                                <Link
+                                    key="link"
+                                    href="/apps/marketplace"
+                                    className="text-primary hover:underline"
+                                >
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
                     </CardBody>
                 </Card>
             )}
@@ -153,8 +164,7 @@ export function ChannelsView({
             {channels.length === 0 && emailChannels.length === 0 ? (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
-                        Nothing connected yet. Connect a messaging channel to start chatting, or an
-                        email sender so Polaris can send sign-in mail.
+                        {t("inboxChannels.empty")}
                     </CardBody>
                 </Card>
             ) : (
@@ -168,16 +178,16 @@ export function ChannelsView({
                                 color={meta?.color}
                                 name={channel.name}
                                 status={channel.status}
-                                statusLabel={channel.status}
+                                statusLabel={t("inboxChannels.status", { status: channel.status })}
                                 detail={[
-                                    `${PLATFORM_LABEL[channel.platform] ?? channel.platform}${
+                                    `${platformLabel(t, channel.platform)}${
                                         channel.provider === "whatsapp-cloud" ? " Cloud" : ""
                                     }`,
                                     channel.externalId
                                 ]
                                     .filter(Boolean)
                                     .join(" - ")}
-                                ready={channel.status === "connected" ? "Connected" : null}
+                                ready={channel.status === "connected" ? t("inboxChannels.connected") : null}
                                 onManage={() => setManaging(channel)}
                             />
                         );
@@ -189,14 +199,16 @@ export function ChannelsView({
                             color={EMAIL_CHANNEL_MARK.color}
                             name={channel.name}
                             status={channel.status}
-                            statusLabel={channel.status === "connected" ? "ready" : channel.status}
+                            statusLabel={t("inboxChannels.status", {
+                                status: channel.status === "connected" ? "ready" : channel.status
+                            })}
                             detail={[MAIL_PROVIDER_INFO[channel.provider].label, channel.from]
                                 .filter(Boolean)
                                 .join(" - ")}
                             error={channel.error}
                             ready={
                                 channel.status === "connected" && !channel.error
-                                    ? "Ready to send"
+                                    ? t("inboxChannels.readyToSend")
                                     : null
                             }
                             onManage={() => setEmailDialog(channel)}
@@ -269,6 +281,7 @@ function ChannelCard({
     ready: string | null;
     onManage: () => void;
 }) {
+    const t = useTranslations("admin");
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -295,7 +308,7 @@ function ChannelCard({
                         </span>
                     ) : null}
                     <Button size="sm" variant="secondary" onClick={onManage}>
-                        <Settings2 className="size-4" /> Manage
+                        <Settings2 className="size-4" /> {t("inboxChannels.manage.button")}
                     </Button>
                 </div>
             </CardBody>
@@ -314,7 +327,9 @@ function ChannelManageDialog({
     onUpdated: (id: string, patch: Partial<ChannelView>) => void;
     onRemoved: (id: string) => void;
 }) {
-    const spec = EDIT_SPEC[channelKind(channel)];
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+    const spec = editSpec(t, channelKind(channel));
     const meta = PLATFORM_LOGO[channel.platform];
     const [name, setName] = useState(channel.name);
     const [token, setToken] = useState("");
@@ -442,7 +457,7 @@ function ChannelManageDialog({
                                 <MessagesSquare className="size-4" />
                             )}
                         </span>
-                        Manage {channel.name}
+                        {t("inboxChannels.manage.title", { name: channel.name })}
                     </DialogTitle>
                     <DialogDescription>{spec.help}</DialogDescription>
                 </DialogHeader>
@@ -450,10 +465,14 @@ function ChannelManageDialog({
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="text-muted-foreground">
-                            Status:{" "}
-                            <span className={cn(CHANNEL_STATUS_TONE[channel.status])}>
-                                {channel.status}
-                            </span>
+                            {t.rich("inboxChannels.manage.status", {
+                                status: t("inboxChannels.status", { status: channel.status }),
+                                tone: (chunks) => (
+                                    <span key="tone" className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                         </span>
                         <Button
                             type="button"
@@ -469,7 +488,7 @@ function ChannelManageDialog({
                             ) : (
                                 <RefreshCw className="size-4" />
                             )}
-                            {isWeb ? "Re-link" : "Reconnect"}
+                            {isWeb ? t("inboxChannels.manage.relink") : t("inboxChannels.manage.reconnect")}
                         </Button>
                     </div>
 
@@ -480,7 +499,7 @@ function ChannelManageDialog({
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                     src={qr}
-                                    alt="WhatsApp QR code"
+                                    alt={t("inbox.qr.alt")}
                                     className="size-56 rounded-md border border-border"
                                 />
                             ) : (
@@ -490,18 +509,18 @@ function ChannelManageDialog({
                             )}
                             <p className="text-center text-xs text-muted-foreground">
                                 {linkFailed
-                                    ? "Connection failed - try Re-link again."
-                                    : "On your phone: WhatsApp > Linked devices > Link a device, then scan this code."}
+                                    ? t("inboxChannels.manage.linkFailed")
+                                    : t("inbox.qr.steps")}
                             </p>
                         </div>
                     )}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Support bot"
+                            placeholder={t("inbox.connect.namePlaceholder")}
                         />
                     </label>
 
@@ -513,7 +532,7 @@ function ChannelManageDialog({
                                 autoComplete="off"
                                 value={token}
                                 onChange={(event) => setToken(event.target.value)}
-                                placeholder="Saved - enter a new token to replace it"
+                                placeholder={t("inboxChannels.manage.tokenPlaceholder")}
                             />
                             <span className="text-xs text-muted-foreground">
                                 {spec.tokenPlaceholder}
@@ -527,11 +546,11 @@ function ChannelManageDialog({
 
                     {spec.needsPhoneNumberId && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Phone number id</span>
+                            <span className="font-medium">{t("inbox.connect.phoneNumberId")}</span>
                             <Input
                                 value={phoneNumberId}
                                 onChange={(event) => setPhoneNumberId(event.target.value)}
-                                placeholder="Leave blank to keep the current one"
+                                placeholder={t("inboxChannels.manage.keepCurrent")}
                             />
                         </label>
                     )}
@@ -545,15 +564,15 @@ function ChannelManageDialog({
                             onClick={() => setConfirming(true)}
                             disabled={busy}
                         >
-                            Remove
+                            {t("inboxChannels.manage.remove")}
                         </Button>
                         <div className="flex gap-2">
                             <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                                Close
+                                {t("inbox.connect.close")}
                             </Button>
                             <Button type="button" onClick={save} disabled={busy || !dirty}>
                                 {saving && <Loader2 className="size-4 animate-spin" />}
-                                Save
+                                {tc("actions.save")}
                             </Button>
                         </div>
                     </div>
@@ -562,10 +581,11 @@ function ChannelManageDialog({
                 <Dialog open={confirming} onOpenChange={(open) => !removing && setConfirming(open)}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Remove {channel.name}?</DialogTitle>
+                            <DialogTitle>
+                                {t("inboxChannels.manage.removeTitle", { name: channel.name })}
+                            </DialogTitle>
                             <DialogDescription>
-                                This disconnects the channel and deletes its conversations and
-                                messages. It cannot be undone.
+                                {t("inboxChannels.manage.removeDescription")}
                             </DialogDescription>
                         </DialogHeader>
                         {error && <p className="text-sm text-danger">{error}</p>}
@@ -575,11 +595,11 @@ function ChannelManageDialog({
                                 onClick={() => setConfirming(false)}
                                 disabled={removing}
                             >
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button variant="danger" onClick={remove} disabled={removing}>
                                 {removing && <Loader2 className="size-4 animate-spin" />}
-                                Remove
+                                {t("inboxChannels.manage.remove")}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

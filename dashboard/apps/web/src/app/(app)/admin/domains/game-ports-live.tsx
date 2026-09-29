@@ -25,6 +25,7 @@ import { inBlock } from "@/lib/apps/port-block";
 import { gameForwardRules } from "@/lib/router-guide";
 import type { GamePortsReading } from "@/lib/apps/port-advice";
 import { describePorts } from "@/lib/apps/port-advice";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function GamePortsLive({
     reading,
@@ -38,6 +39,7 @@ export function GamePortsLive({
     refreshing: boolean;
     onRefresh: () => void;
 }) {
+    const t = useTranslations("admin");
     const { servers, advice, lanIp, policy, blocks } = reading;
     // Split by what can be judged rather than by what is proven. A stopped server
     // is silent on every port it has, so it is not asked about and no rule is
@@ -55,16 +57,15 @@ export function GamePortsLive({
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                    {stale ??
-                        "Checked while this page is open, on the servers that are running: a port is ticked as soon as it answers from outside, or as soon as somebody joins on it."}
+                    {stale ?? t("domainsPorts.game.checking")}
                 </p>
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={onRefresh}
                     disabled={refreshing}
-                    aria-label="Check the ports now"
-                    title="Check the ports now"
+                    aria-label={t("domainsPorts.checkNow")}
+                    title={t("domainsPorts.checkNow")}
                 >
                     <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} />
                 </Button>
@@ -86,22 +87,24 @@ export function GamePortsLive({
                                 className="border-success-edge text-success"
                                 title={
                                     server.confirmedAt
-                                        ? `Last answered from outside on ${new Date(server.confirmedAt).toLocaleString()}`
+                                        ? t("domainsPorts.lastAnswered", {
+                                              time: new Date(server.confirmedAt).toLocaleString()
+                                          })
                                         : undefined
                                 }
                             >
-                                Reached from outside
+                                {t("domainsPorts.reached")}
                             </Badge>
                         ) : server.running ? (
                             <Badge className="border-warning-edge text-warning">
-                                Not confirmed
+                                {t("domainsPorts.notConfirmed")}
                             </Badge>
                         ) : (
                             // Neither reached nor unreachable: nothing was measured, because
                             // there was nothing behind the port to measure. Saying "not
                             // confirmed" here reads as a fault and is a fault in this card.
-                            <Badge title="A stopped server answers nothing, so its port cannot be checked from here">
-                                Checked once it starts
+                            <Badge title={t("domainsPorts.game.stoppedTitle")}>
+                                {t("domainsPorts.game.stopped")}
                             </Badge>
                         )}
                     </li>
@@ -139,13 +142,10 @@ export function GamePortsLive({
 
             {policy === "range" && outside.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                    {outside.length === 1
-                        ? "One server answers"
-                        : `${outside.length} servers answer`}{" "}
-                    outside those ranges - {outside.map((server) => server.name).join(", ")} - so{" "}
-                    {outside.length === 1 ? "it" : "they"} {outside.length === 1 ? "keeps" : "keep"}{" "}
-                    a rule of their own above. Widening a range does not move a server that is
-                    already running; recreating it does.
+                    {t("domainsPorts.game.outside", {
+                        count: outside.length,
+                        names: outside.map((server) => server.name).join(", ")
+                    })}
                 </p>
             )}
         </div>

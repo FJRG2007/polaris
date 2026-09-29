@@ -16,9 +16,12 @@ import { useRouter } from "next/navigation";
 import { decideRecoveryRequestAction } from "./actions";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
 
 export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[] }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const format = useDisplayFormat();
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -56,12 +59,9 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                 <div>
                     <h2 className="flex items-center gap-1.5 text-sm font-medium">
                         <LifeBuoy className="size-4 text-warning" />
-                        Locked out
+                        {t("users.recovery.title")}
                     </h2>
-                    <p className="text-xs text-muted-foreground">
-                        Approving lets them set a new password themselves and signs out everything
-                        already on the account. Make sure you know who is asking.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("users.recovery.hint")}</p>
                 </div>
                 {waiting.map((request) => (
                     <div
@@ -72,16 +72,23 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                             <p className="flex flex-wrap items-center gap-1.5 text-sm">
                                 <span className="truncate font-medium">{request.userName}</span>
                                 {request.verified ? (
-                                    <Badge variant="success">answered their questions</Badge>
+                                    <Badge variant="success">{t("users.recovery.verified")}</Badge>
                                 ) : (
-                                    <Badge variant="warning">nothing verified</Badge>
+                                    <Badge variant="warning">{t("users.recovery.unverified")}</Badge>
                                 )}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">{request.userEmail}</p>
                             <p className="text-xs text-muted-foreground">
-                                Asked {format.dateTime(request.createdAt)}
-                                {request.requestIp ? ` from ${request.requestIp}` : ""} - expires{" "}
-                                {format.dateTime(request.expiresAt)}
+                                {request.requestIp
+                                    ? t("users.recovery.askedFrom", {
+                                          asked: format.dateTime(request.createdAt),
+                                          ip: request.requestIp,
+                                          expires: format.dateTime(request.expiresAt)
+                                      })
+                                    : t("users.recovery.asked", {
+                                          asked: format.dateTime(request.createdAt),
+                                          expires: format.dateTime(request.expiresAt)
+                                      })}
                             </p>
                         </div>
                         <div className="flex shrink-0 gap-2">
@@ -90,13 +97,13 @@ export function RecoveryRequests({ requests }: { requests: RecoveryRequestView[]
                                 disabled={busyId === request.id}
                                 onClick={() => void decide(request.id, false)}
                             >
-                                Deny
+                                {t("users.recovery.deny")}
                             </Button>
                             <Button
                                 disabled={busyId === request.id}
                                 onClick={() => void decide(request.id, true)}
                             >
-                                {busyId === request.id ? "Saving..." : "Approve"}
+                                {busyId === request.id ? tc("actions.saving") : t("users.recovery.approve")}
                             </Button>
                         </div>
                     </div>

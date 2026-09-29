@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import {
     addGroupMemberAction,
@@ -56,6 +57,7 @@ export interface GroupRow {
 }
 
 export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: UserOption[] }) {
+    const t = useTranslations("admin");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [query, setQuery] = useState("");
@@ -102,15 +104,15 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         className="pl-9"
-                        placeholder="Search by group, description or member"
-                        aria-label="Search groups"
+                        placeholder={t("groups.search.placeholder")}
+                        aria-label={t("groups.search.label")}
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </div>
                 <Button onClick={() => setCreating(true)}>
                     <Plus className="size-4" />
-                    New group
+                    {t("groups.newGroup")}
                 </Button>
             </div>
 
@@ -118,9 +120,9 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">Group</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">Members</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">People</th>
+                            <th className="px-3 py-2 font-medium">{t("groups.table.group")}</th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">{t("groups.table.members")}</th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("groups.table.people")}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -131,8 +133,8 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
                                     {groups.length === 0
-                                        ? "No groups yet."
-                                        : "No group matches that."}
+                                        ? t("groups.empty.none")
+                                        : t("groups.empty.noMatch")}
                                 </td>
                             </tr>
                         ) : (
@@ -141,7 +143,7 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                     key={group.id}
                                     tabIndex={0}
                                     role="button"
-                                    aria-label={`Open ${group.name}`}
+                                    aria-label={t("groups.open", { name: group.name })}
                                     onClick={() => setOpenId(group.id)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
@@ -159,10 +161,10 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                             <div className="min-w-0">
                                                 <p className="flex items-center gap-1.5 truncate font-medium">
                                                     {group.name}
-                                                    {group.isSystem ? <Badge>system</Badge> : null}
+                                                    {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    {group.description || "No description."}
+                                                    {group.description || t("groups.noDescription")}
                                                 </p>
                                             </div>
                                         </div>
@@ -170,15 +172,14 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                     <td className="hidden px-3 py-2 sm:table-cell">
                                         {group.members.length === 0 ? (
                                             <span className="text-xs text-muted-foreground">
-                                                Nobody yet
+                                                {t("groups.nobodyYet")}
                                             </span>
                                         ) : (
                                             <AvatarStack people={group.members} />
                                         )}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                        {group.members.length}
-                                        {group.members.length === 1 ? " person" : " people"}
+                                        {t("groups.peopleCount", { count: group.members.length })}
                                     </td>
                                 </tr>
                             ))
@@ -209,7 +210,17 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                 name={deleting?.name ?? ""}
                 kind="group"
                 requireTyping={false}
-                description="Anything granted to the group is granted through it, so deleting it takes that access away from everybody in it. The accounts themselves are untouched."
+                title={t("groups.deleteDialog.title")}
+                question={t.rich("groups.deleteDialog.question", {
+                    name: deleting?.name ?? "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                confirmLabel={t("groups.deleteDialog.confirm")}
+                description={t("groups.deleteDialog.description")}
                 pending={pending}
                 onConfirm={() => {
                     const target = deleting;
@@ -225,6 +236,8 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
 /** Somebody new to belong to something. Name and description only: what a group
  *  reaches is granted to it elsewhere, on the Policies page. */
 function NewGroupDialog({ onClose }: { onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
@@ -249,24 +262,21 @@ function NewGroupDialog({ onClose }: { onClose: () => void }) {
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>New group</DialogTitle>
-                    <DialogDescription>
-                        Bundle people together, then grant access to the group rather than to each
-                        of them.
-                    </DialogDescription>
+                    <DialogTitle>{t("groups.create.title")}</DialogTitle>
+                    <DialogDescription>{t("groups.create.description")}</DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={onCreate} className="flex flex-col gap-3">
                     <Input
                         autoFocus
-                        placeholder="Group name"
-                        aria-label="Group name"
+                        placeholder={t("groups.create.name")}
+                        aria-label={t("groups.create.name")}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
                     />
                     <Input
-                        placeholder="Description (optional)"
-                        aria-label="Description"
+                        placeholder={t("groups.create.descriptionPlaceholder")}
+                        aria-label={t("groups.create.descriptionLabel")}
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
                     />
@@ -277,10 +287,10 @@ function NewGroupDialog({ onClose }: { onClose: () => void }) {
                     ) : null}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={pending || !name.trim()}>
-                            Create group
+                            {t("groups.create.submit")}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -305,6 +315,7 @@ function GroupDialog({
     onDelete: () => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("admin");
     const [add, setAdd] = useState("");
     const memberIds = new Set(group.members.map((member) => member.id));
     const candidates = users.filter((user) => !memberIds.has(user.id));
@@ -317,17 +328,16 @@ function GroupDialog({
                         dialog's own close button. */}
                     <DialogTitle className="flex items-center gap-2 pr-6">
                         <span className="truncate" title={group.name}>{group.name}</span>
-                        {group.isSystem ? <Badge>system</Badge> : null}
+                        {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
                     </DialogTitle>
                     <DialogDescription>
-                        {group.description ||
-                            "Whoever is in this group is granted whatever the group is granted."}
+                        {group.description || t("groups.dialog.defaultDescription")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-1">
                     {group.members.length === 0 ? (
-                        <p className="py-2 text-sm text-muted-foreground">Nobody is in it yet.</p>
+                        <p className="py-2 text-sm text-muted-foreground">{t("groups.dialog.noMembers")}</p>
                     ) : (
                         group.members.map((member) => (
                             <PersonRow
@@ -348,8 +358,11 @@ function GroupDialog({
                                     size="icon"
                                     variant="ghost"
                                     disabled={disabled}
-                                    title="Remove from the group"
-                                    aria-label={`Remove ${member.name} from ${group.name}`}
+                                    title={t("groups.dialog.removeTitle")}
+                                    aria-label={t("groups.dialog.removeLabel", {
+                                        member: member.name,
+                                        group: group.name
+                                    })}
                                     onClick={() =>
                                         onMutate(() => removeGroupMemberAction(group.id, member.id))
                                     }
@@ -367,8 +380,8 @@ function GroupDialog({
                             className="flex-1"
                             value={add}
                             onValueChange={setAdd}
-                            aria-label="Add somebody to this group"
-                            placeholder="Add a member..."
+                            aria-label={t("groups.dialog.addLabel")}
+                            placeholder={t("groups.dialog.addPlaceholder")}
                             options={candidates.map((user) => ({
                                 value: user.id,
                                 label: `${user.name} (${user.email})`
@@ -384,12 +397,12 @@ function GroupDialog({
                             }}
                         >
                             <UserPlus className="size-4" />
-                            Add
+                            {t("groups.dialog.add")}
                         </Button>
                     </div>
                 ) : (
                     <p className="mt-3 text-xs text-muted-foreground">
-                        Everybody on this deployment is already in it.
+                        {t("groups.dialog.everybodyIn")}
                     </p>
                 )}
 
@@ -397,11 +410,11 @@ function GroupDialog({
                     {!group.isSystem ? (
                         <Button variant="danger" disabled={disabled} onClick={onDelete}>
                             <Trash2 className="size-4" />
-                            Delete group
+                            {t("groups.dialog.delete")}
                         </Button>
                     ) : null}
                     <Button variant="ghost" onClick={onClose}>
-                        Done
+                        {t("groups.dialog.done")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

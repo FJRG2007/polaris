@@ -27,6 +27,7 @@ import {
     type EmailChannelView
 } from "@/lib/mail-service";
 import { EMAIL_PLATFORM } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 
 /** Test messages cost the provider's quota and can be aimed anywhere, so they
  *  are throttled per user rather than left open. */
@@ -57,7 +58,9 @@ async function requireOwnedChannel(userId: string, channelId: string): Promise<b
 export async function createEmailChannelAction(input: unknown): Promise<ChannelResult> {
     const user = await requirePermission("inbox.manage");
     const parsed = channelInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("inboxChannels.errors.checkForm") };
+    }
     const result = await createEmailChannel(user.id, parsed.data);
     if (result.channel) {
         await recordAudit({
@@ -74,10 +77,11 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
 
 export async function updateEmailChannelAction(channelId: unknown, input: unknown): Promise<ChannelResult> {
     const user = await requirePermission("inbox.manage");
+    const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const parsed = channelInputSchema.safeParse(input);
-    if (!id.success || !parsed.success) return { error: "Check the form." };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
+    if (!id.success || !parsed.success) return { error: t("inboxChannels.errors.checkForm") };
+    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
     const result = await updateEmailChannel(id.data, parsed.data);
     if (result.channel) {
         await recordAudit({
@@ -93,9 +97,10 @@ export async function updateEmailChannelAction(channelId: unknown, input: unknow
 
 export async function deleteEmailChannelAction(channelId: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
+    const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
-    if (!id.success) return { error: "Unknown channel." };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
+    if (!id.success) return { error: t("inboxChannels.errors.unknown") };
+    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
     await deleteEmailChannel(id.data);
     await recordAudit({
         actorId: user.id,
@@ -110,9 +115,10 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
 /** Re-run the credential check, for a channel whose key was rotated elsewhere. */
 export async function recheckEmailChannelAction(channelId: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
+    const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
-    if (!id.success) return { error: "Unknown channel." };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
+    if (!id.success) return { error: t("inboxChannels.errors.unknown") };
+    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
     const result = await recheckEmailChannel(id.data);
     revalidatePath("/admin/inbox/channels");
     return result;
@@ -126,21 +132,24 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
  */
 export async function sendTestEmailAction(channelId: unknown, to: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
+    const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const address = emailField.safeParse(to);
-    if (!id.success) return { error: "Unknown channel." };
-    if (!address.success) return { error: "Enter the address to send the test to." };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
+    if (!id.success) return { error: t("inboxChannels.errors.unknown") };
+    if (!address.success) return { error: t("inboxChannels.errors.testAddress") };
+    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
 
     const throttle = await rateLimit(`email-test:${user.id}`, TEST_LIMIT, TEST_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many test messages. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        return {
+            error: t("inboxChannels.errors.tooManyTests", { minutes: Math.ceil(throttle.retryAfterMs / 60000) })
+        };
     }
 
     const result = await sendThroughChannel(id.data, {
         to: address.data,
-        subject: "Polaris test message",
-        text: "This is a test from Polaris. If it reached you, this channel can send mail."
+        subject: t("inboxChannels.email.testSubject"),
+        text: t("inboxChannels.email.testBody")
     });
     revalidatePath("/admin/inbox/channels");
     return result;

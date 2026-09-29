@@ -31,6 +31,7 @@ import { GamePortsLive } from "./game-ports-live";
 import { PortPolicyForm } from "./port-policy-form";
 import { describeBlock } from "@/lib/apps/port-block";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { GamePortsReading } from "@/lib/apps/port-advice";
 
 /** How often the card re-reads. The knock behind it is rate limited to one every
@@ -40,6 +41,7 @@ const POLL_MS = 15_000;
 const PORTS_URL = "/api/admin/domains/game-ports";
 
 export function GamePortsCard() {
+    const t = useTranslations("admin");
     // Off for the first read and on for every one after: knocking on a closed port
     // waits out a timeout, so the card is on screen before it starts.
     const [url, setUrl] = useState(PORTS_URL);
@@ -64,25 +66,27 @@ export function GamePortsCard() {
     return (
         <PageSection
             id="game-ports"
-            title="Game server ports"
+            title={t("domainsPorts.game.title")}
             description={
                 <>
-                    Ports 80 and 443 carry every website Polaris serves and not one game client.
-                    Each server below answers on its own port, on its own transport, and nothing
-                    above this opens them.
+                    {t("domainsPorts.game.description")}
                     {reading.policy === "range" ? (
                         <>
                             {" "}
-                            Polaris keeps them inside{" "}
-                            <span className="font-mono text-foreground">
-                                TCP {describeBlock(reading.blocks.tcp)}
-                            </span>{" "}
-                            and{" "}
-                            <span className="font-mono text-foreground">
-                                UDP {describeBlock(reading.blocks.udp)}
-                            </span>
-                            , so forwarding those two ranges covers the servers you have and the
-                            ones you have not created yet.
+                            {t.rich("domainsPorts.game.range", {
+                                tcp: (chunks) => (
+                                    <span key="tcp" className="font-mono text-foreground">
+                                        {chunks}
+                                    </span>
+                                ),
+                                udp: (chunks) => (
+                                    <span key="udp" className="font-mono text-foreground">
+                                        {chunks}
+                                    </span>
+                                ),
+                                tcpRange: describeBlock(reading.blocks.tcp),
+                                udpRange: describeBlock(reading.blocks.udp)
+                            })}
                         </>
                     ) : null}
                 </>

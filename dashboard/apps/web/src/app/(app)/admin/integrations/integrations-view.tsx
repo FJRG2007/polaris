@@ -16,6 +16,7 @@ import { runAction } from "@/lib/run-action";
 import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import {
     use,
@@ -203,6 +204,8 @@ export function IntegrationsView({
     /** Null when GitHub is not connected, so there is nothing to check. */
     runnerAccess?: Promise<RunnerAccessNoteData | null>;
 }) {
+    const t = useTranslations("admin");
+
     const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
     const [query, setQuery] = useState("");
@@ -258,21 +261,21 @@ export function IntegrationsView({
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search integrations"
-                            aria-label="Search integrations"
+                            placeholder={t("integrations.grid.search")}
+                            aria-label={t("integrations.grid.search")}
                             className="pl-9"
                         />
                     </div>
                     <p className="text-muted-foreground whitespace-nowrap text-xs tabular-nums">
-                        {connected} of {cards.length} set up
+                        {t("integrations.grid.count", { connected, total: cards.length })}
                     </p>
                 </div>
 
                 {matches.length === 0 ? (
                     <EmptyState
                         icon={<Search />}
-                        title="Nothing matches"
-                        description="Polaris connects to the services in this list and no others."
+                        title={t("integrations.grid.emptyTitle")}
+                        description={t("integrations.grid.emptyDescription")}
                     />
                 ) : (
                     sections.map((section) => (
@@ -321,11 +324,17 @@ export function IntegrationsView({
                                                     is the one thing on this grid worth reading
                                                     before "On": it is on, and it is not working. */}
                                                 {card.failure ? (
-                                                    <Badge variant="warning">Needs attention</Badge>
+                                                    <Badge variant="warning">
+                                                        {t("integrations.grid.needsAttention")}
+                                                    </Badge>
                                                 ) : card.enabled ? (
-                                                    <Badge variant="success">On</Badge>
+                                                    <Badge variant="success">
+                                                        {t("integrations.grid.on")}
+                                                    </Badge>
                                                 ) : card.hasSecret ? (
-                                                    <Badge variant="neutral">Off</Badge>
+                                                    <Badge variant="neutral">
+                                                        {t("integrations.grid.off")}
+                                                    </Badge>
                                                 ) : null}
                                             </div>
                                             <div className="flex items-center justify-end gap-2">
@@ -335,7 +344,7 @@ export function IntegrationsView({
                                                     rel="noreferrer noopener"
                                                     className="text-muted-foreground hover:text-foreground mr-auto inline-flex items-center gap-1 text-xs"
                                                 >
-                                                    Docs
+                                                    {t("integrations.grid.docs")}
                                                     <ExternalLink className="size-3 shrink-0" />
                                                 </a>
                                                 <Button
@@ -343,7 +352,9 @@ export function IntegrationsView({
                                                     variant="secondary"
                                                     onClick={() => setConfiguring(card)}
                                                 >
-                                                    {card.hasSecret ? "Configure" : "Set up"}
+                                                    {card.hasSecret
+                                                        ? t("integrations.grid.configure")
+                                                        : t("integrations.grid.setUp")}
                                                 </Button>
                                             </div>
                                         </CardBody>
@@ -379,12 +390,13 @@ export function IntegrationsView({
  * person who can fix what it hits.
  */
 function ProvenState({ slug, name, proven }: { slug: string; name: string; proven: boolean }) {
+    const t = useTranslations("admin");
+
     if (proven) {
         return (
             <p className="flex items-start gap-2 rounded-md border border-border p-3 text-xs text-muted-foreground">
                 <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
-                An account has been connected through this application, so everybody here is offered
-                it.
+                {t("integrations.proven.done")}
             </p>
         );
     }
@@ -393,11 +405,9 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
             <span className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                 <span>
-                    <span className="font-medium">Not proven yet</span>
+                    <span className="font-medium">{t("integrations.proven.title")}</span>
                     <span className="block text-xs text-muted-foreground">
-                        Nobody else can connect {name} or sign in with it until one authorization
-                        has gone through here. Connect your own account to check it - whatever{" "}
-                        {name} refuses, you are the one who can change it.
+                        {t("integrations.proven.body", { name })}
                     </span>
                 </span>
             </span>
@@ -405,7 +415,7 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
                 href={`/api/connections/${slug}/link`}
                 className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
-                Connect my {name} account
+                {t("integrations.proven.connect", { name })}
                 <ExternalLink className="size-3 shrink-0" />
             </a>
         </div>
@@ -421,6 +431,8 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
  * field somebody clicked into and left alone is not a change.
  */
 function AccountLimitField({ slug, current }: { slug: string; current: number }) {
+    const t = useTranslations("admin");
+
     const [value, setValue] = useState(String(current));
     const [saved, setSaved] = useState(current);
     const [error, setError] = useState<string | null>(null);
@@ -451,7 +463,7 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
 
     return (
         <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Accounts per person</span>
+            <span className="font-medium">{t("integrations.accountLimit.label")}</span>
             <Input
                 type="number"
                 min={0}
@@ -463,8 +475,7 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
                 onBlur={commit}
             />
             <span className="text-xs text-muted-foreground">
-                How many of these accounts one person may connect. Zero turns connecting off;
-                lowering it never disconnects anybody already over the limit.
+                {t("integrations.accountLimit.hint")}
             </span>
             {error ? <span className="text-xs text-danger">{error}</span> : null}
         </label>
@@ -480,24 +491,18 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
  * lets a URL carry it carries; the rest of the values stay on this screen to be
  * copied, because none of these consoles accept them from a link.
  */
-/** What each value is called on the vendor's own form, so the label here matches
- *  the field it is meant to be pasted into. */
-const SETUP_VALUE_LABEL: Record<IntegrationSetupValue, string> = {
-    redirectUri: "Redirect URI",
-    homeUrl: "Home page URL",
-    privacyUrl: "Privacy policy URL",
-    termsUrl: "Terms of service URL",
-    logoUrl: "Logo, 128x128",
-    domain: "Domain"
-};
-
 /** One value the step is asking for, ready to be taken across. The logo is a file
- *  rather than a string, so it is offered as a download instead of a copy. */
+ *  rather than a string, so it is offered as a download instead of a copy. Each
+ *  value is labelled with what it is called on the vendor's own form
+ *  (`setupValue.label`), so the label here matches the field it is meant to be
+ *  pasted into. */
 function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: string }) {
+    const t = useTranslations("admin");
+
     return (
         <div className="flex items-center gap-2 rounded border border-border bg-field px-2 py-1">
             <span className="shrink-0 text-xs text-muted-foreground">
-                {SETUP_VALUE_LABEL[kind]}
+                {t(`integrations.setupValue.label.${kind}`)}
             </span>
             <code className="min-w-0 flex-1 truncate text-xs" title={value}>
                 {value}
@@ -509,12 +514,12 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
                     className="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
                 >
                     <Download className="size-3" />
-                    Download
+                    {t("integrations.setupValue.download")}
                 </a>
             ) : (
                 <CopyButton
                     value={value}
-                    label={`Copy the ${SETUP_VALUE_LABEL[kind].toLowerCase()}`}
+                    label={t(`integrations.setupValue.copy.${kind}`)}
                 />
             )}
         </div>
@@ -590,18 +595,18 @@ function SetupSteps({
  * whoever arrives at the screen afterwards.
  */
 function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: string }) {
+    const t = useTranslations("admin");
+
     return (
         <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">
-                    Somebody could not connect their account
+                <span className="text-sm font-medium">{t("integrations.attention.title")}</span>
+                <span className="text-muted-foreground">
+                    {t("integrations.attention.reason", { name, reason: failure.reason })}
                 </span>
                 <span className="text-muted-foreground">
-                    The last attempt was refused. {name} said: {failure.reason}
-                </span>
-                <span className="text-muted-foreground">
-                    It clears itself as soon as one authorization completes.
+                    {t("integrations.attention.clears")}
                 </span>
             </div>
         </div>
@@ -628,6 +633,8 @@ function SignInSwitch({
     allowed: boolean;
     warning?: string;
 }) {
+    const t = useTranslations("admin");
+
     const [value, setValue] = useState(allowed);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -651,18 +658,16 @@ function SignInSwitch({
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
                 <span>
-                    <span className="font-medium">Allow signing in with {name}</span>
+                    <span className="font-medium">{t("integrations.signIn.label", { name })}</span>
                     <span className="block text-xs text-muted-foreground">
-                        People who have connected a {name} account get a sign-in button for it. It
-                        never creates an account: only someone who already has one, and connected it
-                        themselves, can use it.
+                        {t("integrations.signIn.hint", { name })}
                     </span>
                 </span>
                 <Switch
                     checked={value}
                     disabled={pending}
                     onChange={toggle}
-                    aria-label={`Allow signing in with ${name}`}
+                    aria-label={t("integrations.signIn.label", { name })}
                 />
             </div>
             {warning ? (
@@ -694,6 +699,8 @@ function EmailTrustSwitch({
     name: string;
     trusted: boolean;
 }) {
+    const t = useTranslations("admin");
+
     const [value, setValue] = useState(trusted);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -717,27 +724,21 @@ function EmailTrustSwitch({
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
                 <span>
-                    <span className="font-medium">
-                        Take {name}&apos;s word for an email address
-                    </span>
+                    <span className="font-medium">{t("integrations.emailTrust.label", { name })}</span>
                     <span className="block text-xs text-muted-foreground">
-                        An address on a connected {name} account is added to that person&apos;s
-                        Polaris account already confirmed, instead of them being sent a link to
-                        confirm it.
+                        {t("integrations.emailTrust.hint", { name })}
                     </span>
                 </span>
                 <Switch
                     checked={value}
                     disabled={pending}
                     onChange={toggle}
-                    aria-label={`Take ${name}'s word for an email address`}
+                    aria-label={t("integrations.emailTrust.label", { name })}
                 />
             </div>
             <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />A confirmed address
-                is where a password reset and a sign-in code are sent. With this off the address is
-                still held for whoever connected it, so nobody else can be given an account under
-                it.
+                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                {t("integrations.emailTrust.warning")}
             </p>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
@@ -789,6 +790,9 @@ function ConnectionPolicy({
  * operator's own quota, and a wrong key surfaces in the firewall log instead.
  */
 function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
     const [apiKey, setApiKey] = useState("");
@@ -832,7 +836,9 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -840,8 +846,8 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             onChange={(event) => setApiKey(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new key to replace it"
-                                    : "Paste your key"
+                                    ? t("integrations.dialog.savedKey")
+                                    : t("integrations.dialog.pasteKey")
                             }
                         />
                         {card.apiKeyHelp ? (
@@ -850,7 +856,9 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                     </label>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Block addresses reported as</span>
+                        <span className="text-sm font-medium">
+                            {t("integrations.criminalIp.block")}
+                        </span>
                         <div className="flex flex-wrap gap-1.5">
                             {CRIMINALIP_RULES.map((rule) => (
                                 <button
@@ -869,21 +877,19 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             ))}
                         </div>
                         <span className="text-xs text-muted-foreground">
-                            Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the
-                            background and the answer is cached as an ordinary ban, so nothing here
-                            slows a request down.
+                            {t("integrations.criminalIp.hint")}
                         </span>
                     </div>
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
-                            Enable {card.name}
+                            {t("integrations.dialog.enable", { name: card.name })}
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label={`Enable ${card.name}`}
+                            aria-label={t("integrations.dialog.enable", { name: card.name })}
                         />
                     </div>
 
@@ -891,10 +897,10 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -912,6 +918,9 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
  * does not hold its own credential in the page.
  */
 function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [enabled, setEnabled] = useState(card.filterModuleUrl ? card.enabled : true);
     const [moduleUrl, setModuleUrl] = useState(card.filterModuleUrl ?? "");
     const [token, setToken] = useState("");
@@ -951,7 +960,7 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Where the filter is served from</span>
+                        <span className="font-medium">{t("integrations.filter.moduleUrl")}</span>
                         <Input
                             value={moduleUrl}
                             autoComplete="off"
@@ -959,14 +968,16 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             onChange={(event) => setModuleUrl(event.target.value)}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A module exporting <code>createNode(context, options)</code>, which
-                            returns the audio node the microphone is played through. Polaris loads
-                            it in the call and sends whatever comes out.
+                            {t.rich("integrations.filter.moduleHint", {
+                                code: (chunks) => <code key="code">{chunks}</code>
+                            })}
                         </span>
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.token")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -974,29 +985,26 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             onChange={(event) => setToken(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new one to replace it"
-                                    : "Optional"
+                                    ? t("integrations.dialog.savedOne")
+                                    : t("integrations.dialog.optional")
                             }
                         />
                         <span className="text-xs text-muted-foreground">
-                            Handed to the filter in the browser, and only to a browser sitting in a
-                            call. A filter runs on the microphone, so there is nowhere else for it
-                            to go.
+                            {t("integrations.filter.tokenHint")}
                         </span>
                     </label>
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
-                            <span className="font-medium">Use it in calls</span>
+                            <span className="font-medium">{t("integrations.filter.use")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Adds it to the noise setting in a call, beside the two free models.
-                                Anyone whose browser cannot load it gets the free one.
+                                {t("integrations.filter.useHint")}
                             </span>
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label="Use it in calls"
+                            aria-label={t("integrations.filter.use")}
                         />
                     </div>
 
@@ -1004,10 +1012,10 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -1023,6 +1031,9 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
  * changes when it is off, and the picker in Chat keeps working without it.
  */
 function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     // Nobody pastes a key meaning to leave it unused.
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [apiKey, setApiKey] = useState("");
@@ -1057,7 +1068,9 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -1065,8 +1078,8 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             onChange={(event) => setApiKey(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new key to replace it"
-                                    : "Paste your key"
+                                    ? t("integrations.dialog.savedKey")
+                                    : t("integrations.dialog.pasteKey")
                             }
                         />
                         {card.apiKeyHelp ? (
@@ -1076,17 +1089,15 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
-                            <span className="font-medium">Search for GIFs and stickers</span>
+                            <span className="font-medium">{t("integrations.tenor.search")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Adds the search to the picker in Chat. A chosen GIF is stored here
-                                like any other attachment, so nobody reading a conversation is
-                                announced to anyone.
+                                {t("integrations.tenor.hint")}
                             </span>
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label="Search for GIFs and stickers"
+                            aria-label={t("integrations.tenor.search")}
                         />
                     </div>
 
@@ -1094,10 +1105,10 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -1121,39 +1132,45 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
  * whether the service may sign anybody in. Only the vocabulary differs, and a
  * second copy of this form would be a second place to fix the next bug in it.
  */
-const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder: string }> = {
+/** The id's name on the vendor's form, as a key of `oauth.idLabel`. */
+type OAuthIdLabel = "clientId" | "applicationId" | "appKey";
+
+const OAUTH_APPS: Record<string, { name: string; idLabel: OAuthIdLabel; idPlaceholder: string }> = {
     google: {
         name: "Google",
-        idLabel: "Client ID",
+        idLabel: "clientId",
         idPlaceholder: "1234567890-abc.apps.googleusercontent.com"
     },
     microsoft: {
         name: "Microsoft",
-        idLabel: "Application (client) ID",
+        idLabel: "applicationId",
         idPlaceholder: "00000000-0000-0000-0000-000000000000"
     },
-    dropbox: { name: "Dropbox", idLabel: "App key", idPlaceholder: "abcdefghijklmno" },
-    epic: { name: "Epic Games", idLabel: "Client ID", idPlaceholder: "xyza7891..." },
+    dropbox: { name: "Dropbox", idLabel: "appKey", idPlaceholder: "abcdefghijklmno" },
+    epic: { name: "Epic Games", idLabel: "clientId", idPlaceholder: "xyza7891..." },
     minecraft: {
         name: "Minecraft",
-        idLabel: "Application (client) ID",
+        idLabel: "applicationId",
         idPlaceholder: "00000000-0000-0000-0000-000000000000"
     },
     // Discord's client id is the application id: a snowflake, so the placeholder
     // is digits rather than the hex an operator might otherwise go looking for.
-    discord: { name: "Discord", idLabel: "Client ID", idPlaceholder: "123456789012345678" },
+    discord: { name: "Discord", idLabel: "clientId", idPlaceholder: "123456789012345678" },
     // Spotify's client id is 32 hexadecimal characters.
     spotify: {
         name: "Spotify",
-        idLabel: "Client ID",
+        idLabel: "clientId",
         idPlaceholder: "0123456789abcdef0123456789abcdef"
     }
 };
 
 function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const app = OAUTH_APPS[card.slug] ?? {
         name: card.name,
-        idLabel: "Client ID",
+        idLabel: "clientId",
         idPlaceholder: ""
     };
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
@@ -1203,12 +1220,14 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>Enabled</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                        <span>{t("integrations.dialog.enabled")}</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{app.idLabel}</span>
+                        <span className="font-medium">
+                            {t(`integrations.oauth.idLabel.${app.idLabel}`)}
+                        </span>
                         <Input
                             value={clientId}
                             onChange={(event) => setClientId(event.target.value)}
@@ -1218,15 +1237,17 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "Client secret"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.clientSecret")}
+                        </span>
                         <Input
                             type="password"
                             value={clientSecret}
                             onChange={(event) => setClientSecret(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new secret to replace it"
-                                    : "Paste the secret"
+                                    ? t("integrations.dialog.savedSecret")
+                                    : t("integrations.dialog.pasteSecret")
                             }
                             autoComplete="off"
                         />
@@ -1245,7 +1266,9 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
 
                     {card.oauthCallbackUrl ? (
                         <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
-                            <span className="font-medium">Authorized redirect URI</span>
+                            <span className="font-medium">
+                                {t("integrations.oauth.redirectTitle")}
+                            </span>
                             <div className="flex items-center gap-2">
                                 <code
                                     className="min-w-0 flex-1 truncate text-xs"
@@ -1255,12 +1278,11 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                                 </code>
                                 <CopyButton
                                     value={card.oauthCallbackUrl}
-                                    label="Copy the redirect URI"
+                                    label={t("integrations.oauth.copyRedirect")}
                                 />
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                Paste this into the app under its redirect URIs. {app.name} refuses
-                                an authorization that arrives from any other address.
+                                {t("integrations.oauth.redirectHint", { name: app.name })}
                             </span>
                         </div>
                     ) : null}
@@ -1268,10 +1290,10 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={onSave} disabled={pending || !canSave}>
-                            {pending ? "Saving..." : "Save"}
+                            {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -1289,6 +1311,9 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
  * decides whether a linked account shows a name or a seventeen-digit number.
  */
 function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [enabled, setEnabled] = useState(card.enabled || !card.hasSecret);
     const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -1327,24 +1352,26 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span className="flex flex-col gap-0.5">
-                            <span>Enabled</span>
+                            <span>{t("integrations.dialog.enabled")}</span>
                             <span className="text-xs text-muted-foreground">
-                                Everybody gets a Connect button for their own Steam account.
+                                {t("integrations.steam.enabledHint")}
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "Web API key"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.webApiKey")}
+                        </span>
                         <Input
                             type="password"
                             value={apiKey}
                             onChange={(event) => setApiKey(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new key to replace it"
-                                    : "Optional"
+                                    ? t("integrations.dialog.savedKey")
+                                    : t("integrations.dialog.optional")
                             }
                             autoComplete="off"
                         />
@@ -1360,10 +1387,10 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={onSave} disabled={pending}>
-                            {pending ? "Saving..." : "Save"}
+                            {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -1373,6 +1400,9 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 }
 
 function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const provider = card.slug as TunnelProviderSlug;
     // Default a first-time setup to enabled; respect the stored state once configured.
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
@@ -1419,19 +1449,19 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>Enabled</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                        <span>{t("integrations.dialog.enabled")}</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
-                        {card.apiKeyLabel ?? "Token"}
+                        {card.apiKeyLabel ?? t("integrations.dialog.token")}
                         <Input
                             type="password"
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new token to replace it"
-                                    : "Paste the token"
+                                    ? t("integrations.dialog.savedToken")
+                                    : t("integrations.dialog.pasteToken")
                             }
                             autoComplete="off"
                         />
@@ -1444,10 +1474,10 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={onSave} disabled={pending || !canSave}>
-                            {pending ? "Applying..." : "Save"}
+                            {pending ? t("integrations.dialog.applying") : tc("actions.save")}
                         </Button>
                     </div>
 
@@ -1458,12 +1488,9 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
     );
 }
 
-/** What a token can be created for, in the order an operator most likely wants. */
-const CLOUDFLARE_SCOPES: Array<{ id: CloudflareTokenScope; label: string; hint: string }> = [
-    { id: "all", label: "Everything", hint: "One token for records and tunnels." },
-    { id: "dns", label: "DNS only", hint: "Points your domains at this server." },
-    { id: "tunnel", label: "Tunnels only", hint: "Publishes apps with no ports open." }
-];
+/** What a token can be created for, in the order an operator most likely wants.
+ *  Each one's label and hint are `cloudflare.scope.<id>`. */
+const CLOUDFLARE_SCOPES: CloudflareTokenScope[] = ["all", "dns", "tunnel"];
 
 /**
  * Connect the API tokens Polaris uses Cloudflare through. Two capabilities, because
@@ -1480,6 +1507,8 @@ const CLOUDFLARE_SCOPES: Array<{ id: CloudflareTokenScope; label: string; hint: 
  * row missing, and the operator only finds out when the token is rejected here.
  */
 function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
+    const t = useTranslations("admin");
+
     const [tunnelConnected, setTunnelConnected] = useState(card.cloudflareApiConnected ?? false);
     const [dnsConnected, setDnsConnected] = useState(card.cloudflareDnsConnected ?? false);
     const [accountName, setAccountName] = useState(card.cloudflareAccountName ?? "");
@@ -1520,9 +1549,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                 // plainly here, because the row above simply not lighting up is the kind
                 // of half-success an operator reads as a bug.
                 if (scope === "all" && !stored.includes("tunnel")) {
-                    setNote(
-                        "Connected for DNS. The token reaches no account, so tunnels still need one."
-                    );
+                    setNote(t("integrations.cloudflare.dnsOnlyNote"));
                 }
                 setAccounts([]);
                 setToken("");
@@ -1556,7 +1583,6 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         });
     }
 
-    const active = CLOUDFLARE_SCOPES.find((entry) => entry.id === scope);
     // Nothing left to ask for once both are connected; the rows above carry the state
     // and a form offering a token for capabilities that already work is just noise.
     const complete = dnsConnected && tunnelConnected;
@@ -1564,27 +1590,26 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
     return (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">API access</span>
+                <span className="text-sm font-medium">{t("integrations.cloudflare.apiAccess")}</span>
                 <span className="text-xs text-muted-foreground">
-                    Lets Polaris create your DNS records and each app&apos;s tunnel for you. One
-                    token can do both, or connect them separately.
+                    {t("integrations.cloudflare.apiAccessHint")}
                 </span>
             </div>
 
             <div className="flex flex-col gap-2">
                 <CloudflareCapability
-                    label="DNS records"
-                    detail="Points your zones at this server."
+                    label={t("integrations.cloudflare.dnsLabel")}
+                    detail={t("integrations.cloudflare.dnsDetail")}
                     connected={dnsConnected}
                     pending={pending}
                     onDisconnect={() => onDisconnect("dns")}
                 />
                 <CloudflareCapability
-                    label="Named tunnels"
+                    label={t("integrations.cloudflare.tunnelsLabel")}
                     detail={
                         tunnelConnected && accountName
-                            ? `Account: ${accountName}`
-                            : "One tunnel per app, no open ports."
+                            ? t("integrations.cloudflare.tunnelsAccount", { name: accountName })
+                            : t("integrations.cloudflare.tunnelsDetail")
                     }
                     connected={tunnelConnected}
                     pending={pending}
@@ -1597,22 +1622,24 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                     <div className="flex flex-wrap gap-1.5">
                         {CLOUDFLARE_SCOPES.map((entry) => (
                             <button
-                                key={entry.id}
+                                key={entry}
                                 type="button"
-                                onClick={() => setScope(entry.id)}
+                                onClick={() => setScope(entry)}
                                 className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                                    scope === entry.id
+                                    scope === entry
                                         ? "border-primary bg-primary/5 text-foreground"
                                         : "border-border/60 text-muted-foreground hover:bg-muted/40"
                                 }`}
                             >
-                                {entry.label}
+                                {t(`integrations.cloudflare.scope.${entry}.label`)}
                             </button>
                         ))}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        {active?.hint} The link opens Cloudflare with{" "}
-                        {CLOUDFLARE_TOKEN_PERMISSIONS[scope].join(", ")} already selected.
+                        {t("integrations.cloudflare.scopeHint", {
+                            hint: t(`integrations.cloudflare.scope.${scope}.hint`),
+                            permissions: CLOUDFLARE_TOKEN_PERMISSIONS[scope].join(", ")
+                        })}
                     </span>
 
                     <Input
@@ -1620,11 +1647,11 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                         autoComplete="off"
                         value={token}
                         onChange={(event) => setToken(event.target.value)}
-                        placeholder="Paste a Cloudflare API token"
+                        placeholder={t("integrations.cloudflare.tokenPlaceholder")}
                     />
                     {accounts.length > 0 ? (
                         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            The token reaches several accounts - pick the one to use
+                            {t("integrations.cloudflare.pickAccount")}
                             <Select
                                 value={accountId}
                                 onValueChange={setAccountId}
@@ -1642,7 +1669,8 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             rel="noreferrer noopener"
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                         >
-                            Create the token on Cloudflare <ExternalLink className="size-3" />
+                            {t("integrations.cloudflare.createToken")}{" "}
+                            <ExternalLink className="size-3" />
                         </a>
                         <Button
                             type="button"
@@ -1655,9 +1683,9 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             {pending ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : accounts.length > 0 ? (
-                                "Use this account"
+                                t("integrations.cloudflare.useAccount")
                             ) : (
-                                "Connect"
+                                t("integrations.dialog.connect")
                             )}
                         </Button>
                     </div>
@@ -1684,6 +1712,8 @@ function CloudflareCapability({
     pending: boolean;
     onDisconnect: () => void;
 }) {
+    const t = useTranslations("admin");
+
     return (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-2.5">
             <span className="flex min-w-0 flex-col">
@@ -1696,7 +1726,7 @@ function CloudflareCapability({
                     {label}
                 </span>
                 <span className="truncate pl-5.5 text-xs text-muted-foreground">
-                    {connected ? detail : `Not connected. ${detail}`}
+                    {connected ? detail : t("integrations.cloudflare.notConnected", { detail })}
                 </span>
             </span>
             {connected && (
@@ -1707,7 +1737,11 @@ function CloudflareCapability({
                     onClick={onDisconnect}
                     disabled={pending}
                 >
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        t("integrations.dialog.disconnect")
+                    )}
                 </Button>
             )}
         </div>
@@ -1715,6 +1749,9 @@ function CloudflareCapability({
 }
 
 function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [subdomain, setSubdomain] = useState(card.duckdnsSubdomain ?? "");
     const [token, setToken] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -1754,6 +1791,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <IntegrationLogo slug="duckdns" className="size-5" />
+                        {/* i18n-ignore: brand name */}
                         DuckDNS
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
@@ -1763,7 +1801,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Subdomain</span>
+                        <span className="font-medium">{t("integrations.duckdns.subdomain")}</span>
                         <div className="flex items-center gap-2">
                             <Input
                                 value={subdomain}
@@ -1778,7 +1816,9 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.token")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -1786,8 +1826,8 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             onChange={(event) => setToken(event.target.value)}
                             placeholder={
                                 card.hasSecret
-                                    ? "Saved - enter a new token to replace it"
-                                    : "Paste your DuckDNS token"
+                                    ? t("integrations.dialog.savedToken")
+                                    : t("integrations.duckdns.pasteToken")
                             }
                         />
                         {card.apiKeyHelp ? (
@@ -1798,7 +1838,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                     {card.hasSecret ? (
                         <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                             <span className="text-muted-foreground">
-                                Point the record at this server's current public IP now.
+                                {t("integrations.duckdns.syncHint")}
                             </span>
                             <Button
                                 type="button"
@@ -1812,7 +1852,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 ) : (
                                     <RefreshCw className="size-4" />
                                 )}
-                                Sync now
+                                {t("integrations.duckdns.syncNow")}
                             </Button>
                         </div>
                     ) : null}
@@ -1827,10 +1867,10 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -1840,6 +1880,9 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
 }
 
 function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [verifyAccessIp, setVerifyAccessIp] = useState(card.verifyAccessIp);
     const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
@@ -1867,8 +1910,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                 setError
             );
             if (!result) return;
-            if (result.ok) setTested("The key works.");
-            else setError(result.error ?? "The key was rejected");
+            if (result.ok) setTested(t("integrations.dialog.keyWorks"));
+            else setError(result.error ?? t("integrations.dialog.keyRejected"));
         });
     }
 
@@ -1897,6 +1940,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <IntegrationLogo slug="dymo" className="size-5" />
+                        {/* i18n-ignore: brand name */}
                         Dymo API
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
@@ -1906,7 +1950,9 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                        </span>
                         <div className="flex gap-2">
                             <Input
                                 type="password"
@@ -1915,8 +1961,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                 onChange={(event) => setApiKey(event.target.value)}
                                 placeholder={
                                     card.hasSecret
-                                        ? "Saved - enter a new key to replace it"
-                                        : "Paste your key"
+                                        ? t("integrations.dialog.savedKey")
+                                        : t("integrations.dialog.pasteKey")
                                 }
                             />
                             <Button
@@ -1925,7 +1971,11 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                 onClick={onTest}
                                 disabled={testing || !apiKey.trim()}
                             >
-                                {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
+                                {testing ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    t("integrations.dialog.test")
+                                )}
                             </Button>
                         </div>
                         {card.apiKeyHelp ? (
@@ -1941,21 +1991,20 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
 
                     <div className="flex items-start justify-between gap-3 text-sm">
                         <span>
-                            <span className="font-medium">Verify visitor IPs on access</span>
+                            <span className="font-medium">{t("integrations.dymo.verify")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Check the IP when someone opens a share link or drop point, and
-                                block the ones that match your rules.
+                                {t("integrations.dymo.verifyHint")}
                             </span>
                         </span>
                         <Switch
                             checked={verifyAccessIp}
                             onChange={setVerifyAccessIp}
-                            aria-label="Verify visitor IPs on access"
+                            aria-label={t("integrations.dymo.verify")}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Block IPs that are</span>
+                        <span className="text-sm font-medium">{t("integrations.dymo.block")}</span>
                         <div className="flex flex-wrap gap-1.5">
                             {DYMO_IP_RULES.map((rule) => (
                                 <button
@@ -1969,8 +2018,9 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                             : "border-border text-muted-foreground hover:bg-muted"
                                     )}
                                 >
-                                    {rule.label}
-                                    {rule.premium ? " (premium)" : ""}
+                                    {rule.premium
+                                        ? t("integrations.dymo.premium", { label: rule.label })
+                                        : rule.label}
                                 </button>
                             ))}
                         </div>
@@ -1979,12 +2029,12 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
-                            Enable Dymo API
+                            {t("integrations.dialog.enable", { name: "Dymo API" })}
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label="Enable Dymo API"
+                            aria-label={t("integrations.dialog.enable", { name: "Dymo API" })}
                         />
                     </div>
 
@@ -1992,10 +2042,10 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -2020,13 +2070,14 @@ function RunnerAccessNote() {
 }
 
 function RunnerAccessAnswer({ pending }: { pending: Promise<RunnerAccessNoteData | null> }) {
+    const t = useTranslations("admin");
     const access = use(pending);
     if (!access) return null;
     if (access.ready && !access.advice) {
         return (
             <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
-                This connection can also register self-hosted runners.
+                {t("integrations.runners.ready")}
             </p>
         );
     }
@@ -2034,7 +2085,9 @@ function RunnerAccessAnswer({ pending }: { pending: Promise<RunnerAccessNoteData
         <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <span>
-                <span className="block font-medium text-foreground">Self-hosted runners</span>
+                <span className="block font-medium text-foreground">
+                    {t("integrations.runners.title")}
+                </span>
                 {access.advice}
             </span>
         </p>
@@ -2049,6 +2102,8 @@ function GitHubDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
 
 /** Connected state: show the account/app, installations, and disconnect. */
 function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+
     const [error, setError] = useState<string | null>(null);
     const [busy, startBusy] = useTransition();
     const isApp = card.githubMethod === "app";
@@ -2059,6 +2114,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <IntegrationLogo slug="github" className="size-5" />
+                        {/* i18n-ignore: brand name */}
                         GitHub
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
@@ -2073,8 +2129,15 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
 
                     <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3 text-sm">
                         <CheckCircle2 className="size-4 text-success" />
-                        Connected via {isApp ? "GitHub App" : "token"} as{" "}
-                        <span className="font-medium">{card.githubLogin}</span>
+                        {t.rich("integrations.github.connectedVia", {
+                            method: isApp ? "app" : "token",
+                            login: card.githubLogin ?? "",
+                            strong: (chunks) => (
+                                <span key="login" className="font-medium">
+                                    {chunks}
+                                </span>
+                            )
+                        })}
                     </div>
 
                     <RunnerAccessNote />
@@ -2091,7 +2154,9 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
 
                     {isApp ? (
                         <div className="flex flex-col gap-2 text-sm">
-                            <span className="font-medium">Installations</span>
+                            <span className="font-medium">
+                                {t("integrations.github.installations")}
+                            </span>
                             {card.githubInstallations && card.githubInstallations.length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5">
                                     {card.githubInstallations.map((login) => (
@@ -2105,8 +2170,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                 </div>
                             ) : (
                                 <p className="text-xs text-muted-foreground">
-                                    Not installed on any account yet. Install the app to grant
-                                    repository access.
+                                    {t("integrations.github.notInstalled")}
                                 </p>
                             )}
                             <div className="flex flex-wrap gap-2">
@@ -2117,7 +2181,8 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                         rel="noreferrer noopener"
                                         className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
                                     >
-                                        Install / manage <ExternalLink className="size-3" />
+                                        {t("integrations.github.installManage")}{" "}
+                                        <ExternalLink className="size-3" />
                                     </a>
                                 ) : null}
                                 <Button
@@ -2136,7 +2201,11 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                         })
                                     }
                                 >
-                                    {busy ? <Loader2 className="size-4 animate-spin" /> : "Refresh"}
+                                    {busy ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        t("integrations.dialog.refresh")
+                                    )}
                                 </Button>
                             </div>
                         </div>
@@ -2146,7 +2215,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Close
+                            {t("integrations.dialog.close")}
                         </Button>
                         <Button
                             type="button"
@@ -2164,7 +2233,11 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                 })
                             }
                         >
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
+                            {busy ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                t("integrations.dialog.disconnect")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -2185,6 +2258,8 @@ type ConnectMethod = "app" | "existing";
  * Connected accounts instead, where it only ever speaks for them.
  */
 function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+
     const [method, setMethod] = useState<ConnectMethod>("app");
     const [appId, setAppId] = useState("");
     const [pem, setPem] = useState("");
@@ -2218,36 +2293,31 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <IntegrationLogo slug="github" className="size-5" />
-                        Connect GitHub
+                        {t("integrations.github.connectTitle")}
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <SegmentedControl
-                        aria-label="How to connect"
+                        aria-label={t("integrations.github.howToConnect")}
                         className="flex w-full"
                         value={method}
                         onValueChange={setMethod}
                         options={[
-                            { value: "app", label: "Create app" },
-                            { value: "existing", label: "Existing app" }
+                            { value: "app", label: t("integrations.github.createApp") },
+                            { value: "existing", label: t("integrations.github.existingApp") }
                         ]}
                     />
 
                     {method === "app" ? (
                         <div className="flex flex-col gap-3 text-sm">
                             <p className="text-muted-foreground">
-                                Create a GitHub App for this Polaris instance in one step. GitHub
-                                will ask you to confirm, then to choose which repositories it can
-                                access.
+                                {t("integrations.github.createIntro")}
                             </p>
                             {!card.githubPublicUrl ? (
                                 <p className="text-muted-foreground">
-                                    This instance has no address GitHub can reach, so the app is
-                                    created without a webhook. Deploys and runner pools poll
-                                    instead; agent triggers need the webhook, which you can add on
-                                    GitHub once a domain is set.
+                                    {t("integrations.github.noWebhook")}
                                 </p>
                             ) : null}
                             <a
@@ -2255,13 +2325,13 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 className="inline-flex w-fit items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 <IntegrationLogo slug="github" className="size-4" />
-                                Create GitHub App
+                                {t("integrations.github.createGithubApp")}
                             </a>
                         </div>
                     ) : method === "existing" ? (
                         <div className="flex flex-col gap-3 text-sm">
                             <label className="flex flex-col gap-1">
-                                <span className="font-medium">App ID</span>
+                                <span className="font-medium">{t("integrations.github.appId")}</span>
                                 <Input
                                     value={appId}
                                     onChange={(event) => setAppId(event.target.value)}
@@ -2269,17 +2339,21 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="font-medium">Private key (PEM)</span>
+                                <span className="font-medium">
+                                    {t("integrations.github.privateKey")}
+                                </span>
                                 <Textarea
                                     value={pem}
                                     onChange={(event) => setPem(event.target.value)}
-                                    placeholder="Paste the contents of the app's .pem file"
+                                    placeholder={t("integrations.github.pemPlaceholder")}
                                     rows={4}
                                     className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="font-medium">Client ID</span>
+                                <span className="font-medium">
+                                    {t("integrations.github.clientId")}
+                                </span>
                                 <Input
                                     value={clientId}
                                     onChange={(event) => setClientId(event.target.value)}
@@ -2290,16 +2364,17 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="font-medium">Client secret</span>
+                                <span className="font-medium">
+                                    {t("integrations.dialog.clientSecret")}
+                                </span>
                                 <Input
                                     type="password"
                                     value={clientSecret}
                                     onChange={(event) => setClientSecret(event.target.value)}
-                                    placeholder="Optional"
+                                    placeholder={t("integrations.dialog.optional")}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Only needed so people can link their own GitHub account to their
-                                    Polaris one. An app created above already carries these.
+                                    {t("integrations.github.clientSecretHint")}
                                 </span>
                             </label>
                             <div className="flex justify-end">
@@ -2311,7 +2386,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                     {saving ? (
                                         <Loader2 className="size-4 animate-spin" />
                                     ) : (
-                                        "Connect app"
+                                        t("integrations.github.connectApp")
                                     )}
                                 </Button>
                             </div>
@@ -2330,6 +2405,9 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
 }
 
 function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [scanDropPoints, setScanDropPoints] = useState(card.scanDropPoints);
     const [onDetection, setOnDetection] = useState<ScanAction>(card.onDetection);
@@ -2348,8 +2426,8 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                 setError
             );
             if (!result) return;
-            if (result.ok) setTested("The key works.");
-            else setError(result.error ?? "The key was rejected");
+            if (result.ok) setTested(t("integrations.dialog.keyWorks"));
+            else setError(result.error ?? t("integrations.dialog.keyRejected"));
         });
     }
 
@@ -2378,6 +2456,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <IntegrationLogo slug="virustotal" className="size-5" />
+                        {/* i18n-ignore: brand name */}
                         VirusTotal
                     </DialogTitle>
                     <DialogDescription>{card.description}</DialogDescription>
@@ -2387,7 +2466,9 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                        </span>
                         <div className="flex gap-2">
                             <Input
                                 type="password"
@@ -2396,8 +2477,8 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                 onChange={(event) => setApiKey(event.target.value)}
                                 placeholder={
                                     card.hasSecret
-                                        ? "Saved - enter a new key to replace it"
-                                        : "Paste your key"
+                                        ? t("integrations.dialog.savedKey")
+                                        : t("integrations.dialog.pasteKey")
                                 }
                             />
                             <Button
@@ -2406,7 +2487,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                 onClick={onTest}
                                 disabled={testing || !apiKey.trim()}
                             >
-                                {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
+                                {testing ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    t("integrations.dialog.test")
+                                )}
                             </Button>
                         </div>
                         {card.apiKeyHelp ? (
@@ -2422,21 +2507,22 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
 
                     <div className="flex items-start justify-between gap-3 text-sm">
                         <span>
-                            <span className="font-medium">Scan drop-point uploads</span>
+                            <span className="font-medium">{t("integrations.virusTotal.scan")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Every file uploaded to a drop point is scanned before it is
-                                accepted.
+                                {t("integrations.virusTotal.scanHint")}
                             </span>
                         </span>
                         <Switch
                             checked={scanDropPoints}
                             onChange={setScanDropPoints}
-                            aria-label="Scan drop-point uploads"
+                            aria-label={t("integrations.virusTotal.scan")}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">When a file is flagged</span>
+                        <span className="text-sm font-medium">
+                            {t("integrations.virusTotal.whenFlagged")}
+                        </span>
                         <div className="flex flex-col gap-1.5">
                             {SCAN_ACTIONS.map((action) => (
                                 <button
@@ -2476,12 +2562,12 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
-                            Enable VirusTotal
+                            {t("integrations.dialog.enable", { name: "VirusTotal" })}
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label="Enable VirusTotal"
+                            aria-label={t("integrations.dialog.enable", { name: "VirusTotal" })}
                         />
                     </div>
 
@@ -2489,10 +2575,10 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
                         </Button>
                     </div>
                 </div>

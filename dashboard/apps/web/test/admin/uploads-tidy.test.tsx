@@ -10,6 +10,7 @@
  * not read as a clean sweep.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { UploadsView } from "@/app/(app)/admin/uploads/uploads-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -47,7 +48,8 @@ function draw() {
             drives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             orgDrives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             footage={null}
-        />
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

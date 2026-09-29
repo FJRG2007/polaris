@@ -13,6 +13,7 @@
  * provider is never one of those cards.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
@@ -69,7 +70,7 @@ describe("the configure dialogs", () => {
 
     it("renders a way in for every card it is given", () => {
         const markup = renderToStaticMarkup(
-            <IntegrationsView cards={SERVICE_INTEGRATIONS.map((entry) => card(entry.slug))} />
+            withMessages(<IntegrationsView cards={SERVICE_INTEGRATIONS.map((entry) => card(entry.slug))} />)
         );
         for (const entry of SERVICE_INTEGRATIONS) expect(markup).toContain(entry.name);
         expect(markup.match(/Set up/g)?.length).toBe(SERVICE_INTEGRATIONS.length);

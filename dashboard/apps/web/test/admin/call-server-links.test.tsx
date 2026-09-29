@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { CallServerView } from "@/app/(app)/admin/chat/call-server-view";
+import { MessagesWrapper } from "../setup/i18n";
 
 let settings: Record<string, unknown> = {};
 
@@ -33,7 +34,7 @@ const BASE = {
 describe("where calls run - container problem links", () => {
     it("points a never-created container at Settings, Update", async () => {
         settings = { ...BASE, container: "missing" };
-        render(<CallServerView />);
+        render(<CallServerView />, { wrapper: MessagesWrapper });
 
         const link = await screen.findByRole("link", { name: "Settings" });
         expect(link.getAttribute("href")).toBe("/admin/settings");
@@ -42,7 +43,7 @@ describe("where calls run - container problem links", () => {
 
     it("points a stopped container at Containers and names the row", async () => {
         settings = { ...BASE, container: "stopped" };
-        render(<CallServerView />);
+        render(<CallServerView />, { wrapper: MessagesWrapper });
 
         const link = await screen.findByRole("link", { name: "Containers" });
         expect(link.getAttribute("href")).toBe("/apps/containers");

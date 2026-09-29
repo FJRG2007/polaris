@@ -6,6 +6,7 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { UsageLimitsCard } from "./usage-limits-card";
 import { CatalogCard, KeySharingCard, SharedWorkspaceCard } from "./catalog-card";
 import { PlatformDefaultsView } from "./platform-defaults-view";
@@ -27,7 +28,8 @@ export default async function AgentDefaultsAdminPage() {
         catalogAt,
         keysShared,
         limits,
-        sharedMachine
+        sharedMachine,
+        t
     ] = await Promise.all([
         getPlatformAgentDefaults(),
         // Every pool on the deployment, not one person's: a default here applies
@@ -42,7 +44,8 @@ export default async function AgentDefaultsAdminPage() {
         catalogRefreshedAt(),
         instanceKeysAreShared(),
         listUsageLimits(),
-        sharedWorkspaceAllowed()
+        sharedWorkspaceAllowed(),
+        getTranslations("admin")
     ]);
 
     return (
@@ -50,8 +53,8 @@ export default async function AgentDefaultsAdminPage() {
         // the form does not sit against the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Agent defaults"
-                description="What agent runs do across the whole deployment. Each account can narrow it under Apps > Agents, and a repository can override it again."
+                title={t("agents.page.title")}
+                description={t("agents.page.description")}
             />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />

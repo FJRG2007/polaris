@@ -9,6 +9,7 @@
  */
 
 import * as actions from "@/app/(app)/admin/users/[id]/actions";
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UserAccessView } from "@/app/(app)/admin/users/[id]/access-view";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -65,7 +66,8 @@ function view() {
             memberOf={[]}
             policies={[]}
             attachedPolicies={[]}
-        />
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

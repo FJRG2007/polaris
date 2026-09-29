@@ -15,8 +15,10 @@ import { RefreshCw } from "lucide-react";
 import { RatesCard } from "./rates-card";
 import { Button, PageHeader, Skeleton } from "@polaris/ui";
 import * as parts from "@/components/billing/statement-parts";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function BillingView({ rates }: { rates: core.BillingRates | null }) {
+    const t = useTranslations("admin");
     const { data, error, stale, refreshing, refresh, month, months } = parts.useStatement(
         "/api/admin/billing",
         "admin.billing"
@@ -25,16 +27,16 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
     return (
         <>
             <PageHeader
-                title="Billing"
-                description="What each project and organization used, month by month, priced at the rates you set. Nothing is charged anywhere - this is for your own statements."
+                title={t("billing.title")}
+                description={t("billing.description")}
                 actions={
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={refresh}
                         disabled={refreshing}
-                        aria-label="Refresh"
-                        title="Refresh"
+                        aria-label={t("billing.refresh")}
+                        title={t("billing.refresh")}
                     >
                         <RefreshCw
                             className={refreshing ? "size-4 animate-spin" : "size-4"}
@@ -54,18 +56,16 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
                 />
                 {error ? <p className="text-danger text-sm">{error}</p> : null}
                 {stale ? (
-                    <p className="text-warning-ink text-sm">
-                        Showing the last statement read. {stale}
-                    </p>
+                    <p className="text-warning-ink text-sm">{t("billing.stale", { reason: stale })}</p>
                 ) : null}
                 <parts.StatementTotals view={data} />
                 <OwnersTable view={data} />
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-sm font-medium">Projects</h2>
+                    <h2 className="text-sm font-medium">{t("billing.projects")}</h2>
                     <parts.StatementTable
                         view={data}
                         showOwner
-                        emptyLabel="There are no projects on this Polaris yet."
+                        emptyLabel={t("billing.noProjects")}
                     />
                 </div>
                 <parts.StatementNotes view={data} />
@@ -76,22 +76,23 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
 
 /** Each owner's month, with its budget beside it when it has one. */
 function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
+    const t = useTranslations("admin");
     const statement = view?.statement ?? null;
     const format = parts.useStatementFormat(statement?.rates?.currency);
     if (statement && statement.owners.length === 0) return null;
 
     return (
         <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">By owner</h2>
+            <h2 className="text-sm font-medium">{t("billing.owners.title")}</h2>
             <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full min-w-[32rem] text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="w-full max-w-0 px-3 py-2 font-medium">Owner</th>
-                            <th className="px-3 py-2 font-medium text-right">Projects</th>
-                            <th className="px-3 py-2 font-medium text-right">CPU</th>
-                            <th className="px-3 py-2 font-medium text-right">Cost</th>
-                            <th className="px-3 py-2 font-medium text-right">Budget</th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("billing.owners.owner")}</th>
+                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.projects")}</th>
+                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.cpu")}</th>
+                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.cost")}</th>
+                            <th className="px-3 py-2 font-medium text-right">{t("billing.owners.budget")}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -123,7 +124,7 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                               {entry.projects}
                                           </td>
                                           <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                                              {parts.quantity(entry.usage.cpuHours)} vCPU-h
+                                              {t("billing.owners.cpuHours", { hours: parts.quantity(entry.usage.cpuHours) })}
                                           </td>
                                           <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
                                               {entry.cost ? format.currency(entry.cost.total) : "-"}
@@ -139,7 +140,10 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
                                           >
                                               {budget === null
                                                   ? "-"
-                                                  : `${Math.round((spent / budget) * 100)}% of ${format.currency(budget)}`}
+                                                  : t("billing.owners.budgetUsed", {
+                                                        percent: Math.round((spent / budget) * 100),
+                                                        budget: format.currency(budget)
+                                                    })}
                                           </td>
                                       </tr>
                                   );
@@ -153,6 +157,7 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
 
 /** An owner's name, leading to their own statement or profile. */
 function OwnerName({ owner }: { owner: core.BillingOwner }) {
+    const t = useTranslations("admin");
     const href = parts.ownerHref(owner);
     const label = (
         <>
@@ -160,7 +165,7 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
                 {owner.name}
             </span>
             <span className="text-muted-foreground shrink-0 text-xs">
-                {owner.kind === "org" ? "Organization" : "Personal"}
+                {owner.kind === "org" ? t("billing.owners.organization") : t("billing.owners.personal")}
             </span>
         </>
     );

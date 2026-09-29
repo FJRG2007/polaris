@@ -9,10 +9,18 @@
  *
  * The permission is not here. Every screen under this already requires its own,
  * and a layout that looked allowed would be a layout somebody trusted.
+ *
+ * The `admin` namespace is handed down here once, so every screen under it -
+ * and its client components - translates without a `<Messages>` of its own.
  */
 
+import { Messages } from "@/components/i18n/messages";
 import { PlainNames } from "@/components/person-name";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    return <PlainNames>{children}</PlainNames>;
+    return (
+        <Messages namespaces={["admin"]}>
+            <PlainNames>{children}</PlainNames>
+        </Messages>
+    );
 }

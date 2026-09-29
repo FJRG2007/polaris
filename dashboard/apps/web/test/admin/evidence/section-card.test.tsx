@@ -5,6 +5,7 @@
  */
 
 import { readings } from "./fixtures";
+import { withMessages } from "../../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildEvidence, type EvidenceSection } from "@/lib/compliance/evidence";
@@ -13,7 +14,7 @@ import { EvidenceSectionCard } from "@/app/(app)/admin/evidence/evidence-section
 const formatDate = (iso: string) => `[${iso.slice(0, 10)}]`;
 
 function render(section: EvidenceSection): string {
-    return renderToStaticMarkup(<EvidenceSectionCard section={section} formatDate={formatDate} />);
+    return renderToStaticMarkup(withMessages(<EvidenceSectionCard section={section} formatDate={formatDate} />));
 }
 
 function area(id: EvidenceSection["id"], overrides = readings()): EvidenceSection {

@@ -13,11 +13,13 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SegmentedControl } from "@polaris/ui";
 import { setDriveShareAction } from "./actions";
 import type { DriveShare } from "@/lib/chat/drive-share";
 
 export function DriveShareView({ how }: { how: DriveShare }) {
+    const t = useTranslations("admin");
     const [chosen, setChosen] = useState<DriveShare>(how);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -36,21 +38,21 @@ export function DriveShareView({ how }: { how: DriveShare }) {
     return (
         <div className="flex flex-col gap-2">
             <div>
-                <p className="text-sm font-medium">A file sent from Drive</p>
+                <p className="text-sm font-medium">{t("chat.driveShare.title")}</p>
                 <p className="text-xs text-muted-foreground">
                     {chosen === "copy"
-                        ? "Copied into the conversation, so nothing can change it and nothing can take it away. The instance keeps a second copy of every file anybody shares, and the size limit above applies to it."
-                        : "Shared where it already is. Nothing is copied, so any size works and the limit above does not apply - but whoever owns the file can edit it or delete it under a message that has already been read, and the conversation says so on the file."}
+                        ? t("chat.driveShare.copy.hint")
+                        : t("chat.driveShare.link.hint")}
                 </p>
             </div>
             <SegmentedControl
                 className="self-start"
-                aria-label="What happens to a file sent from Drive"
+                aria-label={t("chat.driveShare.picker")}
                 value={chosen}
                 onValueChange={(next) => void change(next as DriveShare)}
                 options={[
-                    { value: "copy", label: "Copied", title: "A copy of its own, in the conversation's store" },
-                    { value: "link", label: "Linked", title: "Left where it is, and reached from the message" }
+                    { value: "copy", label: t("chat.driveShare.copy.label"), title: t("chat.driveShare.copy.title") },
+                    { value: "link", label: t("chat.driveShare.link.label"), title: t("chat.driveShare.link.title") }
                 ]}
             />
             {error && (

@@ -12,13 +12,15 @@
 import { PageHeader } from "@polaris/ui";
 import { AuditIntegrity } from "./audit-integrity";
 import { AuditFeed } from "@/components/audit-feed";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ActivityView() {
+    const t = useTranslations("admin");
     return (
         <>
             <PageHeader
-                title="Activity"
-                description="Everything done across Polaris, by whom and from where. Sealed into a chain so an edited or deleted entry shows."
+                title={t("activity.page.title")}
+                description={t("activity.page.description")}
             />
             <div className="flex flex-col gap-4">
                 <AuditIntegrity />
@@ -27,8 +29,8 @@ export function ActivityView() {
                     exportEndpoint="/api/admin/activity/export"
                     path="/admin/activity"
                     cacheKey="admin.activity"
-                    contextLabel="Who"
-                    emptyLabel="No activity recorded yet."
+                    contextLabel={t("activity.feed.who")}
+                    emptyLabel={t("activity.feed.empty")}
                     context={(entry) => entry.actorName}
                     detail={(entry) =>
                         entry.targetType ? [entry.targetType, entry.targetId].filter(Boolean).join(" ") : ""

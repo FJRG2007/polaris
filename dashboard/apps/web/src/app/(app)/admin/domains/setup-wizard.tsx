@@ -19,6 +19,8 @@ import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
 import type { ServerEnvironment } from "@polaris/core";
 import { PageSection } from "@/components/page-section";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
@@ -68,7 +70,15 @@ interface ZoneRow {
     primary: boolean;
 }
 
-const STEPS = ["Server", "Exposure", "Domain", "DNS"];
+/** The four steps, as the progress bar names them. */
+function stepTitles(t: NamespaceTranslator<"admin">): string[] {
+    return [
+        t("domainsSetup.steps.server"),
+        t("domainsSetup.steps.exposure"),
+        t("domainsSetup.steps.domain"),
+        t("domainsSetup.steps.dns")
+    ];
+}
 
 /**
  * Every fresh read of the server's state is reported outwards, because the page around
@@ -79,6 +89,8 @@ const STEPS = ["Server", "Exposure", "Domain", "DNS"];
  * before the records existed.
  */
 export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupState) => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const [state, setState] = useState<DomainSetupState | null>(null);
     const [step, setStep] = useState(0);
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
@@ -136,7 +148,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                 if (next.zones.baseDomain) setStep(3);
             })
             .catch((caught: unknown) => {
-                setLoadError(caught instanceof Error ? caught.message : "Could not read your setup");
+                setLoadError(caught instanceof Error ? caught.message : t("domainsSetup.errors.readFailed"));
             });
     }
 
@@ -191,10 +203,10 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             // is recognisable and its place on the page is held while the state - which
             // re-checks DNS and looks up the public IP - is still on its way.
             <PageSection
-                title="Guided setup"
+                title={t("domainsSetup.title")}
                 actions={
                     <div className="flex items-center gap-1.5">
-                        {STEPS.map((title) => (
+                        {stepTitles(t).map((title) => (
                             <span key={title} className="h-1.5 w-6 rounded-full bg-border" title={title} />
                         ))}
                     </div>
@@ -206,7 +218,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
                         </p>
                         <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
-                            <RefreshCw className="size-4" /> Try again
+                            <RefreshCw className="size-4" /> {t("domains.tryAgain")}
                         </Button>
                     </>
                 ) : (
@@ -266,7 +278,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
         try {
             applyState(await domainSetupStateAction());
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "Could not re-read your setup");
+            setError(caught instanceof Error ? caught.message : t("domainsSetup.errors.rereadFailed"));
         }
     }
 
@@ -286,11 +298,11 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             useForDashboard
         }).catch((caught: unknown) => ({
             state: null,
-            error: caught instanceof Error ? caught.message : "Could not save the domain setup"
+            error: caught instanceof Error ? caught.message : t("domainsSetup.errors.saveFailed")
         }));
         setBusy(false);
         if (!result.state || result.error) {
-            setError(result.error ?? "Could not save the domain setup");
+            setError(result.error ?? t("domainsSetup.errors.saveFailed"));
             return;
         }
         applyState(result.state);
@@ -311,14 +323,14 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
 
     return (
         <PageSection
-            title="Guided setup"
+            title={t("domainsSetup.title")}
             actions={
                 <div className="flex items-center gap-1.5">
                     {/* The domain in use, on every step: the answer to "what is this
                         box on" was two steps deep before, so reopening the setup read
                         as though the domain had never been saved. */}
                     {state.zones.baseDomain && <Badge variant="neutral">{state.zones.baseDomain}</Badge>}
-                    {STEPS.map((title, index) => (
+                    {stepTitles(t).map((title, index) => (
                         <span
                             key={title}
                             className={`h-1.5 w-6 rounded-full ${index <= step ? "bg-primary" : "bg-border"}`}
@@ -330,13 +342,13 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
         >
             {resumed && step <= 2 && (
                 <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                    <span>Picked up where you left off.</span>
+                    <span>{t("domainsSetup.resumed")}</span>
                     <button
                         type="button"
                         onClick={startOver}
                         className="font-medium text-foreground underline-offset-2 hover:underline"
                     >
-                        Start over
+                        {t("domainsSetup.startOver")}
                     </button>
                 </div>
             )}
@@ -404,7 +416,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     onClick={() => setStep((current) => Math.max(0, current - 1))}
                     disabled={step === 0 || busy}
                 >
-                    <ChevronLeft className="size-4" /> Back
+                    <ChevronLeft className="size-4" /> {t("domainsSetup.back")}
                 </Button>
                 {step < 2 && (
                     // Nothing past here reads well without an answer: the exposure
@@ -417,18 +429,18 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                         onClick={() => setStep((current) => current + 1)}
                         disabled={step === 0 && environment === "unknown"}
                     >
-                        Continue
+                        {t("domainsSetup.continue")}
                     </Button>
                 )}
                 {step === 2 && (
                     <Button size="sm" onClick={save} disabled={busy}>
                         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {busy ? "Saving..." : "Save and continue"}
+                        {busy ? tc("actions.saving") : t("domainsSetup.saveAndContinue")}
                     </Button>
                 )}
                 {step === 3 && (
                     <span className="flex items-center gap-1.5 text-sm text-success">
-                        <CheckCircle2 className="size-4" /> Setup saved.
+                        <CheckCircle2 className="size-4" /> {t("domainsSetup.saved")}
                     </span>
                 )}
             </div>
@@ -445,14 +457,15 @@ function EnvironmentStep({
     detected: ServerEnvironment;
     onSelect: (next: ServerEnvironment) => void;
 }) {
+    const t = useTranslations("admin");
     return (
         <div className="flex flex-col gap-3">
             <StepTitle
-                title="Where does this server run?"
+                title={t("domainsSetup.environment.title")}
                 hint={
                     selected === "unknown"
-                        ? "Pick one to continue. It decides which ways of reaching it can work at all."
-                        : "It decides which ways of reaching it can work at all."
+                        ? t("domainsSetup.environment.hintPick")
+                        : t("domainsSetup.environment.hint")
                 }
             />
             <div className="grid gap-2 sm:grid-cols-2">
@@ -469,7 +482,7 @@ function EnvironmentStep({
                         >
                             <span className="flex items-center gap-2 text-sm font-medium">
                                 {meta.label}
-                                {detected === option && <Badge variant="neutral">Detected</Badge>}
+                                {detected === option && <Badge variant="neutral">{t("domainsSetup.environment.detected")}</Badge>}
                             </span>
                             <span className="text-xs text-muted-foreground">{meta.summary}</span>
                         </button>
@@ -516,6 +529,7 @@ function StrategyStep({
     gameRules: readonly RouterForwardRule[];
     onSelect: (next: ExposureStrategy) => void;
 }) {
+    const t = useTranslations("admin");
     const approach = approachOf(selected);
     const picked = approaches.options.find((option) => option.id === approach);
     // Only this side's strategies, but the full list where a side somehow has none -
@@ -529,10 +543,7 @@ function StrategyStep({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
-                <StepTitle
-                    title="How should traffic reach this server?"
-                    hint="Everything below follows from this answer, and either way can be changed later."
-                />
+                <StepTitle title={t("domainsSetup.strategy.title")} hint={t("domainsSetup.strategy.hint")} />
                 <div className="grid gap-2 sm:grid-cols-2">
                     {approaches.options.map((option) => {
                         const active = approach === option.id;
@@ -557,7 +568,7 @@ function StrategyStep({
                                     {option.meta.label}
                                     {option.id === approaches.recommended && (
                                         <Badge variant="success">
-                                            <Sparkles className="size-3" /> Recommended
+                                            <Sparkles className="size-3" /> {t("domainsSetup.recommended")}
                                         </Badge>
                                     )}
                                 </span>
@@ -581,16 +592,18 @@ function StrategyStep({
                 </div>
                 {approach === "ports" && forwardable && (
                     <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                        <p className="font-medium text-foreground">What you have to do in the router</p>
+                        <p className="font-medium text-foreground">{t("domainsSetup.strategy.routerTitle")}</p>
                         <p>
-                            Forward ports 80 and 443 to this server
-                            {gameRules.length > 0
-                                ? gameRules.some((rule) => rule.endPort)
-                                    ? ", plus the range your game servers answer in"
-                                    : `, plus ${gameRules.length === 1 ? "the port" : "the ports"} your game servers answer on`
-                                : ""}
-                            . Pick your brand for the exact menu names and the values to type - the rest of the setup
-                            works either way, so this can be done afterwards.
+                            {t("domainsSetup.strategy.routerBody", {
+                                games:
+                                    gameRules.length === 0
+                                        ? "none"
+                                        : gameRules.some((rule) => rule.endPort)
+                                          ? "range"
+                                          : gameRules.length === 1
+                                            ? "port"
+                                            : "ports"
+                            })}
                         </p>
                         <RouterSteps server={null} lanIp={lanIp} rules={[...FORWARD_RULES, ...gameRules]} />
                     </div>
@@ -599,8 +612,12 @@ function StrategyStep({
 
             <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
                 <StepTitle
-                    title={approach === "tunnel" ? "Which tunnel?" : "Which domain do the hostnames come from?"}
-                    hint="Ordered by what costs least and depends on the fewest others."
+                    title={
+                        approach === "tunnel"
+                            ? t("domainsSetup.strategy.whichTunnel")
+                            : t("domainsSetup.strategy.whichDomain")
+                    }
+                    hint={t("domainsSetup.strategy.ordered")}
                 />
                 <div className="flex flex-col gap-2">
                     {options.map((option) => {
@@ -619,26 +636,28 @@ function StrategyStep({
                                     {option.meta.label}
                                     {option.id === choice.recommended ? (
                                         <Badge variant="success">
-                                            <Sparkles className="size-3" /> Recommended
+                                            <Sparkles className="size-3" /> {t("domainsSetup.recommended")}
                                         </Badge>
                                     ) : (
                                         // The best on this side, said as such: the overall
                                         // recommendation sits on the other one, and a list
                                         // with no cue at all reads as five equal options.
-                                        option.id === picked?.best && <Badge variant="primary">Best of these</Badge>
+                                        option.id === picked?.best && (
+                                            <Badge variant="primary">{t("domainsSetup.strategy.best")}</Badge>
+                                        )
                                     )}
-                                    {option.meta.wildcard && <Badge variant="neutral">Wildcard</Badge>}
+                                    {option.meta.wildcard && <Badge variant="neutral">{t("domainsSetup.strategy.wildcard")}</Badge>}
                                     {option.id === "cloudflare-tunnel" && tunnelReady && (
-                                        <Badge variant="neutral">Token connected</Badge>
+                                        <Badge variant="neutral">{t("domainsSetup.strategy.tokenConnected")}</Badge>
                                     )}
                                 </span>
                                 <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    Depends on: {option.meta.dependency}
+                                    {t("domainsSetup.strategy.dependsOn", { value: option.meta.dependency })}
                                 </span>
                                 {option.meta.requires.length > 0 && (
                                     <span className="text-xs text-muted-foreground">
-                                        Needs: {option.meta.requires.join(" - ")}
+                                        {t("domainsSetup.strategy.needs", { value: option.meta.requires.join(" - ") })}
                                     </span>
                                 )}
                                 {option.note && (
@@ -688,6 +707,7 @@ function DomainStep({
     onDuckToken: (next: string) => void;
     onUseForDashboard: (next: boolean) => void;
 }) {
+    const t = useTranslations("admin");
     const meta = STRATEGY_META[strategy];
 
     function updateZone(index: number, patch: Partial<ZoneRow>) {
@@ -707,18 +727,24 @@ function DomainStep({
         return (
             <div className="flex flex-col gap-3">
                 <StepTitle
-                    title={meta.needsDomain ? "Set this up under Integrations" : "Nothing to configure"}
-                    hint={meta.needsDomain ? "The tunnel publishes each service itself." : "This option needs no domain and no DNS."}
+                    title={
+                        meta.needsDomain
+                            ? t("domainsSetup.domain.integrationsTitle")
+                            : t("domainsSetup.domain.nothingTitle")
+                    }
+                    hint={
+                        meta.needsDomain ? t("domainsSetup.domain.integrationsHint") : t("domainsSetup.domain.nothingHint")
+                    }
                 />
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     {meta.summary}
                 </p>
                 {meta.needsDomain ? (
                     <a href="/admin/integrations" className="w-fit text-xs text-primary hover:underline">
-                        Open Integrations
+                        {t("domainsSetup.domain.openIntegrations")}
                     </a>
                 ) : (
-                    <p className="text-xs text-muted-foreground">You can come back and point a domain here at any time.</p>
+                    <p className="text-xs text-muted-foreground">{t("domainsSetup.domain.comeBack")}</p>
                 )}
             </div>
         );
@@ -726,40 +752,35 @@ function DomainStep({
 
     return (
         <div className="flex flex-col gap-4">
-            <StepTitle
-                title="Domain and zones"
-                hint="A zone is one wildcard record. Everything Polaris mints lives under it, so DNS is a one-time job."
-            />
+            <StepTitle title={t("domainsSetup.domain.title")} hint={t("domainsSetup.domain.hint")} />
 
             {strategy === "duckdns" ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1 text-sm">
-                        DuckDNS subdomain
+                        {t("domainsSetup.domain.duckSubdomain")}
                         <Input value={duckSub} onChange={(event) => onDuckSub(event.target.value)} placeholder="mypolaris" autoComplete="off" />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Token
+                        {t("domainsSetup.domain.token")}
                         <Input
                             type="password"
                             value={duckToken}
                             onChange={(event) => onDuckToken(event.target.value)}
-                            placeholder={hasDuckToken ? "Saved - enter a new token to replace it" : "DuckDNS token"}
+                            placeholder={hasDuckToken ? t("domains.duckdns.tokenSaved") : t("domains.duckdns.tokenPlaceholder")}
                             autoComplete="off"
                         />
                     </label>
                 </div>
             ) : (
                 <label className="flex flex-col gap-1 text-sm">
-                    Base domain
+                    {t("domainsSetup.domain.baseDomain")}
                     <Input
                         value={baseDomain}
                         onChange={(event) => onBaseDomain(event.target.value)}
                         placeholder="example.com"
                         autoComplete="off"
                     />
-                    <span className="text-xs text-muted-foreground">
-                        Any domain or subdomain you control - example.com, plr.com, or plr.example.com.
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("domainsSetup.domain.baseDomainHint")}</span>
                 </label>
             )}
 
@@ -767,13 +788,13 @@ function DomainStep({
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">Zones</span>
+                    <span className="text-sm font-medium">{t("domainsSetup.domain.zones")}</span>
                     <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => onZones([...zones, { label: "", scope: "deploy", primary: false }])}
                     >
-                        <Plus className="size-4" /> Add zone
+                        <Plus className="size-4" /> {t("domainsSetup.domain.addZone")}
                     </Button>
                 </div>
                 {zones.map((zone, index) => (
@@ -789,34 +810,32 @@ function DomainStep({
                             value={zone.scope}
                             onValueChange={(value) => updateZone(index, { scope: value as ZoneRow["scope"] })}
                             options={[
-                                { value: "polaris", label: "Polaris itself" },
-                                { value: "deploy", label: "Deployed services" }
+                                { value: "polaris", label: t("domainsSetup.domain.scopePolaris") },
+                                { value: "deploy", label: t("domainsSetup.domain.scopeDeploy") }
                             ]}
                             className="w-44"
                         />
                         <code className="flex-1 truncate text-xs text-muted-foreground">
-                            {effectiveBase ? `*.${zone.label ? `${zone.label}.` : ""}${effectiveBase}` : "Enter a domain above"}
+                            {effectiveBase ? `*.${zone.label ? `${zone.label}.` : ""}${effectiveBase}` : t("domainsSetup.domain.enterDomain")}
                         </code>
                         {zone.primary ? (
-                            <Badge variant="neutral">Default</Badge>
+                            <Badge variant="neutral">{t("domainsSetup.domain.default")}</Badge>
                         ) : (
                             <Button size="sm" variant="ghost" onClick={() => makePrimary(index)}>
-                                Make default
+                                {t("domainsSetup.domain.makeDefault")}
                             </Button>
                         )}
                         <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => onZones(zones.filter((_, position) => position !== index))}
-                            aria-label="Remove zone"
+                            aria-label={t("domainsSetup.domain.removeZone")}
                         >
                             <Trash2 className="size-4" />
                         </Button>
                     </div>
                 ))}
-                <p className="text-xs text-muted-foreground">
-                    Leave a label empty to use the base domain itself. New services get a name in the default deploy zone.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("domainsSetup.domain.zonesHint")}</p>
             </div>
 
             {/* Only offered while there is a Polaris zone to move onto: with the zone
@@ -829,11 +848,9 @@ function DomainStep({
                             checked={useForDashboard}
                             onChange={(event) => onUseForDashboard(event.target.checked)}
                         />
-                        Use the Polaris zone for the dashboard too
+                        {t("domainsSetup.domain.useForDashboard")}
                     </label>
-                    <span className="text-xs text-muted-foreground">
-                        Applied once the zone is seen resolving to this server, so no link breaks in the meantime.
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("domainsSetup.domain.useForDashboardHint")}</span>
                 </div>
             )}
         </div>
@@ -851,6 +868,7 @@ function DnsStep({
     provider: DnsProviderInfo | null;
     onRefresh: () => Promise<void>;
 }) {
+    const t = useTranslations("admin");
     const [report, setReport] = useState<ZoneDnsReport | null>(null);
     const [conflicts, setConflicts] = useState<ZoneDnsProvisionResult["conflicts"]>([]);
     const [busy, setBusy] = useState<"check" | "create" | null>(null);
@@ -864,7 +882,7 @@ function DnsStep({
         } catch (caught) {
             // Without this the buttons stay disabled forever on any failure, leaving
             // the operator on a dead final step with nothing said.
-            setMessage(caught instanceof Error ? caught.message : "Could not check the DNS records");
+            setMessage(caught instanceof Error ? caught.message : t("domainsSetup.errors.checkFailed"));
         }
     }
 
@@ -894,7 +912,7 @@ function DnsStep({
                 unchanged: [],
                 conflicts: [],
                 failed: [],
-                error: caught instanceof Error ? caught.message : "Could not create the DNS records"
+                error: caught instanceof Error ? caught.message : t("domainsSetup.errors.createFailed")
             }));
             if (result.error) {
                 setMessage(result.error);
@@ -905,13 +923,21 @@ function DnsStep({
             // failure: counting only what changed would report "0 created, 0 repointed"
             // and read like the button did nothing.
             const parts = [
-                ...(result.created.length > 0 ? [`${result.created.length} created`] : []),
-                ...(result.replaced.length > 0 ? [`${result.replaced.length} repointed`] : []),
-                ...(result.unchanged.length > 0 ? [`${result.unchanged.length} already correct`] : []),
-                ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
-                ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
+                ...(result.created.length > 0 ? [t("domainsSetup.dns.created", { count: result.created.length })] : []),
+                ...(result.replaced.length > 0 ? [t("domainsSetup.dns.repointed", { count: result.replaced.length })] : []),
+                ...(result.unchanged.length > 0
+                    ? [t("domainsSetup.dns.alreadyCorrect", { count: result.unchanged.length })]
+                    : []),
+                ...(result.conflicts.length > 0 ? [t("domainsSetup.dns.leftAlone", { count: result.conflicts.length })] : []),
+                ...(result.failed.length > 0
+                    ? [t("domainsSetup.dns.failed", { names: result.failed.map((entry) => entry.name).join(", ") })]
+                    : [])
             ];
-            setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
+            setMessage(
+                parts.length > 0
+                    ? t("domainsSetup.dns.summary", { parts: parts.join(", ") })
+                    : t("domainsSetup.dns.nothingToDo")
+            );
             await runCheck();
             // The check above is where a zone is first seen answering, which is what
             // moves the dashboard onto it - so what the server holds has just changed
@@ -938,16 +964,20 @@ function DnsStep({
     if (state.records.length === 0 || duckdns) {
         return (
             <div className="flex flex-col gap-3">
-                <StepTitle title="Done" hint={duckdns ? "DuckDNS answers for every name under your subdomain." : "This setup needs no DNS records."} />
+                <StepTitle
+                    title={t("domainsSetup.dns.doneTitle")}
+                    hint={duckdns ? t("domainsSetup.dns.duckdnsHint") : t("domainsSetup.dns.noRecordsHint")}
+                />
                 <p className="rounded-md border border-success-edge bg-success-soft px-3 py-2 text-xs text-muted-foreground">
                     {duckdns
-                        ? `Nothing to create: ${state.zones.baseDomain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.`
-                        : "Services get their hostname the moment they are deployed."}
+                        ? t("domainsSetup.dns.duckdnsBody", { domain: state.zones.baseDomain })
+                        : t("domainsSetup.dns.noRecordsBody")}
                 </p>
                 {duckdns && (
                     <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
-                            <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
+                            <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} />{" "}
+                            {t("domainsSetup.dns.check")}
                         </Button>
                         {message && <span className="text-xs text-muted-foreground">{message}</span>}
                     </div>
@@ -977,13 +1007,13 @@ function DnsStep({
     return (
         <div className="flex flex-col gap-3">
             <StepTitle
-                title={verified ? "The DNS is in place" : "Create these DNS records"}
+                title={verified ? t("domainsSetup.dns.inPlace") : t("domainsSetup.dns.create")}
                 hint={
                     verified
-                        ? `${state.zones.baseDomain} points at this server, so every service gets a hostname under it.`
+                        ? t("domainsSetup.dns.inPlaceHint", { domain: state.zones.baseDomain })
                         : publicIp
-                          ? `Point them at this server: ${publicIp}`
-                          : "Polaris could not detect this server's public IP."
+                          ? t("domainsSetup.dns.pointAt", { ip: publicIp })
+                          : t("domainsSetup.dns.noPublicIp")
                 }
             />
             <DnsRecordTable
@@ -993,7 +1023,7 @@ function DnsStep({
                             type: "A",
                             name,
                             value: publicIp,
-                            valueFallback: "your public IP",
+                            valueFallback: t("domainsSetup.dns.yourPublicIp"),
                             status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const)
                         }))
                     ),
@@ -1005,9 +1035,9 @@ function DnsStep({
                         type: "A",
                         name: record.wildcard,
                         value: publicIp,
-                        valueFallback: "your public IP",
+                        valueFallback: t("domainsSetup.dns.yourPublicIp"),
                         status: done.get(record.wildcard) === true ? ("done" as const) : ("waiting" as const),
-                        note: `Covers every ${record.game} server, so each one costs no DNS record.`
+                        note: t("domainsSetup.dns.gameNote", { game: record.game })
                     }))
                 ]}
             />
@@ -1016,7 +1046,8 @@ function DnsStep({
 
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
-                    <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
+                    <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} />{" "}
+                    {t("domainsSetup.dns.check")}
                 </Button>
                 {/* Withdrawn once every zone answers with this server's address: there is
                     nothing left to create, and a live button there invites a second run
@@ -1026,7 +1057,7 @@ function DnsStep({
                     !verified &&
                     (state.cloudflareConnected ? (
                         <Button size="sm" onClick={() => create()} disabled={busy !== null}>
-                            <Globe className="size-4" /> Create them on Cloudflare
+                            <Globe className="size-4" /> {t("domainsSetup.dns.createOnCloudflare")}
                         </Button>
                     ) : (
                         <Button
@@ -1034,7 +1065,7 @@ function DnsStep({
                             onClick={() => setConnecting(true)}
                             disabled={busy !== null || connecting}
                         >
-                            <Globe className="size-4" /> Create them for me
+                            <Globe className="size-4" /> {t("domainsSetup.dns.createForMe")}
                         </Button>
                     ))}
             </div>
@@ -1061,13 +1092,12 @@ function DnsStep({
                 <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                     <span className="flex items-start gap-2 text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                        These records already exist and point somewhere else. Polaris left them alone - replacing one
-                        takes whatever answers on it today offline.
+                        {t("domainsSetup.dns.conflicts")}
                     </span>
                     <ul className="flex flex-col gap-0.5 pl-5 text-muted-foreground">
                         {conflicts.map((conflict) => (
                             <li key={conflict.name}>
-                                <code>{conflict.name}</code> - {conflict.content || "unknown address"}
+                                <code>{conflict.name}</code> - {conflict.content || t("domainsSetup.dns.unknownAddress")}
                             </li>
                         ))}
                     </ul>
@@ -1078,7 +1108,7 @@ function DnsStep({
                         onClick={() => create(true)}
                         disabled={busy !== null}
                     >
-                        Point them at this server
+                        {t("domainsSetup.dns.overwrite")}
                     </Button>
                 </div>
             )}
@@ -1098,6 +1128,7 @@ function DnsStep({
  * keeps a copy once it has been accepted.
  */
 function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: () => Promise<void> }) {
+    const t = useTranslations("admin");
     const [token, setToken] = useState("");
     const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
     const [accountId, setAccountId] = useState("");
@@ -1115,7 +1146,7 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
             scope: "dns",
             ...(accountId ? { accountId } : {})
         }).catch((caught: unknown) => ({
-            error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token",
+            error: caught instanceof Error ? caught.message : t("domainsSetup.errors.connectFailed"),
             connected: false,
             accounts: []
         }));
@@ -1147,9 +1178,9 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
     return (
         <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
             <span className="text-muted-foreground">
-                Polaris writes the records through Cloudflare&apos;s API, which needs a token. The link opens
-                Cloudflare with the two permissions it needs already selected - create the token, paste it here,
-                and {zone ? <code>{zone}</code> : "your domain"} is set up without touching a DNS panel.
+                {t.rich("domainsSetup.cloudflare.intro", {
+                    zone: zone ? <code key="zone">{zone}</code> : t("domainsSetup.cloudflare.yourDomain")
+                })}
             </span>
             <a
                 href={CLOUDFLARE_DNS_TOKEN_URL}
@@ -1157,18 +1188,18 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
                 rel="noreferrer noopener"
                 className="inline-flex w-fit items-center gap-1 font-medium text-primary hover:underline"
             >
-                Create the token on Cloudflare <ExternalLink className="size-3" />
+                {t("domainsSetup.cloudflare.createToken")} <ExternalLink className="size-3" />
             </a>
             <Input
                 type="password"
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste your Cloudflare API token"
+                placeholder={t("domainsSetup.cloudflare.tokenPlaceholder")}
                 autoComplete="off"
             />
             {accounts.length > 0 && (
                 <label className="flex flex-col gap-1 text-muted-foreground">
-                    The token reaches several accounts - pick the one holding this domain
+                    {t("domainsSetup.cloudflare.pickAccount")}
                     <Select
                         value={accountId}
                         onValueChange={setAccountId}
@@ -1180,7 +1211,7 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
             <div className="flex justify-end">
                 <Button size="sm" onClick={connect} disabled={busy || !token.trim()}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {accounts.length > 0 ? "Use this account" : "Connect and create the records"}
+                    {accounts.length > 0 ? t("domainsSetup.cloudflare.useAccount") : t("domainsSetup.cloudflare.connect")}
                 </Button>
             </div>
         </div>
@@ -1195,6 +1226,7 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
  * enough for the operator to recognize who they are with.
  */
 function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProviderInfo; cloudflareConnected: boolean }) {
+    const t = useTranslations("admin");
     const automated = provider.automatable && cloudflareConnected;
     return (
         <div
@@ -1206,18 +1238,30 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
                 <Globe className={`size-3.5 shrink-0 ${automated ? "text-success" : "text-muted-foreground"}`} />
                 {provider.label ? (
                     <span>
-                        <b className="font-medium text-foreground">{provider.label}</b> answers for{" "}
-                        <code>{provider.zone}</code>
-                        {automated
-                            ? " and your token is connected - Polaris creates the records for you."
-                            : provider.automatable
-                              ? " - Polaris can create the records for you on the last step, with no DNS panel at all."
-                              : "."}
+                        {t.rich(
+                            automated
+                                ? "domainsSetup.provider.automated"
+                                : provider.automatable
+                                  ? "domainsSetup.provider.automatable"
+                                  : "domainsSetup.provider.manual",
+                            {
+                                provider: provider.label,
+                                zone: provider.zone,
+                                b: (chunks) => (
+                                    <b key="b" className="font-medium text-foreground">
+                                        {chunks}
+                                    </b>
+                                ),
+                                code: (chunks) => <code key="code">{chunks}</code>
+                            }
+                        )}
                     </span>
                 ) : (
                     <span>
-                        <code>{provider.zone}</code> is served by <code>{provider.nameservers[0]}</code>. Create the
-                        records where you manage it.
+                        {t.rich("domainsSetup.provider.unknown", {
+                            zone: <code key="zone">{provider.zone}</code>,
+                            nameserver: <code key="ns">{provider.nameservers[0]}</code>
+                        })}
                     </span>
                 )}
             </span>
@@ -1228,7 +1272,8 @@ function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProvider
                     rel="noreferrer noopener"
                     className="flex items-center gap-1 font-medium text-primary hover:underline"
                 >
-                    Open {provider.label} <ExternalLink className="size-3" />
+                    {t("domainsSetup.provider.open", { provider: provider.label ?? "" })}{" "}
+                    <ExternalLink className="size-3" />
                 </a>
             )}
         </div>

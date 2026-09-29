@@ -35,6 +35,7 @@ import {
     Select
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EmailChannelView } from "@/lib/mail-service";
 import {
     createEmailChannelAction,
@@ -78,6 +79,8 @@ export function EmailChannelDialog({
     onSaved: (channel: EmailChannelView) => void;
     onRemoved: (id: string) => void;
 }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
     const editing = channel !== null;
     const starting = channel?.provider ?? initialProvider ?? "brevo";
     const [confirm, confirmElement] = useConfirm();
@@ -126,7 +129,7 @@ export function EmailChannelDialog({
                 ? await updateEmailChannelAction(channel.id, input)
                 : await createEmailChannelAction(input);
             if (result.error || !result.channel) {
-                setError(result.error ?? "Could not save the channel.");
+                setError(result.error ?? t("inboxChannels.email.saveFailed"));
                 return;
             }
             setSecret("");
@@ -134,7 +137,7 @@ export function EmailChannelDialog({
             // A stored channel whose credentials were refused is kept so the
             // operator can correct one field; say so rather than looking saved.
             if (result.channel.error) setError(result.channel.error);
-            else setNotice("Saved. Send a test message to confirm the address works.");
+            else setNotice(t("inboxChannels.email.saved"));
         });
     }
 
@@ -148,17 +151,16 @@ export function EmailChannelDialog({
                 setError(result.error);
                 return;
             }
-            setNotice(`Sent to ${testTo.trim()}. Check the inbox, and the spam folder.`);
+            setNotice(t("inboxChannels.email.sent", { to: testTo.trim() }));
         });
     }
 
     async function remove() {
         if (!channel) return;
         const ok = await confirm({
-            title: `Remove ${channel.name}?`,
-            description:
-                "Polaris stops sending through it. Anything set to use it for sign-in mail will need another channel.",
-            confirmLabel: "Remove",
+            title: t("inboxChannels.manage.removeTitle", { name: channel.name }),
+            description: t("inboxChannels.email.removeDescription"),
+            confirmLabel: t("inboxChannels.manage.remove"),
             danger: true
         });
         if (!ok) return;
@@ -177,38 +179,45 @@ export function EmailChannelDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {editing ? `Manage ${channel.name}` : "Add an email sender"}
+                        {editing
+                            ? t("inboxChannels.manage.title", { name: channel.name })
+                            : t("inboxChannels.email.addTitle")}
                     </DialogTitle>
                     <DialogDescription>{info.summary}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Provider</span>
+                        <span className="font-medium">{t("inboxChannels.email.provider")}</span>
                         <Select
                             value={provider}
                             onValueChange={(value) => changeProvider(value as MailProvider)}
                             options={PROVIDER_OPTIONS}
                         />
                         <span className="text-xs text-muted-foreground">
-                            Sending address: {info.senderRequirement}{" "}
-                            <a
-                                href={info.docsUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline-offset-2 hover:underline"
-                            >
-                                Provider docs
-                            </a>
+                            {t.rich("inboxChannels.email.sendingAddress", {
+                                requirement: info.senderRequirement,
+                                docs: (chunks) => (
+                                    <a
+                                        key="docs"
+                                        href={info.docsUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary underline-offset-2 hover:underline"
+                                    >
+                                        {chunks}
+                                    </a>
+                                )
+                            })}
                         </span>
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("inbox.connect.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Account mail"
+                            placeholder={t("inboxChannels.email.namePlaceholder")}
                         />
                     </label>
 
@@ -230,14 +239,14 @@ export function EmailChannelDialog({
                             autoComplete="off"
                             value={secret}
                             onChange={(event) => setSecret(event.target.value)}
-                            placeholder={editing ? "Saved - enter a new one to replace it" : ""}
+                            placeholder={editing ? t("inboxChannels.email.secretPlaceholder") : ""}
                         />
                         <span className="text-xs text-muted-foreground">{info.secretHint}</span>
                     </label>
 
                     {editing && (
                         <div className="flex flex-col gap-1 rounded-md border border-border p-3">
-                            <span className="text-sm font-medium">Send a test message</span>
+                            <span className="text-sm font-medium">{t("inboxChannels.email.testTitle")}</span>
                             <div className="flex items-start gap-2">
                                 <Input
                                     type="email"
@@ -257,12 +266,11 @@ export function EmailChannelDialog({
                                     ) : (
                                         <Send className="size-4" />
                                     )}
-                                    Send
+                                    {t("inboxChannels.email.send")}
                                 </Button>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                The only check that proves the From address is one the provider will
-                                send as.
+                                {t("inboxChannels.email.testHint")}
                             </span>
                         </div>
                     )}
@@ -277,8 +285,8 @@ export function EmailChannelDialog({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label={`Remove ${channel.name}`}
-                            title="Remove"
+                            aria-label={t("inboxChannels.email.removeNamed", { name: channel.name })}
+                            title={t("inboxChannels.manage.remove")}
                             onClick={() => void remove()}
                             disabled={busy}
                         >
@@ -289,11 +297,11 @@ export function EmailChannelDialog({
                     )}
                     <div className="flex gap-2">
                         <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                            {editing ? "Close" : "Cancel"}
+                            {editing ? t("inbox.connect.close") : tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={save} disabled={busy || missing}>
                             {saving && <Loader2 className="size-4 animate-spin" />}
-                            {editing ? "Save" : "Add"}
+                            {editing ? tc("actions.save") : t("inboxChannels.email.add")}
                         </Button>
                     </div>
                 </div>
@@ -312,11 +320,14 @@ function SettingField({
     value: string;
     onChange: (value: string) => void;
 }) {
+    const t = useTranslations("admin");
     return (
         <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">
                 {field.label}
-                {field.optional ? <span className="text-muted-foreground"> (optional)</span> : null}
+                {field.optional ? (
+                    <span className="text-muted-foreground"> {t("inboxChannels.email.optional")}</span>
+                ) : null}
             </span>
             <Input
                 type={

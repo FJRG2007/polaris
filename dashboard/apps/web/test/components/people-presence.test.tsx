@@ -9,6 +9,7 @@
  * Rendered to static markup: this is about what the row states.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DirectoryUser } from "@/lib/user-admin-service";
@@ -62,15 +63,17 @@ function person(overrides: Partial<DirectoryUser>): DirectoryUser {
 
 function markup(users: DirectoryUser[]): string {
     return renderToStaticMarkup(
-        <UsersAdmin
-            users={users}
-            invites={[]}
-            recoveries={[]}
-            groups={[]}
-            roles={[]}
-            canSendMail={false}
-            viewerId="018f2b7a-0000-7000-8000-0000000000ff"
-        />
+        withMessages(
+            <UsersAdmin
+                users={users}
+                invites={[]}
+                recoveries={[]}
+                groups={[]}
+                roles={[]}
+                canSendMail={false}
+                viewerId="018f2b7a-0000-7000-8000-0000000000ff"
+            />
+        )
     );
 }
 

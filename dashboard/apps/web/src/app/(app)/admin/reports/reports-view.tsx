@@ -21,8 +21,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { settleReportAction } from "./actions";
-import { CHAT_REPORT_LABELS } from "@polaris/core";
 import { VoiceNote } from "@/app/(app)/chat/voice-note";
 import type { ChatReportView } from "@/lib/chat/reports";
 import { useDisplayFormat } from "@/components/display-format";
@@ -31,12 +31,8 @@ import type { ChatReportFileView } from "@/lib/chat/report-files";
 import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
 import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 
-const FILTERS = [
-    { value: "open", label: "Waiting" },
-    { value: "removed", label: "Removed" },
-    { value: "kept", label: "Kept" },
-    { value: "all", label: "Everything" }
-] as const;
+/** Which reports the queue can show. Each is named by `reports.filters.<value>`. */
+const FILTERS = ["open", "removed", "kept", "all"] as const;
 
 export function ReportsView({
     reports,
@@ -45,6 +41,7 @@ export function ReportsView({
     reports: readonly ChatReportView[];
     status: string;
 }) {
+    const t = useTranslations("admin");
     const format = useDisplayFormat();
     const [busy, setBusy] = useState("");
     const [error, setError] = useState("");
@@ -66,14 +63,12 @@ export function ReportsView({
                         // list, and filtering it is asking for a different one.
                         window.location.search = `?status=${next}`;
                     }}
-                    options={FILTERS.map((entry) => ({ value: entry.value, label: entry.label }))}
-                    aria-label="Which reports to show"
+                    options={FILTERS.map((value) => ({ value, label: t(`reports.filters.${value}`) }))}
+                    aria-label={t("reports.filterLabel")}
                     className="w-44"
                 />
                 <span className="text-xs text-muted-foreground">
-                    {reports.length === 0
-                        ? "Nothing here."
-                        : `${reports.length} report${reports.length === 1 ? "" : "s"}`}
+                    {reports.length === 0 ? t("reports.empty") : t("reports.count", { count: reports.length })}
                 </span>
             </div>
 
@@ -88,13 +83,13 @@ export function ReportsView({
                     <CardBody className="flex flex-col gap-2 p-4">
                         <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={report.status === "open" ? "primary" : "neutral"}>
-                                {CHAT_REPORT_LABELS[report.reason]}
+                                {t(`reports.reasons.${report.reason}`)}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                                 {report.channelName}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                reported by {report.reporterName}
+                                {t("reports.reportedBy", { name: report.reporterName })}
                             </span>
                             <span className="ml-auto text-xs text-muted-foreground">
                                 {format.dateTime(report.createdAt)}
@@ -108,7 +103,7 @@ export function ReportsView({
                         <blockquote className="whitespace-pre-wrap break-words border-l-2 border-border pl-3 text-sm">
                             {report.excerpt || (
                                 <span className="text-muted-foreground">
-                                    {report.files.length > 0 ? "No text - see below" : "No text"}
+                                    {report.files.length > 0 ? t("reports.noTextSeeBelow") : t("reports.noText")}
                                 </span>
                             )}
                         </blockquote>
@@ -128,8 +123,9 @@ export function ReportsView({
                         )}
 
                         <p className="text-xs text-muted-foreground">
-                            {report.authorName ? `Written by ${report.authorName}` : "Written by an account that is gone"}
-                            {!report.live && " - the message is no longer there"}
+                            {report.authorName
+                                ? t("reports.writtenBy", { name: report.authorName, live: String(report.live) })
+                                : t("reports.writtenByGone", { live: String(report.live) })}
                         </p>
 
                         {report.note && (
@@ -146,7 +142,7 @@ export function ReportsView({
                                         onClick={() => void settle(report.id, "removed")}
                                     >
                                         <Trash2 className="size-4" />
-                                        Remove the message
+                                        {t("reports.remove")}
                                     </Button>
                                     <Button
                                         size="sm"
@@ -155,14 +151,18 @@ export function ReportsView({
                                         onClick={() => void settle(report.id, "kept")}
                                     >
                                         <Check className="size-4" />
-                                        Keep it
+                                        {t("reports.keep")}
                                     </Button>
                                 </>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    {report.status === "removed" ? "Removed" : "Kept"}
-                                    {report.handledByName ? ` by ${report.handledByName}` : ""}
-                                    {report.handledAt ? ` on ${format.dateTime(report.handledAt)}` : ""}
+                                    {t("reports.handled", {
+                                        status: report.status === "removed" ? "removed" : "kept",
+                                        by: report.handledByName ?? "",
+                                        withBy: report.handledByName ? "yes" : "no",
+                                        on: report.handledAt ? format.dateTime(report.handledAt) : "",
+                                        withOn: report.handledAt ? "yes" : "no"
+                                    })}
                                 </span>
                             )}
                             {report.live && report.messageId && (
@@ -171,7 +171,7 @@ export function ReportsView({
                                     className="ml-auto flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
                                 >
                                     <MessageSquare className="size-3.5" />
-                                    Open it in the conversation
+                                    {t("reports.open")}
                                 </Link>
                             )}
                         </div>
@@ -200,6 +200,7 @@ function ReportFiles({
     reportId: string;
     files: readonly ChatReportFileView[];
 }) {
+    const t = useTranslations("admin");
     if (files.length === 0) return null;
 
     const href = (file: ChatReportFileView) => `/api/chat/reports/${reportId}/files/${file.id}`;
@@ -245,11 +246,10 @@ function ReportFiles({
                         </a>
                     )}
                     <span className="text-[0.6875rem] text-foreground-subtle">
-                        {file.name}
                         {/* Said out loud, because the two are different claims: a
                             live file is the one still on the message, and a kept
                             one is the copy that outlived it. */}
-                        {file.held ? " - kept after the message was deleted" : null}
+                        {file.held ? t("reports.fileHeld", { name: file.name }) : file.name}
                     </span>
                 </div>
             ))}

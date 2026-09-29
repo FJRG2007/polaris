@@ -4,6 +4,7 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { allChatRules } from "@/lib/chat/rules";
 import { ChatRulesView } from "./chat-rules-view";
 import { CallServerView } from "./call-server-view";
@@ -16,10 +17,11 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatRulesPage() {
     await requireAdmin();
-    const [rules, offered, share] = await Promise.all([
+    const [rules, offered, share, t] = await Promise.all([
         allChatRules(),
         orgChatOffered(),
-        driveShare()
+        driveShare(),
+        getTranslations("admin")
     ]);
 
     return (
@@ -28,8 +30,8 @@ export default async function ChatRulesPage() {
         // the screen is the whole reason this page looked wrong.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
-                title="Chat"
-                description="How long a message may be, what it may carry, how long it stays editable, and what a deleted one leaves behind. Answered separately for spaces, group chats and direct messages."
+                title={t("chat.page.title")}
+                description={t("chat.page.description")}
             />
             <ChatRulesView initial={rules} />
             {/* Beside the size limit it qualifies: the limit is about what this
