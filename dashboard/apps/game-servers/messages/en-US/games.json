@@ -129,7 +129,23 @@
         "connectTo": "Players will connect to <address></address>.",
         "connectToPort": "Players will connect to <address></address> and its port.",
         "addressHint": "One address, a range like 203.0.113.0/24, or \"any\".",
-        "exampleName": "Survival"
+        "exampleName": "Survival",
+        "machinesFailed": "Could not read your machines",
+        "errors": {
+            "gamertag": "That is not an Xbox gamertag",
+            "javaName": "3 to 16 letters, digits or underscores",
+            "address": "That is not an address or a range",
+            "steamId": "17 digits, starting 7656119",
+            "workshopIds": "Workshop ids are numbers, comma separated",
+            "identifier": "Paste it whole, as the game gives it: license:... or discord:...",
+            "onesync": "More than 32 slots needs OneSync on",
+            "checkDetails": "Check the details and try again",
+            "createFailed": "Could not create the server"
+        },
+        "javaDetail": "PC players",
+        "bedrockDetail": "Phones, consoles, Windows app",
+        "bothDetail": "A Java world Bedrock can join, through Geyser",
+        "machineMemory": "{name} - {free} of {total} GB free"
     },
     "errors": {
         "couldNotReadYourGame": "Could not read your game servers",
@@ -212,7 +228,38 @@
         "notAnArkMod": "{name} is not an ARK mod",
         "linkedEpic": "{name} has linked Epic Games rather than Steam. An ARK server's list only takes Steam ids, so they have to be let in another way.",
         "noSteam": "{name} has not linked a Steam account yet. They can do it under Connected accounts.",
-        "noLoginPassword": "{name} has no password on this server"
+        "noLoginPassword": "{name} has no password on this server",
+        "couldNotReadTheAnti": "Could not read the anti-cheat",
+        "couldNotChangeTheAnti": "Could not change the anti-cheat",
+        "theSettingsCouldNotBe": "The settings could not be read",
+        "saySomething": "Say something",
+        "couldNotBanThatPlayer": "Could not ban that player",
+        "couldNotLiftThatBan": "Could not lift that ban",
+        "couldNotKickThatPlayer": "Could not kick that player",
+        "couldNotChangeWhoAdministers": "Could not change who administers the server",
+        "couldNotReadTheServer2": "Could not read the server's rules",
+        "couldNotSaveTheServer": "Could not save the server's rules",
+        "couldNotReadTheServer3": "Could not read the server's resources",
+        "thatIsNotAResource": "That is not a resource name",
+        "couldNotRescanTheResources": "Could not rescan the resources",
+        "thatIsNotALink": "That is not a link to a resource archive",
+        "couldNotInstallThatResource": "Could not install that resource",
+        "couldNotReadTheConsole": "Could not read the console password",
+        "couldNotChangeTheConsole": "Could not change the console password",
+        "couldNotChangeTheServer2": "Could not change the server key",
+        "couldNotReadTheLogin": "Could not read the login state",
+        "couldNotChangeTheLogin": "Could not change the login",
+        "couldNotResetThePassword": "Could not reset the password",
+        "giveTheServerAName": "Give the server a name",
+        "thatImageIsEmpty": "That image is empty",
+        "thatImageIsTooLarge": "That image is too large",
+        "thatIsNotAPng": "That is not a PNG",
+        "thatIsAModpackShort": "That is a modpack short name, or the link to its page",
+        "unknownApp": "Unknown app",
+        "nothingToSave": "Nothing to save",
+        "playerNameRule": "A player name is 1-16 letters, digits or underscores",
+        "itemIdRule": "An item looks like minecraft:stone",
+        "iconSize": "A server icon has to be {size}"
     },
     "status": {
         "failed": "Failed",
@@ -370,5 +417,201 @@
             "notModpack": "That is a modpack short name, or the link to its page",
             "notJarUrl": "That is an https link ending in .jar"
         }
+    },
+    "textField": {
+        "anyOtherColor": "Any other color",
+        "resetTheFormattingFromHere": "Reset the formatting from here on",
+        "reset": "Reset",
+        "variables": "Variables",
+        "editTheTextAndLet": "Edit the text and let the buttons write the codes",
+        "editTheCodesYourself": "Edit the codes yourself",
+        "formatted": "Formatted",
+        "codes": "Codes",
+        "putAWordPolarisFills": "Put a word Polaris fills in where the cursor is",
+        "variable": "Variable",
+        "pressToClear": "{name} - press to clear",
+        "pressToRemove": "{name} - press to remove",
+        "withCodes": "{label}, with its formatting codes",
+        "fallbackHint": "For a value that may be missing, write what to show instead: '{polaris.name | \"Player\"}'"
+    },
+    "accessEditor": {
+        "addressChecked": "Address checked",
+        "addressNotChecked": "Address not checked",
+        "checkEachPlayerSAddress": "Check each player's address when they join",
+        "aPlayerIsLetIn": "A player is let in when the username is on this list and they arrive from the address registered to it. The rest of the firewall guards HTTP, which a game port is not.",
+        "readingTheList": "Reading the list...",
+        "nobodyIsRegisteredYetSo": "Nobody is registered yet, so nobody can join.",
+        "notSignedInAnywhere": "Not signed in anywhere",
+        "bedrockDoesNotRecordWhere": "Bedrock does not record where a player connected from, so only the names here are enforced.",
+        "whoCanConnect": "Who can connect",
+        "follows": "Follows {name}'s Polaris sign-ins",
+        "removeAddress": "Remove {address} from {name}",
+        "removeNamed": "Remove {name}",
+        "removeEverything": "Remove {name} and every address they have"
+    },
+    "motd": {
+        "colors": {
+            "0": "Black",
+            "1": "Dark blue",
+            "2": "Dark green",
+            "3": "Dark aqua",
+            "4": "Dark red",
+            "5": "Dark purple",
+            "6": "Gold",
+            "7": "Gray",
+            "8": "Dark gray",
+            "9": "Blue",
+            "a": "Green",
+            "b": "Aqua",
+            "c": "Red",
+            "d": "Light purple",
+            "e": "Yellow",
+            "f": "White"
+        },
+        "styles": {
+            "k": "Obfuscated",
+            "l": "Bold",
+            "m": "Strikethrough",
+            "n": "Underline",
+            "o": "Italic"
+        }
+    },
+    "timeoutDialog": {
+        "theyAreBannedNowAnd": "They are banned now and let back in when it runs out, without anybody having to remember.",
+        "timeOut": "Time out",
+        "howLong": "How long",
+        "howLongTheTimeoutLasts": "How long the timeout lasts",
+        "minutes": "Minutes",
+        "reasonShownToThem": "Reason (shown to them)",
+        "optional": "Optional",
+        "presets": {
+            "m5": "5 minutes",
+            "m15": "15 minutes",
+            "h1": "1 hour",
+            "h8": "8 hours",
+            "d1": "1 day",
+            "custom": "Another length"
+        },
+        "between": "Between 1 minute and {days} days",
+        "title": "Time {name} out"
+    },
+    "restartPlanner": {
+        "restarting": "Restarting.",
+        "anybodyPlayingIsDisconnectedFor": "Anybody playing is disconnected for a moment; the change is in force once the server is back.",
+        "savedTheServerIsStopped": "Saved. The server is stopped, so this is what it will start with.",
+        "aRestartIsBooked": "A restart is booked",
+        "itHappensAsSoonAs": "It happens as soon as nobody is playing",
+        "callItOff": "Call it off",
+        "whenNobodyIsPlaying": "When nobody is playing",
+        "atATime": "At a time",
+        "restartNow": "Restart now",
+        "whenToRestart": "When to restart",
+        "bookIt": "Book it",
+        "yourOwnClock": "Your own clock.",
+        "defaultTitle": "Saved, and not yet in force",
+        "defaultDetail": "The server reads this when it starts. Leave it and the next start picks it up; nothing is lost by waiting.",
+        "bookFailed": "That restart could not be booked",
+        "happensAt": "It happens <time></time>"
+    },
+    "accessForm": {
+        "gamertag": "Gamertag",
+        "username": "Username",
+        "player": "Player",
+        "addressTheyConnectFrom": "Address they connect from",
+        "useTheAddressYouAre": "Use the address you are on now",
+        "thatIsNotAUsername": "That is not a username this edition accepts",
+        "thatIsNotAnAddress": "That is not an address or a range",
+        "polarisCouldNotReadThe": "Polaris could not read the address this request came from. Type it in instead.",
+        "addressPlaceholder": "203.0.113.9, 203.0.113.0/24 or any",
+        "add": "Add"
+    },
+    "history": {
+        "readingTheRecord": "Reading the record",
+        "polarisHasNotSeenThis": "Polaris has not seen this player on the server yet.",
+        "played": "Played",
+        "visits": "Visits",
+        "firstSeen": "First seen",
+        "onSince": "On since",
+        "lastSeen": "Last seen",
+        "playtimeAllTime": "Playtime, all time",
+        "deaths": "Deaths",
+        "mobsKilled": "Mobs killed",
+        "underAMinute": "under a minute",
+        "minutes": "{count} min",
+        "hours": "{count} h"
+    },
+    "variablesHelp": {
+        "whatYouCanWrite": "What you can write",
+        "coloursAndStyles": "Colours and styles",
+        "groups": {
+            "server": "The server",
+            "player": "The player reading it",
+            "lists": "Leaderboards and lists",
+            "death": "Last death",
+            "call": "The linked chat's call"
+        },
+        "intro": "Type '{' in a line to pick one. Polaris fills it in when it is sent. Add what to show when there is nothing yet: '{death.player | \"Nobody\"}'.",
+        "serverScope": "A leaderboard or list alone on a line becomes a line a player.",
+        "codesHelp": "Select text and use the buttons, or show the codes and type them: & and a character, which applies from there on. &r goes back to plain."
+    },
+    "itemPicker": {
+        "searchItems": "Search items",
+        "loadingTheItems": "Loading the items...",
+        "items": "Items",
+        "nothingMatchesThat": "Nothing matches that.",
+        "chooseAnItem": "Choose an item.",
+        "searchItemsOrWriteMinecraft": "Search items, or write minecraft:diamond",
+        "moreThan": "More than {count} match. Type more to narrow it.",
+        "minecraftMissing": "The item pictures did not load, so type the id - it looks like minecraft:diamond.",
+        "arkMissing": "The item list did not load. Reload the page to try again.",
+        "modNotes": {
+            "found": "Also searching {count} items this server's mods add. Type a mod's name for just those.",
+            "unread": "Could not read the items {names} adds. They can still be typed as ids.",
+            "skipped": "Not searching {names}: only the first mods on a long list are read. They can still be typed as ids.",
+            "incomplete": "Some mods are still being read. Open the picker again to see their items.",
+            "andMore": "{names} and {count} more"
+        }
+    },
+    "playersTable": {
+        "searchPlayers": "Search players",
+        "filterPlayers": "Filter players"
+    },
+    "rowMenu": {
+        "more": "More"
+    },
+    "playerForm": {
+        "cancel": "Cancel"
+    },
+    "hytale": {
+        "serverFiles": "Server files",
+        "hytaleHandsTheseOutThrough": "Hytale hands these out through your own account, so Polaris cannot fetch them for you.",
+        "lookAgain": "Look again",
+        "files": "Files",
+        "thisServerIsNotAnswering": "This server is not answering, so what is in it cannot be read yet.",
+        "putThemInTheTop": "Put them in the top folder under Files - from the Hytale launcher's own installation, or from the official downloader. The server starts by itself once both are there; nothing needs restarting.",
+        "theServerSOwnCommands": "the server's own commands",
+        "bothHere": "Both are here. Players reach the server on UDP {port}.",
+        "here": "here",
+        "waiting": "waiting"
+    },
+    "firewall": {
+        "openWhoMayJoin": "Open who may join",
+        "fivem": "A FiveM server is guarded by its own list of players rather than by the rules below - a game port does not go through the web firewall.",
+        "carried": ". Addresses blocked here are carried onto that list as well.",
+        "ark": "An ARK server is guarded by its join password and its own allow list of Steam ids, not by the rules below."
+    },
+    "slot": {
+        "yourServersLiveOnThe": "Your servers live on the Game servers page",
+        "createAsManyAsYou": "Create as many as you want, of any game Polaris knows, each with its own address, console, players and settings. The app itself runs nothing.",
+        "openGameServers": "Open Game servers"
+    },
+    "picker": {
+        "noGameIsAvailable": "No game is available",
+        "searchGames": "Search games",
+        "noGameHereMatchesThat": "No game here matches that."
+    },
+    "boundary": {
+        "failed": "{name} could not be shown",
+        "tryAgain": "Try again"
     }
 }

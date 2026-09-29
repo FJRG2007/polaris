@@ -42,7 +42,9 @@
         "giveFull": "{count} cosas es lo máximo que lleva una entrega. Envía estas y ábrelo otra vez.",
         "takeOff": "Quitar {name} de la lista",
         "giveExperience": "Dar experiencia a {name}",
-        "onThisServer": "{name} en este servidor"
+        "onThisServer": "{name} en este servidor",
+        "steamIdHint": "17 dígitos, empezando por 7656119. En Steam: Perfil, y luego el número al final de la URL.",
+        "lookUpFailed": "No se pudo consultar"
     },
     "panel": {
         "usageIsMeasuredOnceThe": "El uso se mide cuando el servidor se ha desplegado.",
@@ -214,5 +216,21 @@
         "earlierNamed": "Cargar {name} antes",
         "laterNamed": "Cargar {name} después",
         "removeNamed": "Quitar {name}"
+    },
+    "rules": {
+        "theseAreWhatTheServer": "Esto es con lo que se lanza el servidor. ARK lo lee al arrancar, así que un cambio surte efecto la próxima vez que lo haga.",
+        "readTheSettingsAgain": "Releer los ajustes",
+        "findASettingByWhat": "Busca un ajuste, por lo que hace o por cómo lo llama ARK",
+        "findASetting": "Buscar un ajuste",
+        "polarisWritesTheseAsLaunch": "Polaris los escribe como opciones de lanzamiento y no en el archivo de ajustes del juego, porque ARK reescribe ese archivo al pararse - un cambio hecho ahí con el servidor en marcha se pierde justo cuando debía contar.",
+        "arkHasNoSettingFor": "ARK no tiene ajuste para mostrar a todos en el mapa - un jugador se ve a sí mismo y a su tribu y a nadie más - ni para la distancia a la que se lee una etiqueta de nombre. Ambos vienen de mods; añade uno desde la pantalla Mods.",
+        "leaveItToTheGame": "Que lo decida el juego",
+        "badValue": "{name} no admite ese valor.",
+        "saveFailed": "No se pudo guardar",
+        "noMatch": "Nada coincide con “{query}”. ARK tiene muchísimos ajustes y Polaris ofrece los que puede poner como opciones de lanzamiento; lo demás vive en los archivos del propio juego.",
+        "fileSays": "El archivo del propio servidor dice {value}.",
+        "notSet": "Sin poner - el juego usa {fallback}.",
+        "stopSetting": "Dejar de fijar {name}",
+        "range": "{min} a {max}"
     }
 }

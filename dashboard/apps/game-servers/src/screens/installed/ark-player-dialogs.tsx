@@ -15,6 +15,7 @@
  */
 
 import * as actions from "./ark-actions";
+import type { GameKey } from "../../../messages";
 import { useGameText } from "../game-text";
 import { isSteamId } from "../../lib/ark/access";
 import { Loader2, Plus, UserSearch, X } from "lucide-react";
@@ -50,8 +51,7 @@ import { hostUi } from "@polaris/app-host/client";
 const { AccountInput } = hostUi.accountInput;
 
 /** What the id has to look like, said the way it is refused. */
-const STEAM_ID_HINT =
-    "17 digits, starting 7656119. In Steam: Profile, then the number at the end of the URL.";
+const STEAM_ID_HINT: GameKey<"ark"> = "playerDialogs.steamIdHint";
 
 export function ArkPlayerDialog({
     player,
@@ -119,7 +119,7 @@ export function ArkPlayerDialog({
         startLooking(async () => {
             const found = await onLookUp(identifier);
             if (found.error || !found.steamId) {
-                setLookUpError(found.error ?? "Could not look that up");
+                setLookUpError(found.error ?? t("playerDialogs.lookUpFailed"));
                 return;
             }
             setSteamId(found.steamId);
@@ -201,8 +201,8 @@ export function ArkPlayerDialog({
 
             <PlayerFormField
                 label={t("playerDialogs.steamId")}
-                error={invalid ? STEAM_ID_HINT : null}
-                hint={editing ? undefined : STEAM_ID_HINT}
+                error={invalid ? t(STEAM_ID_HINT) : null}
+                hint={editing ? undefined : t(STEAM_ID_HINT)}
             >
                 <Input
                     value={steamId}

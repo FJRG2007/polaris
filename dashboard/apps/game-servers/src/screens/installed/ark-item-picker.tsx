@@ -47,8 +47,8 @@ const source: ItemPickerSource<ArkItem> = {
     search: searchArkItems,
     Icon: ArkItemIcon,
     labelOf,
-    placeholder: "Search items",
-    whenMissing: "The item list did not load. Reload the page to try again."
+    placeholder: "itemPicker.searchItems",
+    whenMissing: "itemPicker.arkMissing"
 };
 
 export function ArkItemPicker(props: {

@@ -8,6 +8,7 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
+import { useGameText } from "../game-text";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { useEffect, useState, useTransition } from "react";
 import type { AnticheatState } from "../../lib/minecraft/polaris-anticheat-service";
@@ -28,6 +29,7 @@ export function AnticheatEngineCard({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const t = useGameText("minecraft");
     // What this tab last read paints first, so the switch is not blank on a
     // revisit; the read below replaces it when it moved.
     const stateKey = `anticheat-engine:${installedAppId}`;
@@ -55,7 +57,7 @@ export function AnticheatEngineCard({
                 setHeard(true);
             } else {
                 setState(null);
-                setError(answer.error ?? "Could not read the anti-cheat");
+                setError(answer.error ?? t("engine.readFailed"));
             }
         });
     }, [installedAppId]);
@@ -63,10 +65,9 @@ export function AnticheatEngineCard({
     async function flip(on: boolean): Promise<void> {
         // Asked before the transition: a dialog opened inside one is never drawn.
         const sure = await confirm({
-            title: on ? "Turn on Polaris anti-cheat?" : "Turn off Polaris anti-cheat?",
-            description:
-                "The server restarts to load the change, and everybody on it is disconnected for a moment.",
-            confirmLabel: on ? "Turn on and restart" : "Turn off and restart"
+            title: on ? t("engine.turnOnPolarisAntiCheat") : t("engine.turnOffPolarisAntiCheat"),
+            description: t("engine.theServerRestartsToLoad"),
+            confirmLabel: on ? t("engine.turnOnAndRestart") : t("engine.turnOffAndRestart")
         });
         if (!sure) return;
         setError(null);
@@ -79,11 +80,7 @@ export function AnticheatEngineCard({
                 return;
             }
             setState((current) => (current ? { ...current, on } : current));
-            setNote(
-                on
-                    ? "On. The server is restarting with it."
-                    : "Off. The server is restarting without it."
-            );
+            setNote(on ? t("engine.turnedOn") : t("engine.turnedOff"));
         });
     }
 
@@ -92,27 +89,13 @@ export function AnticheatEngineCard({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-sm font-medium">Polaris anti-cheat</p>
+                        <p className="text-sm font-medium">{t("engine.polarisAntiCheat")}</p>
                         {state?.kind === "mod" ? (
                             <p className="text-xs text-muted-foreground">
-                                On this NeoForge server, Polaris&apos;s own mod sends buried ore as
-                                plain rock, so X-Ray shows nothing but Polaris&apos;s honeypots, and
-                                reports whoever digs at ore they could not see. On by default; it
-                                takes effect on the next start. Movement and combat checks need
-                                Paper or another plugin server.
+                                {t("engine.onThisNeoforgeServerPolaris")}
                             </p>
                         ) : (
-                            <p className="text-xs text-muted-foreground">
-                                Checks every player&apos;s movement and combat against what the game
-                                allows, packet by packet: flying, speed, reach, killaura, no-fall
-                                and the rest. Runs on the server, compensating for each
-                                player&apos;s latency, so a laggy player is not taken for a cheater.
-                                It also sends buried ore as plain rock, so X-Ray shows nothing but
-                                Polaris&apos;s honeypots. On by default; a server made before it
-                                gets it on its next start. While it is on, the server downloads it
-                                from this Polaris each time it starts, and does not start if Polaris
-                                cannot be reached.
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("engine.about")}</p>
                         )}
                     </div>
                     <Switch
@@ -125,19 +108,16 @@ export function AnticheatEngineCard({
                             (!state.on && (!state.supported || !state.reachable))
                         }
                         onChange={(on) => void flip(on)}
-                        aria-label="Polaris anti-cheat"
+                        aria-label={t("engine.polarisAntiCheat")}
                     />
                 </div>
                 {state && !state.supported ? (
                     <p className="text-xs text-muted-foreground">
-                        It runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot, and its
-                        anti-xray on NeoForge 1.21.4. Switch the server to one of them in Settings
-                        to use it.
+                        {t("engine.itRunsOnPaperPurpur")}
                     </p>
                 ) : state && !state.reachable && !state.on ? (
                     <p className="text-xs text-muted-foreground">
-                        It needs this Polaris to have a public address: the server downloads the
-                        plugin from it when it starts. Set one under Domains.
+                        {t("engine.itNeedsThisPolarisTo")}
                     </p>
                 ) : null}
                 {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}

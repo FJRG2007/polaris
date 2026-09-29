@@ -14,6 +14,7 @@
  */
 
 import { UserMinus, X } from "lucide-react";
+import { useGameText } from "../screens/game-text";
 import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "./game-access-form";
 import { ACCESS_REACH_NOTE } from "../lib/minecraft/access";
@@ -38,6 +39,7 @@ export function GameAccessEditor({
     onChanged: () => void;
     onError?: (message: string | null) => void;
 }) {
+    const t = useGameText("games");
     const [pending, startTransition] = useTransition();
     const [failure, setFailure] = useState<string | null>(null);
 
@@ -114,12 +116,14 @@ export function GameAccessEditor({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">
-                        Who can connect{" "}
+                        {t("accessEditor.whoCanConnect")}{" "}
                         <span className="text-muted-foreground">{rules.length || ""}</span>
                     </p>
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                            {access?.bindAddresses ? "Address checked" : "Address not checked"}
+                            {access?.bindAddresses
+                                ? t("accessEditor.addressChecked")
+                                : t("accessEditor.addressNotChecked")}
                         </span>
                         <Switch
                             checked={access?.bindAddresses ?? true}
@@ -127,16 +131,12 @@ export function GameAccessEditor({
                                 run(() => setAddressBindingAction(installedAppId, enabled))
                             }
                             disabled={pending || access === null || !access.addressesAvailable}
-                            aria-label="Check each player's address when they join"
+                            aria-label={t("accessEditor.checkEachPlayerSAddress")}
                         />
                     </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                    A player is let in when the username is on this list and they arrive from the
-                    address registered to it. The rest of the firewall guards HTTP, which a game
-                    port is not.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("accessEditor.aPlayerIsLetIn")}</p>
                 <p className="text-xs text-muted-foreground">{ACCESS_REACH_NOTE}</p>
 
                 <GameAccessForm
@@ -155,10 +155,12 @@ export function GameAccessEditor({
                 />
 
                 {access === null ? (
-                    <p className="py-3 text-sm text-muted-foreground">Reading the list...</p>
+                    <p className="py-3 text-sm text-muted-foreground">
+                        {t("accessEditor.readingTheList")}
+                    </p>
                 ) : people.length === 0 ? (
                     <p className="py-3 text-sm text-muted-foreground">
-                        Nobody is registered yet, so nobody can join.
+                        {t("accessEditor.nobodyIsRegisteredYetSo")}
                     </p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border/60">
@@ -170,7 +172,7 @@ export function GameAccessEditor({
                                     </p>
                                     {person.linkedTo && (
                                         <p className="truncate text-xs text-muted-foreground">
-                                            Follows {person.linkedTo}&apos;s Polaris sign-ins
+                                            {t("accessEditor.follows", { name: person.linkedTo })}
                                         </p>
                                     )}
                                     {person.note && (
@@ -185,7 +187,7 @@ export function GameAccessEditor({
                                 <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
                                     {person.linkedTo && person.addresses.length === 0 && (
                                         <span className="text-xs text-muted-foreground">
-                                            Not signed in anywhere
+                                            {t("accessEditor.notSignedInAnywhere")}
                                         </span>
                                     )}
                                     {person.addresses.map((address) => (
@@ -203,8 +205,14 @@ export function GameAccessEditor({
                                                 <button
                                                     type="button"
                                                     disabled={pending}
-                                                    aria-label={`Remove ${address} from ${person.username}`}
-                                                    title={`Remove ${address} from ${person.username}`}
+                                                    aria-label={t("accessEditor.removeAddress", {
+                                                        address,
+                                                        name: person.username
+                                                    })}
+                                                    title={t("accessEditor.removeAddress", {
+                                                        address,
+                                                        name: person.username
+                                                    })}
                                                     className="text-muted-foreground hover:text-danger disabled:opacity-50"
                                                     onClick={() =>
                                                         run(() =>
@@ -226,8 +234,12 @@ export function GameAccessEditor({
                                     size="sm"
                                     variant="ghost"
                                     disabled={pending}
-                                    aria-label={`Remove ${person.username}`}
-                                    title={`Remove ${person.username} and every address they have`}
+                                    aria-label={t("accessEditor.removeNamed", {
+                                        name: person.username
+                                    })}
+                                    title={t("accessEditor.removeEverything", {
+                                        name: person.username
+                                    })}
                                     onClick={() =>
                                         run(() =>
                                             revokePlayerAccessAction(
@@ -246,8 +258,7 @@ export function GameAccessEditor({
 
                 {access && !access.addressesAvailable && (
                     <p className="text-xs text-muted-foreground">
-                        Bedrock does not record where a player connected from, so only the names
-                        here are enforced.
+                        {t("accessEditor.bedrockDoesNotRecordWhere")}
                     </p>
                 )}
                 {failure && !onError && <p className="text-xs text-danger">{failure}</p>}

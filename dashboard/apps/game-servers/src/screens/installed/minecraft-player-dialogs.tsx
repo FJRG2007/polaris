@@ -195,10 +195,7 @@ export function TeleportDialog({
     const [destination, setDestination] = useState("");
     const value = destination.trim();
     const valid = PLAYER_NAME.test(value) || COORDINATES.test(value);
-    const error =
-        value.length > 0 && !valid
-            ? "A player's name, or three coordinates like 100 64 -220"
-            : null;
+    const error = value.length > 0 && !valid ? t("players.teleportTargetRule") : null;
 
     return (
         <PlayerFormDialog
@@ -330,7 +327,7 @@ export function LocationDialog({
             description={t("players.readFromTheRunningServer")}
             icon={<MapPin className="size-6" />}
             loadingLabel={t("players.asking")}
-            empty="The server did not say."
+            empty={t("players.serverDidNotSay")}
             loading={loading}
             error={error}
             onRefresh={refresh}
@@ -394,6 +391,7 @@ function useServerRead<T extends { error?: string }>(
     loading: boolean;
     refresh: () => void;
 } {
+    const t = useGameText("minecraft");
     const [data, setData] = useState<T | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -413,13 +411,13 @@ function useServerRead<T extends { error?: string }>(
             () => {
                 if (!live) return;
                 setLoading(false);
-                setError("Could not reach the server");
+                setError(t("players.unreachable"));
             }
         );
         return () => {
             live = false;
         };
-    }, [read, attempt]);
+    }, [read, attempt, t]);
 
     return { data, error, loading, refresh: () => setAttempt((count) => count + 1) };
 }
@@ -736,7 +734,7 @@ export function PlayerAccessDialog({
         startLooking(async () => {
             const found = await onLookUp(identifier);
             if (found.error || !found.userId) {
-                setLookUpError(found.error ?? "Could not look that up");
+                setLookUpError(found.error ?? t("players.lookUpFailed"));
                 setSuggested([]);
                 setAddressesHidden(false);
                 setAccount(null);

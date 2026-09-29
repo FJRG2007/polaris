@@ -8,6 +8,7 @@
  */
 
 import Link from "next/link";
+import { useGameText } from "./game-text";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { ArkPanel } from "./installed/ark-panel";
 import { FivemPanel } from "./installed/fivem-panel";
@@ -45,16 +46,16 @@ export function GameServersSlot({ slot, host }: { slot: AppSlot; host?: Installe
  * their owner opens either page and they are adopted.
  */
 function GameServersHome() {
+    const t = useGameText("games");
     return (
         <Card>
             <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
-                <p className="text-sm font-medium">Your servers live on the Game servers page</p>
+                <p className="text-sm font-medium">{t("slot.yourServersLiveOnThe")}</p>
                 <p className="max-w-md text-sm text-muted-foreground">
-                    Create as many as you want, of any game Polaris knows, each with its own
-                    address, console, players and settings. The app itself runs nothing.
+                    {t("slot.createAsManyAsYou")}
                 </p>
                 <Link href="/apps/games">
-                    <Button size="sm">Open Game servers</Button>
+                    <Button size="sm">{t("slot.openGameServers")}</Button>
                 </Link>
             </CardBody>
         </Card>

@@ -21,6 +21,8 @@
  * and both builds' pictures stay addressable, so nothing breaks either way.
  */
 
+import type { Translator } from "@polaris/core";
+import { gameCatalogs, type GameKey } from "../../../messages";
 import {
     ITEM_CATALOG_URL,
     itemName,
@@ -31,6 +33,11 @@ import {
     type CatalogItem,
     type ItemPicture
 } from "../../lib/minecraft/items";
+
+/** The words the line under the grid is written in. */
+type ModItemsText = Translator<GameKey<"games">>;
+
+const ENGLISH: ModItemsText = gameCatalogs.translator("en-US", "games");
 
 /** The vanilla manifest never changes between deploys, so it is fetched once per
  *  tab and every later picker opens against what is already in memory. */
@@ -87,10 +94,13 @@ let filled = 0;
  * cannot reach Modrinth - all of them are no modded items, which leaves the
  * picker exactly as it was before this existed.
  */
-export function loadModItems(installedAppId: string): Promise<ModItemsLoad> {
+export function loadModItems(
+    installedAppId: string,
+    t: ModItemsText = ENGLISH
+): Promise<ModItemsLoad> {
     const held = loads.get(installedAppId);
     if (held && Date.now() - held.at < TTL_MS) return held.load;
-    const load = fetchModItems(installedAppId).catch(() => {
+    const load = fetchModItems(installedAppId, t).catch(() => {
         // Not kept as a failure, for the reason the vanilla loader does not keep
         // one either: the next open should be allowed to try rather than inherit
         // this one. It still resolves - a picker with no modded items is where
@@ -102,7 +112,7 @@ export function loadModItems(installedAppId: string): Promise<ModItemsLoad> {
     return load;
 }
 
-async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
+async function fetchModItems(installedAppId: string, t: ModItemsText): Promise<ModItemsLoad> {
     const [known, response] = await Promise.all([
         loadVanillaItems().catch(() => [] as CatalogItem[]),
         fetch(`/api/apps/installed/${encodeURIComponent(installedAppId)}/minecraft/items`, {
@@ -130,7 +140,7 @@ async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
         loads.delete(installedAppId);
     }
 
-    return { items: modCatalogItems(items), note: noteFor(payload, items.length) };
+    return { items: modCatalogItems(items), note: noteFor(payload, items.length, t) };
 }
 
 /**
@@ -144,38 +154,28 @@ async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
  *
  * Nothing at all on a server with no mods, which is where this started.
  */
-export function noteFor(payload: unknown, found: number): string | null {
+export function noteFor(payload: unknown, found: number, t: ModItemsText = ENGLISH): string | null {
     const lines: string[] = [];
-    if (found > 0) {
-        lines.push(
-            `Also searching ${found} items this server's mods add. Type a mod's name for just those.`
-        );
-    }
+    if (found > 0) lines.push(t("itemPicker.modNotes.found", { count: found }));
     const answer = payload as { unread?: unknown; skipped?: unknown; complete?: unknown } | null;
-    const unread = namesIn(answer?.unread);
-    if (unread !== null) {
-        lines.push(`Could not read the items ${unread} adds. They can still be typed as ids.`);
-    }
-    const skipped = namesIn(answer?.skipped);
-    if (skipped !== null) {
-        lines.push(
-            `Not searching ${skipped}: only the first mods on a long list are read. They can still be typed as ids.`
-        );
-    }
-    if (answer?.complete === false) {
-        lines.push("Some mods are still being read. Open the picker again to see their items.");
-    }
+    const unread = namesIn(t, answer?.unread);
+    if (unread !== null) lines.push(t("itemPicker.modNotes.unread", { names: unread }));
+    const skipped = namesIn(t, answer?.skipped);
+    if (skipped !== null) lines.push(t("itemPicker.modNotes.skipped", { names: skipped }));
+    if (answer?.complete === false) lines.push(t("itemPicker.modNotes.incomplete"));
     return lines.length > 0 ? lines.join(" ") : null;
 }
 
 /** Up to four names from a list in the answer, and how many more there are. */
-function namesIn(list: unknown): string | null {
+function namesIn(t: ModItemsText, list: unknown): string | null {
     const names = Array.isArray(list)
         ? list.filter((name): name is string => typeof name === "string")
         : [];
     if (names.length === 0) return null;
     const shown = names.slice(0, 4).join(", ");
-    return names.length > 4 ? `${shown} and ${names.length - 4} more` : shown;
+    return names.length > 4
+        ? t("itemPicker.modNotes.andMore", { names: shown, count: names.length - 4 })
+        : shown;
 }
 
 /** Drop everything held, so a test starts from the state a fresh tab is in. */

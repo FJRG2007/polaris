@@ -17,6 +17,8 @@
  */
 
 import { Input, cn } from "@polaris/ui";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import { Loader2, Search } from "lucide-react";
 import { DRAG_EFFECT_ALLOWED } from "./minecraft-inventory";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
@@ -49,9 +51,9 @@ export interface ItemPickerSource<T extends SearchableItem> {
     /** An id somebody typed, when the game has ids worth typing - a modded item
      *  that no catalogue covers. Absent means the field only searches. */
     readonly typedId?: (query: string) => string | null;
-    readonly placeholder: string;
+    readonly placeholder: GameKey<"games">;
     /** What to say when the catalogue did not load. */
-    readonly whenMissing: string;
+    readonly whenMissing: GameKey<"games">;
 }
 
 export function GameItemPicker<T extends SearchableItem>({
@@ -77,6 +79,7 @@ export function GameItemPicker<T extends SearchableItem>({
      *  reaches for is nearly always what was reached for last. */
     recent?: readonly string[];
 }) {
+    const t = useGameText("games");
     const [items, setItems] = useState<T[] | null>(null);
     const [extra, setExtra] = useState<T[]>([]);
     const [note, setNote] = useState<string | null>(null);
@@ -153,22 +156,22 @@ export function GameItemPicker<T extends SearchableItem>({
                     className="pl-9"
                     spellCheck={false}
                     value={query}
-                    aria-label="Search items"
-                    placeholder={placeholder}
+                    aria-label={t("itemPicker.searchItems")}
+                    placeholder={t(placeholder)}
                     onChange={(event) => onQueryChange(event.target.value)}
                 />
             </div>
 
             {failed ? (
-                <p className="text-xs text-muted-foreground">{whenMissing}</p>
+                <p className="text-xs text-muted-foreground">{t(whenMissing)}</p>
             ) : items === null ? (
                 <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> Loading the items...
+                    <Loader2 className="size-4 animate-spin" /> {t("itemPicker.loadingTheItems")}
                 </p>
             ) : (
                 <>
                     <ul
-                        aria-label="Items"
+                        aria-label={t("itemPicker.items")}
                         className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface/40 p-1"
                     >
                         {offerTyped && typed && (
@@ -194,13 +197,13 @@ export function GameItemPicker<T extends SearchableItem>({
                         ))}
                         {shown.length === 0 && !offerTyped && (
                             <li className="col-span-full py-6 text-center text-sm text-muted-foreground">
-                                Nothing matches that.
+                                {t("itemPicker.nothingMatchesThat")}
                             </li>
                         )}
                     </ul>
                     {truncated && (
                         <p className="text-xs text-muted-foreground">
-                            More than {SHOWN} match. Type more to narrow it.
+                            {t("itemPicker.moreThan", { count: SHOWN })}
                         </p>
                     )}
                     {note && <p className="text-xs text-muted-foreground">{note}</p>}
@@ -220,7 +223,7 @@ export function GameItemPicker<T extends SearchableItem>({
                         )}
                     </span>
                 ) : (
-                    <span className="text-muted-foreground">Choose an item.</span>
+                    <span className="text-muted-foreground">{t("itemPicker.chooseAnItem")}</span>
                 )}
             </p>
         </div>

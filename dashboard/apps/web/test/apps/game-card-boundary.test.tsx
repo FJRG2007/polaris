@@ -9,6 +9,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { CardBoundary } from "@polaris-app/game-servers/src/components/card-boundary";
 
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+}));
+
 afterEach(() => cleanup());
 
 function Broken(): never {

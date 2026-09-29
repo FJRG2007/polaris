@@ -13,6 +13,7 @@
  */
 
 import { Button, Input } from "@polaris/ui";
+import { useGameText } from "../screens/game-text";
 import { useState, useTransition } from "react";
 import { Locate, Loader2, UserPlus } from "lucide-react";
 import type { MinecraftEdition } from "../lib/minecraft/service";
@@ -29,6 +30,7 @@ export function GameAccessForm({
     /** Resolves once the grant has been attempted; the fields clear on success. */
     onAdd: (input: { username: string; address: string }) => Promise<boolean>;
 }) {
+    const t = useGameText("games");
     const [username, setUsername] = useState("");
     const [address, setAddress] = useState("");
     const [detecting, startDetecting] = useTransition();
@@ -68,9 +70,9 @@ export function GameAccessForm({
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     onKeyDown={(event) => event.key === "Enter" && submit()}
-                    placeholder={edition === "bedrock" ? "Gamertag" : "Username"}
+                    placeholder={edition === "bedrock" ? t("accessForm.gamertag") : t("accessForm.username")}
                     className="min-w-36 flex-1"
-                    aria-label="Player"
+                    aria-label={t("accessForm.player")}
                     disabled={disabled}
                 />
                 <div className="flex min-w-48 flex-1 items-center gap-1">
@@ -78,9 +80,9 @@ export function GameAccessForm({
                         value={address}
                         onChange={(event) => setAddress(event.target.value)}
                         onKeyDown={(event) => event.key === "Enter" && submit()}
-                        placeholder="203.0.113.9, 203.0.113.0/24 or any"
+                        placeholder={t("accessForm.addressPlaceholder")}
                         className="flex-1"
-                        aria-label="Address they connect from"
+                        aria-label={t("accessForm.addressTheyConnectFrom")}
                         disabled={disabled}
                     />
                     <Button
@@ -88,24 +90,24 @@ export function GameAccessForm({
                         variant="ghost"
                         onClick={detect}
                         disabled={disabled || pending}
-                        aria-label="Use the address you are on now"
-                        title="Use the address you are on now"
+                        aria-label={t("accessForm.useTheAddressYouAre")}
+                        title={t("accessForm.useTheAddressYouAre")}
                     >
                         {detecting ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
                     </Button>
                 </div>
                 <Button size="sm" onClick={submit} disabled={disabled || pending || !ready}>
-                    {adding ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} Add
+                    {adding ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} {t("accessForm.add")}
                 </Button>
             </div>
             {(nameInvalid || addressInvalid) && (
                 <p className="text-xs text-danger">
-                    {nameInvalid ? "That is not a username this edition accepts" : "That is not an address or a range"}
+                    {nameInvalid ? t("accessForm.thatIsNotAUsername") : t("accessForm.thatIsNotAnAddress")}
                 </p>
             )}
             {detectFailed && (
                 <p className="text-xs text-muted-foreground">
-                    Polaris could not read the address this request came from. Type it in instead.
+                    {t("accessForm.polarisCouldNotReadThe")}
                 </p>
             )}
         </div>

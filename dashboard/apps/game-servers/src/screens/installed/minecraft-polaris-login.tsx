@@ -17,9 +17,10 @@
  */
 
 import { Skeleton } from "@polaris/ui";
+import { useGameText } from "../game-text";
 import { TriangleAlert } from "lucide-react";
 import { loginStateAction } from "./minecraft-login-actions";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { LoginState } from "../../lib/minecraft/polaris-login-service";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -53,6 +54,7 @@ export function useLoginState(
     // Whether the first render already holds what the server read for the page.
     // Asking again on mount would be the same answer a moment later, and on the
     // Minecraft tabs that one call headed the queue every other action waits in.
+    const t = useGameText("minecraft");
     const seeded = useRef(enabled && initial !== null);
 
     useEffect(() => {
@@ -70,10 +72,10 @@ export function useLoginState(
             setState(result.state);
             setError(null);
         } else {
-            setError(result.error ?? "Could not read the login state");
+            setError(result.error ?? t("login.readFailed"));
         }
         setLoaded(true);
-    }, [installedAppId]);
+    }, [installedAppId, t]);
 
     useEffect(() => {
         if (!enabled) return;
@@ -101,6 +103,7 @@ export function LoginDetails({
     /** Where each player's password is shown and reset. */
     onOpenPlayers?: () => void;
 }) {
+    const t = useGameText("minecraft");
     const registered = state.players.length;
 
     return (
@@ -109,56 +112,69 @@ export function LoginDetails({
                 <p className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
-                        The server has been up for over three minutes without reaching Polaris, so
-                        nobody can join it.
+                        {t("login.theServerHasBeenUp")}
                         {state.seenAt ? (
                             <>
                                 {" "}
-                                Last reached <RelativeTime iso={state.seenAt} />.
+                                {t.rich<ReactNode>("login.lastReached", {
+                                    time: () => <RelativeTime key="time" iso={state.seenAt!} />
+                                })}
                             </>
                         ) : (
-                            " It has never reached it."
+                            ` ${t("login.neverReached")}`
                         )}{" "}
-                        Restarting the server tries again. If it keeps happening, the machine it
-                        runs on cannot reach this Polaris at its address.
+                        {t("login.restartingTheServerTriesAgain")}
                     </span>
                 </p>
             ) : (
                 <p className="text-xs text-muted-foreground">
                     {state.health === "ok" && state.seenAt ? (
                         <>
-                            Polaris login checked in <RelativeTime iso={state.seenAt} />.
-                            {state.outdated &&
-                                " The server runs an older build; the new one installs when it restarts."}
+                            {t.rich<ReactNode>("login.checkedIn", {
+                                time: () => <RelativeTime key="time" iso={state.seenAt!} />
+                            })}
+                            {state.outdated && ` ${t("login.outdated")}`}
                         </>
                     ) : (
-                        "Waiting for the server to start and check in."
+                        t("login.waitingForTheServerTo")
                     )}
                 </p>
             )}
 
             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-                Players register with{" "}
-                <span className="font-mono">/register &lt;password&gt; &lt;password&gt;</span>, come
-                back with <span className="font-mono">/login &lt;password&gt;</span> and change it
-                with <span className="font-mono">/changepassword &lt;old&gt; &lt;new&gt;</span>.
-                Letters, digits and symbols all work; a password with spaces goes in double quotes.
+                {t.rich<ReactNode>("login.commandsHelp", {
+                    register: () => (
+                        <span key="register" className="font-mono">
+                            {`/register <${t("login.words.password")}> <${t("login.words.password")}>`}
+                        </span>
+                    ),
+                    login: () => (
+                        <span key="login" className="font-mono">
+                            {`/login <${t("login.words.password")}>`}
+                        </span>
+                    ),
+                    change: () => (
+                        <span key="change" className="font-mono">
+                            {`/changepassword <${t("login.words.old")}> <${t("login.words.new")}>`}
+                        </span>
+                    )
+                })}
             </p>
 
             <p className="text-xs text-muted-foreground">
                 {registered === 0
-                    ? "Nobody has set a password yet."
-                    : `${registered} ${registered === 1 ? "player has" : "players have"} set a password.`}{" "}
+                    ? t("login.nobodyHasSetAPassword")
+                    : t("login.registeredCount", { count: registered })}{" "}
                 {onOpenPlayers ? (
                     <button
                         type="button"
                         onClick={onOpenPlayers}
                         className="text-primary hover:underline"
                     >
-                        See who, and reset one, in Players
+                        {t("login.seeWhoAndResetOne")}
                     </button>
                 ) : (
-                    "Players shows who, and resets one."
+                    t("login.playersShowsWhoAndResets")
                 )}
             </p>
         </div>

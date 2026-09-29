@@ -15,6 +15,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { useGameText } from "../screens/game-text";
 import type { ReactNode } from "react";
 import {
     Button,
@@ -52,6 +53,7 @@ export function PlayerFormDialog({
     error?: string | null;
     danger?: boolean;
 }) {
+    const t = useGameText("games");
     return (
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
             <DialogContent className="max-w-sm">
@@ -70,7 +72,7 @@ export function PlayerFormDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {t("playerForm.cancel")}
                         </Button>
                         <Button
                             type="submit"

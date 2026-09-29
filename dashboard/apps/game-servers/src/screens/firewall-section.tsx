@@ -11,6 +11,7 @@
  */
 
 import Link from "next/link";
+import { useGameText } from "./game-text";
 import { useCallback, useEffect, useState } from "react";
 import { GameAccessEditor } from "../components/game-access-editor";
 import type { PlayerAccessView } from "../lib/minecraft/player-access";
@@ -25,33 +26,32 @@ export interface GamesFirewallSectionProps {
 }
 
 export function GamesFirewallSection({ installedAppId, game, access }: GamesFirewallSectionProps) {
+    const t = useGameText("games");
     if (game === "minecraft")
         return <PlayerListPanel installedAppId={installedAppId} initial={access} />;
     if (game === "fivem") {
         return (
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                A FiveM server is guarded by its own list of players rather than by the rules below
-                - a game port does not go through the web firewall.{" "}
+                {t("firewall.fivem")}{" "}
                 <Link
                     href={`/apps/installed/${installedAppId}/security`}
                     className="text-primary hover:underline"
                 >
-                    Open who may join
+                    {t("firewall.openWhoMayJoin")}
                 </Link>
-                . Addresses blocked here are carried onto that list as well.
+                {t("firewall.carried")}
             </p>
         );
     }
     if (game === "ark") {
         return (
             <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-                An ARK server is guarded by its join password and its own allow list of Steam ids,
-                not by the rules below.{" "}
+                {t("firewall.ark")}{" "}
                 <Link
                     href={`/apps/installed/${installedAppId}/security`}
                     className="text-primary hover:underline"
                 >
-                    Open who may join
+                    {t("firewall.openWhoMayJoin")}
                 </Link>
                 .
             </p>

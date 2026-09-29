@@ -11,6 +11,9 @@
  * name is a name or it is refused.
  */
 
+import type { Translator } from "@polaris/core";
+import { gameCatalogs, type GameKey } from "../../../messages";
+
 /** Everybody on the server, as the game's own selector says it. */
 export const EVERYBODY = "@a";
 
@@ -73,17 +76,22 @@ export function playersTarget(players: readonly string[]): string {
     return players.join(",");
 }
 
-/** Who it goes to, in words for "Sent to ...". */
-export function describeTarget(target: string): string {
+/** Who it goes to, in words for "Sent to ...", in the language of the translator
+ *  given - English when none is. */
+export function describeTarget(
+    target: string,
+    t: Translator<GameKey<"minecraft">> = gameCatalogs.translator("en-US", "minecraft")
+): string {
     const audience = parseTarget(target);
-    if (!audience || audience.kind === "everybody") return "everybody on the server";
-    if (audience.kind === "operators") return "the operators who are on";
-    if (audience.kind === "others") return "everybody on the server but the operators";
-    if (audience.kind === "gamemode") return `the players in ${GAME_MODE_LABEL[audience.mode]}`;
+    if (!audience || audience.kind === "everybody") return t("sendTo.target.everybody");
+    if (audience.kind === "operators") return t("sendTo.target.operators");
+    if (audience.kind === "others") return t("sendTo.target.others");
+    if (audience.kind === "gamemode")
+        return t("sendTo.target.gamemode", { mode: t(`playersTab.modes.${audience.mode}`) });
     const [first, second, ...rest] = audience.players;
     if (second === undefined) return first ?? "";
-    if (rest.length === 0) return `${first} and ${second}`;
-    return `${first}, ${second} and ${rest.length} more`;
+    if (rest.length === 0) return t("sendTo.target.two", { first: first ?? "", second });
+    return t("sendTo.target.more", { first: first ?? "", second, count: rest.length });
 }
 
 /** A game mode as the game's menus say it. */

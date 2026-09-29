@@ -15,7 +15,8 @@
  * makes choosing the wrong blueprint survivable.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useGameText } from "../game-text";
 import { findMap } from "../../lib/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
 import { expectedMemoryAction, saveServerAsTemplateAction } from "../actions";
@@ -67,6 +68,7 @@ export function MinecraftReset({
     playersOnline: number;
     onDone: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [open, setOpen] = useState(false);
     const current = findBlueprint(blueprintId ?? "");
     const currentMap = findMap(mapId ?? "");
@@ -76,26 +78,25 @@ export function MinecraftReset({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <RotateCcw className="size-4 text-primary" />
-                    Start over
+                    {t("reset.startOver")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Build this server again as another blueprint, or as an ordinary one, on a fresh
-                    map. It keeps its address, its players, the access other people hold on it and
-                    its port - only the game changes.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("reset.buildThisServerAgainAs")}</p>
                 <p className="text-xs text-muted-foreground">
                     {currentMap
-                        ? `It is built from ${current?.name ?? "a blueprint"} on ${currentMap.name} now.`
+                        ? t("reset.builtFromOn", {
+                              name: current?.name ?? t("reset.aBlueprint"),
+                              map: currentMap.name
+                          })
                         : current
-                          ? `It is built from ${current.name} now.`
-                          : "It was not built from a blueprint, or was created before Polaris recorded which one."}{" "}
-                    The map it is on is kept, so you can switch back to it under World.
+                          ? t("reset.builtFrom", { name: current.name })
+                          : t("reset.itWasNotBuiltFrom")}{" "}
+                    {t("reset.theMapItIsOn")}
                 </p>
                 <div className="flex justify-end">
                     <Button variant="secondary" onClick={() => setOpen(true)}>
-                        Start over
+                        {t("reset.startOver")}
                     </Button>
                 </div>
             </CardBody>
@@ -135,6 +136,7 @@ function ResetDialog({
     onClose: () => void;
     onDone: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [shape, setShape] = useState<BlueprintShape>(() => {
         const blueprint = findBlueprint(blueprintId ?? "");
         return blueprint
@@ -230,7 +232,7 @@ function ResetDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <RotateCcw className="size-4" /> Start this server over
+                        <RotateCcw className="size-4" /> {t("reset.startThisServerOver")}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -243,7 +245,7 @@ function ResetDialog({
                     />
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Playing at once, usually</span>
+                        <span className="font-medium">{t("reset.playingAtOnceUsually")}</span>
                         <Input
                             type="number"
                             min={1}
@@ -255,16 +257,22 @@ function ResetDialog({
                         <span className="text-xs text-muted-foreground">
                             {memory === null ? null : (
                                 <>
-                                    The rebuilt server is given{" "}
-                                    {memory === undefined ? (
-                                        <Skeleton className="inline-block h-3 w-10 align-middle" />
-                                    ) : (
-                                        <strong className="text-foreground">{memory}</strong>
-                                    )}{" "}
-                                    of memory.{" "}
+                                    {t.rich<ReactNode>("reset.memoryGiven", {
+                                        memory: () =>
+                                            memory === undefined ? (
+                                                <Skeleton
+                                                    key="memory"
+                                                    className="inline-block h-3 w-10 align-middle"
+                                                />
+                                            ) : (
+                                                <strong key="memory" className="text-foreground">
+                                                    {memory}
+                                                </strong>
+                                            )
+                                    })}{" "}
                                 </>
                             )}
-                            Player slots and everything else on Settings are left as they are.
+                            {t("reset.playerSlotsAndEverythingElse")}
                         </span>
                     </label>
 
@@ -275,16 +283,15 @@ function ResetDialog({
                         gets written down. */}
                     <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
                         <label className="flex flex-1 flex-col gap-1 text-sm">
-                            <span className="font-medium">Save this server as a template</span>
+                            <span className="font-medium">{t("reset.saveThisServerAsA")}</span>
                             <Input
                                 value={templateName}
                                 onChange={(event) => setTemplateName(event.target.value)}
-                                placeholder="My survival setup"
+                                placeholder={t("reset.mySurvivalSetup")}
                                 maxLength={60}
                             />
                             <span className="text-xs text-muted-foreground">
-                                {templateNote ??
-                                    "Keeps what you changed from the blueprint's defaults - not this server's address, players or ports."}
+                                {templateNote ?? t("reset.keepsWhatYouChangedFrom")}
                             </span>
                         </label>
                         <Button
@@ -299,10 +306,7 @@ function ResetDialog({
                                     ""
                                 ).then((answer) => {
                                     setSavingTemplate(false);
-                                    setTemplateNote(
-                                        answer.error ??
-                                            "Saved. It is offered when you create a server."
-                                    );
+                                    setTemplateNote(answer.error ?? t("reset.templateSaved"));
                                     if (!answer.error) setTemplateName("");
                                 });
                             }}
@@ -312,7 +316,7 @@ function ResetDialog({
                             ) : (
                                 <BookmarkPlus className="size-4" />
                             )}
-                            Save
+                            {t("reset.save")}
                         </Button>
                     </div>
 
@@ -329,13 +333,15 @@ function ResetDialog({
                             className="mt-0.5"
                         />
                         <span className="flex flex-col gap-0.5">
-                            <span className="font-medium">Keep what players are carrying</span>
+                            <span className="font-medium">
+                                {t("reset.keepWhatPlayersAreCarrying")}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                                 {carriesPlayers
-                                    ? "Inventories, ender chests, stats and advancements come across. The server has to be running for the copy to be made."
+                                    ? t("reset.inventoriesEnderChestsStatsAnd")
                                     : shape.mapId
-                                      ? "A built map comes with its own spawn and its own idea of what you start with, so everyone begins it fresh."
-                                      : "Bedrock keeps player data inside the world itself, so a new map always starts everyone over."}
+                                      ? t("reset.aBuiltMapComesWith")
+                                      : t("reset.bedrockKeepsPlayerDataInside")}
                             </span>
                         </span>
                     </label>
@@ -343,12 +349,9 @@ function ResetDialog({
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span className="text-muted-foreground">
-                            The server restarts onto a new map, so anybody playing is disconnected
                             {playersOnline > 0
-                                ? ` - ${playersOnline} ${playersOnline === 1 ? "is" : "are"} on it right now`
-                                : ""}
-                            . The map it is on now is kept and you can switch back to it under
-                            World.
+                                ? t("reset.restartWarningPlaying", { count: playersOnline })
+                                : t("reset.restartWarning")}
                         </span>
                     </p>
 
@@ -356,14 +359,14 @@ function ResetDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {t("reset.cancel")}
                         </Button>
                         <Button
                             onClick={() => void submit()}
                             disabled={pending || seedError !== null}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Start over
+                            {t("reset.startOver")}
                         </Button>
                     </div>
                 </div>

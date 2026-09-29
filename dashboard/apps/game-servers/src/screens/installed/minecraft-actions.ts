@@ -135,7 +135,7 @@ const { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnv
 const playerNameSchema = z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9_]{1,16}$/, "A player name is 1-16 letters, digits or underscores");
+    .regex(/^[A-Za-z0-9_]{1,16}$/, schemaWords("games", "errors.playerNameRule"));
 
 const moderationSchema = z.object({
     installedAppId: z.string().uuid(),
@@ -318,7 +318,7 @@ const itemIdSchema = z
     .string()
     .trim()
     .toLowerCase()
-    .regex(ITEM_ID_PATTERN, "An item looks like minecraft:stone");
+    .regex(ITEM_ID_PATTERN, schemaWords("games", "errors.itemIdRule"));
 
 /** Where to send somebody: another player, or three coordinates - each an
  *  absolute number or a `~` offset, which is how the game reads them. */
@@ -1440,7 +1440,12 @@ export async function renameGameServerAction(
     installedAppId: string,
     name: string
 ): Promise<{ name?: string; error?: string }> {
-    const parsed = z.string().trim().min(1, "Give the server a name").max(60).safeParse(name);
+    const parsed = z
+        .string()
+        .trim()
+        .min(1, (await gameWords("games"))("errors.giveTheServerAName"))
+        .max(60)
+        .safeParse(name);
     if (!parsed.success)
         return {
             error:
@@ -1521,12 +1526,16 @@ export async function setServerIconAction(input: {
             parsed.data.installedAppId
         );
         const bytes = Buffer.from(parsed.data.png, "base64");
-        if (bytes.length === 0) throw new Error("That image is empty");
-        if (bytes.length > MAX_ICON_BYTES) throw new Error("That image is too large");
+        if (bytes.length === 0)
+            throw new Error((await gameWords("games"))("errors.thatImageIsEmpty"));
+        if (bytes.length > MAX_ICON_BYTES)
+            throw new Error((await gameWords("games"))("errors.thatImageIsTooLarge"));
         const size = pngSize(bytes);
-        if (!size) throw new Error("That is not a PNG");
+        if (!size) throw new Error((await gameWords("games"))("errors.thatIsNotAPng"));
         if (size.width !== ICON_SIDE || size.height !== ICON_SIDE) {
-            throw new Error(`A server icon has to be ${ICON_SIDE}x${ICON_SIDE}`);
+            throw new Error(
+                (await gameWords("games"))("errors.iconSize", { size: `${ICON_SIDE}x${ICON_SIDE}` })
+            );
         }
 
         if (!access.install.applicationId)
@@ -1821,7 +1830,7 @@ export async function setModpackAction(
 
         const pack = parsed.data.modpack.trim();
         if (pack.length > 0 && !isModpackReference(pack))
-            throw new Error("That is a modpack short name, or the link to its page");
+            throw new Error((await gameWords("games"))("errors.thatIsAModpackShort"));
 
         const vars =
             pack.length > 0
@@ -2507,7 +2516,7 @@ export async function updateServerSettingsAction(
         if (!install.applicationId)
             throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
         const manifest = findApp(install.catalogId);
-        if (!manifest) throw new Error("Unknown app");
+        if (!manifest) throw new Error((await gameWords("games"))("errors.unknownApp"));
 
         // Only what the manifest declares as tunable, only values it allows: the
         // form is a view of this list, not the authority on it.
@@ -2523,7 +2532,7 @@ export async function updateServerSettingsAction(
                 throw new Error(`${field.label}: ${envFormatHint(field)}`);
             return [{ key: entry.key, value, isSecret: Boolean(field.secret) }];
         });
-        if (vars.length === 0) throw new Error("Nothing to save");
+        if (vars.length === 0) throw new Error((await gameWords("games"))("errors.nothingToSave"));
 
         // Changing the software or the release changes what the server can load,
         // and the password guard is the one thing on it that was closing it. A

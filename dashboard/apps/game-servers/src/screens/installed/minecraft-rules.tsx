@@ -21,7 +21,9 @@
  * switches that would fail and a 1.21 one is not short of them.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import type { WorldRules } from "../../lib/minecraft/rules-service";
 import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -50,11 +52,10 @@ const KEPT_RULES_MS = 24 * 3_600_000;
 /** What a control says when its position is Polaris's note of an earlier reading
  *  and the control still works, which is the one case where it would otherwise
  *  read as what the world is being played under right now. */
-const REMEMBERED_NOTE =
-    "This is the value Polaris last read, not one the server confirmed just now.";
+const REMEMBERED_NOTE: GameKey<"minecraft"> = "rules.remembered";
 
 /** What a row says when its value was set here and the server has not taken it. */
-const PENDING_NOTE = "Saved. Applied when the server is running.";
+const PENDING_NOTE: GameKey<"minecraft"> = "rules.pending";
 
 export function MinecraftRules({
     installedAppId,
@@ -64,6 +65,7 @@ export function MinecraftRules({
     /** False for somebody who may watch the server and not change it. */
     canManage: boolean;
 }) {
+    const t = useGameText("minecraft");
     const [rules, setRules] = useState<WorldRules | null>(null);
     const [loading, setLoading] = useState(true);
     /** Whether the server is being asked right now, with Polaris's own values
@@ -107,7 +109,7 @@ export function MinecraftRules({
             setHeard(true);
             setError(null);
         } else {
-            setError(result.error ?? "The rules could not be read");
+            setError(result.error ?? t("rules.readFailed"));
         }
     }, [installedAppId]);
 
@@ -143,7 +145,7 @@ export function MinecraftRules({
     async function apply(rule: GameRule, value: string): Promise<void> {
         const normalized = normalizeRuleValue(rule, value);
         if (normalized === null) {
-            setError(`${rule.label} does not take that value.`);
+            setError(t("rules.badValue", { name: rule.label }));
             return;
         }
         setBusy(rule.id);
@@ -227,15 +229,14 @@ export function MinecraftRules({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    Each of these applies straight away. Nobody is disconnected and the server is
-                    not restarted.
+                    {t("rules.eachOfTheseAppliesStraight")}
                 </p>
                 <Button
                     size="icon"
                     variant="ghost"
                     className="ml-auto"
-                    aria-label="Read the rules again"
-                    title="Read the rules again"
+                    aria-label={t("rules.readTheRulesAgain")}
+                    title={t("rules.readTheRulesAgain")}
                     disabled={checking}
                     onClick={() => void load()}
                 >
@@ -259,14 +260,14 @@ export function MinecraftRules({
             <Card>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Difficulty</p>
+                        <p className="text-sm font-medium">{t("rules.difficulty")}</p>
                         <p className="text-xs text-muted-foreground">
-                            Peaceful removes hostile mobs and stops hunger draining.
+                            {t("rules.peacefulRemovesHostileMobsAnd")}
                         </p>
                         {rules?.pending.includes("difficulty") ? (
-                            <p className="text-xs text-warning">{PENDING_NOTE}</p>
+                            <p className="text-xs text-warning">{t(PENDING_NOTE)}</p>
                         ) : remembered && rules?.difficulty ? (
-                            <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                            <p className="text-xs text-warning">{t(REMEMBERED_NOTE)}</p>
                         ) : null}
                         {rules?.failures.difficulty ? (
                             <p className="text-xs text-danger">{rules.failures.difficulty}</p>
@@ -275,14 +276,16 @@ export function MinecraftRules({
                     {rules ? (
                         <Select
                             className="w-40"
-                            aria-label="Difficulty"
+                            aria-label={t("rules.difficulty")}
                             disabled={
                                 !canManage || !heard || busy === "difficulty" || !rules.changeable
                             }
                             value={rules.difficulty ?? ""}
                             onValueChange={(value) => void applyDifficulty(value)}
                             options={[
-                                ...(rules.difficulty ? [] : [{ value: "", label: "Unknown" }]),
+                                ...(rules.difficulty
+                                    ? []
+                                    : [{ value: "", label: t("rules.unknown") }]),
                                 ...DIFFICULTIES.map((entry) => ({
                                     value: entry,
                                     label: entry.charAt(0).toUpperCase() + entry.slice(1)
@@ -304,7 +307,9 @@ export function MinecraftRules({
                             {rules?.asOf ? (
                                 <>
                                     {" "}
-                                    Read <RelativeTime iso={rules.asOf} />.
+                                    {t.rich<ReactNode>("rules.readAt", {
+                                        time: () => <RelativeTime key="time" iso={rules.asOf!} />
+                                    })}
                                 </>
                             ) : null}
                         </span>
@@ -315,8 +320,7 @@ export function MinecraftRules({
             {groups.length === 0 ? (
                 <Card>
                     <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                        This server did not report any rules. Java servers from 1.13 answer this;
-                        Bedrock cannot be asked from here.
+                        {t("rules.thisServerDidNotReport")}
                     </CardBody>
                 </Card>
             ) : (
@@ -387,6 +391,7 @@ function RuleRow({
     disabled: boolean;
     onChange: (value: string) => void;
 }) {
+    const t = useGameText("minecraft");
     // An integer is committed on blur and on Enter rather than per keystroke: a
     // command per digit would set the rule to 1, then 12, then 128.
     const [draft, setDraft] = useState(value);
@@ -409,14 +414,11 @@ function RuleRow({
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
                 {failure ? <p className="text-xs text-danger">{failure}</p> : null}
                 {reading !== "loaded" ? null : pending ? (
-                    <p className="text-xs text-warning">{PENDING_NOTE}</p>
+                    <p className="text-xs text-warning">{t(PENDING_NOTE)}</p>
                 ) : unknown ? (
-                    <p className="text-xs text-warning">
-                        This server will not say what it is set to, so this is not its current
-                        value.
-                    </p>
+                    <p className="text-xs text-warning">{t("rules.thisServerWillNotSay")}</p>
                 ) : remembered ? (
-                    <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                    <p className="text-xs text-warning">{t(REMEMBERED_NOTE)}</p>
                 ) : null}
             </div>
             {reading === "failed" ? null : reading === "reading" ? (
@@ -454,7 +456,7 @@ function RuleRow({
                     }}
                     title={
                         rule.min !== undefined && rule.max !== undefined
-                            ? `${rule.min} to ${rule.max}`
+                            ? t("rules.range", { min: rule.min, max: rule.max })
                             : undefined
                     }
                 />

@@ -19,6 +19,7 @@
  */
 
 import { type GameDefinition, type GameId } from "@polaris/core";
+import { useGameText } from "../screens/game-text";
 import { Input, cn } from "@polaris/ui";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -55,6 +56,7 @@ export function GamePicker({
     onChange: (game: GameId) => void;
     disabled?: boolean;
 }) {
+    const t = useGameText("games");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const root = useRef<HTMLDivElement>(null);
@@ -116,7 +118,7 @@ export function GamePicker({
                         </span>
                     </>
                 ) : (
-                    <span className="text-muted-foreground">No game is available</span>
+                    <span className="text-muted-foreground">{t("picker.noGameIsAvailable")}</span>
                 )}
                 <ChevronDown
                     className={cn(
@@ -136,8 +138,8 @@ export function GamePicker({
                                 className="h-8 pl-8"
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search games"
-                                aria-label="Search games"
+                                placeholder={t("picker.searchGames")}
+                                aria-label={t("picker.searchGames")}
                             />
                         </div>
                     )}
@@ -147,7 +149,7 @@ export function GamePicker({
                     >
                         {shown.length === 0 ? (
                             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                No game here matches that.
+                                {t("picker.noGameHereMatchesThat")}
                             </p>
                         ) : (
                             shown.map((game) => (

@@ -20,9 +20,11 @@
  */
 
 import Link from "next/link";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import * as actions from "./fivem-actions";
 import { hostUi } from "@polaris/app-host/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PlayersTable, PlayerIconAction } from "../../components/game-players-table";
 import {
     isResourceName,
@@ -53,10 +55,10 @@ const { mergeUnchanged } = hostUi.structuralMerge;
 /** How old a kept list may be and still paint first on a revisit. */
 const KEPT_RESOURCES_MS = 24 * 3_600_000;
 
-const COLUMNS = [
-    { label: "Resource" },
-    { label: "Folder", className: "hidden md:table-cell" },
-    { label: "State" }
+const COLUMNS: { label: GameKey<"fivem">; className?: string }[] = [
+    { label: "resources.columns.resource" },
+    { label: "resources.columns.folder", className: "hidden md:table-cell" },
+    { label: "resources.columns.state" }
 ];
 
 /** Rows sketched in a table whose resources are still being read. */
@@ -82,6 +84,7 @@ export function FivemResources({
      *  so a stopped one can be neither listed nor changed. */
     running: boolean;
 }) {
+    const t = useGameText("fivem");
     const [resources, setResources] = useState<readonly FivemResource[] | null>(null);
     const [loading, setLoading] = useState(true);
     // What this tab last read paints first, so a revisit is not a skeleton while
@@ -158,27 +161,26 @@ export function FivemResources({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    What this server runs. A resource that has just been added has to be started
-                    before it does anything.
+                    {t("resources.whatThisServerRunsA")}
                 </p>
                 <div className="ml-auto flex items-center gap-1">
                     {applicationId && (
                         <Link href={`/drive?c=container:${applicationId}&p=/config/resources`}>
                             <Button size="sm" variant="secondary">
-                                <FolderOpen className="size-4" /> Open the folder
+                                <FolderOpen className="size-4" /> {t("resources.openTheFolder")}
                             </Button>
                         </Link>
                     )}
                     {canManage && (
                         <Button size="sm" onClick={() => setAdding(true)} disabled={!running}>
-                            <Plus className="size-4" /> Add from a link
+                            <Plus className="size-4" /> {t("resources.addFromALink")}
                         </Button>
                     )}
                     <Button
                         size="icon"
                         variant="ghost"
-                        aria-label="Read the list again"
-                        title="Read the list again"
+                        aria-label={t("resources.readTheListAgain")}
+                        title={t("resources.readTheListAgain")}
                         disabled={loading}
                         onClick={() => {
                             setLoading(true);
@@ -202,20 +204,20 @@ export function FivemResources({
             {/* The table and its search are drawn at once; only the rows wait for
                 the container to be asked what is in it. */}
             <PlayersTable
-                columns={COLUMNS}
+                columns={COLUMNS.map((column) => ({ ...column, label: t(column.label) }))}
                 minWidth="34rem"
                 search={query}
                 onSearch={setQuery}
-                searchPlaceholder="Search resources"
+                searchPlaceholder={t("resources.search")}
                 isEmpty={loading || shown.length === 0}
                 empty={
                     loading
                         ? TABLE_LOADING
                         : !running
-                          ? "The server is not running, so there is nothing to list."
+                          ? t("resources.notRunning")
                           : resources && resources.length > 0
-                            ? `Nothing here matches “${query}”.`
-                            : "No resources yet. Add one from a link, or drop a folder into the resources folder."
+                            ? t("resources.noMatch", { query })
+                            : t("resources.none")
                 }
                 rows={shown.map((resource) => (
                     <tr key={resource.name} className="border-t border-border">
@@ -225,13 +227,14 @@ export function FivemResources({
                                     {resource.name}
                                 </span>
                                 {resource.managed && (
-                                    <Badge className="shrink-0 text-[0.6875rem]">Polaris</Badge>
+                                    <Badge className="shrink-0 text-[0.6875rem]">
+                                        {t("resources.polaris")}
+                                    </Badge>
                                 )}
                             </span>
                             {resource.managed && (
                                 <span className="text-xs text-muted-foreground">
-                                    Keeps players off the server. Open it to everyone from the
-                                    Security screen instead of stopping this.
+                                    {t("resources.keepsPlayersOffTheServer")}
                                 </span>
                             )}
                         </td>
@@ -245,7 +248,7 @@ export function FivemResources({
                                     resource.running ? "text-success" : "text-muted-foreground"
                                 )}
                             >
-                                {resource.running ? "Running" : "Stopped"}
+                                {resource.running ? t("resources.running") : t("resources.stopped")}
                             </span>
                         </td>
                         <td className="px-3 py-2">
@@ -253,13 +256,17 @@ export function FivemResources({
                                 {resource.running ? (
                                     <>
                                         <PlayerIconAction
-                                            label={`Restart ${resource.name}`}
+                                            label={t("resources.restartNamed", {
+                                                name: resource.name
+                                            })}
                                             icon={<RotateCw className="size-4" />}
                                             disabled={!canManage || locked}
                                             onClick={() => void act(resource, "restart")}
                                         />
                                         <PlayerIconAction
-                                            label={`Stop ${resource.name}`}
+                                            label={t("resources.stopNamed", {
+                                                name: resource.name
+                                            })}
                                             icon={<Square className="size-4" />}
                                             disabled={!canManage || locked || resource.managed}
                                             danger
@@ -268,7 +275,7 @@ export function FivemResources({
                                     </>
                                 ) : (
                                     <PlayerIconAction
-                                        label={`Start ${resource.name}`}
+                                        label={t("resources.startNamed", { name: resource.name })}
                                         icon={<Play className="size-4" />}
                                         disabled={!canManage || locked}
                                         onClick={() => void act(resource, "start")}
@@ -281,9 +288,13 @@ export function FivemResources({
             />
 
             <p className="text-xs text-muted-foreground">
-                Starting a resource here lasts until the server restarts. To have one start every
-                time, add an <code className="font-mono">ensure</code> line for it in the server
-                config - Polaris does that for the resources it installs itself.
+                {t.rich<ReactNode>("resources.ensureHelp", {
+                    code: (chunks) => (
+                        <code key="code" className="font-mono">
+                            {chunks}
+                        </code>
+                    )
+                })}
             </p>
 
             {adding && (
@@ -311,6 +322,7 @@ function AddResourceDialog({
     onClose: () => void;
     onAdded: () => void;
 }) {
+    const t = useGameText("fivem");
     const [url, setUrl] = useState("");
     const [name, setName] = useState("");
     /** Whether the name was typed. Once it has been, the link stops overwriting it. */
@@ -320,9 +332,7 @@ function AddResourceDialog({
 
     const linkError = url.trim().length === 0 || isResourceUrl(url) ? null : RESOURCE_URL_HINT;
     const nameError =
-        name.trim().length === 0 || isResourceName(name.trim())
-            ? null
-            : "Letters, digits, dots, dashes and underscores - it is a folder name.";
+        name.trim().length === 0 || isResourceName(name.trim()) ? null : t("resources.badName");
 
     useEffect(() => {
         if (named || !isResourceUrl(url)) return;
@@ -355,11 +365,11 @@ function AddResourceDialog({
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a resource</DialogTitle>
+                    <DialogTitle>{t("resources.addAResource")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Link</span>
+                        <span className="font-medium">{t("resources.link")}</span>
                         <Input
                             value={url}
                             onChange={(event) => setUrl(event.target.value)}
@@ -377,7 +387,7 @@ function AddResourceDialog({
                         </span>
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Folder name</span>
+                        <span className="font-medium">{t("resources.folderName")}</span>
                         <Input
                             value={name}
                             onChange={(event) => {
@@ -395,21 +405,20 @@ function AddResourceDialog({
                                 nameError ? "text-danger" : "text-muted-foreground"
                             )}
                         >
-                            {nameError ??
-                                "What the server will know it by. A folder of this name is replaced outright if there is one."}
+                            {nameError ?? t("resources.whatTheServerWillKnow")}
                         </span>
                     </label>
                     {error && <p className="text-sm text-danger">{error}</p>}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
-                        Cancel
+                        {t("resources.cancel")}
                     </Button>
                     <Button
                         onClick={() => void install()}
                         disabled={pending || !isResourceUrl(url) || !isResourceName(name.trim())}
                     >
-                        {pending ? "Fetching..." : "Add"}
+                        {pending ? t("resources.fetching") : t("resources.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

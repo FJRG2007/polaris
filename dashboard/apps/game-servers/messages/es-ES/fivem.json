@@ -72,5 +72,49 @@
         "nobodyAtAll": "No hay nadie jugando, y aún no se ha añadido a nadie.",
         "notAnswering": "El servidor no responde.",
         "savedRestart": "Guardado. Reinicia el servidor para que lo use."
+    },
+    "resources": {
+        "whatThisServerRunsA": "Lo que ejecuta este servidor. Un recurso recién añadido tiene que iniciarse antes de hacer nada.",
+        "openTheFolder": "Abrir la carpeta",
+        "addFromALink": "Añadir desde enlace",
+        "readTheListAgain": "Releer la lista",
+        "polaris": "Polaris",
+        "keepsPlayersOffTheServer": "Mantiene a los jugadores fuera del servidor. Ábrelo a todos desde la pantalla Seguridad en vez de pararlo.",
+        "running": "En marcha",
+        "stopped": "Parado",
+        "addAResource": "Añadir un recurso",
+        "link": "Enlace",
+        "folderName": "Carpeta",
+        "whatTheServerWillKnow": "Cómo lo conocerá el servidor. Una carpeta con este nombre se sustituye por completo si ya existe.",
+        "cancel": "Cancelar",
+        "fetching": "Descargando...",
+        "add": "Añadir",
+        "columns": {
+            "resource": "Recurso",
+            "folder": "Carpeta",
+            "state": "Estado"
+        },
+        "search": "Buscar recursos",
+        "notRunning": "El servidor no está en marcha, así que no hay nada que listar.",
+        "noMatch": "Nada coincide con “{query}”.",
+        "none": "Aún no hay recursos. Añade uno desde un enlace, o suelta una carpeta en la carpeta resources.",
+        "restartNamed": "Reiniciar {name}",
+        "stopNamed": "Parar {name}",
+        "startNamed": "Iniciar {name}",
+        "ensureHelp": "Iniciar un recurso aquí dura hasta que el servidor se reinicia. Para que arranque siempre, añade una línea <code>ensure</code> para él en la configuración del servidor - Polaris lo hace con los recursos que instala él mismo.",
+        "badName": "Letras, dígitos, puntos, guiones y guiones bajos - es un nombre de carpeta."
+    },
+    "rules": {
+        "theseAreTheLinesIn": "Estas son las líneas de la configuración del propio servidor. Las lee al arrancar, así que un cambio surte efecto la próxima vez que lo haga.",
+        "readTheConfigAgain": "Releer la configuración",
+        "findASettingByWhat": "Busca un ajuste, por lo que hace o por cómo lo llama FiveM",
+        "findASetting": "Buscar un ajuste",
+        "anythingAResourceAddsJobs": "Lo que añade un recurso - trabajos, economía, puntos de aparición - se configura dentro de ese recurso, al que llegas desde la pantalla Recursos o en Drive.",
+        "leaveItToTheServer": "Que lo decida el servidor",
+        "setTypeANewOne": "Puesto - escribe otro para sustituirlo",
+        "noMatch": "Nada coincide con “{query}”. Un recurso puede añadir sus propios ajustes, y esos viven en su propia configuración, no aquí.",
+        "notSet": "Sin poner - el servidor usa {fallback}.",
+        "stopSetting": "Dejar de fijar {name}",
+        "leaveWithFallback": "Que lo decida el servidor ({fallback})"
     }
 }

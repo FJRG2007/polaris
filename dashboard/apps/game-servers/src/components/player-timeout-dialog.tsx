@@ -13,19 +13,21 @@
  */
 
 import { useState } from "react";
+import type { GameKey } from "../../messages";
+import { useGameText } from "../screens/game-text";
 import { Input, Select } from "@polaris/ui";
 import { MAX_TIMEOUT_MINUTES } from "../lib/player-timeout";
 import { PlayerFormDialog, PlayerFormField } from "./player-form-dialog";
 
 /** The lengths a moderator actually reaches for, and the one that means "the rest
  *  of the day". Anything else is typed. */
-const TIMEOUT_PRESETS = [
-    { value: "5", label: "5 minutes" },
-    { value: "15", label: "15 minutes" },
-    { value: "60", label: "1 hour" },
-    { value: "480", label: "8 hours" },
-    { value: "1440", label: "1 day" },
-    { value: "custom", label: "Another length" }
+const TIMEOUT_PRESETS: { value: string; label: GameKey<"games"> }[] = [
+    { value: "5", label: "timeoutDialog.presets.m5" },
+    { value: "15", label: "timeoutDialog.presets.m15" },
+    { value: "60", label: "timeoutDialog.presets.h1" },
+    { value: "480", label: "timeoutDialog.presets.h8" },
+    { value: "1440", label: "timeoutDialog.presets.d1" },
+    { value: "custom", label: "timeoutDialog.presets.custom" }
 ];
 
 export function PlayerTimeoutDialog({
@@ -44,36 +46,40 @@ export function PlayerTimeoutDialog({
     onClose: () => void;
     onTimeout: (minutes: number, reason: string) => void;
 }) {
+    const t = useGameText("games");
     const [preset, setPreset] = useState("15");
     const [custom, setCustom] = useState("30");
     const [reason, setReason] = useState("");
     const minutes = preset === "custom" ? Number.parseInt(custom, 10) : Number.parseInt(preset, 10);
     const invalid =
         !Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES
-            ? `Between 1 minute and ${MAX_TIMEOUT_MINUTES / (24 * 60)} days`
+            ? t("timeoutDialog.between", { days: MAX_TIMEOUT_MINUTES / (24 * 60) })
             : null;
 
     return (
         <PlayerFormDialog
-            title={`Time ${player} out`}
-            description="They are banned now and let back in when it runs out, without anybody having to remember."
+            title={t("timeoutDialog.title", { name: player })}
+            description={t("timeoutDialog.theyAreBannedNowAnd")}
             onClose={onClose}
             pending={pending}
             ready={!invalid && !pending}
-            confirmLabel="Time out"
+            confirmLabel={t("timeoutDialog.timeOut")}
             danger
             onConfirm={() => onTimeout(minutes, reason.trim())}
         >
-            <PlayerFormField label="How long">
+            <PlayerFormField label={t("timeoutDialog.howLong")}>
                 <Select
                     value={preset}
                     onValueChange={setPreset}
-                    options={TIMEOUT_PRESETS}
-                    aria-label="How long the timeout lasts"
+                    options={TIMEOUT_PRESETS.map((preset) => ({
+                        value: preset.value,
+                        label: t(preset.label)
+                    }))}
+                    aria-label={t("timeoutDialog.howLongTheTimeoutLasts")}
                 />
             </PlayerFormField>
             {preset === "custom" && (
-                <PlayerFormField label="Minutes" error={invalid}>
+                <PlayerFormField label={t("timeoutDialog.minutes")} error={invalid}>
                     <Input
                         autoFocus
                         type="number"
@@ -84,11 +90,11 @@ export function PlayerTimeoutDialog({
                     />
                 </PlayerFormField>
             )}
-            <PlayerFormField label="Reason (shown to them)" error={error ?? null}>
+            <PlayerFormField label={t("timeoutDialog.reasonShownToThem")} error={error ?? null}>
                 <Input
                     value={reason}
                     maxLength={200}
-                    placeholder="Optional"
+                    placeholder={t("timeoutDialog.optional")}
                     onChange={(event) => setReason(event.target.value)}
                 />
             </PlayerFormField>

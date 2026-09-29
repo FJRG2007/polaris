@@ -212,7 +212,7 @@ export function MinecraftSchedule({
                                             update({ idleMinutes: Number.parseInt(event.target.value, 10) || 0 })
                                         }
                                     />
-                                    <span className="shrink-0 text-xs text-muted-foreground">minutes</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">{t("schedule.minutes")}</span>
                                 </div>
                                 {!sleeps && (
                                     <span className="text-xs text-muted-foreground">
@@ -315,7 +315,7 @@ export function MinecraftSchedule({
                                             ...schedule.routines,
                                             {
                                                 id: `r${Date.now()}`,
-                                                name: "Nightly restart",
+                                                name: t("schedule.nightlyRestart"),
                                                 enabled: true,
                                                 days: [],
                                                 at: "04:00",
@@ -344,7 +344,7 @@ export function MinecraftSchedule({
                                 second is what somebody reports as "I set it and it
                                 did nothing". */}
                             {state !== null && !changed && (
-                                <p className="text-xs text-muted-foreground">{describeLastCheck(state)}</p>
+                                <p className="text-xs text-muted-foreground">{describeLastCheck(t, state)}</p>
                             )}
                         </div>
                     </>
@@ -449,7 +449,7 @@ function WindowRow({
                     );
                 })}
                 <span className="ml-1 text-xs text-muted-foreground">
-                    {[window.days.length === 0 ? "Every day" : null, wraps ? "runs past midnight" : null]
+                    {[window.days.length === 0 ? t("schedule.everyDay") : null, wraps ? t("schedule.pastMidnight") : null]
                         .filter(Boolean)
                         .join(", ")}
                 </span>
@@ -486,20 +486,24 @@ function timezoneOptions(current: string, t: GameText<"minecraft">): { value: st
  * asked is "is this thing running": a check from a minute ago answers yes, and one
  * from yesterday answers no in a way a clock time does not.
  */
-function describeLastCheck(state: ScheduleState): string {
+function describeLastCheck(t: GameText<"minecraft">, state: ScheduleState): string {
     const woken = state.wokenAt ? Date.parse(state.wokenAt) : Number.NaN;
     const started = Number.isNaN(woken)
         ? ""
-        : ` Somebody joining started it ${new Date(woken).toLocaleString()}.`;
+        : ` ${t("schedule.wokenBy", { date: new Date(woken).toLocaleString() })}`;
     const checked = state.checkedAt ? Date.parse(state.checkedAt) : Number.NaN;
-    if (Number.isNaN(checked))
-        return `Not checked yet. The first pass runs within a minute of saving.${started}`;
+    if (Number.isNaN(checked)) return `${t("schedule.notChecked")}${started}`;
     const ago = Math.max(0, Math.round((Date.now() - checked) / 60_000));
-    const when = ago < 1 ? "just now" : ago < 60 ? `${ago} minutes ago` : new Date(checked).toLocaleString();
+    const when =
+        ago < 1
+            ? t("schedule.justNow")
+            : ago < 60
+              ? t("schedule.minutesAgo", { count: ago })
+              : new Date(checked).toLocaleString();
     const empty = state.emptySince ? Math.max(0, Math.round((Date.now() - Date.parse(state.emptySince)) / 60_000)) : null;
     return empty === null
-        ? `Last checked ${when}.${started}`
-        : `Last checked ${when}. Nobody has been on it for ${empty} ${empty === 1 ? "minute" : "minutes"}.${started}`;
+        ? `${t("schedule.lastChecked", { when })}${started}`
+        : `${t("schedule.lastCheckedEmpty", { when, count: empty })}${started}`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

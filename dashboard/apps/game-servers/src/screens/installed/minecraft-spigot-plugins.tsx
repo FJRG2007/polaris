@@ -16,6 +16,7 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
+import { useGameText } from "../game-text";
 import { useEffect, useState, useTransition } from "react";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
@@ -43,6 +44,7 @@ export function SpigotPluginsCard({
     value: string;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const saved = parseSpigetList(value);
     const [ids, setIds] = useState<number[]>(saved);
     const [query, setQuery] = useState("");
@@ -113,14 +115,12 @@ export function SpigotPluginsCard({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Download className="size-4 text-primary" />
-                    SpigotMC plugins
+                    {t("spigot.spigotmcPlugins")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Most plugins are published here rather than on Modrinth. They are installed on
-                    the next restart, by number, and SpigotMC says which releases each one was
-                    tested on - which is its author saying so, not a build this can check.
+                    {t("spigot.mostPluginsArePublishedHere")}
                 </p>
 
                 <div className="relative">
@@ -128,7 +128,7 @@ export function SpigotPluginsCard({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search SpigotMC"
+                        placeholder={t("spigot.searchSpigotmc")}
                         className="pl-8"
                     />
                 </div>
@@ -141,8 +141,7 @@ export function SpigotPluginsCard({
                         </>
                     ) : results.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            Nothing came back. SpigotMC may be unreachable from here rather than
-                            empty.
+                            {t("spigot.nothingCameBackSpigotmcMay")}
                         </p>
                     ) : (
                         results.map((plugin) => (
@@ -161,7 +160,7 @@ export function SpigotPluginsCard({
 
                 {onList !== null && onList.length > 0 && (
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
-                        <p className="text-sm font-medium">On this server</p>
+                        <p className="text-sm font-medium">{t("spigot.onThisServer")}</p>
                         {onList.map((plugin) => (
                             <PluginRow
                                 key={plugin.id}
@@ -181,11 +180,11 @@ export function SpigotPluginsCard({
                 <div className="flex items-center gap-2">
                     <Button size="sm" onClick={save} disabled={!changed || pending}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Save
+                        {t("spigot.save")}
                     </Button>
                     {changed && (
                         <span className="text-xs text-muted-foreground">
-                            Installed when the server next restarts.
+                            {t("spigot.installedWhenTheServerNext")}
                         </span>
                     )}
                 </div>
@@ -205,6 +204,7 @@ function PluginRow({
     onAdd: () => void;
     onRemove: () => void;
 }) {
+    const t = useGameText("minecraft");
     const newest = plugin.testedVersions.at(-1);
     return (
         <div className="flex items-start gap-3 rounded-md border border-border p-2">
@@ -225,7 +225,9 @@ function PluginRow({
                         {plugin.name}
                         <ExternalLink className="ml-1 inline size-3 shrink-0" />
                     </a>
-                    {newest && <Badge variant="neutral">tested to {newest}</Badge>}
+                    {newest && (
+                        <Badge variant="neutral">{t("spigot.testedTo", { version: newest })}</Badge>
+                    )}
                     {plugin.blocked && <Badge variant="warning">{plugin.blocked}</Badge>}
                 </div>
                 <p className="line-clamp-2 text-xs text-muted-foreground">{plugin.summary}</p>
@@ -235,7 +237,7 @@ function PluginRow({
                     size="sm"
                     variant="ghost"
                     onClick={onRemove}
-                    aria-label={`Remove ${plugin.name}`}
+                    aria-label={t("spigot.removeNamed", { name: plugin.name })}
                 >
                     <Trash2 className="size-4" />
                 </Button>
@@ -244,7 +246,7 @@ function PluginRow({
                     size="sm"
                     variant="secondary"
                     onClick={onAdd}
-                    aria-label={`Add ${plugin.name}`}
+                    aria-label={t("spigot.addNamed", { name: plugin.name })}
                 >
                     <Plus className="size-4" />
                 </Button>

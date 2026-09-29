@@ -17,6 +17,10 @@ import {
     type RowMenuEntry
 } from "@polaris-app/game-servers/src/components/row-menu";
 
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+}));
+
 const kicked = vi.fn();
 
 const ENTRIES: RowMenuEntry[] = [

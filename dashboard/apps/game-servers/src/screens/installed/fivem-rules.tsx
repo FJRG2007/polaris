@@ -17,6 +17,7 @@
  */
 
 import * as actions from "./fivem-actions";
+import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
@@ -51,6 +52,7 @@ export function FivemRules({
      *  stopped server can be neither read nor changed. */
     running: boolean;
 }) {
+    const t = useGameText("fivem");
     // What this tab last read paints first, so a revisit is not a skeleton while
     // the config is read inside the container again; the read replaces what moved.
     const rulesKey = `fivem-rules:${installedAppId}`;
@@ -136,16 +138,13 @@ export function FivemRules({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm text-muted-foreground">
-                    These are the lines in the server&apos;s own config. It reads them when it
-                    starts, so a change takes effect the next time it does.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("rules.theseAreTheLinesIn")}</p>
                 <Button
                     size="icon"
                     variant="ghost"
                     className="ml-auto"
-                    aria-label="Read the config again"
-                    title="Read the config again"
+                    aria-label={t("rules.readTheConfigAgain")}
+                    title={t("rules.readTheConfigAgain")}
                     disabled={loading}
                     onClick={() => {
                         setLoading(true);
@@ -186,8 +185,8 @@ export function FivemRules({
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Find a setting, by what it does or what FiveM calls it"
-                    aria-label="Find a setting"
+                    placeholder={t("rules.findASettingByWhat")}
+                    aria-label={t("rules.findASetting")}
                     className="pl-8"
                 />
             </label>
@@ -217,16 +216,10 @@ export function FivemRules({
             ))}
 
             {shown.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    Nothing here matches “{query}”. A resource can add settings of its own, and
-                    those live in its own config rather than here.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("rules.noMatch", { query })}</p>
             ) : null}
 
-            <p className="text-xs text-muted-foreground">
-                Anything a resource adds - jobs, economy, spawn points - is configured inside that
-                resource, which you can reach from the Resources screen or in Drive.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("rules.anythingAResourceAddsJobs")}</p>
         </div>
     );
 }
@@ -252,6 +245,7 @@ function SettingRow({
     disabled: boolean;
     onChange: (next: string | null) => void;
 }) {
+    const t = useGameText("fivem");
     // Never the value for a secret: the reading does not carry one, and the row
     // says whether it is set instead - which is the only thing anybody needs to
     // read off it.
@@ -283,7 +277,7 @@ function SettingRow({
                 {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
                 {!isSet && !loading && (
                     <p className="text-xs text-muted-foreground">
-                        Not set - the server uses {setting.fallback}.
+                        {t("rules.notSet", { fallback: setting.fallback })}
                     </p>
                 )}
             </div>
@@ -309,8 +303,8 @@ function SettingRow({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`Stop setting ${setting.label}`}
-                            title="Leave it to the server"
+                            aria-label={t("rules.stopSetting", { name: setting.label })}
+                            title={t("rules.leaveItToTheServer")}
                             disabled={disabled || busy}
                             onClick={() => onChange(null)}
                         >
@@ -334,7 +328,9 @@ function SettingRow({
                             options={[
                                 {
                                     value: "",
-                                    label: `Leave it to the server (${setting.fallback})`
+                                    label: t("rules.leaveWithFallback", {
+                                        fallback: setting.fallback
+                                    })
                                 },
                                 ...(setting.choices ?? []).map((choice) => ({
                                     value: choice.value,
@@ -354,7 +350,7 @@ function SettingRow({
                             spellCheck={false}
                             placeholder={
                                 setting.secret && isSet
-                                    ? "Set - type a new one to replace it"
+                                    ? t("rules.setTypeANewOne")
                                     : setting.fallback
                             }
                             value={draft}

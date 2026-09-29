@@ -129,7 +129,23 @@
         "connectTo": "Los jugadores se conectarán a <address></address>.",
         "connectToPort": "Los jugadores se conectarán a <address></address> y su puerto.",
         "addressHint": "Una dirección, un rango como 203.0.113.0/24, o \"any\".",
-        "exampleName": "Aventura"
+        "exampleName": "Aventura",
+        "machinesFailed": "No se pudieron leer tus máquinas",
+        "errors": {
+            "gamertag": "Eso no es un gamertag de Xbox",
+            "javaName": "De 3 a 16 letras, dígitos o guiones bajos",
+            "address": "Eso no es una dirección ni un rango",
+            "steamId": "17 dígitos, empezando por 7656119",
+            "workshopIds": "Los ids del Workshop son números, separados por comas",
+            "identifier": "Pégalo entero, tal como lo da el juego: license:... o discord:...",
+            "onesync": "Más de 32 plazas necesita OneSync activado",
+            "checkDetails": "Revisa los datos y vuelve a intentarlo",
+            "createFailed": "No se pudo crear el servidor"
+        },
+        "javaDetail": "Jugadores PC",
+        "bedrockDetail": "Móviles, consolas, app de Windows",
+        "bothDetail": "Un mundo Java al que Bedrock puede entrar, mediante Geyser",
+        "machineMemory": "{name} - {free} de {total} GB libres"
     },
     "errors": {
         "couldNotReadYourGame": "No se pudieron leer tus servidores",
@@ -212,7 +228,38 @@
         "notAnArkMod": "{name} no es un mod de ARK",
         "linkedEpic": "{name} ha vinculado Epic Games en vez de Steam. La lista de un servidor de ARK solo acepta IDs de Steam, así que tiene que entrar de otra forma.",
         "noSteam": "{name} aún no ha vinculado una cuenta de Steam. Puede hacerlo en Cuentas conectadas.",
-        "noLoginPassword": "{name} no tiene contraseña en este servidor"
+        "noLoginPassword": "{name} no tiene contraseña en este servidor",
+        "couldNotReadTheAnti": "No se pudo leer el anti-trampas",
+        "couldNotChangeTheAnti": "No se pudo cambiar el anti-trampas",
+        "theSettingsCouldNotBe": "No se pudieron leer los ajustes",
+        "saySomething": "Escribe algo",
+        "couldNotBanThatPlayer": "No se pudo vetar a ese jugador",
+        "couldNotLiftThatBan": "No se pudo levantar ese veto",
+        "couldNotKickThatPlayer": "No se pudo expulsar a ese jugador",
+        "couldNotChangeWhoAdministers": "No se pudo cambiar quién administra el servidor",
+        "couldNotReadTheServer2": "No se pudieron leer las reglas del servidor",
+        "couldNotSaveTheServer": "No se pudieron guardar las reglas del servidor",
+        "couldNotReadTheServer3": "No se pudieron leer los recursos del servidor",
+        "thatIsNotAResource": "Eso no es un nombre de recurso",
+        "couldNotRescanTheResources": "No se pudieron releer los recursos",
+        "thatIsNotALink": "Eso no es un enlace a un archivo de recurso",
+        "couldNotInstallThatResource": "No se pudo instalar ese recurso",
+        "couldNotReadTheConsole": "No se pudo leer la contraseña de la consola",
+        "couldNotChangeTheConsole": "No se pudo cambiar la contraseña de la consola",
+        "couldNotChangeTheServer2": "No se pudo cambiar la clave",
+        "couldNotReadTheLogin": "No se pudo leer el estado del login",
+        "couldNotChangeTheLogin": "No se pudo cambiar el login",
+        "couldNotResetThePassword": "No se pudo cambiar la contraseña",
+        "giveTheServerAName": "Ponle un nombre al servidor",
+        "thatImageIsEmpty": "Esa imagen está vacía",
+        "thatImageIsTooLarge": "Esa imagen es muy grande",
+        "thatIsNotAPng": "Eso no es un PNG",
+        "thatIsAModpackShort": "Eso debe ser el nombre corto de un modpack, o el enlace a su página",
+        "unknownApp": "App no hallada",
+        "nothingToSave": "Nada que guardar",
+        "playerNameRule": "Un nombre de jugador tiene de 1 a 16 letras, dígitos o guiones bajos",
+        "itemIdRule": "Un objeto es como minecraft:stone",
+        "iconSize": "El icono del servidor tiene que ser de {size}"
     },
     "status": {
         "failed": "Falló",
@@ -370,5 +417,201 @@
             "notModpack": "Eso debe ser el nombre corto de un modpack, o el enlace a su página",
             "notJarUrl": "Eso debe ser un enlace https que acabe en .jar"
         }
+    },
+    "textField": {
+        "anyOtherColor": "Otro color",
+        "resetTheFormattingFromHere": "Quitar el formato desde aquí",
+        "reset": "Quitar",
+        "variables": "Variables",
+        "editTheTextAndLet": "Edita el texto y deja que los botones escriban los códigos",
+        "editTheCodesYourself": "Edita tú los códigos",
+        "formatted": "Con formato",
+        "codes": "Códigos",
+        "putAWordPolarisFills": "Pon una palabra que Polaris rellena donde está el cursor",
+        "variable": "Variable",
+        "pressToClear": "{name} - pulsa para quitarlo",
+        "pressToRemove": "{name} - pulsa para quitarlo",
+        "withCodes": "{label}, con sus códigos de formato",
+        "fallbackHint": "Para un valor que puede faltar, escribe qué mostrar en su lugar: '{polaris.name | \"Jugador\"}'"
+    },
+    "accessEditor": {
+        "addressChecked": "Con dirección",
+        "addressNotChecked": "Sin dirección",
+        "checkEachPlayerSAddress": "Comprobar la dirección de cada jugador al entrar",
+        "aPlayerIsLetIn": "Un jugador entra cuando su usuario está en esta lista y llega desde la dirección registrada para él. El resto del cortafuegos protege HTTP, y un puerto de juego no lo es.",
+        "readingTheList": "Leyendo la lista...",
+        "nobodyIsRegisteredYetSo": "Aún no hay nadie registrado, así que nadie puede entrar.",
+        "notSignedInAnywhere": "Sin sesión en ningún sitio",
+        "bedrockDoesNotRecordWhere": "Bedrock no registra desde dónde se conectó un jugador, así que solo se aplican los nombres de aquí.",
+        "whoCanConnect": "Quién se conecta",
+        "follows": "Sigue los inicios de sesión de {name} en Polaris",
+        "removeAddress": "Quitar {address} de {name}",
+        "removeNamed": "Quitar a {name}",
+        "removeEverything": "Quitar a {name} y todas sus direcciones"
+    },
+    "motd": {
+        "colors": {
+            "0": "Negro",
+            "1": "Azul oscuro",
+            "2": "Verde oscuro",
+            "3": "Cian oscuro",
+            "4": "Rojo oscuro",
+            "5": "Morado oscuro",
+            "6": "Dorado",
+            "7": "Gris",
+            "8": "Gris oscuro",
+            "9": "Azul",
+            "a": "Verde",
+            "b": "Cian",
+            "c": "Rojo",
+            "d": "Morado claro",
+            "e": "Amarillo",
+            "f": "Blanco"
+        },
+        "styles": {
+            "k": "Ofuscado",
+            "l": "Negrita",
+            "m": "Tachado",
+            "n": "Subrayado",
+            "o": "Cursiva"
+        }
+    },
+    "timeoutDialog": {
+        "theyAreBannedNowAnd": "Queda vetado ahora y vuelve a entrar cuando se acabe, sin que nadie tenga que acordarse.",
+        "timeOut": "Aislar",
+        "howLong": "Cuánto",
+        "howLongTheTimeoutLasts": "Cuánto dura el aislamiento",
+        "minutes": "Minutos",
+        "reasonShownToThem": "Motivo (lo verá)",
+        "optional": "Opcional",
+        "presets": {
+            "m5": "5 minutos",
+            "m15": "15 minutos",
+            "h1": "1 hora",
+            "h8": "8 horas",
+            "d1": "1 día",
+            "custom": "Otra duración"
+        },
+        "between": "Entre 1 minuto y {days} días",
+        "title": "Aislar a {name}"
+    },
+    "restartPlanner": {
+        "restarting": "Reiniciando.",
+        "anybodyPlayingIsDisconnectedFor": "Quien esté jugando se desconecta un momento; el cambio rige en cuanto vuelve el servidor.",
+        "savedTheServerIsStopped": "Guardado. El servidor está parado, así que arrancará con esto.",
+        "aRestartIsBooked": "Hay un reinicio previsto",
+        "itHappensAsSoonAs": "Ocurre en cuanto no juegue nadie",
+        "callItOff": "Cancelarlo",
+        "whenNobodyIsPlaying": "Cuando no juegue nadie",
+        "atATime": "A una hora",
+        "restartNow": "Reiniciar ya",
+        "whenToRestart": "Cuándo reiniciar",
+        "bookIt": "Programar",
+        "yourOwnClock": "Tu propio reloj.",
+        "defaultTitle": "Guardado, y aún sin aplicar",
+        "defaultDetail": "El servidor lee esto al arrancar. Déjalo y el próximo arranque lo aplica; esperar no pierde nada.",
+        "bookFailed": "No se pudo programar ese reinicio",
+        "happensAt": "Ocurre <time></time>"
+    },
+    "accessForm": {
+        "gamertag": "Gamertag",
+        "username": "Usuario",
+        "player": "Jugador",
+        "addressTheyConnectFrom": "Dirección de conexión",
+        "useTheAddressYouAre": "Usar la dirección en la que estás",
+        "thatIsNotAUsername": "Ese no es un usuario válido en esta edición",
+        "thatIsNotAnAddress": "Eso no es una dirección ni un rango",
+        "polarisCouldNotReadThe": "Polaris no pudo leer la dirección de la que vino esta petición. Escríbela tú.",
+        "addressPlaceholder": "203.0.113.9, 203.0.113.0/24 o any",
+        "add": "Añadir"
+    },
+    "history": {
+        "readingTheRecord": "Leyendo el registro",
+        "polarisHasNotSeenThis": "Polaris aún no ha visto a este jugador en el servidor.",
+        "played": "Jugado",
+        "visits": "Visitas",
+        "firstSeen": "Primera vez",
+        "onSince": "Desde",
+        "lastSeen": "Última vez",
+        "playtimeAllTime": "Tiempo de juego total",
+        "deaths": "Muertes",
+        "mobsKilled": "Criaturas",
+        "underAMinute": "menos de un minuto",
+        "minutes": "{count} min",
+        "hours": "{count} h"
+    },
+    "variablesHelp": {
+        "whatYouCanWrite": "Lo que puedes escribir",
+        "coloursAndStyles": "Colores y estilos",
+        "groups": {
+            "server": "El servidor",
+            "player": "El jugador que lo lee",
+            "lists": "Clasificaciones y listas",
+            "death": "Última muerte",
+            "call": "Llamada del chat vinculado"
+        },
+        "intro": "Escribe '{' en una línea para elegir uno. Polaris lo rellena al enviarlo. Añade qué mostrar cuando aún no hay nada: '{death.player | \"Nadie\"}'.",
+        "serverScope": "Una clasificación o lista sola en una línea se convierte en una línea por jugador.",
+        "codesHelp": "Selecciona texto y usa los botones, o muestra los códigos y escríbelos: & y un carácter, que se aplica desde ahí. &r vuelve a texto normal."
+    },
+    "itemPicker": {
+        "searchItems": "Buscar objetos",
+        "loadingTheItems": "Cargando los objetos...",
+        "items": "Objetos",
+        "nothingMatchesThat": "Nada coincide.",
+        "chooseAnItem": "Elige un objeto.",
+        "searchItemsOrWriteMinecraft": "Busca objetos, o escribe minecraft:diamond",
+        "moreThan": "Coinciden más de {count}. Escribe más para acotar.",
+        "minecraftMissing": "Las imágenes de los objetos no cargaron, así que escribe el id - es como minecraft:diamond.",
+        "arkMissing": "La lista de objetos no cargó. Recarga la página para intentarlo de nuevo.",
+        "modNotes": {
+            "found": "También se buscan {count} objetos que añaden los mods de este servidor. Escribe el nombre de un mod para ver solo esos.",
+            "unread": "No se pudieron leer los objetos que añade {names}. Aún se pueden escribir como ids.",
+            "skipped": "No se busca en {names}: solo se leen los primeros mods de una lista larga. Aún se pueden escribir como ids.",
+            "incomplete": "Aún se están leyendo algunos mods. Vuelve a abrir el selector para ver sus objetos.",
+            "andMore": "{names} y {count} más"
+        }
+    },
+    "playersTable": {
+        "searchPlayers": "Buscar jugadores",
+        "filterPlayers": "Filtrar jugadores"
+    },
+    "rowMenu": {
+        "more": "Más"
+    },
+    "playerForm": {
+        "cancel": "Cancelar"
+    },
+    "hytale": {
+        "serverFiles": "Archivos base",
+        "hytaleHandsTheseOutThrough": "Hytale los entrega a través de tu propia cuenta, así que Polaris no puede descargarlos por ti.",
+        "lookAgain": "Revisar",
+        "files": "Archivos",
+        "thisServerIsNotAnswering": "Este servidor no responde, así que aún no se puede leer lo que contiene.",
+        "putThemInTheTop": "Ponlos en la carpeta raíz de Archivos - desde la instalación del propio launcher de Hytale, o desde el descargador oficial. El servidor arranca solo cuando están los dos; no hace falta reiniciar nada.",
+        "theServerSOwnCommands": "los comandos del propio servidor",
+        "bothHere": "Están los dos. Los jugadores llegan al servidor por UDP {port}.",
+        "here": "aquí",
+        "waiting": "pendiente"
+    },
+    "firewall": {
+        "openWhoMayJoin": "Abrir quién entra",
+        "fivem": "Un servidor FiveM lo protege su propia lista de jugadores y no las reglas de abajo - un puerto de juego no pasa por el cortafuegos web.",
+        "carried": ". Las direcciones bloqueadas aquí también se pasan a esa lista.",
+        "ark": "Un servidor ARK lo protegen su contraseña de acceso y su propia lista de ids de Steam permitidos, no las reglas de abajo."
+    },
+    "slot": {
+        "yourServersLiveOnThe": "Tus servidores están en la página Servidores de juego",
+        "createAsManyAsYou": "Crea tantos como quieras, de cualquier juego que conozca Polaris, cada uno con su dirección, consola, jugadores y ajustes. La app en sí no ejecuta nada.",
+        "openGameServers": "Abrir Servidores"
+    },
+    "picker": {
+        "noGameIsAvailable": "Ningún juego disponible",
+        "searchGames": "Buscar juegos",
+        "noGameHereMatchesThat": "Ningún juego coincide."
+    },
+    "boundary": {
+        "failed": "No se pudo mostrar {name}",
+        "tryAgain": "Reintentar"
     }
 }

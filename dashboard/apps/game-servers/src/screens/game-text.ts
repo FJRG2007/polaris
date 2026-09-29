@@ -29,3 +29,31 @@ export function timeoutText(t: GameText<"games">, iso: string): string {
 export function usePlayerWords(): PlayerWords {
     return playerWords(useGameText("games"));
 }
+
+/** A Minecraft colour code's name, in the reader's language - the code is the
+ *  game's, the name is only a label for it. */
+export function colorName(t: GameText<"games">, code: string): string {
+    return t(`motd.colors.${code}` as GameKey<"games">);
+}
+
+/** A Minecraft style code's name, in the reader's language. */
+export function styleName(t: GameText<"games">, code: string): string {
+    return t(`motd.styles.${code}` as GameKey<"games">);
+}
+
+/**
+ * A failed parse's message, in the reader's language when it names one of the
+ * app's keys (`namespace:key`, see `schemaWords`); any other message as it is.
+ * The browser's half of `issueText`, for a schema a screen checks before it sends.
+ */
+export function useSchemaText(): (message: string | undefined) => string | undefined {
+    const locale = hostUi.i18nProvider.useLocale();
+    return (message) => {
+        const named = message?.match(/^(\w+):([\w.]+)$/);
+        if (!named || !gameCatalogs.namespaces.includes(named[1] as GameNamespace)) return message;
+        return gameCatalogs.translate(
+            locale,
+            `${named[1]}.${named[2]}` as Parameters<typeof gameCatalogs.translate>[1]
+        );
+    };
+}

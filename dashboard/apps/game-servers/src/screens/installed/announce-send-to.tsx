@@ -10,6 +10,7 @@
  */
 
 import { Checkbox, Select } from "@polaris/ui";
+import { useGameText } from "../game-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import {
     EVERYBODY,
@@ -41,6 +42,7 @@ export function SendTo({
     onChange: (target: string) => void;
     problem?: string;
 }) {
+    const t = useGameText("minecraft");
     const audience = parseTarget(target);
     // An empty pick is still "picking players", with nobody ticked yet.
     const mode: Mode =
@@ -60,7 +62,7 @@ export function SendTo({
 
     return (
         <div className="flex flex-col gap-2 text-sm">
-            <span className="font-medium">Send to</span>
+            <span className="font-medium">{t("sendTo.sendTo")}</span>
             <Select
                 value={mode}
                 onValueChange={(value) => {
@@ -73,27 +75,27 @@ export function SendTo({
                     else onChange(playersTarget(picked));
                 }}
                 options={[
-                    { value: "everybody", label: "Everybody on the server" },
+                    { value: "everybody", label: t("sendTo.everybodyOnTheServer") },
                     // Bedrock keeps its operators by xuid, which the game will
                     // not aim a command at.
                     ...(edition === "java"
                         ? [
-                              { value: "operators", label: "Operators who are on" },
-                              { value: "others", label: "Everybody but operators" }
+                              { value: "operators", label: t("sendTo.operatorsWhoAreOn") },
+                              { value: "others", label: t("sendTo.everybodyButOperators") }
                           ]
                         : []),
                     ...GAME_MODES.map((one) => ({
                         value: one,
-                        label: `Players in ${GAME_MODE_LABEL[one]}`
+                        label: t("sendTo.playersIn", { mode: t(`playersTab.modes.${one}`) })
                     })),
-                    { value: "players", label: "Players I pick" }
+                    { value: "players", label: t("sendTo.playersIPick") }
                 ]}
-                aria-label="Send to"
+                aria-label={t("sendTo.sendTo")}
             />
             {mode === "players" &&
                 (listed.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
-                        Nobody is on the server right now.
+                        {t("sendTo.nobodyIsOnTheServer")}
                     </p>
                 ) : (
                     <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
@@ -116,12 +118,12 @@ export function SendTo({
                                         <span>{name}</span>
                                         {!pickable && (
                                             <span className="text-xs text-muted-foreground">
-                                                can't be picked by name
+                                                {t("sendTo.canTBePickedBy")}
                                             </span>
                                         )}
                                         {offline.includes(name) && (
                                             <span className="text-xs text-muted-foreground">
-                                                not on now
+                                                {t("sendTo.notOnNow")}
                                             </span>
                                         )}
                                     </label>
@@ -131,14 +133,10 @@ export function SendTo({
                     </ul>
                 ))}
             {mode === "operators" && (
-                <p className="text-xs text-muted-foreground">
-                    Each operator who is on when it is sent.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("sendTo.eachOperatorWhoIsOn")}</p>
             )}
             {mode === "others" && (
-                <p className="text-xs text-muted-foreground">
-                    Each player who is on when it is sent, operators left out.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("sendTo.eachPlayerWhoIsOn")}</p>
             )}
             {problem && (
                 <p role="alert" className="text-xs text-danger">

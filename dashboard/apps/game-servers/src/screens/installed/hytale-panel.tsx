@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { useGameText } from "../game-text";
 import { GameConsole } from "./game-console";
 import { hytaleFilesAction } from "./hytale-actions";
 import { hostUi } from "@polaris/app-host/client";
@@ -44,6 +45,7 @@ export function HytalePanel({
     applicationId: string | null;
     running: boolean;
 }) {
+    const t = useGameText("games");
     // What this tab last found paints first, so a revisit is not a skeleton while
     // the volume is read again; the look below replaces it when it differs.
     const filesKey = `hytale-files:${installedAppId}`;
@@ -91,10 +93,9 @@ export function HytalePanel({
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <p className="text-sm font-medium">Server files</p>
+                            <p className="text-sm font-medium">{t("hytale.serverFiles")}</p>
                             <p className="text-xs text-muted-foreground">
-                                Hytale hands these out through your own account, so Polaris cannot
-                                fetch them for you.
+                                {t("hytale.hytaleHandsTheseOutThrough")}
                             </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
@@ -103,8 +104,8 @@ export function HytalePanel({
                                 variant="ghost"
                                 disabled={looking}
                                 onClick={() => void look()}
-                                aria-label="Look again"
-                                title="Look again"
+                                aria-label={t("hytale.lookAgain")}
+                                title={t("hytale.lookAgain")}
                             >
                                 {looking ? (
                                     <Loader2 className="size-4 animate-spin" />
@@ -115,7 +116,7 @@ export function HytalePanel({
                             {applicationId ? (
                                 <Link href={`/drive?c=container:${applicationId}&p=/data`}>
                                     <Button size="sm" variant="secondary">
-                                        <FolderOpen className="size-4" /> Files
+                                        <FolderOpen className="size-4" /> {t("hytale.files")}
                                     </Button>
                                 </Link>
                             ) : null}
@@ -134,7 +135,7 @@ export function HytalePanel({
                         // here would be asking somebody to fix what is already
                         // right.
                         <p className="text-sm text-muted-foreground">
-                            This server is not answering, so what is in it cannot be read yet.
+                            {t("hytale.thisServerIsNotAnswering")}
                         </p>
                     ) : (
                         <>
@@ -144,14 +145,11 @@ export function HytalePanel({
                             </ul>
                             {files.jar && files.assets ? (
                                 <p className="text-xs text-muted-foreground">
-                                    Both are here. Players reach the server on UDP {HYTALE_PORT}.
+                                    {t("hytale.bothHere", { port: HYTALE_PORT })}
                                 </p>
                             ) : (
                                 <p className="text-xs text-muted-foreground">
-                                    Put them in the top folder under Files - from the Hytale
-                                    launcher&apos;s own installation, or from the official
-                                    downloader. The server starts by itself once both are there;
-                                    nothing needs restarting.
+                                    {t("hytale.putThemInTheTop")}
                                 </p>
                             )}
                         </>
@@ -165,13 +163,14 @@ export function HytalePanel({
                 running={running}
                 logName="hytale"
                 game="hytale"
-                hint="the server's own commands"
+                hint={t("hytale.theServerSOwnCommands")}
             />
         </div>
     );
 }
 
 function FileRow({ name, there }: { name: string; there: boolean }) {
+    const t = useGameText("games");
     return (
         <li className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
             <code className="truncate font-mono text-xs" title={name}>
@@ -179,10 +178,10 @@ function FileRow({ name, there }: { name: string; there: boolean }) {
             </code>
             {there ? (
                 <Badge variant="success">
-                    <CheckCircle2 className="size-3" /> here
+                    <CheckCircle2 className="size-3" /> {t("hytale.here")}
                 </Badge>
             ) : (
-                <Badge variant="warning">waiting</Badge>
+                <Badge variant="warning">{t("hytale.waiting")}</Badge>
             )}
         </li>
     );

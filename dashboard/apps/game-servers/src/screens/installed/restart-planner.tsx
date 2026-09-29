@@ -23,10 +23,11 @@
  */
 
 import * as actions from "./restart-actions";
+import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import type { PendingRestart } from "../../lib/games-restart";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarClock, Loader2, RotateCcw, Users, X } from "lucide-react";
 
 /** How long "restarting" is said for before the buttons come back: a server that
@@ -43,8 +44,8 @@ export function RestartPlanner({
     running,
     changed,
     reason,
-    title = "Saved, and not yet in force",
-    detail = "The server reads this when it starts. Leave it and the next start picks it up; nothing is lost by waiting.",
+    title,
+    detail,
     onRestarted
 }: {
     installedAppId: string;
@@ -62,6 +63,7 @@ export function RestartPlanner({
     detail?: string;
     onRestarted?: () => void;
 }) {
+    const t = useGameText("games");
     const [pending, setPending] = useState<PendingRestart | null>(null);
     const [busy, setBusy] = useState<"empty" | "at" | "now" | "cancel" | null>(null);
     /** When a restart began, as far as this screen knows. */
@@ -133,7 +135,7 @@ export function RestartPlanner({
         });
         setBusy(null);
         if (answer.error || !answer.pending) {
-            setError(answer.error ?? "That restart could not be booked");
+            setError(answer.error ?? t("restartPlanner.bookFailed"));
             return;
         }
         booked.current = true;
@@ -175,10 +177,9 @@ export function RestartPlanner({
                 <CardBody className="flex items-center gap-2 py-3 text-sm" role="status">
                     <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
                     <span>
-                        <span className="font-medium">Restarting.</span>{" "}
+                        <span className="font-medium">{t("restartPlanner.restarting")}</span>{" "}
                         <span className="text-muted-foreground">
-                            Anybody playing is disconnected for a moment; the change is in force
-                            once the server is back.
+                            {t("restartPlanner.anybodyPlayingIsDisconnectedFor")}
                         </span>
                     </span>
                 </CardBody>
@@ -191,7 +192,7 @@ export function RestartPlanner({
         return (
             <Card>
                 <CardBody className="py-3 text-sm text-muted-foreground">
-                    Saved. The server is stopped, so this is what it will start with.
+                    {t("restartPlanner.savedTheServerIsStopped")}
                 </CardBody>
             </Card>
         );
@@ -203,23 +204,29 @@ export function RestartPlanner({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                         <p className="text-sm font-medium">
-                            {pending ? "A restart is booked" : title}
+                            {pending
+                                ? t("restartPlanner.aRestartIsBooked")
+                                : (title ?? t("restartPlanner.defaultTitle"))}
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {pending ? (
                                 pending.when === "empty" ? (
                                     <>
-                                        It happens as soon as nobody is playing
+                                        {t("restartPlanner.itHappensAsSoonAs")}
                                         {pending.reason ? ` - ${pending.reason}` : ""}.
                                     </>
                                 ) : (
                                     <>
-                                        It happens <RelativeTime iso={pending.at ?? ""} />
+                                        {t.rich<ReactNode>("restartPlanner.happensAt", {
+                                            time: () => (
+                                                <RelativeTime key="time" iso={pending.at ?? ""} />
+                                            )
+                                        })}
                                         {pending.reason ? ` - ${pending.reason}` : ""}.
                                     </>
                                 )
                             ) : (
-                                detail
+                                (detail ?? t("restartPlanner.defaultDetail"))
                             )}
                         </p>
                     </div>
@@ -234,7 +241,7 @@ export function RestartPlanner({
                             ) : (
                                 <X className="size-4" />
                             )}{" "}
-                            Call it off
+                            {t("restartPlanner.callItOff")}
                         </Button>
                     ) : (
                         <div className="flex flex-wrap items-center gap-2">
@@ -248,14 +255,14 @@ export function RestartPlanner({
                                 ) : (
                                     <Users className="size-4" />
                                 )}{" "}
-                                When nobody is playing
+                                {t("restartPlanner.whenNobodyIsPlaying")}
                             </Button>
                             <Button
                                 variant="secondary"
                                 disabled={busy !== null}
                                 onClick={() => setAt((current) => (current === null ? "" : null))}
                             >
-                                <CalendarClock className="size-4" /> At a time
+                                <CalendarClock className="size-4" /> {t("restartPlanner.atATime")}
                             </Button>
                             <Button disabled={busy !== null} onClick={() => void now()}>
                                 {busy === "now" ? (
@@ -263,7 +270,7 @@ export function RestartPlanner({
                                 ) : (
                                     <RotateCcw className="size-4" />
                                 )}
-                                Restart now
+                                {t("restartPlanner.restartNow")}
                             </Button>
                         </div>
                     )}
@@ -274,7 +281,7 @@ export function RestartPlanner({
                         <Input
                             type="datetime-local"
                             className="w-56"
-                            aria-label="When to restart"
+                            aria-label={t("restartPlanner.whenToRestart")}
                             value={at}
                             onChange={(event) => setAt(event.target.value)}
                         />
@@ -284,9 +291,11 @@ export function RestartPlanner({
                             onClick={() => void book("at", at)}
                         >
                             {busy === "at" && <Loader2 className="size-4 animate-spin" />}
-                            Book it
+                            {t("restartPlanner.bookIt")}
                         </Button>
-                        <span className="text-xs text-muted-foreground">Your own clock.</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("restartPlanner.yourOwnClock")}
+                        </span>
                     </div>
                 )}
 

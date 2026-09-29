@@ -17,6 +17,7 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
+import { useGameText } from "../game-text";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Card, CardBody, Select, Skeleton } from "@polaris/ui";
 import {
@@ -50,6 +51,7 @@ export function MinecraftMemory({
      *  figure that save left behind. */
     refresh?: number;
 }) {
+    const t = useGameText("minecraft");
     const [plan, setPlan] = useState<MemoryPlanView | null>(null);
     // What this tab last read paints first, so the card is not a skeleton on a
     // revisit; the read below replaces what moved.
@@ -83,7 +85,7 @@ export function MinecraftMemory({
         // Before this visit has read a plan, the kept one is not one: a server that
         // now has nothing to plan, or cannot be read, says so on its own.
         if (!heardRef.current) setPlan(null);
-        setNote(answer.error ?? "Could not read the memory plan");
+        setNote(answer.error ?? t("memory.readFailed"));
     }, [installedAppId]);
 
     useEffect(() => {
@@ -101,14 +103,14 @@ export function MinecraftMemory({
         startTransition(async () => {
             const answer = await setMemoryPlanAction(installedAppId, wanted).catch(() => ({
                 plan: undefined,
-                error: "Could not save the plan"
+                error: t("memory.couldNotSaveThePlan")
             }));
             if (answer.plan) {
                 setPlan(answer.plan);
                 return;
             }
             setPlan(previous);
-            setNote(answer.error ?? "Could not save the plan");
+            setNote(answer.error ?? t("memory.couldNotSaveThePlan"));
         });
     }
 
@@ -127,13 +129,14 @@ export function MinecraftMemory({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <p className="text-sm font-medium">Memory</p>
+                        <p className="text-sm font-medium">{t("memory.memory")}</p>
                         <p className="text-xs text-muted-foreground">
-                            How much the server is given to hold the world, the mods and the people
-                            on it.
+                            {t("memory.howMuchTheServerIs")}
                         </p>
                     </div>
-                    {plan && <Badge>{inGigabytes(plan.currentMb)} now</Badge>}
+                    {plan && (
+                        <Badge>{t("memory.now", { size: inGigabytes(plan.currentMb) })}</Badge>
+                    )}
                 </div>
 
                 {!plan ? (
@@ -141,7 +144,7 @@ export function MinecraftMemory({
                 ) : (
                     <>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span>Decided by</span>
+                            <span>{t("memory.decidedBy")}</span>
                             <Select
                                 value={plan.mode}
                                 disabled={!heard}
@@ -149,8 +152,8 @@ export function MinecraftMemory({
                                     save({ mode: value === "auto" ? "auto" : "fixed" })
                                 }
                                 options={[
-                                    { value: "auto", label: "Polaris, from what the server runs" },
-                                    { value: "fixed", label: "The figure under Settings" }
+                                    { value: "auto", label: t("memory.polarisFromWhatTheServer") },
+                                    { value: "fixed", label: t("memory.theFigureUnderSettings") }
                                 ]}
                             />
                         </label>
@@ -158,7 +161,7 @@ export function MinecraftMemory({
                         {plan.mode === "auto" ? (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span>Never more than</span>
+                                    <span>{t("memory.neverMoreThan")}</span>
                                     <Select
                                         value={String(plan.ceilingMb)}
                                         disabled={!heard}
@@ -173,24 +176,29 @@ export function MinecraftMemory({
                                 </label>
                                 <p className="text-xs text-muted-foreground">
                                     {plan.plannedMb > plan.currentMb
-                                        ? `This server wants ${inGigabytes(plan.plannedMb)} for ${plan.reason}. It picks that up at its next restart.`
-                                        : `${inGigabytes(plan.plannedMb)} covers ${plan.reason}, which is what it has.`}{" "}
-                                    Polaris raises it when the server grows or runs out, never past{" "}
-                                    {inGigabytes(plan.ceilingMb)} and never past what the machine
-                                    can spare, and never lowers it on its own.
+                                        ? t("memory.wants", {
+                                              size: inGigabytes(plan.plannedMb),
+                                              reason: plan.reason
+                                          })
+                                        : t("memory.covers", {
+                                              size: inGigabytes(plan.plannedMb),
+                                              reason: plan.reason
+                                          })}{" "}
+                                    {t("memory.raises", { ceiling: inGigabytes(plan.ceilingMb) })}
                                 </p>
                             </>
                         ) : (
                             <p className="text-xs text-muted-foreground">
-                                The Memory field under Settings decides, and nothing changes it. For
-                                what it is running now, this server would be planned{" "}
-                                {inGigabytes(plan.plannedMb)} ({plan.reason}).
+                                {t("memory.manual", {
+                                    size: inGigabytes(plan.plannedMb),
+                                    reason: plan.reason
+                                })}
                             </p>
                         )}
                     </>
                 )}
 
-                {pending && <p className="text-xs text-muted-foreground">Saving...</p>}
+                {pending && <p className="text-xs text-muted-foreground">{t("memory.saving")}</p>}
                 {note && plan && <p className="text-sm text-danger">{note}</p>}
             </CardBody>
         </Card>

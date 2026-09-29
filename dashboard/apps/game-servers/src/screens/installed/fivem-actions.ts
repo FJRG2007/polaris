@@ -148,7 +148,7 @@ export async function banFivemPlayerAction(
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not ban that player");
+        return failed(caught, (await gameWords("games"))("errors.couldNotBanThatPlayer"));
     }
 }
 
@@ -168,7 +168,7 @@ export async function unbanFivemPlayerAction(installedAppId: string, identifier:
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not lift that ban");
+        return failed(caught, (await gameWords("games"))("errors.couldNotLiftThatBan"));
     }
 }
 
@@ -200,7 +200,7 @@ export async function kickFivemPlayerAction(
         });
         return {};
     } catch (caught) {
-        return failed(caught, "Could not kick that player");
+        return failed(caught, (await gameWords("games"))("errors.couldNotKickThatPlayer"));
     }
 }
 
@@ -292,7 +292,7 @@ export async function setFivemAdminAction(
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not change who administers the server");
+        return failed(caught, (await gameWords("games"))("errors.couldNotChangeWhoAdministers"));
     }
 }
 
@@ -307,7 +307,7 @@ export async function readFivemRulesAction(
             ? { error: (await gameWords("games"))("errors.theServerHasNotWritten") }
             : { rules };
     } catch (caught) {
-        return failed(caught, "Could not read the server's rules");
+        return failed(caught, (await gameWords("games"))("errors.couldNotReadTheServer2"));
     }
 }
 
@@ -338,7 +338,7 @@ export async function saveFivemRulesAction(
         });
         return {};
     } catch (caught) {
-        return failed(caught, "Could not save the server's rules");
+        return failed(caught, (await gameWords("games"))("errors.couldNotSaveTheServer"));
     }
 }
 
@@ -350,7 +350,7 @@ export async function listFivemResourcesAction(
         const { access } = await requireGameServer("games.read", installedAppId);
         return { resources: await fivem.listFivemResources(access.ownerId, installedAppId) };
     } catch (caught) {
-        return failed(caught, "Could not read the server's resources");
+        return failed(caught, (await gameWords("games"))("errors.couldNotReadTheServer3"));
     }
 }
 
@@ -363,7 +363,7 @@ export async function actOnFivemResourceAction(
     const parsed = z
         .object({
             installedAppId: z.string().uuid(),
-            name: z.string().trim().refine(isResourceName, "That is not a resource name"),
+            name: z.string().trim().refine(isResourceName, (await gameWords("games"))("errors.thatIsNotAResource")),
             action: z.enum(["start", "stop", "restart", "ensure"])
         })
         .safeParse({ installedAppId, name, action });
@@ -396,7 +396,7 @@ export async function refreshFivemResourcesAction(installedAppId: string): Promi
         await fivem.refreshResources(access.ownerId, installedAppId);
         return {};
     } catch (caught) {
-        return failed(caught, "Could not rescan the resources");
+        return failed(caught, (await gameWords("games"))("errors.couldNotRescanTheResources"));
     }
 }
 
@@ -409,8 +409,8 @@ export async function installFivemResourceAction(
     const parsed = z
         .object({
             installedAppId: z.string().uuid(),
-            url: z.string().trim().refine(isResourceUrl, "That is not a link to a resource archive"),
-            name: z.string().trim().refine(isResourceName, "That is not a resource name")
+            url: z.string().trim().refine(isResourceUrl, (await gameWords("games"))("errors.thatIsNotALink")),
+            name: z.string().trim().refine(isResourceName, (await gameWords("games"))("errors.thatIsNotAResource"))
         })
         .safeParse({ installedAppId, url, name });
     if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
@@ -431,7 +431,7 @@ export async function installFivemResourceAction(
         });
         return {};
     } catch (caught) {
-        return failed(caught, "Could not install that resource");
+        return failed(caught, (await gameWords("games"))("errors.couldNotInstallThatResource"));
     }
 }
 
@@ -454,7 +454,7 @@ export async function revealFivemPasswordAction(
         const { access } = await requireGameServerOwner(installedAppId);
         return { password: await fivem.revealConsolePassword(access.ownerId, installedAppId) };
     } catch (caught) {
-        return failed(caught, "Could not read the console password");
+        return failed(caught, (await gameWords("games"))("errors.couldNotReadTheConsole"));
     }
 }
 
@@ -473,7 +473,7 @@ export async function setFivemPasswordAction(installedAppId: string, password: s
         });
         return {};
     } catch (caught) {
-        return failed(caught, "Could not change the console password");
+        return failed(caught, (await gameWords("games"))("errors.couldNotChangeTheConsole"));
     }
 }
 
@@ -496,6 +496,6 @@ export async function setFivemLicenseKeyAction(installedAppId: string, key: stri
         });
         return {};
     } catch (caught) {
-        return failed(caught, "Could not change the server key");
+        return failed(caught, (await gameWords("games"))("errors.couldNotChangeTheServer2"));
     }
 }

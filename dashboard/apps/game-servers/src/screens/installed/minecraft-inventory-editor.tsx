@@ -189,7 +189,7 @@ export function InventoryEditor({
                 setError(result.error);
                 return;
             }
-            if (result.queued) setNote(`Saved. It happens when ${player} next joins.`);
+            if (result.queued) setNote(t("inventoryEditor.queuedNote", { name: player }));
             else if (result.note) setNote(result.note);
             await Promise.all([reload(), readQueue()]);
             // The screen behind lists what is waiting too, and it only reads that

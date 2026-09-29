@@ -72,5 +72,49 @@
         "nobodyAtAll": "Nobody is playing, and nobody has been added yet.",
         "notAnswering": "The server is not answering.",
         "savedRestart": "Saved. Restart the server to run on it."
+    },
+    "resources": {
+        "whatThisServerRunsA": "What this server runs. A resource that has just been added has to be started before it does anything.",
+        "openTheFolder": "Open the folder",
+        "addFromALink": "Add from a link",
+        "readTheListAgain": "Read the list again",
+        "polaris": "Polaris",
+        "keepsPlayersOffTheServer": "Keeps players off the server. Open it to everyone from the Security screen instead of stopping this.",
+        "running": "Running",
+        "stopped": "Stopped",
+        "addAResource": "Add a resource",
+        "link": "Link",
+        "folderName": "Folder name",
+        "whatTheServerWillKnow": "What the server will know it by. A folder of this name is replaced outright if there is one.",
+        "cancel": "Cancel",
+        "fetching": "Fetching...",
+        "add": "Add",
+        "columns": {
+            "resource": "Resource",
+            "folder": "Folder",
+            "state": "State"
+        },
+        "search": "Search resources",
+        "notRunning": "The server is not running, so there is nothing to list.",
+        "noMatch": "Nothing here matches “{query}”.",
+        "none": "No resources yet. Add one from a link, or drop a folder into the resources folder.",
+        "restartNamed": "Restart {name}",
+        "stopNamed": "Stop {name}",
+        "startNamed": "Start {name}",
+        "ensureHelp": "Starting a resource here lasts until the server restarts. To have one start every time, add an <code>ensure</code> line for it in the server config - Polaris does that for the resources it installs itself.",
+        "badName": "Letters, digits, dots, dashes and underscores - it is a folder name."
+    },
+    "rules": {
+        "theseAreTheLinesIn": "These are the lines in the server's own config. It reads them when it starts, so a change takes effect the next time it does.",
+        "readTheConfigAgain": "Read the config again",
+        "findASettingByWhat": "Find a setting, by what it does or what FiveM calls it",
+        "findASetting": "Find a setting",
+        "anythingAResourceAddsJobs": "Anything a resource adds - jobs, economy, spawn points - is configured inside that resource, which you can reach from the Resources screen or in Drive.",
+        "leaveItToTheServer": "Leave it to the server",
+        "setTypeANewOne": "Set - type a new one to replace it",
+        "noMatch": "Nothing here matches “{query}”. A resource can add settings of its own, and those live in its own config rather than here.",
+        "notSet": "Not set - the server uses {fallback}.",
+        "stopSetting": "Stop setting {name}",
+        "leaveWithFallback": "Leave it to the server ({fallback})"
     }
 }

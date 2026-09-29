@@ -238,13 +238,13 @@ export function MinecraftAnnounce({
             "error",
             () => {
                 setHearing(false);
-                setHeardError("That sound could not be played here.");
+                setHeardError(t("announce.soundFailed"));
             },
             { once: true }
         );
         void audio.play().catch(() => {
             setHearing(false);
-            setHeardError("That sound could not be played here.");
+            setHeardError(t("announce.soundFailed"));
         });
     }
 
@@ -276,7 +276,7 @@ export function MinecraftAnnounce({
                 setError(result.error);
                 return;
             }
-            setNote("Taken off the screen.");
+            setNote(t("announce.takenOff"));
             readLive();
         });
     }
@@ -301,7 +301,7 @@ export function MinecraftAnnounce({
         } catch (caught) {
             return {
                 lines: [],
-                problem: caught instanceof Error ? caught.message : "That cannot be sent"
+                problem: caught instanceof Error ? caught.message : t("announce.cannotSend")
             };
         }
     }, [edition, draft]);
@@ -339,9 +339,9 @@ export function MinecraftAnnounce({
                 return;
             }
             setNote(
-                `Sent to ${describeTarget(target)}.${
-                    result.kept ? " Polaris keeps it on screen." : ""
-                }`
+                t(result.kept ? "announce.sentKept" : "announce.sent", {
+                    target: describeTarget(target, t)
+                })
             );
             if (result.kept) readLive();
         });
@@ -358,14 +358,14 @@ export function MinecraftAnnounce({
                 announcement: draft
             });
             if (result.error || !result.templates) {
-                setError(result.error ?? "That template could not be kept");
+                setError(result.error ?? t("announce.templateFailed"));
                 return;
             }
             setTemplates(result.templates);
             setTemplatesHeard(true);
             setFrom(result.templates.find((one) => one.id === result.id) ?? null);
             setNaming(null);
-            setNote("Template saved.");
+            setNote(t("announce.templateSaved"));
         });
     }
 
@@ -619,13 +619,13 @@ export function MinecraftAnnounce({
                         <div className="grid grid-cols-3 gap-2">
                             {(
                                 [
-                                    ["fadeIn", "Fade in"],
-                                    ["stay", "On screen"],
-                                    ["fadeOut", "Fade out"]
+                                    ["fadeIn", "announce.fadeIn"],
+                                    ["stay", "announce.stay"],
+                                    ["fadeOut", "announce.fadeOut"]
                                 ] as const
                             ).map(([key, label]) => (
                                 <label key={key} className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{label}</span>
+                                    <span className="font-medium">{t(label)}</span>
                                     <span className="flex items-center gap-1">
                                         <Input
                                             type="number"

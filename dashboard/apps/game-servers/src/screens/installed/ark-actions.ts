@@ -627,7 +627,10 @@ export async function readArkRulesAction(installedAppId: string): Promise<ArkRul
         return {
             overrides: {},
             live: {},
-            reason: caught instanceof Error ? caught.message : "The settings could not be read"
+            reason:
+                caught instanceof Error
+                    ? caught.message
+                    : (await gameWords("games"))("errors.theSettingsCouldNotBe")
         };
     }
 }
@@ -1090,7 +1093,11 @@ export async function messageArkPlayerAction(
                 .string()
                 .trim()
                 .refine(isSteamId, schemaWords("games", "errors.thatIsNotASteam")),
-            message: z.string().trim().min(1, "Say something").max(200)
+            message: z
+                .string()
+                .trim()
+                .min(1, (await gameWords("games"))("errors.saySomething"))
+                .max(200)
         })
         .safeParse({ installedAppId, steamId, message });
     if (!parsed.success)

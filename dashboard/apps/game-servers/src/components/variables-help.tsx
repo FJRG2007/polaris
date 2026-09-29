@@ -10,26 +10,28 @@
  */
 
 import * as mc from "../lib/minecraft/motd";
+import type { GameKey } from "../../messages";
+import { colorName, styleName, useGameText } from "../screens/game-text";
 import { Card, CardBody, cn } from "@polaris/ui";
 import type { MinecraftEdition } from "../lib/minecraft/service";
 import { VARIABLES, type VariableSpec } from "../lib/minecraft/text-vars";
 
 /** The headings the values are read under, in the order they are shown. */
-function groupOf(spec: VariableSpec): string {
+function groupOf(spec: VariableSpec): GameKey<"games"> {
     if (spec.name.startsWith("rank.") || spec.name === "server.levels")
-        return "Leaderboards and lists";
-    if (spec.name.startsWith("death.")) return "Last death";
-    if (spec.name.startsWith("call.")) return "The linked chat's call";
-    if (spec.kind === "game" || spec.kind === "account") return "The player reading it";
-    return "The server";
+        return "variablesHelp.groups.lists";
+    if (spec.name.startsWith("death.")) return "variablesHelp.groups.death";
+    if (spec.name.startsWith("call.")) return "variablesHelp.groups.call";
+    if (spec.kind === "game" || spec.kind === "account") return "variablesHelp.groups.player";
+    return "variablesHelp.groups.server";
 }
 
-const GROUP_ORDER = [
-    "The server",
-    "The player reading it",
-    "Leaderboards and lists",
-    "Last death",
-    "The linked chat's call"
+const GROUP_ORDER: readonly GameKey<"games">[] = [
+    "variablesHelp.groups.server",
+    "variablesHelp.groups.player",
+    "variablesHelp.groups.lists",
+    "variablesHelp.groups.death",
+    "variablesHelp.groups.call"
 ];
 
 export function VariablesHelp({
@@ -43,6 +45,7 @@ export function VariablesHelp({
     /** Set where it shares a column of fixed height and scrolls within it. */
     className?: string;
 }) {
+    const t = useGameText("games");
     const offered = VARIABLES.filter(
         (spec) =>
             (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
@@ -56,18 +59,16 @@ export function VariablesHelp({
         <Card className={cn("overflow-y-auto", className)}>
             <CardBody className="flex flex-col gap-3 text-sm">
                 <div>
-                    <p className="font-medium">What you can write</p>
+                    <p className="font-medium">{t("variablesHelp.whatYouCanWrite")}</p>
                     <p className="text-xs text-muted-foreground">
-                        Type {"{"} in a line to pick one. Polaris fills it in when it is sent. Add
-                        what to show when there is nothing yet: {'{death.player | "Nobody"}'}.
-                        {scope === "server" &&
-                            " A leaderboard or list alone on a line becomes a line a player."}
+                        {t("variablesHelp.intro")}
+                        {scope === "server" && ` ${t("variablesHelp.serverScope")}`}
                     </p>
                 </div>
                 {groups.map((group) => (
                     <div key={group.label} className="flex flex-col gap-1">
                         <p className="text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
-                            {group.label}
+                            {t(group.label)}
                         </p>
                         <dl className="flex flex-col gap-1">
                             {group.specs.map((spec) => (
@@ -88,18 +89,15 @@ export function VariablesHelp({
                 ))}
                 <div className="flex flex-col gap-1">
                     <p className="text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
-                        Colours and styles
+                        {t("variablesHelp.coloursAndStyles")}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                        Select text and use the buttons, or show the codes and type them: {"&"} and
-                        a character, which applies from there on. {"&r"} goes back to plain.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("variablesHelp.codesHelp")}</p>
                     <div className="flex flex-wrap gap-1.5">
                         {Object.entries(mc.MOTD_COLORS).map(([code, color]) => (
                             <span
                                 key={code}
                                 className="flex items-center gap-1 text-xs"
-                                title={color.name}
+                                title={colorName(t, code)}
                             >
                                 <span
                                     className="size-3 rounded-sm border border-border"
@@ -111,8 +109,8 @@ export function VariablesHelp({
                         ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        {Object.entries(mc.MOTD_STYLES)
-                            .map(([code, name]) => `&${code} ${name.toLowerCase()}`)
+                        {Object.keys(mc.MOTD_STYLES)
+                            .map((code) => `&${code} ${styleName(t, code).toLowerCase()}`)
                             .join(", ")}
                     </p>
                 </div>

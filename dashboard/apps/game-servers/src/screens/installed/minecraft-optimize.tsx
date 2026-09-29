@@ -15,6 +15,7 @@
  */
 
 import { useState } from "react";
+import { useGameText } from "../game-text";
 import { formatBytes } from "@polaris/core";
 import { Loader2, Sparkles } from "lucide-react";
 import { optimizeWorldAction, previewWorldTrimAction, saveWorldTrimAction } from "./minecraft-actions";
@@ -35,6 +36,7 @@ export function WorldOptimizeCard({
     /** What the last run did, or null when there has not been one. */
     lastRun: WorldTrimRun | null;
 }) {
+    const t = useGameText("minecraft");
     const [settings, setSettings] = useState<WorldTrimSettings>(saved ?? WORLD_TRIM_DEFAULTS);
     const [measuring, setMeasuring] = useState(false);
     const [running, setRunning] = useState(false);
@@ -73,26 +75,23 @@ export function WorldOptimizeCard({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Sparkles className="size-4 text-primary" />
-                    Optimize the world
+                    {t("optimize.optimizeTheWorld")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    A world keeps every chunk anybody has ever loaded, and most of what gets loaded is scenery
-                    nobody walks into. Those chunks generate again, identically, the moment somebody goes there -
-                    so removing them costs nothing and usually takes a world down by half or more. Anything a
-                    player has stood in is kept, along with spawn, forced chunks and everywhere people log out.
+                    {t("optimize.aWorldKeepsEveryChunk")}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="secondary" onClick={measure} disabled={measuring || running}>
                         {measuring ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {measuring ? "Measuring" : "See what would go"}
+                        {measuring ? t("optimize.measuring") : t("optimize.seeWhatWouldGo")}
                     </Button>
                     {found && found.removed > 0 && (
                         <Button size="sm" onClick={run} disabled={running}>
                             {running ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {running ? "Optimizing" : "Do it"}
+                            {running ? t("optimize.optimizing") : t("optimize.doIt")}
                         </Button>
                     )}
                 </div>
@@ -104,10 +103,10 @@ export function WorldOptimizeCard({
                             <>
                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <Checkbox checked={backup} onChange={(event) => setBackup(event.target.checked)} />
-                                    Back the world up first
+                                    {t("optimize.backTheWorldUpFirst")}
                                 </label>
                                 <p className="text-xs text-muted-foreground">
-                                    The server stops while this runs and starts again afterwards.
+                                    {t("optimize.theServerStopsWhileThis")}
                                 </p>
                             </>
                         )}
@@ -120,27 +119,26 @@ export function WorldOptimizeCard({
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-sm font-medium">Keep it tidy on its own</p>
+                            <p className="text-sm font-medium">{t("optimize.keepItTidyOnIts")}</p>
                             <p className="max-w-lg text-xs text-muted-foreground">
-                                Runs while the server is already stopped and never stops one to do it, so a server
-                                that is always up is never touched by this.
+                                {t("optimize.runsWhileTheServerIs")}
                             </p>
                         </div>
                         <Switch
                             checked={settings.enabled}
                             onChange={(enabled) => void save({ ...settings, enabled })}
-                            aria-label="Optimize this world on its own"
+                            aria-label={t("optimize.optimizeThisWorldOnIts")}
                         />
                     </div>
                     {settings.enabled && (
                         <label className="flex max-w-xs items-center gap-2 text-xs">
-                            <span className="shrink-0 text-muted-foreground">At most once every</span>
+                            <span className="shrink-0 text-muted-foreground">{t("optimize.atMostOnceEvery")}</span>
                             <Input
                                 type="number"
                                 min={1}
                                 max={365}
                                 value={String(settings.everyDays)}
-                                aria-label="Days between automatic runs"
+                                aria-label={t("optimize.daysBetweenAutomaticRuns")}
                                 onChange={(event) =>
                                     void save({
                                         ...settings,
@@ -148,20 +146,23 @@ export function WorldOptimizeCard({
                                     })
                                 }
                             />
-                            <span className="shrink-0 text-muted-foreground">days</span>
+                            <span className="shrink-0 text-muted-foreground">{t("optimize.days")}</span>
                         </label>
                     )}
                     {lastRun && (
                         <p className="text-xs text-muted-foreground">
                             {lastRun.ok ? (
                                 <>
-                                    Last run {new Date(lastRun.at).toLocaleDateString()}:{" "}
                                     {lastRun.removed > 0
-                                        ? `${lastRun.removed.toLocaleString()} chunks, ${formatBytes(lastRun.freedBytes)}.`
-                                        : "nothing to take out."}
+                                        ? t("optimize.lastRunRemoved", {
+                                              date: new Date(lastRun.at).toLocaleDateString(),
+                                              count: lastRun.removed,
+                                              size: formatBytes(lastRun.freedBytes)
+                                          })
+                                        : t("optimize.lastRunNothing", { date: new Date(lastRun.at).toLocaleDateString() })}
                                 </>
                             ) : (
-                                <Badge variant="danger">{lastRun.detail || "The last run did not work"}</Badge>
+                                <Badge variant="danger">{lastRun.detail || t("optimize.theLastRunDidNot")}</Badge>
                             )}
                         </p>
                     )}

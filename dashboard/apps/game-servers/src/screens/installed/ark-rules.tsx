@@ -19,6 +19,7 @@
  */
 
 import * as actions from "./ark-actions";
+import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
@@ -52,6 +53,7 @@ export function ArkRules({
      *  so a stopped server can be neither read nor changed. */
     running: boolean;
 }) {
+    const t = useGameText("ark");
     // What this tab last read paints first, so a revisit is not a skeleton while
     // the file is read inside the container again; the read replaces what moved.
     const rulesKey = `ark-rules:${installedAppId}`;
@@ -113,7 +115,7 @@ export function ArkRules({
      *  now holds, so the row never shows something that was not written. */
     async function apply(setting: ArkSetting, value: string | null): Promise<void> {
         if (value !== null && normalizeArkValue(setting, value) === null) {
-            setError(`${setting.label} does not take that value.`);
+            setError(t("rules.badValue", { name: setting.label }));
             return;
         }
         setBusy(setting.key);
@@ -121,7 +123,7 @@ export function ArkRules({
         const result = await actions.setArkRulesAction(installedAppId, { [setting.key]: value });
         setBusy(null);
         if (result.error || !result.rules) {
-            setError(result.error ?? "That could not be saved");
+            setError(result.error ?? t("rules.saveFailed"));
             return;
         }
         setRules(result.rules);
@@ -133,16 +135,13 @@ export function ArkRules({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm text-muted-foreground">
-                    These are what the server is launched with. ARK reads them when it starts, so a
-                    change takes effect the next time it does.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("rules.theseAreWhatTheServer")}</p>
                 <Button
                     size="icon"
                     variant="ghost"
                     className="ml-auto"
-                    aria-label="Read the settings again"
-                    title="Read the settings again"
+                    aria-label={t("rules.readTheSettingsAgain")}
+                    title={t("rules.readTheSettingsAgain")}
                     disabled={loading}
                     onClick={() => {
                         setLoading(true);
@@ -198,8 +197,8 @@ export function ArkRules({
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Find a setting, by what it does or what ARK calls it"
-                    aria-label="Find a setting"
+                    placeholder={t("rules.findASettingByWhat")}
+                    aria-label={t("rules.findASetting")}
                     className="pl-8"
                 />
             </label>
@@ -230,28 +229,16 @@ export function ArkRules({
             ))}
 
             {shown.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    Nothing here matches “{query}”. ARK has a great many settings and Polaris offers
-                    the ones it can set as launch options; anything else lives in the game&apos;s
-                    own files.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("rules.noMatch", { query })}</p>
             ) : null}
 
-            <p className="text-xs text-muted-foreground">
-                Polaris writes these as launch options rather than into the game&apos;s own settings
-                file, because ARK rewrites that file when it stops - an edit made there while the
-                server is up is thrown away at the moment it was meant to count.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("rules.polarisWritesTheseAsLaunch")}</p>
 
             {/* Two things people come to this screen for that are not here, because
                 the game does not have them. Saying so is the only useful answer:
                 the alternative is somebody reading forty rows looking for a switch
                 that was never written. */}
-            <p className="text-xs text-muted-foreground">
-                ARK has no setting for showing everyone on the map - a player sees themselves and
-                their tribe and nobody else - and none for how far away a name tag is readable. Both
-                come from mods; add one from the Mods screen.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("rules.arkHasNoSettingFor")}</p>
         </div>
     );
 }
@@ -281,6 +268,7 @@ function SettingRow({
     disabled: boolean;
     onChange: (value: string | null) => void;
 }) {
+    const t = useGameText("ark");
     // What the row shows: what is pinned, else what the game says, else nothing -
     // and the note under it says which of the three this is.
     const shown = pinned ?? live ?? "";
@@ -296,8 +284,8 @@ function SettingRow({
         loading || pinned !== null
             ? null
             : live !== null
-              ? `The server's own file says ${said}.`
-              : `Not set - the game uses ${setting.fallback}.`;
+              ? t("rules.fileSays", { value: said })
+              : t("rules.notSet", { fallback: setting.fallback });
 
     return (
         <div
@@ -341,8 +329,8 @@ function SettingRow({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`Stop setting ${setting.label}`}
-                            title="Leave it to the game"
+                            aria-label={t("rules.stopSetting", { name: setting.label })}
+                            title={t("rules.leaveItToTheGame")}
                             disabled={disabled || busy}
                             onClick={() => onChange(null)}
                         >
@@ -381,7 +369,7 @@ function SettingRow({
                             }}
                             title={
                                 setting.min !== undefined && setting.max !== undefined
-                                    ? `${setting.min} to ${setting.max}`
+                                    ? t("rules.range", { min: setting.min, max: setting.max })
                                     : undefined
                             }
                         />

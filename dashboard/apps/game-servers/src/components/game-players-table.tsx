@@ -18,6 +18,7 @@
  */
 
 import { Search } from "lucide-react";
+import { useGameText } from "../screens/game-text";
 import type { ReactNode } from "react";
 import { Button, Input, Select, cn } from "@polaris/ui";
 
@@ -39,7 +40,7 @@ export function PlayersTable({
     empty,
     search,
     onSearch,
-    searchPlaceholder = "Search players",
+    searchPlaceholder,
     filter,
     filters,
     onFilter,
@@ -63,6 +64,7 @@ export function PlayersTable({
     readonly toolbar?: ReactNode;
     readonly minWidth?: string;
 }) {
+    const t = useGameText("games");
     const hasToolbar = onSearch !== undefined || (filters && filters.length > 0) || toolbar !== undefined;
 
     return (
@@ -74,8 +76,8 @@ export function PlayersTable({
                             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 className="pl-9"
-                                placeholder={searchPlaceholder}
-                                aria-label="Search players"
+                                placeholder={searchPlaceholder ?? t("playersTable.searchPlayers")}
+                                aria-label={t("playersTable.searchPlayers")}
                                 value={search ?? ""}
                                 onChange={(event) => onSearch(event.target.value)}
                             />
@@ -84,7 +86,7 @@ export function PlayersTable({
                     {filters && filters.length > 0 && onFilter && (
                         <Select
                             className="sm:w-44"
-                            aria-label="Filter players"
+                            aria-label={t("playersTable.filterPlayers")}
                             value={filter ?? filters[0]?.value ?? ""}
                             onValueChange={onFilter}
                             options={filters.map((entry) => ({ value: entry.value, label: entry.label }))}

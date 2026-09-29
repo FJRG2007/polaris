@@ -22,7 +22,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
-import { useGameText } from "./game-text";
+import { useGameText, useSchemaText, type GameText } from "./game-text";
 import { useRouter } from "next/navigation";
 import * as arkAccess from "../lib/ark/access";
 import * as world from "../lib/minecraft/world";
@@ -78,6 +78,7 @@ function mintPassword(): string {
 
 export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const t = useGameText("games");
+    const schemaText = useSchemaText();
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [setup, setSetup] = useState<GameSetup | null>(null);
@@ -152,7 +153,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 if (loaded.games.length > 0 && !loaded.games.includes("minecraft"))
                     setGame(loaded.games[0]!);
             })
-            .catch(() => active && setError("Could not read your machines"));
+            .catch(() => active && setError(t("create.machinesFailed")));
         return () => {
             active = false;
         };
@@ -235,33 +236,33 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         ownerPlayer.trim().length === 0 || isPlayerName(edition, ownerPlayer)
             ? null
             : edition === "bedrock"
-              ? "That is not an Xbox gamertag"
-              : "3 to 16 letters, digits or underscores";
+              ? t("create.errors.gamertag")
+              : t("create.errors.javaName");
     const addressError =
         ownerAddress.trim().length === 0 || isAddressRule(ownerAddress)
             ? null
-            : "That is not an address or a range";
+            : t("create.errors.address");
     const seedError = shapeError(shape);
     const steamIdError =
         ownerSteamId.trim().length === 0 || arkAccess.isSteamId(ownerSteamId)
             ? null
-            : "17 digits, starting 7656119";
+            : t("create.errors.steamId");
     const passwordError = arkAccess.isJoinPassword(joinPassword)
         ? null
         : arkAccess.JOIN_PASSWORD_HINT;
     const modsError =
         mods.trim().length === 0 || isModIdList(mods)
             ? null
-            : "Workshop ids are numbers, comma separated";
+            : t("create.errors.workshopIds");
     const licenseError =
         licenseKey.trim().length === 0 || isLicenseKey(licenseKey) ? null : LICENSE_KEY_HINT;
     const identifierError =
         ownerIdentifier.trim().length === 0 || isIdentifier(ownerIdentifier)
             ? null
-            : "Paste it whole, as the game gives it: license:... or discord:...";
+            : t("create.errors.identifier");
     const onesyncError =
         game === "fivem" && maxPlayers > 32 && onesync === "off"
-            ? "More than 32 slots needs OneSync on"
+            ? t("create.errors.onesync")
             : null;
     const ready =
         name.trim().length > 0 &&
@@ -341,13 +342,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                     }
         );
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the details and try again");
+            setError(schemaText(parsed.error.issues[0]?.message) ?? t("create.errors.checkDetails"));
             return;
         }
         startTransition(async () => {
             const result = await createGameServerAction(parsed.data);
             if (result.error || !result.installedAppId) {
-                setError(result.error ?? "Could not create the server");
+                setError(result.error ?? t("create.errors.createFailed"));
                 return;
             }
             router.push(`/apps/installed/${result.installedAppId}`);
@@ -406,13 +407,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             setCrossplay(false);
                                         }}
                                         title={t("create.java")}
-                                        detail="PC players"
+                                        detail={t("create.javaDetail")}
                                     />
                                     <Choice
                                         selected={edition === "bedrock"}
                                         onSelect={() => setEdition("bedrock")}
                                         title={t("create.bedrock")}
-                                        detail="Phones, consoles, Windows app"
+                                        detail={t("create.bedrockDetail")}
                                     />
                                     <Choice
                                         selected={edition === "java" && crossplay}
@@ -421,7 +422,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             setCrossplay(true);
                                         }}
                                         title={t("create.both")}
-                                        detail="A Java world Bedrock can join, through Geyser"
+                                        detail={t("create.bothDetail")}
                                     />
                                 </div>
                             </div>
@@ -715,7 +716,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 onValueChange={setServerId}
                                 options={setup.machines.map((entry) => ({
                                     value: entry.id,
-                                    label: machineLabel(entry)
+                                    label: machineLabel(t, entry)
                                 }))}
                             />
                         )}
@@ -980,7 +981,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 }
 
 /** A machine with what it has left, so the choice is made on the figures. */
-function machineLabel(machine: {
+function machineLabel(t: GameText<"games">, machine: {
     name: string;
     memoryFreeBytes: number | null;
     memoryTotalBytes: number | null;
@@ -988,5 +989,5 @@ function machineLabel(machine: {
     if (machine.memoryFreeBytes === null || machine.memoryTotalBytes === null) return machine.name;
     const free = Math.round(machine.memoryFreeBytes / (1024 * 1024 * 1024));
     const total = Math.round(machine.memoryTotalBytes / (1024 * 1024 * 1024));
-    return `${machine.name} - ${free} of ${total} GB free`;
+    return t("create.machineMemory", { name: machine.name, free, total });
 }

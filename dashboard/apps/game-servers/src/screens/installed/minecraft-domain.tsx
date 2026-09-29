@@ -10,7 +10,8 @@
  * Java the SRV record that keeps the port out of what anybody has to remember.
  */
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
+import { useGameText } from "../game-text";
 import { Globe, Loader2, PencilLine } from "lucide-react";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { setGameHostnameAction, setGameRoutedAction } from "./minecraft-actions";
@@ -39,6 +40,7 @@ export function MinecraftDomain({
     /** Whether it could - only a client that names the address in its handshake. */
     canRoute?: boolean;
 }) {
+    const t = useGameText("minecraft");
     const [editing, setEditing] = useState(false);
     const [label, setLabel] = useState(() => (hostname && suffix ? hostname.slice(0, -suffix.length) : ""));
     const [error, setError] = useState<string | null>(null);
@@ -75,10 +77,9 @@ export function MinecraftDomain({
         return (
             <Card>
                 <CardBody className="flex flex-col gap-1">
-                    <p className="text-sm font-medium">Address</p>
+                    <p className="text-sm font-medium">{t("domain.address")}</p>
                     <p className="text-xs text-muted-foreground">
-                        No domain is configured, so players connect to this machine&apos;s address and port. Add one
-                        under Admin, Domains and servers can take names on it.
+                        {t("domain.noDomainIsConfiguredSo")}
                     </p>
                 </CardBody>
             </Card>
@@ -90,11 +91,11 @@ export function MinecraftDomain({
             <CardBody className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="flex items-center gap-2 text-sm font-medium">
-                        <Globe className="size-4" /> Address
+                        <Globe className="size-4" /> {t("domain.address")}
                     </p>
                     {!editing && (
                         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-                            <PencilLine className="size-4" /> Change
+                            <PencilLine className="size-4" /> {t("domain.change")}
                         </Button>
                     )}
                 </div>
@@ -107,11 +108,11 @@ export function MinecraftDomain({
                                 onChange={(event) => setLabel(event.target.value)}
                                 placeholder="survival"
                                 className="min-w-36 flex-1"
-                                aria-label="Subdomain"
+                                aria-label={t("domain.subdomain")}
                             />
                             <span className="font-mono text-sm text-muted-foreground">{suffix}</span>
                             <Button size="sm" onClick={save} disabled={pending || normalized.length === 0}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} Save
+                                {pending && <Loader2 className="size-4 animate-spin" />} {t("domain.save")}
                             </Button>
                             <Button
                                 size="sm"
@@ -122,17 +123,22 @@ export function MinecraftDomain({
                                 }}
                                 disabled={pending}
                             >
-                                Cancel
+                                {t("domain.cancel")}
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
                             {preview ? (
                                 <>
-                                    Players will connect to <code className="font-mono">{preview}</code>. The old name
-                                    keeps resolving until you remove its record.
+                                    {t.rich<ReactNode>("domain.willConnect", {
+                                        address: () => (
+                                            <code key="address" className="font-mono">
+                                                {preview}
+                                            </code>
+                                        )
+                                    })}
                                 </>
                             ) : (
-                                "Give it a label, and the rest of the name follows."
+                                t("domain.giveItALabelAnd")
                             )}
                         </p>
                         {error && <p className="text-xs text-danger">{error}</p>}
@@ -145,11 +151,11 @@ export function MinecraftDomain({
                                     <code className="truncate font-mono text-sm" title={address}>
                                         {address}
                                     </code>
-                                    <CopyButton value={address} label="Copy the server address" />
+                                    <CopyButton value={address} label={t("domain.copyTheServerAddress")} />
                                 </>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    No name yet. Give it one and Polaris writes the records.
+                                    {t("domain.noNameYetGiveIt")}
                                 </span>
                             )}
                         </div>
@@ -161,12 +167,12 @@ export function MinecraftDomain({
                             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
                                 <p className="text-xs text-muted-foreground">
                                     {routed
-                                        ? "Shares port 25565 with the other Java servers, so the address needs no port and no DNS record of its own. Players connect from the router's address, so the player list cannot be bound to addresses."
-                                        : "Give it its own port, or put it behind the shared one: an address with no port, and no DNS record per server. Its player list can then only be closed by username."}
+                                        ? t("domain.sharesPort25565WithThe")
+                                        : t("domain.giveItItsOwnPort")}
                                 </p>
                                 <Button size="sm" variant="secondary" onClick={toggleRouted} disabled={pending}>
                                     {pending && <Loader2 className="size-4 animate-spin" />}
-                                    {routed ? "Give it its own port" : "Use the shared port"}
+                                    {routed ? t("domain.giveItItsOwnPort2") : t("domain.useTheSharedPort")}
                                 </Button>
                             </div>
                         )}

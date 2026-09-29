@@ -34,7 +34,7 @@ export async function anticheatStateAction(
             return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.anticheatState(applicationId, access.ownerId) };
     } catch (caught) {
-        return { error: failure(caught, "Could not read the anti-cheat") };
+        return { error: failure(caught, (await gameWords("games"))("errors.couldNotReadTheAnti")) };
     }
 }
 
@@ -71,6 +71,8 @@ export async function setAnticheatAction(input: {
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: failure(caught, "Could not change the anti-cheat") };
+        return {
+            error: failure(caught, (await gameWords("games"))("errors.couldNotChangeTheAnti"))
+        };
     }
 }

@@ -14,6 +14,7 @@
  */
 
 import { RestartPlanner } from "./restart-planner";
+import { useGameText } from "../game-text";
 import { MinecraftMemory } from "./minecraft-memory";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
@@ -45,6 +46,7 @@ export function MinecraftSettings({
     withMemory?: boolean;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const stored = useMemo(
         () => Object.fromEntries(settings.map((setting) => [setting.key, setting.value])),
         [settings]
@@ -106,16 +108,16 @@ export function MinecraftSettings({
         setMemoryNote(null);
         const warning =
             playersOnline > 0
-                ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-                : "The server restarts to pick the new settings up.";
+                ? t("joinPassword.playersWillDrop", { count: playersOnline })
+                : t("settings.restartsForSettings");
         // Only the restart is worth asking about. Saving a value the server will
         // read at its next start costs nobody anything.
         if (
             restart &&
             !(await confirm({
-                title: "Restart with the new settings?",
+                title: t("settings.restartWithTheNewSettings"),
                 description: warning,
-                confirmLabel: "Save and restart"
+                confirmLabel: t("settings.saveAndRestart")
             }))
         ) {
             return;
@@ -134,7 +136,7 @@ export function MinecraftSettings({
                 result.memory
                     ? memoryChangeSentence(result.memory, restart)
                     : result.memoryFixed
-                      ? "The memory you typed is now the server's figure, and Polaris no longer adjusts it. Switch it back under Memory above."
+                      ? t("settings.memoryFixed")
                       : null
             );
             setSaves((count) => count + 1);
@@ -148,7 +150,7 @@ export function MinecraftSettings({
         return (
             <Card>
                 <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                    This server has no settings to change yet. Deploy it first.
+                    {t("settings.thisServerHasNoSettings")}
                 </CardBody>
             </Card>
         );
@@ -218,8 +220,8 @@ export function MinecraftSettings({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                     {changed.length === 0
-                        ? "Nothing to save."
-                        : `${changed.length} ${changed.length === 1 ? "change" : "changes"} the server picks up when it next starts.`}
+                        ? t("settings.nothingToSave")
+                        : t("settings.pendingChanges", { count: changed.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Storing a value and applying it are two decisions. Saving
@@ -235,7 +237,7 @@ export function MinecraftSettings({
                         ) : (
                             <Save className="size-4" />
                         )}
-                        Save
+                        {t("settings.save")}
                     </Button>
                     <Button
                         onClick={() => void save(true)}
@@ -246,7 +248,7 @@ export function MinecraftSettings({
                         ) : (
                             <RotateCw className="size-4" />
                         )}
-                        Save and restart
+                        {t("settings.saveAndRestart")}
                     </Button>
                 </div>
             </div>

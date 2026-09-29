@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FormattedTextField } from "@polaris-app/game-servers/src/components/formatted-text-field";
 import {
@@ -15,6 +15,10 @@ import {
     completionSpot,
     completionsFor
 } from "@polaris-app/game-servers/src/lib/minecraft/completion";
+
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: { i18nProvider: { useLocale: () => "en-US" } }
+}));
 
 afterEach(cleanup);
 

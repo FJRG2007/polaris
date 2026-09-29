@@ -42,7 +42,9 @@
         "giveFull": "{count} things is as much as one give carries. Send these and open it again.",
         "takeOff": "Take {name} off the list",
         "giveExperience": "Give {name} experience",
-        "onThisServer": "{name} on this server"
+        "onThisServer": "{name} on this server",
+        "steamIdHint": "17 digits, starting 7656119. In Steam: Profile, then the number at the end of the URL.",
+        "lookUpFailed": "Could not look that up"
     },
     "panel": {
         "usageIsMeasuredOnceThe": "Usage is measured once the server has deployed.",
@@ -214,5 +216,21 @@
         "earlierNamed": "Load {name} earlier",
         "laterNamed": "Load {name} later",
         "removeNamed": "Remove {name}"
+    },
+    "rules": {
+        "theseAreWhatTheServer": "These are what the server is launched with. ARK reads them when it starts, so a change takes effect the next time it does.",
+        "readTheSettingsAgain": "Read the settings again",
+        "findASettingByWhat": "Find a setting, by what it does or what ARK calls it",
+        "findASetting": "Find a setting",
+        "polarisWritesTheseAsLaunch": "Polaris writes these as launch options rather than into the game's own settings file, because ARK rewrites that file when it stops - an edit made there while the server is up is thrown away at the moment it was meant to count.",
+        "arkHasNoSettingFor": "ARK has no setting for showing everyone on the map - a player sees themselves and their tribe and nobody else - and none for how far away a name tag is readable. Both come from mods; add one from the Mods screen.",
+        "leaveItToTheGame": "Leave it to the game",
+        "badValue": "{name} does not take that value.",
+        "saveFailed": "That could not be saved",
+        "noMatch": "Nothing here matches “{query}”. ARK has a great many settings and Polaris offers the ones it can set as launch options; anything else lives in the game's own files.",
+        "fileSays": "The server's own file says {value}.",
+        "notSet": "Not set - the game uses {fallback}.",
+        "stopSetting": "Stop setting {name}",
+        "range": "{min} to {max}"
     }
 }

@@ -42,7 +42,9 @@ export async function loginStateAction(
             return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.loginState(parsed.data, applicationId, access.ownerId) };
     } catch (caught) {
-        return { error: failure(caught, "Could not read the login state") };
+        return {
+            error: failure(caught, (await gameWords("games"))("errors.couldNotReadTheLogin"))
+        };
     }
 }
 
@@ -79,7 +81,9 @@ export async function setLoginAction(input: {
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: failure(caught, "Could not change the login") };
+        return {
+            error: failure(caught, (await gameWords("games"))("errors.couldNotChangeTheLogin"))
+        };
     }
 }
 
@@ -118,6 +122,8 @@ export async function forgetLoginAction(input: {
         });
         return {};
     } catch (caught) {
-        return { error: failure(caught, "Could not reset the password") };
+        return {
+            error: failure(caught, (await gameWords("games"))("errors.couldNotResetThePassword"))
+        };
     }
 }

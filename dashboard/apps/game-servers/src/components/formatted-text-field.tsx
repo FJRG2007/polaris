@@ -14,6 +14,7 @@
  */
 
 import { Code2, Plus } from "lucide-react";
+import { colorName, styleName, useGameText } from "../screens/game-text";
 import {
     Button,
     DropdownMenu,
@@ -55,6 +56,7 @@ export function FormattedTextField({
      *  name, offered as buttons that put them where the caret is. */
     inserts?: readonly { readonly label: string; readonly text: string; readonly title: string }[];
 }) {
+    const t = useGameText("games");
     // Whether the field holds the text or the codes.
     const [raw, setRaw] = useState(false);
     const area = useRef<HTMLTextAreaElement>(null);
@@ -201,10 +203,12 @@ export function FormattedTextField({
                         key={code}
                         type="button"
                         onClick={() => apply(code)}
-                        aria-label={color.name}
+                        aria-label={colorName(t, code)}
                         aria-pressed={active.color === code}
                         title={
-                            active.color === code ? `${color.name} - press to clear` : color.name
+                            active.color === code
+                                ? t("textField.pressToClear", { name: colorName(t, code) })
+                                : colorName(t, code)
                         }
                         className={cn(
                             "size-6 rounded border transition-transform hover:scale-110",
@@ -220,7 +224,7 @@ export function FormattedTextField({
                     the game's own behaviour rather than something to guard. */}
                 <label
                     className="relative size-6 cursor-pointer overflow-hidden rounded border border-border transition-transform hover:scale-110"
-                    title="Any other color"
+                    title={t("textField.anyOtherColor")}
                     style={{
                         background: "conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)"
                     }}
@@ -228,37 +232,41 @@ export function FormattedTextField({
                     <input
                         type="color"
                         className="absolute inset-0 cursor-pointer opacity-0"
-                        aria-label="Any other color"
+                        aria-label={t("textField.anyOtherColor")}
                         onChange={(event) => applyHex(event.target.value)}
                     />
                 </label>
                 <span className="mx-1 h-5 w-px bg-border" />
-                {Object.entries(mc.MOTD_STYLES).map(([code, name]) => (
+                {Object.keys(mc.MOTD_STYLES).map((code) => (
                     <Button
                         key={code}
                         size="sm"
                         variant="ghost"
                         onClick={() => apply(code)}
-                        title={active.styles.includes(code) ? `${name} - press to remove` : name}
-                        aria-label={name}
+                        title={
+                            active.styles.includes(code)
+                                ? t("textField.pressToRemove", { name: styleName(t, code) })
+                                : styleName(t, code)
+                        }
+                        aria-label={styleName(t, code)}
                         aria-pressed={active.styles.includes(code)}
                         className={cn(
                             "h-6 px-2 text-xs",
                             active.styles.includes(code) && "bg-primary/15 text-foreground"
                         )}
                     >
-                        {name}
+                        {styleName(t, code)}
                     </Button>
                 ))}
                 <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => apply(mc.RESET)}
-                    title="Reset the formatting from here on"
-                    aria-label="Reset the formatting from here on"
+                    title={t("textField.resetTheFormattingFromHere")}
+                    aria-label={t("textField.resetTheFormattingFromHere")}
                     className="h-6 px-2 text-xs"
                 >
-                    Reset
+                    {t("textField.reset")}
                 </Button>
             </div>
 
@@ -317,7 +325,7 @@ export function FormattedTextField({
                     onFocus={() => setDismissedAt(null)}
                     rows={rows}
                     placeholder={placeholder}
-                    aria-label={raw ? `${label}, with its formatting codes` : label}
+                    aria-label={raw ? t("textField.withCodes", { label }) : label}
                     role={inserts.length > 0 ? "combobox" : undefined}
                     aria-autocomplete={inserts.length > 0 ? "list" : undefined}
                     aria-expanded={inserts.length > 0 ? suggesting : undefined}
@@ -330,7 +338,7 @@ export function FormattedTextField({
                     <ul
                         id={listId}
                         role="listbox"
-                        aria-label="Variables"
+                        aria-label={t("textField.variables")}
                         className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 max-w-full overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
                     >
                         {offered.map((option, index) => (
@@ -374,11 +382,12 @@ export function FormattedTextField({
                         onClick={() => setRaw((current) => !current)}
                         title={
                             raw
-                                ? "Edit the text and let the buttons write the codes"
-                                : "Edit the codes yourself"
+                                ? t("textField.editTheTextAndLet")
+                                : t("textField.editTheCodesYourself")
                         }
                     >
-                        <Code2 className="size-3.5" /> {raw ? "Formatted" : "Codes"}
+                        <Code2 className="size-3.5" />{" "}
+                        {raw ? t("textField.formatted") : t("textField.codes")}
                     </Button>
                     {inserts.length > 0 && (
                         <DropdownMenu>
@@ -387,9 +396,9 @@ export function FormattedTextField({
                                     size="sm"
                                     variant="ghost"
                                     className="h-6 px-2 text-xs"
-                                    title="Put a word Polaris fills in where the cursor is"
+                                    title={t("textField.putAWordPolarisFills")}
                                 >
-                                    <Plus className="size-3.5" /> Variable
+                                    <Plus className="size-3.5" /> {t("textField.variable")}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
@@ -408,9 +417,7 @@ export function FormattedTextField({
                                     </DropdownMenuItem>
                                 ))}
                                 <p className="max-w-64 px-2 py-1.5 text-[11px] text-muted-foreground">
-                                    {
-                                        'For a value that may be missing, write what to show instead: {polaris.name | "Player"}'
-                                    }
+                                    {t("textField.fallbackHint")}
                                 </p>
                             </DropdownMenuContent>
                         </DropdownMenu>

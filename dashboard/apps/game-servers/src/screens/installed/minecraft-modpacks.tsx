@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { useGameText } from "../game-text";
 import { Boxes, ExternalLink, Loader2, Search } from "lucide-react";
 import type { ModrinthProject } from "../../lib/minecraft/modrinth";
 import { searchModpacksAction, setModpackAction } from "./minecraft-actions";
@@ -31,6 +32,7 @@ export function ModpacksCard({
     modpack: string;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [query, setQuery] = useState("");
     const [packs, setPacks] = useState<ModrinthProject[] | null>(null);
     const [chosen, setChosen] = useState<ModrinthProject | null>(null);
@@ -68,19 +70,17 @@ export function ModpacksCard({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Boxes className="size-4 text-primary" />
-                    Modpacks
+                    {t("modpacks.modpacks")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    A pack brings its own mod loader, its own release and its own mods, and replaces whatever this
-                    server installs now. Only packs with a server side are listed - a pack whose mods are all for
-                    the player installs nothing a server can run.
+                    {t("modpacks.aPackBringsItsOwn")}
                 </p>
 
                 {modpack.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2">
-                        <span className="text-xs text-muted-foreground">Running</span>
+                        <span className="text-xs text-muted-foreground">{t("modpacks.running")}</span>
                         <span className="text-sm font-medium">{modpack}</span>
                         <Button
                             size="sm"
@@ -89,7 +89,7 @@ export function ModpacksCard({
                             disabled={pending}
                             onClick={() => apply("")}
                         >
-                            Stop running it
+                            {t("modpacks.stopRunningIt")}
                         </Button>
                     </div>
                 )}
@@ -99,7 +99,7 @@ export function ModpacksCard({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search modpacks"
+                        placeholder={t("modpacks.searchModpacks")}
                         className="pl-8"
                     />
                 </div>
@@ -112,7 +112,7 @@ export function ModpacksCard({
                         </>
                     ) : packs.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            Nothing came back. Modrinth may be unreachable from here rather than empty.
+                            {t("modpacks.nothingCameBackModrinthMay")}
                         </p>
                     ) : (
                         packs.map((pack) => (
@@ -137,7 +137,7 @@ export function ModpacksCard({
                                             {pack.title}
                                             <ExternalLink className="ml-1 inline size-3 shrink-0" />
                                         </a>
-                                        {pack.slug === modpack && <Badge variant="success">running</Badge>}
+                                        {pack.slug === modpack && <Badge variant="success">{t("modpacks.runningBadge")}</Badge>}
                                     </div>
                                     <p className="line-clamp-2 text-xs text-muted-foreground">
                                         {pack.description}
@@ -150,7 +150,7 @@ export function ModpacksCard({
                                         disabled={pending}
                                         onClick={() => setChosen(pack)}
                                     >
-                                        Install
+                                        {t("modpacks.install")}
                                     </Button>
                                 )}
                             </div>
@@ -160,19 +160,17 @@ export function ModpacksCard({
 
                 {chosen && (
                     <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
-                        <p className="text-sm font-medium">Install {chosen.title}?</p>
+                        <p className="text-sm font-medium">{t("modpacks.installTitle", { name: chosen.title })}</p>
                         <p className="text-xs text-muted-foreground">
-                            The pack decides this server{"'"}s mod loader, release and mods, so everything it
-                            installs now is replaced. The world stays where it is - a world built with other mods
-                            may not be one this pack can read. The server restarts to install it.
+                            {t("modpacks.installBody")}
                         </p>
                         <div className="flex items-center gap-2">
                             <Button size="sm" disabled={pending} onClick={() => apply(chosen.slug)}>
                                 {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                                Install it
+                                {t("modpacks.installIt")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setChosen(null)}>
-                                Cancel
+                                {t("modpacks.cancel")}
                             </Button>
                         </div>
                     </div>

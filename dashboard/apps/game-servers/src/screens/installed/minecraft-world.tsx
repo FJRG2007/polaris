@@ -78,6 +78,7 @@ export function useWorldView(installedAppId: string): {
     error: string | null;
     reload: () => Promise<void>;
 } {
+    const t = useGameText("minecraft");
     const [view, setView] = useState<WorldView | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -88,15 +89,15 @@ export function useWorldView(installedAppId: string): {
             });
             const data = (await response.json()) as WorldView & { error?: string };
             if (!response.ok) {
-                setError(data.error ?? "Could not read the world");
+                setError(data.error ?? t("world.readFailed"));
                 return;
             }
             setError(null);
             setView(data);
         } catch {
-            setError("Could not read the world");
+            setError(t("world.readFailed"));
         }
-    }, [installedAppId]);
+    }, [installedAppId, t]);
 
     useEffect(() => {
         void reload();
@@ -522,7 +523,7 @@ export function GameServerBackups({
         setBusy(null);
         if (result.error) setError(result.error);
         else {
-            setNote("World backed up");
+            setNote(t("world.backedUp"));
             await onChanged();
         }
     }
@@ -536,7 +537,7 @@ export function GameServerBackups({
         setRestoring(null);
         if (result.error) setError(result.error);
         else {
-            setNote("Restored - the server is restarting onto it");
+            setNote(t("world.restored"));
             await onChanged();
         }
     }

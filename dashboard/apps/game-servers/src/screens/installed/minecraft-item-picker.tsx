@@ -15,6 +15,7 @@
  */
 
 import { useMemo } from "react";
+import { useGameText } from "../game-text";
 import { ItemIcon } from "./minecraft-item-icon";
 import { loadModItems, loadVanillaItems } from "./minecraft-mod-items";
 import { GameItemPicker, type ItemPickerSource } from "./game-item-picker";
@@ -33,21 +34,21 @@ export function ItemPicker({
     onDragItem?: (id: string | null) => void;
     recent?: readonly string[];
 }) {
+    const t = useGameText("games");
     // Per server, and stable across renders: the grid reloads whenever this
     // changes identity, and the modded half of it is a request.
     const source = useMemo<ItemPickerSource<CatalogItem>>(
         () => ({
             load: loadVanillaItems,
-            more: () => loadModItems(installedAppId),
+            more: () => loadModItems(installedAppId, t),
             search: searchItems,
             Icon: ItemIcon,
             labelOf: itemLabel,
             typedId: typedItemId,
-            placeholder: "Search items, or write minecraft:diamond",
-            whenMissing:
-                "The item pictures did not load, so type the id - it looks like minecraft:diamond."
+            placeholder: "itemPicker.searchItemsOrWriteMinecraft",
+            whenMissing: "itemPicker.minecraftMissing"
         }),
-        [installedAppId]
+        [installedAppId, t]
     );
 
     return <GameItemPicker<CatalogItem> source={source} {...props} />;

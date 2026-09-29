@@ -18,6 +18,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useGameText } from "../screens/game-text";
 import { MoreHorizontal } from "lucide-react";
 import {
     Button,
@@ -65,10 +66,11 @@ function OutwardLink({ href, icon, text }: { href: string; icon?: ReactNode; tex
 
 /** The `...` at the end of a row. */
 export function RowMenuButton({ entries, label }: { entries: readonly RowMenuEntry[]; label: string }) {
+    const t = useGameText("games");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" aria-label={label} title="More">
+                <Button size="icon" variant="ghost" aria-label={label} title={t("rowMenu.more")}>
                     <MoreHorizontal className="size-4" />
                 </Button>
             </DropdownMenuTrigger>
