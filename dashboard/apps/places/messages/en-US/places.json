@@ -432,7 +432,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turn-on {turn on} other {turn off}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} other {turn off}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",

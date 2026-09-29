@@ -151,7 +151,8 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     const cannot = /^A (.+) cannot be told to (.+)$/.exec(message);
     const kind = cannot ? KIND_BY_WORD.get(cannot[1] ?? "") : undefined;
     const action = cannot ? ACTION_BY_VERB.get(cannot[2] ?? "") : undefined;
-    if (kind && action) return t("refusals.kindCannot", { kind, action });
+    // An ICU selector cannot hold a hyphen, so "turn-on" is asked as "turnOn".
+    if (kind && action) return t("refusals.kindCannot", { kind, action: action.replace("-on", "On") });
     for (const { pattern, key: shaped, params } of OUTAGES) {
         const found = pattern.exec(message);
         if (!found) continue;

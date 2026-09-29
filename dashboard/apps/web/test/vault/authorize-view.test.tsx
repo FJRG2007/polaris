@@ -14,6 +14,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const answerAuthorizationAction = vi.fn(async () => ({}) as { ok?: true; error?: string });
 
@@ -62,7 +63,7 @@ afterEach(() => {
 
 describe("the approval screen", () => {
     it("refuses a request whose key cannot be sealed to, and stays usable", async () => {
-        render(<AuthorizeView />);
+        render(<AuthorizeView />, { wrapper: MessagesWrapper });
         fireEvent.change(screen.getByPlaceholderText("XXXX-XXXX"), {
             target: { value: "BCDFGHJK" }
         });

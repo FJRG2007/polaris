@@ -13,6 +13,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const VAULT_ID = "vorg-1";
 
@@ -100,7 +101,7 @@ afterEach(cleanup);
 
 /** Open the access dialog for the one member on the list. */
 async function openAccessDialog(): Promise<void> {
-    render(<VaultsView />);
+    render(<VaultsView />, { wrapper: MessagesWrapper });
     const edit = await screen.findByRole("button", {
         name: "Change what bo@example.com reaches"
     });
