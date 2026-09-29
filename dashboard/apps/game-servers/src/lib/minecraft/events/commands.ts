@@ -614,6 +614,26 @@ export function markGround(x: number, z: number): string[] {
     ];
 }
 
+/**
+ * On a server without the heightmap - before 1.19.4 - `spreadplayers` leaves the
+ * marker on a tree's crown, and every place in a wood was given up as rough.
+ * Each line takes it one block down while what is under it is leaves, a log or
+ * air; sent together, they bring it down through the crown and the trunk to the
+ * ground, and stop at anything else - ground, water - which is then judged.
+ */
+const SETTLE_DEPTH = 32;
+export const SETTLE_MARK: readonly string[] = Array.from({ length: SETTLE_DEPTH }, () =>
+    ["#minecraft:leaves", "#minecraft:logs", "minecraft:air"].map(
+        (below) =>
+            `execute as @e[tag=${MARK_TAG},limit=1] at @s if block ~ ~-1 ~ ${below} run tp @s ~ ~-1 ~`
+    )
+).flat();
+
+/** Whether two points are in the same chunk. */
+export function sameChunk(a: { x: number; z: number }, b: { x: number; z: number }): boolean {
+    return a.x >> 4 === b.x >> 4 && a.z >> 4 === b.z >> 4;
+}
+
 /** Whether the marker was moved onto the ground. */
 export function groundWorked(output: string): boolean {
     return /teleported/i.test(output);

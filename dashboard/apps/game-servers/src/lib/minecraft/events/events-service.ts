@@ -1186,15 +1186,31 @@ async function findPlace(
         return null;
     }
     const { x, z } = loop.run.target;
+    let landed: stored.Point | null = null;
     if (await dropMark(server, x, z)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
+        landed = point;
         if (point && (chosen || (await siteIsOpen(loop, server, point, radius)))) {
-            loop.run = { ...loop.run, place: point };
+            // The marker can come down a block or two from the column tried - an
+            // older server spreads it - and so in the next chunk: that chunk is
+            // the one held from now on, and the one tried let go of.
+            const moved = !commands.sameChunk(point, { x, z });
+            if (moved) await server.sayAll([commands.forceload(point.x, point.z)]);
+            loop.run = { ...loop.run, place: point, target: { x: point.x, z: point.z } };
             await persist(installedAppId, loop);
+            if (moved) await server.sayAll([commands.forceloadRemove(x, z)]);
             return point;
         }
     }
-    await server.sayAll([commands.CLEAR_MARK, commands.forceloadRemove(x, z)]);
+    await server.sayAll([
+        commands.CLEAR_MARK,
+        commands.forceloadRemove(x, z),
+        // Judging the ground holds the chunk the marker came down in, which
+        // need not be the column's.
+        ...(landed && !commands.sameChunk(landed, { x, z })
+            ? [commands.forceloadRemove(landed.x, landed.z)]
+            : [])
+    ]);
     loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
@@ -1266,7 +1282,10 @@ async function dropMark(server: ServerContainer, x: number, z: number): Promise<
     for (const line of commands.markGround(x, z)) output = await server.say([line]);
     if (commands.groundWorked(output)) return true;
     for (const line of commands.markSurface(x, z)) output = await server.say([line]);
-    return commands.spreadWorked(output);
+    if (!commands.spreadWorked(output)) return false;
+    // Down through the crown and the trunk to the ground under them.
+    await server.sayAll(commands.SETTLE_MARK);
+    return true;
 }
 
 /**

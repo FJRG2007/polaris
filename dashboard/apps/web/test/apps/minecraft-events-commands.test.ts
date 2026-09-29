@@ -445,6 +445,17 @@ describe("a world boss's end", () => {
     });
 });
 
+describe("the marker on a server without the heightmap", () => {
+    it("is brought down through leaves, logs and air, and stops on anything else", () => {
+        expect(commands.SETTLE_MARK.length).toBe(96);
+        expect(commands.SETTLE_MARK.slice(0, 3)).toEqual([
+            "execute as @e[tag=pe_mark,limit=1] at @s if block ~ ~-1 ~ #minecraft:leaves run tp @s ~ ~-1 ~",
+            "execute as @e[tag=pe_mark,limit=1] at @s if block ~ ~-1 ~ #minecraft:logs run tp @s ~ ~-1 ~",
+            "execute as @e[tag=pe_mark,limit=1] at @s if block ~ ~-1 ~ minecraft:air run tp @s ~ ~-1 ~"
+        ]);
+    });
+});
+
 describe("a gathering of iron", () => {
     /**
      * One player's scoreboard, played through the tick's lines the way the game

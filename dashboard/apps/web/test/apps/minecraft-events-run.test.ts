@@ -982,6 +982,43 @@ describe("chunks somebody else keeps loaded", () => {
     });
 });
 
+describe("the chunks an event loads", () => {
+    it("are all let go of at the end, wherever the marker came down", async () => {
+        // The marker lands at 300 0, chunks away from the column tried, on
+        // somebody's build at first - given up - and later, elsewhere, on
+        // open ground.
+        world.built = true;
+        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 10 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(6_100);
+        world.built = false;
+        world.markAt = [500, 0];
+        await play(30_000);
+        expect(state().history[0]?.note).toBe("Found by Ana");
+        // Every add and remove played back in order, as the game keeps them.
+        const held = new Set<string>();
+        for (const line of world.sent) {
+            const match = /forceload (add|remove) (-?\d+) (-?\d+)(?: (-?\d+) (-?\d+))?$/.exec(line);
+            if (!match) continue;
+            const [x1, z1] = [Number(match[2]), Number(match[3])];
+            const [x2, z2] = [Number(match[4] ?? match[2]), Number(match[5] ?? match[3])];
+            for (let x = Math.min(x1, x2) >> 4; x <= Math.max(x1, x2) >> 4; x += 1)
+                for (let z = Math.min(z1, z2) >> 4; z <= Math.max(z1, z2) >> 4; z += 1) {
+                    if (match[1] === "add") held.add(`${x},${z}`);
+                    else held.delete(`${x},${z}`);
+                }
+        }
+        expect(world.sent.some((line) => line.endsWith("forceload add 300 0"))).toBe(true);
+        expect([...held]).toEqual([]);
+    });
+});
+
 describe("a supply drop", () => {
     it("lands on dry ground, is told in steps, and goes to whoever opens it", async () => {
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
