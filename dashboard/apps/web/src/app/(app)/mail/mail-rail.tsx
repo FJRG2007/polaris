@@ -24,7 +24,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
-import { MAIL_PALETTE } from "./palette";
+import { MAIL_PALETTE, swatchName } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
@@ -688,7 +688,3 @@ function whyBroken(t: NamespaceTranslator<"mail">, account: { state: string; aut
     return account.auth === "oauth" ? t("rail.needsConnecting") : t("rail.passwordRefused");
 }
 
-/** A palette colour's name in the reader's language, from `mail.palette`. */
-export function swatchName(t: NamespaceTranslator<"mail">, name: string): string {
-    return t(`palette.${name.toLowerCase()}` as Parameters<typeof t>[0]);
-}

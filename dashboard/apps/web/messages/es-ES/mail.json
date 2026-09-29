@@ -525,5 +525,105 @@
     "templates": {
         "deleteTitle": "¿Eliminar {name}?",
         "deleted": "{name} se ha eliminado."
+    },
+    "connect": {
+        "reconnected": "{address} vuelve a estar conectado. Su correo está en camino.",
+        "saved": "{address} se ha guardado.",
+        "connected": "{address} está conectado. Su correo está en camino.",
+        "address": "Dirección de correo",
+        "fixedAddress": "Para usar otra dirección, añádela como un buzón nuevo.",
+        "already": "Ese buzón ya está aquí. Ábrelo desde la barra lateral o quítalo primero para volver a añadirlo.",
+        "otherAccount": "La cuenta de {provider} que autorizaste no es {address}. Autoriza esa para conectarlo o usa una contraseña.",
+        "otherAccountThis": "La cuenta de {provider} que autorizaste no es este buzón. Autoriza esa para conectarlo o usa una contraseña.",
+        "authorizedAccount": "Cuenta autorizada",
+        "authorizedAccountLabel": "La cuenta autorizada a la que pertenece este buzón",
+        "noPassword": "No se guarda ninguna contraseña. Polaris usa la cuenta que ya autorizaste.",
+        "noLongerLets": "{provider} ya no deja entrar a Polaris en este buzón. Vuelve a autorizarlo y volverás aquí.",
+        "canAuthorize": "{service} puede conectarlo sin contraseña. Irás a su inicio de sesión y volverás aquí.",
+        "reconnectWith": "Volver a conectar con {provider}",
+        "authorize": "Autorizar {service}",
+        "usePassword": "Usar una contraseña",
+        "onlyHolder": "{service} puede conectarlo sin contraseña, pero solo su titular puede autorizarlo desde su propia cuenta. Entrégalo con una contraseña o pídele que lo añada él mismo.",
+        "nowhereBack": "{service} podría conectarlo sin contraseña, pero no tiene adónde devolverte: Polaris solo es accesible en esta red, y rechazan direcciones así.",
+        "givePublic": "Dale a Polaris una dirección pública",
+        "askAdmin": "Pide a un administrador que le dé a Polaris una dirección pública.",
+        "untilThen": "Mientras tanto, este buzón necesita una contraseña.",
+        "newPassword": "Contraseña nueva",
+        "password": "Contraseña",
+        "keepBlank": "Déjalo vacío para conservar la actual",
+        "savedRefused": "El servidor dejó de aceptar la contraseña guardada. Escribe la nueva: si lo dejas vacío, se vuelve a probar la guardada.",
+        "savedKept": "Si lo dejas vacío, se conserva la contraseña guardada.",
+        "makeOne": "Crear una",
+        "displayName": "Tu nombre, tal como lo verán",
+        "displayNamePlaceholder": "Si lo dejas vacío, se usa tu nombre de Polaris",
+        "label": "Nombre en la barra lateral",
+        "labelPlaceholder": "Si lo dejas vacío, se usa la dirección",
+        "colour": "Color",
+        "automatic": "Automático",
+        "servers": "Ajustes del servidor",
+        "notWorkedOut": "sin determinar",
+        "incoming": "Entrada (IMAP)",
+        "outgoing": "Salida (SMTP)",
+        "login": "Usuario, si no es la dirección",
+        "checking": "Comprobando con los servidores...",
+        "saveChanges": "Guardar cambios",
+        "connect": "Conectar este buzón",
+        "lookup": {
+            "empty": "Polaris deduce el resto a partir de tu dirección.",
+            "invalid": "Eso todavía no es una dirección de correo.",
+            "looking": "Buscando dónde vive este correo...",
+            "catalogue": "{service}. No hay nada más que rellenar.",
+            "polaris": "Un servidor de correo que ejecuta este Polaris. No hay nada más que rellenar.",
+            "domain": "{domain} publica sus propios ajustes, y son estos.",
+            "directory": "Encontrado en el directorio compartido de proveedores de correo.",
+            "exchangers": "El correo de este dominio lo gestiona {service}.",
+            "probe": "Encontrado preguntando a los propios servidores del dominio.",
+            "guessed": "Nada decía dónde vive el correo de este dominio, así que los servidores de abajo son suposiciones. Cambia lo que esté mal."
+        },
+        "portRange": "El puerto es un número del 1 al 65535",
+        "serverOf": "Servidor de {legend}",
+        "portOf": "Puerto de {legend}",
+        "securityOf": "Seguridad de {legend}",
+        "security": {
+            "tls": "TLS desde el principio",
+            "starttls": "Actualizar con STARTTLS",
+            "none": "Sin cifrado (solo un puente en esta máquina)"
+        }
+    },
+    "providers": {
+        "gmail": {
+            "passwordHelp": "Google rechaza aquí tu contraseña normal. Una cuenta con verificación en dos pasos puede crear una contraseña de aplicación para Polaris; sin ella, autorizar la cuenta es la única forma de entrar."
+        },
+        "outlook": {
+            "passwordHelp": "Microsoft ha dejado de aceptar contraseñas para el correo en cuentas personales. Autorizar la cuenta es la forma de entrar."
+        },
+        "yahoo": {
+            "passwordHelp": "Yahoo necesita una contraseña de aplicación. Tu contraseña de inicio de sesión se rechaza."
+        },
+        "icloud": {
+            "passwordHelp": "Apple necesita una contraseña específica de aplicación. La contraseña de tu cuenta de Apple se rechaza."
+        },
+        "fastmail": {
+            "passwordHelp": "Fastmail necesita una contraseña de aplicación con el permiso de correo."
+        },
+        "zoho": {
+            "passwordHelp": "Zoho necesita una contraseña de aplicación cuando la verificación en dos pasos está activada."
+        },
+        "gmx": {
+            "passwordHelp": "Hay que activar IMAP en los ajustes de GMX para que se conecte."
+        },
+        "webDe": {
+            "passwordHelp": "Hay que activar IMAP en los ajustes de WEB.DE para que se conecte."
+        },
+        "aol": {
+            "passwordHelp": "AOL necesita una contraseña de aplicación. Tu contraseña de inicio de sesión se rechaza."
+        },
+        "yandex": {
+            "passwordHelp": "Yandex necesita una contraseña de aplicación e IMAP activado en sus ajustes."
+        },
+        "protonBridge": {
+            "passwordHelp": "Bridge muestra su propia contraseña, que no es la de Proton.",
+            "note": "Los servidores de Proton no hablan IMAP. Llegar a este buzón necesita Proton Mail Bridge funcionando en una máquina a la que Polaris pueda conectarse, y la dirección de abajo es esa máquina: 127.0.0.1 solo funciona si Bridge está en este servidor."
+        }
     }
 }

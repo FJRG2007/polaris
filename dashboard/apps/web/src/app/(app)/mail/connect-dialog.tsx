@@ -30,7 +30,10 @@
  */
 
 import Link from "next/link";
-import { MAIL_PALETTE } from "./palette";
+import { MAIL_PALETTE, swatchName } from "./palette";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
@@ -141,7 +144,7 @@ export function ConnectMailboxDialog({
     microsoftReady,
     allowOauth = true,
     taken = [],
-    title = "Add a mailbox",
+    title: givenTitle,
     done = "",
     lead,
     submit,
@@ -219,6 +222,8 @@ export function ConnectMailboxDialog({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mail");
+    const title = givenTitle ?? t("rail.add");
 
     const [address, setAddress] = useState(editing?.address ?? "");
     const [discovery, setDiscovery] = useState<MailDiscovery | null>(
@@ -412,7 +417,7 @@ export function ConnectMailboxDialog({
     const issue = (name: string): string =>
         checked.success
             ? ""
-            : (checked.error.issues.find((one) => one.path[0] === name)?.message ?? "");
+            : mailRefusalText(t, checked.error.issues.find((one) => one.path[0] === name)?.message ?? "");
 
     /**
      * Whether anything would change. Compared with what was loaded rather than
@@ -468,8 +473,8 @@ export function ConnectMailboxDialog({
                 toast.show({
                     title:
                         editing.state === "auth"
-                            ? `${editing.address} is connected again. Its mail is on its way.`
-                            : `${editing.address} is saved.`
+                            ? t("connect.reconnected", { address: editing.address })
+                            : t("connect.saved", { address: editing.address })
                 });
                 router.refresh();
                 onClose();
@@ -492,7 +497,7 @@ export function ConnectMailboxDialog({
                 if (said.toLowerCase().includes("server")) setShowServers(true);
                 return;
             }
-            toast.show({ title: done || `${address} is connected. Its mail is on its way.` });
+            toast.show({ title: done || t("connect.connected", { address }) });
             router.refresh();
             onClose();
         });
@@ -503,8 +508,8 @@ export function ConnectMailboxDialog({
     // rather than the refusal arriving after the password.
     const serversProblem = authorizable
         ? null
-        : (serverProblem(servers.imapHost, servers.imapPort) ??
-          serverProblem(servers.smtpHost, servers.smtpPort));
+        : (serverProblem(servers.imapHost, servers.imapPort, t) ??
+          serverProblem(servers.smtpHost, servers.smtpPort, t));
     // A server that would be refused is shown, so the disabled button has its
     // reason on screen rather than behind a closed disclosure.
     const serversBroken = Boolean(discovery) && serversProblem !== null;
@@ -564,7 +569,7 @@ export function ConnectMailboxDialog({
                     {editing ? (
                         <label className="block">
                             <span className="mb-1 block text-[12px] text-muted-foreground">
-                                Email address
+                                {t("connect.address")}
                             </span>
                             {/* Shown, not asked: it is what this mailbox is. A
                                 different address is a different mailbox, and
@@ -574,13 +579,13 @@ export function ConnectMailboxDialog({
                                 id="mailbox-fixed"
                                 className="mt-1 block text-[12px] text-foreground-subtle"
                             >
-                                To use a different address, add it as a new mailbox.
+                                {t("connect.fixedAddress")}
                             </span>
                         </label>
                     ) : (
                         <label className="block">
                             <span className="mb-1 block text-[12px] text-muted-foreground">
-                                Email address <span aria-hidden>*</span>
+                                {t("connect.address")} <span aria-hidden>*</span>
                             </span>
                             <div className="relative">
                                 <Input
@@ -611,8 +616,8 @@ export function ConnectMailboxDialog({
                                 )}
                             >
                                 {already
-                                    ? "That mailbox is already here. Open it from the rail, or remove it first to add it again."
-                                    : lookupSentence(address, valid, looking, discovery)}
+                                    ? t("connect.already")
+                                    : lookupSentence(t, address, valid, looking, discovery)}
                             </span>
                         </label>
                     )}
@@ -626,7 +631,7 @@ export function ConnectMailboxDialog({
                                 everything being fine. */}
                             {discovery.note ? (
                                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[12px]">
-                                    {discovery.note}
+                                    {providerWords(t, discovery.service, "note", discovery.note)}
                                 </p>
                             ) : null}
                             {authorizable ? (
@@ -641,16 +646,16 @@ export function ConnectMailboxDialog({
                                         that cannot log in. */}
                                     {otherAccount ? (
                                         <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[12px]">
-                                            The {provider} account you authorized is not{" "}
-                                            {forAddress || "this mailbox"}. Authorize that one to
-                                            connect it, or use a password instead.
+                                            {forAddress
+                                                ? t("connect.otherAccount", { provider, address: forAddress })
+                                                : t("connect.otherAccountThis", { provider })}
                                         </p>
                                     ) : null}
                                     {usable.length > 0 ? (
                                         <>
                                             <label className="block">
                                                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                                                    Authorized account
+                                                    {t("connect.authorizedAccount")}
                                                 </span>
                                                 <Select
                                                     value={chosenConnection}
@@ -659,20 +664,19 @@ export function ConnectMailboxDialog({
                                                         value: link.id,
                                                         label: link.label
                                                     }))}
-                                                    aria-label="The authorized account this mailbox belongs to"
+                                                    aria-label={t("connect.authorizedAccountLabel")}
                                                 />
                                             </label>
                                             <p className="text-[12px] text-foreground-subtle">
-                                                No password is stored. Polaris uses the account you
-                                                already authorized.
+                                                {t("connect.noPassword")}
                                             </p>
                                         </>
                                     ) : (
                                         <>
                                             <p className="text-[13px] text-muted-foreground">
                                                 {editing
-                                                    ? `${provider} no longer lets Polaris into this mailbox. Authorize it again and you will be sent back here.`
-                                                    : `${discovery.serviceName} can connect this without a password. You will be sent to their sign-in and back here.`}
+                                                    ? t("connect.noLongerLets", { provider })
+                                                    : t("connect.canAuthorize", { service: discovery.serviceName })}
                                             </p>
                                             <Button asChild className="w-full">
                                                 <a
@@ -680,8 +684,8 @@ export function ConnectMailboxDialog({
                                                     onClick={() => keepResume(forAddress)}
                                                 >
                                                     {editing
-                                                        ? `Reconnect with ${provider}`
-                                                        : `Authorize ${discovery.serviceName}`}
+                                                        ? t("connect.reconnectWith", { provider })
+                                                        : t("connect.authorize", { service: discovery.serviceName })}
                                                 </a>
                                             </Button>
                                         </>
@@ -693,7 +697,7 @@ export function ConnectMailboxDialog({
                                     {editing && usable.length > 0 ? (
                                         <Button asChild variant="outline" className="w-full">
                                             <a href={authorizeHref} onClick={() => keepResume(forAddress)}>
-                                                Reconnect with {provider}
+                                                {t("connect.reconnectWith", { provider })}
                                             </a>
                                         </Button>
                                     ) : null}
@@ -702,7 +706,7 @@ export function ConnectMailboxDialog({
                                         className="text-[12px] text-muted-foreground underline hover:text-foreground"
                                         onClick={() => setUsePassword(true)}
                                     >
-                                        Use a password instead
+                                        {t("connect.usePassword")}
                                     </button>
                                 </div>
                             ) : (
@@ -713,30 +717,24 @@ export function ConnectMailboxDialog({
                                         Polaris cannot be returned to. */}
                                     {discovery.oauth && !allowOauth ? (
                                         <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
-                                            {discovery.serviceName} can connect this without a
-                                            password, but only its holder can authorize that from
-                                            their own account. Hand it out with a password, or ask
-                                            them to add it themselves.
+                                            {t("connect.onlyHolder", { service: discovery.serviceName })}
                                         </span>
                                     ) : null}
                                     {allowOauth && discovery.oauth && !publicAddress ? (
                                         <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
-                                            {discovery.serviceName} could connect this without a
-                                            password, but it has nowhere to send you back to:
-                                            Polaris is only reachable on this network, and an
-                                            address like that is one they refuse.{" "}
+                                            {t("connect.nowhereBack", { service: discovery.serviceName })}{" "}
                                             {canSetDomain ? (
                                                 <Link href="/admin/domains" className="underline">
-                                                    Give Polaris a public address
+                                                    {t("connect.givePublic")}
                                                 </Link>
                                             ) : (
-                                                "Ask an administrator to give Polaris a public address."
+                                                t("connect.askAdmin")
                                             )}{" "}
-                                            Until then this mailbox takes a password.
+                                            {t("connect.untilThen")}
                                         </span>
                                     ) : null}
                                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                                        {keepsPassword ? "New password" : "Password"}{" "}
+                                        {keepsPassword ? t("connect.newPassword") : t("connect.password")}{" "}
                                         {keepsPassword ? null : <span aria-hidden>*</span>}
                                     </span>
                                     <Input
@@ -745,7 +743,7 @@ export function ConnectMailboxDialog({
                                         autoComplete="off"
                                         autoFocus={focusPassword}
                                         placeholder={
-                                            keepsPassword ? "Leave blank to keep the current one" : undefined
+                                            keepsPassword ? t("connect.keepBlank") : undefined
                                         }
                                         aria-invalid={field === "password" ? true : undefined}
                                         aria-describedby={
@@ -763,7 +761,7 @@ export function ConnectMailboxDialog({
                                             id="mailbox-password-kept"
                                             className="mt-1 block text-[12px] text-foreground-subtle"
                                         >
-                                            The servers or login changed, so enter the password again.
+                                            {t("refusals.passwordAgain")}
                                         </span>
                                     ) : keepsPassword ? (
                                         <span
@@ -776,13 +774,13 @@ export function ConnectMailboxDialog({
                                             )}
                                         >
                                             {editing?.state === "auth"
-                                                ? "The server stopped accepting the saved password. Type the new one - left blank, the saved one is tried again."
-                                                : "Left blank, the saved password is kept."}
+                                                ? t("connect.savedRefused")
+                                                : t("connect.savedKept")}
                                         </span>
                                     ) : null}
                                     {discovery.passwordHelp ? (
                                         <span className="mt-1 block text-[12px] text-foreground-subtle">
-                                            {discovery.passwordHelp}{" "}
+                                            {providerWords(t, discovery.service, "passwordHelp", discovery.passwordHelp)}{" "}
                                             {discovery.passwordUrl ? (
                                                 <a
                                                     className="underline"
@@ -790,7 +788,7 @@ export function ConnectMailboxDialog({
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                 >
-                                                    Make one
+                                                    {t("connect.makeOne")}
                                                 </a>
                                             ) : null}
                                         </span>
@@ -800,12 +798,12 @@ export function ConnectMailboxDialog({
 
                             <label className="block">
                                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                                    Your name, as people will see it
+                                    {t("connect.displayName")}
                                 </span>
                                 <Input
                                     value={displayName}
                                     onChange={(event) => setDisplayName(event.target.value)}
-                                    placeholder="Left blank, your Polaris name is used"
+                                    placeholder={t("connect.displayNamePlaceholder")}
                                     aria-invalid={issue("displayName") ? true : undefined}
                                 />
                                 {issue("displayName") ? (
@@ -819,12 +817,12 @@ export function ConnectMailboxDialog({
                                 <>
                                     <label className="block">
                                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                                            Name in the rail
+                                            {t("connect.label")}
                                         </span>
                                         <Input
                                             value={label}
                                             onChange={(event) => setLabel(event.target.value)}
-                                            placeholder="Left blank, the address is used"
+                                            placeholder={t("connect.labelPlaceholder")}
                                             aria-invalid={issue("label") ? true : undefined}
                                         />
                                         {issue("label") ? (
@@ -835,7 +833,7 @@ export function ConnectMailboxDialog({
                                     </label>
                                     <fieldset>
                                         <legend className="mb-1 block text-[12px] text-muted-foreground">
-                                            Colour
+                                            {t("connect.colour")}
                                         </legend>
                                         <div className="flex flex-wrap items-center gap-1.5">
                                             <button
@@ -847,14 +845,14 @@ export function ConnectMailboxDialog({
                                                     color === null && "ring-2 ring-foreground"
                                                 )}
                                             >
-                                                Automatic
+                                                {t("connect.automatic")}
                                             </button>
                                             {MAIL_PALETTE.map((swatch) => (
                                                 <button
                                                     key={swatch.hex}
                                                     type="button"
-                                                    title={swatch.name}
-                                                    aria-label={swatch.name}
+                                                    title={swatchName(t, swatch.name)}
+                                                    aria-label={swatchName(t, swatch.name)}
                                                     aria-pressed={color === swatch.hex}
                                                     onClick={() => setColor(swatch.hex)}
                                                     className={cn(
@@ -884,15 +882,15 @@ export function ConnectMailboxDialog({
                                             )}
                                             aria-hidden
                                         />
-                                        Server settings
+                                        {t("connect.servers")}
                                         <span className="ml-auto truncate text-foreground-subtle">
-                                            {servers.imapHost || "not worked out"}
+                                            {servers.imapHost || t("connect.notWorkedOut")}
                                         </span>
                                     </button>
                                     {showServers ? (
                                         <div className="space-y-2 border-t border-border p-2">
                                             <ServerFields
-                                                legend="Incoming (IMAP)"
+                                                legend={t("connect.incoming")}
                                                 host={servers.imapHost}
                                                 port={servers.imapPort}
                                                 security={servers.imapSecurity}
@@ -907,7 +905,7 @@ export function ConnectMailboxDialog({
                                                 }}
                                             />
                                             <ServerFields
-                                                legend="Outgoing (SMTP)"
+                                                legend={t("connect.outgoing")}
                                                 host={servers.smtpHost}
                                                 port={servers.smtpPort}
                                                 security={servers.smtpSecurity}
@@ -923,7 +921,7 @@ export function ConnectMailboxDialog({
                                             />
                                             <label className="block">
                                                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                                                    Login, if it is not the address
+                                                    {t("connect.login")}
                                                 </span>
                                                 <Input
                                                     value={username}
@@ -952,9 +950,9 @@ export function ConnectMailboxDialog({
                             ) : null}
                             {editing
                                 ? connecting
-                                    ? "Checking with the servers..."
-                                    : "Save changes"
-                                : "Connect this mailbox"}
+                                    ? t("connect.checking")
+                                    : t("connect.saveChanges")
+                                : t("connect.connect")}
                         </Button>
                     ) : null}
                 </div>
@@ -1004,41 +1002,58 @@ function seededDiscovery(account: MailAccountView): MailDiscovery {
  * argue with.
  */
 function lookupSentence(
+    t: NamespaceTranslator<"mail">,
     address: string,
     valid: boolean,
     looking: boolean,
     discovery: MailDiscovery | null
 ): string {
-    if (!address.trim()) return "Polaris works out the rest from your address.";
-    if (!valid) return "That is not an email address yet.";
-    if (looking) return "Looking up where this mail lives...";
+    if (!address.trim()) return t("connect.lookup.empty");
+    if (!valid) return t("connect.lookup.invalid");
+    if (looking) return t("connect.lookup.looking");
     if (!discovery) return "";
     switch (discovery.source) {
         case "catalogue":
-            return `${discovery.serviceName}. Nothing else to fill in.`;
+            return t("connect.lookup.catalogue", { service: discovery.serviceName });
         case "polaris":
-            return "A mail server this Polaris runs. Nothing else to fill in.";
+            return t("connect.lookup.polaris");
         case "domain":
-            return `${address.split("@")[1]} publishes its own settings, and these are them.`;
+            return t("connect.lookup.domain", { domain: address.split("@")[1] ?? "" });
         case "directory":
-            return "Found in the shared directory of mail providers.";
+            return t("connect.lookup.directory");
         case "exchangers":
-            return `This domain's mail is handled by ${discovery.serviceName}.`;
+            return t("connect.lookup.exchangers", { service: discovery.serviceName });
         case "probe":
-            return "Found by asking the domain's own servers.";
+            return t("connect.lookup.probe");
         default:
-            return "Nothing said where this domain's mail lives, so the servers below are guesses. Change anything that is wrong.";
+            return t("connect.lookup.guessed");
     }
+}
+
+/**
+ * What core's provider catalogue says about a service - its password advice,
+ * its note - in the reader's language. The catalogue is English (the API reads
+ * it); the words for the services it knows are in `mail.providers`, and a
+ * service with none there says what the catalogue says.
+ */
+function providerWords(
+    t: NamespaceTranslator<"mail">,
+    service: string,
+    what: "note" | "passwordHelp",
+    english: string
+): string {
+    const key = `providers.${service.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())}.${what}`;
+    return t.has(key) ? t(key) : english;
 }
 
 /**
  * What is wrong with one server's host and port, read with the schemas the
  * server will read them with. Null when both would be accepted.
  */
-export function serverProblem(host: string, port: string): string | null {
+export function serverProblem(host: string, port: string, t: NamespaceTranslator<"mail">): string | null {
     const hostCheck = mailHost.safeParse(host);
-    if (!hostCheck.success) return hostCheck.error.issues[0]?.message ?? "That is not a server name";
-    if (!mailPort.safeParse(port).success) return "The port is a number from 1 to 65535";
+    if (!hostCheck.success) return mailRefusalText(t, hostCheck.error.issues[0]?.message ?? "That is not a server name");
+    if (!mailPort.safeParse(port).success) return t("connect.portRange");
     return null;
 }
 
@@ -1059,7 +1074,8 @@ function ServerFields({
     names: { host: string; port: string; security: string };
     onChange: (next: Record<string, string>) => void;
 }) {
-    const problem = serverProblem(host, port);
+    const t = useTranslations("mail");
+    const problem = serverProblem(host, port, t);
     const hostBad = invalid || (problem !== null && !mailHost.safeParse(host).success);
     const portBad = problem !== null && !hostBad;
     return (
@@ -1069,7 +1085,7 @@ function ServerFields({
                 <Input
                     className="flex-1"
                     value={host}
-                    aria-label={`${legend} server`}
+                    aria-label={t("connect.serverOf", { legend })}
                     aria-invalid={hostBad ? true : undefined}
                     onChange={(event) => onChange({ [names.host]: event.target.value })}
                 />
@@ -1077,7 +1093,7 @@ function ServerFields({
                     className="w-20"
                     value={port}
                     inputMode="numeric"
-                    aria-label={`${legend} port`}
+                    aria-label={t("connect.portOf", { legend })}
                     aria-invalid={portBad ? true : undefined}
                     onChange={(event) => onChange({ [names.port]: event.target.value })}
                 />
@@ -1086,11 +1102,11 @@ function ServerFields({
             <Select
                 value={security}
                 onValueChange={(next) => onChange({ [names.security]: next })}
-                aria-label={`${legend} security`}
+                aria-label={t("connect.securityOf", { legend })}
                 options={[
-                    { value: "tls", label: "TLS from the start" },
-                    { value: "starttls", label: "Upgrade with STARTTLS" },
-                    { value: "none", label: "No encryption (a bridge on this machine only)" }
+                    { value: "tls", label: t("connect.security.tls") },
+                    { value: "starttls", label: t("connect.security.starttls") },
+                    { value: "none", label: t("connect.security.none") }
                 ]}
             />
         </fieldset>

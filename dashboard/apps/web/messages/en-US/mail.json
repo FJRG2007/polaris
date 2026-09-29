@@ -525,5 +525,105 @@
     "templates": {
         "deleteTitle": "Delete {name}?",
         "deleted": "{name} is gone."
+    },
+    "connect": {
+        "reconnected": "{address} is connected again. Its mail is on its way.",
+        "saved": "{address} is saved.",
+        "connected": "{address} is connected. Its mail is on its way.",
+        "address": "Email address",
+        "fixedAddress": "To use a different address, add it as a new mailbox.",
+        "already": "That mailbox is already here. Open it from the rail, or remove it first to add it again.",
+        "otherAccount": "The {provider} account you authorized is not {address}. Authorize that one to connect it, or use a password instead.",
+        "otherAccountThis": "The {provider} account you authorized is not this mailbox. Authorize that one to connect it, or use a password instead.",
+        "authorizedAccount": "Authorized account",
+        "authorizedAccountLabel": "The authorized account this mailbox belongs to",
+        "noPassword": "No password is stored. Polaris uses the account you already authorized.",
+        "noLongerLets": "{provider} no longer lets Polaris into this mailbox. Authorize it again and you will be sent back here.",
+        "canAuthorize": "{service} can connect this without a password. You will be sent to their sign-in and back here.",
+        "reconnectWith": "Reconnect with {provider}",
+        "authorize": "Authorize {service}",
+        "usePassword": "Use a password instead",
+        "onlyHolder": "{service} can connect this without a password, but only its holder can authorize that from their own account. Hand it out with a password, or ask them to add it themselves.",
+        "nowhereBack": "{service} could connect this without a password, but it has nowhere to send you back to: Polaris is only reachable on this network, and an address like that is one they refuse.",
+        "givePublic": "Give Polaris a public address",
+        "askAdmin": "Ask an administrator to give Polaris a public address.",
+        "untilThen": "Until then this mailbox takes a password.",
+        "newPassword": "New password",
+        "password": "Password",
+        "keepBlank": "Leave blank to keep the current one",
+        "savedRefused": "The server stopped accepting the saved password. Type the new one - left blank, the saved one is tried again.",
+        "savedKept": "Left blank, the saved password is kept.",
+        "makeOne": "Make one",
+        "displayName": "Your name, as people will see it",
+        "displayNamePlaceholder": "Left blank, your Polaris name is used",
+        "label": "Name in the rail",
+        "labelPlaceholder": "Left blank, the address is used",
+        "colour": "Colour",
+        "automatic": "Automatic",
+        "servers": "Server settings",
+        "notWorkedOut": "not worked out",
+        "incoming": "Incoming (IMAP)",
+        "outgoing": "Outgoing (SMTP)",
+        "login": "Login, if it is not the address",
+        "checking": "Checking with the servers...",
+        "saveChanges": "Save changes",
+        "connect": "Connect this mailbox",
+        "lookup": {
+            "empty": "Polaris works out the rest from your address.",
+            "invalid": "That is not an email address yet.",
+            "looking": "Looking up where this mail lives...",
+            "catalogue": "{service}. Nothing else to fill in.",
+            "polaris": "A mail server this Polaris runs. Nothing else to fill in.",
+            "domain": "{domain} publishes its own settings, and these are them.",
+            "directory": "Found in the shared directory of mail providers.",
+            "exchangers": "This domain's mail is handled by {service}.",
+            "probe": "Found by asking the domain's own servers.",
+            "guessed": "Nothing said where this domain's mail lives, so the servers below are guesses. Change anything that is wrong."
+        },
+        "portRange": "The port is a number from 1 to 65535",
+        "serverOf": "{legend} server",
+        "portOf": "{legend} port",
+        "securityOf": "{legend} security",
+        "security": {
+            "tls": "TLS from the start",
+            "starttls": "Upgrade with STARTTLS",
+            "none": "No encryption (a bridge on this machine only)"
+        }
+    },
+    "providers": {
+        "gmail": {
+            "passwordHelp": "Google refuses your ordinary password here. An account with two-step verification can make an app password for Polaris; without it, authorizing the account is the only way in."
+        },
+        "outlook": {
+            "passwordHelp": "Microsoft has stopped accepting passwords for mail on personal accounts. Authorizing the account is the way in."
+        },
+        "yahoo": {
+            "passwordHelp": "Yahoo needs an app password. Your sign-in password is refused."
+        },
+        "icloud": {
+            "passwordHelp": "Apple needs an app-specific password. Your Apple Account password is refused."
+        },
+        "fastmail": {
+            "passwordHelp": "Fastmail needs an app password with the Mail scope."
+        },
+        "zoho": {
+            "passwordHelp": "Zoho needs an app password when two-factor authentication is on."
+        },
+        "gmx": {
+            "passwordHelp": "IMAP has to be switched on in the GMX settings before this will connect."
+        },
+        "webDe": {
+            "passwordHelp": "IMAP has to be switched on in the WEB.DE settings before this will connect."
+        },
+        "aol": {
+            "passwordHelp": "AOL needs an app password. Your sign-in password is refused."
+        },
+        "yandex": {
+            "passwordHelp": "Yandex needs an app password and IMAP switched on in its settings."
+        },
+        "protonBridge": {
+            "passwordHelp": "The Bridge prints its own password, which is not your Proton one.",
+            "note": "Proton's servers do not speak IMAP. Reaching this mailbox needs Proton Mail Bridge running on a machine Polaris can connect to, and the address below is that machine - 127.0.0.1 only works if the Bridge is on this server."
+        }
     }
 }
