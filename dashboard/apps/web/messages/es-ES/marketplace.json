@@ -1,1 +1,66 @@
-{}
+{
+    "capabilities": {
+        "messagingHub": "Mensajería",
+        "messagingChannel": "Canal",
+        "aiAssistant": "Asistente de IA",
+        "gameManager": "Servidores de juegos",
+        "gameServer": "Servidor de juegos",
+        "cameraHub": "Cámaras",
+        "homeHub": "Hogar",
+        "mailServer": "Correo",
+        "tool": "Herramienta"
+    },
+    "statuses": {
+        "installing": "Instalando",
+        "running": "En marcha",
+        "stopped": "Detenida",
+        "failed": "Fallida"
+    },
+    "errors": {
+        "install": "No se pudo instalar la app",
+        "servers": "No se cargaron tus servidores",
+        "checkForm": "Revisa el formulario y reinténtalo",
+        "invalid": "Instalación no válida"
+    },
+    "view": {
+        "results": "Resultados",
+        "title": "Tienda",
+        "description": "Instala y ejecuta apps en tus servidores con un clic.",
+        "search": "Buscar apps",
+        "noMatch": "Aquí nada coincide con eso.",
+        "installed": "Instaladas"
+    },
+    "uninstall": {
+        "games": "{name} sale del selector y deja de hacer sus comprobaciones. Elimina antes tus servidores de juegos; desinstalar nunca borra mundos.",
+        "home": "{name} sale del selector, y sus contenedores de cámaras y reconocimiento se detienen. Tus lugares, cámaras y grabaciones se conservan para cuando vuelvas a instalarla.",
+        "other": "{name} sale del selector. Lo que creaste en ella se conserva para cuando vuelvas a instalarla.",
+        "title": "¿Desinstalar {name}?",
+        "confirm": "Desinstalar",
+        "named": "Desinstalar {name}"
+    },
+    "card": {
+        "by": "De {developer}",
+        "byImage": "De {developer} - imagen de {distributor}",
+        "consent": "Instalar supone aceptar <link>{label}</link>.",
+        "installedCount": "{count, plural, one {# instalada} other {# instaladas}}",
+        "open": "Abrir",
+        "configureHint": "Elige antes el servidor, el almacenamiento y los ajustes",
+        "configure": "Configurar",
+        "installing": "Instalando",
+        "install": "Instalar",
+        "comingSoon": "Próximamente"
+    },
+    "wizard": {
+        "title": "Instalar {name}",
+        "name": "Nombre",
+        "namePlaceholder": "Mi app",
+        "server": "Servidor",
+        "chooseServer": "Elige un servidor",
+        "loading": "Cargando...",
+        "storage": "Almacenamiento",
+        "thisServer": "Este servidor",
+        "chooseNas": "Elige un NAS",
+        "noNas": "Aún no hay conexiones NAS. Añade una antes en Drive.",
+        "configuration": "Configuración"
+    }
+}

@@ -1,1 +1,66 @@
-{}
+{
+    "capabilities": {
+        "messagingHub": "Messaging",
+        "messagingChannel": "Channel",
+        "aiAssistant": "AI assistant",
+        "gameManager": "Game servers",
+        "gameServer": "Game server",
+        "cameraHub": "Cameras",
+        "homeHub": "Home",
+        "mailServer": "Mail",
+        "tool": "Tool"
+    },
+    "statuses": {
+        "installing": "Installing",
+        "running": "Running",
+        "stopped": "Stopped",
+        "failed": "Failed"
+    },
+    "errors": {
+        "install": "Could not install the app",
+        "servers": "Could not load your servers",
+        "checkForm": "Check the form and try again",
+        "invalid": "Invalid install request"
+    },
+    "view": {
+        "results": "Results",
+        "title": "Marketplace",
+        "description": "Install and run apps on your servers in one click.",
+        "search": "Search apps",
+        "noMatch": "Nothing here matches that.",
+        "installed": "Installed"
+    },
+    "uninstall": {
+        "games": "{name} leaves the switcher and stops running its checks. Delete your game servers first; worlds are never deleted by uninstalling.",
+        "home": "{name} leaves the switcher, and its camera and recognition containers stop. Your places, cameras and recordings are kept for when you install it again.",
+        "other": "{name} leaves the switcher. What you made in it is kept for when you install it again.",
+        "title": "Uninstall {name}?",
+        "confirm": "Uninstall",
+        "named": "Uninstall {name}"
+    },
+    "card": {
+        "by": "By {developer}",
+        "byImage": "By {developer} - image by {distributor}",
+        "consent": "Installing accepts the <link>{label}</link>.",
+        "installedCount": "{count} installed",
+        "open": "Open",
+        "configureHint": "Choose the server, storage and settings first",
+        "configure": "Configure",
+        "installing": "Installing",
+        "install": "Install",
+        "comingSoon": "Coming soon"
+    },
+    "wizard": {
+        "title": "Install {name}",
+        "name": "Name",
+        "namePlaceholder": "My app",
+        "server": "Server",
+        "chooseServer": "Choose a server",
+        "loading": "Loading...",
+        "storage": "Storage",
+        "thisServer": "This server",
+        "chooseNas": "Choose a NAS",
+        "noNas": "No NAS connections yet. Add one in Drive first.",
+        "configuration": "Configuration"
+    }
+}

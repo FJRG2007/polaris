@@ -13,6 +13,7 @@ import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp, listInstalledApps, type InstalledAppView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, type AppInstallInput } from "@/lib/apps/install-schema";
+import { getTranslations } from "@/lib/i18n/request";
 
 const MARKETPLACE_PATH = "/apps/marketplace";
 
@@ -54,7 +55,7 @@ export async function listInstalledAppsAction(): Promise<InstalledAppView[]> {
 export async function installAppAction(input: AppInstallInput): Promise<{ error?: string; installedAppId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = appInstallInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid install request" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("marketplace"))("errors.invalid") };
     try {
         const result = await installApp(user.id, user.id, parsed.data);
         await recordAudit({
@@ -66,6 +67,6 @@ export async function installAppAction(input: AppInstallInput): Promise<{ error?
         revalidatePath(MARKETPLACE_PATH);
         return { installedAppId: result.installedAppId };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not install the app" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("marketplace"))("errors.install") };
     }
 }

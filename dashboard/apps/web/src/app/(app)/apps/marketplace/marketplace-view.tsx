@@ -68,25 +68,30 @@ import {
     Select,
     cn
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
-const CAPABILITY_LABEL: Record<AppCapability, string> = {
-    "messaging-hub": "Messaging",
-    "messaging-channel": "Channel",
-    "ai-assistant": "AI assistant",
-    "game-manager": "Game servers",
-    "game-server": "Game server",
-    "camera-hub": "Cameras",
-    "home-hub": "Home",
-    "mail-server": "Mail",
-    tool: "Tool"
+type Words = NamespaceTranslator<"marketplace">;
+
+/** Each capability's badge, as `capabilities.<key>`. */
+const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
+    "messaging-hub": "capabilities.messagingHub",
+    "messaging-channel": "capabilities.messagingChannel",
+    "ai-assistant": "capabilities.aiAssistant",
+    "game-manager": "capabilities.gameManager",
+    "game-server": "capabilities.gameServer",
+    "camera-hub": "capabilities.cameraHub",
+    "home-hub": "capabilities.homeHub",
+    "mail-server": "capabilities.mailServer",
+    tool: "capabilities.tool"
 };
 
-const STATUS_LABEL: Record<string, string> = {
-    installing: "Installing",
-    running: "Running",
-    stopped: "Stopped",
-    failed: "Failed"
-};
+/** An install's state, said as `statuses.<status>`; one a newer service adds shows as it came. */
+const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
+
+function statusLabel(t: Words, status: string): string {
+    return STATUSES.has(status) ? t(`statuses.${status}` as NamespaceKey<"marketplace">) : status;
+}
 
 export function MarketplaceView({
     installed,
@@ -97,6 +102,7 @@ export function MarketplaceView({
      *  here to install that app. */
     initialQuery?: string;
 }) {
+    const t = useTranslations("marketplace");
     const router = useRouter();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
@@ -116,7 +122,7 @@ export function MarketplaceView({
         void installAppAction(defaultInstallInput(app))
             .then((result) => {
                 if (result.error || !result.installedAppId) {
-                    setError(result.error ?? "Could not install the app");
+                    setError(result.error ?? t("errors.install"));
                     setInstallingId(null);
                     return;
                 }
@@ -127,7 +133,7 @@ export function MarketplaceView({
                 else router.push(`/apps/installed/${result.installedAppId}`);
             })
             .catch(() => {
-                setError("Could not install the app");
+                setError(t("errors.install"));
                 setInstallingId(null);
             });
     }
@@ -165,10 +171,10 @@ export function MarketplaceView({
         const term = query.trim();
         if (term) {
             const hits = index.search(term).map((hit) => hit.item);
-            return hits.length === 0 ? [] : [{ category: "Results", apps: sortOffered(hits) }];
+            return hits.length === 0 ? [] : [{ category: t("view.results"), apps: sortOffered(hits) }];
         }
         return groups.map((group) => ({ category: group.category, apps: sortOffered(group.apps) }));
-    }, [groups, index, query]);
+    }, [groups, index, query, t]);
 
     const installedByCatalog = useMemo(() => {
         const map = new Map<string, number>();
@@ -188,8 +194,8 @@ export function MarketplaceView({
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
-                title="Marketplace"
-                description="Install and run apps on your servers in one click."
+                title={t("view.title")}
+                description={t("view.description")}
             />
 
             {/* Above everything, the way a store puts it: the first thing
@@ -199,8 +205,8 @@ export function MarketplaceView({
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search apps"
-                    aria-label="Search apps"
+                    placeholder={t("view.search")}
+                    aria-label={t("view.search")}
                     className="pl-8"
                 />
             </div>
@@ -211,7 +217,7 @@ export function MarketplaceView({
 
             {shown.length === 0 ? (
                 <p className="text-muted-foreground py-10 text-center text-sm">
-                    Nothing here matches that.
+                    {t("view.noMatch")}
                 </p>
             ) : null}
 
@@ -292,17 +298,14 @@ function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[]
  * Nothing anybody made is deleted: the data stays for when the app comes back.
  * An app that runs things of its own says what happens to those.
  */
-function uninstallDescription(catalogId: string, name: string): string {
-    if (catalogId === "game-servers") {
-        return `${name} leaves the switcher and stops running its checks. Delete your game servers first; worlds are never deleted by uninstalling.`;
-    }
-    if (catalogId === "home") {
-        return `${name} leaves the switcher, and its camera and recognition containers stop. Your places, cameras and recordings are kept for when you install it again.`;
-    }
-    return `${name} leaves the switcher. What you made in it is kept for when you install it again.`;
+function uninstallDescription(t: Words, catalogId: string, name: string): string {
+    if (catalogId === "game-servers") return t("uninstall.games", { name });
+    if (catalogId === "home") return t("uninstall.home", { name });
+    return t("uninstall.other", { name });
 }
 
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
+    const t = useTranslations("marketplace");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
@@ -312,9 +315,9 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
 
     async function uninstall(item: InstalledAppView): Promise<void> {
         const agreed = await confirm({
-            title: `Uninstall ${item.name}?`,
-            description: uninstallDescription(item.catalogId, item.name),
-            confirmLabel: "Uninstall",
+            title: t("uninstall.title", { name: item.name }),
+            description: uninstallDescription(t, item.catalogId, item.name),
+            confirmLabel: t("uninstall.confirm"),
             danger: true
         });
         if (!agreed) return;
@@ -332,7 +335,7 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
     return (
         <section className="flex flex-col gap-3">
             {confirmElement}
-            <h2 className="text-sm font-medium text-muted-foreground">Installed</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">{t("view.installed")}</h2>
             {failure && <p className="text-sm text-danger">{failure}</p>}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {own.map((item) => {
@@ -363,7 +366,7 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                                                     "border-success-edge text-success"
                                             )}
                                         >
-                                            {STATUS_LABEL[item.status] ?? item.status}
+                                            {statusLabel(t, item.status)}
                                         </Badge>
                                     </CardBody>
                                 </Card>
@@ -373,8 +376,8 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={`Uninstall ${item.name}`}
-                                title={`Uninstall ${item.name}`}
+                                aria-label={t("uninstall.named", { name: item.name })}
+                                title={t("uninstall.named", { name: item.name })}
                                 disabled={removing !== null}
                                 onClick={() => void uninstall(item)}
                                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-danger"
@@ -401,10 +404,10 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
  * one when they do not, because "Polaris - published by Polaris" says nothing
  * twice.
  */
-function by(from: { developer: string; distributor: string }): string {
+function by(t: Words, from: { developer: string; distributor: string }): string {
     return from.developer === from.distributor
-        ? `By ${from.developer}`
-        : `By ${from.developer} - image by ${from.distributor}`;
+        ? t("card.by", { developer: from.developer })
+        : t("card.byImage", { developer: from.developer, distributor: from.distributor });
 }
 
 function AppCard({
@@ -427,6 +430,7 @@ function AppCard({
     onInstall: () => void;
     onConfigure: () => void;
 }) {
+    const t = useTranslations("marketplace");
     const installable = isInstallable(app);
     // Who made it and who ships the image, read off what the app installs rather
     // than typed in - see `appProvenance`.
@@ -441,35 +445,39 @@ function AppCard({
                         {/* Who is behind it, in the line the category used to
                             have to itself. The category is a heading two inches
                             above; whose software this is was nowhere. */}
-                        <p className="text-muted-foreground truncate text-xs" title={by(from)}>
-                            {by(from)}
+                        <p className="text-muted-foreground truncate text-xs" title={by(t, from)}>
+                            {by(t, from)}
                         </p>
                     </div>
                 </div>
                 <p className="line-clamp-3 text-sm text-muted-foreground">{app.summary}</p>
                 <div className="flex flex-wrap gap-1">
                     {app.capabilities.map((capability) => (
-                        <Badge key={capability}>{CAPABILITY_LABEL[capability]}</Badge>
+                        <Badge key={capability}>{t(CAPABILITY_KEYS[capability])}</Badge>
                     ))}
                 </div>
                 {app.consent && (
                     <p className="text-xs text-muted-foreground">
-                        Installing accepts the{" "}
-                        <a
-                            href={app.consent.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2 hover:text-foreground"
-                        >
-                            {app.consent.label}
-                        </a>
-                        .
+                        {t.rich("card.consent", {
+                            label: app.consent.label,
+                            link: (chunks) => (
+                                <a
+                                    key="consent"
+                                    href={app.consent?.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
                     </p>
                 )}
                 <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     {installedCount > 0 ? (
                         <span className="text-xs text-muted-foreground">
-                            {installedCount} installed
+                            {t("card.installedCount", { count: installedCount })}
                         </span>
                     ) : (
                         <span />
@@ -477,7 +485,7 @@ function AppCard({
                     {openHref ? (
                         <Link href={openHref}>
                             <Button size="sm" variant="secondary">
-                                Open
+                                {t("card.open")}
                             </Button>
                         </Link>
                     ) : installable ? (
@@ -490,18 +498,18 @@ function AppCard({
                                     variant="ghost"
                                     onClick={onConfigure}
                                     disabled={disabled}
-                                    title="Choose the server, storage and settings first"
+                                    title={t("card.configureHint")}
                                 >
-                                    Configure
+                                    {t("card.configure")}
                                 </Button>
                             )}
                             <Button size="sm" onClick={onInstall} disabled={disabled}>
                                 {installing && <Loader2 className="size-4 animate-spin" />}
-                                {installing ? "Installing" : "Install"}
+                                {installing ? t("card.installing") : t("card.install")}
                             </Button>
                         </div>
                     ) : (
-                        <Badge className="text-muted-foreground">Coming soon</Badge>
+                        <Badge className="text-muted-foreground">{t("card.comingSoon")}</Badge>
                     )}
                 </div>
             </CardBody>
@@ -510,6 +518,8 @@ function AppCard({
 }
 
 function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void }) {
+    const t = useTranslations("marketplace");
+    const tcommon = useTranslations("common");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const template = app.template;
@@ -541,11 +551,11 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                 setConnections(loadedConnections);
                 setServerId((current) => current || loadedTargets[0]?.id || "local");
             })
-            .catch(() => active && setError("Could not load your servers"));
+            .catch(() => active && setError(t("errors.servers")));
         return () => {
             active = false;
         };
-    }, []);
+    }, [t]);
 
     function submit() {
         setError(null);
@@ -568,13 +578,13 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
         };
         const parsed = appInstallInputSchema.safeParse(input);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the form and try again");
+            setError(parsed.error.issues[0]?.message ?? t("errors.checkForm"));
             return;
         }
         startTransition(async () => {
             const result = await installAppAction(parsed.data);
             if (result.error || !result.installedAppId) {
-                setError(result.error ?? "Could not install the app");
+                setError(result.error ?? t("errors.install"));
                 return;
             }
             // Land on the app that was just installed, the way installing from the
@@ -589,27 +599,27 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Icon className="size-5" /> Install {app.name}
+                        <Icon className="size-5" /> {t("wizard.title", { name: app.name })}
                     </DialogTitle>
                     <DialogDescription>{app.description}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("wizard.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="My app"
+                            placeholder={t("wizard.namePlaceholder")}
                         />
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Server</span>
+                        <span className="font-medium">{t("wizard.server")}</span>
                         <Select
                             value={serverId}
                             onValueChange={setServerId}
-                            placeholder={targets ? "Choose a server" : "Loading..."}
+                            placeholder={targets ? t("wizard.chooseServer") : t("wizard.loading")}
                             options={(targets ?? []).map((target) => ({
                                 value: target.id,
                                 label: target.name
@@ -619,7 +629,7 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
 
                     {volumes.length > 0 && (
                         <div className="flex flex-col gap-3">
-                            <span className="text-sm font-medium">Storage</span>
+                            <span className="text-sm font-medium">{t("wizard.storage")}</span>
                             {volumes.map((volume) => {
                                 const choice = storage[volume.name] ?? {
                                     backing: "local" as const
@@ -641,8 +651,8 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                                 }))
                                             }
                                             options={[
-                                                { value: "local", label: "This server" },
-                                                { value: "nas", label: "NAS" }
+                                                { value: "local", label: t("wizard.thisServer") },
+                                                { value: "nas", label: "NAS" } // i18n-ignore the same word in both languages
                                             ]}
                                         />
                                         {choice.backing === "nas" &&
@@ -658,7 +668,7 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                                             }
                                                         }))
                                                     }
-                                                    placeholder="Choose a NAS"
+                                                    placeholder={t("wizard.chooseNas")}
                                                     options={connections.map((connection) => ({
                                                         value: connection.id,
                                                         label: connection.name
@@ -666,7 +676,7 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
                                                 />
                                             ) : (
                                                 <p className="text-xs text-muted-foreground">
-                                                    No NAS connections yet. Add one in Drive first.
+                                                    {t("wizard.noNas")}
                                                 </p>
                                             ))}
                                     </div>
@@ -677,7 +687,7 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
 
                     {envFields.length > 0 && (
                         <div className="flex flex-col gap-3">
-                            <span className="text-sm font-medium">Configuration</span>
+                            <span className="text-sm font-medium">{t("wizard.configuration")}</span>
                             {envFields.map((field) => (
                                 <label key={field.key} className="flex flex-col gap-1 text-sm">
                                     <span>{field.label}</span>
@@ -718,26 +728,30 @@ function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void
 
                     {app.consent && (
                         <p className="text-xs text-muted-foreground">
-                            Installing accepts the{" "}
-                            <a
-                                href={app.consent.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline underline-offset-2 hover:text-foreground"
-                            >
-                                {app.consent.label}
-                            </a>
-                            .
+                            {t.rich("card.consent", {
+                                label: app.consent.label,
+                                link: (chunks) => (
+                                    <a
+                                        key="consent"
+                                        href={app.consent?.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="underline underline-offset-2 hover:text-foreground"
+                                    >
+                                        {chunks}
+                                    </a>
+                                )
+                            })}
                         </p>
                     )}
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !serverId}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Install
+                            {t("card.install")}
                         </Button>
                     </div>
                 </div>
