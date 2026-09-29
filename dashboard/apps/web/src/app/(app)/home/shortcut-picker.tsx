@@ -18,6 +18,7 @@ import { Check, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { OverviewShortcut } from "@polaris/core";
 import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { navigationEntries, resourceEntries, type CommandEntry, type SearchResource } from "@/lib/search/entries";
 
 /** Matches shown at once. Past this, narrowing the query is the way to find it. */
@@ -41,6 +42,7 @@ export function ShortcutPicker({
     pinned: readonly OverviewShortcut[];
     onPick: (shortcut: OverviewShortcut) => void;
 }) {
+    const t = useTranslations("home");
     const [query, setQuery] = useState("");
     const [resources, setResources] = useState<SearchResource[]>([]);
 
@@ -93,7 +95,7 @@ export function ShortcutPicker({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent showClose={false} className="max-w-lg overflow-hidden p-0">
-                <DialogTitle className="sr-only">Pin a page to your Overview</DialogTitle>
+                <DialogTitle className="sr-only">{t("picker.title")}</DialogTitle>
                 <div className="flex items-center gap-2 border-b border-border px-3">
                     <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <Input
@@ -101,8 +103,8 @@ export function ShortcutPicker({
                         type="search"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Find a page or service to pin"
-                        aria-label="Find a page or service to pin"
+                        placeholder={t("picker.find")}
+                        aria-label={t("picker.find")}
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}
@@ -113,7 +115,7 @@ export function ShortcutPicker({
                 <div className="max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain p-2">
                     {results.length === 0 ? (
                         <p className="px-2 py-10 text-center text-sm text-muted-foreground">
-                            {trimmed ? `Nothing matches "${trimmed}".` : "Nothing to pin yet."}
+                            {trimmed ? t("picker.noMatch", { query: trimmed }) : t("picker.empty")}
                         </p>
                     ) : (
                         results.map((entry) => {
@@ -140,7 +142,7 @@ export function ShortcutPicker({
                                     {held ? (
                                         <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                                             <Check className="size-3.5" aria-hidden="true" />
-                                            Pinned
+                                            {t("picker.pinned")}
                                         </span>
                                     ) : null}
                                 </button>

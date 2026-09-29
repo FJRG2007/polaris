@@ -10,6 +10,7 @@
  */
 
 import { OverviewGrid } from "./overview-grid";
+import { Messages } from "@/components/i18n/messages";
 import { resolveOverviewLayout } from "@polaris/core";
 import { accessFor, requireUser } from "@/lib/session";
 import { overviewFeatures } from "@/lib/overview/features";
@@ -32,6 +33,7 @@ export default async function OverviewPage() {
     ]);
 
     return (
+        <Messages namespaces={["home"]}>
         <OverviewGrid
             name={user.name}
             isAdmin={user.isAdmin}
@@ -46,5 +48,6 @@ export default async function OverviewPage() {
             }))}
             gate={{ held, installed }}
         />
+        </Messages>
     );
 }

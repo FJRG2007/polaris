@@ -1,1 +1,167 @@
-{}
+{
+    "title": "Resumen",
+    "intro": "Lo que está en marcha, lo que te necesita y los sitios a los que más vas.",
+    "greeting": "{period, select, night {Buenas noches} morning {Buenos días} afternoon {Buenas tardes} other {Buenas noches}}, {name}",
+    "welcomeBack": "Hola de nuevo, {name}",
+    "refresh": "Actualizar las cifras",
+    "allOff": "Todas las tarjetas están desactivadas.",
+    "chooseWhat": "Elegir qué mostrar",
+    "errors": {
+        "layoutNotSaved": "No se ha podido guardar esa disposición.",
+        "changeNotSaved": "No se ha podido guardar ese cambio. Revisa tu conexión y vuelve a intentarlo."
+    },
+    "customize": {
+        "open": "Personalizar",
+        "title": "Personaliza tu resumen",
+        "width": "Ancho de {name}",
+        "moveUp": "Subir {name}",
+        "moveDown": "Bajar {name}",
+        "show": "Mostrar {name}",
+        "greet": "Saludarme por mi nombre",
+        "reset": "Restablecer"
+    },
+    "card": {
+        "open": "Abrir {name}",
+        "drag": "Arrastra para mover {name}",
+        "arrange": "Colocar {name}",
+        "moveUp": "Subir",
+        "moveDown": "Bajar",
+        "width": "Ancho",
+        "clearHistory": "Borrar el historial",
+        "hide": "Ocultar tarjeta"
+    },
+    "sizes": {
+        "sm": "Estrecha",
+        "md": "Media",
+        "lg": "Ancha",
+        "xl": "Muy ancha"
+    },
+    "widgets": {
+        "shortcuts": {
+            "label": "Acceso rápido",
+            "description": "Las páginas y servicios que has fijado tú."
+        },
+        "services": {
+            "label": "Servicios",
+            "description": "Lo que está desplegado y en marcha, y lo que se ha parado."
+        },
+        "usage": {
+            "label": "Uso",
+            "description": "CPU y memoria de las máquinas en las que ejecutas cosas."
+        },
+        "notifications": {
+            "label": "Notificaciones",
+            "description": "Los últimos avisos, los más recientes primero."
+        },
+        "recent": {
+            "label": "Visitado recientemente",
+            "description": "Dónde has estado en Polaris, en este dispositivo."
+        },
+        "tasks": {
+            "label": "Mi trabajo",
+            "description": "Las tareas que tienes asignadas y lo que está atrasado."
+        },
+        "alarms": {
+            "label": "Alarmas",
+            "description": "Las alarmas que están saltando ahora y lo que saltó hace poco."
+        },
+        "storage": {
+            "label": "Almacenamiento",
+            "description": "Lo lleno que está cada dispositivo conectado."
+        },
+        "apps": {
+            "label": "Tus apps",
+            "description": "Todas las apps que puede abrir esta cuenta."
+        },
+        "games": {
+            "label": "Servidores de juegos",
+            "description": "Qué servidores tuyos están en marcha y lo llenos que están."
+        },
+        "sessions": {
+            "label": "Sesiones iniciadas",
+            "description": "Los dispositivos en los que tu cuenta está abierta ahora mismo."
+        },
+        "activity": {
+            "label": "Actividad reciente",
+            "description": "Lo que se ha hecho con tu cuenta, y desde dónde."
+        }
+    },
+    "picker": {
+        "title": "Fija una página en tu resumen",
+        "find": "Busca una página o un servicio para fijar",
+        "noMatch": "Nada coincide con «{query}».",
+        "empty": "Todavía no hay nada que fijar.",
+        "pinned": "Fijada"
+    },
+    "sessions": {
+        "unavailable": "Ahora mismo no se han podido leer tus sesiones.",
+        "empty": "No hay otro dispositivo con la sesión iniciada.",
+        "count": "<big>{count}</big><rest> {count, plural, one {dispositivo con la sesión iniciada} other {dispositivos con la sesión iniciada}}</rest>",
+        "thisOne": "{device} (este)"
+    },
+    "activity": {
+        "unavailable": "Ahora mismo no se ha podido leer tu actividad.",
+        "openLog": "Abrir el registro",
+        "empty": "Todavía no se ha registrado nada en esta cuenta."
+    },
+    "shortcuts": {
+        "pin": "Fijar una página",
+        "empty": "Fija las páginas y servicios que abres cada día.",
+        "unpin": "Quitar {name}"
+    },
+    "recent": {
+        "empty": "Las páginas que abras aparecerán aquí.",
+        "forget": "Olvidar {name}"
+    },
+    "notifications": {
+        "empty": "Nada nuevo."
+    },
+    "apps": {
+        "empty": "Esta cuenta no tiene ninguna app abierta."
+    },
+    "services": {
+        "unavailable": "Ahora mismo no se han podido leer los despliegues.",
+        "deploy": "Desplegar algo",
+        "empty": "Todavía no hay nada desplegado.",
+        "count": "<big>{running}</big><rest> de {total, plural, one {# servicio en marcha} other {# servicios en marcha}}</rest>"
+    },
+    "usage": {
+        "unavailable": "Ahora mismo no se ha podido leer el uso.",
+        "empty": "Todavía no se ha medido ninguna máquina.",
+        "memoryUnknown": "Memoria sin datos",
+        "memory": "{used} de memoria",
+        "memoryOf": "{used} / {total} de memoria"
+    },
+    "alarms": {
+        "unavailable": "Ahora mismo no se han podido leer las alarmas.",
+        "setUp": "Configurar una",
+        "empty": "No ha saltado nada. Y tampoco hay alarmas todavía.",
+        "firing": "<big>{count}</big><rest> saltando ahora</rest>",
+        "resolved": "Resuelta",
+        "triggered": "Disparada"
+    },
+    "storage": {
+        "unavailable": "Ahora mismo no se ha podido leer el almacenamiento.",
+        "connect": "Conectar un dispositivo",
+        "empty": "Todavía ningún dispositivo ha informado de su uso.",
+        "usageUnknown": "Uso sin datos",
+        "usageUnknownOf": "Uso sin datos de {total}",
+        "usedOf": "{used} de {total}"
+    },
+    "games": {
+        "unavailable": "Ahora mismo no se han podido leer tus servidores de juegos.",
+        "create": "Crear uno",
+        "empty": "Todavía no hay ningún servidor de juegos.",
+        "count": "<big>{running}</big><rest> de {total, plural, one {# servidor en marcha} other {# servidores en marcha}}</rest>",
+        "slots": "{count} plazas",
+        "up": "En marcha",
+        "stopped": "Parado"
+    },
+    "tasks": {
+        "unavailable": "Ahora mismo no se ha podido leer tu trabajo.",
+        "empty": "No tienes nada asignado.",
+        "assigned": "<big>{count}</big><rest> {count, plural, one {asignada} other {asignadas}}</rest>",
+        "overdue": " - {count, plural, one {# atrasada} other {# atrasadas}}",
+        "dueToday": " - {count, plural, one {# vence hoy} other {# vencen hoy}}"
+    }
+}

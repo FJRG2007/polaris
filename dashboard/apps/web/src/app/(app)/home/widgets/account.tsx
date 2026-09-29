@@ -15,6 +15,7 @@ import { cn } from "@polaris/ui";
 import type { Loaded } from "./infrastructure";
 import { Laptop, ScrollText } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OverviewActivityEntry, OverviewSessions } from "@/lib/overview/overview-service";
 import { WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
 
@@ -31,18 +32,27 @@ function actionLabel(action: string): string {
 }
 
 export function SessionsWidget({ data }: { data: Loaded<OverviewSessions> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={3} />;
-    if (data === null) return <WidgetUnavailable>Your sessions could not be read just now.</WidgetUnavailable>;
-    if (data.entries.length === 0) return <WidgetEmpty>No other device is signed in.</WidgetEmpty>;
+    if (data === null) return <WidgetUnavailable>{t("sessions.unavailable")}</WidgetUnavailable>;
+    if (data.entries.length === 0) return <WidgetEmpty>{t("sessions.empty")}</WidgetEmpty>;
 
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span className="text-xl font-semibold tabular-nums">{data.total}</span>
-                <span className="text-muted-foreground">
-                    {" "}
-                    device{data.total === 1 ? "" : "s"} signed in
-                </span>
+                {t.rich("sessions.count", {
+                    big: (chunks) => (
+                        <span key="big" className="text-xl font-semibold tabular-nums">
+                            {chunks}
+                        </span>
+                    ),
+                    rest: (chunks) => (
+                        <span key="rest" className="text-muted-foreground">
+                            {chunks}
+                        </span>
+                    ),
+                    count: data.total
+                })}
             </p>
             <WidgetList>
                 {data.entries.map((session) => (
@@ -59,7 +69,7 @@ export function SessionsWidget({ data }: { data: Loaded<OverviewSessions> }) {
                                 <Laptop className="size-3.5" aria-hidden="true" />
                             </span>
                         }
-                        label={session.current ? `${session.device} (this one)` : session.device}
+                        label={session.current ? t("sessions.thisOne", { device: session.device }) : session.device}
                         detail={session.where || null}
                         trailing={
                             <span className="shrink-0 text-xs text-muted-foreground">
@@ -74,18 +84,19 @@ export function SessionsWidget({ data }: { data: Loaded<OverviewSessions> }) {
 }
 
 export function ActivityWidget({ data }: { data: Loaded<OverviewActivityEntry[]> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={3} />;
-    if (data === null) return <WidgetUnavailable>Your activity could not be read just now.</WidgetUnavailable>;
+    if (data === null) return <WidgetUnavailable>{t("activity.unavailable")}</WidgetUnavailable>;
     if (data.length === 0) {
         return (
             <WidgetEmpty
                 action={
                     <Link href="/account/activity" className="text-xs font-medium text-primary hover:underline">
-                        Open the log
+                        {t("activity.openLog")}
                     </Link>
                 }
             >
-                Nothing has been recorded against this account yet.
+                {t("activity.empty")}
             </WidgetEmpty>
         );
     }

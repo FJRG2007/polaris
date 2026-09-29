@@ -10,6 +10,7 @@
  * somebody about to delete an organization is wrong about if it is missing.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import type { OrgDetail } from "@/lib/orgs/org-service";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -65,7 +66,7 @@ describe("the organization deletion warning", () => {
                 candidates={[]}
                 successor={null}
                 impact={{ spaces: 2, tasks: 5, projects: 0, drive: true }}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         expect(screen.getByText(/Its Drive and everything on it go with it\./)).toBeTruthy();
@@ -81,7 +82,7 @@ describe("the organization deletion warning", () => {
                 candidates={[]}
                 successor={null}
                 impact={{ spaces: 2, tasks: 5, projects: 0, drive: false }}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         expect(screen.queryByText(/Its Drive/)).toBeNull();

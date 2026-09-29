@@ -17,6 +17,8 @@ import { POLARIS_APPS } from "@/lib/apps";
 import { useEffect, useState } from "react";
 import { shortcutIcon } from "../shortcut-icons";
 import { RelativeTime } from "@/components/relative-time";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OverviewShortcut, RecentPlace } from "@polaris/core";
 import { WidgetEmpty, WidgetList, WidgetRow } from "../widget-card";
 import { forgetPlace, readRecentPlaces } from "@/lib/overview/recent-places";
@@ -35,17 +37,18 @@ export function ShortcutsWidget({
     onAdd: () => void;
     onRemove: (href: string) => void;
 }) {
+    const t = useTranslations("home");
     if (shortcuts.length === 0) {
         return (
             <WidgetEmpty
                 action={
                     <Button size="sm" variant="outline" onClick={onAdd}>
                         <Plus className="size-4" aria-hidden="true" />
-                        Pin a page
+                        {t("shortcuts.pin")}
                     </Button>
                 }
             >
-                Pin the pages and services you open every day.
+                {t("shortcuts.empty")}
             </WidgetEmpty>
         );
     }
@@ -69,8 +72,8 @@ export function ShortcutsWidget({
                         <button
                             type="button"
                             onClick={() => onRemove(shortcut.href)}
-                            title={`Unpin ${shortcut.label}`}
-                            aria-label={`Unpin ${shortcut.label}`}
+                            title={t("shortcuts.unpin", { name: shortcut.label })}
+                            aria-label={t("shortcuts.unpin", { name: shortcut.label })}
                             className="absolute right-1 top-1 grid size-6 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
                             <X className="size-3.5" aria-hidden="true" />
@@ -84,7 +87,7 @@ export function ShortcutsWidget({
                 className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
             >
                 <Plus className="size-4" aria-hidden="true" />
-                <span className="text-xs">Pin a page</span>
+                <span className="text-xs">{t("shortcuts.pin")}</span>
             </button>
         </div>
     );
@@ -96,6 +99,7 @@ export function ShortcutsWidget({
  * hydrate into a different list than it drew.
  */
 export function RecentWidget() {
+    const t = useTranslations("home");
     const [places, setPlaces] = useState<RecentPlace[] | null>(null);
 
     useEffect(() => {
@@ -109,7 +113,7 @@ export function RecentWidget() {
     }, []);
 
     if (places === null) return <div className="h-24" aria-hidden="true" />;
-    if (places.length === 0) return <WidgetEmpty>Pages you open will be listed here.</WidgetEmpty>;
+    if (places.length === 0) return <WidgetEmpty>{t("recent.empty")}</WidgetEmpty>;
 
     return (
         <WidgetList>
@@ -124,8 +128,8 @@ export function RecentWidget() {
                         <button
                             type="button"
                             onClick={() => setPlaces(forgetPlace(place.href))}
-                            title={`Forget ${place.label}`}
-                            aria-label={`Forget ${place.label}`}
+                            title={t("recent.forget", { name: place.label })}
+                            aria-label={t("recent.forget", { name: place.label })}
                             className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
                             <X className="size-3.5" aria-hidden="true" />
@@ -141,7 +145,8 @@ export function RecentWidget() {
  *  badge above. */
 export function NotificationsWidget() {
     const feed = useNotificationFeed();
-    if (feed.items.length === 0) return <WidgetEmpty>Nothing new.</WidgetEmpty>;
+    const t = useTranslations("home");
+    if (feed.items.length === 0) return <WidgetEmpty>{t("notifications.empty")}</WidgetEmpty>;
 
     return (
         <WidgetList>
@@ -179,7 +184,9 @@ export function AppsWidget({
 }: {
     apps: readonly { id: string; label: string; description: string; href: string }[];
 }) {
-    if (apps.length === 0) return <WidgetEmpty>No apps are open to this account.</WidgetEmpty>;
+    const t = useTranslations("home");
+    const navLabel = useNavLabel();
+    if (apps.length === 0) return <WidgetEmpty>{t("apps.empty")}</WidgetEmpty>;
 
     return (
         <div className="grid grid-cols-2 gap-2">
@@ -193,7 +200,7 @@ export function AppsWidget({
                         className="flex items-center gap-2 rounded-lg border border-border bg-surface/50 px-3 py-2 transition-colors hover:border-primary hover:bg-primary/5"
                     >
                         <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span className="truncate text-sm font-medium">{app.label}</span>
+                        <span className="truncate text-sm font-medium">{navLabel(app.label)}</span>
                     </Link>
                 );
             })}

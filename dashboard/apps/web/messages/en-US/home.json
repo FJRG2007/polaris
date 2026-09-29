@@ -1,1 +1,167 @@
-{}
+{
+    "title": "Overview",
+    "intro": "What is running, what needs you, and the places you go most.",
+    "greeting": "{period, select, night {Good night} morning {Good morning} afternoon {Good afternoon} other {Good evening}}, {name}",
+    "welcomeBack": "Welcome back, {name}",
+    "refresh": "Refresh the figures",
+    "allOff": "Every card is turned off.",
+    "chooseWhat": "Choose what to show",
+    "errors": {
+        "layoutNotSaved": "That layout could not be saved.",
+        "changeNotSaved": "That change could not be saved. Check your connection and try again."
+    },
+    "customize": {
+        "open": "Customize",
+        "title": "Customize your Overview",
+        "width": "Width of {name}",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down",
+        "show": "Show {name}",
+        "greet": "Greet me by name",
+        "reset": "Reset"
+    },
+    "card": {
+        "open": "Open {name}",
+        "drag": "Drag to move {name}",
+        "arrange": "Arrange {name}",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "width": "Width",
+        "clearHistory": "Clear history",
+        "hide": "Hide card"
+    },
+    "sizes": {
+        "sm": "Narrow",
+        "md": "Medium",
+        "lg": "Wide",
+        "xl": "Widest"
+    },
+    "widgets": {
+        "shortcuts": {
+            "label": "Quick access",
+            "description": "The pages and services you pinned yourself."
+        },
+        "services": {
+            "label": "Services",
+            "description": "What is deployed and running, and what stopped."
+        },
+        "usage": {
+            "label": "Usage",
+            "description": "CPU and memory on the machines you run things on."
+        },
+        "notifications": {
+            "label": "Notifications",
+            "description": "The latest alerts, newest first."
+        },
+        "recent": {
+            "label": "Recently visited",
+            "description": "Where you have been in Polaris, on this device."
+        },
+        "tasks": {
+            "label": "My work",
+            "description": "Tasks assigned to you, and what is overdue."
+        },
+        "alarms": {
+            "label": "Alarms",
+            "description": "Alarms firing now, and what tripped recently."
+        },
+        "storage": {
+            "label": "Storage",
+            "description": "How full each connected device is."
+        },
+        "apps": {
+            "label": "Your apps",
+            "description": "Every app this account can open."
+        },
+        "games": {
+            "label": "Game servers",
+            "description": "Which of your servers are up, and how full they are."
+        },
+        "sessions": {
+            "label": "Signed in",
+            "description": "The devices your account is open on right now."
+        },
+        "activity": {
+            "label": "Recent activity",
+            "description": "What was done with your account, and from where."
+        }
+    },
+    "picker": {
+        "title": "Pin a page to your Overview",
+        "find": "Find a page or service to pin",
+        "noMatch": "Nothing matches \"{query}\".",
+        "empty": "Nothing to pin yet.",
+        "pinned": "Pinned"
+    },
+    "sessions": {
+        "unavailable": "Your sessions could not be read just now.",
+        "empty": "No other device is signed in.",
+        "count": "<big>{count}</big><rest> {count, plural, one {device} other {devices}} signed in</rest>",
+        "thisOne": "{device} (this one)"
+    },
+    "activity": {
+        "unavailable": "Your activity could not be read just now.",
+        "openLog": "Open the log",
+        "empty": "Nothing has been recorded against this account yet."
+    },
+    "shortcuts": {
+        "pin": "Pin a page",
+        "empty": "Pin the pages and services you open every day.",
+        "unpin": "Unpin {name}"
+    },
+    "recent": {
+        "empty": "Pages you open will be listed here.",
+        "forget": "Forget {name}"
+    },
+    "notifications": {
+        "empty": "Nothing new."
+    },
+    "apps": {
+        "empty": "No apps are open to this account."
+    },
+    "services": {
+        "unavailable": "Deployments could not be read just now.",
+        "deploy": "Deploy something",
+        "empty": "Nothing is deployed yet.",
+        "count": "<big>{running}</big><rest> of {total, plural, one {# service} other {# services}} running</rest>"
+    },
+    "usage": {
+        "unavailable": "Usage could not be read just now.",
+        "empty": "No machine has been sampled yet.",
+        "memoryUnknown": "Memory not reported",
+        "memory": "{used} memory",
+        "memoryOf": "{used} / {total} memory"
+    },
+    "alarms": {
+        "unavailable": "Alarms could not be read just now.",
+        "setUp": "Set one up",
+        "empty": "Nothing has tripped. No alarms yet either.",
+        "firing": "<big>{count}</big><rest> firing now</rest>",
+        "resolved": "Resolved",
+        "triggered": "Triggered"
+    },
+    "storage": {
+        "unavailable": "Storage could not be read just now.",
+        "connect": "Connect a device",
+        "empty": "No device has reported its usage yet.",
+        "usageUnknown": "Usage not reported",
+        "usageUnknownOf": "Usage not reported of {total}",
+        "usedOf": "{used} of {total}"
+    },
+    "games": {
+        "unavailable": "Your game servers could not be read just now.",
+        "create": "Create one",
+        "empty": "No game server yet.",
+        "count": "<big>{running}</big><rest> of {total, plural, one {# server} other {# servers}} up</rest>",
+        "slots": "{count} slots",
+        "up": "Up",
+        "stopped": "Stopped"
+    },
+    "tasks": {
+        "unavailable": "Your work could not be read just now.",
+        "empty": "Nothing is assigned to you.",
+        "assigned": "<big>{count}</big><rest> assigned</rest>",
+        "overdue": " - {count} overdue",
+        "dueToday": " - {count} due today"
+    }
+}

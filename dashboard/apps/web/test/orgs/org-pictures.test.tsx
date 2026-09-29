@@ -15,6 +15,7 @@
  * banner, the Remove that only exists once there is one to remove.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OrgProfileCard } from "@/app/o/[slug]/org-profile-card";
@@ -52,23 +53,23 @@ afterEach(cleanup);
 
 describe("editing an organization's pictures", () => {
     it("draws both of them, from the organization's own addresses", () => {
-        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />);
+        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(sources()).toContain(`/api/banner/org/${ORG.id}`);
         expect(sources()).toContain(`/api/avatar/org/${ORG.id}`);
     });
 
     it("offers a handle on each", async () => {
-        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />);
+        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(await menuFor(/banner/i)).toEqual(["Reframe", "Replace", "Remove"]);
     });
 
     it("offers no Remove for a picture that is not there", async () => {
-        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto={false} hasBanner={false} />);
+        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto={false} hasBanner={false} />, { wrapper: MessagesWrapper });
         expect(await menuFor(/banner/i)).toEqual(["Upload banner"]);
     });
 
     it("names the organization under its mark, the way the page will", () => {
-        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />);
+        render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(screen.getAllByTitle(ORG.name).length).toBeGreaterThan(0);
     });
 });
@@ -85,7 +86,7 @@ describe("an organization's own page", () => {
     };
 
     it("wears its banner rather than a flat strip of colour", () => {
-        render(<OrgProfileCard org={profile} />);
+        render(<OrgProfileCard org={profile} />, { wrapper: MessagesWrapper });
         expect(sources()).toContain(`/api/banner/org/${ORG.id}`);
     });
 });

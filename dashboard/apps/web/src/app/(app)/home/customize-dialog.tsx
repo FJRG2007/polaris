@@ -15,7 +15,9 @@
  */
 
 import { useState } from "react";
-import { overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
+import { overviewWidget } from "@/lib/overview/catalog";
+import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw } from "lucide-react";
 import type { OverviewWidgetId, OverviewWidgetPreference, OverviewWidgetSize } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select, Switch, cn } from "@polaris/ui";
@@ -44,6 +46,7 @@ export function CustomizeDialog({
     onGreetingChange: (greeting: boolean) => void;
     onReset: () => void;
 }) {
+    const t = useTranslations("home");
     const [dragged, setDragged] = useState<OverviewWidgetId | null>(null);
     const [over, setOver] = useState<OverviewWidgetId | null>(null);
 
@@ -51,13 +54,15 @@ export function CustomizeDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Customize your Overview</DialogTitle>
+                    <DialogTitle>{t("customize.title")}</DialogTitle>
                 </DialogHeader>
 
                 <ul className="-mx-1 max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain px-1">
                     {layout.map((widget, index) => {
                         const entry = overviewWidget(widget.id);
                         const Icon = entry.icon;
+                        const label = widgetLabel(t, widget.id, entry.label);
+                        const description = widgetDescription(t, widget.id, entry.description);
                         return (
                             <li
                                 key={widget.id}
@@ -83,7 +88,7 @@ export function CustomizeDialog({
                             >
                                 <span
                                     draggable
-                                    title={`Drag to move ${entry.label}`}
+                                    title={t("card.drag", { name: label })}
                                     aria-hidden="true"
                                     onDragStart={(event) => {
                                         event.dataTransfer.setData("text/plain", widget.id);
@@ -100,17 +105,17 @@ export function CustomizeDialog({
                                 </span>
                                 <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm font-medium" title={entry.label}>{entry.label}</span>
-                                    <span className="truncate text-xs text-muted-foreground" title={entry.description}>{entry.description}</span>
+                                    <span className="truncate text-sm font-medium" title={label}>{label}</span>
+                                    <span className="truncate text-xs text-muted-foreground" title={description}>{description}</span>
                                 </div>
 
                                 {entry.sizes.length > 1 && !widget.hidden ? (
                                     <Select
                                         value={widget.size}
                                         onValueChange={(value) => onResize(widget.id, value as OverviewWidgetSize)}
-                                        aria-label={`Width of ${entry.label}`}
+                                        aria-label={t("customize.width", { name: label })}
                                         className="h-8 w-28 shrink-0"
-                                        options={entry.sizes.map((size) => ({ value: size, label: OVERVIEW_SIZE_LABELS[size] }))}
+                                        options={entry.sizes.map((size) => ({ value: size, label: sizeLabel(t, size) }))}
                                     />
                                 ) : null}
 
@@ -119,8 +124,8 @@ export function CustomizeDialog({
                                         type="button"
                                         disabled={index === 0}
                                         onClick={() => onMove(widget.id, -1)}
-                                        title={`Move ${entry.label} up`}
-                                        aria-label={`Move ${entry.label} up`}
+                                        title={t("customize.moveUp", { name: label })}
+                                        aria-label={t("customize.moveUp", { name: label })}
                                         className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                     >
                                         <ArrowUp className="size-4" aria-hidden="true" />
@@ -129,8 +134,8 @@ export function CustomizeDialog({
                                         type="button"
                                         disabled={index === layout.length - 1}
                                         onClick={() => onMove(widget.id, 1)}
-                                        title={`Move ${entry.label} down`}
-                                        aria-label={`Move ${entry.label} down`}
+                                        title={t("customize.moveDown", { name: label })}
+                                        aria-label={t("customize.moveDown", { name: label })}
                                         className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                     >
                                         <ArrowDown className="size-4" aria-hidden="true" />
@@ -140,7 +145,7 @@ export function CustomizeDialog({
                                 <Switch
                                     checked={!widget.hidden}
                                     onChange={(checked) => onToggle(widget.id, checked)}
-                                    aria-label={`Show ${entry.label}`}
+                                    aria-label={t("customize.show", { name: label })}
                                 />
                             </li>
                         );
@@ -149,12 +154,12 @@ export function CustomizeDialog({
 
                 <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                     <label className="flex items-center gap-2 text-sm">
-                        <Switch checked={greeting} onChange={onGreetingChange} aria-label="Greet me by name" />
-                        Greet me by name
+                        <Switch checked={greeting} onChange={onGreetingChange} aria-label={t("customize.greet")} />
+                        {t("customize.greet")}
                     </label>
                     <Button variant="ghost" size="sm" onClick={onReset}>
                         <RotateCcw className="size-4" aria-hidden="true" />
-                        Reset
+                        {t("customize.reset")}
                     </Button>
                 </div>
             </DialogContent>

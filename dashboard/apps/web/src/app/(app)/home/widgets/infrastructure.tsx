@@ -17,6 +17,7 @@ import { GameLogo } from "@/components/game-logo";
 import { findGame } from "@/lib/apps/games-catalog";
 import { PriorityMark } from "@/components/priority-mark";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     StateDot,
     WidgetEmpty,
@@ -54,9 +55,9 @@ function barTone(percent: number | null): string {
 }
 
 export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton />;
-    if (data === null)
-        return <WidgetUnavailable>Deployments could not be read just now.</WidgetUnavailable>;
+    if (data === null) return <WidgetUnavailable>{t("services.unavailable")}</WidgetUnavailable>;
     if (data.total === 0) {
         return (
             <WidgetEmpty
@@ -65,11 +66,11 @@ export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
                         href="/apps/deploy"
                         className="text-xs font-medium text-primary hover:underline"
                     >
-                        Deploy something
+                        {t("services.deploy")}
                     </Link>
                 }
             >
-                Nothing is deployed yet.
+                {t("services.empty")}
             </WidgetEmpty>
         );
     }
@@ -77,18 +78,23 @@ export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span
-                    className={cn(
-                        "text-xl font-semibold",
-                        data.running < data.total && "text-warning"
-                    )}
-                >
-                    {data.running}
-                </span>
-                <span className="text-muted-foreground">
-                    {" "}
-                    of {data.total} service{data.total === 1 ? "" : "s"} running
-                </span>
+                {t.rich("services.count", {
+                    big: (chunks) => (
+                        <span
+                            key="big"
+                            className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}
+                        >
+                            {chunks}
+                        </span>
+                    ),
+                    rest: (chunks) => (
+                        <span key="rest" className="text-muted-foreground">
+                            {chunks}
+                        </span>
+                    ),
+                    running: data.running,
+                    total: data.total
+                })}
             </p>
             <WidgetList>
                 {data.rows.map((row) => (
@@ -154,10 +160,10 @@ function Sparkline({ values, tone }: { values: (number | null)[]; tone: string }
 }
 
 export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null)
-        return <WidgetUnavailable>Usage could not be read just now.</WidgetUnavailable>;
-    if (data.length === 0) return <WidgetEmpty>No machine has been sampled yet.</WidgetEmpty>;
+    if (data === null) return <WidgetUnavailable>{t("usage.unavailable")}</WidgetUnavailable>;
+    if (data.length === 0) return <WidgetEmpty>{t("usage.empty")}</WidgetEmpty>;
 
     return (
         <ul className="flex flex-col gap-3">
@@ -182,12 +188,13 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
                     <Sparkline values={server.spark} tone={loadTone(server.cpuPercent)} />
                     <p className="text-xs text-muted-foreground">
                         {server.memUsedBytes == null
-                            ? "Memory not reported"
-                            : `${formatBytes(server.memUsedBytes)}${
-                                  server.memTotalBytes == null
-                                      ? ""
-                                      : ` / ${formatBytes(server.memTotalBytes)}`
-                              } memory`}
+                            ? t("usage.memoryUnknown")
+                            : server.memTotalBytes == null
+                              ? t("usage.memory", { used: formatBytes(server.memUsedBytes) })
+                              : t("usage.memoryOf", {
+                                    used: formatBytes(server.memUsedBytes),
+                                    total: formatBytes(server.memTotalBytes)
+                                })}
                     </p>
                 </li>
             ))}
@@ -196,9 +203,9 @@ export function UsageWidget({ data }: { data: Loaded<OverviewUsageEntry[]> }) {
 }
 
 export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null)
-        return <WidgetUnavailable>Alarms could not be read just now.</WidgetUnavailable>;
+    if (data === null) return <WidgetUnavailable>{t("alarms.unavailable")}</WidgetUnavailable>;
     if (data.firing === 0 && data.events.length === 0) {
         return (
             <WidgetEmpty
@@ -207,11 +214,11 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
                         href="/watch/alarms"
                         className="text-xs font-medium text-primary hover:underline"
                     >
-                        Set one up
+                        {t("alarms.setUp")}
                     </Link>
                 }
             >
-                Nothing has tripped. No alarms yet either.
+                {t("alarms.empty")}
             </WidgetEmpty>
         );
     }
@@ -219,10 +226,19 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span className={cn("text-xl font-semibold", data.firing > 0 && "text-danger")}>
-                    {data.firing}
-                </span>
-                <span className="text-muted-foreground"> firing now</span>
+                {t.rich("alarms.firing", {
+                    big: (chunks) => (
+                        <span key="big" className={cn("text-xl font-semibold", data.firing > 0 && "text-danger")}>
+                            {chunks}
+                        </span>
+                    ),
+                    rest: (chunks) => (
+                        <span key="rest" className="text-muted-foreground">
+                            {chunks}
+                        </span>
+                    ),
+                    count: data.firing
+                })}
             </p>
             {data.events.length > 0 ? (
                 <ul className="flex flex-col gap-2">
@@ -230,14 +246,14 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
                         <li key={event.id} className="flex items-start gap-2">
                             <StateDot
                                 state={event.kind === "resolved" ? "up" : "down"}
-                                label={event.kind === "resolved" ? "Resolved" : "Triggered"}
+                                label={event.kind === "resolved" ? t("alarms.resolved") : t("alarms.triggered")}
                             />
                             <span className="flex min-w-0 flex-1 flex-col">
                                 <span className="truncate text-sm" title={event.name}>
                                     {event.name}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    {event.kind === "resolved" ? "Resolved" : "Triggered"}
+                                    {event.kind === "resolved" ? t("alarms.resolved") : t("alarms.triggered")}
                                     {event.detail ? ` - ${event.detail}` : ""}{" "}
                                     <RelativeTime iso={event.createdAt} />
                                 </span>
@@ -251,9 +267,9 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
 }
 
 export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null)
-        return <WidgetUnavailable>Storage could not be read just now.</WidgetUnavailable>;
+    if (data === null) return <WidgetUnavailable>{t("storage.unavailable")}</WidgetUnavailable>;
     if (data.length === 0) {
         return (
             <WidgetEmpty
@@ -262,11 +278,11 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                         href="/drive/overview"
                         className="text-xs font-medium text-primary hover:underline"
                     >
-                        Connect a device
+                        {t("storage.connect")}
                     </Link>
                 }
             >
-                No device has reported its usage yet.
+                {t("storage.empty")}
             </WidgetEmpty>
         );
     }
@@ -302,11 +318,15 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                         </div>
                         <p className="text-xs text-muted-foreground">
                             {device.usedBytes == null
-                                ? "Usage not reported"
-                                : formatBytes(device.usedBytes)}
-                            {device.totalBytes == null
-                                ? ""
-                                : ` of ${formatBytes(device.totalBytes)}`}
+                                ? device.totalBytes == null
+                                    ? t("storage.usageUnknown")
+                                    : t("storage.usageUnknownOf", { total: formatBytes(device.totalBytes) })
+                                : device.totalBytes == null
+                                  ? formatBytes(device.usedBytes)
+                                  : t("storage.usedOf", {
+                                        used: formatBytes(device.usedBytes),
+                                        total: formatBytes(device.totalBytes)
+                                    })}
                         </p>
                     </li>
                 );
@@ -324,9 +344,9 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
  * not, and the row goes to the server whose state you just read.
  */
 export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton rows={2} />;
-    if (data === null)
-        return <WidgetUnavailable>Your game servers could not be read just now.</WidgetUnavailable>;
+    if (data === null) return <WidgetUnavailable>{t("games.unavailable")}</WidgetUnavailable>;
     if (data.total === 0) {
         return (
             <WidgetEmpty
@@ -335,11 +355,11 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
                         href="/apps/games"
                         className="text-xs font-medium text-primary hover:underline"
                     >
-                        Create one
+                        {t("games.create")}
                     </Link>
                 }
             >
-                No game server yet.
+                {t("games.empty")}
             </WidgetEmpty>
         );
     }
@@ -347,18 +367,23 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm">
-                <span
-                    className={cn(
-                        "text-xl font-semibold",
-                        data.running < data.total && "text-warning"
-                    )}
-                >
-                    {data.running}
-                </span>
-                <span className="text-muted-foreground">
-                    {" "}
-                    of {data.total} server{data.total === 1 ? "" : "s"} up
-                </span>
+                {t.rich("games.count", {
+                    big: (chunks) => (
+                        <span
+                            key="big"
+                            className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}
+                        >
+                            {chunks}
+                        </span>
+                    ),
+                    rest: (chunks) => (
+                        <span key="rest" className="text-muted-foreground">
+                            {chunks}
+                        </span>
+                    ),
+                    running: data.running,
+                    total: data.total
+                })}
             </p>
             <WidgetList>
                 {data.servers.map((server) => (
@@ -371,7 +396,7 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
                         trailing={
                             server.slots === null ? undefined : (
                                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                    {server.slots} slots
+                                    {t("games.slots", { count: server.slots })}
                                 </span>
                             )
                         }
@@ -384,23 +409,34 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
 
 /** The work assigned to somebody, most pressing first. */
 export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
+    const t = useTranslations("home");
     if (data === undefined) return <WidgetRowsSkeleton />;
-    if (data === null)
-        return <WidgetUnavailable>Your work could not be read just now.</WidgetUnavailable>;
-    if (data.assigned === 0) return <WidgetEmpty>Nothing is assigned to you.</WidgetEmpty>;
+    if (data === null) return <WidgetUnavailable>{t("tasks.unavailable")}</WidgetUnavailable>;
+    if (data.assigned === 0) return <WidgetEmpty>{t("tasks.empty")}</WidgetEmpty>;
 
     return (
         <div className="flex flex-col gap-3">
             {/* One line, not three tiles: how much work there is says nothing about
                 what it is, and the tasks below are what somebody came to see. */}
             <p className="text-sm">
-                <span className="text-xl font-semibold tabular-nums">{data.assigned}</span>
-                <span className="text-muted-foreground"> assigned</span>
+                {t.rich("tasks.assigned", {
+                    big: (chunks) => (
+                        <span key="big" className="text-xl font-semibold tabular-nums">
+                            {chunks}
+                        </span>
+                    ),
+                    rest: (chunks) => (
+                        <span key="rest" className="text-muted-foreground">
+                            {chunks}
+                        </span>
+                    ),
+                    count: data.assigned
+                })}
                 {data.overdue > 0 ? (
-                    <span className="text-danger"> - {data.overdue} overdue</span>
+                    <span className="text-danger">{t("tasks.overdue", { count: data.overdue })}</span>
                 ) : null}
                 {data.dueToday > 0 ? (
-                    <span className="text-warning"> - {data.dueToday} due today</span>
+                    <span className="text-warning">{t("tasks.dueToday", { count: data.dueToday })}</span>
                 ) : null}
             </p>
             <WidgetList>
@@ -440,7 +476,8 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
  * the plain dot rather than to a gap where a mark should be.
  */
 function GameMark({ game, running }: { game: string | null; running: boolean }) {
-    const label = running ? "Up" : "Stopped";
+    const t = useTranslations("home");
+    const label = running ? t("games.up") : t("games.stopped");
     const definition = game ? findGame(game) : undefined;
     if (!definition) return <StateDot state={running ? "up" : "idle"} label={label} />;
     return (

@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Card, Skeleton, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function WidgetCard({
     title,
@@ -37,6 +38,7 @@ export function WidgetCard({
     menu?: ReactNode;
     children: ReactNode;
 }) {
+    const t = useTranslations("home");
     return (
         <Card className="group/card flex h-full min-w-0 flex-col">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -47,8 +49,8 @@ export function WidgetCard({
                 {href ? (
                     <Link
                         href={href}
-                        title={`Open ${title}`}
-                        aria-label={`Open ${title}`}
+                        title={t("card.open", { name: title })}
+                        aria-label={t("card.open", { name: title })}
                         className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <ArrowRight className="size-4" aria-hidden="true" />

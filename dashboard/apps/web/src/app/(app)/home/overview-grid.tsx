@@ -16,7 +16,9 @@
  * contents, so the page does not move under the reader when it does.
  */
 
-import { firstName, greetingFor } from "@polaris/core";
+import { firstName } from "@polaris/core";
+import { sizeLabel, widgetLabel } from "./widget-names";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { WidgetCard } from "./widget-card";
 import { ShortcutPicker } from "./shortcut-picker";
 import { CustomizeDialog } from "./customize-dialog";
@@ -28,7 +30,7 @@ import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
+import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
 import {
     AlarmsWidget,
@@ -107,6 +109,18 @@ const SPAN: Record<OverviewWidgetSize, string> = {
 /** The same widths as columns, for the arithmetic that fits a row to the grid. */
 const COLUMNS: Record<OverviewWidgetSize, number> = { sm: 1, md: 2, lg: 3, xl: 4 };
 
+/** The part of the day a greeting is for, by the reader's own clock - the
+ *  same four `greetingFor` in @polaris/core names in English. */
+type DayPeriod = "night" | "morning" | "afternoon" | "evening";
+
+function dayPeriod(date: Date): DayPeriod {
+    const hour = date.getHours();
+    if (hour < 6) return "night";
+    if (hour < 12) return "morning";
+    if (hour < 19) return "afternoon";
+    return "evening";
+}
+
 export function OverviewGrid({
     name,
     isAdmin,
@@ -152,7 +166,8 @@ export function OverviewGrid({
     const [historyNonce, setHistoryNonce] = useState(0);
     // The greeting is the reader's local time of day, which the server does not
     // know: rendering it during SSR would hydrate into a different sentence.
-    const [hello, setHello] = useState<string | null>(null);
+    const [hello, setHello] = useState<DayPeriod | null>(null);
+    const t = useTranslations("home");
     // Columns the grid has right now. 0 until it has been measured, which is the
     // server render and the first paint.
     const [columns, setColumns] = useState(0);
@@ -170,7 +185,7 @@ export function OverviewGrid({
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const gridRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => setHello(greetingFor(new Date())), []);
+    useEffect(() => setHello(dayPeriod(new Date())), []);
 
     /** Cards this account holds but cannot currently see. Carried through every
      *  save untouched, so losing access to an app for a week does not silently
@@ -212,13 +227,11 @@ export function OverviewGrid({
                         setWidgets(previous.widgets);
                         setShortcuts(previous.shortcuts);
                         setGreeting(previous.greeting);
-                        setFailure(
-                            "That change could not be saved. Check your connection and try again."
-                        );
+                        setFailure(t("errors.changeNotSaved"));
                     });
             }, SAVE_DEBOUNCE_MS);
         },
-        [unseen]
+        [unseen, t]
     );
 
     const current = () => ({ widgets, shortcuts, greeting });
@@ -415,20 +428,20 @@ export function OverviewGrid({
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                         {greeting
                             ? hello
-                                ? `${hello}, ${firstName(name)}`
-                                : `Welcome back, ${firstName(name)}`
-                            : "Overview"}
+                                ? t("greeting", { period: hello, name: firstName(name) })
+                                : t("welcomeBack", { name: firstName(name) })
+                            : t("title")}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        What is running, what needs you, and the places you go most.
+                        {t("intro")}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={refresh}
-                        title="Refresh the figures"
-                        aria-label="Refresh the figures"
+                        title={t("refresh")}
+                        aria-label={t("refresh")}
                         className="grid size-9 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <RefreshCw
@@ -441,7 +454,7 @@ export function OverviewGrid({
                     </button>
                     <Button variant="outline" size="sm" onClick={() => setCustomizing(true)}>
                         <Settings2 className="size-4" aria-hidden="true" />
-                        Customize
+                        {t("customize.open")}
                     </Button>
                 </div>
             </div>
@@ -458,15 +471,16 @@ export function OverviewGrid({
             {visible.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
                     <LayoutGrid className="size-6 text-muted-foreground" aria-hidden="true" />
-                    <p className="text-sm text-muted-foreground">Every card is turned off.</p>
+                    <p className="text-sm text-muted-foreground">{t("allOff")}</p>
                     <Button variant="outline" size="sm" onClick={() => setCustomizing(true)}>
-                        Choose what to show
+                        {t("chooseWhat")}
                     </Button>
                 </div>
             ) : (
                 <div ref={gridRef} className="overview-grid">
                     {visible.map((widget, index) => {
                         const entry = overviewWidget(widget.id);
+                        const label = widgetLabel(t, widget.id, entry.label);
                         return (
                             <div
                                 key={widget.id}
@@ -499,12 +513,12 @@ export function OverviewGrid({
                                 }}
                             >
                                 <WidgetCard
-                                    title={entry.label}
+                                    title={label}
                                     icon={entry.icon}
                                     href={entry.href}
                                     grip={
                                         <WidgetGrip
-                                            label={entry.label}
+                                            label={label}
                                             onStart={() => setDragged(widget.id)}
                                             onEnd={() => {
                                                 setDragged(null);
@@ -514,7 +528,7 @@ export function OverviewGrid({
                                     }
                                     menu={
                                         <WidgetMenu
-                                            label={entry.label}
+                                            label={label}
                                             sizes={entry.sizes}
                                             size={overviewSize(widget.id, widget.size)}
                                             first={index === 0}
@@ -647,10 +661,11 @@ function WidgetGrip({
     onStart: () => void;
     onEnd: () => void;
 }) {
+    const t = useTranslations("home");
     return (
         <span
             draggable
-            title={`Drag to move ${label}`}
+            title={t("card.drag", { name: label })}
             aria-hidden="true"
             onDragStart={(event) => {
                 // Firefox starts no drag at all unless something is on the
@@ -694,13 +709,14 @@ function WidgetMenu({
     /** Only for the cards that hold something of the reader's to throw away. */
     onClear?: () => void;
 }) {
+    const t = useTranslations("home");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    title={`Arrange ${label}`}
-                    aria-label={`Arrange ${label}`}
+                    title={t("card.arrange", { name: label })}
+                    aria-label={t("card.arrange", { name: label })}
                     className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <MoreVertical className="size-4" aria-hidden="true" />
@@ -709,23 +725,23 @@ function WidgetMenu({
             <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem disabled={first} onSelect={() => onMove(-1)}>
                     <ArrowUp className="size-4" aria-hidden="true" />
-                    Move up
+                    {t("card.moveUp")}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={last} onSelect={() => onMove(1)}>
                     <ArrowDown className="size-4" aria-hidden="true" />
-                    Move down
+                    {t("card.moveDown")}
                 </DropdownMenuItem>
                 {sizes.length > 1 ? (
                     <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Width</DropdownMenuLabel>
+                        <DropdownMenuLabel>{t("card.width")}</DropdownMenuLabel>
                         {sizes.map((option) => (
                             <DropdownMenuItem
                                 key={option}
                                 onSelect={() => onResize(option)}
                                 className={cn(option === size && "text-primary")}
                             >
-                                {OVERVIEW_SIZE_LABELS[option]}
+                                {sizeLabel(t, option)}
                             </DropdownMenuItem>
                         ))}
                     </>
@@ -734,12 +750,12 @@ function WidgetMenu({
                 {onClear ? (
                     <DropdownMenuItem variant="danger" onSelect={onClear}>
                         <Trash2 className="size-4" aria-hidden="true" />
-                        Clear history
+                        {t("card.clearHistory")}
                     </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem onSelect={onHide}>
                     <EyeOff className="size-4" aria-hidden="true" />
-                    Hide card
+                    {t("card.hide")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

@@ -98,10 +98,8 @@ describe("what the person is told", () => {
     });
 
     it("says the same on the organization's own screen", async () => {
-        const view = await readFile(
-            `${SRC}app/(app)/account/organizations/[slug]/mailboxes/mailboxes-view.tsx`,
-            "utf8"
-        );
+        // The screen's words live in its catalog since it was translated.
+        const view = await readFile(`${SRC}../messages/en-US/accountOrgs.json`, "utf8");
         expect(view).toContain("the filters and templates they wrote");
         expect(view).toContain("The mailbox itself and its mail are not touched");
     });

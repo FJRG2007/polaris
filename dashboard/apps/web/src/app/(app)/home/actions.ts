@@ -13,12 +13,15 @@
 
 import { requireUser } from "@/lib/session";
 import { overviewPreferencesSchema } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { saveOverviewPreferences } from "@/lib/overview/prefs-service";
 
 export async function saveOverviewPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = overviewPreferencesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That layout could not be saved." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("home"))("errors.layoutNotSaved") };
+    }
     await saveOverviewPreferences(user.id, parsed.data);
     return {};
 }
