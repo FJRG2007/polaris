@@ -8,6 +8,7 @@
 import { Badge, Button } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PropagationReport } from "@/lib/dns/propagation";
 import { dnsPropagationAction, type DnsScopeRef } from "@/app/(app)/account/domains/dns-actions";
 import { AlertTriangle, CheckCircle2, CircleSlash, Loader2, RefreshCw, XCircle } from "lucide-react";
@@ -24,6 +25,7 @@ const PROPAGATION_ATTEMPTS = 40;
  */
 export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; recordId: string }) {
     const format = useDisplayFormat();
+    const t = useTranslations("dns");
     const [report, setReport] = useState<PropagationReport | null>(null);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -35,7 +37,7 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
     const check = useCallback(async () => {
         setBusy(true);
         const result = await dnsPropagationAction(scopeRef.current, recordId).catch(() => ({
-            error: "Could not ask the resolvers",
+            error: t("propagation.askFailed"),
             report: undefined
         }));
         setBusy(false);
@@ -43,8 +45,8 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
         if (result.report) {
             setReport(result.report);
             setError("");
-        } else setError(result.error ?? "Could not ask the resolvers");
-    }, [recordId]);
+        } else setError(result.error ?? t("propagation.askFailed"));
+    }, [recordId, t]);
 
     useEffect(() => {
         void check();
@@ -70,31 +72,28 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
     return (
         <div className="flex flex-col gap-2" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-medium">Propagation</span>
+                <span className="font-medium">{t("propagation.title")}</span>
                 {report?.settled ? (
-                    <Badge variant="success">Every resolver agrees</Badge>
+                    <Badge variant="success">{t("propagation.allAgree")}</Badge>
                 ) : report ? (
-                    <Badge variant="warning">Not everywhere yet</Badge>
+                    <Badge variant="warning">{t("propagation.notYet")}</Badge>
                 ) : null}
                 <span className="text-muted-foreground">
                     {busy
-                        ? "Asking the resolvers..."
+                        ? t("propagation.asking")
                         : waiting
-                          ? `Checking again in ${left}s.`
+                          ? t("propagation.checkingIn", { seconds: left })
                           : report
-                            ? `Checked ${format.time(report.checkedAt)}.`
+                            ? t("propagation.checkedAt", { time: format.time(report.checkedAt) })
                             : ""}
                 </span>
                 <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void check()}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Check now
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} {t("propagation.checkNow")}
                 </Button>
             </div>
             {error && <p className="text-danger text-xs">{error}</p>}
             {report && report.expected === null && (
-                <p className="text-muted-foreground text-xs">
-                    Proxied through Cloudflare, so resolvers answer with Cloudflare&rsquo;s addresses rather than the
-                    value here. Compared with each other instead.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("propagation.proxied")}</p>
             )}
             {report && (
                 <ul className="flex flex-col gap-1">
@@ -110,12 +109,12 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
                             <span className="w-40 shrink-0">{resolver.label}</span>
                             <code className="text-muted-foreground min-w-0 flex-1 break-all">
                                 {resolver.status === "unreachable"
-                                    ? "Did not answer"
+                                    ? t("propagation.noAnswer")
                                     : resolver.status === "missing"
-                                      ? "No such name yet"
+                                      ? t("propagation.noSuchName")
                                       : resolver.values.length > 0
                                         ? resolver.values.join(", ")
-                                        : "No record of this type yet"}
+                                        : t("propagation.noRecordOfType")}
                             </code>
                         </li>
                     ))}
@@ -124,8 +123,7 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
             {!busy && report && !report.settled && attempts >= PROPAGATION_ATTEMPTS && (
                 <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
                     <AlertTriangle className="mt-px size-3.5 shrink-0" />
-                    Stopped checking on its own. A resolver keeps an old answer until its cached copy expires, which
-                    can take as long as the old record&rsquo;s TTL.
+                    {t("propagation.gaveUp")}
                 </p>
             )}
         </div>

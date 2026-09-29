@@ -22,6 +22,7 @@ import { Button, Skeleton, cn } from "@polaris/ui";
 import { Pencil, Radar, Trash2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import type { DnsRecordView } from "@/lib/dns/zone-records";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** The rows a skeleton draws while the first read is on its way. */
 const SKELETON_ROWS = 5;
@@ -50,6 +51,7 @@ export function DnsRecordsTable({
     onEdit: (record: DnsRecordView) => void;
     onDelete: (record: DnsRecordView) => void;
 }) {
+    const t = useTranslations("dns");
     return (
         // Scrolls sideways rather than squeezing: six columns on a phone would be
         // six unreadable ones.
@@ -58,22 +60,22 @@ export function DnsRecordsTable({
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                     <tr>
                         <th scope="col" className="w-20 px-3 py-2 font-medium">
-                            Type
+                            {t("table.type")}
                         </th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            Name
+                            {t("table.name")}
                         </th>
                         <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
-                            Content
+                            {t("table.content")}
                         </th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            Proxy status
+                            {t("table.proxyStatus")}
                         </th>
                         <th scope="col" className="px-3 py-2 font-medium">
-                            TTL
+                            {t("table.ttl")}
                         </th>
                         <th scope="col" className="px-3 py-2 text-right font-medium">
-                            <span className="sr-only">Actions</span>
+                            <span className="sr-only">{t("table.actions")}</span>
                         </th>
                     </tr>
                 </thead>
@@ -151,8 +153,9 @@ function RecordRow({
 }) {
     // A type the editor does not write (an HTTPS or PTR record Cloudflare holds)
     // is listed and can be removed, but not changed from here.
+    const t = useTranslations("dns");
     const editable = record.draft !== null && !pending;
-    const described = `${record.type} record ${record.relative}`;
+    const described = { type: record.type, name: record.relative };
     return (
         <tr
             aria-busy={pending ? true : undefined}
@@ -164,13 +167,13 @@ function RecordRow({
                     <span className="block max-w-[16rem] truncate font-medium" title={record.name}>
                         {record.relative}
                     </span>
-                    <CopyButton value={record.name} label={`name ${record.name}`} className="shrink-0" />
+                    <CopyButton value={record.name} label={t("table.copyName", { name: record.name })} className="shrink-0" />
                 </span>
             </td>
             <td className="max-w-0 px-3 py-2">
                 <span className="flex min-w-0 items-center gap-1.5">
                     {record.type === "MX" && record.priority !== null ? (
-                        <span className="shrink-0 font-mono text-xs text-foreground-subtle" title="Priority">
+                        <span className="shrink-0 font-mono text-xs text-foreground-subtle" title={t("table.priority")}>
                             {record.priority}
                         </span>
                     ) : null}
@@ -178,15 +181,15 @@ function RecordRow({
                         {record.content || "-"}
                     </code>
                     {record.content ? (
-                        <CopyButton value={record.content} label={`content ${record.content}`} className="shrink-0" />
+                        <CopyButton value={record.content} label={t("table.copyContent", { content: record.content })} className="shrink-0" />
                     ) : null}
                 </span>
             </td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                {record.proxiable ? (record.proxied ? "Proxied" : "DNS only") : "-"}
+                {record.proxiable ? (record.proxied ? t("table.proxied") : t("table.dnsOnly")) : "-"}
             </td>
             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                {ttlLabel(record.ttl)}
+                {ttlLabel(record.ttl, t)}
             </td>
             <td className="whitespace-nowrap px-3 py-1">
                 <span className="flex items-center justify-end gap-0.5">
@@ -195,9 +198,9 @@ function RecordRow({
                             size="icon-sm"
                             variant="ghost"
                             onClick={onCheck}
-                            aria-label={`Check where the ${described} has reached`}
+                            aria-label={t("table.checkAria", described)}
                             aria-pressed={checking}
-                            title="Check propagation"
+                            title={t("table.check")}
                         >
                             <Radar className="size-4" />
                         </Button>
@@ -207,8 +210,8 @@ function RecordRow({
                             size="icon-sm"
                             variant="ghost"
                             onClick={onEdit}
-                            aria-label={`Edit the ${described}`}
-                            title="Edit"
+                            aria-label={t("table.editAria", described)}
+                            title={t("table.edit")}
                         >
                             <Pencil className="size-4" />
                         </Button>
@@ -218,8 +221,8 @@ function RecordRow({
                         variant="ghost"
                         onClick={onDelete}
                         disabled={pending}
-                        aria-label={`Delete the ${described}`}
-                        title="Delete"
+                        aria-label={t("table.deleteAria", described)}
+                        title={t("table.delete")}
                     >
                         <Trash2 className="size-4" />
                     </Button>

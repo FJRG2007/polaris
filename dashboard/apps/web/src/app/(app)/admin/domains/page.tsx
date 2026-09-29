@@ -17,6 +17,7 @@ import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { DomainsView } from "./domains-view";
+import { Messages } from "@/components/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,9 @@ export default async function DomainsPage() {
                 title={t("domains.page.title")}
                 description={t("domains.page.description")}
             />
-            <DomainsView />
+            <Messages namespaces={["dns"]}>
+                <DomainsView />
+            </Messages>
         </div>
     );
 }

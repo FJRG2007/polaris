@@ -14,10 +14,11 @@
 
 import { txtText } from "./record-schema";
 
+/** Labelled with the operator's name and address, which read the same in every language. */
 export const RESOLVERS = [
-    { id: "cloudflare", label: "Cloudflare (1.1.1.1)", url: "https://cloudflare-dns.com/dns-query" },
-    { id: "google", label: "Google (8.8.8.8)", url: "https://dns.google/dns-query" },
-    { id: "quad9", label: "Quad9 (9.9.9.9)", url: "https://dns.quad9.net/dns-query" }
+    { id: "cloudflare", label: "Cloudflare (1.1.1.1)", url: "https://cloudflare-dns.com/dns-query" }, // i18n-ignore
+    { id: "google", label: "Google (8.8.8.8)", url: "https://dns.google/dns-query" }, // i18n-ignore
+    { id: "quad9", label: "Quad9 (9.9.9.9)", url: "https://dns.quad9.net/dns-query" } // i18n-ignore
 ] as const;
 
 export type ResolverId = (typeof RESOLVERS)[number]["id"];

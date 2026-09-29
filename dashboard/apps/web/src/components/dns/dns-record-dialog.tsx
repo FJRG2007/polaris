@@ -21,6 +21,7 @@ import * as dns from "@/lib/dns/record-schema";
 import { useState, type ReactNode } from "react";
 import { ttlLabel } from "@/lib/dns/records-view";
 import type { ZoneRecords } from "@/lib/dns/zone-records";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -45,23 +46,16 @@ export interface RecordEditing {
     readonly problems?: Record<string, string>;
 }
 
-const TTL_OPTIONS = [String(dns.TTL_AUTO), "60", "300", "3600", "86400"].map((value) => ({
-    value,
-    label: ttlLabel(Number(value))
-}));
+const TTL_VALUES = [String(dns.TTL_AUTO), "60", "300", "3600", "86400"];
 const TYPE_OPTIONS = dns.DNS_RECORD_TYPES.map((type) => ({ value: type, label: type }));
 const TAG_OPTIONS = dns.CAA_TAGS.map((tag) => ({ value: tag, label: tag }));
 
 type NumberKey = "priority" | "weight" | "port" | "flags";
 
-const CONTENT_LABELS: Partial<Record<dns.DnsRecordType, string>> = {
-    A: "IPv4 address",
-    AAAA: "IPv6 address",
-    CNAME: "Target",
-    TXT: "Content",
-    MX: "Mail server",
-    NS: "Nameserver"
-};
+/** The types whose value is one `content` field, labelled for what it holds. */
+const CONTENT_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "NS"] as const;
+type ContentType = (typeof CONTENT_TYPES)[number];
+const hasContent = (type: dns.DnsRecordType): type is ContentType => (CONTENT_TYPES as readonly string[]).includes(type);
 
 const CONTENT_PLACEHOLDERS: Partial<Record<dns.DnsRecordType, string>> = {
     A: "203.0.113.10",
@@ -84,16 +78,17 @@ export function DnsRecordDialog({
     /** A record the schema accepted: the draft as typed, and the record it makes. */
     onSubmit: (draft: dns.DnsRecordDraft, record: dns.DnsRecordFields) => void;
 }) {
+    const t = useTranslations("dns");
     const [draft, setDraft] = useState(editing.draft);
     const [attempted, setAttempted] = useState(Boolean(editing.error));
     const [serverProblems, setServerProblems] = useState<Record<string, string>>(editing.problems ?? {});
     const apex = zone.zone.name;
 
-    const checked = dns.recordFields(draft, apex, { within: zone.within, existing: zone.records, editingId: editing.id });
+    const checked = dns.recordFields(draft, apex, { within: zone.within, existing: zone.records, editingId: editing.id }, t);
     const problems: Record<string, string> = checked.ok ? {} : { ...checked.problems };
     const missing = new Set<string>(checked.ok ? [] : checked.missing);
     const shown = (field: keyof dns.DnsRecordDraft): string | undefined =>
-        serverProblems[field] ?? problems[field] ?? (attempted && missing.has(field) ? "Required" : undefined);
+        serverProblems[field] ?? problems[field] ?? (attempted && missing.has(field) ? t("problems.required") : undefined);
     const unchanged = editing.id !== null && JSON.stringify(dns.normalizeDraft(draft)) === editing.original;
     const blocked = !checked.ok || unchanged;
 
@@ -118,6 +113,7 @@ export function DnsRecordDialog({
         onSubmit(draft, checked.record);
     }
 
+    const ttlOptions = TTL_VALUES.map((value) => ({ value, label: ttlLabel(Number(value), t) }));
     const type = draft.type;
     const proxiable = dns.PROXIABLE_TYPES.includes(type);
     const field = (key: keyof dns.DnsRecordDraft, placeholder: string, extra?: { inputMode?: "numeric" }) => (
@@ -142,10 +138,8 @@ export function DnsRecordDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{editing.id ? "Edit record" : "Add record"}</DialogTitle>
-                    <DialogDescription>
-                        In {apex}. Changes reach resolvers as their cached copies expire.
-                    </DialogDescription>
+                    <DialogTitle>{editing.id ? t("dialog.editTitle") : t("dialog.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("dialog.description", { zone: apex })}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-3"
@@ -156,7 +150,7 @@ export function DnsRecordDialog({
                     }}
                 >
                     <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                        <FormField label="Type">
+                        <FormField label={t("dialog.type")}>
                             <Select
                                 value={type}
                                 disabled={editing.id !== null}
@@ -167,84 +161,84 @@ export function DnsRecordDialog({
                                     setServerProblems({});
                                 }}
                                 options={TYPE_OPTIONS}
-                                aria-label="Record type"
+                                aria-label={t("dialog.typeAria")}
                             />
                         </FormField>
                         <FormField
-                            label="Name"
+                            label={t("dialog.name")}
                             required
                             problem={shown("name")}
                             hint={
                                 draft.name.trim()
-                                    ? `Full name: ${dns.absoluteName(draft.name, apex)}`
-                                    : `@ for ${apex} itself`
+                                    ? t("dialog.fullName", { name: dns.absoluteName(draft.name, apex) })
+                                    : t("dialog.apexHint", { zone: apex })
                             }
                         >
-                            {field("name", type === "SRV" ? "_service._tcp" : "@ or www")}
+                            {field("name", type === "SRV" ? "_service._tcp" : t("dialog.namePlaceholder"))}
                         </FormField>
                     </div>
 
-                    {CONTENT_LABELS[type] && (
-                        <FormField label={CONTENT_LABELS[type]!} problem={shown("content")} required>
+                    {hasContent(type) && (
+                        <FormField label={t(`dialog.content.${type}`)} problem={shown("content")} required>
                             {field("content", CONTENT_PLACEHOLDERS[type] ?? "")}
                         </FormField>
                     )}
 
                     {type === "SRV" && (
-                        <FormField label="Target" problem={shown("target")} required>
+                        <FormField label={t("dialog.target")} problem={shown("target")} required>
                             {field("target", "host.example.com")}
                         </FormField>
                     )}
 
                     {(type === "MX" || type === "SRV") && (
                         <div className="grid gap-3 sm:grid-cols-3">
-                            {numberField("priority", "Priority")}
-                            {type === "SRV" && numberField("weight", "Weight")}
-                            {type === "SRV" && numberField("port", "Port")}
+                            {numberField("priority", t("dialog.priority"))}
+                            {type === "SRV" && numberField("weight", t("dialog.weight"))}
+                            {type === "SRV" && numberField("port", t("dialog.port"))}
                         </div>
                     )}
 
                     {type === "CAA" && (
                         <div className="grid gap-3 sm:grid-cols-[5rem_8rem_minmax(0,1fr)]">
-                            {numberField("flags", "Flags")}
-                            <FormField label="Tag" problem={shown("tag")}>
+                            {numberField("flags", t("dialog.flags"))}
+                            <FormField label={t("dialog.tag")} problem={shown("tag")}>
                                 <Select
                                     value={draft.tag}
                                     onValueChange={(value) => set("tag", value)}
                                     options={TAG_OPTIONS}
-                                    aria-label="Tag"
+                                    aria-label={t("dialog.tag")}
                                 />
                             </FormField>
-                            <FormField label="Value" problem={shown("value")} required>
+                            <FormField label={t("dialog.value")} problem={shown("value")} required>
                                 {field("value", draft.tag === "iodef" ? "mailto:security@example.com" : "letsencrypt.org")}
                             </FormField>
                         </div>
                     )}
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <FormField label="TTL" problem={shown("ttl")}>
+                        <FormField label={t("dialog.ttl")} problem={shown("ttl")}>
                             <Select
                                 value={draft.proxied && proxiable ? String(dns.TTL_AUTO) : draft.ttl}
                                 disabled={draft.proxied && proxiable}
                                 onValueChange={(value) => set("ttl", value)}
                                 options={
-                                    TTL_OPTIONS.some((option) => option.value === draft.ttl)
-                                        ? TTL_OPTIONS
-                                        : [...TTL_OPTIONS, { value: draft.ttl, label: ttlLabel(Number(draft.ttl)) }]
+                                    ttlOptions.some((option) => option.value === draft.ttl)
+                                        ? ttlOptions
+                                        : [...ttlOptions, { value: draft.ttl, label: ttlLabel(Number(draft.ttl), t) }]
                                 }
-                                aria-label="TTL"
+                                aria-label={t("dialog.ttl")}
                             />
                         </FormField>
                         {proxiable && (
                             <div className="flex flex-col gap-1.5">
-                                <span className="text-xs font-medium text-muted-foreground">Proxy status</span>
+                                <span className="text-xs font-medium text-muted-foreground">{t("dialog.proxyStatus")}</span>
                                 <div className="flex h-8 items-center gap-2 text-sm">
                                     <Switch
                                         checked={draft.proxied}
                                         onChange={(value) => set("proxied", value)}
-                                        aria-label="Proxy through Cloudflare"
+                                        aria-label={t("dialog.proxyAria")}
                                     />
-                                    {draft.proxied ? "Proxied" : "DNS only"}
+                                    {draft.proxied ? t("dialog.proxied") : t("dialog.dnsOnly")}
                                 </div>
                             </div>
                         )}
@@ -257,10 +251,10 @@ export function DnsRecordDialog({
                     )}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {t("dialog.cancel")}
                         </Button>
                         <Button type="submit" aria-disabled={blocked} disabled={unchanged}>
-                            {editing.id ? "Save" : "Add record"}
+                            {editing.id ? t("dialog.save") : t("dialog.add")}
                         </Button>
                     </DialogFooter>
                 </form>

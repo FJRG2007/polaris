@@ -12,6 +12,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { MessageParams } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { openText } from "@/lib/tls/managed-certificates";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
@@ -51,6 +54,12 @@ export class DnsEditError extends Error {
     }
 }
 
+/** A refusal in the language of whoever asked. */
+async function refusal(key: NamespaceKey<"dns">, params?: MessageParams, problems?: DraftProblems): Promise<DnsEditError> {
+    const t = await getTranslations("dns");
+    return new DnsEditError(t(key, params), problems);
+}
+
 /** Cloudflare's zone and record ids: 32 hexadecimal characters. Checked before
  *  one is put in a request path. */
 const CF_ID = /^[a-f0-9]{32}$/;
@@ -65,11 +74,11 @@ interface Zone {
 
 async function zoneFor(scope: DnsScope): Promise<Zone> {
     if (scope.kind === "instance") {
-        if (!CF_ID.test(scope.zoneId)) throw new DnsEditError("That zone is not one this Polaris can edit");
+        if (!CF_ID.test(scope.zoneId)) throw await refusal("errors.zoneNotEditable");
         const token = await loadCloudflareToken();
-        if (!token) throw new DnsEditError("Connect a Cloudflare token under Integrations first");
+        if (!token) throw await refusal("errors.connectCloudflare");
         const zone = (await listZones(token)).find((entry) => entry.id === scope.zoneId);
-        if (!zone) throw new DnsEditError("That zone is not one this Polaris's Cloudflare token can edit");
+        if (!zone) throw await refusal("errors.zoneNotReached");
         return { token, id: zone.id, name: zone.name, within: null };
     }
     const row = await prisma.ownerDomain.findFirst({
@@ -80,9 +89,9 @@ async function zoneFor(scope: DnsScope): Promise<Zone> {
         },
         select: { domain: true, dnsToken: true }
     });
-    if (!row) throw new DnsEditError("That domain is not one of yours, or it is not verified yet");
+    if (!row) throw await refusal("errors.notYourDomain");
     const token = openText(row.dnsToken);
-    if (!token) throw new DnsEditError("Add this domain's Cloudflare token first");
+    if (!token) throw await refusal("errors.addDomainToken");
     const zone = await resolveZoneForHostname(token, row.domain);
     return { token, id: zone.id, name: zone.name, within: row.domain };
 }
@@ -235,22 +244,23 @@ export async function saveZoneRecord(
     const zone = await zoneFor(scope);
     const existing = await scopedRecords(zone);
     if (recordId !== null && !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))) {
-        throw new DnsEditError("That record is not in this zone");
+        throw await refusal("errors.recordNotInZone");
     }
-    const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId });
+    const t = await getTranslations("dns");
+    const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId }, t);
     if (!checked.ok) {
         const problems = { ...checked.problems };
-        for (const field of checked.missing) problems[field] ??= "Required";
-        throw new DnsEditError("Check the highlighted fields", problems);
+        for (const field of checked.missing) problems[field] ??= t("problems.required");
+        throw new DnsEditError(t("errors.checkFields"), problems);
     }
     return viewOf(await saveDnsRecord(zone.token, zone.id, recordId, checked.record), zone.name);
 }
 
 /** Refuse a record id that is not in this zone, or not within this scope. */
 async function requireOwnRecord(zone: Zone, recordId: string): Promise<{ type: string; name: string }> {
-    if (!CF_ID.test(recordId)) throw new DnsEditError("That record is not in this zone");
+    if (!CF_ID.test(recordId)) throw await refusal("errors.recordNotInZone");
     const current = await getDnsRecord(zone.token, zone.id, recordId);
-    if (!current || !inside(zone, current.name)) throw new DnsEditError("That record is not in this zone");
+    if (!current || !inside(zone, current.name)) throw await refusal("errors.recordNotInZone");
     return current;
 }
 
@@ -288,7 +298,7 @@ export async function recordPropagation(scope: DnsScope, recordId: string): Prom
     const zone = await zoneFor(scope);
     const current = await requireOwnRecord(zone, recordId);
     if (!(DNS_RECORD_TYPES as readonly string[]).includes(current.type)) {
-        throw new DnsEditError(`Propagation is checked for ${DNS_RECORD_TYPES.join(", ")} records`);
+        throw await refusal("errors.propagationTypes", { types: DNS_RECORD_TYPES.join(", ") });
     }
     const siblings = (await listDnsRecords(zone.token, zone.id)).filter(
         (record) => record.type === current.type && normalizeHostname(record.name) === normalizeHostname(current.name)

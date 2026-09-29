@@ -9,6 +9,7 @@
 
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
 import { getPublicIp } from "@/lib/domain-service";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
 import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
@@ -33,14 +34,16 @@ export default async function AccountDomainsPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("domains.page.title")}</h1>
                 <p className="text-muted-foreground text-sm">{t("domains.page.intro")}</p>
             </div>
-            <OwnerDomainsView
-                owner={{ kind: "user" }}
-                domains={domains}
-                canAdd={allowed.ok}
-                blockedReason={allowed.ok ? "" : allowed.reason}
-                publicIp={publicIp}
-                instanceDomains={reserved}
-            />
+            <Messages namespaces={["dns"]}>
+                <OwnerDomainsView
+                    owner={{ kind: "user" }}
+                    domains={domains}
+                    canAdd={allowed.ok}
+                    blockedReason={allowed.ok ? "" : allowed.reason}
+                    publicIp={publicIp}
+                    instanceDomains={reserved}
+                />
+            </Messages>
         </div>
     );
 }

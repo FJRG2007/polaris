@@ -4,6 +4,7 @@
  */
 
 import api from "./api.json";
+import dns from "./dns.json";
 import nav from "./nav.json";
 import auth from "./auth.json";
 import chat from "./chat.json";
@@ -20,15 +21,22 @@ import common from "./common.json";
 import deploy from "./deploy.json";
 import system from "./system.json";
 import account from "./account.json";
+import backups from "./backups.json";
 import catalog from "./catalog.json";
 import notices from "./notices.json";
+import runners from "./runners.json";
+import servers from "./servers.json";
+import firewall from "./firewall.json";
 import analytics from "./analytics.json";
+import databases from "./databases.json";
 import installed from "./installed.json";
 import reference from "./reference.json";
 import telemetry from "./telemetry.json";
 import compliance from "./compliance.json";
 import components from "./components.json";
+import containers from "./containers.json";
 import deployData from "./deployData.json";
+import mailServer from "./mailServer.json";
 import tasksViews from "./tasksViews.json";
 import validation from "./validation.json";
 import accountOrgs from "./accountOrgs.json";
@@ -57,12 +65,15 @@ export default {
     analytics,
     api,
     auth,
+    backups,
     catalog,
     chat,
     code,
     common,
     compliance,
     components,
+    containers,
+    databases,
     deploy,
     deployConfig,
     deployData,
@@ -70,16 +81,21 @@ export default {
     deployServer,
     deployService,
     deploySettings,
+    dns,
+    firewall,
     home,
     installed,
     mail,
     mailCompose,
+    mailServer,
     mailSettings,
     marketplace,
     nav,
     notices,
     publicPages,
     reference,
+    runners,
+    servers,
     system,
     tasks,
     tasksDetail,

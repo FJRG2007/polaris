@@ -5,6 +5,7 @@
  * and the order are asserted without a browser.
  */
 
+import type { MessageParams } from "@polaris/core";
 import type { DnsRecordView } from "./zone-records";
 import {
     PROXIABLE_TYPES,
@@ -54,12 +55,15 @@ export function recordTypesIn(records: readonly DnsRecordView[]): string[] {
     return [...new Set(records.map((record) => record.type))].sort(compare);
 }
 
-const TTL_LABELS: Record<number, string> = { 60: "1 min", 300: "5 min", 3600: "1 hour", 86400: "1 day" };
+type TtlKey = "ttl.auto" | "ttl.minute" | "ttl.fiveMinutes" | "ttl.hour" | "ttl.day" | "ttl.seconds";
 
-/** A TTL as the table and the form say it. */
-export function ttlLabel(ttl: number): string {
-    if (ttl === TTL_AUTO) return "Auto";
-    return TTL_LABELS[ttl] ?? `${ttl} s`;
+const TTL_LABELS: Record<number, TtlKey> = { 60: "ttl.minute", 300: "ttl.fiveMinutes", 3600: "ttl.hour", 86400: "ttl.day" };
+
+/** A TTL as the table and the form say it, through the `dns` translator. */
+export function ttlLabel(ttl: number, t: (key: TtlKey, params?: MessageParams) => string): string {
+    if (ttl === TTL_AUTO) return t("ttl.auto");
+    const named = TTL_LABELS[ttl];
+    return named ? t(named) : t("ttl.seconds", { seconds: String(ttl) });
 }
 
 /** The value column's text for a record in the shape Cloudflare takes. */
