@@ -10,6 +10,11 @@
  * smelted) since it began, less what they dropped: a stack taken out of their
  * own chest, or thrown down and picked up again, gathers nothing.
  *
+ * Iron made at a table or a furnace counts only as far as raw iron (or iron ore)
+ * picked up since the start could have made it: the game counts ingots crafted
+ * out of a block of iron the same as ingots smelted, so a block taken out of a
+ * player's own chest and crafted into nine gathered nine.
+ *
  * Everything is kept on the server's scoreboard, under `pe_`, so a Polaris
  * restart finds it where it was.
  */
@@ -22,8 +27,9 @@ interface Material {
     readonly held: string;
     /** The item ids the statistics count it by. */
     readonly ids: readonly string[];
-    /** Whether it is made rather than found - smelted - so crafting it counts. */
-    readonly crafted?: boolean;
+    /** What it is smelted from, for what is made rather than found: making it
+     *  counts, but never for more than of these was picked up. */
+    readonly smeltedFrom?: readonly string[];
 }
 
 const MATERIALS: Readonly<Record<GatherMaterial, Material>> = {
@@ -47,7 +53,12 @@ const MATERIALS: Readonly<Record<GatherMaterial, Material>> = {
         ]
     },
     cobblestone: { held: "minecraft:cobblestone", ids: ["cobblestone"] },
-    iron_ingot: { held: "minecraft:iron_ingot", ids: ["iron_ingot"], crafted: true },
+    iron_ingot: {
+        held: "minecraft:iron_ingot",
+        ids: ["iron_ingot"],
+        // Raw iron from 1.17; the ore itself before that, and with silk touch.
+        smeltedFrom: ["raw_iron", "iron_ore", "deepslate_iron_ore"]
+    },
     coal: { held: "minecraft:coal", ids: ["coal"] },
     kelp: { held: "minecraft:kelp", ids: ["kelp"] },
     bamboo: { held: "minecraft:bamboo", ids: ["bamboo"] },
@@ -59,6 +70,9 @@ const MATERIALS: Readonly<Record<GatherMaterial, Material>> = {
 };
 
 const HAVE = "pe_have";
+/** What of the material was made, and what it could have been made from. */
+const MADE = "pe_gmade";
+const RAW = "pe_graw";
 const BASE = "pe_base";
 const SEEN = "pe_seen";
 const CAP = "pe_cap";
@@ -88,8 +102,7 @@ export function materialOf(
 function statistics(
     material: GatherMaterial
 ): { objective: string; criterion: string; sign: 1 | -1 }[] {
-    const { ids, crafted } = MATERIALS[material];
-    return ids.flatMap((id, index) => [
+    return MATERIALS[material].ids.flatMap((id, index) => [
         {
             objective: `pe_gp${index}`,
             criterion: `minecraft.picked_up:minecraft.${id}`,
@@ -99,29 +112,45 @@ function statistics(
             objective: `pe_gd${index}`,
             criterion: `minecraft.dropped:minecraft.${id}`,
             sign: -1 as const
-        },
-        ...(crafted
-            ? [
-                  {
-                      objective: `pe_gc${index}`,
-                      criterion: `minecraft.crafted:minecraft.${id}`,
-                      sign: 1 as const
-                  }
-              ]
-            : [])
+        }
     ]);
+}
+
+/** For what is made: how many were made, and what they could have been made from. */
+function making(material: GatherMaterial): {
+    made: { objective: string; criterion: string };
+    from: { objective: string; criterion: string; sign: 1 | -1 }[];
+} | null {
+    const { ids, smeltedFrom } = MATERIALS[material];
+    if (!smeltedFrom) return null;
+    return {
+        made: { objective: "pe_gc0", criterion: `minecraft.crafted:minecraft.${ids[0]}` },
+        from: smeltedFrom.flatMap((id, index) => [
+            {
+                objective: `pe_gr${index}`,
+                criterion: `minecraft.picked_up:minecraft.${id}`,
+                sign: 1 as const
+            },
+            {
+                objective: `pe_gq${index}`,
+                criterion: `minecraft.dropped:minecraft.${id}`,
+                sign: -1 as const
+            }
+        ])
+    };
 }
 
 /** The objectives it counts with. The statistics count from this moment on. */
 export function gatheringSetup(material: GatherMaterial): string[] {
     const lines: string[] = [];
-    for (const one of statistics(material)) {
+    const made = making(material);
+    for (const one of [...statistics(material), ...(made ? [made.made, ...made.from] : [])]) {
         lines.push(
             `scoreboard objectives remove ${one.objective}`,
             `scoreboard objectives add ${one.objective} ${one.criterion}`
         );
     }
-    for (const objective of [HAVE, BASE, SEEN, CAP, PROGRESS]) {
+    for (const objective of [HAVE, BASE, SEEN, CAP, PROGRESS, ...(made ? [MADE, RAW] : [])]) {
         lines.push(
             `scoreboard objectives remove ${objective}`,
             `scoreboard objectives add ${objective} dummy`
@@ -144,10 +173,22 @@ export function gatheringTick(material: GatherMaterial): string[] {
         `execute as @a store result score @s ${HAVE} run clear @s ${held} 0`,
         `scoreboard players set @a ${CAP} 0`
     ];
-    for (const one of statistics(material)) {
+    const add = (target: string, one: { objective: string; sign: 1 | -1 }) => [
+        `scoreboard players add @a ${one.objective} 0`,
+        `execute as @a run scoreboard players operation @s ${target} ${one.sign === 1 ? "+=" : "-="} @s ${one.objective}`
+    ];
+    for (const one of statistics(material)) lines.push(...add(CAP, one));
+    const made = making(material);
+    if (made) {
+        // What was made, no more than the raw material picked up could make.
+        lines.push(`scoreboard players set @a ${RAW} 0`);
+        for (const one of made.from) lines.push(...add(RAW, one));
         lines.push(
-            `scoreboard players add @a ${one.objective} 0`,
-            `execute as @a run scoreboard players operation @s ${CAP} ${one.sign === 1 ? "+=" : "-="} @s ${one.objective}`
+            `scoreboard players set @a[scores={${RAW}=..-1}] ${RAW} 0`,
+            `scoreboard players set @a ${MADE} 0`,
+            ...add(MADE, { objective: made.made.objective, sign: 1 }),
+            `execute as @a run scoreboard players operation @s ${MADE} < @s ${RAW}`,
+            `execute as @a run scoreboard players operation @s ${CAP} += @s ${MADE}`
         );
     }
     lines.push(
@@ -168,9 +209,11 @@ export const READ_PROGRESS = `execute as @a run scoreboard players get @s ${PROG
 /** Every objective any gathering makes, taken back out. Fails harmlessly for
  *  the ones this one did not make. */
 export function gatheringCleanup(): string[] {
-    const every = new Set<string>([HAVE, BASE, SEEN, CAP, PROGRESS]);
+    const every = new Set<string>([HAVE, BASE, SEEN, CAP, PROGRESS, MADE, RAW]);
     for (const material of GATHER_MATERIALS) {
         for (const one of statistics(material)) every.add(one.objective);
+        const made = making(material);
+        for (const one of made ? [made.made, ...made.from] : []) every.add(one.objective);
     }
     return [...every].map((objective) => `scoreboard objectives remove ${objective}`);
 }

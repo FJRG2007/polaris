@@ -443,6 +443,101 @@ describe("a world boss's end", () => {
     });
 });
 
+describe("a gathering of iron", () => {
+    /**
+     * One player's scoreboard, played through the tick's lines the way the game
+     * runs them: `stats` are the game's own counts, `held` what they carry.
+     */
+    function progress(stats: Record<string, number>, heldAtStart: number, heldNow: number): number {
+        const setup = gather.gatheringSetup("iron_ingot");
+        const criteria = new Map<string, string>();
+        for (const line of setup) {
+            const made = /^scoreboard objectives add (\S+) (\S+)$/.exec(line);
+            if (made) criteria.set(made[1]!, made[2]!);
+        }
+        const scores = new Map<string, number>();
+        for (const [objective, criterion] of criteria) {
+            if (criterion in stats) scores.set(objective, stats[criterion]!);
+        }
+        const matches = (selector: string) => {
+            const range = /scores=\{(.+)\}/.exec(selector)?.[1];
+            if (!range) return true;
+            return range.split(",").every((part) => {
+                const [objective, bounds] = part.split("=") as [string, string];
+                const value = scores.get(objective);
+                if (value === undefined) return false;
+                const [low, high] = bounds.includes("..") ? bounds.split("..") : [bounds, bounds];
+                return (
+                    (low === "" || value >= Number(low)) && (high === "" || value <= Number(high))
+                );
+            });
+        };
+        const run = (line: string, held: number) => {
+            let m =
+                /^execute as (\S+) unless score @s (\S+) matches 1 store result score @s (\S+) run clear/.exec(
+                    line
+                );
+            if (m) {
+                if (scores.get(m[2]!) !== 1) scores.set(m[3]!, held);
+                return;
+            }
+            m = /^execute as \S+ store result score @s (\S+) run clear/.exec(line);
+            if (m) return void scores.set(m[1]!, held);
+            m = /^scoreboard players (set|add) (\S+) (\S+) (-?\d+)$/.exec(line);
+            if (m) {
+                if (!criteria.has(m[3]!) || !matches(m[2]!)) return;
+                const now = m[1] === "add" ? (scores.get(m[3]!) ?? 0) : 0;
+                return void scores.set(m[3]!, now + Number(m[4]));
+            }
+            m = /^execute as (\S+) run scoreboard players operation @s (\S+) (\S+) @s (\S+)$/.exec(
+                line
+            );
+            if (m) {
+                if (!matches(m[1]!)) return;
+                const [, , target, op, source] = m;
+                const right = scores.get(source!);
+                if (right === undefined) return;
+                const left = scores.get(target!) ?? 0;
+                const value =
+                    op === "="
+                        ? right
+                        : op === "+="
+                          ? left + right
+                          : op === "-="
+                            ? left - right
+                            : op === "<"
+                              ? Math.min(left, right)
+                              : op === ">"
+                                ? Math.max(left, right)
+                                : left;
+                scores.set(target!, value);
+            }
+        };
+        for (const line of gather.gatheringTick("iron_ingot")) run(line, heldAtStart);
+        for (const line of gather.gatheringTick("iron_ingot")) run(line, heldNow);
+        return scores.get("pe_prog") ?? 0;
+    }
+
+    it("does not count ingots crafted out of a block taken from the player's own chest", () => {
+        // Nine ingots crafted from a block: made, never picked up as raw iron.
+        expect(progress({ "minecraft.crafted:minecraft.iron_ingot": 9 }, 0, 9)).toBe(0);
+    });
+
+    it("counts ingots smelted from raw iron picked up since the start", () => {
+        const stats = {
+            "minecraft.picked_up:minecraft.raw_iron": 5,
+            "minecraft.crafted:minecraft.iron_ingot": 5
+        };
+        expect(progress(stats, 0, 5)).toBe(5);
+        // And no more than that raw iron could make, however many are crafted.
+        expect(progress({ ...stats, "minecraft.crafted:minecraft.iron_ingot": 14 }, 0, 14)).toBe(5);
+    });
+
+    it("counts ingots picked up off the ground, as before", () => {
+        expect(progress({ "minecraft.picked_up:minecraft.iron_ingot": 3 }, 2, 5)).toBe(3);
+    });
+});
+
 describe("letting go of chunks", () => {
     it("spares the chunks somebody else held, and lets go of the rest one by one", () => {
         const keep = new Set(["2,-1"]);
