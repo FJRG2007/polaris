@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
+import { firstIssue, reply } from "./reply";
 import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import * as activity from "@/lib/activity/activity";
@@ -166,7 +167,7 @@ export async function createProjectAction(input: {
 }): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
-    if (!name) return { error: "A project name is required" };
+    if (!name) return { error: await reply("project.nameRequired") };
     try {
         // The project lands on whichever shelf is open. Working from an
         // organization takes being allowed to run its services - being on its
@@ -190,7 +191,7 @@ export async function createProjectAction(input: {
         revalidatePath(DEPLOY_PATH);
         return { id: project.id };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the project" };
+        return { error: caught instanceof Error ? caught.message : await reply("project.createFailed") };
     }
 }
 
@@ -213,7 +214,7 @@ export async function deleteProjectAction(projectId: string): Promise<{ error?: 
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the project" };
+        return { error: caught instanceof Error ? caught.message : await reply("project.deleteFailed") };
     }
 }
 
@@ -230,7 +231,7 @@ export async function createEnvironmentAction(input: {
     const user = await requirePermission("deploy.manage");
     const parsed = environmentCreateSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Check the environment's details" };
+        return { error: await firstIssue(parsed.error, "environment.checkDetails") };
     }
     const { name, cloneFrom, branch, deploy } = parsed.data;
     try {
@@ -238,11 +239,11 @@ export async function createEnvironmentAction(input: {
         // A copy carries the original's variables and secrets, so it takes being
         // allowed into the original; deploying it takes being allowed to deploy.
         if (cloneFrom && !accessInEnvironment(access, cloneFrom)) {
-            return { error: "Environment not found" };
+            return { error: await reply("environment.notFound") };
         }
         if (cloneFrom && deploy && !accessCan(access, "deploy.run")) {
             return {
-                error: 'You can create this environment, but not deploy it. Untick "Deploy it once it is created" and try again.'
+                error: await reply("environment.cannotDeploy")
             };
         }
         const environment = cloneFrom
@@ -271,7 +272,7 @@ export async function createEnvironmentAction(input: {
         return { id: environment.id };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not create the environment"
+            error: caught instanceof Error ? caught.message : await reply("environment.createFailed")
         };
     }
 }
@@ -294,7 +295,7 @@ export async function saveLayoutAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the layout" };
+        return { error: caught instanceof Error ? caught.message : await reply("environment.layoutFailed") };
     }
 }
 
@@ -321,7 +322,7 @@ export async function deleteEnvironmentAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not delete the environment"
+            error: caught instanceof Error ? caught.message : await reply("environment.deleteFailed")
         };
     }
 }
@@ -346,7 +347,7 @@ export async function listDeployServersAction(
         : user.id;
     const hosts = await listHosts(owner);
     return [
-        { id: "local", name: "Local (this server)", kind: "local" },
+        { id: "local", name: await reply("servers.local"), kind: "local" },
         ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
     ];
 }
@@ -374,7 +375,7 @@ export async function createApplicationAction(input: {
     let template: ReturnType<typeof serviceTemplate> = null;
     if (input.templateId !== undefined) {
         const id = serviceTemplateIdSchema.safeParse(input.templateId);
-        if (!id.success) return { error: "That template is not in the list" };
+        if (!id.success) return { error: await reply("service.templateUnknown") };
         template = serviceTemplate(id.data);
         if (template)
             input = {
@@ -385,7 +386,7 @@ export async function createApplicationAction(input: {
             };
     }
     const name = input.name?.trim() || template?.name;
-    if (!name) return { error: "An application name is required" };
+    if (!name) return { error: await reply("service.nameRequired") };
     const isNixpacks = input.sourceType === "nixpacks";
     const isGit = input.sourceType === "dockerfile" || input.sourceType === "git" || isNixpacks;
     // The container port is stored only when the user pins it, so an image deploy
@@ -402,7 +403,7 @@ export async function createApplicationAction(input: {
         sourceConfig = port !== undefined ? { port } : {};
     } else if (isGit) {
         const repoUrl = input.repoUrl?.trim();
-        if (!repoUrl) return { error: "A git repository URL is required" };
+        if (!repoUrl) return { error: await reply("service.repoRequired") };
         // "nixpacks" auto-builds from source (no Dockerfile); "dockerfile" uses one.
         sourceType = isNixpacks ? "nixpacks" : "dockerfile";
         sourceConfig = {
@@ -419,7 +420,7 @@ export async function createApplicationAction(input: {
         };
     } else {
         const imageRef = input.imageRef?.trim();
-        if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
+        if (!imageRef) return { error: await reply("service.imageRequired") };
         sourceConfig = template
             ? templateSetup.templateSource(template, template.id)
             : { imageRef, ...(port !== undefined ? { port } : {}) };
@@ -450,7 +451,7 @@ export async function createApplicationAction(input: {
         let target;
         if (input.serverId && input.serverId !== "local") {
             const host = (await listHosts(owner)).find((item) => item.id === input.serverId);
-            if (!host) return { error: "The selected server was not found" };
+            if (!host) return { error: await reply("service.serverNotFound") };
             target = await getOrCreateHostTarget(host.id, owner, host.name);
         } else {
             target = await getOrCreateLocalTarget(owner);
@@ -571,7 +572,7 @@ export async function createApplicationAction(input: {
         return { deploymentId, applicationId: app.id, ...(needs.length > 0 ? { needs } : {}) };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not create the application"
+            error: caught instanceof Error ? caught.message : await reply("service.createFailed")
         };
     }
 }
@@ -601,7 +602,7 @@ export async function setAutoDeployAction(input: {
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save settings" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.settingsFailed") };
     }
 }
 
@@ -643,7 +644,7 @@ export async function revealEnvVarAction(
     const user = await requirePermission("deploy.read");
     try {
         const scope = await envVarScope(id);
-        if (!scope) return { error: "That variable no longer exists" };
+        if (!scope) return { error: await reply("variables.gone") };
         const access = await requireEnvScopeAccess(
             scope.scope,
             scope.scopeId,
@@ -667,7 +668,7 @@ export async function revealEnvVarAction(
         return { value };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not reveal the variable"
+            error: caught instanceof Error ? caught.message : await reply("variables.revealFailed")
         };
     }
 }
@@ -699,7 +700,7 @@ export async function serviceHistoryAction(
 export async function rerunServiceSetupAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const id = z.string().uuid().safeParse(applicationId);
-    if (!id.success) return { error: "That service is not there any more" };
+    if (!id.success) return { error: await reply("service.gone") };
     try {
         const access = await requireApplicationAccess(id.data, user.id, "service.configure");
         await templateSetup.rerunTemplateSetup(id.data, access.ownerId);
@@ -711,7 +712,7 @@ export async function rerunServiceSetupAction(applicationId: string): Promise<{ 
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not run the setup" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.setupFailed") };
     }
 }
 
@@ -749,7 +750,7 @@ export async function setServiceFollowAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.changeFailed") };
     }
 }
 
@@ -776,7 +777,7 @@ export async function postServiceCommentAction(input: {
         body: input.body
     });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
+        return { error: await firstIssue(parsed.error, "notes.invalid") };
     try {
         const access = await requireApplicationAccess(
             parsed.data.subjectId,
@@ -791,7 +792,7 @@ export async function postServiceCommentAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not post the note" };
+        return { error: caught instanceof Error ? caught.message : await reply("notes.postFailed") };
     }
 }
 
@@ -810,7 +811,7 @@ export async function deleteServiceCommentAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the note" };
+        return { error: caught instanceof Error ? caught.message : await reply("notes.deleteFailed") };
     }
 }
 
@@ -845,7 +846,7 @@ export async function deployApplicationAction(
         return { deploymentId };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not start the deployment"
+            error: caught instanceof Error ? caught.message : await reply("deployment.startFailed")
         };
     }
 }
@@ -867,7 +868,7 @@ export async function cancelDeploymentAction(deploymentId: string): Promise<{ er
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not stop the deployment"
+            error: caught instanceof Error ? caught.message : await reply("deployment.stopFailed")
         };
     }
 }
@@ -897,7 +898,7 @@ export async function rollbackDeploymentAction(
         return { deploymentId: started.deploymentId };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not roll back to that release"
+            error: caught instanceof Error ? caught.message : await reply("deployment.rollbackFailed")
         };
     }
 }
@@ -921,7 +922,7 @@ export async function pinDeploymentAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change that release"
+            error: caught instanceof Error ? caught.message : await reply("deployment.releaseFailed")
         };
     }
 }
@@ -934,7 +935,7 @@ export async function setDeploymentTrafficAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     if (percent !== null && (!Number.isInteger(percent) || percent < 1 || percent > 50)) {
-        return { error: "A share of the traffic is between 1 and 50 percent" };
+        return { error: await reply("deployment.trafficRange") };
     }
     try {
         const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
@@ -951,7 +952,7 @@ export async function setDeploymentTrafficAction(
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not change where the traffic goes"
+                caught instanceof Error ? caught.message : await reply("deployment.trafficFailed")
         };
     }
 }
@@ -974,7 +975,7 @@ export async function setAppPortAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the port" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.portFailed") };
     }
 }
 
@@ -994,7 +995,7 @@ export async function setAppSourcePathsAction(input: {
         ? runtimeVersionSchema.safeParse(input.runtimeVersion)
         : null;
     if (runtimeVersion && !runtimeVersion.success) {
-        return { error: runtimeVersion.error.issues[0]?.message ?? "Check the runtime version" };
+        return { error: await firstIssue(runtimeVersion.error, "service.runtimeCheck") };
     }
     try {
         const access = await requireApplicationAccess(
@@ -1019,7 +1020,7 @@ export async function setAppSourcePathsAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not update the source paths"
+            error: caught instanceof Error ? caught.message : await reply("service.pathsFailed")
         };
     }
 }
@@ -1042,7 +1043,7 @@ export async function setAppServerAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the server" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.serverFailed") };
     }
 }
 
@@ -1056,7 +1057,7 @@ export async function restartApplicationAction(applicationId: string): Promise<{
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not restart the deployment"
+            error: caught instanceof Error ? caught.message : await reply("deployment.restartFailed")
         };
     }
 }
@@ -1079,7 +1080,7 @@ export async function setApplicationRunningAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not update the deployment"
+            error: caught instanceof Error ? caught.message : await reply("deployment.updateFailed")
         };
     }
 }
@@ -1096,7 +1097,7 @@ export async function removeApplicationDeploymentAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not remove the deployment"
+            error: caught instanceof Error ? caught.message : await reply("deployment.removeFailed")
         };
     }
 }
@@ -1123,7 +1124,7 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the service" };
+        return { error: caught instanceof Error ? caught.message : await reply("service.deleteFailed") };
     }
 }
 
@@ -1139,7 +1140,7 @@ export async function duplicateApplicationAction(
         return { id };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not duplicate the service"
+            error: caught instanceof Error ? caught.message : await reply("service.duplicateFailed")
         };
     }
 }
@@ -1156,7 +1157,7 @@ export async function addDomainAction(input: {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
     if (!Number.isInteger(port) || port < 1 || port > 65535)
-        return { error: "A valid target port is required" };
+        return { error: await reply("domains.portRequired") };
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
@@ -1196,7 +1197,7 @@ export async function addDomainAction(input: {
                 : undefined;
         return { hostname, dns };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not add the domain" };
+        return { error: caught instanceof Error ? caught.message : await reply("domains.addFailed") };
     }
 }
 
@@ -1221,7 +1222,7 @@ export async function autoExposeAction(input: {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
     if (!Number.isInteger(port) || port < 1 || port > 65535)
-        return { error: "A valid target port is required" };
+        return { error: await reply("domains.portRequired") };
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
@@ -1258,12 +1259,12 @@ export async function autoExposeAction(input: {
                 hostname,
                 lanOnly: true,
                 tunnelError:
-                    caught instanceof Error ? caught.message : "Could not start a public tunnel"
+                    caught instanceof Error ? caught.message : await reply("tunnels.publicFailed")
             };
         }
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not create the subdomain"
+            error: caught instanceof Error ? caught.message : await reply("domains.subdomainFailed")
         };
     }
 }
@@ -1333,7 +1334,7 @@ export async function zoneSubdomainAction(input: {
     const user = await requirePermission("deploy.manage");
     const parsed = zoneSubdomainSchema.safeParse(input);
     if (!parsed.success)
-        return { subdomain: "", hostname: "", available: false, error: "Invalid request" };
+        return { subdomain: "", hostname: "", available: false, error: await reply("common.invalidRequest") };
     try {
         const access = await requireApplicationAccess(
             parsed.data.applicationId,
@@ -1357,7 +1358,7 @@ export async function zoneSubdomainAction(input: {
             subdomain: "",
             hostname: "",
             available: false,
-            error: "Could not check that subdomain"
+            error: await reply("domains.subdomainCheckFailed")
         };
     }
 }
@@ -1388,7 +1389,7 @@ export async function setDomainCertificateAction(
         return result;
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the certificate"
+            error: caught instanceof Error ? caught.message : await reply("domains.certificateFailed")
         };
     }
 }
@@ -1433,7 +1434,7 @@ export async function setDomainEnabledAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the domain" };
+        return { error: caught instanceof Error ? caught.message : await reply("domains.updateFailed") };
     }
 }
 
@@ -1452,7 +1453,7 @@ export async function setServedByAction(
     servedBy: "server" | "polaris"
 ): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    if (servedBy !== "server" && servedBy !== "polaris") return { error: "Unknown choice" };
+    if (servedBy !== "server" && servedBy !== "polaris") return { error: await reply("common.unknownChoice") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await deployService.setApplicationServedBy(applicationId, access.ownerId, servedBy);
@@ -1466,7 +1467,7 @@ export async function setServedByAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the domain" };
+        return { error: caught instanceof Error ? caught.message : await reply("domains.updateFailed") };
     }
 }
 
@@ -1489,7 +1490,7 @@ export async function edgeSettingsAction(
         return { ...view, guardChallenge: view.local ? await guardSupportsChallenge() : null };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not read the edge settings"
+            error: caught instanceof Error ? caught.message : await reply("edge.readFailed")
         };
     }
 }
@@ -1503,7 +1504,7 @@ export async function saveEdgeSettingsAction(
     const user = await requirePermission("deploy.manage");
     const parsed = appEdgeConfigSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those settings are not valid" };
+        return { error: await firstIssue(parsed.error, "edge.invalid") };
     }
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
@@ -1526,7 +1527,7 @@ export async function saveEdgeSettingsAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the edge settings"
+            error: caught instanceof Error ? caught.message : await reply("edge.saveFailed")
         };
     }
 }
@@ -1538,7 +1539,7 @@ export async function setPublishPortAction(
     publish: boolean
 ): Promise<{ error?: string; redeployed?: boolean }> {
     const user = await requirePermission("deploy.manage");
-    if (typeof publish !== "boolean") return { error: "Unknown choice" };
+    if (typeof publish !== "boolean") return { error: await reply("common.unknownChoice") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
         const outcome = await deployService.setApplicationPublishPort(
@@ -1557,7 +1558,7 @@ export async function setPublishPortAction(
         revalidatePath(DEPLOY_PATH);
         return { redeployed: outcome.redeployed };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the port" };
+        return { error: caught instanceof Error ? caught.message : await reply("domains.portFailed") };
     }
 }
 
@@ -1588,7 +1589,7 @@ export async function startQuickTunnelAction(
         });
         return { url: status.url };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
     }
 }
 
@@ -1606,7 +1607,7 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
     }
 }
 
@@ -1636,7 +1637,7 @@ export async function startNgrokTunnelAction(
         });
         return { url: status.url };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
     }
 }
 
@@ -1654,7 +1655,7 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
     }
 }
 
@@ -1690,7 +1691,7 @@ export async function setNamedTunnelEnabledAction(input: {
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.updateFailed") };
     }
 }
 
@@ -1735,7 +1736,7 @@ export async function provisionNamedTunnelAction(input: {
         });
         return { hostname: status.hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not set up the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.setupFailed") };
     }
 }
 
@@ -1764,7 +1765,7 @@ export async function startNamedTunnelAction(input: {
         });
         return { hostname: status.hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
     }
 }
 
@@ -1782,7 +1783,7 @@ export async function stopNamedTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
     }
 }
 
@@ -1793,7 +1794,7 @@ export async function createDatabaseAction(
     const parsed = databaseCreateSchema.safeParse(input);
     if (!parsed.success)
         return {
-            error: parsed.error.issues[0]?.message ?? "That database configuration is not valid"
+            error: await firstIssue(parsed.error, "databases.invalid")
         };
     const { serverId, ...settings } = parsed.data;
     try {
@@ -1806,7 +1807,7 @@ export async function createDatabaseAction(
         let target;
         if (serverId && serverId !== "local") {
             const host = (await listHosts(owner)).find((item) => item.id === serverId);
-            if (!host) return { error: "The selected server was not found" };
+            if (!host) return { error: await reply("service.serverNotFound") };
             target = await getOrCreateHostTarget(host.id, owner, host.name);
         } else {
             target = await getOrCreateLocalTarget(owner);
@@ -1822,7 +1823,7 @@ export async function createDatabaseAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not create the database"
+            error: caught instanceof Error ? caught.message : await reply("databases.createFailed")
         };
     }
 }
@@ -1851,7 +1852,7 @@ export async function databaseConnectionAction(
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not read the connection details"
+                caught instanceof Error ? caught.message : await reply("databases.connectionFailed")
         };
     }
 }
@@ -1867,7 +1868,7 @@ export async function deployDatabaseAction(
         return { deploymentId };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not provision the database"
+            error: caught instanceof Error ? caught.message : await reply("databases.provisionFailed")
         };
     }
 }
@@ -1896,7 +1897,7 @@ export async function saveRegistryCredentialAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the registry login"
+            error: caught instanceof Error ? caught.message : await reply("registry.saveFailed")
         };
     }
 }
@@ -1968,7 +1969,7 @@ export async function listNasFoldersAction(
     } catch (caught) {
         return {
             folders: [],
-            error: caught instanceof Error ? caught.message : "Could not list folders"
+            error: caught instanceof Error ? caught.message : await reply("volumes.foldersFailed")
         };
     } finally {
         // A driver is a live session to the storage; the picker opens one per
@@ -2000,7 +2001,7 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not add the volume" };
+        return { error: caught instanceof Error ? caught.message : await reply("volumes.addFailed") };
     }
 }
 
@@ -2017,7 +2018,7 @@ async function volumeWriteAccess(
     userId: string
 ): Promise<{ ownerId: string; applicationId: string }> {
     const summary = await deployService.getVolumeOwner(volumeId);
-    if (!summary?.applicationId) throw new Error("Volume not found");
+    if (!summary?.applicationId) throw new Error(await reply("volumes.notFound"));
     const access = await requireApplicationAccess(summary.applicationId, userId, "volumes.manage");
     return { ownerId: access.ownerId, applicationId: summary.applicationId };
 }
@@ -2041,7 +2042,7 @@ export async function updateVolumeAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the volume" };
+        return { error: caught instanceof Error ? caught.message : await reply("volumes.updateFailed") };
     }
 }
 
@@ -2065,7 +2066,7 @@ export async function deleteVolumeAction(input: {
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove the volume" };
+        return { error: caught instanceof Error ? caught.message : await reply("volumes.removeFailed") };
     }
 }
 

@@ -9,6 +9,7 @@
  */
 
 import * as core from "@polaris/core";
+import { firstIssue, reply } from "./reply";
 import { revalidatePath } from "next/cache";
 import type { Diagnosis } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
@@ -34,7 +35,7 @@ export async function applyDeployFixAction(
 ): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = core.deployFixInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the fix" };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "fix.check") };
     try {
         const fix = parsed.data;
         const access = await requireDeploymentAccess(
@@ -55,6 +56,6 @@ export async function applyDeployFixAction(
         revalidatePath(DEPLOY_PATH);
         return { deploymentId: next };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not apply the fix" };
+        return { error: caught instanceof Error ? caught.message : await reply("fix.failed") };
     }
 }

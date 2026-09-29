@@ -16,6 +16,7 @@ import "@xterm/xterm/css/xterm.css";
 import { Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { RotateCw, ShieldAlert } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** What to attach to: a container on a deploy target, a container on a
  *  Containers connection, a registered server - as the Polaris login, or as root
@@ -36,9 +37,16 @@ export type TerminalTarget =
  */
 type Failure = { kind: "unreachable" } | { kind: "refused"; reason: string };
 
+/** What the corner of the panel says: one of its own states, or the reason the
+ *  far end gave, which is shown as it came. */
+type Status =
+    | { kind: "connecting" | "connected" | "disconnected" | "couldNotConnect" | "couldNotAuthorize" }
+    | { kind: "reason"; text: string };
+
 export function TerminalPanel({ target, label }: { target: TerminalTarget; label: string }) {
+    const t = useTranslations("common");
     const mountRef = useRef<HTMLDivElement>(null);
-    const [status, setStatus] = useState("connecting...");
+    const [status, setStatus] = useState<Status>({ kind: "connecting" });
     const [failure, setFailure] = useState<Failure | null>(null);
     // Bumped by Retry: the session is keyed on it, so asking again is a fresh
     // ticket and a fresh socket rather than a reconnect of the dead one.
@@ -60,7 +68,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
         let cleanup: (() => void) | undefined;
         let opened = false;
         setFailure(null);
-        setStatus("connecting...");
+        setStatus({ kind: "connecting" });
 
         async function start(): Promise<void> {
             const [{ Terminal }, { FitAddon }] = await Promise.all([
@@ -97,7 +105,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 // The route says why (no such connection, no pinned key, not
                 // permitted), and that is more use than "could not authorize".
                 const reason = (await res.json().catch(() => null)) as { error?: string } | null;
-                setStatus(reason?.error ?? "could not authorize terminal");
+                setStatus(reason?.error ? { kind: "reason", text: reason.error } : { kind: "couldNotAuthorize" });
                 return;
             }
             const { token } = (await res.json()) as { token: string };
@@ -113,7 +121,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
 
             socket.onopen = () => {
                 opened = true;
-                setStatus("connected");
+                setStatus({ kind: "connected" });
                 sendResize();
             };
             socket.onmessage = (event) => {
@@ -129,16 +137,16 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
             // while a close with nothing to say never got there at all.
             socket.onclose = (event) => {
                 if (opened) {
-                    setStatus("disconnected");
+                    setStatus({ kind: "disconnected" });
                     return;
                 }
                 const reason = event.reason.trim();
-                setStatus(reason || "could not connect");
+                setStatus(reason ? { kind: "reason", text: reason } : { kind: "couldNotConnect" });
                 setFailure(reason ? { kind: "refused", reason } : { kind: "unreachable" });
             };
             // Fires before the close on a connection that never opened; the close
             // handler has the code and reason, so this only avoids a silent gap.
-            socket.onerror = () => !opened && setStatus("could not connect");
+            socket.onerror = () => !opened && setStatus({ kind: "couldNotConnect" });
 
             const onData = term.onData((input) => {
                 if (socket?.readyState === WebSocket.OPEN) socket.send(input);
@@ -168,7 +176,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
         <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{label}</span>
-                <span>{status}</span>
+                <span>{status.kind === "reason" ? status.text : t(`terminal.status.${status.kind}`)}</span>
             </div>
             <div
                 ref={mountRef}
@@ -189,30 +197,32 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
  * would at least offer to continue.
  */
 function FailureNote({ failure, onRetry }: { failure: Failure; onRetry: () => void }) {
+    const t = useTranslations("common");
     return (
         <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 {failure.kind === "refused" ? (
-                    <span>The server refused the session: {failure.reason}.</span>
+                    <span>{t("terminal.refused", { reason: failure.reason })}</span>
                 ) : (
                     <span>
-                        The browser would not open the connection. A terminal needs this
-                        address&apos;s certificate trusted, and accepting the warning on the page is
-                        not enough.{" "}
-                        <a
-                            href="/api/system/local-ca"
-                            className="font-medium text-foreground underline underline-offset-2"
-                        >
-                            Download Polaris&apos;s certificate
-                        </a>{" "}
-                        and add it to this device&apos;s trusted roots, then reload.
+                        {t.rich("terminal.untrusted", {
+                            download: (chunks) => (
+                                <a
+                                    key="download"
+                                    href="/api/system/local-ca"
+                                    className="font-medium text-foreground underline underline-offset-2"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
                     </span>
                 )}
             </p>
             <div>
                 <Button size="sm" variant="secondary" onClick={onRetry}>
-                    <RotateCw className="size-3.5" /> Try again
+                    <RotateCw className="size-3.5" /> {t("terminal.retry")}
                 </Button>
             </div>
         </div>

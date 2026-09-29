@@ -17,8 +17,10 @@ import { z } from "zod";
 import * as cdn from "@/lib/cdn";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import { firstIssue, reply } from "./reply";
 import * as pitr from "@/lib/database-ops/pitr";
 import { requirePermission } from "@/lib/session";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { copyInto } from "@/lib/database-ops/copy";
 import * as store from "@/lib/object-storage/store";
 import * as upgrade from "@/lib/database-ops/upgrade";
@@ -33,18 +35,18 @@ const DEPLOY_PATH = "/apps/deploy";
 type Result<T = object> = { error?: string } & Partial<T>;
 
 /** The first issue a schema found, in its own words. */
-function invalid(error: z.ZodError): { error: string } {
-    return { error: error.issues[0]?.message ?? "That request is not valid" };
+async function invalid(error: z.ZodError): Promise<{ error: string }> {
+    return { error: await firstIssue(error, "common.invalidRequestShort") };
 }
 
 /** An error's words for the screen. Refusals are written for it; anything else
  *  is logged and replaced, since it may name internals. */
-function failure(caught: unknown, fallback: string): { error: string } {
+async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
     if (caught instanceof Error && !(caught instanceof TypeError) && !caught.name.startsWith("Prisma")) {
         return { error: caught.message };
     }
     console.error(`deploy: ${fallback}:`, caught);
-    return { error: fallback };
+    return { error: await reply(fallback) };
 }
 
 /** Gate a database change and hand back whose it is. */
@@ -70,7 +72,7 @@ export async function databaseOverviewAction(databaseId: string): Promise<Result
         const access = await requireDatabaseAccess(parsed.data, user.id, "project.read");
         return { overview: await databaseOverview(parsed.data, access.ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not read this database");
+        return failure(caught, "databases.readFailed");
     }
 }
 
@@ -86,7 +88,7 @@ export async function databaseMembersAction(
         const access = await requireDatabaseAccess(parsed.data, user.id, "project.read");
         return { members: await databaseMembers(parsed.data, access.ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not read the members");
+        return failure(caught, "databases.membersFailed");
     }
 }
 
@@ -99,7 +101,7 @@ export async function copySourcesAction(
         const { ownerId } = await manage(parsed.data);
         return { sources: await copySources(parsed.data, ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not list the databases to copy from");
+        return failure(caught, "databases.copySourcesFailed");
     }
 }
 
@@ -126,7 +128,7 @@ export async function upgradeDatabaseAction(input: z.input<typeof core.databaseU
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not start the upgrade");
+        return failure(caught, "databases.upgradeFailed");
     }
 }
 
@@ -139,7 +141,7 @@ export async function cancelUpgradeAction(databaseId: string): Promise<Result> {
         await audit(userId, "deploy.db.upgrade.cancel", parsed.data);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not cancel the upgrade");
+        return failure(caught, "databases.upgradeCancelFailed");
     }
 }
 
@@ -153,7 +155,7 @@ export async function revertUpgradeAction(databaseId: string): Promise<Result> {
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not go back to the previous version");
+        return failure(caught, "databases.revertFailed");
     }
 }
 
@@ -174,7 +176,7 @@ export async function setRedisModeAction(input: z.input<typeof core.redisModeSch
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change how Redis keeps its data");
+        return failure(caught, "databases.persistenceFailed");
     }
 }
 
@@ -188,7 +190,7 @@ export async function setMongoReplicaSetAction(input: z.input<typeof core.mongoR
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change the replica set");
+        return failure(caught, "databases.replicaSetFailed");
     }
 }
 
@@ -205,7 +207,7 @@ export async function setDatabaseLimitsAction(input: z.input<typeof databaseLimi
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change the limits");
+        return failure(caught, "databases.limitsFailed");
     }
 }
 
@@ -226,7 +228,7 @@ export async function setPitrAction(input: z.input<typeof core.pitrSettingsSchem
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change point-in-time recovery");
+        return failure(caught, "databases.pitrFailed");
     }
 }
 
@@ -248,7 +250,7 @@ export async function recoverDatabaseAction(
         revalidatePath(DEPLOY_PATH);
         return { databaseId: created.databaseId };
     } catch (caught) {
-        return failure(caught, "Could not start the recovery");
+        return failure(caught, "databases.recoveryFailed");
     }
 }
 
@@ -275,7 +277,7 @@ export async function copyIntoDatabaseAction(input: z.input<typeof core.database
         });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not start the copy");
+        return failure(caught, "databases.copyFailed");
     }
 }
 
@@ -298,7 +300,7 @@ export async function listBucketsAction(
         const { ownerId } = await manage(parsed.data);
         return await store.listBuckets(parsed.data, ownerId);
     } catch (caught) {
-        return failure(caught, "Could not list the buckets");
+        return failure(caught, "buckets.listFailed");
     }
 }
 
@@ -311,7 +313,7 @@ export async function createBucketAction(input: z.input<typeof core.bucketCreate
         await audit(userId, "deploy.bucket.create", parsed.data.storeId, { bucket: parsed.data.name });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not create the bucket");
+        return failure(caught, "buckets.createFailed");
     }
 }
 
@@ -324,7 +326,7 @@ export async function deleteBucketAction(bucketId: string): Promise<Result> {
         await audit(userId, "deploy.bucket.delete", storeId, { bucketId: parsed.data });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not remove the bucket");
+        return failure(caught, "buckets.removeFailed");
     }
 }
 
@@ -343,7 +345,7 @@ export async function createBucketKeyAction(
         });
         return { accessKey: key.accessKey, secretKey: key.secretKey };
     } catch (caught) {
-        return failure(caught, "Could not create the key");
+        return failure(caught, "buckets.keyCreateFailed");
     }
 }
 
@@ -356,7 +358,7 @@ export async function deleteBucketKeyAction(input: { bucketId: string; keyId: st
         await audit(userId, "deploy.bucket.key.delete", storeId, { keyId: parsed.data.keyId });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not revoke the key");
+        return failure(caught, "buckets.keyRevokeFailed");
     }
 }
 
@@ -369,13 +371,13 @@ export async function setLifecycleRuleAction(input: z.input<typeof core.lifecycl
         await audit(userId, "deploy.bucket.lifecycle", storeId, parsed.data);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not set the expiry rule");
+        return failure(caught, "buckets.expirySetFailed");
     }
 }
 
 export async function removeLifecycleRuleAction(input: { bucketId: string; prefix: string }): Promise<Result> {
     const parsed = z
-        .object({ bucketId: z.string().uuid(), prefix: z.string().refine(core.isObjectPrefix, "That is not a prefix") })
+        .object({ bucketId: z.string().uuid(), prefix: z.string().refine(core.isObjectPrefix, "issues.notAPrefix") })
         .safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -384,7 +386,7 @@ export async function removeLifecycleRuleAction(input: { bucketId: string; prefi
         await audit(userId, "deploy.bucket.lifecycle.remove", storeId, parsed.data);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not remove the expiry rule");
+        return failure(caught, "buckets.expiryRemoveFailed");
     }
 }
 
@@ -409,7 +411,7 @@ export async function presignObjectAction(
         });
         return signed;
     } catch (caught) {
-        return failure(caught, "Could not sign the URL");
+        return failure(caught, "buckets.signFailed");
     }
 }
 
@@ -422,7 +424,7 @@ export async function replicationCandidatesAction(
         const { ownerId } = await manageBucket(parsed.data);
         return { candidates: await store.replicationCandidates(parsed.data, ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not list the buckets to replicate into");
+        return failure(caught, "buckets.replicaTargetsFailed");
     }
 }
 
@@ -437,7 +439,7 @@ export async function setBucketReplicationAction(input: z.input<typeof core.buck
         await audit(userId, "deploy.bucket.replication", storeId, parsed.data);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change the replication");
+        return failure(caught, "buckets.replicationFailed");
     }
 }
 
@@ -465,7 +467,7 @@ export async function setDomainCdnAction(input: z.input<typeof core.domainCdnSch
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change how the domain is served");
+        return failure(caught, "cdn.modeFailed");
     }
 }
 
@@ -489,6 +491,6 @@ export async function purgeDomainCacheAction(input: z.input<typeof core.cachePur
         });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not empty the cache");
+        return failure(caught, "cdn.purgeFailed");
     }
 }

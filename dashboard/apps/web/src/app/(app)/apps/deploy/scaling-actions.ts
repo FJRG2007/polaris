@@ -8,8 +8,10 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import { firstIssue, reply } from "./reply";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as scaling from "@/lib/deploy/scaling-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
@@ -22,8 +24,8 @@ const scalingInputSchema = core.serviceScalingSchema.extend({
     sleepAfterMinutes: core.serviceSleepSchema
 });
 
-function failure(caught: unknown, fallback: string): { error: string } {
-    return { error: caught instanceof Error ? caught.message : fallback };
+async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
+    return { error: caught instanceof Error ? caught.message : await reply(fallback) };
 }
 
 export async function serviceScalingAction(
@@ -34,7 +36,7 @@ export async function serviceScalingAction(
         const access = await requireApplicationAccess(applicationId, user.id, "project.read");
         return { scaling: await scaling.getServiceScaling(applicationId, access.ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not read how this service is scaled");
+        return failure(caught, "scaling.loadFailed");
     }
 }
 
@@ -44,7 +46,7 @@ export async function saveServiceScalingAction(
 ): Promise<{ error?: string; redeployed?: boolean }> {
     const user = await requirePermission("deploy.manage");
     const parsed = scalingInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the scaling settings" };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "scaling.check") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
         const outcome = await scaling.setServiceScaling(applicationId, access.ownerId, user.id, parsed.data);
@@ -66,6 +68,6 @@ export async function saveServiceScalingAction(
         revalidatePath(DEPLOY_PATH);
         return { redeployed: outcome.redeployed };
     } catch (caught) {
-        return failure(caught, "Could not save the scaling settings");
+        return failure(caught, "scaling.saveFailed");
     }
 }

@@ -12,6 +12,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { firstIssue, reply } from "./reply";
 import { requirePermission } from "@/lib/session";
 import * as activity from "@/lib/activity/activity";
 import { recordDeployAudit } from "@/lib/deploy-audit";
@@ -57,7 +58,7 @@ export async function saveEnvVarChangesAction(
 ): Promise<{ error?: string; saved?: number; redeployed?: boolean }> {
     const user = await requirePermission("deploy.manage");
     const parsed = variableChangesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the variables" };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "variables.check") };
     const { scope, scopeId, set, secrecy, remove, redeploy } = parsed.data;
     if (set.length + secrecy.length + remove.length === 0 && !redeploy) return { saved: 0 };
 
@@ -70,7 +71,7 @@ export async function saveEnvVarChangesAction(
         for (const id of [...remove, ...secrecy.map((item) => item.id)]) {
             const located = await envVarScope(id);
             if (!located || located.scope !== scope || located.scopeId !== scopeId) {
-                return { error: "One of those variables no longer exists - reload and try again" };
+                return { error: await reply("variables.oneGone") };
             }
             keys.set(id, located.key);
         }
@@ -119,7 +120,7 @@ export async function saveEnvVarChangesAction(
         revalidatePath(DEPLOY_PATH);
         return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the variables" };
+        return { error: caught instanceof Error ? caught.message : await reply("variables.saveFailed") };
     }
 }
 
@@ -127,14 +128,14 @@ export async function saveEnvVarChangesAction(
 export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = scopeSchema.safeParse(input);
-    if (!parsed.success) return { error: "Nothing to redeploy" };
+    if (!parsed.success) return { error: await reply("variables.nothingToRedeploy") };
     try {
         const access = await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "deploy.run");
         void redeployForEnvScope(parsed.data.scope, parsed.data.scopeId, access.ownerId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the redeploy" };
+        return { error: caught instanceof Error ? caught.message : await reply("variables.redeployFailed") };
     }
 }
 

@@ -1,1 +1,224 @@
-{}
+{
+    "project": {
+        "nameRequired": "A project name is required",
+        "createFailed": "Could not create the project",
+        "deleteFailed": "Could not delete the project"
+    },
+    "environment": {
+        "checkDetails": "Check the environment's details",
+        "notFound": "Environment not found",
+        "createFailed": "Could not create the environment",
+        "layoutFailed": "Could not save the layout",
+        "deleteFailed": "Could not delete the environment",
+        "cannotDeploy": "You can create this environment, but not deploy it. Untick \"Deploy it once it is created\" and try again.",
+        "renameFailed": "Could not rename the environment",
+        "defaultFailed": "Could not set the default environment",
+        "networkFailed": "Could not change how the services connect",
+        "checkName": "Check the name",
+        "networkCannotDeploy": "You can change this setting, but not deploy the services in this environment.",
+        "elsewhere": "That environment is not in this project"
+    },
+    "service": {
+        "templateUnknown": "That template is not in the list",
+        "nameRequired": "An application name is required",
+        "repoRequired": "A git repository URL is required",
+        "imageRequired": "An image reference is required (e.g. nginx:latest)",
+        "serverNotFound": "The selected server was not found",
+        "createFailed": "Could not create the application",
+        "settingsFailed": "Could not save settings",
+        "gone": "That service is not there any more",
+        "setupFailed": "Could not run the setup",
+        "changeFailed": "Could not change that",
+        "portFailed": "Could not update the port",
+        "runtimeCheck": "Check the runtime version",
+        "pathsFailed": "Could not update the source paths",
+        "serverFailed": "Could not change the server",
+        "deleteFailed": "Could not delete the service",
+        "duplicateFailed": "Could not duplicate the service"
+    },
+    "variables": {
+        "gone": "That variable no longer exists",
+        "revealFailed": "Could not reveal the variable",
+        "check": "Check the variables",
+        "oneGone": "One of those variables no longer exists - reload and try again",
+        "saveFailed": "Could not save the variables",
+        "nothingToRedeploy": "Nothing to redeploy",
+        "redeployFailed": "Could not start the redeploy"
+    },
+    "notes": {
+        "invalid": "That note cannot be posted",
+        "postFailed": "Could not post the note",
+        "deleteFailed": "Could not delete the note"
+    },
+    "deployment": {
+        "startFailed": "Could not start the deployment",
+        "stopFailed": "Could not stop the deployment",
+        "rollbackFailed": "Could not roll back to that release",
+        "releaseFailed": "Could not change that release",
+        "trafficRange": "A share of the traffic is between 1 and 50 percent",
+        "trafficFailed": "Could not change where the traffic goes",
+        "restartFailed": "Could not restart the deployment",
+        "updateFailed": "Could not update the deployment",
+        "removeFailed": "Could not remove the deployment"
+    },
+    "domains": {
+        "portRequired": "A valid target port is required",
+        "addFailed": "Could not add the domain",
+        "subdomainFailed": "Could not create the subdomain",
+        "subdomainCheckFailed": "Could not check that subdomain",
+        "certificateFailed": "Could not save the certificate",
+        "updateFailed": "Could not update the domain",
+        "portFailed": "Could not change the port"
+    },
+    "tunnels": {
+        "publicFailed": "Could not start a public tunnel",
+        "startFailed": "Could not start the tunnel",
+        "stopFailed": "Could not stop the tunnel",
+        "updateFailed": "Could not update the tunnel",
+        "setupFailed": "Could not set up the tunnel"
+    },
+    "common": {
+        "invalidRequest": "Invalid request",
+        "unknownChoice": "Unknown choice",
+        "checkForm": "Check the form",
+        "pickOption": "Pick one of the offered options",
+        "serviceNotFound": "Service not found",
+        "databaseNotFound": "Database not found",
+        "invalidRequestShort": "That request is not valid",
+        "didNotWork": "That did not work",
+        "checkDetails": "Check the details and try again",
+        "projectNotFound": "Project not found",
+        "unknownService": "Unknown service"
+    },
+    "edge": {
+        "readFailed": "Could not read the edge settings",
+        "invalid": "Those settings are not valid",
+        "saveFailed": "Could not save the edge settings"
+    },
+    "databases": {
+        "invalid": "That database configuration is not valid",
+        "createFailed": "Could not create the database",
+        "connectionFailed": "Could not read the connection details",
+        "provisionFailed": "Could not provision the database",
+        "readFailed": "Could not read this database",
+        "membersFailed": "Could not read the members",
+        "copySourcesFailed": "Could not list the databases to copy from",
+        "upgradeFailed": "Could not start the upgrade",
+        "upgradeCancelFailed": "Could not cancel the upgrade",
+        "revertFailed": "Could not go back to the previous version",
+        "persistenceFailed": "Could not change how Redis keeps its data",
+        "replicaSetFailed": "Could not change the replica set",
+        "limitsFailed": "Could not change the limits",
+        "pitrFailed": "Could not change point-in-time recovery",
+        "recoveryFailed": "Could not start the recovery",
+        "copyFailed": "Could not start the copy"
+    },
+    "registry": {
+        "saveFailed": "Could not save the registry login"
+    },
+    "volumes": {
+        "foldersFailed": "Could not list folders",
+        "addFailed": "Could not add the volume",
+        "updateFailed": "Could not update the volume",
+        "removeFailed": "Could not remove the volume",
+        "notFound": "Volume not found",
+        "loadFailed": "Could not load the volume",
+        "measureFailed": "Could not measure the volume",
+        "wipeFailed": "Could not wipe the volume",
+        "detached": "This volume is not attached to a service"
+    },
+    "servers": {
+        "local": "Local (this server)"
+    },
+    "settings": {
+        "loadFailed": "Could not load the project settings",
+        "saveFailed": "Could not save the project",
+        "visibilityFailed": "Could not change the visibility",
+        "flagsFailed": "Could not save the flags",
+        "templateFailed": "Could not build the template",
+        "visibilityUnknown": "Pick one of the offered visibilities",
+        "unreadable": "Those settings could not be read"
+    },
+    "members": {
+        "loadFailed": "Could not load the members",
+        "saveFailed": "Could not save the access",
+        "teamsFailed": "Could not load the teams",
+        "removeFailed": "Could not remove the member"
+    },
+    "tokens": {
+        "loadFailed": "Could not load the tokens",
+        "createFailed": "Could not create the token",
+        "revokeFailed": "Could not revoke the token",
+        "deleteFailed": "Could not delete the token",
+        "beyondYourAccess": "You cannot deploy, change variables or manage domains in this project, so a token you make could not either. Make a read-only token, or ask the project's owner for one."
+    },
+    "webhooks": {
+        "loadFailed": "Could not load the webhooks",
+        "addFailed": "Could not add the webhook",
+        "updateFailed": "Could not update the webhook",
+        "removeFailed": "Could not remove the webhook",
+        "unreachable": "Could not reach the endpoint"
+    },
+    "usage": {
+        "loadFailed": "Could not load the usage",
+        "monthFailed": "Could not work out this month's usage"
+    },
+    "staged": {
+        "loadFailed": "Could not load the pending changes",
+        "removeServiceFailed": "Could not remove the service",
+        "removeDatabaseFailed": "Could not remove the database",
+        "discardFailed": "Could not discard the change",
+        "discardAllFailed": "Could not discard the changes",
+        "deployFailed": "Could not deploy the changes",
+        "gone": "That change is no longer pending"
+    },
+    "crons": {
+        "loadFailed": "Could not read the scheduled jobs",
+        "saveFailed": "Could not save the scheduled job",
+        "removeFailed": "Could not remove the scheduled job",
+        "runFailed": "Could not start the job",
+        "runsFailed": "Could not read the job's runs",
+        "checkDetails": "Check the job's details"
+    },
+    "source": {
+        "machineLoadFailed": "Could not read where this service builds",
+        "machineSaveFailed": "Could not change where this service builds",
+        "loadFailed": "Could not read this service's source",
+        "machineUnknown": "Choose a machine from the list"
+    },
+    "scaling": {
+        "loadFailed": "Could not read how this service is scaled",
+        "saveFailed": "Could not save the scaling settings",
+        "check": "Check the scaling settings"
+    },
+    "fix": {
+        "check": "Check the fix",
+        "failed": "Could not apply the fix"
+    },
+    "buckets": {
+        "listFailed": "Could not list the buckets",
+        "createFailed": "Could not create the bucket",
+        "removeFailed": "Could not remove the bucket",
+        "keyCreateFailed": "Could not create the key",
+        "keyRevokeFailed": "Could not revoke the key",
+        "expirySetFailed": "Could not set the expiry rule",
+        "expiryRemoveFailed": "Could not remove the expiry rule",
+        "signFailed": "Could not sign the URL",
+        "replicaTargetsFailed": "Could not list the buckets to replicate into",
+        "replicationFailed": "Could not change the replication"
+    },
+    "cdn": {
+        "modeFailed": "Could not change how the domain is served",
+        "purgeFailed": "Could not empty the cache"
+    },
+    "issues": {
+        "notAPrefix": "That is not a prefix",
+        "nameRequired": "Give it a name",
+        "repoRequired": "Polaris needs the repository"
+    },
+    "external": {
+        "unknownAccount": "Unknown account",
+        "moveOutNeedsVariables": "Copying the variables needs access to them. Move it without them, or ask for that access.",
+        "moveHomeNeedsVariables": "Copying the variables needs access to them. Bring it over without them, or ask for that access."
+    }
+}

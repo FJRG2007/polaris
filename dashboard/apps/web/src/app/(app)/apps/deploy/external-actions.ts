@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { firstIssue, reply } from "./reply";
 import * as migrate from "@/lib/deploy/migrate";
 import { requirePermission } from "@/lib/session";
 import { recordDeployAudit } from "@/lib/deploy-audit";
@@ -36,15 +37,15 @@ const idSchema = z.string().uuid();
 const addSchema = z.object({
     environmentId: z.string().uuid(),
     connectionId: z.string().uuid(),
-    name: z.string().trim().min(1, "Give it a name").max(60),
+    name: z.string().trim().min(1, "issues.nameRequired").max(60),
     externalId: z.string().trim().min(1).max(200),
     ref: z.record(z.string().max(40), z.string().max(200)).default({})
 });
 
 /** The sentence a screen shows, from whatever came back. A provider's own words
  *  where there are any: they are written for somebody who has to go and fix it. */
-function refusal(caught: unknown): string {
-    return caught instanceof Error ? caught.message : "That did not work";
+async function refusal(caught: unknown): Promise<string> {
+    return caught instanceof Error ? caught.message : await reply("common.didNotWork");
 }
 
 /** The accounts this person has linked that can run a service, for the picker. */
@@ -77,7 +78,7 @@ async function requireServiceAccess(
 ): Promise<ProjectAccess> {
     const access = await requireProjectAccess(projectId, userId, capability);
     const environmentId = await external.externalServiceEnvironment(projectId, serviceId);
-    if (!accessInEnvironment(access, environmentId)) throw new Error("Service not found");
+    if (!accessInEnvironment(access, environmentId)) throw new Error(await reply("common.serviceNotFound"));
     return access;
 }
 
@@ -87,11 +88,11 @@ export async function listProviderChoicesAction(
 ): Promise<{ choices?: ProviderChoice[]; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(connectionId);
-    if (!parsed.success) return { error: "Unknown account" };
+    if (!parsed.success) return { error: await reply("external.unknownAccount") };
     try {
         return { choices: await external.providerChoices(user.id, parsed.data) };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -102,7 +103,7 @@ export async function addExternalServiceAction(
     const user = await requirePermission("deploy.read");
     const parsed = addSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Through the environment it lands in, which the form names: an access
         // limited to development cannot put a row in production.
@@ -111,12 +112,12 @@ export async function addExternalServiceAction(
             user.id,
             "service.create"
         );
-        if (access.projectId !== projectId) return { error: "Project not found" };
+        if (access.projectId !== projectId) return { error: await reply("common.projectNotFound") };
         const service = await external.addExternalService(user.id, projectId, parsed.data);
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return { service };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -128,12 +129,12 @@ export async function refreshExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown service" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         await requireServiceAccess(projectId, parsed.data, user.id, "project.read");
         return { service: await external.refreshExternalService(projectId, parsed.data) };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -144,12 +145,12 @@ export async function deployExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown service" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         await requireServiceAccess(projectId, parsed.data, user.id, "deploy.run");
         return { service: await external.deployExternalService(projectId, parsed.data) };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -160,16 +161,16 @@ export async function renameExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown service" };
-    const named = z.string().trim().min(1, "Give it a name").max(60).safeParse(name);
-    if (!named.success) return { error: named.error.issues[0]?.message ?? "Give it a name" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
+    const named = z.string().trim().min(1, "issues.nameRequired").max(60).safeParse(name);
+    if (!named.success) return { error: await firstIssue(named.error, "issues.nameRequired") };
     try {
         await requireServiceAccess(projectId, parsed.data, user.id, "service.configure");
         return {
             service: await external.renameExternalService(projectId, parsed.data, named.data)
         };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -181,14 +182,14 @@ export async function removeExternalServiceAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(id);
-    if (!parsed.success) return { error: "Unknown service" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         await requireServiceAccess(projectId, parsed.data, user.id, "service.delete");
         await external.removeExternalService(projectId, parsed.data);
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return {};
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -200,7 +201,7 @@ const moveOutSchema = z.object({
     connectionId: z.string().uuid(),
     externalId: z.string().trim().min(1).max(200),
     ref: z.record(z.string().max(40), z.string().max(200)).default({}),
-    name: z.string().trim().min(1, "Give it a name").max(60),
+    name: z.string().trim().min(1, "issues.nameRequired").max(60),
     environmentId: z.string().uuid(),
     copyVariables: z.boolean().default(true),
     stopHere: z.boolean().default(true),
@@ -210,8 +211,8 @@ const moveOutSchema = z.object({
 const moveHomeSchema = z.object({
     environmentId: z.string().uuid(),
     targetId: z.string().uuid(),
-    name: z.string().trim().min(1, "Give it a name").max(60),
-    repoUrl: z.string().trim().min(1, "Polaris needs the repository").max(500),
+    name: z.string().trim().min(1, "issues.nameRequired").max(60),
+    repoUrl: z.string().trim().min(1, "issues.repoRequired").max(500),
     branch: z.string().trim().max(200).default(""),
     copyVariables: z.boolean().default(true),
     deployNow: z.boolean().default(true)
@@ -241,13 +242,13 @@ export async function moveOutPlanAction(
 ): Promise<{ plan?: migrate.MoveOutPlan; canCopyVariables?: boolean; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(applicationId);
-    if (!parsed.success) return { error: "Unknown service" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         // Through the service itself, so its environment is checked as well as
         // the project: the names of production's variables are not a development
         // access's to read.
         const access = await requireApplicationAccess(parsed.data, user.id, "project.read");
-        if (access.projectId !== projectId) return { error: "Unknown service" };
+        if (access.projectId !== projectId) return { error: await reply("common.unknownService") };
         const canCopyVariables = accessCan(access, COPY_OUT);
         const plan = await migrate.moveOutPlan(projectId, parsed.data);
         // The count travels either way; the names only to somebody who may read
@@ -258,7 +259,7 @@ export async function moveOutPlanAction(
             canCopyVariables
         };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -278,10 +279,10 @@ export async function moveOutAction(
 ): Promise<{ result?: migrate.MoveOutResult; error?: string }> {
     const user = await requirePermission("deploy.read");
     const service = idSchema.safeParse(applicationId);
-    if (!service.success) return { error: "Unknown service" };
+    if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveOutSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Reached through the environment the row lands in rather than through
         // the project, so an access limited to development cannot put one in
@@ -292,16 +293,16 @@ export async function moveOutAction(
             user.id,
             "service.create"
         );
-        if (access.projectId !== projectId) return { error: "Project not found" };
-        if (!accessCan(access, "service.configure")) return { error: "Project not found" };
+        if (access.projectId !== projectId) return { error: await reply("common.projectNotFound") };
+        if (!accessCan(access, "service.configure")) return { error: await reply("common.projectNotFound") };
         // And the service being moved, in the environment it is in: the row lands
         // where the form says, but the secrets read and the service stopped are
         // this one's, which may be in an environment the access does not reach.
         const moving = await requireApplicationAccess(service.data, user.id, "service.configure");
-        if (moving.projectId !== projectId) return { error: "Unknown service" };
+        if (moving.projectId !== projectId) return { error: await reply("common.unknownService") };
         if (parsed.data.copyVariables && !accessCan(access, COPY_OUT)) {
             return {
-                error: "Copying the variables needs access to them. Move it without them, or ask for that access."
+                error: await reply("external.moveOutNeedsVariables")
             };
         }
         const result = await migrate.moveOut(user.id, projectId, service.data, parsed.data);
@@ -323,7 +324,7 @@ export async function moveOutAction(
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return { result };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -340,7 +341,7 @@ export async function moveHomePlanAction(
 }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(serviceId);
-    if (!parsed.success) return { error: "Unknown service" };
+    if (!parsed.success) return { error: await reply("common.unknownService") };
     try {
         const access = await requireServiceAccess(projectId, parsed.data, user.id, "project.read");
         const [plan, targets] = await Promise.all([
@@ -353,7 +354,7 @@ export async function moveHomePlanAction(
             targets: targets.map((target) => ({ id: target.id, name: target.name }))
         };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }
 
@@ -366,10 +367,10 @@ export async function moveHomeAction(
 ): Promise<{ result?: migrate.MoveHomeResult; error?: string }> {
     const user = await requirePermission("deploy.read");
     const service = idSchema.safeParse(serviceId);
-    if (!service.success) return { error: "Unknown service" };
+    if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveHomeSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // The environment is where the new service is created, and it arrives on
         // a form. Authorized through itself rather than through the project:
@@ -382,10 +383,10 @@ export async function moveHomeAction(
             user.id,
             "service.create"
         );
-        if (access.projectId !== projectId) return { error: "Project not found" };
+        if (access.projectId !== projectId) return { error: await reply("common.projectNotFound") };
         if (parsed.data.copyVariables && !accessCan(access, COPY_HOME)) {
             return {
-                error: "Copying the variables needs access to them. Bring it over without them, or ask for that access."
+                error: await reply("external.moveHomeNeedsVariables")
             };
         }
         // The row being brought home is read at the provider with its account's
@@ -406,6 +407,6 @@ export async function moveHomeAction(
         revalidatePath(`/apps/deploy/${projectId}`);
         return { result };
     } catch (caught) {
-        return { error: refusal(caught) };
+        return { error: await refusal(caught) };
     }
 }

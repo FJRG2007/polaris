@@ -7,8 +7,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import { reply } from "./reply";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as buildMachine from "@/lib/deploy/build-machine";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
@@ -16,8 +18,8 @@ import { uploadedSourceOf, type UploadedSource } from "@/lib/deploy/source-uploa
 
 const DEPLOY_PATH = "/apps/deploy";
 
-function failure(caught: unknown, fallback: string): { error: string } {
-    return { error: caught instanceof Error ? caught.message : fallback };
+async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
+    return { error: caught instanceof Error ? caught.message : await reply(fallback) };
 }
 
 export async function buildMachineAction(
@@ -28,14 +30,14 @@ export async function buildMachineAction(
         const access = await requireApplicationAccess(applicationId, user.id, "project.read");
         return { view: await buildMachine.buildMachineOptions(applicationId, access.ownerId) };
     } catch (caught) {
-        return failure(caught, "Could not read where this service builds");
+        return failure(caught, "source.machineLoadFailed");
     }
 }
 
 export async function setBuildMachineAction(applicationId: string, value: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = buildMachine.buildOnSchema.safeParse(value);
-    if (!parsed.success) return { error: "Choose a machine from the list" };
+    if (!parsed.success) return { error: await reply("source.machineUnknown") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
         await buildMachine.setBuildMachine(applicationId, access.ownerId, parsed.data);
@@ -49,7 +51,7 @@ export async function setBuildMachineAction(applicationId: string, value: unknow
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Could not change where this service builds");
+        return failure(caught, "source.machineSaveFailed");
     }
 }
 
@@ -68,12 +70,12 @@ export async function uploadedSourceAction(
             where: { id: applicationId, environment: { project: { ownerId: access.ownerId } } },
             select: { sourceType: true, sourceConfig: true }
         });
-        if (!app) return { error: "Service not found" };
+        if (!app) return { error: await reply("common.serviceNotFound") };
         const source = JSON.parse(app.sourceConfig || "{}") as Record<string, unknown>;
         const fromRepository = typeof source.repoUrl === "string" && source.repoUrl.length > 0;
         const uploadable = !fromRepository && (app.sourceType === "dockerfile" || app.sourceType === "nixpacks");
         return { upload: uploadedSourceOf(source), uploadable };
     } catch (caught) {
-        return failure(caught, "Could not read this service's source");
+        return failure(caught, "source.loadFailed");
     }
 }

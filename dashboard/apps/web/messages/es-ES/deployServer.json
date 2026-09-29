@@ -1,1 +1,224 @@
-{}
+{
+    "project": {
+        "nameRequired": "El proyecto necesita un nombre",
+        "createFailed": "No se pudo crear el proyecto",
+        "deleteFailed": "No se pudo eliminar el proyecto"
+    },
+    "environment": {
+        "checkDetails": "Revisa los datos del entorno",
+        "notFound": "No se encontró el entorno",
+        "createFailed": "No se pudo crear el entorno",
+        "layoutFailed": "No se pudo guardar la disposición",
+        "deleteFailed": "No se pudo eliminar el entorno",
+        "cannotDeploy": "Puedes crear este entorno, pero no desplegarlo. Desmarca «Desplegarlo en cuanto se cree» y vuelve a intentarlo.",
+        "renameFailed": "No se pudo cambiar el nombre del entorno",
+        "defaultFailed": "No se pudo fijar el entorno predeterminado",
+        "networkFailed": "No se pudo cambiar cómo se conectan los servicios",
+        "checkName": "Revisa el nombre",
+        "networkCannotDeploy": "Puedes cambiar este ajuste, pero no desplegar los servicios de este entorno.",
+        "elsewhere": "Ese entorno no pertenece a este proyecto"
+    },
+    "service": {
+        "templateUnknown": "Esa plantilla no está en la lista",
+        "nameRequired": "La aplicación necesita un nombre",
+        "repoRequired": "Falta la URL del repositorio git",
+        "imageRequired": "Falta la referencia de la imagen (p. ej. nginx:latest)",
+        "serverNotFound": "No se encontró el servidor elegido",
+        "createFailed": "No se pudo crear la aplicación",
+        "settingsFailed": "No se pudieron guardar los ajustes",
+        "gone": "Ese servicio ya no existe",
+        "setupFailed": "No se pudo ejecutar la configuración",
+        "changeFailed": "No se pudo cambiar",
+        "portFailed": "No se pudo actualizar el puerto",
+        "runtimeCheck": "Revisa la versión del entorno de ejecución",
+        "pathsFailed": "No se pudieron actualizar las rutas del código",
+        "serverFailed": "No se pudo cambiar el servidor",
+        "deleteFailed": "No se pudo eliminar el servicio",
+        "duplicateFailed": "No se pudo duplicar el servicio"
+    },
+    "variables": {
+        "gone": "Esa variable ya no existe",
+        "revealFailed": "No se pudo mostrar la variable",
+        "check": "Revisa las variables",
+        "oneGone": "Una de esas variables ya no existe: recarga y vuelve a intentarlo",
+        "saveFailed": "No se pudieron guardar las variables",
+        "nothingToRedeploy": "No hay nada que volver a desplegar",
+        "redeployFailed": "No se pudo iniciar el nuevo despliegue"
+    },
+    "notes": {
+        "invalid": "No se puede publicar esa nota",
+        "postFailed": "No se pudo publicar la nota",
+        "deleteFailed": "No se pudo eliminar la nota"
+    },
+    "deployment": {
+        "startFailed": "No se pudo iniciar el despliegue",
+        "stopFailed": "No se pudo detener el despliegue",
+        "rollbackFailed": "No se pudo volver a esa versión",
+        "releaseFailed": "No se pudo cambiar esa versión",
+        "trafficRange": "Una parte del tráfico va del 1 al 50 por ciento",
+        "trafficFailed": "No se pudo cambiar adónde va el tráfico",
+        "restartFailed": "No se pudo reiniciar el despliegue",
+        "updateFailed": "No se pudo actualizar el despliegue",
+        "removeFailed": "No se pudo quitar el despliegue"
+    },
+    "domains": {
+        "portRequired": "Falta un puerto de destino válido",
+        "addFailed": "No se pudo añadir el dominio",
+        "subdomainFailed": "No se pudo crear el subdominio",
+        "subdomainCheckFailed": "No se pudo comprobar ese subdominio",
+        "certificateFailed": "No se pudo guardar el certificado",
+        "updateFailed": "No se pudo actualizar el dominio",
+        "portFailed": "No se pudo cambiar el puerto"
+    },
+    "tunnels": {
+        "publicFailed": "No se pudo abrir un túnel público",
+        "startFailed": "No se pudo iniciar el túnel",
+        "stopFailed": "No se pudo detener el túnel",
+        "updateFailed": "No se pudo actualizar el túnel",
+        "setupFailed": "No se pudo configurar el túnel"
+    },
+    "common": {
+        "invalidRequest": "Solicitud no válida",
+        "unknownChoice": "Opción desconocida",
+        "checkForm": "Revisa el formulario",
+        "pickOption": "Elige una de las opciones disponibles",
+        "serviceNotFound": "No se encontró el servicio",
+        "databaseNotFound": "No se encontró la base de datos",
+        "invalidRequestShort": "Esa solicitud no es válida",
+        "didNotWork": "No ha funcionado",
+        "checkDetails": "Revisa los datos y vuelve a intentarlo",
+        "projectNotFound": "No se encontró el proyecto",
+        "unknownService": "Servicio desconocido"
+    },
+    "edge": {
+        "readFailed": "No se pudieron leer los ajustes del borde",
+        "invalid": "Esos ajustes no son válidos",
+        "saveFailed": "No se pudieron guardar los ajustes del borde"
+    },
+    "databases": {
+        "invalid": "Esa configuración de base de datos no es válida",
+        "createFailed": "No se pudo crear la base de datos",
+        "connectionFailed": "No se pudieron leer los datos de conexión",
+        "provisionFailed": "No se pudo preparar la base de datos",
+        "readFailed": "No se pudo leer esta base de datos",
+        "membersFailed": "No se pudieron leer los miembros",
+        "copySourcesFailed": "No se pudieron listar las bases de datos de origen",
+        "upgradeFailed": "No se pudo iniciar la actualización",
+        "upgradeCancelFailed": "No se pudo cancelar la actualización",
+        "revertFailed": "No se pudo volver a la versión anterior",
+        "persistenceFailed": "No se pudo cambiar cómo guarda Redis sus datos",
+        "replicaSetFailed": "No se pudo cambiar el conjunto de réplicas",
+        "limitsFailed": "No se pudieron cambiar los límites",
+        "pitrFailed": "No se pudo cambiar la recuperación a un momento dado",
+        "recoveryFailed": "No se pudo iniciar la recuperación",
+        "copyFailed": "No se pudo iniciar la copia"
+    },
+    "registry": {
+        "saveFailed": "No se pudo guardar el acceso al registro"
+    },
+    "volumes": {
+        "foldersFailed": "No se pudieron listar las carpetas",
+        "addFailed": "No se pudo añadir el volumen",
+        "updateFailed": "No se pudo actualizar el volumen",
+        "removeFailed": "No se pudo quitar el volumen",
+        "notFound": "No se encontró el volumen",
+        "loadFailed": "No se pudo cargar el volumen",
+        "measureFailed": "No se pudo medir el volumen",
+        "wipeFailed": "No se pudo vaciar el volumen",
+        "detached": "Este volumen no está conectado a ningún servicio"
+    },
+    "servers": {
+        "local": "Local (este servidor)"
+    },
+    "settings": {
+        "loadFailed": "No se pudieron cargar los ajustes del proyecto",
+        "saveFailed": "No se pudo guardar el proyecto",
+        "visibilityFailed": "No se pudo cambiar la visibilidad",
+        "flagsFailed": "No se pudieron guardar las opciones",
+        "templateFailed": "No se pudo generar la plantilla",
+        "visibilityUnknown": "Elige una de las visibilidades disponibles",
+        "unreadable": "No se pudieron leer esos ajustes"
+    },
+    "members": {
+        "loadFailed": "No se pudieron cargar los miembros",
+        "saveFailed": "No se pudo guardar el acceso",
+        "teamsFailed": "No se pudieron cargar los equipos",
+        "removeFailed": "No se pudo quitar al miembro"
+    },
+    "tokens": {
+        "loadFailed": "No se pudieron cargar los tokens",
+        "createFailed": "No se pudo crear el token",
+        "revokeFailed": "No se pudo revocar el token",
+        "deleteFailed": "No se pudo eliminar el token",
+        "beyondYourAccess": "En este proyecto no puedes desplegar, cambiar variables ni gestionar dominios, así que un token creado por ti tampoco podría. Crea un token de solo lectura o pídeselo al propietario del proyecto."
+    },
+    "webhooks": {
+        "loadFailed": "No se pudieron cargar los webhooks",
+        "addFailed": "No se pudo añadir el webhook",
+        "updateFailed": "No se pudo actualizar el webhook",
+        "removeFailed": "No se pudo quitar el webhook",
+        "unreachable": "No se pudo contactar con el endpoint"
+    },
+    "usage": {
+        "loadFailed": "No se pudo cargar el consumo",
+        "monthFailed": "No se pudo calcular el consumo de este mes"
+    },
+    "staged": {
+        "loadFailed": "No se pudieron cargar los cambios pendientes",
+        "removeServiceFailed": "No se pudo quitar el servicio",
+        "removeDatabaseFailed": "No se pudo quitar la base de datos",
+        "discardFailed": "No se pudo descartar el cambio",
+        "discardAllFailed": "No se pudieron descartar los cambios",
+        "deployFailed": "No se pudieron desplegar los cambios",
+        "gone": "Ese cambio ya no está pendiente"
+    },
+    "crons": {
+        "loadFailed": "No se pudieron leer las tareas programadas",
+        "saveFailed": "No se pudo guardar la tarea programada",
+        "removeFailed": "No se pudo quitar la tarea programada",
+        "runFailed": "No se pudo iniciar la tarea",
+        "runsFailed": "No se pudieron leer las ejecuciones de la tarea",
+        "checkDetails": "Revisa los datos de la tarea"
+    },
+    "source": {
+        "machineLoadFailed": "No se pudo leer dónde se compila este servicio",
+        "machineSaveFailed": "No se pudo cambiar dónde se compila este servicio",
+        "loadFailed": "No se pudo leer el código de este servicio",
+        "machineUnknown": "Elige una máquina de la lista"
+    },
+    "scaling": {
+        "loadFailed": "No se pudo leer cómo escala este servicio",
+        "saveFailed": "No se pudieron guardar los ajustes de escalado",
+        "check": "Revisa los ajustes de escalado"
+    },
+    "fix": {
+        "check": "Revisa la corrección",
+        "failed": "No se pudo aplicar la corrección"
+    },
+    "buckets": {
+        "listFailed": "No se pudieron listar los buckets",
+        "createFailed": "No se pudo crear el bucket",
+        "removeFailed": "No se pudo quitar el bucket",
+        "keyCreateFailed": "No se pudo crear la clave",
+        "keyRevokeFailed": "No se pudo revocar la clave",
+        "expirySetFailed": "No se pudo fijar la regla de caducidad",
+        "expiryRemoveFailed": "No se pudo quitar la regla de caducidad",
+        "signFailed": "No se pudo firmar la URL",
+        "replicaTargetsFailed": "No se pudieron listar los buckets de destino de la réplica",
+        "replicationFailed": "No se pudo cambiar la replicación"
+    },
+    "cdn": {
+        "modeFailed": "No se pudo cambiar cómo se sirve el dominio",
+        "purgeFailed": "No se pudo vaciar la caché"
+    },
+    "issues": {
+        "notAPrefix": "Eso no es un prefijo",
+        "nameRequired": "Ponle un nombre",
+        "repoRequired": "Polaris necesita el repositorio"
+    },
+    "external": {
+        "unknownAccount": "Cuenta desconocida",
+        "moveOutNeedsVariables": "Copiar las variables requiere acceso a ellas. Muévelo sin ellas o pide ese acceso.",
+        "moveHomeNeedsVariables": "Copiar las variables requiere acceso a ellas. Tráelo sin ellas o pide ese acceso."
+    }
+}

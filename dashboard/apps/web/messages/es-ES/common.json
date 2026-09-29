@@ -38,5 +38,17 @@
     "mentions": {
         "unreadable": "No se ha podido leer esa búsqueda",
         "lookupFailed": "No se han podido consultar"
+    },
+    "terminal": {
+        "status": {
+            "connecting": "conectando...",
+            "connected": "conectado",
+            "disconnected": "desconectado",
+            "couldNotConnect": "no se pudo conectar",
+            "couldNotAuthorize": "no se pudo autorizar el terminal"
+        },
+        "refused": "El servidor rechazó la sesión: {reason}.",
+        "untrusted": "El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.",
+        "retry": "Reintentar"
     }
 }

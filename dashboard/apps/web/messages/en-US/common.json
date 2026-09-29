@@ -38,5 +38,17 @@
     "mentions": {
         "unreadable": "That search could not be read",
         "lookupFailed": "Those could not be looked up"
+    },
+    "terminal": {
+        "status": {
+            "connecting": "connecting...",
+            "connected": "connected",
+            "disconnected": "disconnected",
+            "couldNotConnect": "could not connect",
+            "couldNotAuthorize": "could not authorize terminal"
+        },
+        "refused": "The server refused the session: {reason}.",
+        "untrusted": "The browser would not open the connection. A terminal needs this address's certificate trusted, and accepting the warning on the page is not enough. <download>Download Polaris's certificate</download> and add it to this device's trusted roots, then reload.",
+        "retry": "Try again"
     }
 }
