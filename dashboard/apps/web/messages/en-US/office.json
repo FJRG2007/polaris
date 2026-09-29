@@ -1,1 +1,110 @@
-{}
+{
+    "kinds": {
+        "doc": "Document",
+        "sheet": "Spreadsheet",
+        "slides": "Presentation",
+        "diagram": "Diagram",
+        "comparison": "Comparison"
+    },
+    "kindsPlural": {
+        "doc": "Documents",
+        "sheet": "Spreadsheets",
+        "slides": "Presentations",
+        "diagram": "Diagrams",
+        "comparison": "Comparisons"
+    },
+    "kindHints": {
+        "doc": "Write something and lay it out.",
+        "sheet": "Numbers, formulas and tables.",
+        "slides": "Something to present.",
+        "diagram": "Draw how it fits together.",
+        "comparison": "Line competitors up against the things that matter, with the evidence."
+    },
+    "view": {
+        "emptyKind": {
+            "doc": "No documents yet",
+            "sheet": "No spreadsheets yet",
+            "slides": "No presentations yet",
+            "diagram": "No diagrams yet",
+            "comparison": "No comparisons yet"
+        },
+        "sorts": {
+            "opened": "Last opened by me",
+            "edited": "Last edited",
+            "created": "Newest",
+            "title": "Name"
+        },
+        "makeFailed": "That could not be made",
+        "openFailed": "{name} could not be opened.",
+        "opened": "{count} {count, plural, one {file} other {files}} opened.",
+        "binTitle": "Move {name} to the bin?",
+        "binBody": "It leaves this list and waits in the bin, where you can put it back or delete it for good.",
+        "bin": "Move to the bin",
+        "restored": "Put back",
+        "binned": "Moved to the bin",
+        "search": "Search by name",
+        "searchLabel": "Search documents",
+        "sortLabel": "How to order these",
+        "unstarred": "Unstarred",
+        "starred": "Starred",
+        "archived": "Archived",
+        "importTitle": "Open a file as a document",
+        "burnTitle": "Delete {name} for good?",
+        "burnQuestion": "Delete <strong>{name}</strong>?",
+        "burnBody": "It goes from the bin and from Polaris. Nothing here can bring it back.",
+        "burn": "Delete for good",
+        "burned": "Deleted for good",
+        "sharedWithYou": "Shared with you",
+        "editedBy": "Last edited by {name}",
+        "restoreNamed": "Put {name} back",
+        "restore": "Put back",
+        "burnNamed": "Delete {name} for good",
+        "unstarNamed": "Unstar {name}",
+        "starNamed": "Star {name}",
+        "unstar": "Unstar",
+        "star": "Star",
+        "archiveNamed": "Archive {name}",
+        "archive": "Archive",
+        "binNamed": "Move {name} to the bin",
+        "makeNew": "Make something new",
+        "import": "Import",
+        "empty": {
+            "query": "Nothing matched",
+            "trashed": "The bin is empty",
+            "archived": "Nothing archived",
+            "starred": "Nothing starred",
+            "shared": "Nothing shared with you",
+            "none": "Nothing here yet"
+        },
+        "emptyBody": {
+            "query": "No document here has that in its name.",
+            "trashed": "Documents you delete wait here until you empty it.",
+            "archived": "Archiving takes something out of the way without deleting it.",
+            "starred": "Star a document to keep it at the top of this list.",
+            "shared": "Documents other people give you appear here.",
+            "none": "Make a document, a spreadsheet, a presentation, a diagram or a comparison."
+        }
+    },
+    "pages": {
+        "office": {
+            "title": "Office",
+            "description": "Documents, spreadsheets, slides and diagrams - yours and the ones you were given."
+        },
+        "archive": {
+            "title": "Archive",
+            "description": "Put away, and still here."
+        },
+        "shared": {
+            "title": "Shared with me",
+            "description": "Documents somebody handed to you, or to a team or role you are in."
+        },
+        "starred": {
+            "title": "Starred",
+            "description": "The ones you keep coming back to."
+        },
+        "trash": {
+            "title": "Trash",
+            "description": "Deleted, and not yet gone. Put something back, or delete it for good."
+        }
+    }
+}

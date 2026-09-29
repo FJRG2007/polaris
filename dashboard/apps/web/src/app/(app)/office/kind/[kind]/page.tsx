@@ -7,13 +7,16 @@
  */
 
 import * as core from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { notFound } from "next/navigation";
 import { OfficeView } from "../../office-view";
+import { OFFICE_KIND_HINT_KEYS, OFFICE_KIND_PLURAL_KEYS } from "../../office-kinds";
 import { requirePermission } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OfficeKindPage({ params }: { params: Promise<{ kind: string }> }) {
+    const t = await getTranslations("office");
     await requirePermission("office.use");
     const { kind } = await params;
     if (!core.isOfficeKind(kind)) notFound();
@@ -23,8 +26,8 @@ export default async function OfficeKindPage({ params }: { params: Promise<{ kin
             kind={kind}
             starredOnly={false}
             sharedOnly={false}
-            title={`${core.OFFICE_KIND_LABELS[kind]}s`}
-            description={core.OFFICE_KIND_HINTS[kind]}
+            title={t(OFFICE_KIND_PLURAL_KEYS[kind])}
+            description={t(OFFICE_KIND_HINT_KEYS[kind])}
         />
     );
 }

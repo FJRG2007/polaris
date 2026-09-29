@@ -1,11 +1,13 @@
 /** What other people gave this account, rather than what it made. */
 
 import { OfficeView } from "../office-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OfficeSharedPage() {
+    const t = await getTranslations("office");
     await requirePermission("office.use");
     return (
         <OfficeView
@@ -13,8 +15,8 @@ export default async function OfficeSharedPage() {
             kind=""
             starredOnly={false}
             sharedOnly
-            title="Shared with me"
-            description="Documents somebody handed to you, or to a team or role you are in."
+            title={t("pages.shared.title")}
+            description={t("pages.shared.description")}
         />
     );
 }

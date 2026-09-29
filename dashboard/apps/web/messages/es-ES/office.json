@@ -1,1 +1,110 @@
-{}
+{
+    "kinds": {
+        "doc": "Documento",
+        "sheet": "Hoja",
+        "slides": "Presentación",
+        "diagram": "Diagrama",
+        "comparison": "Comparativa"
+    },
+    "kindsPlural": {
+        "doc": "Documentos",
+        "sheet": "Hojas",
+        "slides": "Presentaciones",
+        "diagram": "Diagramas",
+        "comparison": "Comparativas"
+    },
+    "kindHints": {
+        "doc": "Escribe algo y dale formato.",
+        "sheet": "Números, fórmulas y tablas.",
+        "slides": "Algo que presentar.",
+        "diagram": "Dibuja cómo encaja todo.",
+        "comparison": "Enfrenta a tus competidores en lo que importa, con las pruebas."
+    },
+    "view": {
+        "emptyKind": {
+            "doc": "Sin documentos aún",
+            "sheet": "Sin hojas aún",
+            "slides": "Sin presentaciones aún",
+            "diagram": "Sin diagramas aún",
+            "comparison": "Sin comparativas aún"
+        },
+        "sorts": {
+            "opened": "Abiertos por mí",
+            "edited": "Editados",
+            "created": "Recientes",
+            "title": "Nombre"
+        },
+        "makeFailed": "No se pudo crear",
+        "openFailed": "No se pudo abrir {name}.",
+        "opened": "{count, plural, one {# archivo abierto} other {# archivos abiertos}}.",
+        "binTitle": "¿Mover {name} a la papelera?",
+        "binBody": "Sale de esta lista y espera en la papelera, donde puedes recuperarlo o borrarlo para siempre.",
+        "bin": "A la papelera",
+        "restored": "Recuperado",
+        "binned": "En la papelera",
+        "search": "Buscar por nombre",
+        "searchLabel": "Buscar documentos",
+        "sortLabel": "Cómo ordenarlos",
+        "unstarred": "Desmarcado",
+        "starred": "Marcado",
+        "archived": "Archivado",
+        "importTitle": "Abrir un archivo como documento",
+        "burnTitle": "¿Borrar {name} para siempre?",
+        "burnQuestion": "¿Borrar <strong>{name}</strong>?",
+        "burnBody": "Desaparece de la papelera y de Polaris. Nada de aquí puede recuperarlo.",
+        "burn": "Borrar del todo",
+        "burned": "Borrado del todo",
+        "sharedWithYou": "Compartido contigo",
+        "editedBy": "Editado por última vez por {name}",
+        "restoreNamed": "Recuperar {name}",
+        "restore": "Recuperar",
+        "burnNamed": "Borrar {name} para siempre",
+        "unstarNamed": "Desmarcar {name}",
+        "starNamed": "Marcar {name}",
+        "unstar": "Desmarcar",
+        "star": "Marcar",
+        "archiveNamed": "Archivar {name}",
+        "archive": "Archivar",
+        "binNamed": "Mover {name} a la papelera",
+        "makeNew": "Crear algo nuevo",
+        "import": "Importar",
+        "empty": {
+            "query": "Nada coincide",
+            "trashed": "Papelera vacía",
+            "archived": "Nada archivado",
+            "starred": "Nada marcado",
+            "shared": "Nada compartido contigo",
+            "none": "Aún no hay nada"
+        },
+        "emptyBody": {
+            "query": "Ningún documento tiene eso en el nombre.",
+            "trashed": "Los documentos que borras esperan aquí hasta que la vacíes.",
+            "archived": "Archivar quita algo de en medio sin borrarlo.",
+            "starred": "Marca un documento para tenerlo arriba en esta lista.",
+            "shared": "Aquí aparecen los documentos que otras personas te dan.",
+            "none": "Crea un documento, una hoja de cálculo, una presentación, un diagrama o una comparativa."
+        }
+    },
+    "pages": {
+        "office": {
+            "title": "Office",
+            "description": "Documentos, hojas de cálculo, presentaciones y diagramas - los tuyos y los que te han dado."
+        },
+        "archive": {
+            "title": "Archivo",
+            "description": "Guardados, y aún aquí."
+        },
+        "shared": {
+            "title": "Conmigo",
+            "description": "Documentos que alguien te ha dado a ti, o a un equipo o rol en el que estás."
+        },
+        "starred": {
+            "title": "Marcados",
+            "description": "Los que siempre vuelves a abrir."
+        },
+        "trash": {
+            "title": "Papelera",
+            "description": "Borrados, pero aún no del todo. Recupera algo o bórralo para siempre."
+        }
+    }
+}

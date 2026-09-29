@@ -2,11 +2,13 @@
  *  reason a bin exists between deleting and gone. */
 
 import { OfficeView } from "../office-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OfficeTrashPage() {
+    const t = await getTranslations("office");
     await requirePermission("office.use");
     return (
         <OfficeView
@@ -14,8 +16,8 @@ export default async function OfficeTrashPage() {
             kind=""
             starredOnly={false}
             sharedOnly={false}
-            title="Trash"
-            description="Deleted, and not yet gone. Put something back, or delete it for good."
+            title={t("pages.trash.title")}
+            description={t("pages.trash.description")}
         />
     );
 }

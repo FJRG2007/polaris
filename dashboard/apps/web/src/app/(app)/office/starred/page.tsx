@@ -2,11 +2,13 @@
  *  somebody else set never shows here. */
 
 import { OfficeView } from "../office-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OfficeStarredPage() {
+    const t = await getTranslations("office");
     await requirePermission("office.use");
     return (
         <OfficeView
@@ -14,8 +16,8 @@ export default async function OfficeStarredPage() {
             kind=""
             starredOnly
             sharedOnly={false}
-            title="Starred"
-            description="The ones you keep coming back to."
+            title={t("pages.starred.title")}
+            description={t("pages.starred.description")}
         />
     );
 }

@@ -8,11 +8,13 @@
  */
 
 import { OfficeView } from "./office-view";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function OfficePage() {
+    const t = await getTranslations("office");
     await requirePermission("office.use");
     return (
         <OfficeView
@@ -20,8 +22,8 @@ export default async function OfficePage() {
             kind=""
             starredOnly={false}
             sharedOnly={false}
-            title="Office"
-            description="Documents, spreadsheets, slides and diagrams - yours and the ones you were given."
+            title={t("pages.office.title")}
+            description={t("pages.office.description")}
         />
     );
 }

@@ -14,6 +14,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -21,6 +23,7 @@ import { useShelfScope } from "@/components/shelf-scope";
 import { RelativeTime } from "@/components/relative-time";
 import { asFiles } from "@/components/file-picker/as-files";
 import type { OfficeDocumentView } from "@/lib/office/documents";
+import { OFFICE_KIND_HINT_KEYS, OFFICE_KIND_KEYS } from "./office-kinds";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
@@ -79,6 +82,21 @@ const KIND_TONES: Record<core.OfficeKind, string> = {
     comparison: "text-foreground-subtle"
 };
 
+const EMPTY_KIND_KEYS = {
+    doc: "view.emptyKind.doc",
+    sheet: "view.emptyKind.sheet",
+    slides: "view.emptyKind.slides",
+    diagram: "view.emptyKind.diagram",
+    comparison: "view.emptyKind.comparison"
+} as const satisfies Record<core.OfficeKind, NamespaceKey<"office">>;
+
+const SORT_KEYS = {
+    opened: "view.sorts.opened",
+    edited: "view.sorts.edited",
+    created: "view.sorts.created",
+    title: "view.sorts.title"
+} as const satisfies Record<core.OfficeSort, NamespaceKey<"office">>;
+
 export interface OfficeViewProps {
     /** What this screen is: a shelf, one kind, or what somebody was given. */
     readonly shelf: "live" | "archived" | "trashed";
@@ -97,6 +115,7 @@ export function OfficeView({
     title,
     description
 }: OfficeViewProps) {
+    const t = useTranslations("office");
     const router = useRouter();
     const toast = useToast();
     const on = useShelfScope();
@@ -129,13 +148,13 @@ export function OfficeView({
                 const answer = await createDocumentAction({ kind });
                 setMaking(null);
                 if (answer.error || !answer.id) {
-                    toast.show({ title: answer.error ?? "That could not be made" });
+                    toast.show({ title: answer.error ?? t("view.makeFailed") });
                     return;
                 }
                 router.push(core.officeDocumentPath(kind, answer.id));
             })();
         },
-        [making, router, toast]
+        [making, router, toast, t]
     );
     const [importing, setImporting] = useState(false);
     const [reading, setReading] = useState(false);
@@ -208,7 +227,7 @@ export function OfficeView({
                         error?: string;
                     } | null;
                     if (!answer.ok || !body?.id || !body.kind) {
-                        toast.show({ title: body?.error ?? `${file.name} could not be opened.` });
+                        toast.show({ title: body?.error ?? t("view.openFailed", { name: file.name }) });
                         continue;
                     }
                     opened.push({ id: body.id, kind: body.kind });
@@ -228,14 +247,14 @@ export function OfficeView({
                 // still on screen, and "4 files opened" over three of them is
                 // the screen contradicting itself.
                 toast.show({
-                    title: `${opened.length} ${opened.length === 1 ? "file" : "files"} opened.`
+                    title: t("view.opened", { count: opened.length })
                 });
                 await load();
             } finally {
                 setReading(false);
             }
         },
-        [load, on, router, toast]
+        [load, on, router, toast, t]
     );
 
     /**
@@ -283,10 +302,9 @@ export function OfficeView({
         async (row: OfficeDocumentView): Promise<void> => {
             if (!row.trashed) {
                 const sure = await confirm({
-                    title: `Move ${row.title} to the bin?`,
-                    description:
-                        "It leaves this list and waits in the bin, where you can put it back or delete it for good.",
-                    confirmLabel: "Move to the bin",
+                    title: t("view.binTitle", { name: row.title }),
+                    description: t("view.binBody"),
+                    confirmLabel: t("view.bin"),
                     danger: true
                 });
                 if (!sure) return;
@@ -294,10 +312,10 @@ export function OfficeView({
             await act(
                 drop(row.id),
                 () => trashDocumentAction(row.id, !row.trashed),
-                row.trashed ? "Put back" : "Moved to the bin"
+                row.trashed ? t("view.restored") : t("view.binned")
             );
         },
-        [act, confirm]
+        [act, confirm, t]
     );
 
     return (
@@ -322,19 +340,19 @@ export function OfficeView({
                     <Input
                         className="pl-8"
                         value={query}
-                        placeholder="Search by name"
-                        aria-label="Search documents"
+                        placeholder={t("view.search")}
+                        aria-label={t("view.searchLabel")}
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </div>
                 <Select
                     className="w-48"
-                    aria-label="How to order these"
+                    aria-label={t("view.sortLabel")}
                     value={sort}
                     onValueChange={(next) => setSort(core.readOfficeSort(next))}
                     options={core.OFFICE_SORTS.map((one) => ({
                         value: one,
-                        label: core.OFFICE_SORT_LABELS[one]
+                        label: t(SORT_KEYS[one])
                     }))}
                 />
             </div>
@@ -358,8 +376,8 @@ export function OfficeView({
             ) : shown.length === 0 ? (
                 <EmptyState
                     icon={<FileText className="size-5 shrink-0" aria-hidden />}
-                    title={emptyTitle(shelf, kind, starredOnly, sharedOnly, query)}
-                    description={emptyBody(shelf, kind, starredOnly, sharedOnly, query)}
+                    title={t(emptyTitle(shelf, kind, starredOnly, sharedOnly, query))}
+                    description={t(emptyBody(shelf, kind, starredOnly, sharedOnly, query))}
                     action={
                         shelf === "live" && !query && !sharedOnly ? (
                             <NewButton
@@ -389,14 +407,14 @@ export function OfficeView({
                                                       : one
                                               ),
                                     () => starDocumentAction(row.id, !row.starred),
-                                    row.starred ? "Unstarred" : "Starred"
+                                    row.starred ? t("view.unstarred") : t("view.starred")
                                 )
                             }
                             onArchive={() =>
                                 void act(
                                     drop(row.id),
                                     () => archiveDocumentAction(row.id, !row.archived),
-                                    row.archived ? "Put back" : "Archived"
+                                    row.archived ? t("view.restored") : t("view.archived")
                                 )
                             }
                             onTrash={() => void bin(row)}
@@ -408,7 +426,7 @@ export function OfficeView({
 
             {importing ? (
                 <FilePickerDialog
-                    title="Open a file as a document"
+                    title={t("view.importTitle")}
                     accept={core.OFFICE_IMPORT_ACCEPT}
                     onPick={(picked) => void importPicked(picked)}
                     onClose={() => setImporting(false)}
@@ -424,16 +442,24 @@ export function OfficeView({
                     name={burning.title}
                     requireTyping={false}
                     kind="document"
-                    title={`Delete ${burning.title} for good?`}
-                    description="It goes from the bin and from Polaris. Nothing here can bring it back."
-                    confirmLabel="Delete for good"
+                    title={t("view.burnTitle", { name: burning.title })}
+                    question={t.rich("view.burnQuestion", {
+                        name: burning.title,
+                        strong: (chunks) => (
+                            <span key="name" className="font-medium text-foreground">
+                                {chunks}
+                            </span>
+                        )
+                    })}
+                    description={t("view.burnBody")}
+                    confirmLabel={t("view.burn")}
                     onConfirm={() => {
                         const gone = burning;
                         setBurning(null);
                         void act(
                             drop(gone.id),
                             () => deleteDocumentAction(gone.id),
-                            "Deleted for good"
+                            t("view.burned")
                         );
                     }}
                 />
@@ -458,6 +484,7 @@ function Row({
     onTrash: () => void;
     onDelete: () => void;
 }) {
+    const t = useTranslations("office");
     const Icon = KIND_ICONS[row.kind];
     return (
         <li className="group flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-surface-hover">
@@ -480,7 +507,7 @@ function Row({
                     {row.title}
                 </Link>
                 <p className="flex flex-wrap items-center gap-1.5 truncate text-[12px] text-muted-foreground">
-                    <span>{core.OFFICE_KIND_LABELS[row.kind]}</span>
+                    <span>{t(OFFICE_KIND_KEYS[row.kind])}</span>
                     {row.orgName ? (
                         <>
                             <span aria-hidden>-</span>
@@ -492,14 +519,14 @@ function Row({
                             <span aria-hidden>-</span>
                             <span className="flex items-center gap-1">
                                 <Users className="size-3 shrink-0" aria-hidden />
-                                Shared with you
+                                {t("view.sharedWithYou")}
                             </span>
                         </>
                     ) : null}
                     {row.editedBy ? (
                         <>
                             <span aria-hidden>-</span>
-                            <span className="truncate">Last edited by {row.editedBy}</span>
+                            <span className="truncate">{t("view.editedBy", { name: row.editedBy })}</span>
                         </>
                     ) : null}
                 </p>
@@ -515,8 +542,8 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Put ${row.title} back`}
-                            title="Put back"
+                            aria-label={t("view.restoreNamed", { name: row.title })}
+                            title={t("view.restore")}
                             onClick={onTrash}
                         >
                             <Undo2 className="size-4 shrink-0" aria-hidden />
@@ -524,8 +551,8 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Delete ${row.title} for good`}
-                            title="Delete for good"
+                            aria-label={t("view.burnNamed", { name: row.title })}
+                            title={t("view.burn")}
                             onClick={onDelete}
                         >
                             <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -537,8 +564,12 @@ function Row({
                             variant="ghost"
                             size="icon"
                             aria-pressed={row.starred}
-                            aria-label={row.starred ? `Unstar ${row.title}` : `Star ${row.title}`}
-                            title={row.starred ? "Unstar" : "Star"}
+                            aria-label={
+                                row.starred
+                                    ? t("view.unstarNamed", { name: row.title })
+                                    : t("view.starNamed", { name: row.title })
+                            }
+                            title={row.starred ? t("view.unstar") : t("view.star")}
                             onClick={onStar}
                         >
                             <Star
@@ -553,9 +584,11 @@ function Row({
                             variant="ghost"
                             size="icon"
                             aria-label={
-                                row.archived ? `Put ${row.title} back` : `Archive ${row.title}`
+                                row.archived
+                                    ? t("view.restoreNamed", { name: row.title })
+                                    : t("view.archiveNamed", { name: row.title })
                             }
-                            title={row.archived ? "Put back" : "Archive"}
+                            title={row.archived ? t("view.restore") : t("view.archive")}
                             onClick={onArchive}
                         >
                             <Undo2
@@ -570,8 +603,8 @@ function Row({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Move ${row.title} to the bin`}
-                            title="Move to the bin"
+                            aria-label={t("view.binNamed", { name: row.title })}
+                            title={t("view.bin")}
                             onClick={onTrash}
                         >
                             <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -595,8 +628,9 @@ function NewButton({
      *  it says so, rather than the whole header being replaced by a spinner. */
     busy: boolean;
 }) {
+    const t = useTranslations("office");
     return (
-        <ScrollRow className="-mx-1 flex items-center gap-2 px-1" aria-label="Make something new">
+        <ScrollRow className="-mx-1 flex items-center gap-2 px-1" aria-label={t("view.makeNew")}>
             {core.OFFICE_KINDS.map((kind) => {
                 const Icon = KIND_ICONS[kind];
                 return (
@@ -604,7 +638,7 @@ function NewButton({
                         key={kind}
                         size="sm"
                         variant={kind === "doc" ? "primary" : "secondary"}
-                        title={core.OFFICE_KIND_HINTS[kind]}
+                        title={t(OFFICE_KIND_HINT_KEYS[kind])}
                         onClick={() => onPick(kind)}
                     >
                         {kind === "doc" ? (
@@ -612,7 +646,7 @@ function NewButton({
                         ) : (
                             <Icon className="size-4 shrink-0" aria-hidden />
                         )}
-                        {core.OFFICE_KIND_LABELS[kind]}
+                        {t(OFFICE_KIND_KEYS[kind])}
                     </Button>
                 );
             })}
@@ -624,7 +658,7 @@ function NewButton({
                 ) : (
                     <Upload className="size-4 shrink-0" aria-hidden />
                 )}
-                Import
+                {t("view.import")}
             </Button>
         </ScrollRow>
     );
@@ -639,14 +673,14 @@ function emptyTitle(
     starred: boolean,
     shared: boolean,
     query: string
-): string {
-    if (query) return "Nothing matched";
-    if (shelf === "trashed") return "The bin is empty";
-    if (shelf === "archived") return "Nothing archived";
-    if (starred) return "Nothing starred";
-    if (shared) return "Nothing shared with you";
-    if (kind) return `No ${core.OFFICE_KIND_LABELS[kind].toLowerCase()}s yet`;
-    return "Nothing here yet";
+): NamespaceKey<"office"> {
+    if (query) return "view.empty.query";
+    if (shelf === "trashed") return "view.empty.trashed";
+    if (shelf === "archived") return "view.empty.archived";
+    if (starred) return "view.empty.starred";
+    if (shared) return "view.empty.shared";
+    if (kind) return EMPTY_KIND_KEYS[kind];
+    return "view.empty.none";
 }
 
 function emptyBody(
@@ -655,13 +689,12 @@ function emptyBody(
     starred: boolean,
     shared: boolean,
     query: string
-): string {
-    if (query) return "No document here has that in its name.";
-    if (shelf === "trashed") return "Documents you delete wait here until you empty it.";
-    if (shelf === "archived")
-        return "Archiving takes something out of the way without deleting it.";
-    if (starred) return "Star a document to keep it at the top of this list.";
-    if (shared) return "Documents other people give you appear here.";
-    if (kind) return core.OFFICE_KIND_HINTS[kind];
-    return "Make a document, a spreadsheet, a presentation, a diagram or a comparison.";
+): NamespaceKey<"office"> {
+    if (query) return "view.emptyBody.query";
+    if (shelf === "trashed") return "view.emptyBody.trashed";
+    if (shelf === "archived") return "view.emptyBody.archived";
+    if (starred) return "view.emptyBody.starred";
+    if (shared) return "view.emptyBody.shared";
+    if (kind) return OFFICE_KIND_HINT_KEYS[kind];
+    return "view.emptyBody.none";
 }
