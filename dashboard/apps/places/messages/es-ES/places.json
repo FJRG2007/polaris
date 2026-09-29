@@ -6,7 +6,7 @@
         "notAnsweringSince": "No responde desde {since}",
         "open": "Abrir {name}",
         "paused": "En pausa",
-        "quiet": "Sin señal",
+        "quiet": "Inactiva",
         "rec": "REC",
         "recording": "Grabando",
         "settings": "Ajustes",
@@ -15,7 +15,7 @@
         "switchedOff": "Apagada"
     },
     "cameras": {
-        "add": "Añadir una cámara",
+        "add": "Añadir cámara",
         "area": "Zona",
         "areaCount": "{area} - {count}",
         "areas": "Zonas",
@@ -37,9 +37,9 @@
         "everyArea": "Todas las zonas - {count}",
         "extrasFailed": "No se han podido leer las máquinas y los discos con los que se configura una cámara, así que no se pueden añadir ni cambiar cámaras. Recarga la página para volver a intentarlo.",
         "keeps": {
-            "continuous": "Se guarda siempre",
-            "motion": "Se guarda con movimiento",
-            "off": "No se guarda nada"
+            "continuous": "Guarda siempre",
+            "motion": "Guarda movimiento",
+            "off": "No guarda nada"
         },
         "noArea": "Sin zona",
         "noMatch": {
@@ -73,8 +73,8 @@
             "animal": "Un animal",
             "face": "Reconocido",
             "motion": "Movimiento",
-            "offline": "La cámara dejó de responder",
-            "package": "Una caja o bolsa",
+            "offline": "Cámara sin respuesta",
+            "package": "Caja o bolsa",
             "person": "Alguien",
             "tamper": "Cámara manipulada",
             "vehicle": "Un vehículo"
@@ -83,7 +83,7 @@
     "detectors": {
         "camera": {
             "cost": "Ninguno. La cámara hace el trabajo y Polaris solo escucha.",
-            "label": "Los avisos de la propia cámara",
+            "label": "Avisos de la propia cámara",
             "summary": "La cámara decide si algo se ha movido y se lo dice a Polaris. Casi todas las cámaras de los últimos diez años pueden."
         },
         "faces": {
@@ -110,11 +110,11 @@
     },
     "modelPicker": {
         "brandEmpty": "No hay ninguna marca con ese nombre. Elige Otra y Polaris le preguntará el resto a la cámara.",
-        "brandLabel": "Marca de la cámara",
-        "brandNone": "Quién la fabrica",
+        "brandLabel": "Marca",
+        "brandNone": "Quién la hace",
         "brandPlaceholder": "Tapo, TP-Link, Reolink",
         "modelEmpty": "No hay ninguna cámara con ese nombre. Elige la más parecida o «Otra cosa».",
-        "modelLabel": "Modelo de la cámara",
+        "modelLabel": "Modelo",
         "modelNone": "Elige la cámara",
         "modelPlaceholder": "C410, tapo c200, tplink"
     },
@@ -122,14 +122,14 @@
         "brandOther": "Otra",
         "conditionalNote": "Esta solo responde por RTSP cuando está conectada a la corriente, tiene el puente puesto y está configurada para no dormirse en la app de Tapo. Con batería no publica nada, y Polaris llega a ella por el protocolo propio de TP-Link.",
         "names": {
-            "amcrest-other": "Cualquier cámara Amcrest",
-            "dahua-other": "Cualquier cámara Dahua",
+            "amcrest-other": "Cualquier Amcrest",
+            "dahua-other": "Cualquier Dahua",
             "generic-other": "Otra cosa",
-            "hikvision-other": "Cualquier cámara Hikvision",
-            "onvif-other": "Cualquier cámara ONVIF",
-            "reolink-other": "Cualquier cámara Reolink",
+            "hikvision-other": "Cualquier Hikvision",
+            "onvif-other": "Cámara ONVIF",
+            "reolink-other": "Cualquier Reolink",
             "tapo-other": "Otra cámara Tapo",
-            "vigi-other": "Cualquier cámara VIGI"
+            "vigi-other": "Cualquier VIGI"
         }
     },
     "objects": {
@@ -165,7 +165,7 @@
             "title": "Personas"
         },
         "place": {
-            "addCamera": "Añadir una cámara",
+            "addCamera": "Añadir cámara",
             "description": "Todas las cámaras de este sitio y lo que ven ahora mismo."
         },
         "settings": {
@@ -175,7 +175,7 @@
     },
     "placeDialog": {
         "add": "Añadir sitio",
-        "addTitle": "Añadir un sitio",
+        "addTitle": "Añadir sitio",
         "address": "Dónde está",
         "addressPlaceholder": "Opcional; solo se guarda como texto",
         "description": "Una casa, una oficina, un taller: cualquier sitio con sus propias cámaras.",
@@ -187,7 +187,7 @@
         "house": "Casa",
         "office": "Oficina",
         "other": "Otro sitio",
-        "site": "Instalación"
+        "site": "Recinto"
     },
     "power": {
         "batteryCost": "Esta cámara funciona con su propia batería, y todo lo que Polaris vigile por su cuenta obliga a mantener la emisión abierta todo el día. Eso aumenta mucho el consumo: si no se recarga más rápido, se quedará sin batería, se apagará y Polaris no podrá despertarla.",
@@ -211,7 +211,7 @@
         "up": "Arriba"
     },
     "switcher": {
-        "add": "Añadir un sitio",
+        "add": "Añadir sitio",
         "label": "Qué sitio"
     },
     "vendors": {
@@ -229,7 +229,7 @@
             "label": "Hikvision"
         },
         "onvif": {
-            "label": "Cualquier cámara ONVIF",
+            "label": "Cámara ONVIF",
             "note": "Polaris le pregunta a la cámara qué emite. Casi todas las cámaras de los últimos diez años responden."
         },
         "reolink": {
@@ -271,7 +271,7 @@
     },
     "wall": {
         "empty": {
-            "add": "Añadir una cámara",
+            "add": "Añadir cámara",
             "manage": "Añade una y Polaris encontrará sus emisiones, o busca las que ya están en tu red.",
             "title": "Aún no hay cámaras",
             "view": "Nadie ha añadido todavía una cámara a esta casa."
