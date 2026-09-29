@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import * as catalog from "./catalog";
-import { rewardItemSchema } from "../events/catalog";
+import { chosenLanguage as chosenEventsLanguage, rewardItemSchema } from "../events/catalog";
 
 /** Where the settings live in the install's config. Written by the screen. */
 export const CHALLENGES_KEY = "challenges";
@@ -249,6 +249,19 @@ export type ChallengeSettings = z.infer<typeof settingsSchema>;
 
 /** The stored settings, whole: a server without any reads as switched off,
  *  in the time zone and language its events already use. */
+/**
+ * The language the operator chose for challenges, or - none chosen - the one
+ * chosen for events; null when neither ever was (the server then speaks its
+ * owner's language).
+ */
+export function chosenLanguage(config: Record<string, unknown>): "en" | "es" | null {
+    const raw = config[CHALLENGES_KEY];
+    const own =
+        typeof raw === "object" && raw !== null ? (raw as { language?: unknown }).language : undefined;
+    if (own === "en" || own === "es") return own;
+    return chosenEventsLanguage(config);
+}
+
 export function readSettings(
     config: Record<string, unknown>,
     defaults: { timezone?: string; language?: "en" | "es" } = {}

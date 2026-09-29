@@ -23,7 +23,9 @@ import * as replies from "./replies";
 import * as service from "../service";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
-import * as messages from "./messages";
+import * as speech from "../speech";
+import * as speechService from "../speech-service";
+import * as written from "./messages";
 import * as stage from "./kinds/stage";
 import * as playing from "../activity";
 import * as trivia from "./trivia-bank";
@@ -44,6 +46,9 @@ import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
+
 const { readInstallConfig } = host.appsInstallConfig;
 
 /** How long what kind of server one is stays known: it changes only with a restart. */
@@ -61,7 +66,7 @@ const bukkitServers = new Map<string, { at: number; bukkit: boolean }>();
  * split by the names online when the game ran the answers together or wrote
  * them with a team's prefix.
  */
-function eventServer(server: ServerContainer): ServerContainer {
+function eventServer(server: ServerContainer, installedAppId: string): ServerContainer {
     const bukkit = async (): Promise<boolean> => {
         const known = bukkitServers.get(server.installedAppId);
         if (known && Date.now() - known.at < KIND_KNOWN_MS) return known.bukkit;
@@ -93,10 +98,20 @@ function eventServer(server: ServerContainer): ServerContainer {
         }
         return read.join("\n");
     };
+    // Each line split for who reads which language, before anything else.
+    const audience = () =>
+        speechService.audienceFor(installedAppId, homes.get(installedAppId) ?? "en");
     return {
         ...server,
         say: async (argv) => {
-            const line = argv.join(" ");
+            const written = argv.join(" ");
+            const split = speech.localize(written, audience());
+            if (split.length !== 1 || split[0] !== written) {
+                const said: string[] = [];
+                for (const line of split) said.push(await one(line));
+                return said.join("");
+            }
+            const line = written;
             const said = await one(line);
             if (!replies.isPlayerRead(line)) return said;
             const whole = replies.cutShort(said) ? await paged(line, said) : said;
@@ -105,8 +120,33 @@ function eventServer(server: ServerContainer): ServerContainer {
             const roster = replies.rosterNames(await one(replies.ROSTER).catch(() => ""));
             return replies.canonicalReplies(whole, roster).text;
         },
-        sayAll: async (lines) => server.sayAll(await named(lines))
+        sayAll: async (lines) =>
+            server.sayAll(await named(speech.localizeAll(lines, audience())))
     };
+}
+
+/** Each server's own language, as its event loop last settled it. */
+const homes = new Map<string, catalog.Language>();
+
+/**
+ * Who reads which language: the server's own settled first (chosen, or its
+ * owner's), then who is on looked at again every few seconds and tagged.
+ */
+async function hearPlayers(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer
+): Promise<void> {
+    if (!loop.homeKnown) {
+        const row = await readRow(installedAppId).catch(() => null);
+        loop.home = await speechService.homeLanguage(
+            loop.ownerId,
+            row ? catalog.chosenLanguage(row.config) : loop.home
+        );
+        loop.homeKnown = true;
+    }
+    homes.set(installedAppId, loop.home);
+    await speechService.hear(installedAppId, server, loop.home).catch(() => undefined);
 }
 
 function withServerContainer<T>(
@@ -115,7 +155,7 @@ function withServerContainer<T>(
     work: (server: ServerContainer) => Promise<T>
 ): Promise<T> {
     return service.withServerContainer(ownerId, installedAppId, (server) =>
-        work(eventServer(server))
+        work(eventServer(server, installedAppId))
     );
 }
 
@@ -124,7 +164,7 @@ async function openServerContainer(
     installedAppId: string
 ): Promise<{ server: ServerContainer; close: () => Promise<void> }> {
     const link = await service.openServerContainer(ownerId, installedAppId);
-    return { server: eventServer(link.server), close: link.close };
+    return { server: eventServer(link.server, installedAppId), close: link.close };
 }
 
 const TICK_MS = 2_000;
@@ -170,7 +210,13 @@ interface Loop {
     /** The countdown marks already sounded, in seconds before the start. */
     sounded: Set<number>;
     announced: boolean;
-    language: catalog.Language;
+    /** Always every language: each line is split for its readers on the way out. */
+    language: speech.Speech;
+    /** The server's own language: what a player nobody knows reads, and what
+     *  nobody in particular reads (a boss bar's name, a side panel's title). */
+    home: catalog.Language;
+    /** Whether `home` is settled: chosen, or the owner's looked up. */
+    homeKnown: boolean;
     countdown: number;
     /** Parkour and spleef: how this server spells marked items, and its build limit. */
     flavour: stage.Flavour | null;
@@ -646,7 +692,9 @@ function startLoop(
         sounded: new Set(),
         // Resumed after a restart: the countdown was already said.
         announced: run.phase === "running",
-        language: settings.language,
+        language: speech.EVERY,
+        home: settings.language,
+        homeKnown: false,
         countdown: catalog.countdownSecondsFor(run.preset, settings),
         flavour: null,
         quiet: false
@@ -711,6 +759,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         }
         return;
     }
+    await hearPlayers(installedAppId, loop, server);
     if (run.cancelled) return finish(installedAppId, loop, server, "cancelled", "Called off");
 
     if (run.phase === "countdown") return countdown(installedAppId, loop, server, now);
@@ -899,7 +948,7 @@ async function quieten(installedAppId: string, loop: Loop, server: ServerContain
 }
 
 /** What a gathering or a rare catch is for, said with the rules. */
-function targetLines(run: stored.EventRun, language: catalog.Language): string[] {
+function targetLines(run: stored.EventRun, language: speech.Speech): string[] {
     const { preset } = run;
     if (preset.kind === "gathering") {
         const material = gather.materialOf(
@@ -1025,7 +1074,7 @@ async function begin(
             ...meteors.meteorSetup((preset.options as catalog.EventOptions<"meteor-shower">).ores)
         );
     }
-    if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, language));
+    if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, loop.home));
     if (catalog.needsPvp(preset)) {
         // Nobody loses what they carry to a fight: a death keeps all of it, for
         // exactly as long as the duel lasts, and the rule is put back after.
@@ -1409,6 +1458,7 @@ function kindContext(
     return {
         server,
         language: loop.language,
+        home: loop.home,
         now,
         get run() {
             return loop.run;
@@ -1548,8 +1598,9 @@ async function worldBoss(
             // Both ways a name has been written, the older first: up to 1.21.4 the
             // newer is not a name at all and is passed over; from 1.21.5 the older
             // would show as its own text, and the newer replaces it.
-            commands.bossNameCommand(name, false),
-            commands.bossNameCommand(name, true),
+            // Over its head, one name for everybody: the server's own language.
+            commands.bossNameCommand(messages.bossName(options.boss, loop.home), false),
+            commands.bossNameCommand(messages.bossName(options.boss, loop.home), true),
             commands.CLEAR_MARK,
             `bossbar set ${commands.BAR} max ${options.health}`,
             commands.say(
@@ -1919,8 +1970,8 @@ async function rareCatchTick(
     return `Caught by ${winner}`;
 }
 
-/** The round being played, what it asks and what counts as right. */
-function roundOf(
+/** The round being played in one language: what it asks and what counts as right. */
+function roundIn(
     run: stored.EventRun,
     language: catalog.Language
 ): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
@@ -1943,6 +1994,36 @@ function roundOf(
     }
     const question = questions[run.round % questions.length]!;
     return { kind: "question", asked: question.question, accepted: [...question.answers] };
+}
+
+/**
+ * The round being played: each language's readers are asked their own question
+ * (the operator's own are the same for everybody), and the first right answer
+ * to any of them takes it. `answer` is the right one, as each reader reads it.
+ */
+function roundOf(
+    run: stored.EventRun,
+    language: speech.Speech
+): { kind: "question" | "scramble"; asked: string; answer: string; accepted: string[] } {
+    const each = Object.fromEntries(speech.LANGUAGES.map((one) => [one, roundIn(run, one)])) as Record<
+        catalog.Language,
+        ReturnType<typeof roundIn>
+    >;
+    const first = each[speech.LANGUAGES[0]];
+    const pick = (value: (one: ReturnType<typeof roundIn>) => string) =>
+        speech.pickIn(
+            Object.fromEntries(speech.LANGUAGES.map((one) => [one, value(each[one])])) as Record<
+                catalog.Language,
+                string
+            >,
+            language
+        );
+    return {
+        kind: first.kind,
+        asked: pick((one) => one.asked),
+        answer: pick((one) => one.accepted[0] ?? ""),
+        accepted: [...new Set(speech.LANGUAGES.flatMap((one) => each[one].accepted))]
+    };
 }
 
 async function triviaTick(
@@ -2011,11 +2092,11 @@ async function triviaTick(
             commands.setScore(winner, points[winner] ?? 1),
             ...commands.titleCommands(
                 messages.roundWonTitle(winner, language),
-                `&f${asked.accepted[0] ?? ""}`
+                `&f${asked.answer}`
             ),
             commands.say(
                 messages.tag(language) +
-                    messages.roundWon(winner, asked.accepted[0] ?? "", language)
+                    messages.roundWon(winner, asked.answer, language)
             ),
             commands.sound(commands.SOUNDS.win)
         );
@@ -2027,10 +2108,10 @@ async function triviaTick(
         lines.push(
             ...commands.titleCommands(
                 messages.roundMissedTitle(language),
-                `&f${asked.accepted[0] ?? ""}`
+                `&f${asked.answer}`
             ),
             commands.say(
-                messages.tag(language) + messages.roundMissed(asked.accepted[0] ?? "", language)
+                messages.tag(language) + messages.roundMissed(asked.answer, language)
             )
         );
         await persist(installedAppId, loop);
@@ -2923,7 +3004,7 @@ async function settleArenaLeftovers(
 }
 
 /** A score the way the podium says it: `12 points`, `3:20` for time on the hill. */
-function scoreText(preset: catalog.EventPreset, score: number, language: catalog.Language): string {
+function scoreText(preset: catalog.EventPreset, score: number, language: speech.Speech): string {
     if (preset.kind === "supply-drop" || preset.kind === "rare-catch") return "";
     const stageText = stageService.scoreText(preset.kind, score, language);
     if (stageText !== null) return stageText;

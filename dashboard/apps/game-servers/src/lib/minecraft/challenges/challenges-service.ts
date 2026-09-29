@@ -36,7 +36,8 @@ import * as season from "./season";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
 import * as progress from "./progress";
-import * as messages from "./messages";
+import * as speech from "../speech";
+import * as written from "./messages";
 import * as commands from "./commands";
 import * as playing from "../activity";
 import { host } from "@polaris/app-host";
@@ -48,14 +49,44 @@ import * as replies from "../events/replies";
 import { readEventState } from "../events/state";
 import { readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import {
-    editionOf,
-    openServerContainer,
-    withServerContainer,
-    type ServerContainer
-} from "../service";
+import * as speechService from "../speech-service";
+import * as service from "../service";
+import { editionOf, type ServerContainer } from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
+/** A challenge's name, in one language or in every one. */
+const titles = speech.spoken({ titleOf: play.titleOf });
+
+/** Each server's own language, as its last look settled it. */
+const homes = new Map<string, catalog.Language>();
+
+/** A server whose lines are split for who reads which language on their way out. */
+function speakingServer(installedAppId: string, server: ServerContainer): ServerContainer {
+    return speechService.speaking(server, () =>
+        speechService.audienceFor(installedAppId, homes.get(installedAppId) ?? "en")
+    );
+}
+
+async function openServerContainer(
+    ownerId: string,
+    installedAppId: string
+): Promise<{ server: ServerContainer; close: () => Promise<void> }> {
+    const link = await service.openServerContainer(ownerId, installedAppId);
+    return { server: speakingServer(installedAppId, link.server), close: link.close };
+}
+
+function withServerContainer<T>(
+    ownerId: string,
+    installedAppId: string,
+    work: (server: ServerContainer) => Promise<T>
+): Promise<T> {
+    return service.withServerContainer(ownerId, installedAppId, (server) =>
+        work(speakingServer(installedAppId, server))
+    );
+}
 
 /**
  * A refusal the screen may show: its message is a key of the app's
@@ -518,10 +549,19 @@ interface Sweep {
     readonly season: period.Season;
     readonly links: Map<string, string>;
     readonly seen: ReadonlyMap<string, plan.Seen>;
+    /** Settled for the server's own language; a player's own is `contextOf`. */
     readonly context: play.Context;
+    /** The server's own language, and what each player online reads. */
+    readonly home: catalog.Language;
+    readonly languageOf: (name: string) => catalog.Language;
     readonly eventOn: boolean;
     /** Who the anti-xray caught, and when, by lowercased name. */
     readonly caught: Map<string, number[]>;
+}
+
+/** The sweep's settings as one player reads them: in their own language. */
+function contextOf(sweep: Sweep, name: string): play.Context {
+    return { ...sweep.context, language: sweep.languageOf(name) };
 }
 
 /**
@@ -581,6 +621,13 @@ async function contextFor(
     );
     const tiers = held.flat().map((one) => season.tierOf(one.ledger.points, settings));
     const version = loop.version;
+    // The server's own language settled (chosen, or its owner's), then who reads which.
+    const home = await speechService.homeLanguage(
+        row.ownerId,
+        settingsModule.chosenLanguage(row.config)
+    );
+    homes.set(installedAppId, home);
+    const audience = await speechService.hear(installedAppId, server, home);
     return {
         installedAppId,
         ownerId: row.ownerId,
@@ -596,9 +643,11 @@ async function contextFor(
         seen: new Map(),
         eventOn: readEventState(row.config).run !== null,
         caught: caughtBy(row.config),
+        home,
+        languageOf: (name) => audience.of.get(name.toLowerCase()) ?? home,
         context: {
             settings,
-            language: settings.language,
+            language: home,
             now,
             clock,
             day: period.dayKey(clock, now),
@@ -916,7 +965,7 @@ async function endSeason(sweep: Sweep): Promise<void> {
                 : [];
         const number = Number(before.split("#")[1] ?? 0);
         const names = champions.map((one) => one.holder.replace(/^(player|user):/, ""));
-        const title = messages.championTitle(number, sweep.settings.language);
+        const title = messages.championTitle(number, sweep.home);
         // Every server of a shared season ends it: the first one crowns.
         for (const one of champions) {
             await changeLedger({ scope: one.scope, holder: one.holder }, before, (ledger) =>
@@ -934,7 +983,7 @@ async function endSeason(sweep: Sweep): Promise<void> {
         }
         const shown = await namesFor(sweep.installedAppId, names);
         await sweep.server.sayAll([
-            `tellraw @a ${commandsText(messages.seasonEnded(number, shown, sweep.settings.language))}`
+            `tellraw @a ${commandsText(messages.seasonEnded(number, shown, speech.EVERY))}`
         ]);
         sweep.state =
             (await updateState(sweep.installedAppId, (state) => ({
@@ -1128,18 +1177,14 @@ async function runGoals(sweep: Sweep): Promise<void> {
     const total = Object.values(first.shares).reduce((sum, one) => sum + one.value, 0);
     const title = play.titleOf(
         { template: first.template, variant: first.variant, target: first.target },
-        sweep.settings.language
+        sweep.home
     );
     if (sweep.eventOn) await sweep.server.sayAll(commands.barHide(commands.GOAL_BAR));
     else
         await sweep.server.sayAll(
             commands.barShow(
                 commands.GOAL_BAR,
-                messages.goalBar(
-                    title,
-                    play.goalTier(total, first.target),
-                    sweep.settings.language
-                ),
+                messages.goalBar(title, play.goalTier(total, first.target), sweep.home),
                 total,
                 first.target,
                 "@a",
@@ -1152,15 +1197,15 @@ async function runGoals(sweep: Sweep): Promise<void> {
 async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void> {
     const total = Object.values(goal.shares).reduce((sum, one) => sum + one.value, 0);
     const tier = play.goalTier(total, goal.target);
-    const title = play.titleOf(
-        { template: goal.template, variant: goal.variant, target: goal.target },
-        sweep.settings.language
-    );
+    const which = { template: goal.template, variant: goal.variant, target: goal.target };
+    const title = play.titleOf(which, sweep.home);
     const paid = { ...goal.paid };
     const lines: string[] = [];
     for (let reached = goal.tier + 1; reached <= tier; reached += 1)
         lines.push(
-            `tellraw @a ${commandsText(messages.goalTierLine(title, reached, sweep.settings.language))}`
+            `tellraw @a ${commandsText(
+                messages.goalTierLine(titles.titleOf(which, speech.EVERY), reached, speech.EVERY)
+            )}`
         );
     if (lines.length > 0) await sweep.server.sayAll(lines);
     for (let reached = 1; reached <= tier; reached += 1) {
@@ -1196,8 +1241,8 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
                         kind: "tell",
                         line: messages.tierLine(
                             one,
-                            messages.rewardText(tierReward, sweep.settings.language),
-                            sweep.settings.language
+                            messages.rewardText(tierReward, sweep.languageOf(name)),
+                            sweep.languageOf(name)
                         )
                     });
                     effects.push({ kind: "pay", payout: tierReward, label: `tier ${one}` });
@@ -1206,8 +1251,8 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
             effects.push({
                 kind: "tell",
                 line: messages.goalRewardLine(
-                    messages.rewardText(reward, sweep.settings.language),
-                    sweep.settings.language
+                    messages.rewardText(reward, sweep.languageOf(name)),
+                    sweep.languageOf(name)
                 )
             });
             effects.push({ kind: "pay", payout: reward, label: title });
@@ -1711,7 +1756,7 @@ async function settleAndCarry(
         card: record.card?.key ?? keys.card
     };
     const settled = await changeLedger(holder, sweep.season.key, (ledger) => {
-        const next = play.settle(record, ledger, sweep.context, own);
+        const next = play.settle(record, ledger, contextOf(sweep, record.name), own);
         return next.effects.length === 0 ? null : { ledger: next.ledger, value: next };
     });
     if (!settled) return record;
@@ -1730,7 +1775,7 @@ async function carry(
     effects: readonly play.Effect[]
 ): Promise<void> {
     if (!commands.PLAYER_NAME.test(name)) return;
-    const language = sweep.settings.language;
+    const language = sweep.languageOf(name);
     const said: string[] = [];
     const owed: { items: { id: string; count: number }[]; levels: number } = {
         items: [],
@@ -1757,7 +1802,7 @@ async function carry(
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;
     if (online) await sweep.server.sayAll([commands.tell(name, messages.rewardWaiting(language))]);
-    await owe(sweep.installedAppId, name, owed, language);
+    await owe(sweep.installedAppId, name, owed, sweep.home);
 }
 
 /**
@@ -1809,8 +1854,8 @@ async function showProgress(
     justJoined: boolean
 ): Promise<void> {
     const { settings, now } = sweep;
-    const language = settings.language;
     const name = record.name;
+    const language = sweep.languageOf(name);
     const lines: string[] = [];
     const tracked = play.lookup(record, record.tracked);
     const bar = commands.trackedBar(name);
@@ -1950,9 +1995,10 @@ async function handlePresses(
 
 /** What a button press does, and the lines that answer it. */
 async function answer(sweep: Sweep, record: stored.PlayerRecord, value: number): Promise<string[]> {
-    const { settings, context, now } = sweep;
-    const language = settings.language;
+    const { settings, now } = sweep;
     const name = record.name;
+    const language = sweep.languageOf(name);
+    const context = contextOf(sweep, name);
     const linkedOk = !settings.eligibility.linkedOnly || sweep.links.has(name.toLowerCase());
     if (!linkedOk) return [commands.tell(name, messages.notLinked(language))];
     if (record.minutes < settings.eligibility.minMinutes)
@@ -2047,8 +2093,8 @@ async function reroll(
     index: number
 ): Promise<string[]> {
     const { settings, now } = sweep;
-    const language = settings.language;
     const name = record.name;
+    const language = sweep.languageOf(name);
     const layered = record[layer];
     const current = sweep.state[layer];
     const instance = layered?.instances[index];

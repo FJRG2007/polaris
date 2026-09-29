@@ -655,6 +655,19 @@ export function defaultEventsConfig(): EventsConfig {
  * by hand - is left out rather than failing the whole list, and a server that has
  * none gets one of each kind so the screen opens on something to run.
  */
+/**
+ * The language the operator chose for what players read, or null when none was
+ * ever chosen - the server then speaks its owner's (`speech-service`).
+ */
+export function chosenLanguage(config: Record<string, unknown>): Language | null {
+    const raw = config[EVENTS_KEY];
+    if (typeof raw !== "object" || raw === null) return null;
+    const settings = (raw as { settings?: unknown }).settings;
+    if (typeof settings !== "object" || settings === null) return null;
+    const language = (settings as { language?: unknown }).language;
+    return LANGUAGES.includes(language as Language) ? (language as Language) : null;
+}
+
 export function readEventsConfig(config: Record<string, unknown>, timezone = "UTC"): EventsConfig {
     const raw = config[EVENTS_KEY];
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {

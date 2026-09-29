@@ -174,6 +174,8 @@ let config: Record<string, unknown> = {};
 const players = new Map<string, { player: string; playerName: string; data: string }>();
 const ledgers = new Map<string, { scope: string; holder: string; data: string }>();
 const links = new Map<string, string>();
+/** Each Polaris account's language. */
+const locales = new Map<string, string>();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -261,6 +263,9 @@ vi.mock("@polaris/app-host", () => ({
         appsInstallConfig: {
             readInstallConfig: (raw: string | null) =>
                 raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        },
+        i18nLocaleService: {
+            getUserLocale: async (userId: string) => locales.get(userId) ?? "en-US"
         }
     }
 }));
@@ -286,6 +291,7 @@ const service = await import(
 const stored = await import("@polaris-app/game-servers/src/lib/minecraft/challenges/state");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { forgetActivity } = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
+const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/speech-service");
 
 const START = Date.parse("2026-09-29T12:00:00Z");
 const record = (name: string) =>
@@ -339,6 +345,8 @@ beforeEach(async () => {
     players.clear();
     ledgers.clear();
     links.clear();
+    locales.clear();
+    speechService.forget("srv");
     forgetActivity();
     await service.stopAllLoops();
     fake.join("Alba", 0, 0);
@@ -458,6 +466,25 @@ describe("challenges on a server", () => {
         fake.set("Alba", "pc_menu", 12);
         await service.runTick("srv", Date.now(), false);
         expect(record("Alba").daily!.instances[2]!.template).toBe("C2");
+    });
+
+    it("answers each player in the language of their own Polaris account", async () => {
+        links.set("alba", "user-es");
+        locales.set("user-es", "es-ES");
+        knownPool();
+        await step(1);
+        await step(16, ["Alba", "Bruno"]);
+        expect(fake.heard).toContain("tag Alba add pl_es");
+        fake.set("Alba", "pc_menu", 1);
+        fake.set("Bruno", "pc_menu", 1);
+        await service.runTick("srv", Date.now(), false);
+        const to = (name: string) => fake.heard.filter((line) => line.startsWith(`tellraw ${name} `));
+        expect(to("Alba").some((line) => line.includes("Cosecha 5 de trigo"))).toBe(true);
+        expect(to("Alba").some((line) => line.includes("Harvest 5 wheat"))).toBe(false);
+        expect(to("Bruno").some((line) => line.includes("Harvest 5 wheat"))).toBe(true);
+        expect(to("Bruno").some((line) => line.includes("Cosecha"))).toBe(false);
+        // Nothing still carries a message in every language on its way out.
+        expect(fake.heard.some((line) => line.includes('{"polaris":"') || /\ue000/.test(line))).toBe(false);
     });
 
     it("answers a player by their own name through a team's prefix and suffix, and a Bedrock player by theirs", async () => {

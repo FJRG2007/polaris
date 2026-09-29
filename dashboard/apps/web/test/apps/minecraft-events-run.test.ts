@@ -127,6 +127,9 @@ interface World {
     tags: Record<string, Set<string>>;
     /** How long the rain lasts, in ticks, as the last `weather rain` left it. */
     stormTicks: number;
+    /** Players linked to a Polaris account, and each account's language. */
+    links: Record<string, string>;
+    locales: Record<string, string>;
 }
 
 const world: World = {
@@ -193,7 +196,9 @@ const world: World = {
     display: {},
     scoreTitle: "Event title",
     tags: {},
-    stormTicks: 0
+    stormTicks: 0,
+    links: {},
+    locales: {}
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -345,7 +350,7 @@ function answer(sent: string): string {
         return "";
     }
     // One player's own tag, as the game answers it; offline, nobody is found.
-    const tagOne = /^tag (\w+) (add|remove) (pe_\w+)$/.exec(line);
+    const tagOne = /^tag (\w+) (add|remove) (p[el]_\w+)$/.exec(line);
     if (tagOne) {
         const [, name, how, tag] = tagOne as unknown as [string, string, string, string];
         if (!world.online.includes(name)) return "No entity was found";
@@ -833,6 +838,10 @@ vi.mock("@polaris/db", () => ({
         },
         minecraftAnticheatFlag: {
             groupBy: async () => world.flagged.map((player) => ({ player }))
+        },
+        gamePlayerLink: {
+            findMany: async () =>
+                Object.entries(world.links).map(([player, userId]) => ({ player, userId }))
         }
     }
 }));
@@ -842,6 +851,9 @@ vi.mock("@polaris/app-host", () => ({
         appsInstallConfig: {
             readInstallConfig: (raw: string | null) =>
                 raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        },
+        i18nLocaleService: {
+            getUserLocale: async (userId: string) => world.locales[userId] ?? "en-US"
         }
     }
 }));
@@ -872,6 +884,8 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
 const SERVER = "00000000-0000-4000-8000-000000000001";
 const catalog = await import("@polaris-app/game-servers/src/lib/minecraft/events/catalog");
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/events/events-service");
+const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/speech-service");
+const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 
 function setUp(
@@ -960,6 +974,9 @@ beforeEach(() => {
     world.display = {};
     world.scoreTitle = "Event title";
     world.tags = {};
+    world.links = {};
+    world.locales = {};
+    speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
     held.length = 0;
@@ -4466,5 +4483,94 @@ describe("a build battle", () => {
         expect(world.sent).toContain("gamemode survival Ana");
         expect(after.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+});
+
+describe("each player reads their own language", () => {
+    const quiz = () => ({
+        ...catalog.newPreset("trivia", "quiz"),
+        options: { rounds: 3, seconds: 15, mode: "questions" as const, questions: [] }
+    });
+    const sentTo = (selector: string, words: string) =>
+        world.sent.some((line) => line.startsWith(`tellraw ${selector} `) && line.includes(words));
+
+    it("asks a Spanish account's player in Spanish and everybody else in English, and takes either answer", async () => {
+        world.links = { Ana: "user-es" };
+        world.locales = { "user-es": "es-ES" };
+        setUp([quiz()]);
+        await startArena("quiz");
+        await play(4_100);
+        // Each player carries the tag of the language they read.
+        expect(world.sent).toContain("tag Ana add pl_es");
+        expect(world.sent).toContain("tag Ben add pl_en");
+        const random = triviaBank.seeded(state().run!.id);
+        const spanish = triviaBank.shuffled(triviaBank.QUESTIONS.es, random)[0]!;
+        const english = triviaBank.shuffled(triviaBank.QUESTIONS.en, triviaBank.seeded(state().run!.id))[0]!;
+        expect(sentTo("@a[tag=pl_es]", "Pregunta 1/3")).toBe(true);
+        // As the game's JSON writes it: every accent an escape.
+        const escaped = (words: string) =>
+            words.replace(/[\u0080-\uffff]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+        expect(sentTo("@a[tag=pl_es]", escaped(spanish.question))).toBe(true);
+        expect(sentTo("@a[tag=!pl_es]", "Question 1/3")).toBe(true);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a[tag=!pl_es] ") && line.includes(english.question.slice(0, 20))
+            )
+        ).toBe(true);
+        // Nothing reaches everybody in one language any more.
+        expect(world.sent.some((line) => line.startsWith("tellraw @a ") && line.includes("Question"))).toBe(false);
+        expect(world.sent.some((line) => /^title @a\[tag=pl_es\] title /.test(line) && line.includes("Pregunta"))).toBe(true);
+        // Ana answers her own question, in Spanish.
+        chat(["Ana", spanish.answers[0]!]);
+        await play(2_100);
+        expect(state().run?.points ?? state().history[0]?.podium).toBeTruthy();
+        const won = world.sent.find((line) => line.startsWith("tellraw @a[tag=pl_es] ") && line.includes("Ana acert"));
+        expect(won).toBeDefined();
+        expect(sentTo("@a[tag=!pl_es]", "Ana got it")).toBe(true);
+    });
+
+    it("talks to one player in that player's language", async () => {
+        world.links = { Ana: "user-es" };
+        world.locales = { "user-es": "es-ES" };
+        const floor = {
+            ...catalog.newPreset("spleef", "floor"),
+            minutes: 5,
+            options: { place: { mode: "players" as const }, size: 6, height: 30 }
+        };
+        setUp([floor]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "unirse"], ["Ben", "join"]);
+        await play(2_100);
+        expect(sentTo("Ana", "s dentro. Te llevamos")).toBe(true);
+        expect(sentTo("Ben", "You are in")).toBe(true);
+        // The join buttons: each language its own labels.
+        expect(sentTo("@a[tag=pl_es]", "[Unirse]")).toBe(true);
+        expect(sentTo("@a[tag=!pl_es]", "[Join]")).toBe(true);
+    });
+
+    it("writes what nobody in particular reads in the server's own language", async () => {
+        world.links = { Ana: "user-es" };
+        world.locales = { "user-es": "es-ES" };
+        setUp([quiz()]);
+        await startArena("quiz");
+        await play(4_100);
+        const bar = world.sent.filter((line) => line.startsWith("bossbar set polaris:event name "));
+        expect(bar.length).toBeGreaterThan(0);
+        expect(bar.every((line) => line.includes("Trivia") && !line.includes("polaris\":"))).toBe(true);
+        // Nothing still carries a message in every language on its way out.
+        expect(world.sent.some((line) => line.includes('{"polaris":"') || /\ue000/.test(line))).toBe(false);
+    });
+
+    it("speaks its owner's language when the operator never chose one", async () => {
+        world.locales = { owner: "es-ES" };
+        setUp([quiz()]);
+        const settings = (config[catalog.EVENTS_KEY] as { settings: Record<string, unknown> }).settings;
+        delete settings.language;
+        await startArena("quiz");
+        await play(4_100);
+        // Nobody linked: everybody reads the owner's language, sent to all at once.
+        expect(sentTo("@a", "Pregunta 1/3")).toBe(true);
+        expect(world.sent.some((line) => line.includes("Question 1/3"))).toBe(false);
     });
 });

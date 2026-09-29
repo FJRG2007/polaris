@@ -15,9 +15,13 @@
  */
 
 import * as commands from "../commands";
-import * as messages from "../messages";
+import * as speech from "../../speech";
+import * as written from "../messages";
 import type { HiddenChest } from "../state";
-import type { EventOptions, Language } from "../catalog";
+import type { EventOptions } from "../catalog";
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
 
 /** How close a chest must be before a player's action bar points at it. */
 export const GUIDE_RANGE = 48;
@@ -84,7 +88,7 @@ export function clues(
     chests: readonly HiddenChest[],
     step: 1 | 2 | 3,
     origin: { x: number; z: number },
-    language: Language
+    language: speech.Speech
 ): string[] {
     return chests.flatMap((chest, index) => {
         if (chest.opened) return [];
@@ -123,7 +127,7 @@ export function clues(
 export function guides(
     players: readonly { name: string; x: number; z: number }[],
     chests: readonly HiddenChest[],
-    language: Language
+    language: speech.Speech
 ): string[] {
     const open = chests.filter((one) => !one.opened);
     return players.map((player) => {

@@ -14,9 +14,13 @@ import * as spleef from "./spleef";
 import * as parkour from "./parkour";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
-import * as messages from "../messages";
+import * as speech from "../../speech";
+import * as written from "../messages";
 import type { EventRun, Point } from "../state";
 import type { ServerContainer } from "../../service";
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -25,7 +29,8 @@ export class CalledOff extends Error {}
 /** What of the loop this needs: the run, which it changes, and the language. */
 export interface StageLoop {
     run: EventRun;
-    readonly language: catalog.Language;
+    /** Every language: each line is split for its readers on the way out. */
+    readonly language: speech.Speech;
 }
 
 export interface StageTools {
@@ -427,7 +432,7 @@ async function returnOne(
     server: ServerContainer,
     saved: stage.Saved,
     items: stage.Flavour["items"],
-    language: catalog.Language
+    language: speech.Speech
 ): Promise<boolean> {
     // Sent back by an end that was stopped before it wrote so: not moved again.
     const say = (line: string) => server.say([line]);
@@ -715,7 +720,7 @@ export async function settle(
     server: ServerContainer,
     leftover: stage.Leftover,
     flavour: stage.Flavour,
-    language: catalog.Language
+    language: speech.Speech
 ): Promise<stage.Leftover | null> {
     let saved = leftover.saved;
     if (saved.length > 0) {
@@ -799,15 +804,16 @@ export function standings(run: EventRun): { name: string; score: number }[] {
 export function scoreText(
     kind: catalog.EventKind,
     score: number,
-    language: catalog.Language
+    language: speech.Speech
 ): string | null {
     if (kind === "parkour") {
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
-        return language === "es" ? `${score} saltos` : `${score} jumps`;
+        return speech.pickIn({ en: `${score} jumps`, es: `${score} saltos` }, language);
     }
     if (kind === "spleef")
-        return language === "es"
-            ? `${score} puntos`
-            : `${score} ${score === 1 ? "point" : "points"}`;
+        return speech.pickIn(
+            { en: `${score} ${score === 1 ? "point" : "points"}`, es: `${score} puntos` },
+            language
+        );
     return null;
 }

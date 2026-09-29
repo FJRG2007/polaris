@@ -13,7 +13,7 @@
  */
 
 import { stripFormatting } from "../parse";
-import { javaComponent } from "../announcement";
+import * as speech from "../speech";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
@@ -203,10 +203,11 @@ export function hasScoreboard(preset: EventPreset): boolean {
 /**
  * Formatted text as the game's JSON, with every character past ASCII written as
  * an escape: the line travels through a console and RCON, and an escape is
- * something none of them can mistake for another encoding.
+ * something none of them can mistake for another encoding. A line written in
+ * every language carries each one's JSON until it is sent (`speech.localize`).
  */
 export function text(line: string): string {
-    return asciiJson(javaComponent(line, false));
+    return speech.formatted(line);
 }
 
 export function asciiJson(json: string): string {

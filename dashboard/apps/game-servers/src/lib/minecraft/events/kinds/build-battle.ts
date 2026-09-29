@@ -18,6 +18,7 @@
  * Pure; the loop is `arena-service.ts`.
  */
 
+import * as speech from "../../speech";
 import type { Box } from "../state";
 import type { Marker } from "../state";
 import { giveMarked, type Spot } from "./arena";
@@ -249,11 +250,11 @@ export const THEMES: readonly Readonly<Record<Language, string>>[] = [
 export function themeFor(
     options: EventOptions<"build-battle">,
     runId: string,
-    language: Language
+    language: speech.Speech
 ): string {
     const random = seeded(`${runId}-theme`);
     if (options.themeMode === "mine" && options.themes.length > 0) {
         return shuffled(options.themes, random)[0] as string;
     }
-    return (shuffled(THEMES, random)[0] as Readonly<Record<Language, string>>)[language];
+    return speech.pickIn(shuffled(THEMES, random)[0] as Readonly<Record<Language, string>>, language);
 }

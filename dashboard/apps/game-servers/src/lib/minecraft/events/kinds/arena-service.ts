@@ -28,9 +28,13 @@ import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
 import * as commands from "../commands";
-import * as messages from "../messages";
+import * as speech from "../../speech";
+import * as written from "../messages";
 import type * as stored from "../state";
 import type { ServerContainer } from "../../service";
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
 
 /** One line somebody said in the chat. */
 export interface Said {
@@ -41,7 +45,10 @@ export interface Said {
 /** What the loop lends one of these events for a tick. */
 export interface KindContext {
     readonly server: ServerContainer;
-    readonly language: catalog.Language;
+    /** Every language: each line is split for its readers on the way out. */
+    readonly language: speech.Speech;
+    /** The server's own: what is written once for everybody (the teams' names). */
+    readonly home: catalog.Language;
     readonly now: number;
     /** The run as the loop holds it; set to change it. */
     run: stored.EventRun;
@@ -129,11 +136,12 @@ export async function joinTick(ctx: KindContext): Promise<string[]> {
 }
 
 /** Above everybody's hotbar while the countdown runs. */
-export function joinBar(run: stored.EventRun, language: catalog.Language): string {
+export function joinBar(run: stored.EventRun, language: speech.Speech): string {
     return `title @a actionbar ${commands.text(messages.joinedBar(run.joined.length, language))}`;
 }
 
-/** What the start adds for these events: a duel's teams and counts. */
+/** What the start adds for these events: a duel's teams and counts, named in
+ *  the server's own language - a team has one name for everybody. */
 export function beginLines(preset: catalog.EventPreset, language: catalog.Language): string[] {
     if (preset.kind !== "team-duel") return [];
     return duel.duelSetup(language === "es" ? ["Rojo", "Azul"] : ["Red", "Blue"]);
@@ -384,8 +392,9 @@ async function bringIn(ctx: KindContext): Promise<void> {
         }
     } else {
         const options = run.preset.options as catalog.EventOptions<"build-battle">;
-        const theme = ctx.run.theme ?? build.themeFor(options, run.id, language);
-        ctx.run = { ...ctx.run, theme };
+        // Kept in the server's own language; shown in each reader's.
+        ctx.run = { ...ctx.run, theme: ctx.run.theme ?? build.themeFor(options, run.id, ctx.home) };
+        const theme = build.themeFor(options, run.id, language);
         for (const one of entrants) {
             out.push(
                 ...arena.enter(
@@ -641,14 +650,16 @@ export function standings(run: stored.EventRun): { name: string; score: number }
 }
 
 /** Said with the results: how the teams did, what the theme was. */
-export function resultLines(run: stored.EventRun, language: catalog.Language): string[] {
+export function resultLines(run: stored.EventRun, language: speech.Speech): string[] {
     if (run.readyAt === null) return [];
     if (run.preset.kind === "team-duel") {
         return [
             commands.say(messages.duelResult(run.tally["0"] ?? 0, run.tally["1"] ?? 0, language))
         ];
     }
-    return run.theme ? [commands.say(messages.themeWas(run.theme, language))] : [];
+    if (!run.theme) return [];
+    const options = run.preset.options as catalog.EventOptions<"build-battle">;
+    return [commands.say(messages.themeWas(build.themeFor(options, run.id, language), language))];
 }
 
 /** What of a run still has to be undone: the arena, and whoever it moved. */
@@ -697,7 +708,7 @@ function releases(left: stored.ArenaLeftover): string[] {
 export async function closeArena(
     server: ServerContainer,
     left: stored.ArenaLeftover,
-    language: catalog.Language | null = null
+    language: speech.Speech | null = null
 ): Promise<stored.ArenaLeftover | null> {
     memories.delete(left.id);
     let rules = left.gamerules;
