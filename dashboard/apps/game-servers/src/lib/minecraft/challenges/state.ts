@@ -249,7 +249,9 @@ export const ledgerSchema = z.object({
     lastDoneAt: z.number().nullable().default(null),
     /** Challenges already done in this period on any server of a shared season. */
     done: z.array(z.string()).default([]),
-    titles: z.array(z.string()).default([])
+    titles: z.array(z.string()).default([]),
+    /** This season's champion title was given. */
+    crowned: z.boolean().default(false)
 });
 export type Ledger = z.infer<typeof ledgerSchema>;
 

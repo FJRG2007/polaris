@@ -99,6 +99,15 @@ describe("settling what was finished", () => {
         const old = play.toBacklog(kept, day.daily!, "2026-09-29", "2026-10-03", (key) => Date.parse(key) / 86_400_000);
         expect(old.backlog).toEqual([]);
     });
+
+    it("moves a day to the backlog once however often it is closed, each ready to be dealt again", () => {
+        const day = withDaily([true, false, false]);
+        const read = { ...day, daily: { ...day.daily!, instances: day.daily!.instances.map((one) => ({ ...one, readAt: NOW, progress: 1 })) } };
+        const once = play.toBacklog(read, read.daily!, "2026-09-29", "2026-09-30", (key) => Date.parse(key) / 86_400_000);
+        const twice = play.toBacklog(once, read.daily!, "2026-09-29", "2026-09-30", (key) => Date.parse(key) / 86_400_000);
+        expect(twice.backlog.map((one) => one.template)).toEqual(["F1", "C2"]);
+        expect(twice.backlog.every((one) => one.readAt === null && one.carry === 1 && Object.keys(one.base).length === 0)).toBe(true);
+    });
 });
 
 describe("the in-game menu", () => {

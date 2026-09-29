@@ -147,6 +147,7 @@ const server = {
 let config: Record<string, unknown> = {};
 const players = new Map<string, { player: string; playerName: string; data: string }>();
 const ledgers = new Map<string, { scope: string; holder: string; data: string }>();
+const links = new Map<string, string>();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -170,13 +171,21 @@ vi.mock("@polaris/db", () => ({
         minecraftChallengeLedger: {
             findUnique: async ({ where }: { where: { scope_holder: { scope: string; holder: string } } }) =>
                 ledgers.get(`${where.scope_holder.scope}|${where.scope_holder.holder}`) ?? null,
-            findMany: async ({ where }: { where: { scope: string } }) => [...ledgers.values()].filter((one) => one.scope === where.scope),
-            upsert: async ({ create, update }: { create: { scope: string; holder: string; data: string }; update: { data: string } }) => {
-                const key = `${create.scope}|${create.holder}`;
-                ledgers.set(key, { ...create, ...(ledgers.has(key) ? update : {}) });
+            findMany: async ({ where }: { where: { scope: string | { in: string[] } } }) =>
+                [...ledgers.values()].filter((one) => (typeof where.scope === "string" ? one.scope === where.scope : where.scope.in.includes(one.scope))),
+            create: async ({ data }: { data: { scope: string; holder: string; data: string } }) => {
+                const key = `${data.scope}|${data.holder}`;
+                if (ledgers.has(key)) throw new Error("Unique constraint failed");
+                ledgers.set(key, data);
+            },
+            updateMany: async ({ where, data }: { where: { scope: string; holder: string; data: string }; data: { data: string } }) => {
+                const key = `${where.scope}|${where.holder}`;
+                if (ledgers.get(key)?.data !== where.data) return { count: 0 };
+                ledgers.set(key, { scope: where.scope, holder: where.holder, data: data.data });
+                return { count: 1 };
             }
         },
-        gamePlayerLink: { findMany: async () => [] },
+        gamePlayerLink: { findMany: async () => [...links.entries()].map(([player, userId]) => ({ player, userId })) },
         minecraftAnticheatFlag: { groupBy: async () => [] }
     }
 }));
@@ -243,6 +252,7 @@ beforeEach(async () => {
     config = { challenges: { enabled: true, timezone: "UTC", language: "en", eligibility: { minMinutes: 0 }, antiExploit: { afkMinutes: 1 } } };
     players.clear();
     ledgers.clear();
+    links.clear();
     forgetActivity();
     await service.stopAllLoops();
     fake.join("Alba", 0, 0);
@@ -400,6 +410,26 @@ describe("challenges on a server", () => {
         expect(state().outcomes.some((one) => one.template === "F4" && one.done === 1)).toBe(true);
     });
 
+    it("moves yesterday's unfinished challenges to the backlog once, dealt again to count from the new day", async () => {
+        knownPool();
+        await step(1);
+        await step(16, ["Alba"]);
+        fake.add("Alba", PUMPKIN, 3);
+        fake.add("Alba", ZOMBIE, 1);
+        await step(16, ["Alba"]);
+        expect(record("Alba").daily!.instances[0]!.doneAt).not.toBeNull();
+        expect(record("Alba").daily!.instances[2]!.progress).toBe(1);
+        vi.setSystemTime(Date.parse("2026-09-30T00:00:30Z"));
+        await service.runTick("srv", Date.now(), true);
+        await step(16, ["Alba"]);
+        await step(16, ["Alba"]);
+        const alba = record("Alba");
+        expect(alba.daily!.key).toBe("2026-09-30");
+        expect(alba.backlog).toHaveLength(2);
+        expect(new Set(alba.backlog.map((one) => one.template)).size).toBe(2);
+        expect(alba.backlog.every((one) => one.day === "2026-09-29" && one.dealtAt >= Date.parse("2026-09-30T00:00:00Z"))).toBe(true);
+    });
+
     it("never sends anything that breaks, places, removes or takes", async () => {
         knownPool();
         await step(1);
@@ -444,6 +474,37 @@ describe("challenges on a server", () => {
         await step(16, ["Alba"]);
         expect(record("Alba").weekly!.instances[0]!.doneAt).not.toBeNull();
         expect(record("Alba").weekly!.instances[1]!.doneAt).not.toBeNull();
+    });
+
+    it("counts a shared season from the day the group already counts from", async () => {
+        config = { ...config, challenges: { ...(config.challenges as object), shared: { enabled: true, group: "Hub" } } };
+        ledgers.set("group:owner:hub|season", { scope: "group:owner:hub", holder: "season", data: JSON.stringify({ start: "2026-09-01" }) });
+        links.set("alba", "u1");
+        knownPool();
+        await step(1);
+        await step(16, ["Alba"]);
+        fake.add("Alba", PUMPKIN, 3);
+        await step(16, ["Alba"]);
+        const ledger = JSON.parse(ledgers.get("group:owner:hub|user:u1")!.data) as { season: string; points: number };
+        expect(ledger.season).toBe("2026-09-01#1");
+        expect(ledger.points).toBe(10);
+    });
+
+    it("takes down a week's objectives and a tracked bar when switched off with no day running", async () => {
+        config = { ...config, challenges: { ...(config.challenges as object), layers: { daily: false, card: false } } };
+        await step(1);
+        await step(16, ["Alba"]);
+        expect(state().daily).toBeNull();
+        expect(state().weekly?.applied).toBe(true);
+        fake.set("Alba", "pc_menu", 23);
+        await service.runTick("srv", Date.now(), false);
+        expect(record("Alba").tracked).toBe("weekly:0");
+        await service.stopAllLoops();
+        config = { ...config, challenges: { ...(config.challenges as object), enabled: false } };
+        fake.heard.length = 0;
+        await service.sweepChallenges(Date.now());
+        expect([...fake.objectives.keys()].filter((name) => name.startsWith("pc_"))).toEqual([]);
+        expect(fake.heard).toContain("bossbar remove polaris:pc_alba");
     });
 
     it("takes its objectives down when switched off", async () => {

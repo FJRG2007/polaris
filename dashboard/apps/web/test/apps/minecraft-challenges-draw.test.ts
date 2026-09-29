@@ -169,6 +169,14 @@ describe("the calendar", () => {
         expect(period.msToNextDay(madrid, Date.parse("2026-09-29T03:30:00Z"))).toBe(30 * 60_000);
     });
 
+    it("keeps a day, a week and a goal on the reset across a change of the clocks", () => {
+        // Madrid goes from +2 to +1 on 2026-10-25: 06:00 there is 04:00 UTC before, 05:00 after.
+        expect(new Date(period.dayStartsAt(madrid, "2026-10-24")).toISOString()).toBe("2026-10-24T04:00:00.000Z");
+        expect(new Date(period.dayStartsAt(madrid, "2026-10-26")).toISOString()).toBe("2026-10-26T05:00:00.000Z");
+        expect(new Date(period.dayEndsAt(madrid, Date.parse("2026-10-25T12:00:00Z"))).toISOString()).toBe("2026-10-26T05:00:00.000Z");
+        expect(new Date(period.weekEndsAt(madrid, Date.parse("2026-10-21T12:00:00Z"))).toISOString()).toBe("2026-10-26T05:00:00.000Z");
+    });
+
     it("starts a week on the chosen day and a month on the first", () => {
         const utc: period.Clock = { timezone: "UTC", resetAt: "00:00", weekDay: 1 };
         expect(period.weekKey(utc, Date.parse("2026-10-01T12:00:00Z"))).toBe("2026-09-28");

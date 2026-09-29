@@ -102,30 +102,43 @@ export function monthKey(clock: Clock, now: number): string {
     return dayKey(clock, now).slice(0, 7);
 }
 
+/** When a day begins: its reset, in the zone's own time on that date. */
+export function dayStartsAt(clock: Clock, key: string): number {
+    const wall = dayNumber(key) * DAY_MS + resetMinutes(clock) * 60_000;
+    let at = wall;
+    for (let pass = 0; pass < 2; pass += 1) {
+        const parts = localParts(at, clock.timezone);
+        at += wall - (dayNumber(dateKey(parts)) * DAY_MS + parts.minutes * 60_000);
+    }
+    return at;
+}
+
+/** When the day that begins `days` after today's does. */
+function dayAfter(clock: Clock, now: number, days: number): number {
+    return dayStartsAt(clock, keyOfDay(dayNumber(dayKey(clock, now)) + days));
+}
+
 /** Milliseconds to the next reset of the day. */
 export function msToNextDay(clock: Clock, now: number): number {
-    const { minutes } = localParts(now, clock.timezone);
-    const seconds = Math.floor(now / 1000) % 60;
-    const wait = (resetMinutes(clock) - minutes + 1440) % 1440 || 1440;
-    return wait * 60_000 - seconds * 1000;
+    return dayEndsAt(clock, now) - now;
 }
 
 /** When the period of a key ends, as an instant, from the moment now. */
 export function dayEndsAt(clock: Clock, now: number): number {
-    return now + msToNextDay(clock, now);
+    return dayAfter(clock, now, 1);
 }
 
 export function weekEndsAt(clock: Clock, now: number): number {
     const today = dayKey(clock, now);
     const left = 6 - ((weekdayOf(today) - clock.weekDay + 7) % 7);
-    return dayEndsAt(clock, now) + left * DAY_MS;
+    return dayAfter(clock, now, left + 1);
 }
 
 export function monthEndsAt(clock: Clock, now: number): number {
     const today = dayKey(clock, now);
     const [year, month] = today.split("-").map(Number) as [number, number];
     const next = Math.round(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1) / DAY_MS);
-    return dayEndsAt(clock, now) + (next - dayNumber(today) - 1) * DAY_MS;
+    return dayStartsAt(clock, keyOfDay(next));
 }
 
 export interface Season {
@@ -152,7 +165,7 @@ export function seasonOf(clock: Clock, now: number, firstDay: string, weeks: num
         number: index + 1,
         startDay: keyOfDay(start),
         endDay: keyOfDay(end),
-        endsAt: dayEndsAt(clock, now) + (end - dayNumber(today)) * DAY_MS,
+        endsAt: dayStartsAt(clock, keyOfDay(end + 1)),
         daysLeft: end - dayNumber(today) + 1
     };
 }

@@ -26,6 +26,7 @@
  */
 
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import * as draw from "./draw";
 import * as play from "./play";
 import * as stored from "./state";
@@ -202,6 +203,17 @@ interface Holder {
     readonly holder: string;
 }
 
+/** The scope of a season shared with other servers, or null when this one keeps its own. */
+function sharedScope(settings: settingsModule.ChallengeSettings, ownerId: string): string | null {
+    return settings.shared.enabled && settings.shared.group ? `group:${ownerId}:${settings.shared.group.toLowerCase()}` : null;
+}
+
+/** Every scope whose ledgers play this server's season: its own, and a shared one. */
+function scopesOf(settings: settingsModule.ChallengeSettings, ownerId: string, installedAppId: string): string[] {
+    const shared = sharedScope(settings, ownerId);
+    return shared ? [`server:${installedAppId}`, shared] : [`server:${installedAppId}`];
+}
+
 function holderOf(
     settings: settingsModule.ChallengeSettings,
     ownerId: string,
@@ -210,9 +222,8 @@ function holderOf(
     links: ReadonlyMap<string, string>
 ): Holder {
     const user = links.get(name.toLowerCase());
-    if (settings.shared.enabled && settings.shared.group && user) {
-        return { scope: `group:${ownerId}:${settings.shared.group.toLowerCase()}`, holder: `user:${user}` };
-    }
+    const shared = sharedScope(settings, ownerId);
+    if (shared && user) return { scope: shared, holder: `user:${user}` };
     return { scope: `server:${installedAppId}`, holder: `player:${name.toLowerCase()}` };
 }
 
@@ -224,13 +235,44 @@ async function loadLedger(holder: Holder, seasonKey: string): Promise<stored.Led
     return stored.readLedger(row?.data ?? null, seasonKey);
 }
 
-async function saveLedger(holder: Holder, ledger: stored.Ledger): Promise<void> {
-    const data = JSON.stringify(ledger);
-    await prisma.minecraftChallengeLedger.upsert({
-        where: { scope_holder: { scope: holder.scope, holder: holder.holder } },
-        create: { scope: holder.scope, holder: holder.holder, data },
-        update: { data }
-    });
+/**
+ * A ledger read, changed and written back only if nobody wrote it in between -
+ * the servers of a shared season write the same row - and read again when
+ * somebody did. `change` answers null to leave it as it is.
+ */
+async function changeLedger<T>(
+    holder: Holder,
+    seasonKey: string,
+    change: (ledger: stored.Ledger) => { ledger: stored.Ledger; value: T } | null
+): Promise<T | null> {
+    const where = { scope: holder.scope, holder: holder.holder };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const row = await prisma.minecraftChallengeLedger.findUnique({ where: { scope_holder: where }, select: { data: true } });
+        const changed = change(stored.readLedger(row?.data ?? null, seasonKey));
+        if (!changed) return null;
+        const data = JSON.stringify(changed.ledger);
+        const written = row
+            ? (await prisma.minecraftChallengeLedger.updateMany({ where: { ...where, data: row.data }, data: { data } })).count === 1
+            : await prisma.minecraftChallengeLedger.create({ data: { ...where, data } }).then(
+                  () => true,
+                  () => false
+              );
+        if (written) return changed.value;
+    }
+    throw new Error(`the season ledger ${holder.scope} ${holder.holder} kept changing under a write`);
+}
+
+/** The row in a shared scope that holds the day its seasons count from. */
+const SEASON_ANCHOR = "season";
+const anchorSchema = z.object({ start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+
+function anchorOf(data: string | null | undefined): string | null {
+    try {
+        const parsed = anchorSchema.safeParse(JSON.parse(data ?? "null"));
+        return parsed.success ? parsed.data.start : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Players linked to a Polaris account, by lowercased name. */
@@ -371,15 +413,20 @@ async function tick(installedAppId: string, now = Date.now()): Promise<void> {
     }
 }
 
+function anyApplied(state: stored.ServerState): boolean {
+    return [state.daily, state.weekly, state.card, state.community].some((one) => one?.applied);
+}
+
 /** Challenges switched off: their objectives and bars taken down. Nothing of a
  *  player's is touched; what they were owed stays owed. */
 async function switchOff(installedAppId: string, server: ServerContainer, row: Row | null): Promise<void> {
     if (!row) return;
     const state = stored.readServerState(row.config);
+    if (!anyApplied(state)) return;
     const names = [state.daily, state.weekly, state.card, state.community].flatMap((one) => (one ? Object.values(one.objectives) : []));
-    if (names.length === 0 && !state.daily) return;
-    const loop = loops.get(installedAppId);
-    await server.sayAll(commands.teardown(names, [...(loop?.bars ?? [])])).catch(() => undefined);
+    const tracking = [...(await loadPlayers(installedAppId, null, Date.now())).values()].filter((held) => held.record.tracked !== null);
+    const bars = new Set([...(loops.get(installedAppId)?.bars ?? []), ...tracking.map((held) => commands.trackedBar(held.record.name))]);
+    await server.sayAll(commands.teardown(names, [...bars])).catch(() => undefined);
     await updateState(installedAppId, (current) => ({
         ...current,
         daily: current.daily ? { ...current.daily, applied: false } : null,
@@ -410,9 +457,32 @@ interface Sweep {
     readonly caught: Map<string, number[]>;
 }
 
-function firstDayOf(settings: settingsModule.ChallengeSettings, state: stored.ServerState, clock: period.Clock, now: number): string {
+/**
+ * The day seasons count from. Servers sharing a season count from one day - the
+ * first of them to look writes it - so they agree on which season it is.
+ */
+async function firstDayOf(
+    settings: settingsModule.ChallengeSettings,
+    ownerId: string,
+    state: stored.ServerState,
+    clock: period.Clock,
+    now: number
+): Promise<string> {
     if (settings.season.start) return settings.season.start;
-    return period.dayKey(clock, state.since ?? now);
+    const own = period.dayKey(clock, state.since ?? now);
+    const scope = sharedScope(settings, ownerId);
+    if (!scope) return own;
+    const where = { scope_holder: { scope, holder: SEASON_ANCHOR } };
+    const read = async () => anchorOf((await prisma.minecraftChallengeLedger.findUnique({ where, select: { data: true } }))?.data);
+    const found = await read();
+    if (found) return found;
+    const created = await prisma.minecraftChallengeLedger
+        .create({ data: { scope, holder: SEASON_ANCHOR, data: JSON.stringify({ start: own }) } })
+        .then(
+            () => true,
+            () => false
+        );
+    return created ? own : ((await read()) ?? own);
 }
 
 async function contextFor(
@@ -426,10 +496,10 @@ async function contextFor(
     if (loop.version === undefined) loop.version = await versionOf(server);
     const state = stored.readServerState(row.config);
     const clock = clockOf(settings);
-    const seasonNow = period.seasonOf(clock, now, firstDayOf(settings, state, clock, now), settings.season.weeks);
+    const seasonNow = period.seasonOf(clock, now, await firstDayOf(settings, row.ownerId, state, clock, now), settings.season.weeks);
     const links = await linksOf(installedAppId);
-    const scope = holderOf(settings, row.ownerId, installedAppId, "-", new Map()).scope;
-    const tiers = (await ledgersIn(scope, seasonNow.key)).map((one) => season.tierOf(one.ledger.points, settings));
+    const held = await Promise.all(scopesOf(settings, row.ownerId, installedAppId).map((scope) => ledgersIn(scope, seasonNow.key)));
+    const tiers = held.flat().map((one) => season.tierOf(one.ledger.points, settings));
     const version = loop.version;
     return {
         installedAppId,
@@ -495,7 +565,7 @@ async function readAll(installedAppId: string, loop: Loop, server: ServerContain
             console.warn("polaris: reading a player's challenges failed", installedAppId, one.name, String(error))
         );
     }
-    await welcome(live, players);
+    await welcome(live);
     await runGoals(live);
     loop.online = new Set(names.map((name) => name.toLowerCase()));
 }
@@ -680,18 +750,23 @@ async function endSeason(sweep: Sweep): Promise<void> {
     const before = sweep.state.season;
     if (before === sweep.season.key) return;
     if (before !== null && sweep.settings.layers.season) {
-        const scope = holderOf(sweep.settings, sweep.ownerId, sweep.installedAppId, "-", new Map()).scope;
-        const rows = await prisma.minecraftChallengeLedger.findMany({ where: { scope }, select: { holder: true, data: true } }).catch(() => []);
+        const scopes = scopesOf(sweep.settings, sweep.ownerId, sweep.installedAppId);
+        const rows = await prisma.minecraftChallengeLedger
+            .findMany({ where: { scope: { in: scopes } }, select: { scope: true, holder: true, data: true } })
+            .catch(() => []);
         const ended = rows
-            .map((row) => ({ holder: row.holder, ledger: stored.readLedger(row.data, before) }))
+            .map((row) => ({ scope: row.scope, holder: row.holder, ledger: stored.readLedger(row.data, before) }))
             .filter((one) => one.ledger.season === before && one.ledger.points > 0);
         const top = Math.max(0, ...ended.map((one) => season.tierOf(one.ledger.points, sweep.settings)));
         const champions = top > 0 ? ended.filter((one) => season.tierOf(one.ledger.points, sweep.settings) === top) : [];
         const number = Number(before.split("#")[1] ?? 0);
         const names = champions.map((one) => one.holder.replace(/^(player|user):/, ""));
+        const title = messages.championTitle(number, sweep.settings.language);
+        // Every server of a shared season ends it: the first one crowns.
         for (const one of champions) {
-            const title = messages.championTitle(number, sweep.settings.language);
-            await saveLedger({ scope, holder: one.holder }, { ...one.ledger, titles: [...one.ledger.titles, title].slice(-10) });
+            await changeLedger({ scope: one.scope, holder: one.holder }, before, (ledger) =>
+                ledger.points <= 0 || ledger.crowned ? null : { ledger: { ...ledger, crowned: true, titles: [...ledger.titles, title].slice(-10) }, value: true }
+            );
         }
         const shown = await namesFor(sweep.installedAppId, names);
         await sweep.server.sayAll([`tellraw @a ${commandsText(messages.seasonEnded(number, shown, sweep.settings.language))}`]);
@@ -743,12 +818,9 @@ async function rotateCommunity(sweep: Sweep): Promise<void> {
     if (settings.layers.community) {
         for (const goal of settings.community.goals) {
             if (goals.some((one) => one.id === goal.id)) continue;
-            const start = period.dayNumber(goal.start);
-            const today = period.dayNumber(period.dayKey(clock, now));
             // From the reset of its first day to the reset after its last.
-            const todayStarted = period.dayEndsAt(clock, now) - 86_400_000;
-            const startsAt = todayStarted + (start - today) * 86_400_000;
-            const endsAt = todayStarted + (start + goal.days - today) * 86_400_000;
+            const startsAt = period.dayStartsAt(clock, goal.start);
+            const endsAt = period.dayStartsAt(clock, period.keyOfDay(period.dayNumber(goal.start) + goal.days));
             if (endsAt <= now) continue;
             goals.push(
                 stored.goalStateSchema.parse({
@@ -868,10 +940,11 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
             const effects: play.Effect[] = [];
             const holder = holderOf(sweep.settings, sweep.ownerId, sweep.installedAppId, name, sweep.links);
             if (reward.points > 0 && sweep.settings.layers.season) {
-                const ledger = await loadLedger(holder, sweep.season.key);
-                const earned = season.addPoints(ledger, reward.points, sweep.context.day, sweep.settings, false);
-                await saveLedger(holder, earned.ledger);
-                for (const one of earned.tiers) {
+                const earned = await changeLedger(holder, sweep.season.key, (ledger) => {
+                    const added = season.addPoints(ledger, reward.points, sweep.context.day, sweep.settings, false);
+                    return { ledger: added.ledger, value: added };
+                });
+                for (const one of earned?.tiers ?? []) {
                     const tierReward = season.tierReward(one, sweep.settings);
                     effects.push({ kind: "tell", line: messages.tierLine(one, messages.rewardText(tierReward, sweep.settings.language), sweep.settings.language) });
                     effects.push({ kind: "pay", payout: tierReward, label: `tier ${one}` });
@@ -1271,7 +1344,6 @@ function redeal(record: stored.PlayerRecord, today: stored.Period, values: Reado
 
 async function settleAndCarry(sweep: Sweep, record: stored.PlayerRecord, online: boolean): Promise<stored.PlayerRecord> {
     const holder = holderOf(sweep.settings, sweep.ownerId, sweep.installedAppId, record.name, sweep.links);
-    const ledger = await loadLedger(holder, sweep.season.key);
     const keys = {
         daily: sweep.state.daily?.key ?? null,
         weekly: sweep.state.weekly?.key ?? null,
@@ -1283,9 +1355,11 @@ async function settleAndCarry(sweep: Sweep, record: stored.PlayerRecord, online:
         weekly: record.weekly?.key ?? keys.weekly,
         card: record.card?.key ?? keys.card
     };
-    const settled = play.settle(record, ledger, sweep.context, own);
-    if (settled.effects.length === 0) return record;
-    await saveLedger(holder, settled.ledger);
+    const settled = await changeLedger(holder, sweep.season.key, (ledger) => {
+        const next = play.settle(record, ledger, sweep.context, own);
+        return next.effects.length === 0 ? null : { ledger: next.ledger, value: next };
+    });
+    if (!settled) return record;
     // Written before anything is handed out: a crash after this owes it, never pays it twice.
     await savePlayer(sweep.installedAppId, settled.record);
     await carry(sweep, record.name, online, settled.effects);
@@ -1333,6 +1407,7 @@ async function owe(
     const { updateEventState } = await import("../events/events-service");
     const { livePending } = await import("../events/state");
     const now = Date.now();
+    const batch = randomUUID().slice(0, 8);
     // Split into rewards of at most six items, which is what the queue holds.
     const chunks: { items: { id: string; count: number }[]; levels: number }[] = [];
     for (let index = 0; index < Math.max(1, reward.items.length); index += 6) {
@@ -1344,7 +1419,7 @@ async function owe(
             [
                 ...state.pending,
                 ...chunks.map((chunk, index) => ({
-                    id: `challenge-${now.toString(36)}-${name.toLowerCase()}-${index}`,
+                    id: `challenge-${now.toString(36)}-${name.toLowerCase()}-${batch}-${index}`,
                     player: name,
                     reward: chunk,
                     event: language === "es" ? "Retos" : "Challenges",
@@ -1585,7 +1660,7 @@ async function noteNewcomer(sweep: Sweep, name: string): Promise<void> {
 
 /** Whoever said something in the chat soon after a newcomer's first join: the
  *  first three to do it, once per newcomer, count for Welcome a newcomer. */
-async function welcome(sweep: Sweep, players: Map<string, Stored>): Promise<void> {
+async function welcome(sweep: Sweep): Promise<void> {
     const loop = sweep.loop;
     loop.newcomers = loop.newcomers.filter((one) => sweep.now - one.at <= WELCOME_MS + READ_MS);
     const size = await containerFileSize(sweep.server, LOG_FILE);
@@ -1611,7 +1686,7 @@ async function welcome(sweep: Sweep, players: Map<string, Stored>): Promise<void
     }
     for (const pair of credited) {
         const [speaker, newcomer] = pair.split("|") as [string, string];
-        const held = players.get(speaker) ?? (await loadPlayers(sweep.installedAppId, [speaker], sweep.now)).get(speaker);
+        const held = (await loadPlayers(sweep.installedAppId, [speaker], sweep.now)).get(speaker);
         if (!held || held.fresh || held.record.greeted.includes(newcomer)) continue;
         const record = bump({ ...held.record, greeted: [...held.record.greeted, newcomer].slice(-50) }, "welcome", 1);
         await savePlayer(sweep.installedAppId, record);
@@ -1696,7 +1771,7 @@ export async function sweepChallenges(now = Date.now()): Promise<{ running: numb
         const settings = settingsOf(config);
         if (!settings.enabled) {
             if (loops.has(row.id)) await stopLoop(row.id);
-            if (stored.readServerState(config).daily?.applied) {
+            if (anyApplied(stored.readServerState(config))) {
                 await withServerContainer(row.ownerId, row.id, async (server) => {
                     if (server.running) await inTurn(row.id, () => switchOff(row.id, server, { ownerId: row.ownerId, catalogId: "minecraft", config }));
                 }).catch(() => undefined);
@@ -1796,7 +1871,7 @@ export async function challengesView(installedAppId: string): Promise<Challenges
     const state = stored.readServerState(row.config);
     const now = Date.now();
     const clock = clockOf(settings);
-    const seasonNow = period.seasonOf(clock, now, firstDayOf(settings, state, clock, now), settings.season.weeks);
+    const seasonNow = period.seasonOf(clock, now, await firstDayOf(settings, row.ownerId, state, clock, now), settings.season.weeks);
     const rows = await prisma.minecraftChallengePlayer
         .findMany({ where: { installedAppId }, select: { player: true, playerName: true, data: true }, orderBy: { updatedAt: "desc" }, take: 200 })
         .catch(() => []);

@@ -205,10 +205,13 @@ export const BACKLOG_MAX = 3;
  * is let go.
  */
 export function toBacklog(record: PlayerRecord, ended: PlayerLayer, endedDay: string, today: string, dayNumber: (key: string) => number): PlayerRecord {
+    const identity = (one: Instance) => `${one.day ?? endedDay}|${one.template}|${one.dealtAt}`;
+    const held = new Set(record.backlog.map(identity));
+    const carried = (one: Instance): Instance => ({ ...one, carry: one.progress, base: {}, last: {}, raw: 0, offset: 0, readAt: null });
     const left = ended.instances
-        .filter((one) => one.doneAt === null && !one.voided)
-        .map((one) => ({ ...one, day: one.day ?? endedDay, carry: one.progress, base: {}, last: {}, raw: 0, offset: 0 }));
-    const kept = [...record.backlog.filter((one) => one.doneAt === null), ...left]
+        .filter((one) => one.doneAt === null && !one.voided && !held.has(identity(one)))
+        .map((one) => carried({ ...one, day: one.day ?? endedDay }));
+    const kept = [...record.backlog.filter((one) => one.doneAt === null).map(carried), ...left]
         .filter((one) => dayNumber(today) - dayNumber(one.day ?? today) <= BACKLOG_DAYS)
         .slice(-BACKLOG_MAX);
     return { ...record, backlog: kept };
