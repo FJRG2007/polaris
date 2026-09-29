@@ -25,6 +25,8 @@
  *  variable, `sets` makes one the server browser is also told, `setr` one the
  *  connected clients are told. Which one a value wants is the game's business and
  *  is recorded with the setting, never guessed. */
+import { gameMessage } from "../game-message";
+
 export type CfgPrefix = "" | "set" | "sets" | "setr";
 
 export interface CfgKey {
@@ -74,7 +76,7 @@ export function tokenize(line: string): string[] {
  *  could not survive being split, and refused when it holds a quote of its own -
  *  the format has no escape for one, so there is no honest way to write it. */
 export function quoteValue(value: string): string {
-    if (value.includes("\"")) throw new Error("A double quote is not something server.cfg can hold");
+    if (value.includes("\"")) throw new Error(gameMessage("games", "lib.cfgQuote"));
     return value.length === 0 || /[\s#]/.test(value) ? `"${value}"` : value;
 }
 

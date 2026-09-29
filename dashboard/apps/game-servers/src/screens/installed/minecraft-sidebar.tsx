@@ -13,7 +13,8 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
-import { useGameText } from "../game-text";
+import type { GameKey } from "../../../messages";
+import { useGameText, useSchemaText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { McLine } from "../../components/mc-text";
 import { insertsFor } from "./minecraft-announce";
@@ -98,6 +99,7 @@ export function MinecraftSidebar({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     // What this tab last read paints first, so the panel is there at once on a
     // revisit; the read below replaces it when it moved.
@@ -253,7 +255,9 @@ export function MinecraftSidebar({
                                 />
                             }
                         />
-                        {refused && <p className="text-xs text-muted-foreground">{refused}.</p>}
+                        {refused && (
+                            <p className="text-xs text-muted-foreground">{schemaText(refused)}.</p>
+                        )}
 
                         <div className="flex flex-col gap-1.5">
                             <span className="text-sm font-medium">{t("sidebar.title")}</span>
@@ -356,7 +360,7 @@ export function MinecraftSidebar({
                             ))}
                             {problems.count && (
                                 <p role="alert" className="text-xs text-danger">
-                                    {problems.count}
+                                    {schemaText(problems.count)}
                                 </p>
                             )}
                             <div className="flex flex-wrap gap-2">
@@ -404,7 +408,9 @@ export function MinecraftSidebar({
                                                     )
                                                 }
                                             >
-                                                {block.label}
+                                                {t(
+                                                    `sidebar.blocks.${block.id}` as GameKey<"minecraft">
+                                                )}
                                             </DropdownMenuItem>
                                         ))}
                                         <DropdownMenuSeparator />
@@ -607,7 +613,9 @@ function RotatingDialog({
                                         onChange={() => undefined}
                                         onClick={(event) => selection.press(block.id, event)}
                                     />
-                                    <span className="min-w-0 flex-1 truncate">{block.label}</span>
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {t(`sidebar.blocks.${block.id}` as GameKey<"minecraft">)}
+                                    </span>
                                     {turn >= 0 ? (
                                         <span
                                             className="shrink-0 text-xs tabular-nums text-muted-foreground"

@@ -23,6 +23,8 @@
  * with, and the file this writes is parsed by the same code that formats it.
  */
 
+import type { GameKey } from "../../../messages";
+
 /** What a setting holds. ARK's config is untyped text; these are what the screen
  *  draws and what a value is checked against. */
 export type ArkSettingType = "boolean" | "number";
@@ -30,12 +32,14 @@ export type ArkSettingType = "boolean" | "number";
 export interface ArkSetting {
     /** The name the game takes, spelled exactly as the game spells it. */
     readonly key: string;
-    readonly label: string;
-    /** One line saying what it does, in the terms somebody changing it thinks in. */
-    readonly hint: string;
+    /** Its name, as a key into the `ark` catalog. */
+    readonly label: GameKey<"ark">;
+    /** One line saying what it does, in the terms somebody changing it thinks in -
+     *  a key into the `ark` catalog, or empty for none. */
+    readonly hint: GameKey<"ark"> | "";
     readonly type: ArkSettingType;
-    /** The heading it sits under. */
-    readonly group: string;
+    /** The heading it sits under, as a key into the `ark` catalog. */
+    readonly group: GameKey<"ark">;
     /** What the game does when nothing sets it, as text, so a row can say what
      *  "unset" means rather than showing an empty box. */
     readonly fallback: string;
@@ -77,12 +81,12 @@ export function switchValue(setting: ArkSetting, on: boolean): string {
     return (setting.invert ? !on : on) ? "True" : "False";
 }
 
-const RATES = "Rates";
-const COMBAT = "Damage";
-const SURVIVAL = "Survival";
-const WORLD = "World";
-const PLAYING = "Playing";
-const STRUCTURES = "Structures";
+const RATES = "settingGroups.rates";
+const COMBAT = "settingGroups.damage";
+const SURVIVAL = "settingGroups.survival";
+const WORLD = "settingGroups.world";
+const PLAYING = "settingGroups.playing";
+const STRUCTURES = "settingGroups.structures";
 
 /**
  * The settings the screen offers.
@@ -94,8 +98,8 @@ const STRUCTURES = "Structures";
 export const ARK_SETTINGS: readonly ArkSetting[] = [
     {
         key: "XPMultiplier",
-        label: "Experience",
-        hint: "How fast players and tames level. 3 is the usual boosted server.",
+        label: "settings.XPMultiplier.label",
+        hint: "settings.XPMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -105,8 +109,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "TamingSpeedMultiplier",
-        label: "Taming speed",
-        hint: "Higher tames faster. The single most changed setting on a private server.",
+        label: "settings.TamingSpeedMultiplier.label",
+        hint: "settings.TamingSpeedMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -116,8 +120,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "HarvestAmountMultiplier",
-        label: "Harvest amount",
-        hint: "How much wood, stone and hide one hit gives.",
+        label: "settings.HarvestAmountMultiplier.label",
+        hint: "settings.HarvestAmountMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -127,8 +131,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "HarvestHealthMultiplier",
-        label: "Resource health",
-        hint: "How much a tree or rock takes before it is used up. Higher means more from each.",
+        label: "settings.HarvestHealthMultiplier.label",
+        hint: "settings.HarvestHealthMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -138,8 +142,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ResourcesRespawnPeriodMultiplier",
-        label: "Resource respawn wait",
-        hint: "Lower brings trees and rocks back sooner.",
+        label: "settings.ResourcesRespawnPeriodMultiplier.label",
+        hint: "settings.ResourcesRespawnPeriodMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -149,8 +153,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ItemStackSizeMultiplier",
-        label: "Stack size",
-        hint: "How much fits in one slot. Changing it later does not restack what is already in a box.",
+        label: "settings.ItemStackSizeMultiplier.label",
+        hint: "settings.ItemStackSizeMultiplier.hint",
         type: "number",
         group: RATES,
         fallback: "1",
@@ -160,7 +164,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerDamageMultiplier",
-        label: "Damage players deal",
+        label: "settings.PlayerDamageMultiplier.label",
         hint: "",
         type: "number",
         group: COMBAT,
@@ -171,8 +175,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerResistanceMultiplier",
-        label: "Damage players take",
-        hint: "Higher means they take more, not less.",
+        label: "settings.PlayerResistanceMultiplier.label",
+        hint: "settings.PlayerResistanceMultiplier.hint",
         type: "number",
         group: COMBAT,
         fallback: "1",
@@ -182,7 +186,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DinoDamageMultiplier",
-        label: "Damage wild creatures deal",
+        label: "settings.DinoDamageMultiplier.label",
         hint: "",
         type: "number",
         group: COMBAT,
@@ -193,8 +197,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DinoResistanceMultiplier",
-        label: "Damage wild creatures take",
-        hint: "Higher means they take more.",
+        label: "settings.DinoResistanceMultiplier.label",
+        hint: "settings.DinoResistanceMultiplier.hint",
         type: "number",
         group: COMBAT,
         fallback: "1",
@@ -204,8 +208,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "StructureDamageMultiplier",
-        label: "Damage structures deal",
-        hint: "Spike walls and turrets.",
+        label: "settings.StructureDamageMultiplier.label",
+        hint: "settings.StructureDamageMultiplier.hint",
         type: "number",
         group: COMBAT,
         fallback: "1",
@@ -215,8 +219,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "StructureResistanceMultiplier",
-        label: "Damage structures take",
-        hint: "Higher means buildings come apart faster.",
+        label: "settings.StructureResistanceMultiplier.label",
+        hint: "settings.StructureResistanceMultiplier.hint",
         type: "number",
         group: COMBAT,
         fallback: "1",
@@ -226,7 +230,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerCharacterFoodDrainMultiplier",
-        label: "How fast players get hungry",
+        label: "settings.PlayerCharacterFoodDrainMultiplier.label",
         hint: "",
         type: "number",
         group: SURVIVAL,
@@ -237,7 +241,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerCharacterWaterDrainMultiplier",
-        label: "How fast players get thirsty",
+        label: "settings.PlayerCharacterWaterDrainMultiplier.label",
         hint: "",
         type: "number",
         group: SURVIVAL,
@@ -248,7 +252,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerCharacterStaminaDrainMultiplier",
-        label: "How fast players tire",
+        label: "settings.PlayerCharacterStaminaDrainMultiplier.label",
         hint: "",
         type: "number",
         group: SURVIVAL,
@@ -259,7 +263,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "PlayerCharacterHealthRecoveryMultiplier",
-        label: "How fast players heal",
+        label: "settings.PlayerCharacterHealthRecoveryMultiplier.label",
         hint: "",
         type: "number",
         group: SURVIVAL,
@@ -270,8 +274,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DinoCharacterFoodDrainMultiplier",
-        label: "How fast tames get hungry",
-        hint: "Lower means less time spent filling troughs.",
+        label: "settings.DinoCharacterFoodDrainMultiplier.label",
+        hint: "settings.DinoCharacterFoodDrainMultiplier.hint",
         type: "number",
         group: SURVIVAL,
         fallback: "1",
@@ -281,8 +285,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "OverrideOfficialDifficulty",
-        label: "Difficulty",
-        hint: "How high wild creatures go: their top level is this times 30. 5 is the usual choice, for level 150. Set, it decides the levels on its own and the offset below stops mattering.",
+        label: "settings.OverrideOfficialDifficulty.label",
+        hint: "settings.OverrideOfficialDifficulty.hint",
         type: "number",
         group: WORLD,
         fallback: "off",
@@ -292,8 +296,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DifficultyOffset",
-        label: "Difficulty offset",
-        hint: "The older way of saying the same thing, between 0 and 1. Only read when the difficulty above is not set.",
+        label: "settings.DifficultyOffset.label",
+        hint: "settings.DifficultyOffset.hint",
         type: "number",
         group: WORLD,
         fallback: "0.2",
@@ -303,7 +307,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DayCycleSpeedScale",
-        label: "How fast the day passes",
+        label: "settings.DayCycleSpeedScale.label",
         hint: "",
         type: "number",
         group: WORLD,
@@ -314,8 +318,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "NightTimeSpeedScale",
-        label: "How fast the night passes",
-        hint: "Higher makes nights shorter.",
+        label: "settings.NightTimeSpeedScale.label",
+        hint: "settings.NightTimeSpeedScale.hint",
         type: "number",
         group: WORLD,
         fallback: "1",
@@ -325,7 +329,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "DayTimeSpeedScale",
-        label: "How fast the daylight passes",
+        label: "settings.DayTimeSpeedScale.label",
         hint: "",
         type: "number",
         group: WORLD,
@@ -336,24 +340,24 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ServerPVE",
-        label: "Players cannot hurt each other",
-        hint: "On makes it a PvE server.",
+        label: "settings.ServerPVE.label",
+        hint: "settings.ServerPVE.hint",
         type: "boolean",
         group: WORLD,
         fallback: "off"
     },
     {
         key: "ServerHardcore",
-        label: "Death is permanent",
-        hint: "A player who dies starts again at level 1.",
+        label: "settings.ServerHardcore.label",
+        hint: "settings.ServerHardcore.hint",
         type: "boolean",
         group: WORLD,
         fallback: "off"
     },
     {
         key: "AutoSavePeriodMinutes",
-        label: "Save the world every",
-        hint: "Minutes. Shorter loses less in a crash and costs a pause each time.",
+        label: "settings.AutoSavePeriodMinutes.label",
+        hint: "settings.AutoSavePeriodMinutes.hint",
         type: "number",
         group: WORLD,
         fallback: "15",
@@ -363,8 +367,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "KickIdlePlayersPeriod",
-        label: "Throw idle players out after",
-        hint: "Seconds. Only applies while the server is full of people who are actually playing.",
+        label: "settings.KickIdlePlayersPeriod.label",
+        hint: "settings.KickIdlePlayersPeriod.hint",
         type: "number",
         group: WORLD,
         fallback: "3600",
@@ -373,15 +377,15 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ShowMapPlayerLocation",
-        label: "Show players where they are",
-        hint: "Their own position, and their tribe's, on the map. Off, the map is a picture.",
+        label: "settings.ShowMapPlayerLocation.label",
+        hint: "settings.ShowMapPlayerLocation.hint",
         type: "boolean",
         group: PLAYING,
         fallback: "on"
     },
     {
         key: "AllowThirdPersonPlayer",
-        label: "Third person camera",
+        label: "settings.AllowThirdPersonPlayer.label",
         hint: "",
         type: "boolean",
         group: PLAYING,
@@ -389,7 +393,7 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ServerCrosshair",
-        label: "Crosshair",
+        label: "settings.ServerCrosshair.label",
         hint: "",
         type: "boolean",
         group: PLAYING,
@@ -397,8 +401,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "EnablePvPGamma",
-        label: "Let players change their gamma while PvP is on",
-        hint: "Their own brightness, set with the gamma command in game. Off, nights are genuinely dark - and unplayable for some people.",
+        label: "settings.EnablePvPGamma.label",
+        hint: "settings.EnablePvPGamma.hint",
         type: "boolean",
         group: PLAYING,
         fallback: "off"
@@ -411,8 +415,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
         // because a switch labelled with a double negative is how this was got
         // wrong in the first place.
         key: "DisablePvEGamma",
-        label: "Let players change their gamma while PvE is on",
-        hint: "The same thing for a PvE server, which is a separate setting in the game. Both are worth leaving on.",
+        label: "settings.DisablePvEGamma.label",
+        hint: "settings.DisablePvEGamma.hint",
         type: "boolean",
         group: PLAYING,
         fallback: "on",
@@ -420,15 +424,15 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "ShowFloatingDamageText",
-        label: "Show damage numbers",
-        hint: "The RPG-style numbers over whatever was hit.",
+        label: "settings.ShowFloatingDamageText.label",
+        hint: "settings.ShowFloatingDamageText.hint",
         type: "boolean",
         group: PLAYING,
         fallback: "off"
     },
     {
         key: "AllowHitMarkers",
-        label: "Show hit markers",
+        label: "settings.AllowHitMarkers.label",
         hint: "",
         type: "boolean",
         group: PLAYING,
@@ -436,31 +440,31 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "GlobalVoiceChat",
-        label: "Voice chat reaches the whole server",
-        hint: "Off, it only reaches people nearby.",
+        label: "settings.GlobalVoiceChat.label",
+        hint: "settings.GlobalVoiceChat.hint",
         type: "boolean",
         group: PLAYING,
         fallback: "off"
     },
     {
         key: "AlwaysAllowStructurePickup",
-        label: "Pick structures back up at any time",
-        hint: "Off, only within the first few seconds of placing one.",
+        label: "settings.AlwaysAllowStructurePickup.label",
+        hint: "settings.AlwaysAllowStructurePickup.hint",
         type: "boolean",
         group: STRUCTURES,
         fallback: "off"
     },
     {
         key: "DisableStructureDecayPvE",
-        label: "Buildings never decay",
-        hint: "On a server people play on a few nights a week, this is what stops bases falling down.",
+        label: "settings.DisableStructureDecayPvE.label",
+        hint: "settings.DisableStructureDecayPvE.hint",
         type: "boolean",
         group: STRUCTURES,
         fallback: "off"
     },
     {
         key: "AllowCaveBuildingPvE",
-        label: "Building in caves",
+        label: "settings.AllowCaveBuildingPvE.label",
         hint: "",
         type: "boolean",
         group: STRUCTURES,
@@ -468,16 +472,16 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "AllowFlyerCarryPvE",
-        label: "Flyers can pick things up",
-        hint: "Including wild creatures and other players' tames.",
+        label: "settings.AllowFlyerCarryPvE.label",
+        hint: "settings.AllowFlyerCarryPvE.hint",
         type: "boolean",
         group: STRUCTURES,
         fallback: "off"
     },
     {
         key: "StructurePreventResourceRadiusMultiplier",
-        label: "How far a building stops resources growing",
-        hint: "Lower lets trees come back closer to a base.",
+        label: "settings.StructurePreventResourceRadiusMultiplier.label",
+        hint: "settings.StructurePreventResourceRadiusMultiplier.hint",
         type: "number",
         group: STRUCTURES,
         fallback: "1",
@@ -487,8 +491,8 @@ export const ARK_SETTINGS: readonly ArkSetting[] = [
     },
     {
         key: "TheMaxStructuresInRange",
-        label: "Most structures in one area",
-        hint: "The ceiling on how big one base can get.",
+        label: "settings.TheMaxStructuresInRange.label",
+        hint: "settings.TheMaxStructuresInRange.hint",
         type: "number",
         group: STRUCTURES,
         fallback: "10500",
@@ -502,8 +506,8 @@ export function findArkSetting(key: string): ArkSetting | undefined {
 }
 
 /** The settings a screen draws, in the order the groups are declared. */
-export function arkSettingGroups(): { group: string; settings: ArkSetting[] }[] {
-    const groups: { group: string; settings: ArkSetting[] }[] = [];
+export function arkSettingGroups(): { group: GameKey<"ark">; settings: ArkSetting[] }[] {
+    const groups: { group: GameKey<"ark">; settings: ArkSetting[] }[] = [];
     for (const setting of ARK_SETTINGS) {
         const existing = groups.find((entry) => entry.group === setting.group);
         if (existing) existing.settings.push(setting);

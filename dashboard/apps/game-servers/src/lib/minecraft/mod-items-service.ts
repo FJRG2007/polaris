@@ -21,6 +21,7 @@
  * Server-only.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 import JSZip from "jszip";
 import { prisma } from "@polaris/db";
@@ -347,7 +348,7 @@ async function readBuild(
         read = await modItems.readJarItems({
             paths: Object.keys(zip.files),
             read: async (path: string) => {
-                if (Date.now() >= until) throw new Error("Out of time reading the jar");
+                if (Date.now() >= until) throw new Error(gameMessage("games", "lib.jarTimeout"));
                 const entry = zip.files[path];
                 if (!entry || entry.dir) return null;
                 const body = await inflated(entry, MAX_READ_BYTES - spent);

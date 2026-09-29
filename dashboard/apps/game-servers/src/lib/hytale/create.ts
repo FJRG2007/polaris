@@ -7,6 +7,7 @@
  * block, which is the block a game port belongs in anyway.
  */
 
+import { gameMessage } from "../game-message";
 import { HYTALE_PORT } from "./paths";
 import { host } from "@polaris/app-host";
 
@@ -26,6 +27,6 @@ export async function allocateHytalePort(): Promise<number> {
     for (let port = from; port <= block.end; port += 1) if (free(port)) return port;
     for (let port = block.start; port < from; port += 1) if (free(port)) return port;
     throw new Error(
-        `Every port in the range ${describeBlock(block)} is in use. Widen it under Admin, Domains, or remove a server that is no longer running.`
+        gameMessage("games", "lib.portsFull", { range: describeBlock(block) })
     );
 }

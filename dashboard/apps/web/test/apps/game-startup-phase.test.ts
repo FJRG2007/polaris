@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import { isPluginOf } from "@polaris-app/game-servers/src/lib/minecraft/world";
 import { startupPhase } from "@polaris-app/game-servers/src/lib/minecraft/parse";
+import { english } from "../setup/game-english";
 
 /** The first minute of a server being built, as the image narrates it. */
 const BOOTING = [
@@ -26,17 +27,17 @@ const BOOTING = [
 
 describe("what a starting server is doing", () => {
     it("names the step it is on, not the one before it", () => {
-        expect(startupPhase(BOOTING.join("\n"))).toBe("Loading the server.");
+        expect(english(startupPhase(BOOTING.join("\n")))).toBe("Loading the server.");
     });
 
     it("follows the server through its steps", () => {
-        expect(startupPhase(BOOTING.slice(0, 1).join("\n"))).toBe("Getting the container up.");
-        expect(startupPhase(BOOTING.slice(0, 2).join("\n"))).toBe("Downloading what it needs.");
-        expect(startupPhase(BOOTING.slice(0, 3).join("\n"))).toBe("Putting the settings in place.");
+        expect(english(startupPhase(BOOTING.slice(0, 1).join("\n")))).toBe("Getting the container up.");
+        expect(english(startupPhase(BOOTING.slice(0, 2).join("\n")))).toBe("Downloading what it needs.");
+        expect(english(startupPhase(BOOTING.slice(0, 3).join("\n")))).toBe("Putting the settings in place.");
     });
 
     it("reaches the world, which is the step people wait longest on", () => {
-        expect(startupPhase([...BOOTING, '[23:28:23 INFO]: Preparing level "world-20260812-232325"'].join("\n"))).toBe(
+        expect(english(startupPhase([...BOOTING, '[23:28:23 INFO]: Preparing level "world-20260812-232325"'].join("\n")))).toBe(
             "Building the world."
         );
     });
@@ -50,11 +51,11 @@ describe("what a starting server is doing", () => {
             '[23:28:30 WARN]: Unexpected exception while parsing console command "list"',
             "java.lang.IllegalStateException: Asynchronous command dispatch!"
         ].join("\n");
-        expect(startupPhase(noisy)).toBe("Loading the server.");
+        expect(english(startupPhase(noisy))).toBe("Loading the server.");
     });
 
     it("says nothing about a log with nothing to say", () => {
-        expect(startupPhase("[12:00:04 INFO]: Alice joined the game")).toBeNull();
+        expect(english(startupPhase("[12:00:04 INFO]: Alice joined the game"))).toBeNull();
     });
 });
 

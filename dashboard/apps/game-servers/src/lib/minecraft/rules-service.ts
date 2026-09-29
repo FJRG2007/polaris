@@ -32,6 +32,7 @@
  * per rule (`failures`) instead of silently keeping the old value.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { editionOf, withServerContainer, type ServerContainer } from "./service";
@@ -111,7 +112,7 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
         return {
             values: {},
             difficulty: null,
-            reason: "Bedrock keeps its rules inside the world rather than answering for them.",
+            reason: gameMessage("games", "lib.bedrockRules"),
             asOf: null,
             answering: false,
             changeable: false,
@@ -136,7 +137,7 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
             return {
                 values: {},
                 difficulty: null,
-                reason: "Start the server to read what these are set to.",
+                reason: gameMessage("games", "lib.startToRead"),
                 asOf: null,
                 answering: false,
                 changeable: true,
@@ -158,7 +159,7 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
             return {
                 values: {},
                 difficulty: parseDifficulty(output),
-                reason: "This server's version will not say what a rule is set to. Setting one still works.",
+                reason: gameMessage("games", "lib.rulesUnreported"),
                 asOf: null,
                 answering: true,
                 changeable: true,
@@ -173,7 +174,7 @@ export async function readWorldRules(server: ServerContainer): Promise<WorldRule
         return {
             values: {},
             difficulty: parseDifficulty(output),
-            reason: "The server is not answering, so what these are set to cannot be read right now.",
+            reason: gameMessage("games", "lib.rulesNotAnswering"),
             asOf: null,
             answering: false,
             changeable: true,
@@ -443,7 +444,9 @@ async function tellServer(
     if (said !== undefined) return { value: said };
     const trimmed = reply.trim().replace(/\s+/g, " ").slice(0, 160);
     return {
-        refused: trimmed ? `The server refused it: ${trimmed}` : "The server did not accept that"
+        refused: trimmed
+            ? gameMessage("games", "lib.refusedIt", { said: trimmed })
+            : gameMessage("games", "lib.notAccepted")
     };
 }
 
@@ -479,7 +482,7 @@ async function reconcile(
         // time, so it says so instead of being retried forever.
         if (readable && !isDifficultyRow && current === undefined) {
             await settle(installedAppId, row.rule, {
-                failure: "This server's version does not have this rule."
+                failure: gameMessage("games", "lib.ruleMissing")
             });
             continue;
         }
@@ -569,7 +572,7 @@ export async function readRulesFor(ownerId: string, installedAppId: string): Pro
                 reason:
                     live?.answering === true
                         ? live.reason
-                        : "The server is not running. These are the values Polaris last read from it, and a change made now is applied when it starts.",
+                        : gameMessage("games", "lib.rulesRemembered"),
                 asOf: kept.at,
                 answering: live?.answering === true,
                 changeable: java,
@@ -583,7 +586,7 @@ export async function readRulesFor(ownerId: string, installedAppId: string): Pro
         live ?? {
             values: {},
             difficulty: null,
-            reason: "The server is stopped, so its rules cannot be read yet. A change made now is applied when it starts.",
+            reason: gameMessage("games", "lib.rulesStopped"),
             asOf: null,
             answering: false,
             changeable: java,
@@ -618,7 +621,7 @@ async function changeRule(
     value: string
 ): Promise<RuleChange> {
     if (!(await isJavaServer(installedAppId))) {
-        throw new Error("Bedrock servers cannot be asked this from here");
+        throw new Error(gameMessage("games", "lib.bedrockCannotAsk"));
     }
     const before = await prisma.gameRuleSetting.findUnique({
         where: { installedAppId_rule: { installedAppId, rule } }
@@ -682,9 +685,10 @@ export async function setWorldRule(
     actorId: string | null = null
 ): Promise<RuleChange> {
     const rule = findRule(id);
-    if (!rule) throw new Error("That is not a rule Polaris can set");
+    if (!rule) throw new Error(gameMessage("games", "lib.notSettableRule"));
     const normalized = normalizeRuleValue(rule, value);
-    if (normalized === null) throw new Error(`${rule.label} does not take that value`);
+    // Named by the game's own id: only a request the screen would not send gets here.
+    if (normalized === null) throw new Error(`${rule.id} does not take that value`);
     return changeRule(ownerId, installedAppId, actorId, rule.id, normalized);
 }
 

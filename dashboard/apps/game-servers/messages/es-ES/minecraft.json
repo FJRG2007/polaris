@@ -180,7 +180,19 @@
         "templateSaved": "Plantilla guardada.",
         "fadeIn": "Aparecer",
         "stay": "En pantalla",
-        "fadeOut": "Desaparecer"
+        "fadeOut": "Desaparecer",
+        "sounds": {
+            "none": "Sin sonido",
+            "pling": "Pling",
+            "orb": "Orbe de XP",
+            "levelUp": "Subir nivel",
+            "challenge": "Desafío completado",
+            "bell": "Campana",
+            "beacon": "Faro",
+            "bass": "Aviso (bajo)",
+            "horn": "Cuerno",
+            "dragon": "Gruñido dragón"
+        }
     },
     "errors": {
         "checkTheDetailsAndTry": "Revisa los datos y vuelve a intentarlo",
@@ -314,7 +326,14 @@
         "budgetHintUsed": "Cero es sin límite. Las más antiguas se van cuando el total se acerca - ahora ocupan {size}. La copia más reciente nunca se borra.",
         "readFailed": "No se pudo leer el mundo",
         "backedUp": "Mundo copiado",
-        "restored": "Restaurado - el servidor se reinicia con él"
+        "restored": "Restaurado - el servidor se reinicia con él",
+        "every": {
+            "never": "Nunca - solo cuando lo pida",
+            "hourly": "Cada hora",
+            "sixHourly": "Cada seis horas",
+            "daily": "A diario",
+            "weekly": "Cada semana"
+        }
     },
     "schedule": {
         "schedule": "Horario",
@@ -721,7 +740,22 @@
         "playersWillDrop": "{count, plural, one {Hay # jugador conectado que se desconectará.} other {Hay # jugadores conectados que se desconectarán.}}",
         "restartsToInstall": "El servidor se reinicia para instalar y quitar lo que cambió.",
         "byAuthor": "de {name}",
-        "noBuildForThisSoftware": "sin versión para este software"
+        "noBuildForThisSoftware": "sin versión para este software",
+        "categories": {
+            "popular": "Populares",
+            "management": "Gestión",
+            "utility": "Utilidad",
+            "adventure": "Aventura",
+            "economy": "Economía",
+            "mechanics": "Mecánicas",
+            "social": "Social",
+            "worldgen": "Generación",
+            "performance": "Rendimiento",
+            "technology": "Tecnología",
+            "magic": "Magia",
+            "storage": "Almacén",
+            "food": "Comida"
+        }
     },
     "inventoryEditor": {
         "everythingTheyCarryGoesArmour": "Se va todo lo que lleva, armadura y mano secundaria incluidas. No se puede deshacer.",
@@ -840,7 +874,37 @@
         "callVarsLinked": "'{call.count}', '{call.members}' y '{call.max}' leen la llamada del chat al que está vinculado este servidor.",
         "callVarsUnlinked": "'{call.count}', '{call.members}' y '{call.max}' necesitan un chat con llamada.",
         "chosen": "{count} de {total} elegidas",
-        "seconds": "segundos"
+        "seconds": "segundos",
+        "blocks": {
+            "rank": {
+                "level": "Mejor nivel",
+                "deaths": "Más muertes",
+                "kills": "Más mobs matados",
+                "pvp": "Más jugadores matados",
+                "playtime": "Más tiempo jugado",
+                "explorer": "Más recorrido",
+                "mined": "Más bloques minados",
+                "diamonds": "Más diamantes minados",
+                "enchanted": "Más objetos encantados",
+                "crafted": "Más objetos fabricados",
+                "fish": "Más peces pescados",
+                "bred": "Más animales criados",
+                "trades": "Más tratos con aldeanos",
+                "damage": "Más daño hecho, en corazones",
+                "hurt": "Más daño recibido, en corazones",
+                "alive": "Más tiempo vivo ahora",
+                "bosses": "Más jefes derrotados",
+                "jumps": "Más saltos",
+                "sleep": "Más noches dormidas",
+                "chests": "Más cofres abiertos",
+                "sessions": "Más visitas",
+                "events": "Más eventos ganados"
+            },
+            "death": "Última muerte",
+            "server": {
+                "levels": "El nivel de todos"
+            }
+        }
     },
     "panel": {
         "polarisLoginHasAnUpdate": "Polaris login tiene novedades",
@@ -1123,7 +1187,8 @@
         "theLastRunDidNot": "La última ejecución falló",
         "days": "días",
         "lastRunRemoved": "Última ejecución el {date}: {count, number} chunks, {size}.",
-        "lastRunNothing": "Última ejecución el {date}: nada que quitar."
+        "lastRunNothing": "Última ejecución el {date}: nada que quitar.",
+        "done": "Hecho."
     },
     "domain": {
         "address": "Dirección",
@@ -1262,6 +1327,99 @@
         "save": "Guardar",
         "restartsForSettings": "El servidor se reinicia para coger los nuevos ajustes.",
         "memoryFixed": "La memoria que escribiste es ahora la cifra del servidor, y Polaris ya no la ajusta. Vuelve a cambiarlo en Memoria, arriba.",
-        "pendingChanges": "{count} {count, plural, one {cambio} other {cambios}} que el servidor toma en su próximo arranque."
+        "pendingChanges": "{count} {count, plural, one {cambio} other {cambios}} que el servidor toma en su próximo arranque.",
+        "restartReason": "un cambio de ajustes"
+    },
+    "gameRules": {
+        "keepInventory": {
+            "label": "Conservar inventario al morir",
+            "hint": "Los jugadores conservan lo que llevaban en vez de soltarlo."
+        },
+        "doImmediateRespawn": {
+            "label": "Reaparecer al instante",
+            "hint": "Se salta la pantalla de muerte y los devuelve directamente."
+        },
+        "showDeathMessages": {
+            "label": "Anunciar muertes en el chat"
+        },
+        "spawnRadius": {
+            "label": "Radio de spawn",
+            "hint": "En cuántos bloques alrededor del spawn del mundo pueden aparecer los jugadores."
+        },
+        "fallDamage": {
+            "label": "Daño por caída"
+        },
+        "fireDamage": {
+            "label": "Daño por fuego"
+        },
+        "drowningDamage": {
+            "label": "Daño por ahogo"
+        },
+        "naturalRegeneration": {
+            "label": "Curarse con hambre llena",
+            "hint": "Desactivado hace que la comida sea la única forma de recuperar la salud."
+        },
+        "mobGriefing": {
+            "label": "Criaturas cambian el mundo",
+            "hint": "Cráteres de creeper, endermen moviendo bloques, zombis rompiendo puertas."
+        },
+        "doFireTick": {
+            "label": "Propagar fuego"
+        },
+        "doDaylightCycle": {
+            "label": "El tiempo pasa",
+            "hint": "Desactivado congela el sol donde está."
+        },
+        "doWeatherCycle": {
+            "label": "El clima cambia"
+        },
+        "randomTickSpeed": {
+            "label": "Crecimiento",
+            "hint": "Lo rápido que crecen los cultivos y caen las hojas. 3 es lo normal; números grandes cuestan al servidor."
+        },
+        "playersSleepingPercentage": {
+            "label": "Jugadores necesarios para saltar la noche",
+            "hint": "En porcentaje. 0 deja que un solo jugador la salte."
+        },
+        "doMobSpawning": {
+            "label": "Criaturas"
+        },
+        "doMobLoot": {
+            "label": "Botín de criaturas"
+        },
+        "doInsomnia": {
+            "label": "Phantoms",
+            "hint": "Los que van a por los jugadores que no han dormido."
+        },
+        "doPatrolSpawning": {
+            "label": "Patrullas"
+        },
+        "doTraderSpawning": {
+            "label": "Comerciantes errantes"
+        },
+        "doWardenSpawning": {
+            "label": "Wardens"
+        },
+        "doTileDrops": {
+            "label": "Bloques rotos sueltan"
+        },
+        "doLimitedCrafting": {
+            "label": "Fabricar solo lo desbloqueado",
+            "hint": "Hay que descubrir las recetas antes de poder usarlas."
+        },
+        "announceAdvancements": {
+            "label": "Anunciar logros"
+        },
+        "disableRaids": {
+            "label": "Sin asaltos",
+            "hint": "Las aldeas quedan tranquilas cuando un jugador consigue Mal presagio."
+        }
+    },
+    "gameRuleGroups": {
+        "death": "Muerte y reaparición",
+        "damage": "Daño",
+        "world": "Mundo",
+        "mobs": "Mobs",
+        "playing": "Juego"
     }
 }

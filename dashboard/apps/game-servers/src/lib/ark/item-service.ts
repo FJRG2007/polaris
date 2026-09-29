@@ -14,6 +14,7 @@
  * says what was sent and to whom.
  */
 
+import { gameMessage } from "../game-message";
 import { readArkPlayerId, runArkCommand } from "./service";
 import { findArkItem, type ArkCatalogItem } from "./item-catalog";
 import { arkGiveCommand, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkGiveLine } from "./items";
@@ -37,7 +38,7 @@ export async function requireArkPlayerId(
     const id = await readArkPlayerId(ownerId, installedAppId, steamId);
     if (id) return id;
     throw new ArkGiveError(
-        "ARK knows this player by a number kept in their own survivor file, and there is none to read. They have to have played on this server at least once, and the server has to be running."
+        gameMessage("games", "lib.arkNoSurvivor")
     );
 }
 
@@ -71,7 +72,7 @@ export async function giveArkItems(
     if (requests.length === 0) return [];
     const items = requests.map((request) => {
         const item = findArkItem(request.key);
-        if (!item) throw new ArkGiveError("That is not an item this server's catalog knows");
+        if (!item) throw new ArkGiveError(gameMessage("games", "lib.unknownItem"));
         return item;
     });
     const playerId = await requireArkPlayerId(ownerId, installedAppId, steamId);
@@ -105,7 +106,7 @@ export async function giveArkItems(
             throw new ArkGiveError(
                 given.length === 0
                     ? reason
-                    : `The first ${given.length} of ${requests.length} were sent. The rest were not: ${reason}`
+                    : gameMessage("games", "lib.partlySent", { sent: given.length, total: requests.length, reason })
             );
         }
     }

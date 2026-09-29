@@ -32,6 +32,7 @@ import {
     GAME_BLUEPRINTS,
     findBlueprint
 } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
+import { rejection } from "../setup/game-english";
 
 /** Minecraft's releases as the tag endpoint gives them: newest first, and with
  *  the snapshots a blueprint must never pin mixed in. */
@@ -228,7 +229,7 @@ describe("the release a blueprint is built on", () => {
     });
 
     it("refuses a release the blueprint's plugins cannot run on", async () => {
-        await expect(envFor("bedwars", { version: "1.21.6" })).rejects.toThrow(
+        expect(await rejection(envFor("bedwars", { version: "1.21.6" }))).toMatch(
             /nothing built for Minecraft 1\.21\.6/
         );
     });

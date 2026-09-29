@@ -5,6 +5,7 @@
  * the formats can be tested against real server output.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 
 /** Who is on the server right now, as `list` reports it. */
@@ -144,12 +145,12 @@ export function parseWhitelistRefusal(output: string): string | null {
     // Already on the list is the command declining to do something already done.
     if (/already whitelisted/i.test(text)) return null;
     if (/(does not exist|that player does not exist|no player was found)/i.test(text)) {
-        return "The game does not know that name. Check the spelling, or turn Mojang authentication off if this server is for cracked clients.";
+        return gameMessage("games", "lib.unknownName");
     }
     // The third is the parser's own wording and is kept to what it actually
     // prints: a bare "expected" is a word an answer that worked can carry too.
     if (/(unknown or incomplete command|incorrect argument|expected (?:whitespace|end of|quote|value|integer|float|bool|literal|string))/i.test(text)) {
-        return "This server did not understand the whitelist command.";
+        return gameMessage("games", "lib.whitelistNotUnderstood");
     }
     return null;
 }
@@ -294,14 +295,14 @@ export function lastStartupSignal(log: string): string | null {
  * to quoting the line itself, which is what it did before any of this.
  */
 const STARTUP_PHASES: readonly (readonly [RegExp, string])[] = [
-    [/Done \(\d/, "Nearly there."],
-    [/Preparing (?:level|start region|spawn area)/i, "Building the world."],
-    [/Loading server plugin|Enabling [\w-]+ v/i, "Starting the plugins."],
-    [/Starting minecraft server version|Loading libraries/i, "Loading the server."],
-    [/\[init\] Starting the Minecraft server/i, "Handing over to the server."],
-    [/\[init\] Copying any (?:plugins|configs)/i, "Putting the settings in place."],
-    [/\[init\] Resolving type given|Downloading|\[mc-image-helper\]/i, "Downloading what it needs."],
-    [/\[init\] Running as uid=/i, "Getting the container up."]
+    [/Done \(\d/, gameMessage("games", "lib.phases.nearly")],
+    [/Preparing (?:level|start region|spawn area)/i, gameMessage("games", "lib.phases.world")],
+    [/Loading server plugin|Enabling [\w-]+ v/i, gameMessage("games", "lib.phases.plugins")],
+    [/Starting minecraft server version|Loading libraries/i, gameMessage("games", "lib.phases.server")],
+    [/\[init\] Starting the Minecraft server/i, gameMessage("games", "lib.phases.handover")],
+    [/\[init\] Copying any (?:plugins|configs)/i, gameMessage("games", "lib.phases.settings")],
+    [/\[init\] Resolving type given|Downloading|\[mc-image-helper\]/i, gameMessage("games", "lib.phases.downloading")],
+    [/\[init\] Running as uid=/i, gameMessage("games", "lib.phases.container")]
 ];
 
 /** The step the server is on, or null when nothing in the log names one. */

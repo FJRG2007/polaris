@@ -11,6 +11,7 @@ import type { Translator } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { gameCatalogs, type GameKey, type GameNamespace } from "../../messages";
 import { timeoutLeft } from "../lib/player-timeout";
+import { gameMessageIn } from "../lib/game-message";
 import { playerWords, type PlayerWords } from "../lib/player-vocabulary";
 
 export type GameText<N extends GameNamespace> = Translator<GameKey<N>>;
@@ -42,18 +43,12 @@ export function styleName(t: GameText<"games">, code: string): string {
 }
 
 /**
- * A failed parse's message, in the reader's language when it names one of the
- * app's keys (`namespace:key`, see `schemaWords`); any other message as it is.
- * The browser's half of `issueText`, for a schema a screen checks before it sends.
+ * A message that may carry one of the app's keys (see `lib/game-message`) - a
+ * failed parse's, a status read on the server - in the reader's language; any
+ * other text as it is. The browser's half of `issueText`.
  */
-export function useSchemaText(): (message: string | undefined) => string | undefined {
+export function useSchemaText(): (message: string | null | undefined) => string | undefined {
     const locale = hostUi.i18nProvider.useLocale();
-    return (message) => {
-        const named = message?.match(/^(\w+):([\w.]+)$/);
-        if (!named || !gameCatalogs.namespaces.includes(named[1] as GameNamespace)) return message;
-        return gameCatalogs.translate(
-            locale,
-            `${named[1]}.${named[2]}` as Parameters<typeof gameCatalogs.translate>[1]
-        );
-    };
+    return (message) =>
+        message === undefined || message === null ? undefined : gameMessageIn(locale, message);
 }

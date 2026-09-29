@@ -25,6 +25,7 @@
  * know was wanted - is recoverable rather than final.
  */
 
+import { gameMessage } from "../game-message";
 import { formatBytes } from "@polaris/core";
 
 /** Where the settings live on the install, beside the schedule and the rest. */
@@ -200,10 +201,9 @@ function numberOf(value: unknown): number {
 
 /** What a run did, in one sentence, for the screen and for the activity trail. */
 export function describeTrim(report: WorldTrimReport): string {
-    if (report.removed === 0) return "Nothing to take out - every chunk has been visited.";
-    const chunks = report.removed === 1 ? "1 chunk" : `${report.removed.toLocaleString()} chunks`;
+    if (report.removed === 0) return gameMessage("games", "lib.trim.nothing");
     const size = formatBytes(report.freedBytes);
     return report.dryRun
-        ? `${chunks} have never been visited. Removing them would free ${size}.`
-        : `Removed ${chunks} nobody had been in, freeing ${size}.`;
+        ? gameMessage("games", "lib.trim.wouldFree", { count: report.removed, size })
+        : gameMessage("games", "lib.trim.freed", { count: report.removed, size });
 }

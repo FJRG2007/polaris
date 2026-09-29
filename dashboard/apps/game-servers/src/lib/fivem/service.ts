@@ -22,6 +22,7 @@
  * says so rather than pretending otherwise.
  */
 
+import { gameMessage } from "../game-message";
 import * as guard from "./guard";
 import * as access from "./access";
 import { prisma } from "@polaris/db";
@@ -160,7 +161,7 @@ async function readLive(
         select: { applicationId: true, config: true }
     });
     if (!install?.applicationId)
-        return quiet(NOT_ANSWERING("This server has not been deployed yet", null, null));
+        return quiet(NOT_ANSWERING(gameMessage("games", "lib.notDeployed"), null, null));
 
     const app = await prisma.application.findFirst({
         where: { id: install.applicationId },
@@ -175,7 +176,7 @@ async function readLive(
             NOT_ANSWERING(
                 halted
                     ? `The server kept failing to start, so it has been stopped after ${halted.restarts} restarts.${halted.cause ? ` ${halted.cause}` : ""}`
-                    : "The server is stopped",
+                    : gameMessage("games", "lib.stopped"),
                 null,
                 halted
             )
@@ -200,13 +201,7 @@ async function readLive(
         );
     }
     if (state !== null && state !== "running") {
-        return quiet(
-            NOT_ANSWERING(
-                "The container is not running. Redeploy it, or read the logs to see why it stopped.",
-                false,
-                null
-            )
-        );
+        return quiet(NOT_ANSWERING(gameMessage("games", "lib.containerDown"), false, null));
     }
     const containerRunning = state === null ? null : true;
     try {
@@ -220,11 +215,7 @@ async function readLive(
         });
         if (raw.live === null) {
             return quiet(
-                NOT_ANSWERING(
-                    "The server is starting. It loads its resources first, which takes a moment.",
-                    containerRunning,
-                    null
-                )
+                NOT_ANSWERING(gameMessage("games", "lib.fivemStarting"), containerRunning, null)
             );
         }
         const dynamic = players.parseDynamic(raw.dynamic);
@@ -243,7 +234,7 @@ async function readLive(
     } catch (caught) {
         return quiet(
             NOT_ANSWERING(
-                caught instanceof Error ? caught.message : "The server is not answering",
+                caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
                 containerRunning,
                 null
             )
@@ -432,9 +423,10 @@ async function requireApplication(ownerId: string, installedAppId: string): Prom
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true }
     });
-    if (!install) throw new Error("Server not found");
-    if (install.catalogId !== FIVEM_CATALOG_ID) throw new Error("That is not a FiveM server");
-    if (!install.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install) throw new Error(gameMessage("games", "lib.serverNotFound"));
+    if (install.catalogId !== FIVEM_CATALOG_ID)
+        throw new Error(gameMessage("games", "lib.notFivem"));
+    if (!install.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     return install.applicationId;
 }
 
@@ -444,7 +436,7 @@ async function configOf(ownerId: string, installedAppId: string): Promise<Record
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { config: true }
     });
-    if (!install) throw new Error("Server not found");
+    if (!install) throw new Error(gameMessage("games", "lib.serverNotFound"));
     return readInstallConfig(install.config);
 }
 
@@ -462,7 +454,7 @@ export async function addAllowedPlayer(
     player: { identifier: string; label: string }
 ): Promise<FivemAccessView> {
     if (!players.isIdentifier(player.identifier))
-        throw new Error("That is not a player identifier");
+        throw new Error(gameMessage("games", "lib.notIdentifier"));
     const config = await configOf(ownerId, installedAppId);
     await patchInstallConfig(installedAppId, {
         [access.ALLOW_LIST_KEY]: access.withAllowed(
@@ -490,9 +482,7 @@ export async function removeAllowedPlayer(
     const config = await configOf(ownerId, installedAppId);
     const next = access.withoutAllowed(access.readAllowList(config), identifier);
     if (next.length === 0 && access.readExclusiveJoin(config)) {
-        throw new Error(
-            "Open the server to everyone first, or taking the last player off would keep you out too"
-        );
+        throw new Error(gameMessage("games", "lib.openBeforeRemoving"));
     }
     await patchInstallConfig(installedAppId, { [access.ALLOW_LIST_KEY]: next });
     return handOver(ownerId, installedAppId);
@@ -518,9 +508,9 @@ export async function banFivemPlayer(
     installedAppId: string,
     ban: { identifier: string; label: string; reason: string; until?: string | null }
 ): Promise<FivemAccessView> {
-    if (!players.isIdentifier(ban.identifier)) throw new Error("That is not a player identifier");
-    if (!access.isBanReason(ban.reason))
-        throw new Error("That reason is too long for the screen it is shown on");
+    if (!players.isIdentifier(ban.identifier))
+        throw new Error(gameMessage("games", "lib.notIdentifier"));
+    if (!access.isBanReason(ban.reason)) throw new Error(gameMessage("games", "lib.reasonTooLong"));
     const config = await configOf(ownerId, installedAppId);
     await patchInstallConfig(installedAppId, {
         [access.BAN_LIST_KEY]: access.withBan(
@@ -578,7 +568,7 @@ export async function setExclusiveJoin(
 ): Promise<FivemAccessView> {
     const config = await configOf(ownerId, installedAppId);
     if (closed && access.readAllowList(config).length === 0) {
-        throw new Error("Add somebody to the list first, or closing it would keep you out too");
+        throw new Error(gameMessage("games", "lib.addBeforeClosing"));
     }
     await patchInstallConfig(installedAppId, { [access.EXCLUSIVE_JOIN_KEY]: closed });
     return handOver(ownerId, installedAppId);
@@ -597,7 +587,8 @@ export async function setFivemAdmin(
     admin: { identifier: string; label: string },
     isAdmin: boolean
 ): Promise<FivemAccessView> {
-    if (!players.isIdentifier(admin.identifier)) throw new Error("That is not a player identifier");
+    if (!players.isIdentifier(admin.identifier))
+        throw new Error(gameMessage("games", "lib.notIdentifier"));
     const config = await configOf(ownerId, installedAppId);
     const held = access.readAdmins(config);
     const next = isAdmin
@@ -776,6 +767,7 @@ export async function applyFivemFirewallBans(
         if (next.some((entry) => entry.identifier === identifier)) continue;
         next = access.withBan(
             next,
+            // i18n-ignore: the ban reason is shown in the game, to the player
             { identifier, label: address, reason: "Blocked by the Polaris firewall" },
             now
         );
@@ -934,7 +926,7 @@ export async function writeFivemRules(
     const wanted: { setting: FivemSetting; value: string | null }[] = [];
     for (const [key, value] of Object.entries(changes)) {
         const setting = findSetting(key);
-        if (!setting) throw new Error("That is not a setting this server has");
+        if (!setting) throw new Error(gameMessage("games", "lib.notServerSetting"));
         if (value !== null) {
             const problem = settingError(setting, value);
             if (problem) throw new Error(problem);
@@ -943,10 +935,7 @@ export async function writeFivemRules(
     }
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
-        if (cfg === null)
-            throw new Error(
-                "The server has not written its config yet. Start it once and try again."
-            );
+        if (cfg === null) throw new Error(gameMessage("games", "lib.noConfigYet"));
         let next = cfg;
         for (const change of wanted) next = writeSetting(next, change.setting, change.value);
         await writeContainerFile(server.container, SERVER_CFG, next);
@@ -995,11 +984,9 @@ export async function actOnResource(
     name: string,
     action: ResourceAction
 ): Promise<string> {
-    if (!isResourceName(name)) throw new Error("That is not a resource name");
+    if (!isResourceName(name)) throw new Error(gameMessage("games", "lib.notResourceName"));
     if (name.toLowerCase() === guard.GUARD_RESOURCE && action === "stop") {
-        throw new Error(
-            "That resource is what keeps players off this server. Open the server to everyone instead."
-        );
+        throw new Error(gameMessage("games", "lib.guardResource"));
     }
     return runFivemCommand(ownerId, installedAppId, `${action} ${name}`);
 }
@@ -1036,10 +1023,9 @@ export async function installResourceFromUrl(
 ): Promise<void> {
     const archive = resourceArchiveOf(url);
     if (archive === null) throw new Error(RESOURCE_URL_HINT);
-    if (!isResourceName(name))
-        throw new Error("A resource name is letters, digits, dots, dashes and underscores");
+    if (!isResourceName(name)) throw new Error(gameMessage("games", "lib.resourceNameRule"));
     if (name.toLowerCase() === guard.GUARD_RESOURCE)
-        throw new Error("That name belongs to Polaris' own resource");
+        throw new Error(gameMessage("games", "lib.polarisResourceName"));
     const link = Buffer.from(url.trim(), "utf8").toString("base64");
     const folder = Buffer.from(`${RESOURCES_ROOT}/${name}`, "utf8").toString("base64");
     const script = [
@@ -1068,21 +1054,17 @@ export async function installResourceFromUrl(
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const result = await server.container.run(["sh", "-c", script]);
         if (result.code === NO_MANIFEST) {
-            throw new Error(
-                "There is no resource in that archive - it has no fxmanifest.lua anywhere in it."
-            );
+            throw new Error(gameMessage("games", "lib.noResourceInArchive"));
         }
         if (result.code === NO_UNPACKER || result.code === NO_HTTP_CLIENT) {
-            throw new Error(
-                "This server's image cannot unpack that. Redeploy it to get the current one."
-            );
+            throw new Error(gameMessage("games", "lib.imageCannotUnpack"));
         }
         if (result.code !== 0) {
             const said = result.output.trim().slice(0, 200);
             throw new Error(
                 said.length > 0
-                    ? `That could not be installed: ${said}`
-                    : "That could not be installed"
+                    ? gameMessage("games", "lib.installRefused", { said })
+                    : gameMessage("games", "lib.installFailed")
             );
         }
         // On disk is not the same as known about; the server has to be told to look
@@ -1144,10 +1126,7 @@ export async function setConsolePassword(
     // changed, and pressing the button again still speaks the password that works.
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
-        if (cfg === null)
-            throw new Error(
-                "The server has not written its config yet. Start it once and try again."
-            );
+        if (cfg === null) throw new Error(gameMessage("games", "lib.noConfigYet"));
         // `set` is how the console changes a variable it already holds. Not
         // swallowed: a change the server did not take is not a change.
         await server.rcon(`set rcon_password ${quoteArgument(password)}`);

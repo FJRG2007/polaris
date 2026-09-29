@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { gameWords } from "../game-words";
+import { gameWords, messageText } from "../game-words";
 import { host } from "@polaris/app-host";
 import { revalidatePath } from "next/cache";
 import * as service from "../../lib/minecraft/polaris-anticheat-service";
@@ -19,8 +19,8 @@ const { requireGameServer } = host.appsInstallAccess;
 
 const serverId = z.string().uuid();
 
-const failure = (caught: unknown, fallback: string) =>
-    caught instanceof Error ? caught.message : fallback;
+const failure = async (caught: unknown, fallback: string): Promise<string> =>
+    caught instanceof Error ? await messageText(caught.message) : fallback;
 
 export async function anticheatStateAction(
     installedAppId: string
@@ -34,7 +34,9 @@ export async function anticheatStateAction(
             return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.anticheatState(applicationId, access.ownerId) };
     } catch (caught) {
-        return { error: failure(caught, (await gameWords("games"))("errors.couldNotReadTheAnti")) };
+        return {
+            error: await failure(caught, (await gameWords("games"))("errors.couldNotReadTheAnti"))
+        };
     }
 }
 
@@ -72,7 +74,7 @@ export async function setAnticheatAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: failure(caught, (await gameWords("games"))("errors.couldNotChangeTheAnti"))
+            error: await failure(caught, (await gameWords("games"))("errors.couldNotChangeTheAnti"))
         };
     }
 }

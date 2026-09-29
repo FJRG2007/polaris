@@ -162,111 +162,111 @@ const tally = (key: keyof PlayerTallies) => (figures: PlayerFigures) => figures.
 /** The rankings on offer, by variable. */
 export const RANKINGS = {
     "rank.deaths": {
-        label: "Most deaths",
+        label: "Most deaths", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: (figures) => figures.stats.deaths,
         sample: ["1. Steve 42", "2. Alex 30"]
     },
     "rank.kills": {
-        label: "Most mobs killed",
+        label: "Most mobs killed", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: (figures) => figures.stats.mobKills,
         sample: ["1. Alex 812", "2. Steve 640"]
     },
     "rank.pvp": {
-        label: "Most players killed",
+        label: "Most players killed", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: (figures) => figures.stats.playerKills,
         sample: ["1. Alex 9", "2. Steve 4"]
     },
     "rank.playtime": {
-        label: "Most time played",
+        label: "Most time played", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: (figures) => figures.stats.playedMs,
         text: (ms) => playedText(ms),
         sample: ["1. Steve 120h", "2. Alex 86h"]
     },
     "rank.explorer": {
-        label: "Furthest travelled",
+        label: "Furthest travelled", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("travelledCm"),
         text: distanceText,
         sample: ["1. Alex 412.5km", "2. Steve 230.1km"]
     },
     "rank.mined": {
-        label: "Most blocks mined",
+        label: "Most blocks mined", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("mined"),
         text: countText,
         sample: ["1. Steve 37.4k", "2. Alex 17k"]
     },
     "rank.diamonds": {
-        label: "Most diamonds mined",
+        label: "Most diamonds mined", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("diamonds"),
         sample: ["1. Steve 214", "2. Alex 96"]
     },
     "rank.enchanted": {
-        label: "Most items enchanted",
+        label: "Most items enchanted", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("enchanted"),
         sample: ["1. Alex 48", "2. Steve 31"]
     },
     "rank.crafted": {
-        label: "Most items crafted",
+        label: "Most items crafted", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("crafted"),
         text: countText,
         sample: ["1. Steve 12.8k", "2. Alex 7.6k"]
     },
     "rank.fish": {
-        label: "Most fish caught",
+        label: "Most fish caught", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("fishCaught"),
         sample: ["1. Alex 62", "2. Steve 14"]
     },
     "rank.bred": {
-        label: "Most animals bred",
+        label: "Most animals bred", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("animalsBred"),
         sample: ["1. Steve 120", "2. Alex 35"]
     },
     "rank.trades": {
-        label: "Most villager trades",
+        label: "Most villager trades", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("villagerTrades"),
         sample: ["1. Alex 88", "2. Steve 23"]
     },
     "rank.damage": {
-        label: "Most damage dealt, in hearts",
+        label: "Most damage dealt, in hearts", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("damageDealt"),
         text: heartsText,
         sample: ["1. Alex 2.5k", "2. Steve 1.9k"]
     },
     "rank.hurt": {
-        label: "Most damage taken, in hearts",
+        label: "Most damage taken, in hearts", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("damageTaken"),
         text: heartsText,
         sample: ["1. Steve 860", "2. Alex 640"]
     },
     "rank.alive": {
-        label: "Longest alive right now",
+        label: "Longest alive right now", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("aliveTicks"),
         text: (ticks) => playedText(ticks * TICK_MS),
         sample: ["1. Alex 26h", "2. Steve 3h"]
     },
     "rank.bosses": {
-        label: "Most bosses slain",
+        label: "Most bosses slain", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("bossesSlain"),
         sample: ["1. Steve 3", "2. Alex 1"]
     },
     "rank.jumps": {
-        label: "Most jumps",
+        label: "Most jumps", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("jumps"),
         text: countText,
         sample: ["1. Alex 64.2k", "2. Steve 41k"]
     },
     "rank.sleep": {
-        label: "Most nights slept",
+        label: "Most nights slept", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("slept"),
         sample: ["1. Steve 96", "2. Alex 40"]
     },
     "rank.chests": {
-        label: "Most chests opened",
+        label: "Most chests opened", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("chestsOpened"),
         text: countText,
         sample: ["1. Alex 3.1k", "2. Steve 2.4k"]
     },
     "rank.sessions": {
-        label: "Most visits",
+        label: "Most visits", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("sessions"),
         sample: ["1. Steve 97", "2. Alex 58"]
     }

@@ -21,6 +21,7 @@
  * separate, deliberate act on that screen.
  */
 
+import { gameMessage } from "./game-message";
 import { prisma } from "@polaris/db";
 import { PROJECTS_KEY } from "./minecraft/join-guard";
 import { findMap, pinnedRelease } from "./minecraft/maps";
@@ -94,8 +95,8 @@ export async function resetMinecraftServer(
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true, config: true }
     });
-    if (!install) throw new Error("Server not found");
-    if (!install.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install) throw new Error(gameMessage("games", "lib.serverNotFound"));
+    if (!install.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
 
     const edition = editionOf(install.catalogId);
     const blueprint = blueprintFor(edition, input.blueprintId);

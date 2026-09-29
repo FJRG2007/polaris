@@ -19,13 +19,14 @@
  * the one this command runs as.
  */
 
+import { gameMessage } from "./game-message";
 import type { ServerContainer } from "./minecraft/service";
 
 /** Paths are the callers' own constants, never anything typed. Proved rather than
  *  assumed, because everything below puts one in a shell command. */
 export function assertSafePath(path: string): void {
     if (!/^[A-Za-z0-9_./-]+$/.test(path) || path.includes("..")) {
-        throw new Error("That is not a path Polaris will read");
+        throw new Error(gameMessage("games", "lib.notReadablePath"));
     }
 }
 
@@ -358,8 +359,8 @@ export async function writeContainerFile(
         const said = result.output.trim().slice(0, 200);
         throw new Error(
             said.length > 0
-                ? `The server refused the write: ${said}`
-                : "The file could not be written"
+                ? gameMessage("games", "lib.writeRefused", { said })
+                : gameMessage("games", "lib.writeFailed")
         );
     }
 }

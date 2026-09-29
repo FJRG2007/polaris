@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { GameKey } from "../../../messages";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import type { WorldRules } from "../../lib/minecraft/rules-service";
 import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -66,6 +66,7 @@ export function MinecraftRules({
     canManage: boolean;
 }) {
     const t = useGameText("minecraft");
+    const schemaText = useSchemaText();
     const [rules, setRules] = useState<WorldRules | null>(null);
     const [loading, setLoading] = useState(true);
     /** Whether the server is being asked right now, with Polaris's own values
@@ -145,7 +146,7 @@ export function MinecraftRules({
     async function apply(rule: GameRule, value: string): Promise<void> {
         const normalized = normalizeRuleValue(rule, value);
         if (normalized === null) {
-            setError(t("rules.badValue", { name: rule.label }));
+            setError(t("rules.badValue", { name: t(rule.label) }));
             return;
         }
         setBusy(rule.id);
@@ -204,7 +205,7 @@ export function MinecraftRules({
     // the code and are drawn regardless: a stopped server does not change what
     // rules the game has, and a daemon error naming a container id is not an
     // answer to put in front of anybody.
-    const reason = rules?.reason ?? null;
+    const reason = schemaText(rules?.reason) ?? null;
     // Positions Polaris kept rather than read just now. A server that is off locks
     // the whole screen and the card above says why; one that is up and simply will
     // not read a rule back leaves every control working and every position beside
@@ -327,7 +328,7 @@ export function MinecraftRules({
                 groups.map((group) => (
                     <div key={group.group} className="flex flex-col gap-1">
                         <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {group.group}
+                            {t(group.group)}
                         </p>
                         <Card>
                             <CardBody className="flex flex-col gap-0 py-0">
@@ -406,12 +407,12 @@ function RuleRow({
         >
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
-                    {rule.label}
+                    {t(rule.label)}
                     {busy ? (
                         <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                     ) : null}
                 </p>
-                {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
+                {rule.hint ? <p className="text-xs text-muted-foreground">{t(rule.hint)}</p> : null}
                 {failure ? <p className="text-xs text-danger">{failure}</p> : null}
                 {reading !== "loaded" ? null : pending ? (
                     <p className="text-xs text-warning">{t(PENDING_NOTE)}</p>
@@ -431,7 +432,7 @@ function RuleRow({
                 />
             ) : rule.type === "boolean" ? (
                 <Switch
-                    aria-label={rule.label}
+                    aria-label={t(rule.label)}
                     disabled={disabled || busy}
                     // Off rather than a guess: an unread rule drawn as on would be
                     // a screen asserting something about somebody's world that
@@ -443,7 +444,7 @@ function RuleRow({
                 <Input
                     type="number"
                     className="w-24"
-                    aria-label={rule.label}
+                    aria-label={t(rule.label)}
                     disabled={disabled || busy}
                     min={rule.min}
                     max={rule.max}

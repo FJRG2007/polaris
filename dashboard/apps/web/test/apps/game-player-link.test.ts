@@ -8,6 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { rejection } from "../setup/game-english";
 
 const SERVER = "0190c1d2-0000-7000-8000-0000000000a1";
 const OWNER = "0190c1d2-0000-7000-8000-000000000001";
@@ -216,15 +217,17 @@ describe("a linked player's addresses", () => {
     it("cannot be typed by hand or removed one by one", async () => {
         signedInFrom[ADA] = ["1.1.1.1"];
         await service.linkPlayerAccount(OWNER, SERVER, OWNER, { username: "AdaMC", userId: ADA });
-        await expect(
-            service.grantPlayerAccess(OWNER, SERVER, OWNER, {
-                username: "adamc",
-                address: "9.9.9.9"
-            })
-        ).rejects.toThrow(/Polaris account/);
-        await expect(
-            service.revokePlayerAddress(OWNER, SERVER, "AdaMC", "1.1.1.1")
-        ).rejects.toThrow(/Unlink/);
+        expect(
+            await rejection(
+                service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+                    username: "adamc",
+                    address: "9.9.9.9"
+                })
+            )
+        ).toMatch(/Polaris account/);
+        expect(await rejection(service.revokePlayerAddress(OWNER, SERVER, "AdaMC", "1.1.1.1"))).toMatch(
+            /Unlink/
+        );
     });
 });
 

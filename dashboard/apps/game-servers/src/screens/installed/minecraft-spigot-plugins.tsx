@@ -16,7 +16,7 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { useEffect, useState, useTransition } from "react";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
@@ -204,6 +204,7 @@ function PluginRow({
     onAdd: () => void;
     onRemove: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const newest = plugin.testedVersions.at(-1);
     return (
@@ -228,7 +229,9 @@ function PluginRow({
                     {newest && (
                         <Badge variant="neutral">{t("spigot.testedTo", { version: newest })}</Badge>
                     )}
-                    {plugin.blocked && <Badge variant="warning">{plugin.blocked}</Badge>}
+                    {plugin.blocked && (
+                        <Badge variant="warning">{schemaText(plugin.blocked)}</Badge>
+                    )}
                 </div>
                 <p className="line-clamp-2 text-xs text-muted-foreground">{plugin.summary}</p>
             </div>

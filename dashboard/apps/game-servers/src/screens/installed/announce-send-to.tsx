@@ -10,7 +10,7 @@
  */
 
 import { Checkbox, Select } from "@polaris/ui";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import {
     EVERYBODY,
@@ -42,6 +42,7 @@ export function SendTo({
     onChange: (target: string) => void;
     problem?: string;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const audience = parseTarget(target);
     // An empty pick is still "picking players", with nobody ticked yet.
@@ -140,7 +141,7 @@ export function SendTo({
             )}
             {problem && (
                 <p role="alert" className="text-xs text-danger">
-                    {problem}
+                    {schemaText(problem)}
                 </p>
             )}
         </div>

@@ -12,6 +12,8 @@
 
 /** Enough to take somebody most of the way up on a fast server, and short of the
  *  typo that would put them at the level cap in one go. */
+import { gameMessage } from "../game-message";
+
 export const MAX_ARK_EXPERIENCE = 1_000_000;
 
 /**
@@ -22,7 +24,7 @@ export const MAX_ARK_EXPERIENCE = 1_000_000;
  * handing a player a level means that player.
  */
 export function arkExperienceCommand(playerId: string, amount: number): string {
-    if (!/^\d{1,20}$/.test(playerId)) throw new Error("That is not an in-game player id");
+    if (!/^\d{1,20}$/.test(playerId)) throw new Error(gameMessage("games", "lib.notInGameId"));
     const points = Math.max(1, Math.min(MAX_ARK_EXPERIENCE, Math.trunc(amount)));
     return `GiveExpToPlayer ${playerId} ${points} 0 1`;
 }

@@ -21,6 +21,8 @@
 /** The kinds of identifier a FiveM client presents, in the order they are worth
  *  trusting. The licence is the account itself and is always there; the rest are
  *  whatever that account happens to be linked to. */
+import { gameMessage } from "../game-message";
+
 export const IDENTIFIER_KINDS = ["license", "steam", "discord", "fivem", "live", "xbl", "ip"] as const;
 
 export type IdentifierKind = (typeof IDENTIFIER_KINDS)[number];
@@ -28,10 +30,10 @@ export type IdentifierKind = (typeof IDENTIFIER_KINDS)[number];
 /** What each kind is called on a screen, since `xbl` and `live` mean nothing on
  *  sight and "license" is not a word anybody would guess at. */
 export const IDENTIFIER_LABEL: Readonly<Record<IdentifierKind, string>> = {
-    license: "Cfx account",
+    license: gameMessage("games", "lib.identifiers.license"),
     steam: "Steam",
     discord: "Discord",
-    fivem: "FiveM forum",
+    fivem: gameMessage("games", "lib.identifiers.fivem"),
     live: "Xbox Live",
     xbl: "Xbox",
     ip: "Address"
@@ -89,7 +91,7 @@ export function parsePlayers(raw: unknown): FivemPlayer[] {
         return [
             {
                 id,
-                name: typeof row.name === "string" ? row.name : `Player ${id}`,
+                name: typeof row.name === "string" ? row.name : gameMessage("games", "lib.playerNumber", { id }),
                 ping: Number.isFinite(Number(row.ping)) ? Number(row.ping) : 0,
                 identifiers,
                 endpoint: typeof row.endpoint === "string" && row.endpoint.length > 0 ? row.endpoint : null

@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as parse from "@polaris-app/game-servers/src/lib/minecraft/parse";
+import { english } from "../setup/game-english";
 
 describe("parsePlayerList", () => {
     it("reads the modern reply, with names", () => {
@@ -247,8 +248,8 @@ describe("parseWhitelistRefusal", () => {
     });
 
     it("names the refusal when the game does not know the account", () => {
-        expect(parse.parseWhitelistRefusal("That player does not exist")).toContain("does not know that name");
-        expect(parse.parseWhitelistRefusal("No player was found")).toContain("does not know that name");
+        expect(english(parse.parseWhitelistRefusal("That player does not exist"))).toContain("does not know that name");
+        expect(english(parse.parseWhitelistRefusal("No player was found"))).toContain("does not know that name");
     });
 
     it("names the refusal when the server would not take the command", () => {

@@ -19,7 +19,7 @@
  */
 
 import * as actions from "./ark-actions";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
@@ -54,6 +54,7 @@ export function ArkRules({
     running: boolean;
 }) {
     const t = useGameText("ark");
+    const schemaText = useSchemaText();
     // What this tab last read paints first, so a revisit is not a skeleton while
     // the file is read inside the container again; the read replaces what moved.
     const rulesKey = `ark-rules:${installedAppId}`;
@@ -91,7 +92,7 @@ export function ArkRules({
             const wanted = query.trim().toLowerCase();
             if (!wanted) return group;
             const matches = group.settings.filter((setting) =>
-                [setting.key, setting.label, setting.hint, group.group]
+                [setting.key, t(setting.label), setting.hint ? t(setting.hint) : "", t(group.group)]
                     .join(" ")
                     .toLowerCase()
                     .includes(wanted)
@@ -115,7 +116,7 @@ export function ArkRules({
      *  now holds, so the row never shows something that was not written. */
     async function apply(setting: ArkSetting, value: string | null): Promise<void> {
         if (value !== null && normalizeArkValue(setting, value) === null) {
-            setError(t("rules.badValue", { name: setting.label }));
+            setError(t("rules.badValue", { name: t(setting.label) }));
             return;
         }
         setBusy(setting.key);
@@ -130,7 +131,7 @@ export function ArkRules({
         setChanged(true);
     }
 
-    const reason = rules?.reason ?? null;
+    const reason = schemaText(rules?.reason) ?? null;
 
     return (
         <div className="flex flex-col gap-4">
@@ -178,7 +179,7 @@ export function ArkRules({
                     installedAppId={installedAppId}
                     running={running}
                     changed={changed}
-                    reason="a settings change"
+                    reason={t("rules.restartReason")}
                     onRestarted={() => {
                         setChanged(false);
                         void load();
@@ -206,7 +207,7 @@ export function ArkRules({
             {shown.map((group) => (
                 <div key={group.group} className="flex flex-col gap-1">
                     <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {group.group}
+                        {t(group.group)}
                     </p>
                     <Card>
                         <CardBody className="flex flex-col gap-0 py-0">
@@ -279,13 +280,22 @@ function SettingRow({
     // file: for the settings ARK names `DisableSomething` those two words are
     // opposites, and printing the raw one is the same trap as drawing it.
     const said =
-        setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
+        setting.type === "boolean"
+            ? t(switchIsOn(setting, live ?? "") ? "rules.on" : "rules.off")
+            : live;
+    // "on" and "off" are the table's own words for a switch nobody has set.
+    const fallback =
+        setting.fallback === "on"
+            ? t("rules.on")
+            : setting.fallback === "off"
+              ? t("rules.off")
+              : setting.fallback;
     const source =
         loading || pinned !== null
             ? null
             : live !== null
               ? t("rules.fileSays", { value: said })
-              : t("rules.notSet", { fallback: setting.fallback });
+              : t("rules.notSet", { fallback });
 
     return (
         <div
@@ -296,7 +306,7 @@ function SettingRow({
         >
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
-                    {setting.label}
+                    {t(setting.label)}
                     {/* What ARK calls it. Quiet, because it is not what the row
                         is for - and present, because it is what somebody who
                         came here from a wiki is holding, and without it they are
@@ -309,7 +319,7 @@ function SettingRow({
                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                     )}
                 </p>
-                {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
+                {setting.hint && <p className="text-xs text-muted-foreground">{t(setting.hint)}</p>}
                 {source && <p className="text-xs text-muted-foreground">{source}</p>}
             </div>
             {loading ? (
@@ -329,7 +339,7 @@ function SettingRow({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={t("rules.stopSetting", { name: setting.label })}
+                            aria-label={t("rules.stopSetting", { name: t(setting.label) })}
                             title={t("rules.leaveItToTheGame")}
                             disabled={disabled || busy}
                             onClick={() => onChange(null)}
@@ -339,7 +349,7 @@ function SettingRow({
                     )}
                     {setting.type === "boolean" ? (
                         <Switch
-                            aria-label={setting.label}
+                            aria-label={t(setting.label)}
                             disabled={disabled || busy}
                             // Through the setting rather than straight off the text: a
                             // few of ARK's switches are named `DisableSomething`, and
@@ -352,7 +362,7 @@ function SettingRow({
                         <Input
                             type="number"
                             className="w-28"
-                            aria-label={setting.label}
+                            aria-label={t(setting.label)}
                             disabled={disabled || busy}
                             min={setting.min}
                             max={setting.max}

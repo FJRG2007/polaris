@@ -19,6 +19,8 @@
  * stores it cannot disagree about what is allowed.
  */
 
+import { gameMessage } from "./game-message";
+
 /** One line somebody kept. */
 export interface SavedCommand {
     readonly id: string;
@@ -95,7 +97,7 @@ export function withSavedCommand(list: readonly SavedCommand[], entry: SavedComm
     if (list.some((kept) => kept.id === entry.id)) {
         return list.map((kept) => (kept.id === entry.id ? entry : kept));
     }
-    if (list.length >= MAX_SAVED_COMMANDS) throw new Error(`Only ${MAX_SAVED_COMMANDS} commands can be kept`);
+    if (list.length >= MAX_SAVED_COMMANDS) throw new Error(gameMessage("games", "lib.maxCommands", { count: MAX_SAVED_COMMANDS }));
     return [...list, entry];
 }
 

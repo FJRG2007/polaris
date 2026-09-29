@@ -21,7 +21,7 @@
  */
 
 import Image from "next/image";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import * as actions from "./ark-actions";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
@@ -184,7 +184,7 @@ export function ArkMods({
                     installedAppId={installedAppId}
                     running={running}
                     changed={changed}
-                    reason="a change to the mods"
+                    reason={t("mods.restartReason")}
                     onRestarted={() => {
                         setChanged(false);
                         void load();
@@ -336,6 +336,7 @@ function ModShelves({
     onAdd: (id: string) => void;
     onSetMap: (id: string) => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("ark");
     const shelvesKey = `ark-mod-shelves:${installedAppId}`;
     const [shelves, setShelves] = useState<ModShelves>([]);
@@ -378,7 +379,7 @@ function ModShelves({
                     shown.map((shelf) => (
                         <div key={shelf.group} className="flex flex-col gap-2">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {shelf.group}
+                                {schemaText(shelf.group)}
                             </p>
                             {shelf.entries.map(({ suggestion, item }) => (
                                 <div
@@ -398,7 +399,7 @@ function ModShelves({
                                             {item?.title ?? suggestion.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {suggestion.why}
+                                            {schemaText(suggestion.why)}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {[

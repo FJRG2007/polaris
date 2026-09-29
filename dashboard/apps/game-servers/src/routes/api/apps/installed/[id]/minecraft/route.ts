@@ -1,3 +1,4 @@
+import { messageText } from "../../../../../../screens/game-words";
 import { after, NextResponse } from "next/server";
 import { gameWords } from "../../../../../../screens/game-words";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
@@ -246,7 +247,7 @@ export async function GET(
             {
                 error:
                     caught instanceof Error
-                        ? caught.message
+                        ? await messageText(caught.message)
                         : (await gameWords("games"))("errors.couldNotReadTheServer")
             },
             { status: 400 }

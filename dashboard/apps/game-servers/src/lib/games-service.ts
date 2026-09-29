@@ -9,6 +9,7 @@
  * server that is still booting is a row that says so, not a page that errors.
  */
 
+import { gameMessage } from "./game-message";
 import { type GameId, gameOfServer, softwareLabel } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
@@ -365,8 +366,8 @@ export async function listGameServerFacts(
             message: app
                 ? running
                     ? null
-                    : "The server is stopped"
-                : "This server is still being set up"
+                    : gameMessage("games", "lib.stopped")
+                : gameMessage("games", "lib.settingUp")
         };
     });
 }
@@ -494,7 +495,8 @@ async function readPresence(
             containerRunning: null,
             players: [],
             max: 0,
-            message: caught instanceof Error ? caught.message : "The server is not answering",
+            message:
+                caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
             crashLoop: null
         }));
         return {
@@ -521,7 +523,8 @@ async function readPresence(
             answering: false,
             containerRunning: null,
             players: [],
-            message: caught instanceof Error ? caught.message : "The server is not answering",
+            message:
+                caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
             crashLoop: null
         }));
         return {
@@ -541,7 +544,8 @@ async function readPresence(
         answering: false,
         containerRunning: null,
         players: { online: 0, max: 0, players: [] },
-        message: caught instanceof Error ? caught.message : "The server is not answering",
+        message:
+            caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
         crashLoop: null
     }));
     return {
@@ -591,7 +595,7 @@ export async function listGameMachines(ownerId: string, probe = true): Promise<G
     const committed = await committedMemoryByTarget(ownerId);
     const local: GameMachine = {
         id: "local",
-        name: "Local (this server)",
+        name: gameMessage("games", "lib.localMachine"),
         // The web runs in a container that shares the host's memory accounting, so
         // these are the machine's figures unless it was given a limit of its own.
         memoryTotalBytes: totalmem(),

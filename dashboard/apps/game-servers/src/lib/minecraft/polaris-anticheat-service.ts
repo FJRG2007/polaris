@@ -6,6 +6,7 @@
  * the plugin caught for the evidence window the Anti-cheat tab scores over.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { TOKEN_KEY, loginOn } from "./polaris-login";
@@ -69,23 +70,19 @@ export async function setAnticheat(
             current.get("VERSION") ?? ""
         );
         if (!build) {
-            throw new Error(
-                "Polaris anti-cheat runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot, and its anti-xray on NeoForge 1.21.4. This server's software cannot load it."
-            );
+            throw new Error(gameMessage("games", "lib.anticheatUnsupported"));
         }
         // The server downloads the plugin from this address when it boots and
         // reports to it, and a LAN-only name does not resolve inside a container.
         const baseUrl = await publicAppUrl();
         if (baseUrl === null) {
-            throw new Error(
-                "Polaris anti-cheat needs this Polaris to have a public address: the server downloads the plugin from it when it starts."
-            );
+            throw new Error(gameMessage("games", "lib.anticheatNeedsAddress"));
         }
         if (!(await anticheatBundled(build.file))) {
             throw new Error(
                 build.kind === "plugin"
-                    ? "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
-                    : "This Polaris was installed without the Polaris mod for this release. Update Polaris from Settings to get it."
+                    ? gameMessage("games", "lib.noAnticheatPlugin")
+                    : gameMessage("games", "lib.noModBuild")
             );
         }
         // The token the server already has, when the login plugin gave it one:

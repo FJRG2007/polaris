@@ -18,6 +18,7 @@
  * are told that plainly rather than being handed a blank failure.
  */
 
+import { gameMessage } from "../game-message";
 import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
@@ -46,7 +47,7 @@ type StagedArtifact = AppHostTypes["StagedArtifact"];
 /** The install a resource names. */
 function installIdOf(resource: SourceResource): string {
     const id = resource.selector.split(":")[1];
-    if (!id) throw new SourceUnavailableError("This world's server is missing from its record");
+    if (!id) throw new SourceUnavailableError(gameMessage("games", "lib.worldServerMissing"));
     return id;
 }
 
@@ -87,7 +88,7 @@ export const minecraftWorldSource: BackupSource = {
         const installedAppId = installIdOf(resource);
         const taken = await createWorldBackup(resource.ownerId, installedAppId).catch((error: unknown) => {
             throw new SourceUnavailableError(
-                error instanceof Error ? error.message : "The server could not be asked to back up"
+                error instanceof Error ? error.message : gameMessage("games", "lib.backupNotAsked")
             );
         });
         return {
@@ -122,7 +123,7 @@ export const minecraftWorldSource: BackupSource = {
         const installedAppId = installIdOf(resource);
         const view = await readWorldView(resource.ownerId, installedAppId).catch(() => null);
         const taken = await this.produceInPlace!(resource);
-        if (!taken) throw new SourceUnavailableError("The server produced no archive");
+        if (!taken) throw new SourceUnavailableError(gameMessage("games", "lib.noArchive"));
 
         const dir = await stageDir();
         const target = join(dir, taken.path);
@@ -158,7 +159,7 @@ export const minecraftWorldSource: BackupSource = {
     ): Promise<void> {
         const installedAppId = installIdOf(resource);
         const name = typeof metadata.fileName === "string" ? metadata.fileName : "";
-        if (!name) throw new SourceUnavailableError("That copy has no archive name to restore from");
+        if (!name) throw new SourceUnavailableError(gameMessage("games", "lib.copyNoArchive"));
 
         await withServerContainer(resource.ownerId, installedAppId, async (server) => {
             const path = backupPathInContainer(name);
@@ -168,7 +169,7 @@ export const minecraftWorldSource: BackupSource = {
                 // to unpack. Buffered because the daemon's write takes a body, and
                 // an archive being restored is one somebody is waiting on anyway.
                 const bytes = Buffer.from(await new Response(body).arrayBuffer());
-                await server.runOk(["mkdir", "-p", "--", path.slice(0, path.lastIndexOf("/"))], "Could not create the backup folder");
+                await server.runOk(["mkdir", "-p", "--", path.slice(0, path.lastIndexOf("/"))], gameMessage("games", "lib.run.backupFolder"));
                 await writeIntoContainer(server, path, bytes);
             }
         });
@@ -191,16 +192,16 @@ async function writeIntoContainer(
 ): Promise<void> {
     const CHUNK = 32 * 1024;
     const encoded = bytes.toString("base64");
-    await server.runOk(["sh", "-c", `: > ${shellQuote(path)}.b64`], "Could not stage the archive");
+    await server.runOk(["sh", "-c", `: > ${shellQuote(path)}.b64`], gameMessage("games", "lib.run.stageArchive"));
     for (let at = 0; at < encoded.length; at += CHUNK) {
         const piece = encoded.slice(at, at + CHUNK);
         await server.runOk(
             ["sh", "-c", `printf %s ${shellQuote(piece)} >> ${shellQuote(path)}.b64`],
-            "Could not stage the archive"
+            gameMessage("games", "lib.run.stageArchive")
         );
     }
     await server.runOk(
         ["sh", "-c", `base64 -d ${shellQuote(path)}.b64 > ${shellQuote(path)} && rm -f ${shellQuote(path)}.b64`],
-        "Could not unpack the staged archive"
+        gameMessage("games", "lib.run.unpackStaged")
     );
 }

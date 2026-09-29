@@ -18,6 +18,7 @@
  * which is how it reaches an instance whose owner never runs anything else.
  */
 
+import { gameMessage } from "./game-message";
 import { GAME_SERVERS_APP_ID, GAMES } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
@@ -72,7 +73,7 @@ export async function installGameServersApp(ownerId: string, actorId: string): P
     const adopted = await adoptGameServersApp(ownerId);
     if (adopted) return adopted;
     const manifest = findApp(GAME_SERVERS_APP_ID);
-    if (!manifest) throw new Error("Game servers is not in the catalog");
+    if (!manifest) throw new Error(gameMessage("games", "lib.appMissing"));
     const result = await installApp(ownerId, actorId, {
         catalogId: manifest.id,
         name: manifest.name,

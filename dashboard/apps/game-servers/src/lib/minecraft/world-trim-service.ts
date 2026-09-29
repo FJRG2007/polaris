@@ -21,6 +21,7 @@
  * them is not part of tidying up a world.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { DATA_DIR, levelParent } from "./world";
 import { withServerContainer } from "./service";
@@ -58,7 +59,7 @@ async function worldPathOf(ownerId: string, installedAppId: string): Promise<str
         where: { id: installedAppId, ownerId },
         select: { applicationId: true, catalogId: true }
     });
-    if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install?.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     const env = await listEnvVars("application", install.applicationId, ownerId).catch(() => []);
     const level = env.find((row: { key: string }) => row.key === "LEVEL")?.value?.trim();
     // The image defaults to a level called `world`, and a level name with a slash
@@ -140,9 +141,9 @@ async function runTrim(
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true, config: true }
     });
-    if (!install?.applicationId) return fail("This server has not been deployed yet", false);
+    if (!install?.applicationId) return fail(gameMessage("games", "lib.notDeployed"), false);
     if (install.catalogId !== "minecraft")
-        return fail("Only a Java server keeps its world in the files this reads", false);
+        return fail(gameMessage("games", "lib.trim.javaOnly"), false);
 
     const settings = readWorldTrim(readInstallConfig(install.config));
     const world = await worldPathOf(ownerId, installedAppId).catch(() => `${DATA_DIR}/world`);
@@ -152,7 +153,7 @@ async function runTrim(
     const wasRunning = app?.desiredState === "running";
 
     if (wasRunning && !how.restart)
-        return fail("The server has to be stopped before its world can be optimized", false);
+        return fail(gameMessage("games", "lib.trim.stopFirst"), false);
 
     let restarted = false;
     try {
@@ -168,7 +169,7 @@ async function runTrim(
         if (!how.dryRun) await record(installedAppId, outcome);
         return { ...outcome, restarted };
     } catch (caught) {
-        const why = caught instanceof Error ? caught.message : "The world could not be optimized";
+        const why = caught instanceof Error ? caught.message : gameMessage("games", "lib.trim.failed");
         if (!how.dryRun) await record(installedAppId, { report: null, failure: why, restarted });
         return { report: null, failure: why, restarted };
     } finally {
@@ -187,7 +188,7 @@ async function execute(
 ): Promise<WorldTrimOutcome> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.trimWorld)
-            return fail("This machine needs a newer Polaris before it can optimize a world", false);
+            return fail(gameMessage("games", "lib.trim.needsNewer"), false);
         const result = await server.trimWorld(WORLD_TRIM_SCRIPT, {
             world,
             keepTicks: settings.keepTicks,
@@ -200,7 +201,7 @@ async function execute(
             // "python3: not found" is the whole answer for an image that has none,
             // and inventing a friendlier sentence would hide it.
             const said = result.output.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? "";
-            return fail(said.length > 0 && said.length < 300 ? said : "The world could not be optimized", false);
+            return fail(said.length > 0 && said.length < 300 ? said : gameMessage("games", "lib.trim.failed"), false);
         }
         return { report, failure: null, restarted: false };
     });

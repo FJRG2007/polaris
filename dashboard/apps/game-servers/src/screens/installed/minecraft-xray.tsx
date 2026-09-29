@@ -19,7 +19,7 @@
 import { Eraser, Loader2 } from "lucide-react";
 import type { GameKey } from "../../../messages";
 import { hostUi } from "@polaris/app-host/client";
-import { useGameText, type GameText } from "../game-text";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { useEffect, useMemo, useRef, useState, useTransition, type ComponentProps } from "react";
 import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -164,6 +164,7 @@ export function MinecraftXray({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const display = useDisplayFormat();
     const [view, setView] = useState<XrayView | null>(null);
@@ -338,7 +339,7 @@ export function MinecraftXray({
                         />
                     </div>
                     {view?.refusal && (
-                        <p className="text-xs text-muted-foreground">{view.refusal}.</p>
+                        <p className="text-xs text-muted-foreground">{schemaText(view.refusal)}.</p>
                     )}
 
                     {reading === "reading" ? (

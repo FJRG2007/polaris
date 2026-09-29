@@ -12,6 +12,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { english } from "../setup/game-english";
+import { gameMessage } from "@polaris-app/game-servers/src/lib/game-message";
 
 /** A reading nobody has answered yet. */
 const never = () => new Promise<never>(() => undefined);
@@ -151,8 +153,9 @@ describe("Minecraft's rules before the server answers", () => {
         render(<MinecraftRules installedAppId={SERVER} canManage />);
         expect(screen.getByText("Difficulty")).toBeTruthy();
         const rule = ruleGroups()[0]!.rules[0]!;
-        expect(screen.getByText(rule.label)).toBeTruthy();
-        expect(screen.queryByLabelText(rule.label)).toBeNull();
+        const label = english(gameMessage("minecraft", rule.label));
+        expect(screen.getByText(label)).toBeTruthy();
+        expect(screen.queryByLabelText(label)).toBeNull();
         expect(screen.queryByLabelText("Difficulty")).toBeNull();
     });
 
@@ -166,7 +169,9 @@ describe("Minecraft's rules before the server answers", () => {
         render(<MinecraftRules installedAppId={SERVER} canManage />);
         await waitFor(() => expect(screen.getByText("The server is not running")).toBeTruthy());
         expect(screen.getByText("Difficulty")).toBeTruthy();
-        expect(screen.getByText(ruleGroups()[0]!.rules[0]!.label)).toBeTruthy();
+        expect(
+            screen.getByText(english(gameMessage("minecraft", ruleGroups()[0]!.rules[0]!.label)))
+        ).toBeTruthy();
     });
 });
 

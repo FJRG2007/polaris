@@ -25,6 +25,7 @@
  * author, not a build matrix - so it is shown and never used to refuse anything.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 
 /** Spiget is the read-only API in front of SpigotMC. */
@@ -88,8 +89,8 @@ async function spigetJson(url: string): Promise<unknown> {
 
 /** Why the image could not install this one, or null. */
 function blockedReason(resource: z.infer<typeof resourceSchema>): string | null {
-    if (resource.premium) return "Paid on SpigotMC, so it has to be downloaded by hand";
-    if (resource.external) return "Hosted somewhere else, so it has to be downloaded by hand";
+    if (resource.premium) return gameMessage("games", "lib.spigotPaid");
+    if (resource.external) return gameMessage("games", "lib.spigotExternal");
     return null;
 }
 

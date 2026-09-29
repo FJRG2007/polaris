@@ -11,6 +11,7 @@
  * logs back in is a surprise rather than a service.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { applyOnContainer } from "./player-access";
 import { giveItem, giveToSlot } from "./item-service";
@@ -263,7 +264,7 @@ async function apply(
         return;
     }
     const argv = commandFor(action.username, action.payload);
-    if (!argv) throw new Error("Nothing to run");
+    if (!argv) throw new Error(gameMessage("games", "lib.nothingToRun"));
     // Not `server.say` directly: a queued decision is applied when the server can
     // finally hear it, which on a server that invents its players' identities is
     // exactly when the raw command writes an entry the login will never match.

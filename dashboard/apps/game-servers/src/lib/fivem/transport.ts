@@ -22,6 +22,7 @@
  * completely different things doing about them.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
@@ -121,11 +122,11 @@ async function readWholeDocument(
         const fetched = await withTimeout(
             container.run(["sh", "-c", script]),
             COMMAND_TIMEOUT_MS,
-            "The server did not answer in time"
+            gameMessage("games", "lib.noAnswerInTime")
         );
-        if (fetched.code !== 0) throw new Error("The server is not answering yet");
+        if (fetched.code !== 0) throw new Error(gameMessage("games", "lib.notAnsweringYet"));
         const text = await readContainerFile(container, path);
-        if (text === null) throw new Error("The server is not answering yet");
+        if (text === null) throw new Error(gameMessage("games", "lib.notAnsweringYet"));
         return text;
     } finally {
         await container.run(["rm", "-f", "--", path]).catch(() => undefined);
@@ -143,14 +144,12 @@ async function readDocument(container: ServerContainer, name: FivemDocument): Pr
     const result = await withTimeout(
         container.run(["sh", "-c", script]),
         COMMAND_TIMEOUT_MS,
-        "The server did not answer in time"
+        gameMessage("games", "lib.noAnswerInTime")
     );
     if (result.code === NO_HTTP_CLIENT) {
-        throw new Error(
-            "This server's image has no way for Polaris to read it. Redeploy it to get the current one."
-        );
+        throw new Error(gameMessage("games", "lib.imageUnreadable"));
     }
-    if (result.code !== 0) throw new Error("The server is not answering yet");
+    if (result.code !== 0) throw new Error(gameMessage("games", "lib.notAnsweringYet"));
     const text = mayBeCut(result.output)
         ? await readWholeDocument(container, url, name)
         : result.output;
@@ -175,7 +174,7 @@ async function runRcon(
     password: string,
     command: string
 ): Promise<string> {
-    if (!isSafeCommand(command)) throw new Error("That command is not valid");
+    if (!isSafeCommand(command)) throw new Error(gameMessage("games", "lib.commandInvalid"));
     const packet = rconRequest(password, command).toString("base64");
     const script = [
         `command -v nc >/dev/null 2>&1 || exit ${NO_UDP_CLIENT}`,
@@ -186,24 +185,20 @@ async function runRcon(
     const result = await withTimeout(
         container.run(["sh", "-c", script]),
         COMMAND_TIMEOUT_MS,
-        "The server did not answer in time"
+        gameMessage("games", "lib.noAnswerInTime")
     );
     if (result.code === NO_UDP_CLIENT) {
-        throw new Error(
-            "This server's image has no way for Polaris to reach its console. Redeploy it to get the current one."
-        );
+        throw new Error(gameMessage("games", "lib.imageNoConsole"));
     }
-    if (result.code !== 0) throw new Error("The server is not accepting commands yet");
+    if (result.code !== 0) throw new Error(gameMessage("games", "lib.notAcceptingCommands"));
     const raw = Buffer.from(result.output.replace(/\s+/g, ""), "base64");
     // Nothing at all came back, which is a server that is not listening - a command
     // that simply printed nothing still arrives as an empty reply with a header on
     // it.
-    if (raw.length === 0) throw new Error("The server is not accepting commands yet");
+    if (raw.length === 0) throw new Error(gameMessage("games", "lib.notAcceptingCommands"));
     const said = parseRconReply(raw);
     if (isRconRefusal(said)) {
-        throw new Error(
-            "The server did not accept Polaris' console password. Set it again from the Access screen."
-        );
+        throw new Error(gameMessage("games", "lib.consolePasswordRefused"));
     }
     return said;
 }
@@ -221,13 +216,13 @@ async function consolePassword(applicationId: string, ownerId: string): Promise<
         where: { scopeType: "application", scopeId: applicationId, key: RCON_PASSWORD_VAR },
         select: { id: true }
     });
-    if (!row) throw new Error("This server has no console password yet");
+    if (!row) throw new Error(gameMessage("games", "lib.noConsolePassword"));
     // Imported lazily so only the paths that genuinely need it ever touch the
     // master key, and so this reuses the same owner-gated decrypt the env screen
     // does.
     const { revealEnvVar } = await Promise.resolve(host.envVarService);
     const password = await revealEnvVar(row.id, ownerId).catch(() => null);
-    if (!password) throw new Error("This server's console password could not be read");
+    if (!password) throw new Error(gameMessage("games", "lib.consolePasswordUnreadable"));
     return password;
 }
 

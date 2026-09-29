@@ -1,3 +1,4 @@
+import { messageText } from "../../../../../../../screens/game-words";
 import { NextResponse } from "next/server";
 import { gameWords } from "../../../../../../../screens/game-words";
 import { readWorldView } from "../../../../../../../lib/minecraft/world-service";
@@ -24,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         return NextResponse.json(await readWorldView(access.ownerId, id));
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadTheWorld") },
+            { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.couldNotReadTheWorld") },
             { status: 400 }
         );
     }

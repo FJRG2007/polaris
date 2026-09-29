@@ -23,6 +23,8 @@
  */
 
 /** Where the game looks, relative to the server's own root inside the container. */
+import { gameMessage } from "../game-message";
+
 export const ADMIN_LIST_PATH = "ShooterGame/Saved/AllowedCheaterSteamIDs.txt";
 
 /** A SteamID64, which is the only thing this file may contain. */
@@ -57,9 +59,10 @@ export function formatAdminList(ids: readonly string[]): string {
 
 /** The list with one more admin on it, or unchanged when they already are one. */
 export function withAdmin(ids: readonly string[], steamId: string): string[] {
-    if (!STEAM_ID_64.test(steamId)) throw new Error("That is not a Steam id");
+    if (!STEAM_ID_64.test(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     if (ids.includes(steamId)) return [...ids];
-    if (ids.length >= MAX_ADMINS) throw new Error(`Only ${MAX_ADMINS} admins can be listed`);
+    if (ids.length >= MAX_ADMINS)
+        throw new Error(gameMessage("games", "lib.maxAdmins", { count: MAX_ADMINS }));
     return [...ids, steamId];
 }
 

@@ -18,6 +18,8 @@
 /** How often a copy is taken. Nothing faster than hourly: a world worth backing
  *  up takes real seconds to archive, and a schedule that overlaps its own last
  *  run is a server that is always mid-backup. */
+import type { GameKey } from "../../../messages";
+
 export type BackupEvery = "off" | "hourly" | "six-hourly" | "daily" | "weekly";
 
 export interface BackupPolicy {
@@ -67,12 +69,12 @@ const INTERVALS: Record<Exclude<BackupEvery, "off">, number> = {
     weekly: 7 * 24 * 60 * 60 * 1000
 };
 
-export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; readonly label: string }[] = [
-    { value: "off", label: "Never - only when I ask" },
-    { value: "hourly", label: "Every hour" },
-    { value: "six-hourly", label: "Every six hours" },
-    { value: "daily", label: "Every day" },
-    { value: "weekly", label: "Every week" }
+export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; readonly label: GameKey<"minecraft"> }[] = [
+    { value: "off", label: "world.every.never" },
+    { value: "hourly", label: "world.every.hourly" },
+    { value: "six-hourly", label: "world.every.sixHourly" },
+    { value: "daily", label: "world.every.daily" },
+    { value: "weekly", label: "world.every.weekly" }
 ];
 
 function isEvery(value: unknown): value is BackupEvery {

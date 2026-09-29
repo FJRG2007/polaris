@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -75,7 +75,7 @@ export async function readChatLinkAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeRead")
         };
     }
@@ -133,7 +133,7 @@ export async function saveChatLinkAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeSaved")
         };
     }

@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText, schemaWords } from "../game-words";
+import { gameWords, issueText, messageText, schemaWords } from "../game-words";
 import { revalidatePath } from "next/cache";
 import * as ark from "../../lib/ark/service";
 import { isModId, MAX_MODS } from "../../lib/ark/mods";
@@ -101,7 +101,7 @@ export async function addArkPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotAddThatPlayer")
         };
     }
@@ -150,7 +150,7 @@ export async function readArkPlayerRecordAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotReadThisPlayer")
         };
     }
@@ -189,7 +189,7 @@ export async function removeArkPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotRemoveThatPlayer")
         };
     }
@@ -216,7 +216,7 @@ export async function setArkExclusiveJoinAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotChangeWhoMay")
         };
     }
@@ -244,7 +244,7 @@ export async function setArkJoinPasswordAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotChangeThePassword")
         };
     }
@@ -276,7 +276,7 @@ export async function setArkGameLogAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotChangeTheLog")
         };
     }
@@ -304,7 +304,7 @@ export async function setArkAdminPasswordAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotChangeThePassword")
         };
     }
@@ -334,7 +334,7 @@ export async function revealArkPasswordsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotReadThePasswords")
         };
     }
@@ -397,7 +397,7 @@ export async function moderateArkPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -453,7 +453,7 @@ export async function actOnArkSurvivorAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -513,7 +513,7 @@ export async function giveArkExperienceAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -588,7 +588,7 @@ export async function giveArkItemsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -629,7 +629,7 @@ export async function readArkRulesAction(installedAppId: string): Promise<ArkRul
             live: {},
             reason:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theSettingsCouldNotBe")
         };
     }
@@ -675,7 +675,7 @@ export async function setArkRulesAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -692,7 +692,7 @@ export async function readArkModsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theModsCouldNotBe")
         };
     }
@@ -748,7 +748,7 @@ export async function setArkModsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theModsCouldNotBe2")
         };
     }
@@ -789,7 +789,7 @@ export async function setArkMapModAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theMapCouldNotBe")
         };
     }
@@ -816,7 +816,7 @@ export async function lookUpArkModAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.steamCouldNotBeReached")
         };
     }
@@ -869,7 +869,7 @@ export async function searchArkModsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.steamCouldNotBeReached")
         };
     }
@@ -909,7 +909,7 @@ export async function restartArkServerAction(installedAppId: string): Promise<{ 
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerCouldNotBe")
         };
     }
@@ -967,7 +967,7 @@ export async function setArkAdminAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -1029,7 +1029,7 @@ export async function timeoutArkPlayerAction(input: {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
@@ -1073,7 +1073,7 @@ export async function liftArkTimeoutAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotLiftThat")
         };
     }
@@ -1119,7 +1119,7 @@ export async function messageArkPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotSendThatMessage")
         };
     }
@@ -1135,7 +1135,7 @@ export async function saveArkWorldAction(installedAppId: string): Promise<{ erro
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotSaveTheWorld")
         };
     }
@@ -1156,7 +1156,7 @@ export async function broadcastArkAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotSendThatMessage")
         };
     }
@@ -1209,7 +1209,7 @@ export async function findArkPlayerByUserAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotLookThatUp")
         };
     }

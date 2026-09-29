@@ -7,6 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { rejection } from "../setup/game-english";
 
 /** Every command the fake container was asked to run, in order. */
 let ran: string[][] = [];
@@ -153,7 +154,7 @@ describe("taking somebody off the allow list", () => {
     it("refuses to empty the list while the server is exclusive, which would lock its own owner out", async () => {
         config.fivemExclusiveJoin = true;
 
-        await expect(removeAllowedPlayer("owner-1", "install-1", "license:abc123")).rejects.toThrow(
+        expect(await rejection(removeAllowedPlayer("owner-1", "install-1", "license:abc123"))).toMatch(
             /Open the server to everyone first/
         );
         expect(config.fivemAllowList).toHaveLength(1);

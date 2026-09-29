@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { linkedChannels, readChatLink } from "../../lib/minecraft/chat-link";
@@ -77,7 +77,7 @@ export async function readLiveDisplayAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeRead")
         };
     }
@@ -103,7 +103,7 @@ export async function stopPinnedAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotTake")
         };
     }
@@ -147,7 +147,7 @@ export async function saveLiveDisplayAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeSaved")
         };
     }

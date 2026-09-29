@@ -26,6 +26,7 @@ import {
     parseTarget,
     playersTarget
 } from "@polaris-app/game-servers/src/lib/minecraft/announce-target";
+import { english, thrown } from "../setup/game-english";
 
 const sent: { announcement: Announcement }[] = [];
 
@@ -126,12 +127,14 @@ describe("the lines it becomes", () => {
     });
 
     it("refuses when no operator is on, rather than reaching everybody", () => {
-        expect(() =>
-            announcementCommands("java", draft({ target: "@ops", chat: "Hi" }), {
-                ...NONE,
-                named: []
-            })
-        ).toThrow("No operator is on the server right now");
+        expect(
+            thrown(() =>
+                announcementCommands("java", draft({ target: "@ops", chat: "Hi" }), {
+                    ...NONE,
+                    named: []
+                })
+            )
+        ).toContain("No operator is on the server right now");
     });
 
     it("takes a held one down from the same people", () => {
@@ -153,12 +156,14 @@ describe("the lines it becomes", () => {
             named: others
         });
         expect(lines.map((line) => line.split(" ")[1])).toEqual(["Steve", "alex"]);
-        expect(() =>
-            announcementCommands("java", draft({ target: "@others", chat: "Hi" }), {
-                ...NONE,
-                named: []
-            })
-        ).toThrow("Nobody but operators is on the server right now");
+        expect(
+            thrown(() =>
+                announcementCommands("java", draft({ target: "@others", chat: "Hi" }), {
+                    ...NONE,
+                    named: []
+                })
+            )
+        ).toContain("Nobody but operators is on the server right now");
         expect(describeTarget("@others")).toBe("everybody on the server but the operators");
         expect(
             clearAnnouncementCommands("java", draft({ target: "@others", title: "Hi" }), ["Steve"])
@@ -225,17 +230,19 @@ describe("the lines it becomes", () => {
     });
 
     it("says so under Send to, and refuses operators on Bedrock", () => {
-        expect(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target).toBe(
-            "Choose who it goes to"
-        );
         expect(
-            announcementProblems(draft({ target: "@ops", chat: "Hi" }), "bedrock").target
+            english(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target)
+        ).toBe("Choose who it goes to");
+        expect(
+            english(announcementProblems(draft({ target: "@ops", chat: "Hi" }), "bedrock").target)
         ).toMatch(/Bedrock/);
         expect(
             announcementProblems(draft({ target: "@ops", chat: "Hi" }), "java").target
         ).toBeUndefined();
         expect(
-            announcementProblems(draft({ target: "@others", chat: "Hi" }), "bedrock").target
+            english(
+                announcementProblems(draft({ target: "@others", chat: "Hi" }), "bedrock").target
+            )
         ).toMatch(/Bedrock/);
         expect(
             announcementProblems(draft({ target: "@a[gamemode=creative]", chat: "Hi" }), "bedrock")

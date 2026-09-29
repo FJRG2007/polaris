@@ -19,6 +19,8 @@
 
 /** What a shelf entry is for, which decides which button the row offers: a mod is
  *  added to the load order, a map replaces the one the server runs. */
+import { gameMessage } from "../game-message";
+
 export type ArkModKind = "mod" | "map";
 
 export interface ArkModSuggestion {
@@ -45,36 +47,36 @@ export interface ArkModShelf {
  */
 export const ARK_MOD_SHELVES: readonly ArkModShelf[] = [
     {
-        group: "Quality of life",
+        group: gameMessage("games", "lib.modShelves.qualityOfLife"),
         entries: [
             {
                 id: "1404697612",
                 name: "Awesome SpyGlass!",
-                why: "Look at anything and see its level, stats and torpor. The one mod every server ends up with.",
+                why: gameMessage("games", "lib.modWhy.stats"),
                 kind: "mod"
             },
             {
                 id: "793605978",
                 name: "Super Spyglass (Open Source)",
-                why: "The same idea, kept up by the community. Pick one of the two, not both.",
+                why: gameMessage("games", "lib.modWhy.community"),
                 kind: "mod"
             },
             {
                 id: "566885854",
                 name: "Death Helper",
-                why: "Find where you died and what you were carrying, instead of losing an evening to it.",
+                why: gameMessage("games", "lib.modWhy.death"),
                 kind: "mod"
             },
             {
                 id: "566887000",
                 name: "Pet Finder",
-                why: "Points at a tame you have left somewhere on the map.",
+                why: gameMessage("games", "lib.modWhy.tame"),
                 kind: "mod"
             },
             {
                 id: "889745138",
                 name: "Awesome Teleporters!",
-                why: "Teleport pads between bases. What most servers use instead of raising flyer speed.",
+                why: gameMessage("games", "lib.modWhy.teleport"),
                 kind: "mod"
             }
         ]
@@ -85,13 +87,13 @@ export const ARK_MOD_SHELVES: readonly ArkModShelf[] = [
             {
                 id: "731604991",
                 name: "Structures Plus (S+)",
-                why: "Snap points that work, pick-up without a timer, and pipes and wires that hide. The building mod.",
+                why: gameMessage("games", "lib.modWhy.building"),
                 kind: "mod"
             },
             {
                 id: "821530042",
                 name: "Upgrade Station",
-                why: "Turn spare gear into better gear, so a bad drop is not simply thrown away.",
+                why: gameMessage("games", "lib.modWhy.gear"),
                 kind: "mod"
             }
         ]
@@ -102,42 +104,42 @@ export const ARK_MOD_SHELVES: readonly ArkModShelf[] = [
             {
                 id: "895711211",
                 name: "Classic Flyers",
-                why: "Gives flyers their speed levelling back, the way it worked before it was taken out.",
+                why: gameMessage("games", "lib.modWhy.flyers"),
                 kind: "mod"
             },
             {
                 id: "1251632107",
                 name: "Immersive Taming",
-                why: "Tame by feeding and bonding rather than by knocking everything out.",
+                why: gameMessage("games", "lib.modWhy.taming"),
                 kind: "mod"
             },
             {
                 id: "632898827",
                 name: "Dino Colors Plus",
-                why: "Far more colors on wild creatures, and babies for species that had none.",
+                why: gameMessage("games", "lib.modWhy.colors"),
                 kind: "mod"
             }
         ]
     },
     {
-        group: "Bigger changes",
+        group: gameMessage("games", "lib.modShelves.bigger"),
         entries: [
             {
                 id: "1169020368",
                 name: "Ark Creatures Rebalanced (AG Reborn)",
-                why: "An overhaul: new creatures, rebalanced stats, its own progression. Several gigabytes, and it changes the game.",
+                why: gameMessage("games", "lib.modWhy.overhaul"),
                 kind: "mod"
             },
             {
                 id: "1523045986",
                 name: "Additional Creatures 2: Paranoia!",
-                why: "A large set of new creatures, without rewriting the rest of the game.",
+                why: gameMessage("games", "lib.modWhy.creatures"),
                 kind: "mod"
             },
             {
                 id: "916417001",
                 name: "Ebenus Astrum",
-                why: "A whole map of its own, with its own biomes. Use it as the map rather than as a mod.",
+                why: gameMessage("games", "lib.modWhy.map"),
                 kind: "map"
             }
         ]

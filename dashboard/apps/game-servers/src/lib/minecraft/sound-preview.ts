@@ -13,6 +13,7 @@
  * hosts it ever reaches are Mojang's two.
  */
 
+import { gameMessage } from "../game-message";
 import { ANNOUNCE_SOUNDS } from "./announcement";
 
 const MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -48,15 +49,15 @@ async function loadIndex(): Promise<SoundIndex> {
         versions?: { id: string; url: string }[];
     };
     const release = manifest.versions?.find((one) => one.id === manifest.latest?.release);
-    if (!release) throw new Error("Mojang named no release");
+    if (!release) throw new Error(gameMessage("games", "lib.mojangNoRelease"));
     const version = (await json(release.url)) as { assetIndex?: { url?: string } };
-    if (!version.assetIndex?.url) throw new Error("That release has no asset index");
+    if (!version.assetIndex?.url) throw new Error(gameMessage("games", "lib.noAssetIndex"));
     const assets = (await json(version.assetIndex.url)) as {
         objects?: Record<string, { hash: string; size: number }>;
     };
     const objects = assets.objects ?? {};
     const table = objects["minecraft/sounds.json"];
-    if (!table) throw new Error("That release lists no sounds");
+    if (!table) throw new Error(gameMessage("games", "lib.noSounds"));
     const sounds = (await json(objectUrl(table.hash))) as SoundIndex["sounds"];
     return { objects, sounds, at: Date.now() };
 }

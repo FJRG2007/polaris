@@ -7,6 +7,7 @@
  * `game-templates.ts` for why the difference rather than the whole thing.
  */
 
+import { gameMessage } from "./game-message";
 import { gameOfServer } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { guardAsTemplate, PROJECTS_KEY } from "./minecraft/join-guard";
@@ -106,11 +107,11 @@ export async function saveServerAsTemplate(
             select: { applicationId: true, catalogId: true, config: true }
         })
         .catch(() => null);
-    if (!install?.applicationId) return { error: "This server has not been deployed yet" };
+    if (!install?.applicationId) return { error: gameMessage("games", "lib.notDeployed") };
 
     const kept = await prisma.serverTemplate.count({ where: { ownerId } }).catch(() => 0);
     if (kept >= TEMPLATE_LIMIT)
-        return { error: `You can keep ${TEMPLATE_LIMIT} templates. Delete one first.` };
+        return { error: gameMessage("games", "lib.maxTemplates", { count: TEMPLATE_LIMIT }) };
 
     const game = gameOfServer(install.catalogId)?.id ?? "minecraft";
     const config = readInstallConfig(install.config);
@@ -162,7 +163,7 @@ export async function saveServerAsTemplate(
             }
         })
         .catch(() => null);
-    return row ? { id: row.id } : { error: "You already have a template with that name" };
+    return row ? { id: row.id } : { error: gameMessage("games", "lib.templateNameTaken") };
 }
 
 export async function deleteServerTemplate(ownerId: string, id: string): Promise<void> {

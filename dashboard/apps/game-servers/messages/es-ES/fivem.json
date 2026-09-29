@@ -115,6 +115,104 @@
         "noMatch": "Nada coincide con “{query}”. Un recurso puede añadir sus propios ajustes, y esos viven en su propia configuración, no aquí.",
         "notSet": "Sin poner - el servidor usa {fallback}.",
         "stopSetting": "Dejar de fijar {name}",
-        "leaveWithFallback": "Que lo decida el servidor ({fallback})"
+        "leaveWithFallback": "Que lo decida el servidor ({fallback})",
+        "fallbacks": {
+            "on": "sí",
+            "off": "no",
+            "none": "nada",
+            "newest": "la última"
+        },
+        "restartReason": "un cambio de ajustes"
+    },
+    "settings": {
+        "sv_hostname": {
+            "label": "Nombre",
+            "hint": "Lo que ven los jugadores en el navegador de servidores y en la pantalla de conexión."
+        },
+        "sv_maxclients": {
+            "label": "Plazas",
+            "hint": "Cuánta gente cabe. Más de 32 necesita OneSync activado."
+        },
+        "onesync": {
+            "label": "OneSync",
+            "hint": "La sincronización de estado que necesitan más de 32 plazas y la mayoría de recursos de roleplay.",
+            "choices": {
+                "on": "Sí",
+                "legacy": "Heredado",
+                "off": "No"
+            }
+        },
+        "onesync_population": {
+            "label": "Tráfico y peatones",
+            "hint": "Desactivado vacía las calles, que es lo que suele querer un servidor de roleplay."
+        },
+        "sv_enforceGameBuild": {
+            "label": "Versión GTA",
+            "hint": "Fija a todos los jugadores a una actualización de GTA, para recursos que la necesitan. Vacío es la más reciente."
+        },
+        "sv_scriptHookAllowed": {
+            "label": "Permitir mods ScriptHook",
+            "hint": "Activado deja a los jugadores usar menús de mods de un jugador. Es por donde entran casi todas las trampas."
+        },
+        "sv_pureLevel": {
+            "label": "Revisar archivos",
+            "hint": "Rechaza a jugadores con archivos del juego modificados. El nivel 2 también comprueba el audio y el texto.",
+            "choices": {
+                "0": "No",
+                "1": "Archivos idénticos",
+                "2": "Archivos, audio y texto deben coincidir"
+            }
+        },
+        "sv_endpointprivacy": {
+            "label": "Ocultar direcciones",
+            "hint": "Deja las direcciones de quien se conecta fuera del registro y de la lista pública de jugadores."
+        },
+        "sv_authMaxVariance": {
+            "label": "Control de cuentas",
+            "hint": "Más bajo rechaza cuentas que parecen recién creadas. 1 es lo más estricto."
+        },
+        "sv_authMinTrust": {
+            "label": "Confianza mínima",
+            "hint": "Más alto rechaza cuentas con mala reputación. 5 es lo más estricto."
+        },
+        "steam_webApiKey": {
+            "label": "Clave de Steam Web API",
+            "hint": "Solo hace falta si quieres los ids de Steam de los jugadores. Consíguela en la página de desarrolladores de Steam."
+        },
+        "sv_master1": {
+            "label": "Salir en el navegador público",
+            "hint": "Desactivado deja el servidor fuera de la lista pública. Quien sepa la dirección puede entrar igualmente."
+        },
+        "sv_projectName": {
+            "label": "Proyecto",
+            "hint": "Se muestra sobre el servidor en el navegador, junto a su descripción."
+        },
+        "sv_projectDesc": {
+            "label": "Descripción",
+            "hint": "Una línea sobre el servidor, en el navegador."
+        },
+        "locale": {
+            "label": "Idioma",
+            "hint": "La etiqueta por la que los jugadores filtran el navegador, como en-US o es-ES."
+        },
+        "tags": {
+            "label": "Tags",
+            "hint": "Separadas por comas, para los filtros del navegador: roleplay, drift, economía."
+        }
+    },
+    "settingGroups": {
+        "server": "Servidor",
+        "gameplay": "Juego",
+        "players": "Jugadores",
+        "listing": "Navegador"
+    },
+    "settingErrors": {
+        "quote": "Una comilla doble no cabe en la configuración del servidor",
+        "oneLine": "Tiene que ser una sola línea",
+        "whole": "Tiene que ser un número entero",
+        "lowest": "El mínimo es {min}",
+        "highest": "El máximo es {max}",
+        "notAnOption": "Eso no es una de las opciones",
+        "tooLong": "Eso pasa de {max} caracteres"
     }
 }

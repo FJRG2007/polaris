@@ -16,7 +16,7 @@
 
 import * as actions from "./ark-actions";
 import type { GameKey } from "../../../messages";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { isSteamId } from "../../lib/ark/access";
 import { Loader2, Plus, UserSearch, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
@@ -326,6 +326,7 @@ export function ArkGiveDialog({
     onClose: () => void;
     onGive: (lines: readonly ArkGiveLine[]) => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("ark");
     const [picked, setPicked] = useState<string | null>(null);
     const [query, setQuery] = useState("");
@@ -354,7 +355,7 @@ export function ArkGiveDialog({
     // neither, and the game ignores both arguments for it - so the two fields are
     // only drawn where they mean something.
     const gear = item !== undefined && item.stack === 1;
-    const split = item ? describeArkStacks(item.stack, quantity) : null;
+    const split = item ? (schemaText(describeArkStacks(item.stack, quantity)) ?? null) : null;
     /** The line the fields are describing right now, if they describe one. */
     const writing: ArkGiveLine | null =
         picked === null
@@ -382,9 +383,13 @@ export function ArkGiveDialog({
      *  it. Falls back to the class the catalogue keys it by, which is at least
      *  recognisable, for a line whose item the catalogue has since dropped. */
     function describe(line: ArkGiveLine): string {
-        return describeArkGive(
-            items.find((entry) => entry.id === line.key)?.label ?? line.key,
-            line
+        return (
+            schemaText(
+                describeArkGive(
+                    items.find((entry) => entry.id === line.key)?.label ?? line.key,
+                    line
+                )
+            ) ?? ""
         );
     }
 

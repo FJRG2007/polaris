@@ -13,7 +13,7 @@
  */
 
 import { host } from "@polaris/app-host";
-import { gameWords } from "../game-words";
+import { gameWords, messageText } from "../game-words";
 import { readHytaleFiles } from "../../lib/hytale/service";
 import type { HytaleFiles } from "../../lib/hytale/paths";
 
@@ -29,7 +29,7 @@ export async function hytaleFilesAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatServerDidNotAnswer")
         };
     }

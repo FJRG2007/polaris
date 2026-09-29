@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { PLAYER_NAME } from "../../lib/minecraft/polaris-login";
 import * as service from "../../lib/minecraft/polaris-login-service";
@@ -27,8 +27,8 @@ const { requireGameServer } = host.appsInstallAccess;
 
 const serverId = z.string().uuid();
 
-const failure = (caught: unknown, fallback: string) =>
-    caught instanceof Error ? caught.message : fallback;
+const failure = async (caught: unknown, fallback: string): Promise<string> =>
+    caught instanceof Error ? await messageText(caught.message) : fallback;
 
 export async function loginStateAction(
     installedAppId: string
@@ -43,7 +43,7 @@ export async function loginStateAction(
         return { state: await service.loginState(parsed.data, applicationId, access.ownerId) };
     } catch (caught) {
         return {
-            error: failure(caught, (await gameWords("games"))("errors.couldNotReadTheLogin"))
+            error: await failure(caught, (await gameWords("games"))("errors.couldNotReadTheLogin"))
         };
     }
 }
@@ -82,7 +82,10 @@ export async function setLoginAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: failure(caught, (await gameWords("games"))("errors.couldNotChangeTheLogin"))
+            error: await failure(
+                caught,
+                (await gameWords("games"))("errors.couldNotChangeTheLogin")
+            )
         };
     }
 }
@@ -123,7 +126,10 @@ export async function forgetLoginAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: failure(caught, (await gameWords("games"))("errors.couldNotResetThePassword"))
+            error: await failure(
+                caught,
+                (await gameWords("games"))("errors.couldNotResetThePassword")
+            )
         };
     }
 }

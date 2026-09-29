@@ -215,7 +215,8 @@
         "installed": "installed",
         "earlierNamed": "Load {name} earlier",
         "laterNamed": "Load {name} later",
-        "removeNamed": "Remove {name}"
+        "removeNamed": "Remove {name}",
+        "restartReason": "a change to the mods"
     },
     "rules": {
         "theseAreWhatTheServer": "These are what the server is launched with. ARK reads them when it starts, so a change takes effect the next time it does.",
@@ -231,6 +232,167 @@
         "fileSays": "The server's own file says {value}.",
         "notSet": "Not set - the game uses {fallback}.",
         "stopSetting": "Stop setting {name}",
-        "range": "{min} to {max}"
+        "range": "{min} to {max}",
+        "on": "on",
+        "off": "off",
+        "restartReason": "a settings change"
+    },
+    "settings": {
+        "XPMultiplier": {
+            "label": "Experience",
+            "hint": "How fast players and tames level. 3 is the usual boosted server."
+        },
+        "TamingSpeedMultiplier": {
+            "label": "Taming speed",
+            "hint": "Higher tames faster. The single most changed setting on a private server."
+        },
+        "HarvestAmountMultiplier": {
+            "label": "Harvest amount",
+            "hint": "How much wood, stone and hide one hit gives."
+        },
+        "HarvestHealthMultiplier": {
+            "label": "Resource health",
+            "hint": "How much a tree or rock takes before it is used up. Higher means more from each."
+        },
+        "ResourcesRespawnPeriodMultiplier": {
+            "label": "Resource respawn wait",
+            "hint": "Lower brings trees and rocks back sooner."
+        },
+        "ItemStackSizeMultiplier": {
+            "label": "Stack size",
+            "hint": "How much fits in one slot. Changing it later does not restack what is already in a box."
+        },
+        "PlayerDamageMultiplier": {
+            "label": "Damage players deal"
+        },
+        "PlayerResistanceMultiplier": {
+            "label": "Damage players take",
+            "hint": "Higher means they take more, not less."
+        },
+        "DinoDamageMultiplier": {
+            "label": "Damage wild creatures deal"
+        },
+        "DinoResistanceMultiplier": {
+            "label": "Damage wild creatures take",
+            "hint": "Higher means they take more."
+        },
+        "StructureDamageMultiplier": {
+            "label": "Damage structures deal",
+            "hint": "Spike walls and turrets."
+        },
+        "StructureResistanceMultiplier": {
+            "label": "Damage structures take",
+            "hint": "Higher means buildings come apart faster."
+        },
+        "PlayerCharacterFoodDrainMultiplier": {
+            "label": "How fast players get hungry"
+        },
+        "PlayerCharacterWaterDrainMultiplier": {
+            "label": "How fast players get thirsty"
+        },
+        "PlayerCharacterStaminaDrainMultiplier": {
+            "label": "How fast players tire"
+        },
+        "PlayerCharacterHealthRecoveryMultiplier": {
+            "label": "How fast players heal"
+        },
+        "DinoCharacterFoodDrainMultiplier": {
+            "label": "How fast tames get hungry",
+            "hint": "Lower means less time spent filling troughs."
+        },
+        "OverrideOfficialDifficulty": {
+            "label": "Difficulty",
+            "hint": "How high wild creatures go: their top level is this times 30. 5 is the usual choice, for level 150. Set, it decides the levels on its own and the offset below stops mattering."
+        },
+        "DifficultyOffset": {
+            "label": "Difficulty offset",
+            "hint": "The older way of saying the same thing, between 0 and 1. Only read when the difficulty above is not set."
+        },
+        "DayCycleSpeedScale": {
+            "label": "How fast the day passes"
+        },
+        "NightTimeSpeedScale": {
+            "label": "How fast the night passes",
+            "hint": "Higher makes nights shorter."
+        },
+        "DayTimeSpeedScale": {
+            "label": "How fast the daylight passes"
+        },
+        "ServerPVE": {
+            "label": "Players cannot hurt each other",
+            "hint": "On makes it a PvE server."
+        },
+        "ServerHardcore": {
+            "label": "Death is permanent",
+            "hint": "A player who dies starts again at level 1."
+        },
+        "AutoSavePeriodMinutes": {
+            "label": "Save the world every",
+            "hint": "Minutes. Shorter loses less in a crash and costs a pause each time."
+        },
+        "KickIdlePlayersPeriod": {
+            "label": "Throw idle players out after",
+            "hint": "Seconds. Only applies while the server is full of people who are actually playing."
+        },
+        "ShowMapPlayerLocation": {
+            "label": "Show players where they are",
+            "hint": "Their own position, and their tribe's, on the map. Off, the map is a picture."
+        },
+        "AllowThirdPersonPlayer": {
+            "label": "Third person camera"
+        },
+        "ServerCrosshair": {
+            "label": "Crosshair"
+        },
+        "EnablePvPGamma": {
+            "label": "Let players change their gamma while PvP is on",
+            "hint": "Their own brightness, set with the gamma command in game. Off, nights are genuinely dark - and unplayable for some people."
+        },
+        "DisablePvEGamma": {
+            "label": "Let players change their gamma while PvE is on",
+            "hint": "The same thing for a PvE server, which is a separate setting in the game. Both are worth leaving on."
+        },
+        "ShowFloatingDamageText": {
+            "label": "Show damage numbers",
+            "hint": "The RPG-style numbers over whatever was hit."
+        },
+        "AllowHitMarkers": {
+            "label": "Show hit markers"
+        },
+        "GlobalVoiceChat": {
+            "label": "Voice chat reaches the whole server",
+            "hint": "Off, it only reaches people nearby."
+        },
+        "AlwaysAllowStructurePickup": {
+            "label": "Pick structures back up at any time",
+            "hint": "Off, only within the first few seconds of placing one."
+        },
+        "DisableStructureDecayPvE": {
+            "label": "Buildings never decay",
+            "hint": "On a server people play on a few nights a week, this is what stops bases falling down."
+        },
+        "AllowCaveBuildingPvE": {
+            "label": "Building in caves"
+        },
+        "AllowFlyerCarryPvE": {
+            "label": "Flyers can pick things up",
+            "hint": "Including wild creatures and other players' tames."
+        },
+        "StructurePreventResourceRadiusMultiplier": {
+            "label": "How far a building stops resources growing",
+            "hint": "Lower lets trees come back closer to a base."
+        },
+        "TheMaxStructuresInRange": {
+            "label": "Most structures in one area",
+            "hint": "The ceiling on how big one base can get."
+        }
+    },
+    "settingGroups": {
+        "rates": "Rates",
+        "damage": "Damage",
+        "survival": "Survival",
+        "world": "World",
+        "playing": "Playing",
+        "structures": "Structures"
     }
 }

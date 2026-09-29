@@ -30,6 +30,8 @@ const JOIN_PASSWORD = /^[A-Za-z0-9]{8,32}$/;
  *  into a game by somebody who is not looking at both at once. */
 const PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
+import { gameMessage } from "../game-message";
+
 export const GENERATED_PASSWORD_LENGTH = 16;
 
 export function isSteamId(value: string): boolean {
@@ -41,8 +43,8 @@ export function isJoinPassword(value: string): boolean {
 }
 
 /** What to say when a password is refused, in the terms it was refused on. */
-export const JOIN_PASSWORD_HINT =
-    "8 to 32 letters and digits, and nothing else - ARK will not carry the rest";
+/** A carried key (see `lib/game-message`): shown through the reader's language. */
+export const JOIN_PASSWORD_HINT = gameMessage("games", "schema.joinPasswordRule");
 
 /**
  * A join password nobody had to invent.

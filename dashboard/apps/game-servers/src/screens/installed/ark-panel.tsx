@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { timeoutText, useGameText, usePlayerWords } from "../game-text";
+import { timeoutText, useGameText, usePlayerWords, useSchemaText } from "../game-text";
 import { ArkMods } from "./ark-mods";
 import { ArkRules } from "./ark-rules";
 import * as actions from "./ark-actions";
@@ -775,6 +775,7 @@ function OverviewTab({
     status: ArkStatus | null;
     settings: InstalledAppSetting[];
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("ark");
     const shown = useMemo(
         () =>
@@ -799,7 +800,7 @@ function OverviewTab({
                         <Skeleton className="h-8 w-full" />
                     ) : !status.answering ? (
                         <p className="text-sm text-muted-foreground">
-                            {status.message ?? t("panel.theServerIsNotAnswering")}
+                            {schemaText(status.message) ?? t("panel.theServerIsNotAnswering")}
                         </p>
                     ) : status.players.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
@@ -931,6 +932,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: ArkAccessView) => void;
 }) {
+    const schemaText = useSchemaText();
     const { playerFilters, playerAction, playerConfirm } = usePlayerWords();
     const t = useGameText("ark");
     const [query, setQuery] = useState("");
@@ -1166,7 +1168,7 @@ function PlayersTab({
                 isEmpty={shown.length === 0}
                 empty={
                     players.length === 0
-                        ? (status?.message ?? t("panel.nobodyAtAll"))
+                        ? (schemaText(status?.message) ?? t("panel.nobodyAtAll"))
                         : t("panel.nobodyMatches")
                 }
                 rows={shown.map((entry) => (
@@ -2157,6 +2159,7 @@ function ChangePassword({
     onSaved: () => void;
 }) {
     const t = useGameText("ark");
+    const schemaText = useSchemaText();
     const [value, setValue] = useState("");
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -2221,7 +2224,7 @@ function ChangePassword({
                     error || invalid ? "text-danger" : "text-muted-foreground"
                 )}
             >
-                {error ?? (invalid ? JOIN_PASSWORD_HINT : (message ?? help))}
+                {error ?? (invalid ? schemaText(JOIN_PASSWORD_HINT) : (message ?? help))}
             </span>
         </div>
     );

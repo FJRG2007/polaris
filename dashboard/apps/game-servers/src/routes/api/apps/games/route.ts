@@ -1,3 +1,4 @@
+import { messageText } from "../../../../screens/game-words";
 import { NextResponse } from "next/server";
 import { gameWords } from "../../../../screens/game-words";
 import { listGameServerFacts } from "../../../../lib/games-service";
@@ -21,7 +22,7 @@ export async function GET(): Promise<Response> {
         return NextResponse.json({ servers: await listGameServerFacts(user.id, granted) });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadYourGame") },
+            { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.couldNotReadYourGame") },
             { status: 400 }
         );
     }

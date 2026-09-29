@@ -16,28 +16,33 @@
  * the screen and the action check a value against the same rules.
  */
 
+import type { GameKey } from "../../../messages";
+
 /** What a rule holds. Minecraft has only these two kinds. */
 export type GameRuleType = "boolean" | "integer";
 
 export interface GameRule {
     /** The name the command takes, exactly as the game spells it. */
     readonly id: string;
-    readonly label: string;
+    /** Its name, as a key into the `minecraft` catalog. */
+    readonly label: GameKey<"minecraft">;
     /** One line saying what turning it on does. */
-    readonly hint: string;
+    /** What it does, as a key into the `minecraft` catalog, or empty for none. */
+    readonly hint: GameKey<"minecraft"> | "";
     readonly type: GameRuleType;
     /** The heading it sits under. */
-    readonly group: string;
+    /** The heading it sits under, as a key into the `minecraft` catalog. */
+    readonly group: GameKey<"minecraft">;
     /** For an integer rule, the range the screen will accept. */
     readonly min?: number;
     readonly max?: number;
 }
 
-const DEATH = "Death and respawn";
-const DAMAGE = "Damage";
-const WORLD = "World";
-const MOBS = "Mobs";
-const PLAY = "Playing";
+const DEATH = "gameRuleGroups.death";
+const DAMAGE = "gameRuleGroups.damage";
+const WORLD = "gameRuleGroups.world";
+const MOBS = "gameRuleGroups.mobs";
+const PLAY = "gameRuleGroups.playing";
 
 /**
  * The rules the screen offers.
@@ -48,64 +53,64 @@ const PLAY = "Playing";
 export const GAME_RULES: readonly GameRule[] = [
     {
         id: "keepInventory",
-        label: "Keep inventory on death",
-        hint: "Players keep what they were carrying instead of dropping it.",
+        label: "gameRules.keepInventory.label",
+        hint: "gameRules.keepInventory.hint",
         type: "boolean",
         group: DEATH
     },
     {
         id: "doImmediateRespawn",
-        label: "Respawn immediately",
-        hint: "Skips the death screen and puts them straight back in.",
+        label: "gameRules.doImmediateRespawn.label",
+        hint: "gameRules.doImmediateRespawn.hint",
         type: "boolean",
         group: DEATH
     },
     {
         id: "showDeathMessages",
-        label: "Announce deaths in chat",
+        label: "gameRules.showDeathMessages.label",
         hint: "",
         type: "boolean",
         group: DEATH
     },
     {
         id: "spawnRadius",
-        label: "Spawn spread",
-        hint: "How many blocks around the world spawn players can appear in.",
+        label: "gameRules.spawnRadius.label",
+        hint: "gameRules.spawnRadius.hint",
         type: "integer",
         group: DEATH,
         min: 0,
         max: 128
     },
-    { id: "fallDamage", label: "Fall damage", hint: "", type: "boolean", group: DAMAGE },
-    { id: "fireDamage", label: "Fire damage", hint: "", type: "boolean", group: DAMAGE },
-    { id: "drowningDamage", label: "Drowning damage", hint: "", type: "boolean", group: DAMAGE },
+    { id: "fallDamage", label: "gameRules.fallDamage.label", hint: "", type: "boolean", group: DAMAGE },
+    { id: "fireDamage", label: "gameRules.fireDamage.label", hint: "", type: "boolean", group: DAMAGE },
+    { id: "drowningDamage", label: "gameRules.drowningDamage.label", hint: "", type: "boolean", group: DAMAGE },
     {
         id: "naturalRegeneration",
-        label: "Heal from a full hunger bar",
-        hint: "Off makes food the only way back to full health.",
+        label: "gameRules.naturalRegeneration.label",
+        hint: "gameRules.naturalRegeneration.hint",
         type: "boolean",
         group: DAMAGE
     },
     {
         id: "mobGriefing",
-        label: "Mobs can change the world",
-        hint: "Creeper craters, endermen moving blocks, zombies breaking doors.",
+        label: "gameRules.mobGriefing.label",
+        hint: "gameRules.mobGriefing.hint",
         type: "boolean",
         group: WORLD
     },
     {
         id: "doFireTick",
-        label: "Fire spreads",
+        label: "gameRules.doFireTick.label",
         hint: "",
         type: "boolean",
         group: WORLD
     },
-    { id: "doDaylightCycle", label: "Time passes", hint: "Off freezes the sun where it is.", type: "boolean", group: WORLD },
-    { id: "doWeatherCycle", label: "Weather changes", hint: "", type: "boolean", group: WORLD },
+    { id: "doDaylightCycle", label: "gameRules.doDaylightCycle.label", hint: "gameRules.doDaylightCycle.hint", type: "boolean", group: WORLD },
+    { id: "doWeatherCycle", label: "gameRules.doWeatherCycle.label", hint: "", type: "boolean", group: WORLD },
     {
         id: "randomTickSpeed",
-        label: "Growth speed",
-        hint: "How fast crops grow and leaves decay. 3 is normal; large numbers cost the server.",
+        label: "gameRules.randomTickSpeed.label",
+        hint: "gameRules.randomTickSpeed.hint",
         type: "integer",
         group: WORLD,
         min: 0,
@@ -113,40 +118,40 @@ export const GAME_RULES: readonly GameRule[] = [
     },
     {
         id: "playersSleepingPercentage",
-        label: "Share of players needed to skip the night",
-        hint: "As a percentage. 0 lets one player skip it.",
+        label: "gameRules.playersSleepingPercentage.label",
+        hint: "gameRules.playersSleepingPercentage.hint",
         type: "integer",
         group: WORLD,
         min: 0,
         max: 100
     },
-    { id: "doMobSpawning", label: "Mobs spawn", hint: "", type: "boolean", group: MOBS },
-    { id: "doMobLoot", label: "Mobs drop loot", hint: "", type: "boolean", group: MOBS },
-    { id: "doInsomnia", label: "Phantoms", hint: "The ones that come for players who have not slept.", type: "boolean", group: MOBS },
-    { id: "doPatrolSpawning", label: "Pillager patrols", hint: "", type: "boolean", group: MOBS },
-    { id: "doTraderSpawning", label: "Wandering traders", hint: "", type: "boolean", group: MOBS },
-    { id: "doWardenSpawning", label: "Wardens", hint: "", type: "boolean", group: MOBS },
-    { id: "doTileDrops", label: "Broken blocks drop", hint: "", type: "boolean", group: PLAY },
+    { id: "doMobSpawning", label: "gameRules.doMobSpawning.label", hint: "", type: "boolean", group: MOBS },
+    { id: "doMobLoot", label: "gameRules.doMobLoot.label", hint: "", type: "boolean", group: MOBS },
+    { id: "doInsomnia", label: "gameRules.doInsomnia.label", hint: "gameRules.doInsomnia.hint", type: "boolean", group: MOBS },
+    { id: "doPatrolSpawning", label: "gameRules.doPatrolSpawning.label", hint: "", type: "boolean", group: MOBS },
+    { id: "doTraderSpawning", label: "gameRules.doTraderSpawning.label", hint: "", type: "boolean", group: MOBS },
+    { id: "doWardenSpawning", label: "gameRules.doWardenSpawning.label", hint: "", type: "boolean", group: MOBS },
+    { id: "doTileDrops", label: "gameRules.doTileDrops.label", hint: "", type: "boolean", group: PLAY },
     {
         id: "doLimitedCrafting",
-        label: "Only craft what has been unlocked",
-        hint: "Recipes have to be discovered before they can be used.",
+        label: "gameRules.doLimitedCrafting.label",
+        hint: "gameRules.doLimitedCrafting.hint",
         type: "boolean",
         group: PLAY
     },
-    { id: "announceAdvancements", label: "Announce advancements", hint: "", type: "boolean", group: PLAY },
+    { id: "announceAdvancements", label: "gameRules.announceAdvancements.label", hint: "", type: "boolean", group: PLAY },
     {
         id: "disableRaids",
-        label: "No raids",
-        hint: "Villages are left alone after a player earns Bad Omen.",
+        label: "gameRules.disableRaids.label",
+        hint: "gameRules.disableRaids.hint",
         type: "boolean",
         group: PLAY
     }
 ];
 
 /** The rules a screen draws, in the order the groups are declared. */
-export function ruleGroups(): { group: string; rules: GameRule[] }[] {
-    const groups: { group: string; rules: GameRule[] }[] = [];
+export function ruleGroups(): { group: GameKey<"minecraft">; rules: GameRule[] }[] {
+    const groups: { group: GameKey<"minecraft">; rules: GameRule[] }[] = [];
     for (const rule of GAME_RULES) {
         const existing = groups.find((entry) => entry.group === rule.group);
         if (existing) existing.rules.push(rule);

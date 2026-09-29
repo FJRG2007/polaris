@@ -465,15 +465,16 @@ export function BlueprintFields({
                                             onValueChange={(levelType) => set({ levelType })}
                                             options={world.LEVEL_TYPES.map((entry) => ({
                                                 value: entry.value,
-                                                label: entry.label
+                                                label: t(entry.label)
                                             }))}
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            {
-                                                world.LEVEL_TYPES.find(
+                                            {(() => {
+                                                const shape = world.LEVEL_TYPES.find(
                                                     (entry) => entry.value === value.levelType
-                                                )?.detail
-                                            }
+                                                );
+                                                return shape ? t(shape.detail) : null;
+                                            })()}
                                         </span>
                                     </label>
                                 )}
@@ -488,7 +489,7 @@ export function BlueprintFields({
                                     onValueChange={(biome) => set({ biome })}
                                     options={world.BIOMES.map((entry) => ({
                                         value: entry.value,
-                                        label: entry.label
+                                        label: t(entry.label)
                                     }))}
                                 />
                                 <span className="text-xs text-muted-foreground">

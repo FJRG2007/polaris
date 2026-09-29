@@ -22,6 +22,7 @@
  * testable against a captured log without a container anywhere near it.
  */
 
+import { gameMessage } from "./game-message";
 import { isPollNoise, stripFormatting } from "./minecraft/parse";
 
 /** What a server is doing when it will not start, and what to do about it. */
@@ -283,19 +284,19 @@ function shorten(line: string): string {
  */
 export function crashAdvice(cause: string): string | null {
     if (isConfigCrash(cause)) {
-        return "The settings on disk were written by a newer Minecraft than this server now runs, and it cannot read them. Setting them aside lets the server write its own again.";
+        return gameMessage("games", "lib.crash.config");
     }
     if (/newer version of minecraft/i.test(cause)) {
-        return "One of the worlds on this server was saved by a newer Minecraft than it now runs, and the server stops rather than damage it. Remove that world, or put the server back on the release it was made with.";
+        return gameMessage("games", "lib.crash.newerWorld");
     }
     if (/AccessDenied/i.test(cause) && /session\.lock/i.test(cause)) {
-        return "The server is not allowed to write into its own world folder, so it cannot claim the world.";
+        return gameMessage("games", "lib.crash.worldLocked");
     }
     if (/Address already in use|FAILED TO BIND/i.test(cause)) {
-        return "Something else already holds the port this server was given.";
+        return gameMessage("games", "lib.crash.portTaken");
     }
     if (/OutOfMemoryError|heap space/i.test(cause)) {
-        return "The server ran out of memory for what it has been asked to load. Give it a larger heap or install less.";
+        return gameMessage("games", "lib.crash.memory");
     }
     return null;
 }

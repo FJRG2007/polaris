@@ -20,6 +20,7 @@ import {
     reachedReady,
     watchesRestarts
 } from "@polaris-app/game-servers/src/lib/crash-loop";
+import { english } from "../setup/game-english";
 
 const NOW = new Date("2026-08-12T21:05:30.000Z");
 
@@ -205,7 +206,7 @@ describe("what the log says went wrong", () => {
 describe("what to do about it", () => {
     it("names the fix for settings a newer release wrote", () => {
         const advice = crashAdvice('NumberFormatException: For input string: "default"');
-        expect(advice).toContain("newer Minecraft");
+        expect(english(advice)).toContain("newer Minecraft");
     });
 
     it("stays quiet about a crash it does not recognise", () => {
@@ -216,7 +217,7 @@ describe("what to do about it", () => {
         const loop = crashLoopOf(looping(), PAPER_DOWNGRADE);
         expect(loop.restarts).toBe(4);
         expect(loop.cause).toContain("NumberFormatException");
-        expect(loop.advice).toContain("newer Minecraft");
+        expect(english(loop.advice)).toContain("newer Minecraft");
     });
 });
 
@@ -253,7 +254,7 @@ describe("a server that starts and then dies", () => {
     });
 
     it("says what a world from a newer release means", () => {
-        expect(crashAdvice(crashCause(UP_THEN_DEAD) ?? "")).toContain("newer Minecraft");
+        expect(english(crashAdvice(crashCause(UP_THEN_DEAD) ?? ""))).toContain("newer Minecraft");
     });
 });
 

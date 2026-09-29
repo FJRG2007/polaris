@@ -19,6 +19,7 @@ import {
     readArkItemCatalog,
     searchArkItems
 } from "@polaris-app/game-servers/src/lib/ark/items";
+import { english } from "../setup/game-english";
 
 const WOOD = "/Game/PrimalEarth/CoreBlueprints/Resources/PrimalItemResource_Wood.PrimalItemResource_Wood";
 
@@ -115,12 +116,12 @@ describe("arkItemIconUrl", () => {
  */
 describe("describeArkStacks", () => {
     it("names what is left over rather than rounding it up to a full stack", () => {
-        expect(describeArkStacks(100, 125)).toBe("Arrives as a stack of 100 and 25.");
-        expect(describeArkStacks(100, 350)).toBe("Arrives as 3 stacks of 100 and 50.");
+        expect(english(describeArkStacks(100, 125))).toBe("Arrives as a stack of 100 and 25.");
+        expect(english(describeArkStacks(100, 350))).toBe("Arrives as 3 stacks of 100 and 50.");
     });
 
     it("says nothing about a remainder there is not", () => {
-        expect(describeArkStacks(100, 200)).toBe("Arrives as 2 stacks of 100.");
+        expect(english(describeArkStacks(100, 200))).toBe("Arrives as 2 stacks of 100.");
     });
 
     it("stays quiet when it all fits in one stack", () => {
@@ -131,7 +132,7 @@ describe("describeArkStacks", () => {
 
     it("counts gear as pieces, because gear does not stack", () => {
         // "5 stacks of 1" is arithmetic rather than English.
-        expect(describeArkStacks(1, 5)).toBe("Arrives as 5 separate pieces.");
+        expect(english(describeArkStacks(1, 5))).toBe("Arrives as 5 separate pieces.");
     });
 
     it("never adds up to more than was asked for", () => {
@@ -239,11 +240,11 @@ describe("describeArkGive", () => {
     const line = { key: "PrimalItemResource_Wood", quantity: 100, quality: 0, blueprint: false };
 
     it("says how many of what", () => {
-        expect(describeArkGive("Wood", line)).toBe("100 x Wood");
+        expect(english(describeArkGive("Wood", line))).toBe("100 x Wood");
     });
 
     it("says when it is the blueprint rather than the thing", () => {
-        expect(describeArkGive("Assault Rifle", { ...line, quantity: 1, blueprint: true })).toBe(
+        expect(english(describeArkGive("Assault Rifle", { ...line, quantity: 1, blueprint: true }))).toBe(
             "1 x Assault Rifle blueprint"
         );
     });
@@ -251,7 +252,7 @@ describe("describeArkGive", () => {
     // Quality is off by default and is the difference between a pistol and the
     // best pistol on the server, so a line carrying one has had it typed in.
     it("says the quality when there is one, and stays quiet when there is not", () => {
-        expect(describeArkGive("Pistol", { ...line, quantity: 1, quality: 40 })).toBe("1 x Pistol, quality 40");
-        expect(describeArkGive("Pistol", { ...line, quantity: 1 })).toBe("1 x Pistol");
+        expect(english(describeArkGive("Pistol", { ...line, quantity: 1, quality: 40 }))).toBe("1 x Pistol, quality 40");
+        expect(english(describeArkGive("Pistol", { ...line, quantity: 1 }))).toBe("1 x Pistol");
     });
 });

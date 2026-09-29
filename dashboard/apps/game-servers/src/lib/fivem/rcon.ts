@@ -17,6 +17,8 @@
  */
 
 /** Every datagram of this protocol begins with this, request and reply alike. */
+import { gameMessage } from "../game-message";
+
 const HEADER = Buffer.from([0xff, 0xff, 0xff, 0xff]);
 
 /** What the server puts in front of what it printed. */
@@ -112,6 +114,6 @@ export function isSafeCommand(command: string): boolean {
  * means something else.
  */
 export function quoteArgument(value: string): string {
-    if (value.includes('"')) throw new Error("A double quote is not something the game console can carry");
+    if (value.includes('"')) throw new Error(gameMessage("games", "lib.consoleQuote"));
     return /[\s;]/.test(value) || value.length === 0 ? `"${value}"` : value;
 }

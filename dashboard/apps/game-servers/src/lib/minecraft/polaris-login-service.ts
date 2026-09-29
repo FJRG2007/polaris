@@ -10,6 +10,7 @@
  * Server-only.
  */
 
+import { gameMessage } from "../game-message";
 import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
 import { accessRefusal } from "./access";
@@ -388,9 +389,7 @@ export async function setLogin(
         );
         const foreign = foreignLogin(current.get(PROJECTS_KEY) ?? "");
         if (foreign !== null) {
-            throw new Error(
-                `This server logs players in with ${foreign}, which Polaris does not manage. Remove it from the Mods screen first.`
-            );
+            throw new Error(gameMessage("games", "lib.foreignLogin", { name: foreign }));
         }
         if (build === null) {
             throw new Error(
@@ -403,9 +402,7 @@ export async function setLogin(
         // starts.
         const baseUrl = await publicAppUrl();
         if (baseUrl === null) {
-            throw new Error(
-                "Polaris login needs this Polaris to have a public address: the server downloads the mod from it and asks it on every join."
-            );
+            throw new Error(gameMessage("games", "lib.loginNeedsAddress"));
         }
         const token =
             (await readInstallEnvSecret(applicationId, ownerId, polarisLogin.TOKEN_KEY)) ??

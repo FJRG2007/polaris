@@ -8,7 +8,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
-import { gameWords, issueText } from "./game-words";
+import { gameWords, issueText, messageText } from "./game-words";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { clearResourceGrants } from "@polaris/auth";
@@ -229,7 +229,7 @@ export async function createGameServerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotCreateTheServer")
         };
     }
@@ -292,7 +292,7 @@ export async function saveServerAsTemplateAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotSaveThisAs")
         };
     }
@@ -308,7 +308,7 @@ export async function deleteServerTemplateAction(id: string): Promise<{ error?: 
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotDeleteThatTemplate")
         };
     }
@@ -335,7 +335,7 @@ export async function setGameServerPrefAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotUpdateYourList")
         };
     }
@@ -370,7 +370,7 @@ export async function setGameServerRunningAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotChangeTheServer")
         };
     }
@@ -394,7 +394,7 @@ export async function redeployGameServerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotRedeployTheServer")
         };
     }
@@ -441,7 +441,7 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotDeleteTheServer")
         };
     }
@@ -467,7 +467,7 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotTurnGameServers")
         };
     }

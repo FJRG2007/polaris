@@ -50,6 +50,7 @@
  * immutable is what lets each entry carry the hash of what it will actually get.
  */
 
+import { gameMessage } from "../game-message";
 import { FLAT_LEVEL_TYPE } from "./world";
 import type { GameBlueprint } from "./blueprints";
 
@@ -283,7 +284,7 @@ export function hasMaps(blueprint: Pick<GameBlueprint, "mapCategory"> | undefine
 export function mapFor(blueprint: GameBlueprint, id: string | undefined): WorldMap | undefined {
     if (!id) return undefined;
     const map = findMap(id);
-    if (!map || map.category !== blueprint.mapCategory) throw new Error("That map is not one this game can be built on");
+    if (!map || map.category !== blueprint.mapCategory) throw new Error(gameMessage("games", "lib.notMapForGame"));
     return map;
 }
 

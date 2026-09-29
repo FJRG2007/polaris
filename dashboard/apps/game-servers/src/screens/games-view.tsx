@@ -28,7 +28,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
-import { useGameText } from "./game-text";
+import { useGameText, useSchemaText } from "./game-text";
 import Link from "next/link";
 import * as list from "./list";
 import { useRouter } from "next/navigation";
@@ -1017,12 +1017,13 @@ function AddressCell({
     /** False while `facts` is the kept reading: the address is shown, not copied. */
     fresh: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     if (facts === null) return <Skeleton className="h-4 w-40" />;
     if (!facts.address) {
         return (
             <span className="text-xs text-muted-foreground">
-                {facts.message ?? t("list.noAddressYet")}
+                {schemaText(facts.message) ?? t("list.noAddressYet")}
             </span>
         );
     }

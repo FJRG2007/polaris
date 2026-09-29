@@ -18,6 +18,7 @@
  * running - including backing it up. Callers say so rather than failing blankly.
  */
 
+import { gameMessage, readGameMessage } from "../game-message";
 import * as world from "./world";
 import { readWorldTrim, readWorldTrimRun, type WorldTrimRun, type WorldTrimSettings } from "./world-trim";
 import { prisma } from "@polaris/db";
@@ -127,8 +128,8 @@ async function applicationOf(ownerId: string, installedAppId: string): Promise<s
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true }
     });
-    if (!install) throw new Error("Server not found");
-    if (!install.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install) throw new Error(gameMessage("games", "lib.serverNotFound"));
+    if (!install.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     return install.applicationId;
 }
 
@@ -200,7 +201,7 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
                     worldSeed: null,
                     backupBytes: 0,
                     nextBackupAt: null,
-                    message: "The server has to be running to read or change its worlds. Start it first."
+                    message: gameMessage("games", "lib.worldsNeedRunning")
                 };
             }
             const [worlds, backups, worldSeed] = await Promise.all([
@@ -226,7 +227,7 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
                 worldSeed: null,
                 backupBytes: 0,
                 nextBackupAt: null,
-                message: caught instanceof Error ? caught.message : "Could not read the server's files"
+                message: caught instanceof Error ? caught.message : gameMessage("games", "lib.filesUnreadable")
             };
         }
     });
@@ -372,7 +373,7 @@ async function assertRoomToCopy(server: ServerContainer, dirs: readonly string[]
     for (const bytes of world.parseDuLines(measured.output).values()) wanted += bytes;
     if (wanted === 0 || available >= wanted) return;
     throw new Error(
-        `There is not enough room beside the world to copy it - ${formatBytes(available)} free, and the world is ${formatBytes(wanted)}. Delete a backup or two, or lower how many are kept.`
+        gameMessage("games", "lib.noRoom", { free: formatBytes(available), size: formatBytes(wanted) })
     );
 }
 
@@ -424,15 +425,15 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     const { level } = await readWorldSettings(ownerId, server.applicationId, server.edition);
     const listing = await server.runOk(
         ["ls", "-1A", "--", world.levelParent(server.edition)],
-        "Could not read the server's files"
+        gameMessage("games", "lib.filesUnreadable")
     );
     const present = new Set(world.parseListing(listing));
     const dirs = world.levelDirs(server.edition, level).filter((dir) => present.has(dir.split("/").pop() as string));
     if (dirs.length === 0) {
-        throw new Error("There is no world to back up yet - start the server and let it generate one");
+        throw new Error(gameMessage("games", "lib.noWorldYet"));
     }
 
-    await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], "Could not create the backup folder");
+    await server.runOk(["mkdir", "-p", "--", world.BACKUP_DIR], gameMessage("games", "lib.run.backupFolder"));
     await sweepStagedBackups(server);
     await assertRoomToCopy(server, dirs);
     await holdSave(server);
@@ -448,8 +449,8 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     // under this name is invisible to it, and the move is what publishes the copy.
     const partial = `${world.BACKUP_DIR}/${name}${STAGING_SUFFIX}`;
     try {
-        await server.runOk(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs], "Could not write the backup");
-        await server.runOk(["mv", "--", partial, `${world.BACKUP_DIR}/${name}`], "Could not write the backup");
+        await server.runOk(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs], gameMessage("games", "lib.run.writeBackup"));
+        await server.runOk(["mv", "--", partial, `${world.BACKUP_DIR}/${name}`], gameMessage("games", "lib.run.writeBackup"));
     } catch (caught) {
         // A world big enough to run out of disk leaves the half of it that fit.
         // Never fatal, and never the error reported: the container this would run
@@ -523,15 +524,15 @@ async function resumeSave(server: ServerContainer): Promise<void> {
 
 /** Take an archive off the server. */
 export async function deleteWorldBackup(ownerId: string, installedAppId: string, name: string): Promise<void> {
-    if (!world.isBackupName(name)) throw new Error("That is not a backup of this server");
+    if (!world.isBackupName(name)) throw new Error(gameMessage("games", "lib.notThisBackup"));
     await withServerContainer(ownerId, installedAppId, (server) =>
-        server.runOk(["rm", "-f", "--", `${world.BACKUP_DIR}/${name}`], "Could not delete the backup")
+        server.runOk(["rm", "-f", "--", `${world.BACKUP_DIR}/${name}`], gameMessage("games", "lib.run.deleteBackup"))
     );
 }
 
 /** Where an archive sits inside the container, for the route that streams it out. */
 export function backupPathInContainer(name: string): string {
-    if (!world.isBackupName(name)) throw new Error("That is not a backup of this server");
+    if (!world.isBackupName(name)) throw new Error(gameMessage("games", "lib.notThisBackup"));
     return `${world.BACKUP_DIR}/${name}`;
 }
 
@@ -548,32 +549,32 @@ export async function restoreWorldBackup(
     name: string,
     actorId: string
 ): Promise<{ level: string }> {
-    if (!world.isBackupName(name)) throw new Error("That is not a backup of this server");
+    if (!world.isBackupName(name)) throw new Error(gameMessage("games", "lib.notThisBackup"));
     const level = await withServerContainer(ownerId, installedAppId, async (server) => {
         const parent = world.levelParent(server.edition);
         const staging = server.edition === "bedrock" ? `${world.STAGING_DIR}/worlds` : world.STAGING_DIR;
 
-        await server.runOk(["rm", "-rf", "--", world.STAGING_DIR], "Could not clear the restore folder");
-        await server.runOk(["mkdir", "-p", "--", world.STAGING_DIR], "Could not create the restore folder");
+        await server.runOk(["rm", "-rf", "--", world.STAGING_DIR], gameMessage("games", "lib.run.clearRestore"));
+        await server.runOk(["mkdir", "-p", "--", world.STAGING_DIR], gameMessage("games", "lib.run.createRestore"));
         try {
             await server.runOk(
                 ["tar", "-xzf", `${world.BACKUP_DIR}/${name}`, "-C", world.STAGING_DIR],
-                "Could not unpack the backup"
+                gameMessage("games", "lib.run.unpackBackup")
             );
             const unpacked = world.parseListing(
-                await server.runOk(["ls", "-1A", "--", staging], "The backup does not hold a world")
+                await server.runOk(["ls", "-1A", "--", staging], gameMessage("games", "lib.run.noWorldInBackup"))
             );
             const listing = await server.run(["ls", "-1A", "--", parent]);
             const taken = listing.code === 0 ? world.parseListing(listing.output) : [];
             const target = world.newLevelName(new Date(), taken);
             const plan = world.restorePlan(server.edition, unpacked, target);
-            if (plan.length === 0) throw new Error("That backup does not hold a world this server can use");
+            if (plan.length === 0) throw new Error(gameMessage("games", "lib.backupNoWorld"));
 
-            await makeServerDir(server, parent, "Could not create the worlds folder");
+            await makeServerDir(server, parent, gameMessage("games", "lib.run.worldsFolder"));
             for (const move of plan) {
                 await server.runOk(
                     ["mv", "--", `${staging}/${move.from}`, `${parent}/${move.to}`],
-                    "Could not put the world in place"
+                    gameMessage("games", "lib.run.placeWorld")
                 );
             }
             return target;
@@ -625,9 +626,9 @@ export async function newWorld(
     // blueprint's own defaults through this call, and refusing one of them would
     // be refusing the reset over a value that is never written anywhere.
     if (generating) {
-        if (seed.length > 0 && !world.isSeed(seed)) throw new Error("That seed will not do");
-        if (!world.isLevelType(levelType)) throw new Error("That is not a world type");
-        if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error("That is not a biome");
+        if (seed.length > 0 && !world.isSeed(seed)) throw new Error(gameMessage("games", "lib.badSeed"));
+        if (!world.isLevelType(levelType)) throw new Error(gameMessage("games", "lib.notLevelType"));
+        if (world.usesBiome(levelType) && !world.isBiome(biome)) throw new Error(gameMessage("games", "lib.notBiome"));
     }
 
     // Copying what people are carrying reads the old level off the disk, which
@@ -661,7 +662,7 @@ export async function newWorld(
             // Written out first, or what is copied is the last save rather than
             // what everyone is holding right now.
             await server.say(["save-all", "flush"]).catch(() => undefined);
-            await makeServerDir(server, `${world.DATA_DIR}/${target}`, "Could not create the new world");
+            await makeServerDir(server, `${world.DATA_DIR}/${target}`, gameMessage("games", "lib.run.newWorld"));
             for (const folder of world.PLAYER_DATA_DIRS) {
                 // A server that has none of a folder yet is the ordinary case for a
                 // young world, so a copy that finds nothing is not a failure.
@@ -764,7 +765,7 @@ export async function setAsideVersionedConfig(ownerId: string, installedAppId: s
             if (moving.length === 0) return null;
 
             const aside = `${world.CONFIG_ASIDE_DIR}/${world.folderStamp(new Date())}`;
-            await makeServerDir(server, aside, "Could not set the old config aside");
+            await makeServerDir(server, aside, gameMessage("games", "lib.run.asideConfig"));
             // One move for the whole set rather than one each: on a container that
             // is crash-looping every exec is a race against the next restart, and
             // `mv` takes a directory as its last argument for exactly this.
@@ -847,7 +848,7 @@ export async function setAsideOtherLevels(
             if (moving.length === 0) return null;
 
             const aside = `${world.LEVEL_ASIDE_DIR}/${world.folderStamp(new Date())}`;
-            await makeServerDir(server, aside, "Could not set the old worlds aside");
+            await makeServerDir(server, aside, gameMessage("games", "lib.run.asideWorlds"));
             // One move for the whole set: on a container that is crash-looping,
             // every exec is a race against the next restart.
             const moved = await server.run(["mv", "--", ...moving, aside]);
@@ -884,7 +885,7 @@ export async function setAsideRetiredPlugins(
             if (moving.length === 0) return null;
 
             const aside = `${world.PLUGIN_ASIDE_DIR}/${world.folderStamp(new Date())}`;
-            await makeServerDir(server, aside, "Could not set the old plugins aside");
+            await makeServerDir(server, aside, gameMessage("games", "lib.run.asidePlugins"));
             const moved = await server.run([
                 "mv",
                 "--",
@@ -929,7 +930,7 @@ async function startForFileAccess(ownerId: string, installedAppId: string): Prom
         if (await reachable()) return;
     }
     throw new Error(
-        "The server would not start, so what players are carrying could not be copied. Check the console for why, or try again without carrying it across."
+        gameMessage("games", "lib.carryFailed")
     );
 }
 
@@ -1067,13 +1068,20 @@ async function sweepOne(
             };
         });
     } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "The backup did not run";
+        const message = caught instanceof Error ? caught.message : gameMessage("games", "lib.backupDidNotRun");
         // A server that is simply off is not a failure worth waking anybody for,
         // and neither is one that has nothing to copy yet: a server created a
         // minute ago is still generating its world, and this pass comes round
         // every ten minutes - so the alternative is a notification that repeats
         // until the world exists, about a server doing exactly what it should.
-        if (/start the server first|not been deployed|no world to back up/i.test(message)) return null;
+        const carried = readGameMessage(message)?.key;
+        if (
+            carried === "lib.notDeployed" ||
+            carried === "lib.noWorldYet" ||
+            carried === "lib.startFirst" ||
+            /start the server first|not been deployed|no world to back up/i.test(message)
+        )
+            return null;
         if (rules.notifyOnFailure && (await noteBackupFailure(install, message))) {
             await createNotification({
                 userId: ownerId,
@@ -1096,10 +1104,10 @@ export async function switchLevel(
     level: string,
     actorId: string
 ): Promise<void> {
-    if (!world.isLevelName(level)) throw new Error("That is not a world on this server");
+    if (!world.isLevelName(level)) throw new Error(gameMessage("games", "lib.notWorldHere"));
     const applicationId = await applicationOf(ownerId, installedAppId);
     const edition = await withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!(await readLevels(server)).includes(level)) throw new Error("That world is not on this server");
+        if (!(await readLevels(server)).includes(level)) throw new Error(gameMessage("games", "lib.worldNotHere"));
         return server.edition;
     });
     await setEnvVars("application", applicationId, ownerId, [
@@ -1112,11 +1120,11 @@ export async function switchLevel(
  *  rather than in the screen, because that is the mistake worth being unable to
  *  make from anywhere. */
 export async function deleteLevel(ownerId: string, installedAppId: string, level: string): Promise<void> {
-    if (!world.isLevelName(level)) throw new Error("That is not a world on this server");
+    if (!world.isLevelName(level)) throw new Error(gameMessage("games", "lib.notWorldHere"));
     await withServerContainer(ownerId, installedAppId, async (server) => {
         const { level: current } = await readWorldSettings(ownerId, server.applicationId, server.edition);
-        if (level === current) throw new Error("That is the world the server plays on - switch to another one first");
+        if (level === current) throw new Error(gameMessage("games", "lib.activeWorld"));
         const dirs = world.levelDirs(server.edition, level).map((dir) => `${world.DATA_DIR}/${dir}`);
-        await server.runOk(["rm", "-rf", "--", ...dirs], "Could not delete the world");
+        await server.runOk(["rm", "-rf", "--", ...dirs], gameMessage("games", "lib.run.deleteWorld"));
     });
 }

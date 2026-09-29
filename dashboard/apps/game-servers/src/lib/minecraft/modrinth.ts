@@ -17,6 +17,7 @@
  * and put on screen before the restart rather than after it.
  */
 
+import type { GameKey } from "../../../messages";
 import { z } from "zod";
 import { modrinthLoaderOf } from "@polaris/core";
 
@@ -71,31 +72,32 @@ export function loaderForType(type: string): string | null {
 export interface ModrinthCategory {
     /** The Modrinth tag, or the empty string for "everything". */
     readonly value: string;
-    readonly label: string;
+    /** Its name, as a key into the `minecraft` catalog. */
+    readonly label: GameKey<"minecraft">;
 }
 
 const PLUGIN_CATEGORIES: readonly ModrinthCategory[] = [
-    { value: "", label: "Popular" },
-    { value: "management", label: "Management" },
-    { value: "utility", label: "Utility" },
-    { value: "adventure", label: "Adventure" },
-    { value: "economy", label: "Economy" },
-    { value: "game-mechanics", label: "Game mechanics" },
-    { value: "social", label: "Social" },
-    { value: "worldgen", label: "World generation" },
-    { value: "optimization", label: "Performance" }
+    { value: "", label: "mods.categories.popular" },
+    { value: "management", label: "mods.categories.management" },
+    { value: "utility", label: "mods.categories.utility" },
+    { value: "adventure", label: "mods.categories.adventure" },
+    { value: "economy", label: "mods.categories.economy" },
+    { value: "game-mechanics", label: "mods.categories.mechanics" },
+    { value: "social", label: "mods.categories.social" },
+    { value: "worldgen", label: "mods.categories.worldgen" },
+    { value: "optimization", label: "mods.categories.performance" }
 ];
 
 const MOD_CATEGORIES: readonly ModrinthCategory[] = [
-    { value: "", label: "Popular" },
-    { value: "utility", label: "Utility" },
-    { value: "adventure", label: "Adventure" },
-    { value: "technology", label: "Technology" },
-    { value: "magic", label: "Magic" },
-    { value: "storage", label: "Storage" },
-    { value: "food", label: "Food" },
-    { value: "worldgen", label: "World generation" },
-    { value: "optimization", label: "Performance" }
+    { value: "", label: "mods.categories.popular" },
+    { value: "utility", label: "mods.categories.utility" },
+    { value: "adventure", label: "mods.categories.adventure" },
+    { value: "technology", label: "mods.categories.technology" },
+    { value: "magic", label: "mods.categories.magic" },
+    { value: "storage", label: "mods.categories.storage" },
+    { value: "food", label: "mods.categories.food" },
+    { value: "worldgen", label: "mods.categories.worldgen" },
+    { value: "optimization", label: "mods.categories.performance" }
 ];
 
 /** What a server of this flavour can be browsed by. */

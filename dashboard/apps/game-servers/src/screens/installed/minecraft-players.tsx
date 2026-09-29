@@ -18,7 +18,13 @@
  */
 
 import * as actions from "./minecraft-actions";
-import { timeoutText, useGameText, usePlayerWords, type GameText } from "../game-text";
+import {
+    type GameText,
+    timeoutText,
+    useGameText,
+    usePlayerWords,
+    useSchemaText
+} from "../game-text";
 import type { PlayerWords } from "../../lib/player-vocabulary";
 import { forgetLoginAction } from "./minecraft-login-actions";
 import type { PlayerSeen } from "../../lib/games-activity";
@@ -145,6 +151,7 @@ export function MinecraftPlayers({
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
+    const schemaText = useSchemaText();
     const { playerAction, playerConfirm, playerFilters } = usePlayerWords();
     const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
@@ -644,7 +651,7 @@ export function MinecraftPlayers({
                 isEmpty={shown.length === 0}
                 empty={
                     !answering && players.length === 0
-                        ? (status?.message ?? t("playersTab.connecting"))
+                        ? (schemaText(status?.message) ?? t("playersTab.connecting"))
                         : players.length === 0
                           ? t("playersTab.nobodyAtAll")
                           : t("playersTab.nobodyMatches")
@@ -907,6 +914,7 @@ function PlayerRow({
     onResetPassword?: () => void;
     onRevoke: () => void;
 }) {
+    const schemaText = useSchemaText();
     const { playerAction, playerStanding } = usePlayerWords();
     const t = useGameText("minecraft");
     const tGames = useGameText("games");
@@ -959,9 +967,9 @@ function PlayerRow({
                     {(player.note ?? player.banReason) && (
                         <p
                             className="truncate text-xs text-muted-foreground"
-                            title={player.banReason ?? player.note ?? undefined}
+                            title={schemaText(player.banReason ?? player.note ?? undefined)}
                         >
-                            {player.banReason ?? player.note}
+                            {schemaText(player.banReason ?? player.note ?? undefined)}
                         </p>
                     )}
                 </td>
@@ -1013,7 +1021,9 @@ function PlayerRow({
                     <div className="flex flex-wrap items-center gap-1">
                         {player.linkedTo && (
                             <Badge
-                                title={t("playersTab.linkedHint", { name: player.linkedTo.name })}
+                                title={t("playersTab.linkedHint", {
+                                    name: schemaText(player.linkedTo.name) ?? ""
+                                })}
                             >
                                 {t("playersTab.linked")}
                             </Badge>
@@ -1092,7 +1102,7 @@ function PlayerRow({
                     ) : (
                         <span className="flex flex-wrap gap-1">
                             {player.addresses.map((address) => (
-                                <Badge key={address}>{address}</Badge>
+                                <Badge key={address}>{schemaText(address)}</Badge>
                             ))}
                         </span>
                     )}

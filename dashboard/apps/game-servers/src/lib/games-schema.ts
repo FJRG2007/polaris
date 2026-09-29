@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { gameMessage } from "./game-message";
 import { isArkMap, findSoftware, isModpackReference, isServerJarUrl, isServerSoftware } from "@polaris/core";
 import { isWorldMap } from "./minecraft/maps";
 import { isBiome, isLevelType, isSeed } from "./minecraft/world";
@@ -24,7 +25,7 @@ import { isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "./ark/access";
 /** What every server is asked, whatever it plays: what it is called, where it
  *  runs, how big it is and what it answers to. */
 const commonFields = {
-    name: z.string().trim().min(1, "Name the server").max(48),
+    name: z.string().trim().min(1, gameMessage("games", "schema.nameServer")).max(48),
     /** "local" or a connected server's id. */
     serverId: z.string().trim().min(1),
     /** Slots. What the server refuses past, not what it plans for. */
@@ -40,16 +41,16 @@ const minecraftServerSchema = z.object({
     ...commonFields,
     /** The player the server is created for. Required: both images enforce a
      *  list, and a server created without a name on it is one nobody can join. */
-    ownerPlayer: z.string().trim().min(1, "Give the username that will run the server").max(16),
+    ownerPlayer: z.string().trim().min(1, gameMessage("games", "schema.ownerPlayer")).max(16),
     /** Where that player connects from - one address, a CIDR range, or "any". */
-    ownerAddress: z.string().trim().min(1, "Give the address that player connects from").max(43),
+    ownerAddress: z.string().trim().min(1, gameMessage("games", "schema.ownerAddress")).max(43),
     /** Which client it is for. Crossplay makes a Java server Bedrock can also join. */
     edition: z.enum(["java", "bedrock"]),
     crossplay: z.boolean().default(false),
     blueprintId: z.string().trim().min(1).max(48).default("survival"),
     /** A prebuilt map of that game to build on, fetched while the server is
      *  created. Blank generates a world instead. */
-    mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
+    mapId: z.string().trim().max(64).refine(isWorldMap, gameMessage("games", "schema.notMap")).optional(),
     /** Java only: PAPER, FABRIC, ... The blueprint may pin it. Checked against the
      *  software catalogue, because this is written into the image environment as
      *  it stands and the image exits on anything it does not know. */
@@ -57,7 +58,7 @@ const minecraftServerSchema = z.object({
         .string()
         .trim()
         .max(32)
-        .refine(isServerSoftware, "That is not server software Polaris can install")
+        .refine(isServerSoftware, gameMessage("games", "schema.notSoftware"))
         .optional(),
     /** The one value the chosen software needs: the modpack for a modpack server,
      *  the URL of the jar for a custom one. Ignored by everything else. */
@@ -67,9 +68,9 @@ const minecraftServerSchema = z.object({
      *  else is hashed. Blank is a random world. */
     seed: z.string().trim().max(64).optional(),
     /** The shape of the world. Java only; Bedrock names its own differently. */
-    levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
+    levelType: z.string().trim().max(64).refine(isLevelType, gameMessage("games", "schema.notLevelType")).optional(),
     /** Which biome the whole overworld is, when the type is the one-biome one. */
-    biome: z.string().trim().max(64).refine(isBiome, "That is not a biome").optional()
+    biome: z.string().trim().max(64).refine(isBiome, gameMessage("games", "schema.notBiome")).optional()
 });
 
 const arkServerSchema = z.object({
@@ -77,16 +78,16 @@ const arkServerSchema = z.object({
     ...commonFields,
     /** The map its world is generated on. A closed set: the level names are case
      *  sensitive and four of them are not what the map is called. */
-    map: z.string().trim().min(1).max(64).refine(isArkMap, "That is not a map this server can run"),
+    map: z.string().trim().min(1).max(64).refine(isArkMap, gameMessage("games", "schema.notArkMap")),
     /** The name the server shows in the in-game browser, which is not the name
      *  Polaris files it under. */
-    sessionName: z.string().trim().min(1, "Name the server as players will see it").max(64),
+    sessionName: z.string().trim().min(1, gameMessage("games", "schema.sessionName")).max(64),
     /** What a player types to get in. Always set: the image's own default is
      *  published in its documentation. */
-    joinPassword: z.string().trim().min(1, "Give a join password"),
+    joinPassword: z.string().trim().min(1, gameMessage("games", "schema.joinPassword")),
     /** The SteamID64 of whoever is creating it, so a closed server has somebody
      *  who can actually get into it. */
-    ownerSteamId: z.string().trim().min(1, "Give your Steam id"),
+    ownerSteamId: z.string().trim().min(1, gameMessage("games", "schema.steamId")),
     /** How the owner is listed on the allow list, since a 17-digit number
      *  identifies nobody on sight. */
     ownerLabel: z.string().trim().max(48).optional(),
@@ -102,10 +103,10 @@ const fivemServerSchema = z.object({
     ...commonFields,
     /** The free Cfx key the server will not start without. The one value Polaris
      *  cannot mint for them. */
-    licenseKey: z.string().trim().min(1, "Paste the server key from keymaster.fivem.net"),
+    licenseKey: z.string().trim().min(1, gameMessage("games", "schema.licenseKey")),
     /** The name the server shows in the in-game browser, which is not the name
      *  Polaris files it under. */
-    sessionName: z.string().trim().min(1, "Name the server as players will see it").max(96),
+    sessionName: z.string().trim().min(1, gameMessage("games", "schema.sessionName")).max(96),
     /**
      * Whoever is creating it, as the game will know them.
      *
@@ -120,7 +121,7 @@ const fivemServerSchema = z.object({
         .string()
         .trim()
         .max(96)
-        .refine((value) => value.length === 0 || isIdentifier(value), "That is not a player identifier")
+        .refine((value) => value.length === 0 || isIdentifier(value), gameMessage("games", "schema.notIdentifier"))
         .optional(),
     /** How the owner is listed, since an identifier names nobody on sight. */
     ownerLabel: z.string().trim().max(48).optional(),
@@ -145,7 +146,7 @@ const hytaleServerSchema = z.object({
     memory: z
         .string()
         .trim()
-        .regex(/^[1-9][0-9]{0,4}[MG]$/, "Memory is a number and a unit, like 3G or 4096M")
+        .regex(/^[1-9][0-9]{0,4}[MG]$/, gameMessage("games", "schema.memory"))
         .default("3G")
 });
 
@@ -164,7 +165,7 @@ export const createGameServerSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["concurrentPlayers"],
-                message: "There cannot be more players at once than there are slots"
+                message: gameMessage("games", "schema.tooManyPlayers")
             });
         }
         if (value.game === "fivem") {
@@ -175,14 +176,14 @@ export const createGameServerSchema = z
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["exclusiveJoin"],
-                    message: "A closed server needs somebody on its list, or nobody can join it"
+                    message: gameMessage("games", "schema.closedNeedsSomebody")
                 });
             }
             if (value.maxPlayers > 32 && value.onesync === "off") {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["onesync"],
-                    message: "More than 32 slots needs OneSync on"
+                    message: gameMessage("games", "schema.onesync")
                 });
             }
             return;
@@ -195,7 +196,7 @@ export const createGameServerSchema = z
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["ownerSteamId"],
-                    message: "A Steam id is the 17-digit number from your profile, starting 7656119"
+                    message: gameMessage("games", "schema.steamIdRule")
                 });
             }
             if (!isJoinPassword(value.joinPassword)) {
@@ -205,7 +206,7 @@ export const createGameServerSchema = z
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["mods"],
-                    message: "Workshop ids are numbers, comma separated"
+                    message: gameMessage("games", "schema.workshopIds")
                 });
             }
             return;
@@ -216,22 +217,22 @@ export const createGameServerSchema = z
                 path: ["ownerPlayer"],
                 message:
                     value.edition === "bedrock"
-                        ? "That is not an Xbox gamertag"
-                        : "A Minecraft username is 3 to 16 letters, digits or underscores"
+                        ? gameMessage("games", "schema.gamertag")
+                        : gameMessage("games", "schema.javaName")
             });
         }
         if (!isAddressRule(value.ownerAddress)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["ownerAddress"],
-                message: "Give one address, a range like 203.0.113.0/24, or \"any\""
+                message: gameMessage("games", "schema.addressRule")
             });
         }
         if (value.seed !== undefined && value.seed.length > 0 && !isSeed(value.seed)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["seed"],
-                message: "A seed is up to 64 characters of ordinary text"
+                message: gameMessage("games", "schema.seed")
             });
         }
         const wrongSource = softwareSourceError(value.software, value.softwareSource);
@@ -242,7 +243,7 @@ export const createGameServerSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["crossplay"],
-                message: "Crossplay is a Java server that Bedrock players can also join"
+                message: gameMessage("games", "schema.crossplay")
             });
         }
     });
@@ -261,18 +262,18 @@ export const resetMinecraftServerSchema = z
     .object({
         installedAppId: z.string().uuid(),
         blueprintId: z.string().trim().min(1).max(48).default("survival"),
-        mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
+        mapId: z.string().trim().max(64).refine(isWorldMap, gameMessage("games", "schema.notMap")).optional(),
         software: z
             .string()
             .trim()
             .max(32)
-            .refine(isServerSoftware, "That is not server software Polaris can install")
+            .refine(isServerSoftware, gameMessage("games", "schema.notSoftware"))
             .optional(),
         softwareSource: z.string().trim().max(500).optional(),
         version: z.string().trim().max(32).default("LATEST"),
         seed: z.string().trim().max(64).optional(),
-        levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
-        biome: z.string().trim().max(64).refine(isBiome, "That is not a biome").optional(),
+        levelType: z.string().trim().max(64).refine(isLevelType, gameMessage("games", "schema.notLevelType")).optional(),
+        biome: z.string().trim().max(64).refine(isBiome, gameMessage("games", "schema.notBiome")).optional(),
         concurrentPlayers: z.number().int().min(1).max(1000).default(8),
         /** Java only, and the server has to be running for the copy to be made. */
         keepPlayers: z.boolean().default(false)
@@ -282,7 +283,7 @@ export const resetMinecraftServerSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["seed"],
-                message: "A seed is up to 64 characters of ordinary text"
+                message: gameMessage("games", "schema.seed")
             });
         }
         const wrongSource = softwareSourceError(value.software, value.softwareSource);
@@ -304,10 +305,10 @@ export function softwareSourceError(software: string | undefined, source: string
     if (!asks) return null;
     const value = (source ?? "").trim();
     if (value.length === 0)
-        return asks === "modpack" ? "Name the modpack to install" : "Give the URL of the server jar";
+        return asks === "modpack" ? gameMessage("games", "lib.nameModpack") : gameMessage("games", "lib.giveJarUrl");
     if (asks === "modpack" && !isModpackReference(value))
-        return "That is a modpack short name, or the link to its page";
-    if (asks === "jar" && !isServerJarUrl(value)) return "That is an https link ending in .jar";
+        return gameMessage("games", "lib.modpackRule");
+    if (asks === "jar" && !isServerJarUrl(value)) return gameMessage("games", "lib.jarRule");
     return null;
 }
 

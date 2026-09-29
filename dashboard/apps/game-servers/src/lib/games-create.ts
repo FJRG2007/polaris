@@ -18,6 +18,7 @@
  * which is strictly better than no server.
  */
 
+import { gameMessage } from "./game-message";
 import { prisma } from "@polaris/db";
 import * as fivemAccess from "./fivem/access";
 import { joinAccess } from "./minecraft/access";
@@ -214,15 +215,22 @@ export async function minecraftShapeEnv(
     // that boots, loads the world, and silently does none of what the map does.
     if (pinned && !wantsLatest(asked) && asked !== pinned) {
         throw new Error(
-            `${map?.name} only plays on Minecraft ${pinned}, so the server has to be built on it.`
+            gameMessage("games", "lib.mapPinned", { name: map?.name ?? "", version: pinned })
         );
     }
     const wanted = pinned ?? (wantsLatest(asked) ? null : asked);
     if (wanted && knownUnsupported(versions, wanted)) {
         throw new Error(
             pinned
-                ? `${map?.name} needs Minecraft ${pinned}, which this server's plugins have nothing built for.`
-                : `${blueprint.name} has nothing built for Minecraft ${wanted}. The newest it runs on is ${versions[0]}.`
+                ? gameMessage("games", "lib.mapNeedsVersion", {
+                      name: map?.name ?? "",
+                      version: pinned
+                  })
+                : gameMessage("games", "lib.blueprintNoBuild", {
+                      name: blueprint.name,
+                      version: wanted,
+                      newest: versions[0] ?? ""
+                  })
         );
     }
     env.set("VERSION", wanted ?? versions[0] ?? "LATEST");
@@ -495,9 +503,9 @@ export async function expectedMinecraftHeapMb(
 /** The blueprint a shape names, refusing one this edition cannot be built from. */
 export function blueprintFor(edition: "java" | "bedrock", blueprintId: string): GameBlueprint {
     const blueprint = findBlueprint(blueprintId);
-    if (!blueprint) throw new Error("Unknown blueprint");
+    if (!blueprint) throw new Error(gameMessage("games", "lib.unknownBlueprint"));
     if (!blueprint.editions.includes(edition))
-        throw new Error("That blueprint is not available for this edition");
+        throw new Error(gameMessage("games", "lib.blueprintNotForEdition"));
     return blueprint;
 }
 
@@ -522,7 +530,7 @@ async function createMinecraftServer(
 ): Promise<CreatedGameServer> {
     const catalogId = TEMPLATE_BY_EDITION[input.edition];
     const manifest = findApp(catalogId);
-    if (!manifest) throw new Error("That edition is not available");
+    if (!manifest) throw new Error(gameMessage("games", "lib.editionUnavailable"));
     const blueprint = blueprintFor(input.edition, input.blueprintId);
 
     const base = defaultInstallInput(manifest, input.serverId);
@@ -613,7 +621,7 @@ async function createMinecraftServer(
     await grantPlayerAccess(ownerId, install.installedAppId, actorId, {
         username: input.ownerPlayer,
         address: input.ownerAddress,
-        note: "Created this server"
+        note: gameMessage("games", "lib.createdServer")
     });
 
     const hostname = await attachHostname(ownerId, install.installedAppId, input, {
@@ -707,7 +715,7 @@ async function createArkServer(
     input: CreateArkServerInput
 ): Promise<CreatedGameServer> {
     const manifest = findApp(ARK_CATALOG_ID);
-    if (!manifest) throw new Error("ARK is not available");
+    if (!manifest) throw new Error(gameMessage("games", "lib.arkUnavailable"));
 
     const ports = await allocateArkPorts();
     const base = defaultInstallInput(manifest, input.serverId);
@@ -789,7 +797,7 @@ async function createFivemServer(
     input: CreateFivemServerInput
 ): Promise<CreatedGameServer> {
     const manifest = findApp(FIVEM_CATALOG_ID);
-    if (!manifest) throw new Error("FiveM is not available");
+    if (!manifest) throw new Error(gameMessage("games", "lib.fivemUnavailable"));
 
     const port = await allocateFivemPort();
     const base = defaultInstallInput(manifest, input.serverId);
@@ -876,7 +884,7 @@ async function createHytaleServer(
     input: CreateHytaleServerInput
 ): Promise<CreatedGameServer> {
     const manifest = findApp(HYTALE_CATALOG_ID);
-    if (!manifest) throw new Error("Hytale is not available");
+    if (!manifest) throw new Error(gameMessage("games", "lib.hytaleUnavailable"));
 
     const port = await allocateHytalePort();
     const base = defaultInstallInput(manifest, input.serverId);

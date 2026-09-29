@@ -7,6 +7,7 @@
  * screen, a core job or a core pass is reached through here.
  */
 
+import { gameMessage } from "./game-message";
 import { host } from "@polaris/app-host";
 import { gameJobTable } from "./games-jobs";
 import { SOFTWARE_KEY } from "./minecraft/join-guard";
@@ -53,13 +54,13 @@ const lazyWorldSource: BackupSource = {
     produceInPlace: async (resource) => (await worldSource()).produceInPlace?.(resource) ?? null,
     readInPlace: async (resource, path) => {
         const source = await worldSource();
-        if (!source.readInPlace) throw new Error("This copy cannot be read back");
+        if (!source.readInPlace) throw new Error(gameMessage("games", "lib.copyNotReadable"));
         return source.readInPlace(resource, path);
     },
     removeInPlace: async (resource, path) => (await worldSource()).removeInPlace?.(resource, path),
     restore: async (resource, body, metadata, actorId) => {
         const source = await worldSource();
-        if (!source.restore) throw new Error("This copy cannot be put back");
+        if (!source.restore) throw new Error(gameMessage("games", "lib.copyNotRestorable"));
         return source.restore(resource, body, metadata, actorId);
     }
 };

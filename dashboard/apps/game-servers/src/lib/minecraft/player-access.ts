@@ -29,6 +29,7 @@
  * name is a promise about who is playing, not only where from.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { noteReachedFrom } from "./reach";
 import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "./parse";
@@ -75,7 +76,7 @@ const { requireUser } = host.session;
 const PLAYER_ADDRESSES_SETTING = "games.share-player-addresses";
 
 /** What a session-followed address reads as to somebody not allowed to see it. */
-export const HIDDEN_SIGN_IN_ADDRESS = "Polaris sign-in (hidden)";
+export const HIDDEN_SIGN_IN_ADDRESS = gameMessage("games", "lib.hiddenSignIn");
 
 /**
  * Whether the person asking may see where other accounts sign in from. An
@@ -233,7 +234,7 @@ async function resolve(ownerId: string, installedAppId: string): Promise<AccessI
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { id: true, applicationId: true, catalogId: true, config: true }
     });
-    if (!row) throw new Error("Installed app not found");
+    if (!row) throw new Error(gameMessage("games", "lib.appNotFound"));
     const config = readInstallConfig(row.config);
     return {
         id: row.id,
@@ -281,7 +282,7 @@ export async function listPlayerAccess(
         links: links.map((link) => ({
             username: link.player,
             userId: link.userId,
-            name: names.get(link.userId) || "A Polaris account",
+            name: names.get(link.userId) || gameMessage("games", "lib.aPolarisAccount"),
             followSignIns: follows(link)
         })),
         bindAddresses: install.bindAddresses,
@@ -332,12 +333,10 @@ async function readRoster(server: ServerContainer, path: string): Promise<string
 }
 
 /** Said when the list could not be read, so nothing was written over it. */
-const ROSTER_UNREAD =
-    "Polaris could not read this server's player list just now, and will not write over a list it cannot see. Try again in a moment.";
+const ROSTER_UNREAD = gameMessage("games", "lib.playerListUnread");
 
 /** Said when the file is right and the running server has not been told. */
-const RELOAD_UNREAD =
-    "The server did not reload its list, so it will pick this up the next time it starts.";
+const RELOAD_UNREAD = gameMessage("games", "lib.listNotReloaded");
 
 /** Write a roster file, refusing in terms of the list rather than the shell's.
  *  What the container printed is a command's complaint about a path; the person
@@ -346,9 +345,7 @@ async function writeRoster(server: ServerContainer, path: string, content: strin
     try {
         await writeContainerFile(server, path, content);
     } catch {
-        throw new Error(
-            "The server's player list could not be written, so nothing on it was changed."
-        );
+        throw new Error(gameMessage("games", "lib.playerListUnwritten"));
     }
 }
 
@@ -430,7 +427,7 @@ async function spellingsSeen(installedAppId: string): Promise<string[]> {
  */
 async function putOnWhitelist(server: ServerContainer, names: readonly string[]): Promise<string> {
     if (names.length === 0) return "";
-    const added = `Added to the whitelist: ${names.join(", ")}.`;
+    const added = gameMessage("games", "lib.whitelistAdded", { names: names.join(", ") });
     if (!(await inventsIdentities(server))) {
         for (const name of names) {
             const refusal = parseWhitelistRefusal(await server.say(["whitelist", "add", name]));
@@ -444,13 +441,15 @@ async function putOnWhitelist(server: ServerContainer, names: readonly string[])
     if (current === null) throw new Error(ROSTER_UNREAD);
     const written = withOfflineNames(current, names);
     if (written !== null) await writeRoster(server, WHITELIST_FILE, written);
-    return (await reloadWhitelist(server)) ? added : `${added} ${RELOAD_UNREAD}`;
+    return (await reloadWhitelist(server))
+        ? added
+        : gameMessage("games", "lib.withNote", { message: added, note: RELOAD_UNREAD });
 }
 
 /** Take a name off the game's own whitelist. Same split: the file is the truth on
  *  a server that invents identities, and the command is on one that does not. */
 async function takeOffWhitelist(server: ServerContainer, name: string): Promise<string> {
-    const removed = `Removed ${name} from the whitelist.`;
+    const removed = gameMessage("games", "lib.whitelistRemoved", { name });
     if (!(await inventsIdentities(server))) {
         await server.say(["whitelist", "remove", name]);
         return removed;
@@ -815,17 +814,15 @@ export async function linkPlayerAccount(
     const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
     const followSignIns = input.followSignIns !== false;
     if (install.edition !== "java" && followSignIns) {
-        throw new Error(
-            "Bedrock servers do not report where a player connects from, so a player cannot be tied to their sign-ins."
-        );
+        throw new Error(gameMessage("games", "lib.bedrockNoLink"));
     }
     if (!isPlayerName(install.edition, username))
-        throw new Error("That is not a username this edition accepts");
+        throw new Error(gameMessage("games", "lib.notEditionUsername"));
     const person = await prisma.user.findUnique({
         where: { id: input.userId },
         select: { id: true }
     });
-    if (!person) throw new Error("That Polaris account does not exist");
+    if (!person) throw new Error(gameMessage("games", "lib.noSuchAccount"));
 
     const existing = await linkFor(installedAppId, username);
     if (existing) {
@@ -860,7 +857,7 @@ export async function linkPlayerAccount(
     await whitelistPlayer(ownerId, installedAppId, username).catch((caught: unknown) => {
         if (!(caught instanceof WhitelistRefused)) return null;
         throw new Error(
-            `${username} is linked, but the game would not take them: ${caught.message}`
+            gameMessage("games", "lib.linkedRefused", { name: username, said: caught.message })
         );
     });
     await enforcePlayerAddresses(ownerId, installedAppId).catch(() => null);
@@ -926,16 +923,13 @@ export async function grantPlayerAccess(
     const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
     const address = input.address.trim().toLowerCase();
     if (!isPlayerName(install.edition, username))
-        throw new Error("That is not a username this edition accepts");
-    if (!isAddressRule(address))
-        throw new Error('Give one address, a range like 203.0.113.0/24, or "any"');
+        throw new Error(gameMessage("games", "lib.notEditionUsername"));
+    if (!isAddressRule(address)) throw new Error(gameMessage("games", "schema.addressRule"));
     // Only a link that follows sign-ins owns where they connect from. One that
     // only says who they are leaves their addresses to be typed, like anybody's.
     const link = await linkFor(installedAppId, username);
     if (link && follows(link)) {
-        throw new Error(
-            `${username} is tied to a Polaris account, so where they connect from follows its sign-ins.`
-        );
+        throw new Error(gameMessage("games", "lib.addressFollowsAccount", { name: username }));
     }
 
     await prisma.gamePlayerAccess.upsert({
@@ -961,7 +955,7 @@ export async function grantPlayerAccess(
     await whitelistPlayer(ownerId, installedAppId, username).catch((caught: unknown) => {
         if (!(caught instanceof WhitelistRefused)) return null;
         throw new Error(
-            `${username} is on this server's player list, but the game would not take them: ${caught.message}`
+            gameMessage("games", "lib.listedRefused", { name: username, said: caught.message })
         );
     });
 }
@@ -985,9 +979,7 @@ export async function revokePlayerAddress(
         select: { source: true }
     });
     if (held?.source === "session") {
-        throw new Error(
-            "That address comes from their Polaris sign-ins. Unlink the account to change it."
-        );
+        throw new Error(gameMessage("games", "lib.addressFromSignIns"));
     }
     await prisma.gamePlayerAccess.deleteMany({ where: { installedAppId, username, address } });
     const left = await prisma.gamePlayerAccess.count({ where: { installedAppId, username } });

@@ -12,6 +12,7 @@
  * slot with the enchantments it left with, or does not arrive at all.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { planStackMove } from "./stack-move";
@@ -380,7 +381,7 @@ export async function transferInventory(
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const reading = await readLiveInventory((argv) => server.say(argv), from);
         if (!reading.answered)
-            throw new Error(`${from} has to be on the server to send their inventory.`);
+            throw new Error(gameMessage("games", "lib.senderOffline", { name: from }));
         let moved = 0;
         let kept = reading.unreadable;
         for (const [index, item] of reading.items.entries()) {

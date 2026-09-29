@@ -18,6 +18,7 @@
  * to the server is rendered from the same list the screen drew.
  */
 
+import { gameMessage } from "../game-message";
 import { isIdentifier, normalizeIdentifier } from "./players";
 
 /** Where each list lives on the install's own settings blob. */
@@ -249,7 +250,7 @@ export function isConsolePassword(value: string): boolean {
 }
 
 /** What to say when one is refused, in the terms it was refused on. */
-export const CONSOLE_PASSWORD_HINT = "12 to 64 letters and digits, and nothing else";
+export const CONSOLE_PASSWORD_HINT = gameMessage("games", "lib.consolePasswordRule");
 
 /**
  * A console password nobody had to invent.
@@ -284,4 +285,4 @@ export function isBanReason(value: string): boolean {
 }
 
 /** What to say when one is refused, in the terms it was refused on. */
-export const REASON_HINT = "One line, and no double quotes - the game console cannot carry them.";
+export const REASON_HINT = gameMessage("games", "lib.reasonRule");

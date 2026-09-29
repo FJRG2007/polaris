@@ -19,6 +19,7 @@
  * the button is usually that it is not well.
  */
 
+import { gameMessage } from "./game-message";
 import { prisma } from "@polaris/db";
 import { gameOfServer, withTimeout } from "@polaris/core";
 import { saveArkWorld } from "./ark/service";
@@ -64,7 +65,7 @@ async function backUpBeforeStop(
     await withTimeout(
         createWorldBackup(ownerId, installedAppId),
         SHUTDOWN_BACKUP_MS,
-        "The backup was still running when the server had to stop"
+        gameMessage("games", "lib.backupInterrupted")
     );
 }
 

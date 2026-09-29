@@ -14,6 +14,8 @@
  */
 
 /** One resource on the server. */
+import { gameMessage } from "../game-message";
+
 export interface FivemResource {
     readonly name: string;
     /** Whether the server has it started right now. */
@@ -158,7 +160,7 @@ export function isResourceUrl(value: string): boolean {
 }
 
 /** What to say when a link is refused, in the terms it was refused on. */
-export const RESOURCE_URL_HINT = "A https link ending in .zip, .tar.gz or .tgz - the release file, not the page.";
+export const RESOURCE_URL_HINT = gameMessage("games", "lib.resourceUrlRule");
 
 /** A resource name suggested from a link, so the field is filled in rather than
  *  asked for. The archive's own file name, with the version and the extension

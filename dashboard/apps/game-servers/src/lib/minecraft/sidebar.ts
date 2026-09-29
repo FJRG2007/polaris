@@ -15,6 +15,7 @@
  * Pure: what is allowed and what is sent can be asserted without a server.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 import { stripMotd } from "./motd";
 import { javaComponent } from "./announcement";
@@ -106,7 +107,7 @@ const text = (max: number) =>
     z
         .string()
         .max(max * 4)
-        .refine((value) => !/[\0\r\n]/.test(value), "One line each");
+        .refine((value) => !/[\0\r\n]/.test(value), gameMessage("games", "lib.oneLineEach"));
 
 const effectSchema = z.object({
     kind: z.enum(SIDEBAR_EFFECTS),
@@ -178,9 +179,9 @@ export function sidebarSupported(edition: MinecraftEdition, release: string | nu
 
 /** Why the panel cannot be switched on here, or null. */
 export function sidebarRefusal(edition: MinecraftEdition, release: string | null): string | null {
-    if (edition === "bedrock") return "Bedrock has no side panel Polaris can write to";
+    if (edition === "bedrock") return gameMessage("games", "lib.bedrockNoSidebar");
     if (!sidebarSupported(edition, release)) {
-        return "The side panel needs Minecraft 1.20.3 or newer on this server";
+        return gameMessage("games", "lib.sidebarNeeds1203");
     }
     return null;
 }
@@ -188,11 +189,12 @@ export function sidebarRefusal(edition: MinecraftEdition, release: string | null
 /** What is wrong with one text of the panel, or null. */
 function textProblem(value: string, max: number, known: KnownValues): string | null {
     if (usesPerPlayer(value)) {
-        return "The panel is the same for everybody: only {server.*} and {call.*} go on it";
+        return gameMessage("games", "lib.sidebarSharedOnly");
     }
     const wrong = variableProblem(value, "java");
     if (wrong) return wrong;
-    if (visibleLength(stripMotd(value), known) > max) return `At most ${max} characters`;
+    if (visibleLength(stripMotd(value), known) > max)
+        return gameMessage("games", "lib.atMostCharacters", { count: max });
     return null;
 }
 
@@ -218,9 +220,9 @@ export function sidebarProblems(
     const lines = sidebar.lines.map((line) => of(line, SIDEBAR_LINE_MAX));
     const count =
         sidebar.lines.length > SIDEBAR_LINES_MAX
-            ? `At most ${SIDEBAR_LINES_MAX} lines`
+            ? gameMessage("games", "lib.atMostLines", { count: SIDEBAR_LINES_MAX })
             : sidebar.enabled && sidebar.lines.length === 0
-              ? "Add a line for the panel to show"
+              ? gameMessage("games", "lib.sidebarAddLine")
               : undefined;
     return { title, lines, ...(count ? { count } : {}) };
 }

@@ -18,6 +18,7 @@
  * the two states each row is in.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { ARK_ROOT } from "./files";
 import { withServerContainer } from "../minecraft/service";
@@ -54,7 +55,7 @@ async function requireArkApplication(ownerId: string, installedAppId: string): P
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true }
     });
-    if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install?.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     return install.applicationId;
 }
 
@@ -107,7 +108,7 @@ export async function setArkMods(
     ids: readonly string[]
 ): Promise<void> {
     const applicationId = await requireArkApplication(ownerId, installedAppId);
-    for (const id of ids) if (!isModId(id)) throw new Error("That is not a Steam Workshop id");
+    for (const id of ids) if (!isModId(id)) throw new Error(gameMessage("games", "lib.notWorkshopId"));
     await setEnvVars("application", applicationId, ownerId, [
         { key: MOD_LIST, value: formatModIds([...ids]), isSecret: false }
     ]);
@@ -121,7 +122,7 @@ export async function setArkMapMod(
     id: string | null
 ): Promise<void> {
     const applicationId = await requireArkApplication(ownerId, installedAppId);
-    if (id !== null && !isModId(id)) throw new Error("That is not a Steam Workshop id");
+    if (id !== null && !isModId(id)) throw new Error(gameMessage("games", "lib.notWorkshopId"));
     await setEnvVars("application", applicationId, ownerId, [
         { key: MAP_MOD, value: id ?? "", isSecret: false }
     ]);

@@ -15,6 +15,7 @@
  * server whose ports fall outside a range rule.
  */
 
+import { gameMessage } from "../game-message";
 import { PREFERRED_HOST_PORT } from "./config";
 import { host } from "@polaris/app-host";
 
@@ -35,6 +36,6 @@ export async function allocateFivemPort(): Promise<number> {
     for (let port = from; port <= block.end; port += 1) if (free(port)) return port;
     for (let port = block.start; port < from; port += 1) if (free(port)) return port;
     throw new Error(
-        `Every port in the range ${describeBlock(block)} is in use. Widen it under Admin, Domains, or remove a server that is no longer running.`
+        gameMessage("games", "lib.portsFull", { range: describeBlock(block) })
     );
 }

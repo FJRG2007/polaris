@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { MAX_RESTART_REASON, type PendingRestart } from "../../lib/games-restart";
 import {
@@ -76,7 +76,7 @@ export async function scheduleGameRestartAction(input: {
         });
         return { pending };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatRestartCouldNotBe") };
+        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatRestartCouldNotBe") };
     }
 }
 
@@ -93,7 +93,7 @@ export async function cancelGameRestartAction(installedAppId: string): Promise<{
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatRestartCouldNotBe2") };
+        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatRestartCouldNotBe2") };
     }
 }
 
@@ -117,6 +117,6 @@ export async function restartGameNowAction(installedAppId: string): Promise<{ er
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerCouldNotBe") };
+        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.theServerCouldNotBe") };
     }
 }

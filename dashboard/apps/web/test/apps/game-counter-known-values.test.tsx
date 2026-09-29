@@ -12,6 +12,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { english } from "../setup/game-english";
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
@@ -52,7 +53,7 @@ describe("counting a text", () => {
 describe("what is refused", () => {
     it("takes a panel title that fits with the server's own name", () => {
         const sidebar = { ...DEFAULT_SIDEBAR, title: plainLine(TITLE) };
-        expect(sidebarProblems(sidebar).title[0]).toBe(`At most ${SIDEBAR_TITLE_MAX} characters`);
+        expect(english(sidebarProblems(sidebar).title[0])).toBe(`At most ${SIDEBAR_TITLE_MAX} characters`);
         expect(sidebarProblems(sidebar, KNOWN).title[0]).toBeNull();
     });
 
@@ -61,7 +62,7 @@ describe("what is refused", () => {
         const draft = { ...BLANK_ANNOUNCEMENT, title: `${"x".repeat(100)}{server.name}` };
         const plain = announcementProblems(draft, "java").title;
         const known = announcementProblems(draft, "java", Date.now(), KNOWN).title;
-        expect(plain).toBe(`At most ${LINE_MAX} characters on screen`);
+        expect(english(plain)).toBe(`At most ${LINE_MAX} characters on screen`);
         expect(known).toBeUndefined();
     });
 });

@@ -180,7 +180,19 @@
         "templateSaved": "Template saved.",
         "fadeIn": "Fade in",
         "stay": "On screen",
-        "fadeOut": "Fade out"
+        "fadeOut": "Fade out",
+        "sounds": {
+            "none": "No sound",
+            "pling": "Pling",
+            "orb": "Experience orb",
+            "levelUp": "Level up",
+            "challenge": "Challenge complete",
+            "bell": "Bell",
+            "beacon": "Beacon",
+            "bass": "Warning (bass)",
+            "horn": "Raid horn",
+            "dragon": "Dragon growl"
+        }
     },
     "errors": {
         "checkTheDetailsAndTry": "Check the details and try again",
@@ -314,7 +326,14 @@
         "budgetHintUsed": "Nought is no limit. The oldest go as the total approaches it - they take up {size} now. The newest copy is never deleted.",
         "readFailed": "Could not read the world",
         "backedUp": "World backed up",
-        "restored": "Restored - the server is restarting onto it"
+        "restored": "Restored - the server is restarting onto it",
+        "every": {
+            "never": "Never - only when I ask",
+            "hourly": "Every hour",
+            "sixHourly": "Every six hours",
+            "daily": "Every day",
+            "weekly": "Every week"
+        }
     },
     "schedule": {
         "schedule": "Schedule",
@@ -721,7 +740,22 @@
         "playersWillDrop": "{count, plural, one {# player is} other {# players are}} connected and will be disconnected.",
         "restartsToInstall": "The server restarts to install and remove what changed.",
         "byAuthor": "by {name}",
-        "noBuildForThisSoftware": "no build for this software"
+        "noBuildForThisSoftware": "no build for this software",
+        "categories": {
+            "popular": "Popular",
+            "management": "Management",
+            "utility": "Utility",
+            "adventure": "Adventure",
+            "economy": "Economy",
+            "mechanics": "Game mechanics",
+            "social": "Social",
+            "worldgen": "World generation",
+            "performance": "Performance",
+            "technology": "Technology",
+            "magic": "Magic",
+            "storage": "Storage",
+            "food": "Food"
+        }
     },
     "inventoryEditor": {
         "everythingTheyCarryGoesArmour": "Everything they carry goes, armour and offhand included. This cannot be undone.",
@@ -840,7 +874,37 @@
         "callVarsLinked": "'{call.count}', '{call.members}' and '{call.max}' read the call of the chat this server is linked to.",
         "callVarsUnlinked": "'{call.count}', '{call.members}' and '{call.max}' need a chat with a call.",
         "chosen": "{count} of {total} chosen",
-        "seconds": "seconds"
+        "seconds": "seconds",
+        "blocks": {
+            "rank": {
+                "level": "Top levels",
+                "deaths": "Most deaths",
+                "kills": "Most mobs killed",
+                "pvp": "Most players killed",
+                "playtime": "Most time played",
+                "explorer": "Furthest travelled",
+                "mined": "Most blocks mined",
+                "diamonds": "Most diamonds mined",
+                "enchanted": "Most items enchanted",
+                "crafted": "Most items crafted",
+                "fish": "Most fish caught",
+                "bred": "Most animals bred",
+                "trades": "Most villager trades",
+                "damage": "Most damage dealt, in hearts",
+                "hurt": "Most damage taken, in hearts",
+                "alive": "Longest alive right now",
+                "bosses": "Most bosses slain",
+                "jumps": "Most jumps",
+                "sleep": "Most nights slept",
+                "chests": "Most chests opened",
+                "sessions": "Most visits",
+                "events": "Most events won"
+            },
+            "death": "Last death",
+            "server": {
+                "levels": "Everybody's level"
+            }
+        }
     },
     "panel": {
         "polarisLoginHasAnUpdate": "Polaris login has an update",
@@ -1123,7 +1187,8 @@
         "theLastRunDidNot": "The last run did not work",
         "days": "days",
         "lastRunRemoved": "Last run {date}: {count, number} chunks, {size}.",
-        "lastRunNothing": "Last run {date}: nothing to take out."
+        "lastRunNothing": "Last run {date}: nothing to take out.",
+        "done": "Done."
     },
     "domain": {
         "address": "Address",
@@ -1262,6 +1327,99 @@
         "save": "Save",
         "restartsForSettings": "The server restarts to pick the new settings up.",
         "memoryFixed": "The memory you typed is now the server's figure, and Polaris no longer adjusts it. Switch it back under Memory above.",
-        "pendingChanges": "{count} {count, plural, one {change} other {changes}} the server picks up when it next starts."
+        "pendingChanges": "{count} {count, plural, one {change} other {changes}} the server picks up when it next starts.",
+        "restartReason": "a settings change"
+    },
+    "gameRules": {
+        "keepInventory": {
+            "label": "Keep inventory on death",
+            "hint": "Players keep what they were carrying instead of dropping it."
+        },
+        "doImmediateRespawn": {
+            "label": "Respawn immediately",
+            "hint": "Skips the death screen and puts them straight back in."
+        },
+        "showDeathMessages": {
+            "label": "Announce deaths in chat"
+        },
+        "spawnRadius": {
+            "label": "Spawn spread",
+            "hint": "How many blocks around the world spawn players can appear in."
+        },
+        "fallDamage": {
+            "label": "Fall damage"
+        },
+        "fireDamage": {
+            "label": "Fire damage"
+        },
+        "drowningDamage": {
+            "label": "Drowning damage"
+        },
+        "naturalRegeneration": {
+            "label": "Heal from a full hunger bar",
+            "hint": "Off makes food the only way back to full health."
+        },
+        "mobGriefing": {
+            "label": "Mobs can change the world",
+            "hint": "Creeper craters, endermen moving blocks, zombies breaking doors."
+        },
+        "doFireTick": {
+            "label": "Fire spreads"
+        },
+        "doDaylightCycle": {
+            "label": "Time passes",
+            "hint": "Off freezes the sun where it is."
+        },
+        "doWeatherCycle": {
+            "label": "Weather changes"
+        },
+        "randomTickSpeed": {
+            "label": "Growth speed",
+            "hint": "How fast crops grow and leaves decay. 3 is normal; large numbers cost the server."
+        },
+        "playersSleepingPercentage": {
+            "label": "Share of players needed to skip the night",
+            "hint": "As a percentage. 0 lets one player skip it."
+        },
+        "doMobSpawning": {
+            "label": "Mobs spawn"
+        },
+        "doMobLoot": {
+            "label": "Mobs drop loot"
+        },
+        "doInsomnia": {
+            "label": "Phantoms",
+            "hint": "The ones that come for players who have not slept."
+        },
+        "doPatrolSpawning": {
+            "label": "Pillager patrols"
+        },
+        "doTraderSpawning": {
+            "label": "Wandering traders"
+        },
+        "doWardenSpawning": {
+            "label": "Wardens"
+        },
+        "doTileDrops": {
+            "label": "Broken blocks drop"
+        },
+        "doLimitedCrafting": {
+            "label": "Only craft what has been unlocked",
+            "hint": "Recipes have to be discovered before they can be used."
+        },
+        "announceAdvancements": {
+            "label": "Announce advancements"
+        },
+        "disableRaids": {
+            "label": "No raids",
+            "hint": "Villages are left alone after a player earns Bad Omen."
+        }
+    },
+    "gameRuleGroups": {
+        "death": "Death and respawn",
+        "damage": "Damage",
+        "world": "World",
+        "mobs": "Mobs",
+        "playing": "Playing"
     }
 }

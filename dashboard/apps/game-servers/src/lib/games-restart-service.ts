@@ -12,6 +12,7 @@
  * anybody agreed to, and both games can be told to write the world to disk.
  */
 
+import { gameMessage } from "./game-message";
 import { gameOfServer } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import {
@@ -43,7 +44,7 @@ export async function requestRestart(
     input: { when: RestartWhen; at?: string | null; reason?: string; requestedBy: string }
 ): Promise<PendingRestart> {
     const pending = newPendingRestart({ ...input, now: new Date() });
-    if (!pending) throw new Error("Pick a time in the next few weeks");
+    if (!pending) throw new Error(gameMessage("games", "lib.pickSoonerTime"));
     await patchInstallConfig(installedAppId, { [PENDING_RESTART_KEY]: pending });
     return pending;
 }
@@ -70,7 +71,7 @@ export async function runRestartNow(
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true }
     });
-    if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install?.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     await saveWorld(ownerId, installedAppId, install.catalogId);
     await deployApplication(install.applicationId, ownerId, actorId);
     // Whatever was booked for later has just happened.

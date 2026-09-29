@@ -23,6 +23,7 @@ import {
     type ChatLink,
     type Linkable
 } from "@polaris-app/game-servers/src/lib/minecraft/chat-link";
+import { english } from "../setup/game-english";
 
 const GROUP = "01a09cdd-7a10-7811-833d-8b014c82de02";
 const OTHER_GROUP = "01a09cdd-7a10-7811-833d-8b014c82de03";
@@ -107,27 +108,31 @@ describe("who may link to what", () => {
     };
 
     it("takes a group they are in, and rooms of the right kind in a space they run", () => {
-        expect(linkRefusal(groupLink(GROUP), linkable)).toBeNull();
-        expect(linkRefusal(spaceLink, linkable)).toBeNull();
-        expect(linkRefusal({ ...spaceLink, callChannelId: null }, linkable)).toBeNull();
+        expect(english(linkRefusal(groupLink(GROUP), linkable))).toBeNull();
+        expect(english(linkRefusal(spaceLink, linkable))).toBeNull();
+        expect(english(linkRefusal({ ...spaceLink, callChannelId: null }, linkable))).toBeNull();
     });
 
     it("refuses a group they are not in, and a space they do not run", () => {
-        expect(linkRefusal(groupLink(OTHER_GROUP), linkable)).toBe("Choose a group you are in");
-        expect(linkRefusal({ ...spaceLink, spaceId: OTHER_GROUP }, linkable)).toBe(
+        expect(english(linkRefusal(groupLink(OTHER_GROUP), linkable))).toBe(
+            "Choose a group you are in"
+        );
+        expect(english(linkRefusal({ ...spaceLink, spaceId: OTHER_GROUP }, linkable))).toBe(
             "Choose a space you run"
         );
     });
 
     it("refuses a text room for the call, a voice room for the text, and neither", () => {
-        expect(linkRefusal({ ...spaceLink, callChannelId: TEXT }, linkable)).toBe(
+        expect(english(linkRefusal({ ...spaceLink, callChannelId: TEXT }, linkable))).toBe(
             "Choose a voice channel of that space"
         );
-        expect(linkRefusal({ ...spaceLink, textChannelId: VOICE }, linkable)).toBe(
+        expect(english(linkRefusal({ ...spaceLink, textChannelId: VOICE }, linkable))).toBe(
             "Choose a text channel of that space"
         );
         expect(
-            linkRefusal({ ...spaceLink, callChannelId: null, textChannelId: null }, linkable)
+            english(
+                linkRefusal({ ...spaceLink, callChannelId: null, textChannelId: null }, linkable)
+            )
         ).toBe("Choose a voice channel, a text channel, or both");
     });
 

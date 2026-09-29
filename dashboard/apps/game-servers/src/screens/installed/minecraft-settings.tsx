@@ -14,7 +14,7 @@
  */
 
 import { RestartPlanner } from "./restart-planner";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { MinecraftMemory } from "./minecraft-memory";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
@@ -46,6 +46,7 @@ export function MinecraftSettings({
     withMemory?: boolean;
     onSaved: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const stored = useMemo(
         () => Object.fromEntries(settings.map((setting) => [setting.key, setting.value])),
@@ -134,7 +135,7 @@ export function MinecraftSettings({
             }
             setMemoryNote(
                 result.memory
-                    ? memoryChangeSentence(result.memory, restart)
+                    ? (schemaText(memoryChangeSentence(result.memory, restart)) ?? null)
                     : result.memoryFixed
                       ? t("settings.memoryFixed")
                       : null
@@ -210,7 +211,7 @@ export function MinecraftSettings({
                 installedAppId={installedAppId}
                 running={running}
                 changed={waiting}
-                reason="a settings change"
+                reason={t("settings.restartReason")}
                 onRestarted={() => {
                     setWaiting(false);
                     onSaved();

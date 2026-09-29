@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { editionOf, onlinePlayers } from "../../lib/minecraft/service";
@@ -135,7 +135,7 @@ export async function readXrayAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeRead")
         };
     }
@@ -184,7 +184,7 @@ export async function saveXraySettingsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeSaved")
         };
     }
@@ -225,7 +225,7 @@ export async function clearXrayPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatCouldNotBeCleared")
         };
     }

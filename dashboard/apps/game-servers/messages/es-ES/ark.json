@@ -215,7 +215,8 @@
         "installed": "instalado",
         "earlierNamed": "Cargar {name} antes",
         "laterNamed": "Cargar {name} después",
-        "removeNamed": "Quitar {name}"
+        "removeNamed": "Quitar {name}",
+        "restartReason": "un cambio en los mods"
     },
     "rules": {
         "theseAreWhatTheServer": "Esto es con lo que se lanza el servidor. ARK lo lee al arrancar, así que un cambio surte efecto la próxima vez que lo haga.",
@@ -231,6 +232,167 @@
         "fileSays": "El archivo del propio servidor dice {value}.",
         "notSet": "Sin poner - el juego usa {fallback}.",
         "stopSetting": "Dejar de fijar {name}",
-        "range": "{min} a {max}"
+        "range": "{min} a {max}",
+        "on": "sí",
+        "off": "no",
+        "restartReason": "un cambio de ajustes"
+    },
+    "settings": {
+        "XPMultiplier": {
+            "label": "Experiencia",
+            "hint": "Lo rápido que suben de nivel jugadores y domesticados. 3 es lo habitual en un servidor potenciado."
+        },
+        "TamingSpeedMultiplier": {
+            "label": "Domesticación",
+            "hint": "Más alto domestica más rápido. El ajuste que más se cambia en un servidor privado."
+        },
+        "HarvestAmountMultiplier": {
+            "label": "Recolección",
+            "hint": "Cuánta madera, piedra y piel da un golpe."
+        },
+        "HarvestHealthMultiplier": {
+            "label": "Aguante de recursos",
+            "hint": "Cuánto aguanta un árbol o una roca antes de agotarse. Más alto da más de cada uno."
+        },
+        "ResourcesRespawnPeriodMultiplier": {
+            "label": "Espera de reaparición",
+            "hint": "Más bajo hace que árboles y rocas vuelvan antes."
+        },
+        "ItemStackSizeMultiplier": {
+            "label": "Pila máxima",
+            "hint": "Cuánto cabe en una casilla. Cambiarlo después no reagrupa lo que ya hay en una caja."
+        },
+        "PlayerDamageMultiplier": {
+            "label": "Daño de jugadores"
+        },
+        "PlayerResistanceMultiplier": {
+            "label": "Daño a jugadores",
+            "hint": "Más alto significa que reciben más, no menos."
+        },
+        "DinoDamageMultiplier": {
+            "label": "Daño de criaturas salvajes"
+        },
+        "DinoResistanceMultiplier": {
+            "label": "Daño a criaturas salvajes",
+            "hint": "Más alto significa que reciben más."
+        },
+        "StructureDamageMultiplier": {
+            "label": "Daño de estructuras",
+            "hint": "Muros de pinchos y torretas."
+        },
+        "StructureResistanceMultiplier": {
+            "label": "Daño a estructuras",
+            "hint": "Más alto hace que los edificios se deshagan antes."
+        },
+        "PlayerCharacterFoodDrainMultiplier": {
+            "label": "Hambre de los jugadores"
+        },
+        "PlayerCharacterWaterDrainMultiplier": {
+            "label": "Sed de los jugadores"
+        },
+        "PlayerCharacterStaminaDrainMultiplier": {
+            "label": "Cansancio de los jugadores"
+        },
+        "PlayerCharacterHealthRecoveryMultiplier": {
+            "label": "Curación de los jugadores"
+        },
+        "DinoCharacterFoodDrainMultiplier": {
+            "label": "Hambre de los domesticados",
+            "hint": "Más bajo significa menos tiempo llenando comederos."
+        },
+        "OverrideOfficialDifficulty": {
+            "label": "Dificultad",
+            "hint": "Hasta dónde llegan las criaturas salvajes: su nivel máximo es esto por 30. 5 es lo habitual, para nivel 150. Puesto, decide los niveles por sí solo y el desfase de abajo deja de importar."
+        },
+        "DifficultyOffset": {
+            "label": "Desfase de dificultad",
+            "hint": "La forma antigua de decir lo mismo, entre 0 y 1. Solo se lee si la dificultad de arriba no está puesta."
+        },
+        "DayCycleSpeedScale": {
+            "label": "Velocidad del día completo"
+        },
+        "NightTimeSpeedScale": {
+            "label": "Velocidad de la noche",
+            "hint": "Más alto hace las noches más cortas."
+        },
+        "DayTimeSpeedScale": {
+            "label": "Velocidad de las horas de luz"
+        },
+        "ServerPVE": {
+            "label": "Los jugadores no se pueden herir",
+            "hint": "Activado lo convierte en un servidor PvE."
+        },
+        "ServerHardcore": {
+            "label": "La muerte es permanente",
+            "hint": "Un jugador que muere empieza otra vez en nivel 1."
+        },
+        "AutoSavePeriodMinutes": {
+            "label": "Guardar el mundo cada",
+            "hint": "Minutos. Más corto pierde menos en un fallo y cuesta una pausa cada vez."
+        },
+        "KickIdlePlayersPeriod": {
+            "label": "Echar a inactivos tras",
+            "hint": "Segundos. Solo se aplica cuando el servidor está lleno de gente que juega de verdad."
+        },
+        "ShowMapPlayerLocation": {
+            "label": "Mostrar dónde está cada jugador",
+            "hint": "Su propia posición, y la de su tribu, en el mapa. Desactivado, el mapa es solo un dibujo."
+        },
+        "AllowThirdPersonPlayer": {
+            "label": "Cámara en 3.ª persona"
+        },
+        "ServerCrosshair": {
+            "label": "Mira"
+        },
+        "EnablePvPGamma": {
+            "label": "Dejar cambiar el gamma con PvP activo",
+            "hint": "Su propio brillo, puesto con el comando gamma en el juego. Desactivado, las noches son oscuras de verdad - e injugables para algunos."
+        },
+        "DisablePvEGamma": {
+            "label": "Dejar cambiar el gamma con PvE activo",
+            "hint": "Lo mismo para un servidor PvE, que es otro ajuste en el juego. Vale la pena dejar ambos activados."
+        },
+        "ShowFloatingDamageText": {
+            "label": "Mostrar números de daño",
+            "hint": "Los números estilo RPG sobre lo que se golpea."
+        },
+        "AllowHitMarkers": {
+            "label": "Marcas de impacto"
+        },
+        "GlobalVoiceChat": {
+            "label": "El chat de voz llega a todo el servidor",
+            "hint": "Desactivado, solo llega a quien está cerca."
+        },
+        "AlwaysAllowStructurePickup": {
+            "label": "Recoger estructuras en cualquier momento",
+            "hint": "Desactivado, solo en los primeros segundos tras colocarla."
+        },
+        "DisableStructureDecayPvE": {
+            "label": "Edificios sin deterioro",
+            "hint": "En un servidor donde se juega unas noches a la semana, esto es lo que evita que las bases se caigan."
+        },
+        "AllowCaveBuildingPvE": {
+            "label": "Construir en cuevas"
+        },
+        "AllowFlyerCarryPvE": {
+            "label": "Voladores cargan cosas",
+            "hint": "Incluidas criaturas salvajes y domesticados de otros jugadores."
+        },
+        "StructurePreventResourceRadiusMultiplier": {
+            "label": "Radio sin recursos junto a edificios",
+            "hint": "Más bajo deja que los árboles vuelvan más cerca de una base."
+        },
+        "TheMaxStructuresInRange": {
+            "label": "Máximo de estructuras en una zona",
+            "hint": "El límite de lo grande que puede ser una base."
+        }
+    },
+    "settingGroups": {
+        "rates": "Ritmos",
+        "damage": "Daño",
+        "survival": "Sobrevivir",
+        "world": "Mundo",
+        "playing": "Juego",
+        "structures": "Estructuras"
     }
 }

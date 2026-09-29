@@ -15,7 +15,7 @@
  */
 
 import { useState } from "react";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { formatBytes } from "@polaris/core";
 import { Loader2, Sparkles } from "lucide-react";
 import { optimizeWorldAction, previewWorldTrimAction, saveWorldTrimAction } from "./minecraft-actions";
@@ -36,6 +36,7 @@ export function WorldOptimizeCard({
     /** What the last run did, or null when there has not been one. */
     lastRun: WorldTrimRun | null;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [settings, setSettings] = useState<WorldTrimSettings>(saved ?? WORLD_TRIM_DEFAULTS);
     const [measuring, setMeasuring] = useState(false);
@@ -57,7 +58,7 @@ export function WorldOptimizeCard({
         const result = await previewWorldTrimAction(installedAppId);
         setMeasuring(false);
         if (result.error) setFailed(result.error);
-        else setFound({ summary: result.summary ?? "", removed: result.removed ?? 0 });
+        else setFound({ summary: schemaText(result.summary) ?? "", removed: result.removed ?? 0 });
     }
 
     async function run(): Promise<void> {
@@ -67,7 +68,7 @@ export function WorldOptimizeCard({
         setRunning(false);
         setFound(null);
         if (result.error) setFailed(result.error);
-        else setDone(result.summary ?? "Done.");
+        else setDone(schemaText(result.summary) ?? t("optimize.done"));
     }
 
     return (

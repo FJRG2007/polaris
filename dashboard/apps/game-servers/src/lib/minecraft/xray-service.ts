@@ -22,6 +22,7 @@
  * and a honeypot placed while the settings are saved is never forgotten.
  */
 
+import { gameMessage } from "../game-message";
 import * as xray from "./xray";
 import { prisma } from "@polaris/db";
 import * as movement from "./movement";
@@ -120,7 +121,7 @@ export async function updateXray(
         });
         if (written.count > 0) return next;
     }
-    throw new Error("The server's settings kept changing while this was saved. Try again.");
+    throw new Error(gameMessage("games", "lib.settingsRaced"));
 }
 
 function sameTrap(
@@ -303,6 +304,7 @@ async function act(
             installedAppId,
             evidence.name,
             state.settings.banHours * 60,
+            // i18n-ignore: the ban reason is shown in the game, to the player
             `X-Ray: dug straight to ${hits} hidden ores`
         )
             .then(() => {
@@ -521,11 +523,9 @@ const LOG_FILE = "/data/logs/latest.log";
  *  a few seconds is being flooded, and the part read is the newest. */
 const LOG_READ_MAX = 256 * 1024;
 /** Why teleports cannot be judged, for the screen. */
-const NO_ADMIN_LOG =
-    "Teleports are not checked: this server does not log what operators run (the logAdminCommands game rule is off), so an operator's teleport cannot be told apart";
-const NO_LOG = "Teleports are not checked: the server log cannot be read";
-const UNKNOWN_ADMIN_LOG =
-    "Teleports are not checked: this server did not say whether it logs what operators run (the logAdminCommands game rule)";
+const NO_ADMIN_LOG = gameMessage("games", "lib.teleportsNoAdminLog");
+const NO_LOG = gameMessage("games", "lib.teleportsNoLog");
+const UNKNOWN_ADMIN_LOG = gameMessage("games", "lib.teleportsUnknownAdminLog");
 
 /** How long the server log is now, or null where it cannot be read. */
 async function logLength(server: ServerContainer): Promise<number | null> {

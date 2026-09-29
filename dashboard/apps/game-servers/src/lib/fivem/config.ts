@@ -17,6 +17,8 @@
  */
 
 /** The catalog id a FiveM server install is made from. */
+import { gameMessage } from "../game-message";
+
 export const FIVEM_CATALOG_ID = "fivem";
 
 /** What the server listens on inside its container. Fixed by the image's own
@@ -52,7 +54,8 @@ export function isLicenseKey(value: string): boolean {
 }
 
 /** What to say when a key is refused, in the terms it was refused on. */
-export const LICENSE_KEY_HINT = "That is not a server key. Copy it from keymaster.fivem.net.";
+/** A carried key (see `lib/game-message`): shown through the reader's language. */
+export const LICENSE_KEY_HINT = gameMessage("games", "schema.licenseKeyRule");
 
 /** Where an operator gets one. Named here so every screen that asks for a key
  *  sends them to the same place. */

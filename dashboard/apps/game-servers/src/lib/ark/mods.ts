@@ -15,6 +15,8 @@
  */
 
 /** A Workshop id: all digits, and long enough not to be somebody's typo. */
+import { gameMessage } from "../game-message";
+
 const MOD_ID = /^\d{6,12}$/;
 
 /** Enough for the heaviest modded server anybody sensibly runs, and a ceiling so
@@ -50,9 +52,10 @@ export function formatModIds(ids: readonly string[]): string {
  *  so wins over everything before it - what somebody adding a mod expects. */
 export function withMod(ids: readonly string[], id: string): string[] {
     const wanted = id.trim();
-    if (!MOD_ID.test(wanted)) throw new Error("That is not a Steam Workshop id");
+    if (!MOD_ID.test(wanted)) throw new Error(gameMessage("games", "lib.notWorkshopId"));
     if (ids.includes(wanted)) return [...ids];
-    if (ids.length >= MAX_MODS) throw new Error(`A server can run ${MAX_MODS} mods at most`);
+    if (ids.length >= MAX_MODS)
+        throw new Error(gameMessage("games", "lib.maxMods", { count: MAX_MODS }));
     return [...ids, wanted];
 }
 

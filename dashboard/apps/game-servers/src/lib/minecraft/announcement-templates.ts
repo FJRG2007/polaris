@@ -9,6 +9,7 @@
  * passes is dropped rather than offered.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 import {
     CHAT_MAX,
@@ -27,15 +28,19 @@ export const MAX_TEMPLATE_NAME = 40;
 
 const line = z
     .string()
-    .max(LINE_MAX * 4, "That line is too long")
-    .refine((value) => !/[\0\r\n]/.test(value), "A title is one line");
+    .max(LINE_MAX * 4, gameMessage("games", "lib.lineTooLongShort"))
+    .refine((value) => !/[\0\r\n]/.test(value), gameMessage("games", "lib.titleOneLine"));
 const seconds = z.number().min(0).max(SECONDS_MAX);
 
 /** One announcement, as the action and the template store both accept it. The
  *  length caps allow for codes: `&x&f&f&0&0&0&0` is fourteen characters of
  *  formatting in front of the words. */
 export const announcementSchema = z.object({
-    target: z.string().trim().max(900).refine(isAnnouncementTarget, "Choose who it goes to"),
+    target: z
+        .string()
+        .trim()
+        .max(900)
+        .refine(isAnnouncementTarget, gameMessage("games", "lib.chooseAudience")),
     title: line.default(""),
     subtitle: line.default(""),
     actionbar: line.default(""),
@@ -110,7 +115,7 @@ export function withTemplate(
         return list.map((kept) => (kept.id === entry.id ? entry : kept));
     }
     if (list.length >= MAX_TEMPLATES) {
-        throw new Error(`Only ${MAX_TEMPLATES} templates can be kept. Remove one first.`);
+        throw new Error(gameMessage("games", "lib.maxAnnounceTemplates", { count: MAX_TEMPLATES }));
     }
     return [...list, entry];
 }

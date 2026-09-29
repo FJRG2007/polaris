@@ -22,6 +22,7 @@ import {
     SIDEBAR_BLOCKS,
     withRotatingBlocks
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks";
+import { english } from "../setup/game-english";
 
 const effect = (
     kind: side.SidebarEffectKind,
@@ -90,7 +91,10 @@ describe("taking turns", () => {
             ...side.DEFAULT_SIDEBAR,
             lines: [{ ...line, frames: ["ok", "x".repeat(41)] }]
         });
-        expect(problems.lines[0]).toEqual([null, "At most 40 characters"]);
+        expect(problems.lines[0]?.map((problem) => english(problem))).toEqual([
+            null,
+            "At most 40 characters"
+        ]);
     });
 
     it("lets a scrolling line be longer than the panel is wide", () => {

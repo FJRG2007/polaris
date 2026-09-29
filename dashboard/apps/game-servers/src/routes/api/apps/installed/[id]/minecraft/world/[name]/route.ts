@@ -1,3 +1,4 @@
+import { messageText } from "../../../../../../../../screens/game-words";
 import { Readable } from "node:stream";
 import { backupPathInContainer } from "../../../../../../../../lib/minecraft/world-service";
 import { host } from "@polaris/app-host";
@@ -56,7 +57,9 @@ export async function GET(
         });
     } catch (caught) {
         return new Response(
-            caught instanceof Error ? caught.message : "Could not read the backup",
+            caught instanceof Error
+                ? await messageText(caught.message)
+                : "Could not read the backup",
             { status: 400 }
         );
     }

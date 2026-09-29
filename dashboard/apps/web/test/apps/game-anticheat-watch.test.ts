@@ -63,6 +63,7 @@ import {
     RIDING_COMMAND,
     sinceCommand
 } from "@polaris-app/game-servers/src/lib/minecraft/movement";
+import { english } from "../setup/game-english";
 
 const INSTALL = "018f2b7a-0000-7000-8000-0000000000e2";
 
@@ -298,9 +299,9 @@ describe("watching movement", () => {
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
         await look();
         expect(incidents("Alex")).toEqual([]);
-        expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(
-            /logAdminCommands/
-        );
+        expect(
+            english((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck)
+        ).toMatch(/logAdminCommands/);
     });
 
     it("stands the teleport check down, and says why, when the server does not answer about logging", async () => {
@@ -312,9 +313,9 @@ describe("watching movement", () => {
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
         await look();
         expect(incidents("Alex")).toEqual([]);
-        expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(
-            /did not say/
-        );
+        expect(
+            english((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck)
+        ).toMatch(/did not say/);
     });
 
     it("tells the owner once a player looks likely to be cheating", async () => {

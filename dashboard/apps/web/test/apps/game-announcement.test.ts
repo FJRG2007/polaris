@@ -20,6 +20,7 @@ import {
     readTemplates,
     withTemplate
 } from "@polaris-app/game-servers/src/lib/minecraft/announcement-templates";
+import { english, thrown } from "../setup/game-english";
 
 const draft = (over: Partial<Announcement>): Announcement => ({ ...BLANK_ANNOUNCEMENT, ...over });
 
@@ -217,7 +218,7 @@ describe("templates a server keeps", () => {
             ...one,
             id: `t${index}`
         }));
-        expect(() => withTemplate(full, one)).toThrow(/Only/);
+        expect(thrown(() => withTemplate(full, one))).toMatch(/Only/);
         expect(withTemplate(full, { ...one, id: "t0", name: "Renamed" })[0]?.name).toBe("Renamed");
     });
 });
@@ -253,7 +254,7 @@ describe("a part with a lot of formatting", () => {
             { ...BLANK_ANNOUNCEMENT, title: "Fine", actionbar: busy },
             "java"
         );
-        expect(problems.actionbar).toMatch(/Too much formatting/);
+        expect(english(problems.actionbar)).toMatch(/Too much formatting/);
         expect(problems.title).toBeUndefined();
     });
 });

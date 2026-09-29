@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
@@ -812,6 +812,7 @@ function ConnectCard({
     onOpenPlayers: () => void;
     onOpenConsole: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
@@ -928,7 +929,9 @@ function ConnectCard({
                                 </p>
                             )}
                             {status.crashLoop.advice && (
-                                <p className="text-muted-foreground">{status.crashLoop.advice}</p>
+                                <p className="text-muted-foreground">
+                                    {schemaText(status.crashLoop.advice)}
+                                </p>
                             )}
                             <div className="flex items-center gap-3">
                                 {/* Only offered for the crash where it is the
@@ -1124,6 +1127,7 @@ function OverviewTab({
     /** Whether the poll has answered on this visit: a kept reading only paints. */
     heard: boolean;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const shown = useMemo(
         () =>
@@ -1193,7 +1197,7 @@ function OverviewTab({
                         <Skeleton className="h-8 w-full" />
                     ) : !status.answering ? (
                         <p className="text-sm text-muted-foreground">
-                            {status.message ?? t("panel.theServerIsNotAnswering")}
+                            {schemaText(status.message) ?? t("panel.theServerIsNotAnswering")}
                         </p>
                     ) : status.players.players.length === 0 ? (
                         <p className="text-sm text-muted-foreground">

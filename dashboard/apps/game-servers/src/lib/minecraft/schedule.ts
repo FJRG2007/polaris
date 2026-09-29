@@ -18,6 +18,8 @@
  */
 
 /** What a window asks for. */
+import { gameMessage } from "../game-message";
+
 export type GameScheduleMode = "on" | "off" | "sleep";
 
 export interface GameScheduleWindow {
@@ -303,11 +305,11 @@ export function scheduleAction(
 
 /** One line saying what the schedule is doing, for the screen that sets it. */
 export function describeSchedule(schedule: GameSchedule, at: Date): string {
-    if (!schedule.enabled) return "No schedule. The server stays as you leave it.";
+    if (!schedule.enabled) return gameMessage("games", "lib.schedule.none");
     const mode = scheduleModeAt(schedule, at);
-    if (mode === "on") return "Right now: kept running.";
-    if (mode === "off") return "Right now: kept stopped.";
-    return `Right now: stopped once nobody has played for ${schedule.idleMinutes} minutes.`;
+    if (mode === "on") return gameMessage("games", "lib.schedule.on");
+    if (mode === "off") return gameMessage("games", "lib.schedule.off");
+    return gameMessage("games", "lib.schedule.idle", { minutes: schedule.idleMinutes });
 }
 
 /** The longest a message or a command is allowed to be, so a settings blob cannot

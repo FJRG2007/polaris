@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ARK_MOD_SHELVES, findSuggestion, shelfModIds } from "@polaris-app/game-servers/src/lib/ark/mod-catalog";
+import { english } from "../setup/game-english";
 
 const entries = ARK_MOD_SHELVES.flatMap((shelf) => shelf.entries);
 
@@ -31,7 +32,7 @@ describe("the suggested mods", () => {
     it("says why each one is worth having", () => {
         // A shelf of names is a search box with extra steps.
         for (const entry of entries) {
-            expect(entry.why.length).toBeGreaterThan(20);
+            expect(english(entry.why).length).toBeGreaterThan(20);
             expect(entry.name.length).toBeGreaterThan(0);
         }
     });

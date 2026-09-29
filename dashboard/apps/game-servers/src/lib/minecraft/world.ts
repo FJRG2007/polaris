@@ -17,6 +17,7 @@
  * Pure - names, paths and rules. What runs inside the container is world-service.
  */
 
+import type { GameKey } from "../../../messages";
 import type { MinecraftEdition } from "./service";
 
 /** The image's own data directory, which the world volume is mounted at. */
@@ -106,7 +107,7 @@ export const VERSIONED_CONFIG = [
 ] as const;
 
 /** The level each image generates into when it is told nothing else. */
-const DEFAULT_LEVEL: Record<MinecraftEdition, string> = { java: "world", bedrock: "Bedrock level" };
+const DEFAULT_LEVEL: Record<MinecraftEdition, string> = { java: "world", bedrock: "Bedrock level" /* i18n-ignore: a folder name the game writes */ };
 
 /** The variable that names the level folder, per edition. */
 const LEVEL_KEY: Record<MinecraftEdition, string> = { java: "LEVEL", bedrock: "LEVEL_NAME" };
@@ -271,8 +272,9 @@ const GENERATOR_SETTINGS_KEY = "GENERATOR_SETTINGS";
 /** The shape of the world, as `level-type` names it. */
 export interface LevelTypeOption {
     readonly value: string;
-    readonly label: string;
-    readonly detail: string;
+    /** Its name and what it is, as keys into the `games` catalog. */
+    readonly label: GameKey<"games">;
+    readonly detail: GameKey<"games">;
 }
 
 /**
@@ -287,11 +289,11 @@ export interface LevelTypeOption {
 export const FLAT_LEVEL_TYPE = "minecraft:flat";
 
 export const LEVEL_TYPES: readonly LevelTypeOption[] = [
-    { value: "minecraft:normal", label: "Normal", detail: "The ordinary world, with every biome in it." },
-    { value: "minecraft:large_biomes", label: "Large biomes", detail: "The same world, with each biome several times wider." },
-    { value: "minecraft:amplified", label: "Amplified", detail: "Enormous terrain. Hard on the machine, and worth seeing." },
-    { value: "minecraft:single_biome_surface", label: "One biome", detail: "The whole overworld is the biome you pick." },
-    { value: FLAT_LEVEL_TYPE, label: "Flat", detail: "A featureless plane, for building on." }
+    { value: "minecraft:normal", label: "blueprint.levelTypes.normal", detail: "blueprint.levelTypes.normalDetail" },
+    { value: "minecraft:large_biomes", label: "blueprint.levelTypes.largeBiomes", detail: "blueprint.levelTypes.largeBiomesDetail" },
+    { value: "minecraft:amplified", label: "blueprint.levelTypes.amplified", detail: "blueprint.levelTypes.amplifiedDetail" },
+    { value: "minecraft:single_biome_surface", label: "blueprint.levelTypes.singleBiome", detail: "blueprint.levelTypes.singleBiomeDetail" },
+    { value: FLAT_LEVEL_TYPE, label: "blueprint.levelTypes.flat", detail: "blueprint.levelTypes.flatDetail" }
 ];
 
 export const DEFAULT_LEVEL_TYPE = "minecraft:normal";
@@ -303,23 +305,23 @@ export function usesBiome(levelType: string): boolean {
 
 /** Overworld biomes worth offering as a whole world: the ones that read as a
  *  different place to be, rather than every id the game has. */
-export const BIOMES: readonly { readonly value: string; readonly label: string }[] = [
-    { value: "minecraft:plains", label: "Plains" },
-    { value: "minecraft:forest", label: "Forest" },
-    { value: "minecraft:birch_forest", label: "Birch forest" },
-    { value: "minecraft:dark_forest", label: "Dark forest" },
-    { value: "minecraft:cherry_grove", label: "Cherry grove" },
-    { value: "minecraft:desert", label: "Desert" },
-    { value: "minecraft:badlands", label: "Badlands" },
-    { value: "minecraft:savanna", label: "Savanna" },
-    { value: "minecraft:jungle", label: "Jungle" },
-    { value: "minecraft:swamp", label: "Swamp" },
-    { value: "minecraft:mangrove_swamp", label: "Mangrove swamp" },
-    { value: "minecraft:taiga", label: "Taiga" },
-    { value: "minecraft:snowy_taiga", label: "Snowy taiga" },
-    { value: "minecraft:ice_spikes", label: "Ice spikes" },
-    { value: "minecraft:mushroom_fields", label: "Mushroom fields" },
-    { value: "minecraft:ocean", label: "Ocean" }
+export const BIOMES: readonly { readonly value: string; readonly label: GameKey<"games"> }[] = [
+    { value: "minecraft:plains", label: "blueprint.biomes.plains" },
+    { value: "minecraft:forest", label: "blueprint.biomes.forest" },
+    { value: "minecraft:birch_forest", label: "blueprint.biomes.birchForest" },
+    { value: "minecraft:dark_forest", label: "blueprint.biomes.darkForest" },
+    { value: "minecraft:cherry_grove", label: "blueprint.biomes.cherryGrove" },
+    { value: "minecraft:desert", label: "blueprint.biomes.desert" },
+    { value: "minecraft:badlands", label: "blueprint.biomes.badlands" },
+    { value: "minecraft:savanna", label: "blueprint.biomes.savanna" },
+    { value: "minecraft:jungle", label: "blueprint.biomes.jungle" },
+    { value: "minecraft:swamp", label: "blueprint.biomes.swamp" },
+    { value: "minecraft:mangrove_swamp", label: "blueprint.biomes.mangroveSwamp" },
+    { value: "minecraft:taiga", label: "blueprint.biomes.taiga" },
+    { value: "minecraft:snowy_taiga", label: "blueprint.biomes.snowyTaiga" },
+    { value: "minecraft:ice_spikes", label: "blueprint.biomes.iceSpikes" },
+    { value: "minecraft:mushroom_fields", label: "blueprint.biomes.mushroomFields" },
+    { value: "minecraft:ocean", label: "blueprint.biomes.ocean" }
 ];
 
 export const DEFAULT_BIOME = "minecraft:plains";

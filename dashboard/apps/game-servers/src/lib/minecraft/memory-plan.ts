@@ -24,6 +24,7 @@
  * writes the setting lives with the service that already does both.
  */
 
+import { gameMessage } from "../game-message";
 import { formatMemory } from "./blueprints";
 import { findSoftware } from "@polaris/core";
 import type { BlueprintWeight } from "./blueprints";
@@ -133,13 +134,8 @@ export function plannedHeapMb(input: MemoryPlanInput): number {
 export function planReason(input: MemoryPlanInput): string {
     const cost = costClass(input);
     const mods = Math.max(0, Math.trunc(input.mods ?? 0));
-    const parts: string[] = [];
-    if (cost === "mods") parts.push("a mod loader");
-    else if (cost === "plugins") parts.push("a plugin server");
-    if (mods > 0) parts.push(`${mods} ${mods === 1 ? "mod" : "mods"}`);
     const players = Math.max(0, Math.trunc(input.concurrentPlayers));
-    parts.push(players === 1 ? "one player at a time" : `${players} players at a time`);
-    return parts.join(", ");
+    return gameMessage("games", "lib.memory.reason", { cost, mods, players });
 }
 
 export interface HeapBounds {
@@ -239,7 +235,9 @@ export interface MemoryChange {
 
 /** The sentence a screen shows after a save moved the heap. */
 export function memoryChangeSentence(change: MemoryChange, restarted: boolean): string {
-    return `Memory went from ${formatMemory(change.fromMb)} to ${formatMemory(change.toMb)} for ${change.reason}. ${
-        restarted ? "The restart applies it." : "It applies at the next restart."
-    }`;
+    return gameMessage("games", restarted ? "lib.memory.changedRestarted" : "lib.memory.changed", {
+        from: formatMemory(change.fromMb),
+        to: formatMemory(change.toMb),
+        reason: change.reason
+    });
 }

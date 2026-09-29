@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { sendAnnouncement } from "../../lib/minecraft/service";
@@ -86,7 +86,7 @@ export async function sendAnnouncementAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.theServerDidNotTake")
         };
     }
@@ -146,7 +146,7 @@ export async function saveAnnouncementTemplateAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatTemplateCouldNotBe")
         };
     }
@@ -176,7 +176,7 @@ export async function deleteAnnouncementTemplateAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.thatTemplateCouldNotBe2")
         };
     }

@@ -19,7 +19,7 @@ export interface SidebarBlock {
 export const SIDEBAR_BLOCKS: readonly SidebarBlock[] = [
     {
         id: "rank.level",
-        label: "Top levels",
+        label: "Top levels", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         lines: ["&6&lTop levels", '&f{rank.level | "Nobody on"}']
     },
     ...STATS_RANKINGS.map((id) => ({
@@ -29,17 +29,17 @@ export const SIDEBAR_BLOCKS: readonly SidebarBlock[] = [
     })),
     {
         id: EVENTS_RANKING,
-        label: "Most events won",
+        label: "Most events won", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         lines: ["&6&lEvent winners", `&f{${EVENTS_RANKING} | "No winners yet"}`]
     },
     {
         id: "death",
-        label: "Last death",
+        label: "Last death", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         lines: ["&6&lLast death", '&7{death.message | "Nobody has died"}']
     },
     {
         id: "server.levels",
-        label: "Everybody's level",
+        label: "Everybody's level", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         lines: ["&6&lLevels", '&f{server.levels | "Nobody on"}']
     }
 ];

@@ -8,6 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { rejection } from "../setup/game-english";
 
 const fake = vi.hoisted(() => ({
     edition: "minecraft" as string,
@@ -120,7 +121,9 @@ describe("sayAll", () => {
         fake.hang = true;
         const { server } = await service.openServerContainer("owner", "mc");
         const sending = server.sayAll([line('"a"')]);
-        const failed = expect(sending).rejects.toThrow("did not answer in time");
+        const failed = rejection(sending).then((said) =>
+            expect(said).toContain("did not answer in time")
+        );
         await vi.advanceTimersByTimeAsync(16_000);
         await failed;
     });

@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { blueprintFor, minecraftShapeEnv } from "@polaris-app/game-servers/src/lib/games-create";
 import { GAME_BLUEPRINTS, findBlueprint } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
 import { MAP_CATEGORIES, WORLD_MAPS, findMap, mapsFor } from "@polaris-app/game-servers/src/lib/minecraft/maps";
+import { rejection } from "../setup/game-english";
 
 /** Modrinth as these tests need it: enough for the version pin to resolve, since
  *  a map with no plugins asks it nothing and a blueprint without one still does. */
@@ -137,7 +138,7 @@ describe("building a server on a map", () => {
     });
 
     it("refuses a release a pinned map cannot play on", async () => {
-        await expect(envFor("bedwars", "bedwars-treasure-island", {}, "1.21.4")).rejects.toThrow(
+        expect(await rejection(envFor("bedwars", "bedwars-treasure-island", {}, "1.21.4"))).toMatch(
             /only plays on Minecraft 1\.19\.4/
         );
     });
@@ -186,11 +187,11 @@ describe("building a server on a map", () => {
     });
 
     it("refuses a map that is not this game's", async () => {
-        await expect(envFor("skyblock", "bedwars-treasure-island")).rejects.toThrow(/not one this game/);
+        expect(await rejection(envFor("skyblock", "bedwars-treasure-island"))).toMatch(/not one this game/);
     });
 
     it("refuses a map nothing knows about", async () => {
-        await expect(envFor("skyblock", "not-a-map")).rejects.toThrow(/not one this game/);
+        expect(await rejection(envFor("skyblock", "not-a-map"))).toMatch(/not one this game/);
     });
 
     it("puts the world shape back to its default, rather than leaving the old one", async () => {

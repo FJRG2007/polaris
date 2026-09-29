@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as plan from "@polaris-app/game-servers/src/lib/minecraft/memory-plan";
+import { english } from "../setup/game-english";
 
 describe("what a server is planned", () => {
     it("gives a vanilla server for a few friends about what it always got", () => {
@@ -39,10 +40,10 @@ describe("what a server is planned", () => {
     });
 
     it("says what it counted, in words rather than in arithmetic", () => {
-        expect(plan.planReason({ concurrentPlayers: 5, loader: "neoforge", mods: 6 })).toBe(
-            "a mod loader, 6 mods, 5 players at a time"
-        );
-        expect(plan.planReason({ concurrentPlayers: 1, loader: "", mods: 0 })).toBe(
+        expect(
+            english(plan.planReason({ concurrentPlayers: 5, loader: "neoforge", mods: 6 }))
+        ).toBe("a mod loader, 6 mods, 5 players at a time");
+        expect(english(plan.planReason({ concurrentPlayers: 1, loader: "", mods: 0 }))).toBe(
             "one player at a time"
         );
     });

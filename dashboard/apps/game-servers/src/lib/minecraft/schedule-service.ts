@@ -12,6 +12,7 @@
  * requirement for the feature to work at all.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { type GameId, gameOfServer, withTimeout } from "@polaris/core";
 import { createWorldBackup } from "./world-service";
@@ -419,7 +420,7 @@ async function runRoutine(
                     // Only Minecraft has backups in Polaris, so for the others this
                     // is a step that would silently do nothing - said out loud
                     // instead.
-                    if (game !== "minecraft") return "This server has no backups to take";
+                    if (game !== "minecraft") return gameMessage("games", "lib.noBackupsToTake");
                     await createWorldBackup(ownerId, installedAppId);
                     break;
                 case "restart":
@@ -440,7 +441,9 @@ async function runRoutine(
                     break;
             }
         } catch (caught) {
-            return caught instanceof Error ? caught.message : "That step did not work";
+            return caught instanceof Error
+                ? caught.message
+                : gameMessage("games", "lib.stepFailed");
         }
     }
     return null;
@@ -453,6 +456,6 @@ async function applicationOf(ownerId: string, installedAppId: string): Promise<s
         where: { id: installedAppId, ownerId },
         select: { applicationId: true }
     });
-    if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install?.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     return install.applicationId;
 }

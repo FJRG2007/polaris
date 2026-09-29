@@ -14,7 +14,7 @@
  */
 
 import { UserMinus, X } from "lucide-react";
-import { useGameText } from "../screens/game-text";
+import { useGameText, useSchemaText } from "../screens/game-text";
 import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "./game-access-form";
 import { ACCESS_REACH_NOTE } from "../lib/minecraft/access";
@@ -39,6 +39,7 @@ export function GameAccessEditor({
     onChanged: () => void;
     onError?: (message: string | null) => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     const [pending, startTransition] = useTransition();
     const [failure, setFailure] = useState<string | null>(null);
@@ -172,15 +173,17 @@ export function GameAccessEditor({
                                     </p>
                                     {person.linkedTo && (
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {t("accessEditor.follows", { name: person.linkedTo })}
+                                            {t("accessEditor.follows", {
+                                                name: schemaText(person.linkedTo) ?? ""
+                                            })}
                                         </p>
                                     )}
                                     {person.note && (
                                         <p
                                             className="truncate text-xs text-muted-foreground"
-                                            title={person.note}
+                                            title={schemaText(person.note)}
                                         >
-                                            {person.note}
+                                            {schemaText(person.note)}
                                         </p>
                                     )}
                                 </div>
@@ -195,7 +198,7 @@ export function GameAccessEditor({
                                             key={address}
                                             className="inline-flex items-center gap-0.5"
                                         >
-                                            <Badge>{address}</Badge>
+                                            <Badge>{schemaText(address)}</Badge>
                                             {/* Each address goes on its own. Taking the last
                                                 one takes the player, which the service decides
                                                 so both screens agree about it. A linked

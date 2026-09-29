@@ -16,6 +16,8 @@
  * Pure so the command can be tested exactly. It ends up on a console.
  */
 
+import { gameMessage } from "../game-message";
+
 export const EXPERIENCE_UNITS = ["levels", "points"] as const;
 
 export type ExperienceUnit = (typeof EXPERIENCE_UNITS)[number];
@@ -54,7 +56,8 @@ export interface ExperienceChange {
  * here would be a second opinion about somebody else's numbers.
  */
 export function experienceCommand(change: ExperienceChange): string[] {
-    if (!PLAYER_NAME.test(change.player)) throw new Error("That is not a player name");
+    if (!PLAYER_NAME.test(change.player))
+        throw new Error(gameMessage("games", "lib.notPlayerName"));
     const amount = Math.max(0, Math.min(MAX_EXPERIENCE, Math.trunc(change.amount)));
     if (change.mode === "set") return ["xp", "set", change.player, String(amount), change.unit];
     const signed = change.mode === "remove" ? -amount : amount;

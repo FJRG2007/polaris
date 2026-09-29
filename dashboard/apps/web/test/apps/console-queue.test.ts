@@ -12,6 +12,7 @@ import {
     commandCount,
     parseQueue
 } from "@polaris-app/game-servers/src/lib/console-queue";
+import { english } from "../setup/game-english";
 
 describe("a block of console lines", () => {
     it("runs each line in order, with a wait line as a pause between them", () => {
@@ -48,13 +49,17 @@ describe("a block of console lines", () => {
     });
 
     it("says what is wrong instead of running half of it", () => {
-        expect(parseQueue("# only a note\n\n", MAX_CONSOLE_LINE).problem).toMatch(/no command/);
-        expect(parseQueue("say a\nwait 500", MAX_CONSOLE_LINE).problem).toMatch(/Line 2 waits/);
-        expect(parseQueue(`say ${"x".repeat(600)}`, MAX_CONSOLE_LINE).problem).toMatch(
+        expect(english(parseQueue("# only a note\n\n", MAX_CONSOLE_LINE).problem)).toMatch(
+            /no command/
+        );
+        expect(english(parseQueue("say a\nwait 500", MAX_CONSOLE_LINE).problem)).toMatch(
+            /Line 2 waits/
+        );
+        expect(english(parseQueue(`say ${"x".repeat(600)}`, MAX_CONSOLE_LINE).problem)).toMatch(
             /Line 1 is longer/
         );
         const many = Array.from({ length: MOST_QUEUED + 1 }, (_, index) => `say ${index}`);
-        expect(parseQueue(many.join("\n"), MAX_CONSOLE_LINE).problem).toMatch(/more than/);
+        expect(english(parseQueue(many.join("\n"), MAX_CONSOLE_LINE).problem)).toMatch(/more than/);
         expect(parseQueue(many.join("\n"), MAX_CONSOLE_LINE).steps).toEqual([]);
     });
 

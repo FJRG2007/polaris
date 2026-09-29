@@ -16,7 +16,7 @@
  */
 
 import { formatBytes } from "@polaris/core";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import * as world from "../../lib/minecraft/world";
 import { useCallback, useEffect, useState } from "react";
 import type { WorldView } from "../../lib/minecraft/world-service";
@@ -143,10 +143,11 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
 
 /** Why the lists are empty, when they are. */
 export function WorldMessage({ view }: { view: WorldView | null }) {
+    const schemaText = useSchemaText();
     if (!view?.message) return null;
     return (
         <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
-            {view.message}
+            {schemaText(view.message)}
         </p>
     );
 }
@@ -812,7 +813,7 @@ function BackupScheduleCard({
                                     onValueChange={(value) => setEvery(value as BackupEvery)}
                                     options={BACKUP_EVERY_OPTIONS.map((entry) => ({
                                         value: entry.value,
-                                        label: entry.label
+                                        label: t(entry.label)
                                     }))}
                                 />
                                 <span className="text-xs text-muted-foreground">

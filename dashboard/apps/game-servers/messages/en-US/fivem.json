@@ -115,6 +115,104 @@
         "noMatch": "Nothing here matches “{query}”. A resource can add settings of its own, and those live in its own config rather than here.",
         "notSet": "Not set - the server uses {fallback}.",
         "stopSetting": "Stop setting {name}",
-        "leaveWithFallback": "Leave it to the server ({fallback})"
+        "leaveWithFallback": "Leave it to the server ({fallback})",
+        "fallbacks": {
+            "on": "on",
+            "off": "off",
+            "none": "none",
+            "newest": "the newest"
+        },
+        "restartReason": "a settings change"
+    },
+    "settings": {
+        "sv_hostname": {
+            "label": "Server name",
+            "hint": "What players see in the server browser and on the connecting screen."
+        },
+        "sv_maxclients": {
+            "label": "Player slots",
+            "hint": "How many people fit. Above 32 needs OneSync on."
+        },
+        "onesync": {
+            "label": "OneSync",
+            "hint": "The state synchronisation everything above 32 slots and most roleplay resources need.",
+            "choices": {
+                "on": "On",
+                "legacy": "Legacy",
+                "off": "Off"
+            }
+        },
+        "onesync_population": {
+            "label": "Ambient traffic and pedestrians",
+            "hint": "Off empties the streets, which is what a roleplay server usually wants."
+        },
+        "sv_enforceGameBuild": {
+            "label": "Game build",
+            "hint": "Pins every player to one GTA update, for resources that need a particular one. Blank is the newest."
+        },
+        "sv_scriptHookAllowed": {
+            "label": "Allow ScriptHook mods",
+            "hint": "On lets players run single-player mod menus. It is how most cheating gets in."
+        },
+        "sv_pureLevel": {
+            "label": "File checking",
+            "hint": "Refuses players whose game files were changed. Level 2 also checks the audio and text.",
+            "choices": {
+                "0": "Off",
+                "1": "Game files must match",
+                "2": "Game files, audio and text must match"
+            }
+        },
+        "sv_endpointprivacy": {
+            "label": "Hide player addresses",
+            "hint": "Keeps connecting players' addresses out of the log and the public player list."
+        },
+        "sv_authMaxVariance": {
+            "label": "Account checks",
+            "hint": "Lower refuses accounts that look freshly made. 1 is the strictest."
+        },
+        "sv_authMinTrust": {
+            "label": "Account trust",
+            "hint": "Higher refuses accounts with a poor standing. 5 is the strictest."
+        },
+        "steam_webApiKey": {
+            "label": "Steam Web API key",
+            "hint": "Only needed if you want players' Steam ids. Get one from Steam's developer page."
+        },
+        "sv_master1": {
+            "label": "List in the public server browser",
+            "hint": "Off keeps the server off the public list. People who know the address can still join."
+        },
+        "sv_projectName": {
+            "label": "Project name",
+            "hint": "Shown above the server in the browser, next to its description."
+        },
+        "sv_projectDesc": {
+            "label": "Description",
+            "hint": "One line about the server, in the browser."
+        },
+        "locale": {
+            "label": "Language",
+            "hint": "The tag players filter the browser by, like en-US or es-ES."
+        },
+        "tags": {
+            "label": "Tags",
+            "hint": "Comma separated, for the browser's filters: roleplay, drift, economy."
+        }
+    },
+    "settingGroups": {
+        "server": "Server",
+        "gameplay": "Gameplay",
+        "players": "Players",
+        "listing": "Server browser"
+    },
+    "settingErrors": {
+        "quote": "A double quote is not something the server config can hold",
+        "oneLine": "That has to be one line",
+        "whole": "That has to be a whole number",
+        "lowest": "The lowest is {min}",
+        "highest": "The highest is {max}",
+        "notAnOption": "That is not one of the options",
+        "tooLong": "That is longer than {max} characters"
     }
 }

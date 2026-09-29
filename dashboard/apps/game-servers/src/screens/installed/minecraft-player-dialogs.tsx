@@ -16,7 +16,7 @@
  */
 
 import * as actions from "./minecraft-actions";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import type { GameKey } from "../../../messages";
 
 /** The three worlds, by the id the game reports them with. */
@@ -691,6 +691,7 @@ export function PlayerAccessDialog({
     }>;
 }) {
     const t = useGameText("minecraft");
+    const schemaText = useSchemaText();
     const editing = player !== null;
     const linkedTo = player?.linkedTo ?? null;
     /** Linked, and their addresses are the account's sign-ins - which is the one
@@ -843,7 +844,7 @@ export function PlayerAccessDialog({
                     : linkedTo
                       ? t("players.linkedDescription", {
                             player: player?.username ?? "",
-                            account: linkedTo.name
+                            account: schemaText(linkedTo.name) ?? ""
                         })
                       : editing
                         ? t("players.addAnotherAddressTheyPlay")
@@ -1056,7 +1057,7 @@ export function PlayerAccessDialog({
                             : player?.addresses.length
                               ? t("players.followsSignIns", { name: linkedTo.name })
                               : t("players.notSignedIn", {
-                                    account: linkedTo.name,
+                                    account: schemaText(linkedTo.name) ?? "",
                                     player: player?.username ?? ""
                                 })}
                     </span>

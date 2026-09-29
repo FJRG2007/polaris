@@ -5,6 +5,7 @@
 
 import { host } from "@polaris/app-host";
 import { gameCatalogs, type GameKey, type GameNamespace } from "../../messages";
+import { gameMessage, gameMessageIn, readGameMessage } from "../lib/game-message";
 import type { GameText } from "./game-text";
 
 /** One namespace's translator, in the requester's language. */
@@ -14,20 +15,27 @@ export async function gameWords<N extends GameNamespace>(namespace: N): Promise<
 
 /**
  * A schema is built once, when its module loads, where nobody is asking yet -
- * so a refine names its words as `namespace:key` (`schemaWords`) and they are
- * put into the requester's language when the parse fails (`issueText`).
+ * so a refine names its words as a carried key (`schemaWords`, which is
+ * `gameMessage` from `lib/game-message`) and they are put into the requester's
+ * language when the parse fails (`issueText`).
  */
 export function schemaWords<N extends GameNamespace>(namespace: N, key: GameKey<N>): string {
-    return `${namespace}:${key}`;
+    return gameMessage(namespace, key);
 }
 
-/** A failed parse's message, in the requester's language when it names one of
- *  the app's keys; any other message as it is. */
+/** A message that may carry one of the app's keys - a failed parse's, a status
+ *  from the lib - in the requester's language; any other text as it is. */
 export async function issueText(message: string | undefined): Promise<string | undefined> {
-    const named = message?.match(/^(\w+):([\w.]+)$/);
-    if (!named || !gameCatalogs.namespaces.includes(named[1] as GameNamespace)) return message;
-    return gameCatalogs.translate(
-        await host.i18nRequest.getLocale(),
-        `${named[1]}.${named[2]}` as Parameters<typeof gameCatalogs.translate>[1]
-    );
+    if (message === undefined) return undefined;
+    return readGameMessage(message)
+        ? gameMessageIn(await host.i18nRequest.getLocale(), message)
+        : message;
+}
+
+/** A thrown message, in the requester's language when it carries one of the
+ *  app's keys - which is what the lib throws - and as it is otherwise. */
+export async function messageText(message: string): Promise<string> {
+    return readGameMessage(message)
+        ? gameMessageIn(await host.i18nRequest.getLocale(), message)
+        : message;
 }

@@ -20,7 +20,7 @@
  */
 
 import { GAME_RULES } from "../../lib/minecraft/rules";
-import { useGameText, type GameText } from "../game-text";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
@@ -154,6 +154,7 @@ export function GameConsole({
      *  to - the two do not share a single command. */
     hint?: string;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("games");
     const { log, refresh } = useRuntimeLog(applicationId, true, 400);
     const [line, setLine] = useState("");
@@ -774,7 +775,7 @@ export function GameConsole({
                             />
                             {parsedBatch?.problem && batch.trim().length > 0 ? (
                                 <p role="alert" className="text-sm text-danger">
-                                    {parsedBatch.problem}
+                                    {schemaText(parsedBatch.problem)}
                                 </p>
                             ) : parsedBatch && !parsedBatch.problem ? (
                                 <p className="text-sm text-muted-foreground">

@@ -21,6 +21,7 @@
  * Pure, so the screen, the service and the tests read it the same way.
  */
 
+import { gameMessage } from "../game-message";
 import { z } from "zod";
 import { stripMotd } from "./motd";
 import type { PlayerList } from "./parse";
@@ -151,17 +152,17 @@ export function linkRefusal(link: ChatLink, linkable: Linkable): string | null {
     if (link.kind === "group") {
         return linkable.groups.some((group) => group.id === link.groupId)
             ? null
-            : "Choose a group you are in";
+            : gameMessage("games", "lib.chooseYourGroup");
     }
     const space = linkable.spaces.find((one) => one.id === link.spaceId);
-    if (!space) return "Choose a space you run";
+    if (!space) return gameMessage("games", "lib.chooseYourSpace");
     if (!link.callChannelId && !link.textChannelId) {
-        return "Choose a voice channel, a text channel, or both";
+        return gameMessage("games", "lib.chooseChannels");
     }
     const fits = (id: string | null, kind: "text" | "voice") =>
         id === null || space.channels.some((channel) => channel.id === id && channel.kind === kind);
-    if (!fits(link.callChannelId, "voice")) return "Choose a voice channel of that space";
-    if (!fits(link.textChannelId, "text")) return "Choose a text channel of that space";
+    if (!fits(link.callChannelId, "voice")) return gameMessage("games", "lib.chooseVoiceChannel");
+    if (!fits(link.textChannelId, "text")) return gameMessage("games", "lib.chooseTextChannel");
     return null;
 }
 

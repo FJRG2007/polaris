@@ -22,6 +22,7 @@ import {
     WORLD_TRIM_RUN_KEY
 } from "@polaris-app/game-servers/src/lib/minecraft/world-trim";
 import { WORLD_TRIM_SCRIPT } from "@polaris-app/game-servers/src/lib/minecraft/world-trim-script";
+import { english } from "../setup/game-english";
 
 const stopped = { running: false, edition: "java" as const };
 
@@ -150,9 +151,9 @@ describe("what the container printed", () => {
 
     it("says what happened in one sentence", () => {
         const report = readTrimReport(line);
-        expect(report && describeTrim(report)).toContain("55,790 chunks");
+        expect(report && english(describeTrim(report))).toContain("55,790 chunks");
         const nothing = readTrimReport(JSON.stringify({ removed: 0, freedBytes: 0 }));
-        expect(nothing && describeTrim(nothing)).toContain("Nothing to take out");
+        expect(nothing && english(describeTrim(nothing))).toContain("Nothing to take out");
     });
 });
 

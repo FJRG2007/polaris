@@ -24,7 +24,7 @@
  */
 
 import * as actions from "./minecraft-actions";
-import { useGameText, type GameText } from "../game-text";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
 import { bySlot } from "../../lib/minecraft/inventory";
 import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
@@ -82,6 +82,7 @@ export function InventoryEditor({
      *  what is waiting agrees with this one. */
     onChanged: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const display = useDisplayFormat();
     const [reading, setReading] = useState<actions.InventoryReading | null>(null);
@@ -190,7 +191,7 @@ export function InventoryEditor({
                 return;
             }
             if (result.queued) setNote(t("inventoryEditor.queuedNote", { name: player }));
-            else if (result.note) setNote(result.note);
+            else if (result.note) setNote(schemaText(result.note) ?? null);
             await Promise.all([reload(), readQueue()]);
             // The screen behind lists what is waiting too, and it only reads that
             // on its own poll.

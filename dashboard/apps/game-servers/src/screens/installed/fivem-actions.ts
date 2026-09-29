@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText, schemaWords } from "../game-words";
+import { gameWords, issueText, messageText, schemaWords } from "../game-words";
 import * as fivem from "../../lib/fivem/service";
 import { isIdentifier } from "../../lib/fivem/players";
 import { isLicenseKey, LICENSE_KEY_HINT } from "../../lib/fivem/config";
@@ -48,8 +48,8 @@ const connectedSchema = z.object({
 
 type AccessResult = { access?: fivem.FivemAccessView; error?: string };
 
-function failed(caught: unknown, fallback: string): { error: string } {
-    return { error: caught instanceof Error ? caught.message : fallback };
+async function failed(caught: unknown, fallback: string): Promise<{ error: string }> {
+    return { error: caught instanceof Error ? await messageText(caught.message) : fallback };
 }
 
 /** Let somebody onto the server. Recorded whether or not the server was up to be
@@ -484,7 +484,7 @@ export async function setFivemPasswordAction(installedAppId: string, password: s
  * Cfx account, and no screen here has any reason to print one.
  */
 export async function setFivemLicenseKeyAction(installedAppId: string, key: string): Promise<{ error?: string }> {
-    if (!isLicenseKey(key)) return { error: LICENSE_KEY_HINT };
+    if (!isLicenseKey(key)) return { error: (await issueText(LICENSE_KEY_HINT))! };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await fivem.setLicenseKey(access.ownerId, installedAppId, key);

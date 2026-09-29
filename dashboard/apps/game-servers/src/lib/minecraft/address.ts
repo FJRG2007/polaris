@@ -13,6 +13,7 @@
  * still a server: it falls back to the address it always had.
  */
 
+import { gameMessage } from "../game-message";
 import { routesByHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { normalizeZoneName } from "@polaris/deploy";
@@ -153,7 +154,7 @@ export async function setGameHostname(
     const wanted = await gameHostname(input.name, input.subdomain, input.gameLabel);
     if (!wanted) return null;
     if (await hostnameTaken(ownerId, wanted, installedAppId)) {
-        throw new Error(`${wanted} is already taken by another server - pick a different subdomain`);
+        throw new Error(gameMessage("games", "lib.subdomainTaken", { name: wanted }));
     }
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId },
@@ -199,15 +200,15 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
         where: { id: installedAppId, ownerId },
         select: { applicationId: true, catalogId: true, config: true }
     });
-    if (!install) throw new Error("That server does not exist");
+    if (!install) throw new Error(gameMessage("games", "lib.noSuchServer"));
     // Only a client that puts the address in its handshake can be routed by it.
     if (!routesByHostname(install.catalogId)) {
-        throw new Error("Only Minecraft: Java servers can share a port - the others carry no hostname to route on");
+        throw new Error(gameMessage("games", "lib.sharePortJavaOnly"));
     }
     const config = readInstallConfig(install.config);
     if (routed && config.bindAddresses === true) {
         throw new Error(
-            "This server's player list is bound to addresses, which cannot be checked through the router - turn that off first, or leave this server on its own port"
+            gameMessage("games", "lib.boundBehindRouter")
         );
     }
     // Turning routing on drops the SRV record that carried this server's port, so
@@ -226,7 +227,7 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
         // working and this asking them to press it again.
         if (!(await waitForRouter())) {
             throw new Error(
-                `The router was started but is not answering on port ${routerPort()} yet. Give it a moment and turn this on again.`
+                gameMessage("games", "lib.routerSilent", { port: routerPort() })
             );
         }
     }

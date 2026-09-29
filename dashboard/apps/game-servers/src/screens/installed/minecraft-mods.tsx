@@ -21,7 +21,7 @@
  */
 
 import { updateServerSettingsAction } from "./minecraft-actions";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { memoryChangeSentence } from "../../lib/minecraft/memory-plan";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
@@ -89,6 +89,7 @@ export function MinecraftMods({
     packCommands?: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
     onSaved: () => void;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const projectsSetting = settings.find((setting) => setting.key === PROJECTS_KEY);
     const dependenciesSetting = settings.find((setting) => setting.key === DEPENDENCIES_KEY);
@@ -317,7 +318,11 @@ export function MinecraftMods({
                 setError(result.error);
                 return;
             }
-            setMemoryNote(result.memory ? memoryChangeSentence(result.memory, true) : null);
+            setMemoryNote(
+                result.memory
+                    ? (schemaText(memoryChangeSentence(result.memory, true)) ?? null)
+                    : null
+            );
             onSaved();
         });
     }
@@ -426,7 +431,7 @@ export function MinecraftMods({
                                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
-                                {entry.label}
+                                {t(entry.label)}
                             </button>
                         ))}
                     </ScrollRow>

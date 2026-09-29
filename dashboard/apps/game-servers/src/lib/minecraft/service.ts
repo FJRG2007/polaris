@@ -14,6 +14,7 @@
  * the console text is prose that changes between versions.
  */
 
+import { gameMessage } from "../game-message";
 import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
@@ -180,13 +181,13 @@ async function loadInstall(ownerId: string, installedAppId: string): Promise<Min
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: INSTALL_FIELDS
     });
-    if (!install) throw new Error("Installed app not found");
-    if (!install.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install) throw new Error(gameMessage("games", "lib.appNotFound"));
+    if (!install.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     const app = await prisma.application.findFirst({
         where: { id: install.applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true }
     });
-    if (!app) throw new Error("This server's deployment is gone");
+    if (!app) throw new Error(gameMessage("games", "lib.deploymentGone"));
     return installFrom(install, app, await currentReleaseRef(app));
 }
 
@@ -313,8 +314,8 @@ async function withPorts<T>(
  *  player name would arrive. */
 function assertSafeArgument(value: string): void {
     if (value.length === 0 || commandBytes(value) > COMMAND_BYTES_MAX)
-        throw new Error("That command is not valid");
-    if (/[\0\r\n]/.test(value)) throw new Error("That command is not valid");
+        throw new Error(gameMessage("games", "lib.commandInvalid"));
+    if (/[\0\r\n]/.test(value)) throw new Error(gameMessage("games", "lib.commandInvalid"));
 }
 
 /**
@@ -331,7 +332,7 @@ function assertSafeArgument(value: string): void {
  */
 function assertSafeCommand(argv: readonly string[]): void {
     if (argv.length === 0 || argv.length > MAX_COMMAND_ARGUMENTS)
-        throw new Error("That command is not valid");
+        throw new Error(gameMessage("games", "lib.commandInvalid"));
     for (const argument of argv) assertSafeArgument(argument);
 }
 
@@ -433,12 +434,10 @@ export async function sendAnnouncement(
               }
             : context;
     const lines = announcementCommands(install.edition, announcement, withNames);
-    if (lines.length === 0) throw new Error("There is nothing to send yet");
+    if (lines.length === 0) throw new Error(gameMessage("games", "lib.nothingToSend"));
     for (const line of lines) {
         if (commandBytes(line) > COMMAND_BYTES_MAX) {
-            throw new Error(
-                "That is too much formatting for one line. Use fewer colours or styles."
-            );
+            throw new Error(gameMessage("games", "lib.tooMuchFormatting"));
         }
         assertSafeArgument(line);
         await execCommand(install, ownerId, [line]);
@@ -529,7 +528,7 @@ async function sendGameCommand(
         withTimeout(
             ports.runIn(install.container, command),
             COMMAND_TIMEOUT_MS,
-            "The server did not answer in time"
+            gameMessage("games", "lib.noAnswerInTime")
         )
     );
     if (result.code !== 0) {
@@ -538,7 +537,7 @@ async function sendGameCommand(
         throw new Error(
             result.output.trim().length > 0 && !/connection refused/i.test(result.output)
                 ? result.output.trim().slice(0, 300)
-                : "The server is not accepting commands yet"
+                : gameMessage("games", "lib.notAcceptingCommands")
         );
     }
     return result.output;
@@ -680,7 +679,7 @@ async function sendGameLines(
                     `printf %s ${encoded} | base64 -d | rcon-cli`
                 ]),
                 COMMAND_TIMEOUT_MS,
-                "The server did not answer in time"
+                gameMessage("games", "lib.noAnswerInTime")
             )
         );
         if (result.code !== 0) {
@@ -700,9 +699,9 @@ async function sendGameLines(
 function containerFailure(output: string, failure: string): string {
     const said = output.trim();
     if (said.length === 0 || /is not running|no such container/i.test(said)) {
-        return `${failure} - start the server first`;
+        return gameMessage("games", "lib.startFirst", { failure });
     }
-    return `${failure}: ${said.slice(0, 200)}`;
+    return gameMessage("games", "lib.failureSaid", { failure, said: said.slice(0, 200) });
 }
 
 /** Read one of the server's own files out of the container. Empty when it does
@@ -823,7 +822,7 @@ async function readLivePlayers(
         return {
             answering: false,
             players: empty,
-            message: halted ? crashLoopMessage(halted) : "The server is stopped",
+            message: halted ? crashLoopMessage(halted) : gameMessage("games", "lib.stopped"),
             containerRunning: null,
             crashLoop: halted
         };
@@ -864,7 +863,7 @@ async function readLivePlayers(
             message: await withReason(
                 install.applicationId,
                 ownerId,
-                "The container is not running. Redeploy it, or read the logs to see why it stopped."
+                gameMessage("games", "lib.containerDown")
             ),
             containerRunning: false,
             crashLoop: null
@@ -883,7 +882,7 @@ async function readLivePlayers(
                 message: await withReason(
                     install.applicationId,
                     ownerId,
-                    "The server is starting."
+                    gameMessage("games", "lib.starting")
                 ),
                 containerRunning,
                 crashLoop: null
@@ -894,7 +893,8 @@ async function readLivePlayers(
         return {
             answering: false,
             players: empty,
-            message: caught instanceof Error ? caught.message : "The server is not answering",
+            message:
+                caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
             containerRunning,
             crashLoop: null
         };
@@ -921,8 +921,9 @@ async function tail(applicationId: string, ownerId: string, lines: number): Prom
 /** What the panel says about a server that will not start. The cause carries the
  *  sentence when there is one, because it is more specific than anything here. */
 function crashLoopMessage(loop: CrashLoop): string {
-    const opening = `The server kept failing to start, so it has been stopped after ${loop.restarts} restarts.`;
-    return loop.cause ? `${opening} ${loop.cause}` : opening;
+    return loop.cause
+        ? gameMessage("games", "lib.crashLoopCause", { count: loop.restarts, cause: loop.cause })
+        : gameMessage("games", "lib.crashLoop", { count: loop.restarts });
 }
 
 /**
@@ -946,9 +947,11 @@ async function withReason(
     try {
         const log = await readAppRuntimeLog(applicationId, ownerId, LOG_TAIL);
         const phase = parse.startupPhase(log);
-        if (phase) return `${message} ${phase}`;
+        if (phase) return gameMessage("games", "lib.withPhase", { message, phase });
         const line = parse.lastStartupSignal(log);
-        return line ? `${message} Last: ${line.slice(0, LOG_LINE_MAX)}` : message;
+        return line
+            ? gameMessage("games", "lib.withLast", { message, line: line.slice(0, LOG_LINE_MAX) })
+            : message;
     } catch {
         return message;
     }
@@ -986,11 +989,13 @@ export async function getServerFirewall(
  */
 export async function applyFirewallBans(ownerId: string, installedAppId: string): Promise<number> {
     const install = await resolveInstall(ownerId, installedAppId);
-    if (install.edition === "bedrock") throw new Error("Bedrock servers cannot ban an address");
+    if (install.edition === "bedrock")
+        throw new Error(gameMessage("games", "lib.bedrockNoAddressBan"));
     const firewall = await getServerFirewall(ownerId, installedAppId);
     const pending = firewall.blocked.filter((entry) => !firewall.applied.includes(entry));
     let banned = 0;
     for (const address of pending) {
+        // i18n-ignore: the ban reason is shown in the game, to the player
         await execCommand(install, ownerId, ["ban-ip", address, "Blocked by the Polaris firewall"]);
         banned += 1;
     }
@@ -1114,7 +1119,7 @@ export async function setPlayerExperience(
 ): Promise<string> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (server.edition !== "java") {
-            throw new Error("Bedrock's console does not have the command that changes experience");
+            throw new Error(gameMessage("games", "lib.bedrockNoXp"));
         }
         return parse.stripFormatting(await server.say(experienceCommand(change))).trim();
     });

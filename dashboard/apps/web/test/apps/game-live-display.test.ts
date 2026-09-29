@@ -34,6 +34,7 @@ import {
     sidebarProblems,
     sidebarSupported
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar";
+import { english } from "../setup/game-english";
 
 const draft = (over: Partial<Announcement>): Announcement => ({ ...BLANK_ANNOUNCEMENT, ...over });
 const NOW = Date.parse("2026-09-25T20:00:00Z");
@@ -102,23 +103,23 @@ describe("checking what was written", () => {
             "java",
             NOW
         );
-        expect(problems.title).toBe("At most 120 characters on screen");
-        expect(problems.chat).toBe("At most 4 lines");
-        expect(problems.until).toBe("Choose when it comes down");
+        expect(english(problems.title)).toBe("At most 120 characters on screen");
+        expect(english(problems.chat)).toBe("At most 4 lines");
+        expect(english(problems.until)).toBe("Choose when it comes down");
     });
 
     it("refuses an until that has passed, or is more than a week off", () => {
         const at = (iso: string) =>
             announcementProblems(draft({ actionbar: "Hi", hold: "until", until: iso }), "java", NOW)
                 .until;
-        expect(at("2026-09-25T19:00:00Z")).toBe("That moment has already passed");
-        expect(at("2026-10-05T20:00:00Z")).toBe("At most a week from now");
+        expect(english(at("2026-09-25T19:00:00Z"))).toBe("That moment has already passed");
+        expect(english(at("2026-10-05T20:00:00Z"))).toBe("At most a week from now");
         expect(at("2026-09-25T21:00:00Z")).toBeUndefined();
     });
 
     it("keeps only something on screen held: a chat line cannot stay", () => {
         expect(
-            announcementProblems(draft({ chat: "Hi", hold: "manual" }), "java", NOW).hold
+            english(announcementProblems(draft({ chat: "Hi", hold: "manual" }), "java", NOW).hold)
         ).toMatch(/Only the title/);
     });
 });
@@ -280,9 +281,12 @@ describe("the side panel", () => {
                 { ...plainLine("ok"), frames: ["ok", "{player.level}"] }
             ]
         });
-        expect(problems.lines[0]![0]).toMatch(/same for everybody/);
+        expect(english(problems.lines[0]![0])).toMatch(/same for everybody/);
         // Every text a line takes turns between is held to it.
-        expect(problems.lines[1]).toEqual([null, expect.stringMatching(/same for everybody/)]);
+        expect(problems.lines[1]?.map((problem) => english(problem))).toEqual([
+            null,
+            expect.stringMatching(/same for everybody/)
+        ]);
     });
 
     it("is written whole the first time, clearing whatever was there", () => {

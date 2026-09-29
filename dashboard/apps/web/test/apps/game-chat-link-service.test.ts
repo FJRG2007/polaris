@@ -7,6 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { english } from "../setup/game-english";
 
 const SERVER = "01a09cdd-7a10-7811-833d-8b014c82de01";
 const GROUP = "01a09cdd-7a10-7811-833d-8b014c82de02";
@@ -320,7 +321,7 @@ describe("linking a server", () => {
     it("refuses a group the person linking it is not in", async () => {
         fake.linkable = { groups: [], spaces: [] };
         const result = await actions.saveChatLinkAction({ installedAppId: SERVER, link: group });
-        expect(result.error).toBe("Choose a group you are in");
+        expect(english(result.error)).toBe("Choose a group you are in");
         expect(fake.patched).toEqual([]);
     });
 
@@ -343,7 +344,7 @@ describe("linking a server", () => {
                 installedAppId: SERVER,
                 link: { ...group, ...use }
             });
-            expect(result.error).toBe("Choose a group you are in");
+            expect(english(result.error)).toBe("Choose a group you are in");
         }
         expect(fake.patched).toEqual([]);
     });

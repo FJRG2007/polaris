@@ -9,7 +9,7 @@
  */
 
 import { MAX_CONSOLE_LINE } from "../../lib/console-queue";
-import { gameWords, issueText, schemaWords } from "../game-words";
+import { gameWords, issueText, messageText, schemaWords } from "../game-words";
 import { gameOfServer, isModpackReference, routesByHostname } from "@polaris/core";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -247,7 +247,7 @@ export async function setGamemodeAction(input: {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -305,7 +305,7 @@ export async function moderatePlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -406,7 +406,7 @@ export async function givePlayerItemAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -461,7 +461,7 @@ export async function setPlayerExperienceAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -514,7 +514,7 @@ export async function teleportPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -629,7 +629,7 @@ export async function readPlayerInventoryAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadTheInventory")
         };
     }
@@ -686,7 +686,7 @@ export async function readPlayerPositionAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadThePosition")
         };
     }
@@ -728,7 +728,7 @@ export async function readPlayerRecordAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadThisPlayer")
         };
     }
@@ -761,7 +761,7 @@ export async function timeoutPlayerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
@@ -802,7 +802,7 @@ export async function liftTimeoutAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotLiftTheTimeout")
         };
     }
@@ -905,7 +905,7 @@ export async function saveGameScheduleAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheSchedule")
         };
     }
@@ -936,7 +936,7 @@ export async function setWakeOnJoinAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeThat")
         };
     }
@@ -959,7 +959,7 @@ export async function setWhitelistEnforcedAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeTheWhitelist")
         };
     }
@@ -1013,7 +1013,7 @@ export async function grantPlayerAccessAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotAddThatPlayer")
         };
     }
@@ -1082,7 +1082,7 @@ export async function findMinecraftPlayerByUserAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotLookThatUp")
         };
     }
@@ -1138,7 +1138,7 @@ export async function linkPlayerAccountAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotLinkThatPlayer")
         };
     }
@@ -1189,7 +1189,7 @@ export async function invitePlayerAccountAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotInviteThem")
         };
     }
@@ -1228,7 +1228,7 @@ export async function unlinkPlayerAccountAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotUnlinkThatPlayer")
         };
     }
@@ -1283,7 +1283,7 @@ export async function revokePlayerAccessAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotRemoveThatPlayer")
         };
     }
@@ -1312,7 +1312,7 @@ export async function revokePlayerAddressAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotRemoveThatAddress")
         };
     }
@@ -1343,7 +1343,7 @@ export async function setAddressBindingAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeThat")
         };
     }
@@ -1388,7 +1388,7 @@ export async function setGameHostnameAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSetThatAddress")
         };
     }
@@ -1422,7 +1422,7 @@ export async function setGameRoutedAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeThat")
         };
     }
@@ -1473,7 +1473,7 @@ export async function renameGameServerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotRenameTheServer")
         };
     }
@@ -1557,7 +1557,7 @@ export async function setServerIconAction(input: {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSetTheIcon")
         };
     }
@@ -1598,7 +1598,7 @@ export async function applyFirewallBansAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotApplyTheFirewall")
         };
     }
@@ -1616,7 +1616,7 @@ export async function saveWorldAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheWorld")
         };
     }
@@ -1687,7 +1687,7 @@ export async function backUpWorldAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotBackUpThe")
         };
     }
@@ -1860,7 +1860,7 @@ export async function setModpackAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeTheModpack")
         };
     }
@@ -1938,7 +1938,7 @@ export async function saveSpigotPluginsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheList")
         };
     }
@@ -1996,7 +1996,7 @@ export async function saveBackupPolicyAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheBackup")
         };
     }
@@ -2032,7 +2032,7 @@ export async function deleteWorldBackupAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotDeleteTheBackup")
         };
     }
@@ -2074,7 +2074,7 @@ export async function restoreWorldBackupAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotRestoreThatBackup")
         };
     }
@@ -2119,7 +2119,7 @@ export async function resetServerConfigAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotResetTheServer")
         };
     }
@@ -2169,7 +2169,7 @@ export async function newWorldAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotStartANew")
         };
     }
@@ -2225,7 +2225,7 @@ export async function resetGameServerAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotResetTheServer2")
         };
     }
@@ -2262,7 +2262,7 @@ export async function switchWorldAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSwitchWorld")
         };
     }
@@ -2298,7 +2298,7 @@ export async function deleteWorldAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotDeleteThatWorld")
         };
     }
@@ -2360,7 +2360,7 @@ export async function sendConsoleCommandAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.theServerDidNotAccept2")
         };
     }
@@ -2590,7 +2590,7 @@ export async function updateServerSettingsAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveTheSettings")
         };
     }
@@ -2667,7 +2667,7 @@ export async function setMemoryPlanAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSaveThePlan")
         };
     }
@@ -2719,7 +2719,7 @@ export async function readMemoryPlanAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadThePlan")
         };
     }
@@ -2744,7 +2744,7 @@ export async function readWorldRulesAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadTheRules")
         };
     }
@@ -2767,7 +2767,7 @@ export async function storedWorldRulesAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotReadTheRules")
         };
     }
@@ -2819,7 +2819,7 @@ export async function setWorldRuleAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeThatRule")
         };
     }
@@ -2900,7 +2900,7 @@ export async function setWorldDifficultyAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotChangeTheDifficulty")
         };
     }
@@ -2966,7 +2966,7 @@ export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ e
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotMoveThatStack")
         };
     }
@@ -3032,7 +3032,7 @@ export async function setInventorySlotAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotPutThatIn")
         };
     }
@@ -3080,7 +3080,7 @@ export async function clearInventorySlotAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotEmptyThatSlot")
         };
     }
@@ -3133,7 +3133,7 @@ export async function clearPlayerItemAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotTakeThatAway")
         };
     }
@@ -3178,7 +3178,7 @@ export async function clearPlayerInventoryAction(input: {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotEmptyTheInventory")
         };
     }
@@ -3228,7 +3228,7 @@ export async function transferStackAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSendThatStack")
         };
     }
@@ -3265,7 +3265,7 @@ export async function transferInventoryAction(input: {
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotSendTheInventory")
         };
     }
@@ -3308,7 +3308,7 @@ export async function cancelQueuedActionAction(
         return {
             error:
                 caught instanceof Error
-                    ? caught.message
+                    ? await messageText(caught.message)
                     : (await gameWords("minecraft"))("errors.couldNotCancelThat")
         };
     }

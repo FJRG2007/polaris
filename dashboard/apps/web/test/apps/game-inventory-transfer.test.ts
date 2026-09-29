@@ -8,6 +8,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { rejection } from "../setup/game-english";
 
 type Stack = { id: string; count: number };
 
@@ -218,7 +219,7 @@ describe("sending everything", () => {
 
     it("says so when the sender is not on", async () => {
         bags.delete("Alice");
-        await expect(transferInventory(OWNER, SERVER, "Alice", "Bob")).rejects.toThrow(
+        expect(await rejection(transferInventory(OWNER, SERVER, "Alice", "Bob"))).toMatch(
             /Alice has to be on the server/
         );
     });

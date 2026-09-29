@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { gameWords, issueText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import {
     deleteConsoleCommand,
@@ -81,7 +81,7 @@ export async function saveConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCommandCouldNotBe") };
+        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe") };
     }
 }
 
@@ -106,6 +106,6 @@ export async function deleteConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
+        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
     }
 }

@@ -17,6 +17,7 @@
  * nothing here talks to anybody at runtime.
  */
 
+import { gameMessage } from "../game-message";
 import { searchCatalog, type SearchableItem } from "@polaris/core/catalog-search";
 
 /** An item's class, which is what the picture is named after and what a screen
@@ -149,11 +150,13 @@ export interface ArkGiveLine {
  * thing over and knows what it was called.
  */
 export function describeArkGive(name: string, line: ArkGiveLine): string {
-    const what = line.blueprint ? `${name} blueprint` : name;
+    const what = line.blueprint ? gameMessage("games", "lib.blueprintOf", { name }) : name;
     // Quality is the one field that is worth saying twice: it is the difference
     // between a pistol and the best pistol on the server, and it is off by
     // default, so a line that carries one has had it typed in deliberately.
-    return `${line.quantity} x ${what}${line.quality > 0 ? `, quality ${line.quality}` : ""}`;
+    return line.quality > 0
+        ? gameMessage("games", "lib.giveLineQuality", { quantity: line.quantity, what, quality: line.quality })
+        : gameMessage("games", "lib.giveLine", { quantity: line.quantity, what });
 }
 
 /** How many stacks a quantity actually arrives as. The game splits them itself -
@@ -184,13 +187,12 @@ export function describeArkStacks(stack: number, quantity: number): string | nul
     if (total <= size) return null;
     // Gear does not stack at all, so counting it in stacks of one is arithmetic
     // rather than English. Five swords are five swords.
-    if (size === 1) return `Arrives as ${total} separate pieces.`;
+    if (size === 1) return gameMessage("games", "lib.arrives.pieces", { count: total });
     const full = Math.trunc(total / size);
     const rest = total - full * size;
-    const stacks = full === 1 ? `a stack of ${size}` : `${full} stacks of ${size}`;
     return rest === 0
-        ? `Arrives as ${stacks}.`
-        : `Arrives as ${stacks} and ${rest}.`;
+        ? gameMessage("games", "lib.arrives.stacks", { count: full, size })
+        : gameMessage("games", "lib.arrives.stacksAndRest", { count: full, size, rest });
 }
 
 export interface ArkGive {
@@ -215,8 +217,8 @@ export interface ArkGive {
  * `Blueprint'…'`, and stopping at the object rather than at the generated class.
  */
 export function arkGiveCommand(give: ArkGive): string {
-    if (!/^\d{1,20}$/.test(give.playerId)) throw new Error("That is not an in-game player id");
-    if (!ARK_BLUEPRINT_PATH.test(give.blueprintPath)) throw new Error("That is not an item");
+    if (!/^\d{1,20}$/.test(give.playerId)) throw new Error(gameMessage("games", "lib.notInGameId"));
+    if (!ARK_BLUEPRINT_PATH.test(give.blueprintPath)) throw new Error(gameMessage("games", "lib.notItem"));
     const quantity = Math.max(1, Math.min(MAX_ARK_GIVE, Math.trunc(give.quantity)));
     const quality = Math.max(0, Math.min(MAX_ARK_QUALITY, Math.trunc(give.quality)));
     return [

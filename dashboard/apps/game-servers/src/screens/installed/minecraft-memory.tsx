@@ -17,7 +17,7 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
-import { useGameText } from "../game-text";
+import { useGameText, useSchemaText } from "../game-text";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Card, CardBody, Select, Skeleton } from "@polaris/ui";
 import {
@@ -51,6 +51,7 @@ export function MinecraftMemory({
      *  figure that save left behind. */
     refresh?: number;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [plan, setPlan] = useState<MemoryPlanView | null>(null);
     // What this tab last read paints first, so the card is not a skeleton on a
@@ -178,11 +179,11 @@ export function MinecraftMemory({
                                     {plan.plannedMb > plan.currentMb
                                         ? t("memory.wants", {
                                               size: inGigabytes(plan.plannedMb),
-                                              reason: plan.reason
+                                              reason: schemaText(plan.reason) ?? ""
                                           })
                                         : t("memory.covers", {
                                               size: inGigabytes(plan.plannedMb),
-                                              reason: plan.reason
+                                              reason: schemaText(plan.reason) ?? ""
                                           })}{" "}
                                     {t("memory.raises", { ceiling: inGigabytes(plan.ceilingMb) })}
                                 </p>
@@ -191,7 +192,7 @@ export function MinecraftMemory({
                             <p className="text-xs text-muted-foreground">
                                 {t("memory.manual", {
                                     size: inGigabytes(plan.plannedMb),
-                                    reason: plan.reason
+                                    reason: schemaText(plan.reason) ?? ""
                                 })}
                             </p>
                         )}

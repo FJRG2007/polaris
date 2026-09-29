@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { useGameText, usePlayerWords } from "../game-text";
+import { useGameText, usePlayerWords, useSchemaText } from "../game-text";
 import * as actions from "./fivem-actions";
 import { FivemRules } from "./fivem-rules";
 import { GameConsole } from "./game-console";
@@ -570,6 +570,7 @@ function ConnectCard({
 }
 
 function OverviewTab({ status }: { status: FivemStatus | null }) {
+    const schemaText = useSchemaText();
     const t = useGameText("fivem");
     const figures: { label: string; value: string }[] = [
         {
@@ -592,7 +593,7 @@ function OverviewTab({ status }: { status: FivemStatus | null }) {
                 <Card>
                     <CardBody className="flex items-start gap-2 py-3 text-sm text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                        <span>{status.message}</span>
+                        <span>{schemaText(status.message)}</span>
                     </CardBody>
                 </Card>
             )}
@@ -640,6 +641,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: FivemAccessView) => void;
 }) {
+    const schemaText = useSchemaText();
     const { playerFilters, playerAction, playerConfirm } = usePlayerWords();
     const t = useGameText("fivem");
     const [query, setQuery] = useState("");
@@ -703,7 +705,7 @@ function PlayersTab({
                         ? t("panel.reading")
                         : status.answering
                           ? t("panel.nobodyAtAll")
-                          : (status.message ?? t("panel.notAnswering"))
+                          : (schemaText(status.message) ?? t("panel.notAnswering"))
                 }
                 rows={rows.map((entry) => (
                     <PlayerRow
@@ -863,6 +865,7 @@ function PlayerRow({
     onMessage: () => void;
     onAdmin: (isAdmin: boolean) => void;
 }) {
+    const schemaText = useSchemaText();
     const { playerAction, playerMenuItem, playerStanding, playerPresence } = usePlayerWords();
     const t = useGameText("fivem");
     // What the line under the name says - see `presenceLine`.
@@ -900,7 +903,7 @@ function PlayerRow({
                                 title={identifier}
                                 className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground"
                             >
-                                {kind ? IDENTIFIER_LABEL[kind] : identifier}
+                                {kind ? schemaText(IDENTIFIER_LABEL[kind]) : identifier}
                             </span>
                         );
                     })}
@@ -1301,6 +1304,7 @@ function ConsolePasswordCard({
 
 function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
     const t = useGameText("fivem");
+    const schemaText = useSchemaText();
     const [draft, setDraft] = useState("");
     const [pending, startTransition] = useTransition();
     const [note, setNote] = useState<string | null>(null);
@@ -1335,7 +1339,7 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                                 spellCheck={false}
                             />
                             <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? LICENSE_KEY_HINT : t("panel.theServerPicksItUp")}
+                                {invalid ? schemaText(LICENSE_KEY_HINT) : t("panel.theServerPicksItUp")}
                             </span>
                         </label>
                         <Button

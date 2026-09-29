@@ -1,3 +1,4 @@
+import { messageText } from "../../../../../screens/game-words";
 import { NextResponse } from "next/server";
 import { gameWords } from "../../../../../screens/game-words";
 import { listGameServerLive } from "../../../../../lib/games-service";
@@ -38,7 +39,7 @@ export async function GET(): Promise<Response> {
             {
                 error:
                     caught instanceof Error
-                        ? caught.message
+                        ? await messageText(caught.message)
                         : (await gameWords("games"))("errors.couldNotReadYourGame")
             },
             { status: 400 }

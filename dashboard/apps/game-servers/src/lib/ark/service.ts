@@ -22,6 +22,7 @@
  * the moment it has one - see `gateDecisions` in `ark/access` for the rule.
  */
 
+import { gameMessage } from "../game-message";
 import { ARK_ROOT } from "./files";
 import { prisma } from "@polaris/db";
 import * as arkAccess from "./access";
@@ -61,8 +62,8 @@ const MAX_COMMAND_LENGTH = 512;
  *  arrive. */
 function assertSafeCommand(command: string): void {
     if (command.length === 0 || command.length > MAX_COMMAND_LENGTH)
-        throw new Error("That command is not valid");
-    if (/[\0\r\n]/.test(command)) throw new Error("That command is not valid");
+        throw new Error(gameMessage("games", "lib.commandInvalid"));
+    if (/[\0\r\n]/.test(command)) throw new Error(gameMessage("games", "lib.commandInvalid"));
 }
 
 /** How arkmanager is invoked. The image runs the server as `steam` and its own
@@ -106,7 +107,11 @@ export async function runArkCommand(
     assertSafeCommand(command);
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const bounded = (argv: string[]): Promise<{ code: number; output: string }> =>
-            withTimeout(server.run(argv), COMMAND_TIMEOUT_MS, "The server did not answer in time");
+            withTimeout(
+                server.run(argv),
+                COMMAND_TIMEOUT_MS,
+                gameMessage("games", "lib.noAnswerInTime")
+            );
         let result = await bounded(rconArgv(command));
         if (result.code !== 0 && couldNotStart(result)) {
             result = await bounded(["arkmanager", "rconcmd", command]);
@@ -116,7 +121,7 @@ export async function runArkCommand(
             throw new Error(
                 said.length > 0 && !isRconRefusal(said)
                     ? said.slice(0, 300)
-                    : "The server is not accepting commands yet"
+                    : gameMessage("games", "lib.notAcceptingCommands")
             );
         }
         return result.output;
@@ -167,7 +172,7 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             answering: false,
             containerRunning: null,
             players: [],
-            message: "This server has not been deployed yet",
+            message: gameMessage("games", "lib.notDeployed"),
             crashLoop: null
         };
     }
@@ -185,8 +190,13 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             containerRunning: null,
             players: [],
             message: halted
-                ? `The server kept failing to start, so it has been stopped after ${halted.restarts} restarts.${halted.cause ? ` ${halted.cause}` : ""}`
-                : "The server is stopped",
+                ? halted.cause
+                    ? gameMessage("games", "lib.crashLoopCause", {
+                          count: halted.restarts,
+                          cause: halted.cause
+                      })
+                    : gameMessage("games", "lib.crashLoop", { count: halted.restarts })
+                : gameMessage("games", "lib.stopped"),
             crashLoop: halted
         };
     }
@@ -203,7 +213,12 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             answering: false,
             containerRunning: false,
             players: [],
-            message: `The server kept failing to start, so it has been stopped after ${loop.restarts} restarts.${loop.cause ? ` ${loop.cause}` : ""}`,
+            message: loop.cause
+                ? gameMessage("games", "lib.crashLoopCause", {
+                      count: loop.restarts,
+                      cause: loop.cause
+                  })
+                : gameMessage("games", "lib.crashLoop", { count: loop.restarts }),
             crashLoop: loop
         };
     }
@@ -212,8 +227,7 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             answering: false,
             containerRunning: false,
             players: [],
-            message:
-                "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+            message: gameMessage("games", "lib.containerDown"),
             crashLoop: null
         };
     }
@@ -234,8 +248,8 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
                 // is what silence means, and anything else is quoted back.
                 message:
                     said.trim().length === 0
-                        ? "The server is starting. A new one installs about 30 GB first, which takes a while."
-                        : `The server answered something Polaris could not read: ${firstLine(said)}`,
+                        ? gameMessage("games", "lib.arkStarting")
+                        : gameMessage("games", "lib.unreadableAnswer", { said: firstLine(said) }),
                 crashLoop: null
             };
         }
@@ -245,7 +259,8 @@ export async function getArkPlayers(ownerId: string, installedAppId: string): Pr
             answering: false,
             containerRunning,
             players: [],
-            message: caught instanceof Error ? caught.message : "The server is not answering",
+            message:
+                caught instanceof Error ? caught.message : gameMessage("games", "lib.notAnswering"),
             crashLoop: null
         };
     }
@@ -383,7 +398,7 @@ export async function readArkAccess(
         accounts: Object.fromEntries(
             people.map((person) => [
                 person.id,
-                person.name || person.username || "A Polaris account"
+                person.name || person.username || gameMessage("games", "lib.aPolarisAccount")
             ])
         )
     };
@@ -411,13 +426,14 @@ export async function addAllowedPlayer(
     installedAppId: string,
     player: { steamId: string; label: string; userId?: string | null }
 ): Promise<ArkAccessView> {
-    if (!arkAccess.isSteamId(player.steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(player.steamId))
+        throw new Error(gameMessage("games", "lib.notSteamId"));
     if (player.userId) {
         const person = await prisma.user.findUnique({
             where: { id: player.userId },
             select: { id: true }
         });
-        if (!person) throw new Error("That Polaris account does not exist");
+        if (!person) throw new Error(gameMessage("games", "lib.noSuchAccount"));
     }
     const steamId = player.steamId.trim();
     const list = arkAccess.withPlayer(
@@ -443,7 +459,7 @@ export async function removeAllowedPlayer(
     installedAppId: string,
     steamId: string
 ): Promise<ArkAccessView> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     const access = await readArkAccess(ownerId, installedAppId);
     const known = access.players.find((entry) => entry.steamId === steamId);
     // Only a player the server was actually told about has to be untold. One that
@@ -515,9 +531,9 @@ async function requireApplication(ownerId: string, installedAppId: string): Prom
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true }
     });
-    if (!install) throw new Error("Server not found");
-    if (install.catalogId !== ARK_CATALOG_ID) throw new Error("That is not an ARK server");
-    if (!install.applicationId) throw new Error("This server has not been deployed yet");
+    if (!install) throw new Error(gameMessage("games", "lib.serverNotFound"));
+    if (install.catalogId !== ARK_CATALOG_ID) throw new Error(gameMessage("games", "lib.notArk"));
+    if (!install.applicationId) throw new Error(gameMessage("games", "lib.notDeployed"));
     return install.applicationId;
 }
 
@@ -571,7 +587,7 @@ export async function setJoinPassword(
     password: string
 ): Promise<void> {
     if (!arkAccess.isJoinPassword(password))
-        throw new Error("That password is not one ARK will carry");
+        throw new Error(gameMessage("games", "lib.arkPassword"));
     const applicationId = await requireApplication(ownerId, installedAppId);
     await setEnvVars("application", applicationId, ownerId, [
         { key: "SERVER_PASSWORD", value: password, isSecret: true }
@@ -592,7 +608,7 @@ export async function setAdminPassword(
     password: string
 ): Promise<void> {
     if (!arkAccess.isJoinPassword(password))
-        throw new Error("That password is not one ARK will carry");
+        throw new Error(gameMessage("games", "lib.arkPassword"));
     const applicationId = await requireApplication(ownerId, installedAppId);
     await setEnvVars("application", applicationId, ownerId, [
         { key: "ADMIN_PASSWORD", value: password, isSecret: true }
@@ -668,7 +684,7 @@ export async function messageArkPlayer(
     steamId: string,
     message: string
 ): Promise<void> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     await runArkCommand(ownerId, installedAppId, `ServerChatTo ${steamId.trim()} ${message}`);
 }
 
@@ -679,7 +695,7 @@ export async function kickArkPlayer(
     installedAppId: string,
     steamId: string
 ): Promise<void> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     await runArkCommand(ownerId, installedAppId, `KickPlayer ${steamId.trim()}`);
 }
 
@@ -690,7 +706,7 @@ export async function banArkPlayer(
     installedAppId: string,
     steamId: string
 ): Promise<void> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     await runArkCommand(ownerId, installedAppId, `BanPlayer ${steamId.trim()}`);
 }
 
@@ -699,7 +715,7 @@ export async function unbanArkPlayer(
     installedAppId: string,
     steamId: string
 ): Promise<void> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     await runArkCommand(ownerId, installedAppId, `UnbanPlayer ${steamId.trim()}`);
 }
 
@@ -721,7 +737,7 @@ export async function readArkPlayerId(
     installedAppId: string,
     steamId: string
 ): Promise<string | null> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     const profiles = await readArkProfiles(ownerId, installedAppId, [steamId.trim()]);
     return profiles[steamId.trim()]?.dataId ?? null;
 }
@@ -784,7 +800,7 @@ export async function giveArkExperience(
  *  read rather than from a form, so this is the second line of defence rather than
  *  the first - but it is what stops a malformed one reaching the console. */
 function assertPlayerId(playerId: string): string {
-    if (!/^\d{1,20}$/.test(playerId)) throw new Error("That is not an in-game player id");
+    if (!/^\d{1,20}$/.test(playerId)) throw new Error(gameMessage("games", "lib.notInGameId"));
     return playerId;
 }
 
@@ -826,7 +842,7 @@ export async function setArkAdmin(
     steamId: string,
     admin: boolean
 ): Promise<string[]> {
-    if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
+    if (!arkAccess.isSteamId(steamId)) throw new Error(gameMessage("games", "lib.notSteamId"));
     const id = steamId.trim();
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const current = arkAdmins.parseAdminList(

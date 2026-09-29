@@ -13,7 +13,7 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
-import { useGameText, type GameText } from "../game-text";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import type { GameKey } from "../../../messages";
 import { McLine } from "../../components/mc-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
@@ -126,6 +126,7 @@ export function FieldNote({
     /** The values already settled, like the server's name, counted as they are. */
     known?: KnownValues;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const used = visibleLength(mc.stripMotd(text), known);
     return (
@@ -136,7 +137,7 @@ export function FieldNote({
             <span className={cn("tabular-nums", used > max && "text-danger")}>
                 {used}/{max}
             </span>
-            {problem && <span>{problem}</span>}
+            {problem && <span>{schemaText(problem)}</span>}
         </span>
     );
 }
@@ -182,6 +183,7 @@ export function MinecraftAnnounce({
     /** Who is on, to send to one of them. */
     players: readonly string[];
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [draft, setDraft] = useState<Announcement>(BLANK_ANNOUNCEMENT);
     // What this tab last read paints first - the saved templates and what is
@@ -686,7 +688,7 @@ export function MinecraftAnnounce({
                             </div>
                             {(problems.hold || problems.until) && (
                                 <span role="alert" className="text-xs text-danger">
-                                    {problems.hold ?? problems.until}
+                                    {schemaText(problems.hold ?? problems.until)}
                                 </span>
                             )}
                             {!problems.hold && !problems.until && needsRepeating(draft) && (
@@ -713,7 +715,7 @@ export function MinecraftAnnounce({
                                             }
                                             options={ANNOUNCE_SOUNDS.map((sound) => ({
                                                 value: sound.id || NO_SOUND,
-                                                label: sound.label
+                                                label: t(sound.label)
                                             }))}
                                             aria-label={t("announce.sound")}
                                         />

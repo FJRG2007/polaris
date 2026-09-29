@@ -17,7 +17,7 @@
  */
 
 import * as actions from "./fivem-actions";
-import { useGameText } from "../game-text";
+import { useGameText, type GameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
@@ -102,7 +102,7 @@ export function FivemRules({
             (setting) =>
                 setting.group === group &&
                 (wanted.length === 0 ||
-                    [setting.key, setting.label, setting.hint, group]
+                    [setting.key, t(setting.label), setting.hint ? t(setting.hint) : "", t(group)]
                         .join(" ")
                         .toLowerCase()
                         .includes(wanted))
@@ -113,9 +113,11 @@ export function FivemRules({
      *  the file now holds, so a row never shows something that was not written. */
     async function apply(setting: FivemSetting, value: string | null): Promise<void> {
         if (value !== null) {
-            const problem = settingError(setting, value);
+            const problem = settingError(setting, value, t);
             if (problem) {
-                setError(`${setting.label}: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`);
+                setError(
+                    `${t(setting.label)}: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`
+                );
                 return;
             }
         }
@@ -169,7 +171,7 @@ export function FivemRules({
                     installedAppId={installedAppId}
                     running={running}
                     changed={changed}
-                    reason="a settings change"
+                    reason={t("rules.restartReason")}
                     onRestarted={() => {
                         setChanged(false);
                         void load();
@@ -194,7 +196,7 @@ export function FivemRules({
             {shown.map((entry) => (
                 <div key={entry.group} className="flex flex-col gap-1">
                     <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {entry.group}
+                        {t(entry.group)}
                     </p>
                     <Card>
                         <CardBody className="flex flex-col gap-0 py-0">
@@ -263,7 +265,7 @@ function SettingRow({
         >
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
-                    {setting.label}
+                    {t(setting.label)}
                     {/* What FiveM calls it. Quiet, because it is not what the row is
                         for - and present, because it is what somebody arriving from
                         a forum post is holding. */}
@@ -274,10 +276,10 @@ function SettingRow({
                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                     )}
                 </p>
-                {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
+                {setting.hint && <p className="text-xs text-muted-foreground">{t(setting.hint)}</p>}
                 {!isSet && !loading && (
                     <p className="text-xs text-muted-foreground">
-                        {t("rules.notSet", { fallback: setting.fallback })}
+                        {t("rules.notSet", { fallback: fallbackText(t, setting.fallback) })}
                     </p>
                 )}
             </div>
@@ -303,7 +305,7 @@ function SettingRow({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={t("rules.stopSetting", { name: setting.label })}
+                            aria-label={t("rules.stopSetting", { name: t(setting.label) })}
                             title={t("rules.leaveItToTheServer")}
                             disabled={disabled || busy}
                             onClick={() => onChange(null)}
@@ -313,7 +315,7 @@ function SettingRow({
                     )}
                     {setting.type === "boolean" ? (
                         <Switch
-                            aria-label={setting.label}
+                            aria-label={t(setting.label)}
                             disabled={disabled || busy}
                             checked={switchIsOn(setting, value)}
                             onChange={(next: boolean) => onChange(switchValue(setting, next))}
@@ -321,7 +323,7 @@ function SettingRow({
                     ) : setting.type === "choice" ? (
                         <Select
                             className="w-48"
-                            aria-label={setting.label}
+                            aria-label={t(setting.label)}
                             disabled={disabled || busy}
                             value={value ?? ""}
                             onValueChange={(next) => onChange(next || null)}
@@ -329,12 +331,12 @@ function SettingRow({
                                 {
                                     value: "",
                                     label: t("rules.leaveWithFallback", {
-                                        fallback: setting.fallback
+                                        fallback: fallbackText(t, setting.fallback)
                                     })
                                 },
                                 ...(setting.choices ?? []).map((choice) => ({
                                     value: choice.value,
-                                    label: choice.label
+                                    label: t(choice.label)
                                 }))
                             ]}
                         />
@@ -342,7 +344,7 @@ function SettingRow({
                         <Input
                             type={setting.type === "number" ? "number" : "text"}
                             className={setting.type === "number" ? "w-28" : "w-56"}
-                            aria-label={setting.label}
+                            aria-label={t(setting.label)}
                             disabled={disabled || busy}
                             min={setting.min}
                             max={setting.max}
@@ -351,7 +353,7 @@ function SettingRow({
                             placeholder={
                                 setting.secret && isSet
                                     ? t("rules.setTypeANewOne")
-                                    : setting.fallback
+                                    : fallbackText(t, setting.fallback)
                             }
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
@@ -371,4 +373,14 @@ function SettingRow({
             )}
         </div>
     );
+}
+
+/** What the server falls back to, in words: the table's own few words translated,
+ *  anything else - a name, a number - as it is. */
+function fallbackText(t: GameText<"fivem">, fallback: string): string {
+    if (fallback === "on") return t("rules.fallbacks.on");
+    if (fallback === "off") return t("rules.fallbacks.off");
+    if (fallback === "none") return t("rules.fallbacks.none");
+    if (fallback === "the newest") return t("rules.fallbacks.newest");
+    return fallback;
 }

@@ -18,6 +18,8 @@
  * Pure, so every command can be asserted without a server.
  */
 
+import { gameMessage } from "../game-message";
+import type { GameKey } from "../../../messages";
 import {
     EVERYBODY,
     LONGEST_NAME,
@@ -109,19 +111,20 @@ export const BLANK_ANNOUNCEMENT: Announcement = {
  *  brings it up to that and no further. */
 export const ANNOUNCE_SOUNDS: readonly {
     readonly id: string;
-    readonly label: string;
+    /** Its name, as a key into the `minecraft` catalog. */
+    readonly label: GameKey<"minecraft">;
     readonly volume?: number;
 }[] = [
-    { id: "", label: "No sound" },
-    { id: "minecraft:block.note_block.pling", label: "Pling" },
-    { id: "minecraft:entity.experience_orb.pickup", label: "Experience orb" },
-    { id: "minecraft:entity.player.levelup", label: "Level up" },
-    { id: "minecraft:ui.toast.challenge_complete", label: "Challenge complete" },
-    { id: "minecraft:block.bell.use", label: "Bell" },
-    { id: "minecraft:block.beacon.activate", label: "Beacon" },
-    { id: "minecraft:block.note_block.bass", label: "Warning (bass)" },
-    { id: "minecraft:event.raid.horn", label: "Raid horn", volume: 100 },
-    { id: "minecraft:entity.ender_dragon.growl", label: "Dragon growl" }
+    { id: "", label: "announce.sounds.none" },
+    { id: "minecraft:block.note_block.pling", label: "announce.sounds.pling" },
+    { id: "minecraft:entity.experience_orb.pickup", label: "announce.sounds.orb" },
+    { id: "minecraft:entity.player.levelup", label: "announce.sounds.levelUp" },
+    { id: "minecraft:ui.toast.challenge_complete", label: "announce.sounds.challenge" },
+    { id: "minecraft:block.bell.use", label: "announce.sounds.bell" },
+    { id: "minecraft:block.beacon.activate", label: "announce.sounds.beacon" },
+    { id: "minecraft:block.note_block.bass", label: "announce.sounds.bass" },
+    { id: "minecraft:event.raid.horn", label: "announce.sounds.horn", volume: 100 },
+    { id: "minecraft:entity.ender_dragon.growl", label: "announce.sounds.dragon" }
 ];
 
 /** Java's names for the sixteen colours, by hex, so a named colour is sent by
@@ -360,15 +363,15 @@ export function announcementCommands(
     part: AnnouncementPart = "all"
 ): string[] {
     const audience = parseTarget(announcement.target);
-    if (!audience) throw new Error("Choose who it goes to");
+    if (!audience) throw new Error(gameMessage("games", "lib.chooseAudience"));
     const targets = concreteTargets(audience, context.named, edition);
     if (targets.length === 0) {
         throw new Error(
             audience.kind === "operators"
-                ? "No operator is on the server right now"
+                ? gameMessage("games", "lib.noOperatorOn")
                 : audience.kind === "others"
-                  ? "Nobody but operators is on the server right now"
-                  : "Choose who it goes to"
+                  ? gameMessage("games", "lib.onlyOperatorsOn")
+                  : gameMessage("games", "lib.chooseAudience")
         );
     }
     // The same lines for each of them, once - the scores behind a variable are
@@ -493,7 +496,7 @@ export function clearAnnouncementCommands(
     named: readonly string[] = []
 ): string[] {
     const audience = parseTarget(announcement.target);
-    if (!audience) throw new Error("Choose who it goes to");
+    if (!audience) throw new Error(gameMessage("games", "lib.chooseAudience"));
     return concreteTargets(audience, named, edition).flatMap((target) =>
         clearFor(edition, announcement, target)
     );
@@ -540,9 +543,9 @@ export function announcementProblems(
 ): Partial<Record<AnnouncementField, string>> {
     const problems: Partial<Record<AnnouncementField, string>> = {};
     const audience = parseTarget(announcement.target);
-    if (!audience) problems.target = "Choose who it goes to";
+    if (!audience) problems.target = gameMessage("games", "lib.chooseAudience");
     else if (namedByPolaris(audience) && edition === "bedrock") {
-        problems.target = "Bedrock keeps no operators list Polaris can read";
+        problems.target = gameMessage("games", "lib.bedrockNoOps");
     }
     const lineFields = ["title", "subtitle", "actionbar"] as const;
     for (const field of lineFields) {
@@ -550,15 +553,16 @@ export function announcementProblems(
         const wrong = variableProblem(text, edition);
         const shown = visibleLength(stripMotd(text), known);
         if (wrong) problems[field] = wrong;
-        else if (shown > LINE_MAX) problems[field] = `At most ${LINE_MAX} characters on screen`;
+        else if (shown > LINE_MAX)
+            problems[field] = gameMessage("games", "lib.atMostOnScreen", { count: LINE_MAX });
     }
     const chat = announcement.chat;
     const chatWrong = variableProblem(chat, edition);
     if (chatWrong) problems.chat = chatWrong;
     else if (chat.split("\n").length > CHAT_MAX_LINES) {
-        problems.chat = `At most ${CHAT_MAX_LINES} lines`;
+        problems.chat = gameMessage("games", "lib.atMostLines", { count: CHAT_MAX_LINES });
     } else if (visibleLength(stripMotd(chat), known) > CHAT_MAX) {
-        problems.chat = `At most ${CHAT_MAX} characters`;
+        problems.chat = gameMessage("games", "lib.atMostCharacters", { count: CHAT_MAX });
     }
 
     // Each part becomes one command, and one command has to fit in what the
@@ -588,19 +592,20 @@ export function announcementProblems(
             ...announcementCommands(edition, alone).map((line) => commandBytes(line))
         );
         if (longest > COMMAND_BYTES_MAX) {
-            problems[field] = "Too much formatting for one line. Use fewer colours or styles here.";
+            problems[field] = gameMessage("games", "lib.tooMuchFormattingHere");
         }
     }
 
     if (announcement.hold !== "timed") {
         const shows = lineFields.some((field) => hasText(announcement[field]));
-        if (!shows) problems.hold = "Only the title, subtitle or action bar can stay on screen";
+        if (!shows) problems.hold = gameMessage("games", "lib.onlyTitlesStay");
     }
     if (announcement.hold === "until") {
         const moment = Date.parse(announcement.until);
-        if (!Number.isFinite(moment)) problems.until = "Choose when it comes down";
-        else if (moment <= now + 10_000) problems.until = "That moment has already passed";
-        else if (moment > now + UNTIL_MAX_MS) problems.until = "At most a week from now";
+        if (!Number.isFinite(moment)) problems.until = gameMessage("games", "lib.chooseWhenDown");
+        else if (moment <= now + 10_000) problems.until = gameMessage("games", "lib.momentPassed");
+        else if (moment > now + UNTIL_MAX_MS)
+            problems.until = gameMessage("games", "lib.atMostAWeek");
     }
     return problems;
 }

@@ -13,6 +13,7 @@
  * pretence that a slider moved something.
  */
 
+import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { withServerContainer } from "../minecraft/service";
 import { ARK_ROOT } from "./files";
@@ -70,7 +71,7 @@ export async function readArkRules(ownerId: string, installedAppId: string): Pro
         if (config === null && ini === null) {
             return {
                 ...NOTHING,
-                reason: "This server has not written its settings yet. It does that the first time it starts."
+                reason: gameMessage("games", "lib.noSettingsYet")
             };
         }
         const live = parseIniSection(ini ?? "", INI_SECTION);
@@ -83,7 +84,7 @@ export async function readArkRules(ownerId: string, installedAppId: string): Pro
         };
     }).catch(() => ({
         ...NOTHING,
-        reason: "The server is stopped, so its settings cannot be read or changed yet."
+        reason: gameMessage("games", "lib.settingsStopped")
     }));
 }
 
@@ -102,13 +103,15 @@ export async function setArkRules(
     const wanted = new Map<string, string | null>();
     for (const [key, raw] of Object.entries(changes)) {
         const setting = findArkSetting(key);
-        if (!setting) throw new Error("That is not a setting Polaris can change");
+        if (!setting) throw new Error(gameMessage("games", "lib.notSettableSetting"));
         if (raw === null) {
             wanted.set(key, null);
             continue;
         }
         const value = normalizeArkValue(setting, raw);
-        if (value === null) throw new Error(`${setting.label} does not take that value`);
+        if (value === null) // Named by the game's own key: this only fires on a request the screen
+        // would not have sent, since the screen checks the same rule first.
+        throw new Error(`${setting.key} does not take that value`);
         wanted.set(key, value);
     }
     if (wanted.size === 0) return readArkRules(ownerId, installedAppId);

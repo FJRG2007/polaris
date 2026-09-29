@@ -18,9 +18,10 @@
  * coming back is a window that says on, or somebody pressing start.
  */
 
+import { readGameMessage } from "../../lib/game-message";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import type { GameKey } from "../../../messages";
-import { useGameText, type GameText } from "../game-text";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input, Select, Switch } from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
@@ -86,6 +87,7 @@ export function MinecraftSchedule({
      *  read it. */
     state?: ScheduleState | null;
 }) {
+    const schemaText = useSchemaText();
     const t = useGameText("minecraft");
     const [schedule, setSchedule] = useState<GameSchedule>(saved);
     const [wakes, setWakes] = useState(wakeOnJoin);
@@ -331,12 +333,12 @@ export function MinecraftSchedule({
 
                         <div className="flex flex-col gap-1">
                             <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {schedule.enabled && summary.includes("nobody") ? (
+                                {schedule.enabled && readGameMessage(summary)?.key === "lib.schedule.idle" ? (
                                     <Moon className="size-3.5" />
                                 ) : (
                                     <Power className="size-3.5" />
                                 )}
-                                {summary}
+                                {schemaText(summary)}
                             </p>
                             {/* Whether anything is following this at all. A schedule
                                 that fires and one that is never looked at read the

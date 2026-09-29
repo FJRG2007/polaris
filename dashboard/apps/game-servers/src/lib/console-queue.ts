@@ -20,6 +20,8 @@
 
 /** The longest single line the console sends: what the server-side guard takes
  *  in one argument, so the box never accepts a line the server would refuse. */
+import { gameMessage } from "./game-message";
+
 export const MAX_CONSOLE_LINE = 512;
 
 /** One thing to do. */
@@ -58,7 +60,10 @@ export function parseQueue(text: string, maxLineLength: number): ParsedQueue {
             if (seconds > LONGEST_WAIT_S) {
                 return {
                     steps: [],
-                    problem: `Line ${index + 1} waits longer than ${LONGEST_WAIT_S} seconds. Use the Schedule tab for that.`
+                    problem: gameMessage("games", "lib.waitTooLong", {
+                        line: index + 1,
+                        seconds: LONGEST_WAIT_S
+                    })
                 };
             }
             steps.push({ kind: "wait", ms: Math.round(seconds * 1000) });
@@ -68,19 +73,22 @@ export function parseQueue(text: string, maxLineLength: number): ParsedQueue {
         if (command.length > maxLineLength) {
             return {
                 steps: [],
-                problem: `Line ${index + 1} is longer than the ${maxLineLength} characters the server takes in one command.`
+                problem: gameMessage("games", "lib.lineTooLong", {
+                    line: index + 1,
+                    max: maxLineLength
+                })
             };
         }
         commands += 1;
         if (commands > MOST_QUEUED) {
             return {
                 steps: [],
-                problem: `That is more than ${MOST_QUEUED} commands. Split it into smaller runs.`
+                problem: gameMessage("games", "lib.tooManyQueued", { count: MOST_QUEUED })
             };
         }
         steps.push({ kind: "command", line: command });
     }
-    if (commands === 0) return { steps: [], problem: "There is no command in that." };
+    if (commands === 0) return { steps: [], problem: gameMessage("games", "lib.noCommand") };
     return { steps, problem: null };
 }
 
