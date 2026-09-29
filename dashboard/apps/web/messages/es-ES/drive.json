@@ -1,0 +1,311 @@
+{
+    "archiveDialog": {
+        "description": "Explora el contenido sin extraerlo, o extráelo en una carpeta.",
+        "reading": "Leyendo el archivo comprimido...",
+        "unreadable": "No se ha podido leer este archivo comprimido. Si está protegido con contraseña, introdúcela para ver su contenido.",
+        "password": "Contraseña",
+        "unlock": "Desbloquear",
+        "emptyFolder": "Carpeta vacía.",
+        "moreFiles": "Y {count, plural, one {# archivo más} other {# archivos más}} en esta carpeta.",
+        "extractTo": "Extraer en",
+        "folderPath": "ruta de la carpeta",
+        "passwordIfEncrypted": "Contraseña (si está cifrado)",
+        "close": "Cerrar",
+        "extracting": "Extrayendo...",
+        "extract": "Extraer"
+    },
+    "fileCategories": {
+        "images": "Imágenes",
+        "audio": "Audio",
+        "video": "Vídeo",
+        "documents": "Documentos",
+        "spreadsheets": "Hojas de cálculo",
+        "presentations": "Presentaciones",
+        "text": "Texto sin formato",
+        "archives": "Comprimidos"
+    },
+    "filesView": {
+        "sort": {
+            "labels": {
+                "name": "Nombre",
+                "created": "Creado el",
+                "modified": "Última modificación",
+                "size": "Tamaño"
+            },
+            "sortedReverse": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}. Invertir.",
+            "sortBy": "Ordenar por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}",
+            "sorted": "Ordenado por {column, select, name {nombre} created {fecha de creación} modified {última modificación} other {tamaño}}, {dir, select, asc {ascendente} other {descendente}}",
+            "title": "Ordenar",
+            "ascending": "A-Z",
+            "descending": "Z-A"
+        },
+        "activity": {
+            "actions": {
+                "download": "Descargado",
+                "upload": "Subido",
+                "create": "Creado",
+                "mkdir": "Creado",
+                "move": "Movido o renombrado",
+                "copy": "Copiado",
+                "trash": "Movido a la papelera",
+                "delete": "Eliminado"
+            },
+            "by": "{action} por <actor>{name}</actor>",
+            "title": "Actividad",
+            "loading": "Cargando...",
+            "empty": "Aún no hay actividad registrada."
+        },
+        "tally": {
+            "both": "{folders, plural, one {# carpeta} other {# carpetas}}, {files, plural, one {# archivo} other {# archivos}}",
+            "folders": "{folders, plural, one {# carpeta} other {# carpetas}}",
+            "files": "{files, plural, one {# archivo} other {# archivos}}",
+            "selected": "{count} seleccionados",
+            "selectedWithSize": "{count} seleccionados - {size}"
+        },
+        "size": {
+            "measuring": "Midiendo esta carpeta...",
+            "contents": "{files, plural, one {# archivo} other {# archivos}} en {folders, plural, one {# carpeta} other {# carpetas}}",
+            "partial": "{contents}. No se ha contado una carpeta bloqueada que hay dentro.",
+            "atLeast": "mín. {size}"
+        },
+        "moveErrors": {
+            "intoItself": "Una carpeta no se puede mover dentro de sí misma.",
+            "alreadyThere": "Ya está en esa carpeta."
+        },
+        "selection": {
+            "downloadZip": "Descargar ZIP",
+            "download": "Descargar",
+            "getLink": "Obtener enlace",
+            "getLinks": "Obtener {count} enlaces",
+            "fetching": "Preparando",
+            "share": "Compartir",
+            "delete": "Eliminar",
+            "clearSelection": "Quitar selección",
+            "clear": "Quitar",
+            "hint": "Selecciona archivos para descargarlos, comprimirlos o eliminarlos.",
+            "selectAll": "Seleccionar todo",
+            "selectItem": "Seleccionar {name}"
+        },
+        "menu": {
+            "itemsSelected": "{count} elementos seleccionados",
+            "downloadZip": "Descargar como ZIP",
+            "open": "Abrir",
+            "requestHere": "Pedir archivos aquí",
+            "pasteHere": "Pegar aquí",
+            "pasteHereCount": "Pegar aquí ({count})",
+            "download": "Descargar",
+            "openArchive": "Abrir archivo comprimido",
+            "rename": "Cambiar nombre",
+            "copy": "Copiar",
+            "copyMany": "Copiar {count} elementos",
+            "cut": "Cortar",
+            "cutMany": "Cortar {count} elementos",
+            "duplicate": "Duplicar",
+            "moveTo": "Mover a...",
+            "copyPath": "Copiar ruta",
+            "copyPaths": "Copiar rutas",
+            "sharePeople": "Compartir con personas",
+            "send": "Enviar una copia",
+            "getLink": "Obtener enlace",
+            "getLinks": "Obtener {count} enlaces",
+            "favoriteAdd": "Añadir a favoritos",
+            "favoriteRemove": "Quitar de favoritos",
+            "changeIcon": "Cambiar icono",
+            "hide": "Ocultar",
+            "unhide": "Mostrar",
+            "editNote": "Editar nota",
+            "addNote": "Añadir nota",
+            "details": "Detalles",
+            "permissions": "Permisos y bloqueo",
+            "delete": "Eliminar",
+            "trash": "Mover a la papelera",
+            "deleteKey": "Supr",
+            "deletePermanently": "Eliminar para siempre",
+            "emptyToTrash": "Vaciar carpeta en la papelera",
+            "emptyPermanently": "Vaciar carpeta para siempre",
+            "empty": "Vaciar carpeta",
+            "deleteLater": "Eliminar más tarde...",
+            "newFolder": "Nueva carpeta",
+            "newFile": "Nuevo archivo",
+            "uploadFiles": "Subir archivos",
+            "uploadFolder": "Subir carpeta",
+            "shareFolder": "Compartir esta carpeta con personas",
+            "linkFolder": "Obtener enlace a esta carpeta",
+            "paste": "Pegar",
+            "pasteCount": "Pegar ({count})"
+        },
+        "viewer": {
+            "back": "Volver",
+            "getLink": "Obtener enlace",
+            "fetching": "Preparando",
+            "download": "Descargar"
+        },
+        "home": "Inicio",
+        "toolbar": {
+            "pasteItems": "Pegar {count} elementos",
+            "pasteCount": "Pegar ({count})",
+            "shareFolder": "Compartir esta carpeta con personas",
+            "share": "Compartir",
+            "linkFolder": "Obtener enlace a esta carpeta",
+            "requestFilesHint": "Pedir archivos ({shortcut})",
+            "requestFiles": "Pedir archivos",
+            "newFolderHint": "Nueva carpeta ({shortcut})",
+            "newFolder": "Nueva carpeta",
+            "upload": "Subir",
+            "readOnly": "Puedes verlo, pero no cambiarlo",
+            "uploading": "Subiendo...",
+            "uploadFiles": "Archivos",
+            "uploadFolder": "Carpeta"
+        },
+        "search": {
+            "placeholder": "Buscar - prueba *.pdf, ext:pptx,pdf, /regex/",
+            "help": "Comodines (*, ?), ext:pptx,pdf para extensiones, /patrón/ para expresiones regulares, o texto normal para una búsqueda aproximada",
+            "toggleScope": "Cambiar alcance de la búsqueda",
+            "recursive": "Buscando en esta carpeta y en todas sus subcarpetas. Haz clic para buscar solo en esta carpeta.",
+            "current": "Buscando solo en esta carpeta. Haz clic para buscar también en las subcarpetas.",
+            "searchingRecursive": "Buscando en esta carpeta y en todas sus subcarpetas...",
+            "results": "{count, plural, one {# resultado} other {# resultados}} en las subcarpetas{truncated, select, yes { (solo las primeras coincidencias - afina la búsqueda)} other {}}"
+        },
+        "view": {
+            "list": "Vista de lista",
+            "grid": "Vista de cuadrícula"
+        },
+        "filters": {
+            "button": "Filtros",
+            "showAll": "Mostrar todos los elementos",
+            "starredOnly": "Mostrar solo destacados",
+            "starred": "Destacados",
+            "hideHidden": "Ocultar elementos ocultos",
+            "showHidden": "Mostrar elementos ocultos",
+            "hidden": "Ocultos",
+            "extension": "Extensión",
+            "minSize": "Tamaño mín. (MB)",
+            "maxSize": "Tamaño máx. (MB)",
+            "after": "Modificado después de",
+            "before": "Modificado antes de",
+            "clear": "Quitar filtros"
+        },
+        "empty": {
+            "searching": "Buscando...",
+            "noMatchesRecursive": "No hay coincidencias en esta carpeta ni en sus subcarpetas.",
+            "folderEmpty": "Esta carpeta está vacía.",
+            "noMatches": "Nada coincide con tu búsqueda o tus filtros."
+        },
+        "entry": {
+            "folder": "Carpeta",
+            "needsPassword": "Necesita contraseña",
+            "inFolder": "en /{path}",
+            "favorite": "Favorito",
+            "gated": "Acceso restringido",
+            "hasNote": "Tiene una nota",
+            "share": "Compartir {name}"
+        },
+        "dropHere": "Suelta los archivos aquí para subirlos",
+        "dragCount": "{count} elementos",
+        "panel": {
+            "passwordProtected": "Protegido con contraseña",
+            "type": "Tipo",
+            "folder": "Carpeta",
+            "fileOfType": "Archivo {extension}",
+            "file": "Archivo",
+            "size": "Tamaño",
+            "owner": "Propietario",
+            "unknown": "Desconocido",
+            "location": "Ubicación",
+            "created": "Creado el",
+            "modified": "Última modificación",
+            "open": "Abrir",
+            "duplicate": "Duplicar",
+            "move": "Mover",
+            "copyPath": "Copiar ruta",
+            "starred": "Destacado",
+            "star": "Destacar",
+            "note": "Nota",
+            "edit": "Editar",
+            "add": "Añadir",
+            "noNote": "Sin nota"
+        },
+        "uploadFolder": {
+            "title": "Subir carpeta",
+            "confirm": "¿Subir {count, plural, one {# archivo} other {# archivos}} ({size}) desde \"{name}\"?",
+            "upload": "Subir"
+        },
+        "icon": {
+            "title": "Cambiar icono",
+            "items": "{count} elementos",
+            "reset": "Restablecer",
+            "done": "Hecho",
+            "colors": {
+                "primary": "principal",
+                "slate": "pizarra",
+                "red": "rojo",
+                "orange": "naranja",
+                "amber": "ámbar",
+                "green": "verde",
+                "cyan": "cian",
+                "violet": "violeta",
+                "pink": "rosa"
+            }
+        },
+        "details": {
+            "title": "Detalles",
+            "name": "Nombre",
+            "type": "Tipo",
+            "location": "Ubicación",
+            "size": "Tamaño",
+            "bytes": "{size} ({bytes} bytes)",
+            "modified": "Modificado"
+        },
+        "note": {
+            "title": "Nota",
+            "placeholder": "Añade una nota a este elemento...",
+            "remove": "Quitar"
+        },
+        "move": {
+            "title": "Mover {count, plural, =0 {elemento} one {elemento} other {# elementos}}",
+            "hint": "Elige la carpeta de destino o escribe su ruta.",
+            "placeholder": "p. ej. Documentos/Archivo",
+            "submit": "Mover"
+        },
+        "retry": "Reintentar"
+    },
+    "page": {
+        "title": "Drive",
+        "description": "Explora y gestiona archivos en todos los NAS y nubes conectados.",
+        "personalDriveFailed": "No se ha podido abrir tu propia unidad"
+    },
+    "transferActions": {
+        "couldNotSend": "No se ha podido enviar.",
+        "invalidSend": "Eso no es algo que Polaris pueda enviar.",
+        "notAnOffer": "Eso no es una oferta."
+    },
+    "transfersPanel": {
+        "title": "Archivos en camino",
+        "givingUp": "se desprende de él",
+        "toOrganization": "para tu organización",
+        "accept": "Aceptar",
+        "decline": "Rechazar",
+        "gotIt": "Entendido",
+        "waiting": "Esperando respuesta. Nada ha salido de tu Drive.",
+        "sending": "Se lo da",
+        "copy": "Copia",
+        "takeBack": "Retirar"
+    },
+    "zipMenu": {
+        "failed": "No se ha podido crear el archivo comprimido",
+        "linkFailed": "Se ha creado el archivo comprimido, pero el enlace ha fallado",
+        "zip": "Comprimir",
+        "saveHere": "Guardar ZIP en esta carpeta",
+        "saveAndLink": "Guardar ZIP y crear un enlace",
+        "titleShare": "Comprimir y compartir",
+        "title": "Guardar como ZIP",
+        "description": "{count, plural, one {# elemento} other {# elementos}} en un ZIP en esta carpeta. Pon una contraseña para cifrar el propio archivo.",
+        "linkLabel": "Enlace para compartir (cópialo ahora):",
+        "done": "Hecho",
+        "name": "Nombre",
+        "password": "Contraseña (opcional, cifra el ZIP)",
+        "creating": "Creando...",
+        "createAndLink": "Crear y enlazar",
+        "create": "Crear ZIP"
+    }
+}

@@ -17,6 +17,8 @@ export type FileCategory =
 
 export interface CategoryDef {
     readonly id: FileCategory;
+    /** The English name, for a screen not yet translated. Translated screens draw
+     *  `fileCategories.<id>` from the drive catalog instead. */
     readonly label: string;
     /** Lowercase, dot-less extensions that belong to this category. */
     readonly extensions: readonly string[];
@@ -27,25 +29,25 @@ export interface CategoryDef {
 export const FILE_CATEGORIES: readonly CategoryDef[] = [
     {
         id: "images",
-        label: "Images",
+        label: "Images", // i18n-ignore
         extensions: ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "tiff", "tif", "heic", "avif", "ico"],
         mimeTypes: ["image/"]
     },
     {
         id: "audio",
-        label: "Audio",
+        label: "Audio", // i18n-ignore
         extensions: ["mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "wma", "opus"],
         mimeTypes: ["audio/"]
     },
     {
         id: "video",
-        label: "Video",
+        label: "Video", // i18n-ignore
         extensions: ["mp4", "mkv", "mov", "avi", "webm", "wmv", "flv", "m4v", "mpg", "mpeg", "3gp"],
         mimeTypes: ["video/"]
     },
     {
         id: "documents",
-        label: "Documents",
+        label: "Documents", // i18n-ignore
         extensions: ["pdf", "doc", "docx", "odt", "rtf", "pages", "epub"],
         mimeTypes: [
             "application/pdf",
@@ -57,7 +59,7 @@ export const FILE_CATEGORIES: readonly CategoryDef[] = [
     },
     {
         id: "spreadsheets",
-        label: "Spreadsheets",
+        label: "Spreadsheets", // i18n-ignore
         extensions: ["xls", "xlsx", "ods", "csv", "tsv", "numbers"],
         mimeTypes: [
             "application/vnd.ms-excel",
@@ -68,7 +70,7 @@ export const FILE_CATEGORIES: readonly CategoryDef[] = [
     },
     {
         id: "presentations",
-        label: "Presentations",
+        label: "Presentations", // i18n-ignore
         extensions: ["ppt", "pptx", "odp", "key"],
         mimeTypes: [
             "application/vnd.ms-powerpoint",
@@ -78,13 +80,13 @@ export const FILE_CATEGORIES: readonly CategoryDef[] = [
     },
     {
         id: "text",
-        label: "Plain text",
+        label: "Plain text", // i18n-ignore
         extensions: ["txt", "md", "markdown", "log", "json", "xml", "yaml", "yml", "ini", "conf", "csv"],
         mimeTypes: ["text/plain", "text/markdown", "application/json", "application/xml"]
     },
     {
         id: "archives",
-        label: "Compressed",
+        label: "Compressed", // i18n-ignore
         extensions: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
         mimeTypes: ["application/zip", "application/x-7z-compressed", "application/x-rar-compressed", "application/gzip"]
     }

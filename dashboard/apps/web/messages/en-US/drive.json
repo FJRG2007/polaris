@@ -1,0 +1,311 @@
+{
+    "archiveDialog": {
+        "description": "Browse the contents without extracting, or extract into a folder.",
+        "reading": "Reading archive...",
+        "unreadable": "Couldn't read this archive. If it's password-protected, enter the password to view its contents.",
+        "password": "Password",
+        "unlock": "Unlock",
+        "emptyFolder": "Empty folder.",
+        "moreFiles": "And {count, plural, one {# more file} other {# more files}} in this folder.",
+        "extractTo": "Extract to",
+        "folderPath": "folder path",
+        "passwordIfEncrypted": "Password (if encrypted)",
+        "close": "Close",
+        "extracting": "Extracting...",
+        "extract": "Extract"
+    },
+    "fileCategories": {
+        "images": "Images",
+        "audio": "Audio",
+        "video": "Video",
+        "documents": "Documents",
+        "spreadsheets": "Spreadsheets",
+        "presentations": "Presentations",
+        "text": "Plain text",
+        "archives": "Compressed"
+    },
+    "filesView": {
+        "sort": {
+            "labels": {
+                "name": "Name",
+                "created": "Created on",
+                "modified": "Last Modified",
+                "size": "Size"
+            },
+            "sortedReverse": "Sorted by {column, select, name {name} created {created on} modified {last modified} other {size}}, {dir, select, asc {ascending} other {descending}}. Reverse it.",
+            "sortBy": "Sort by {column, select, name {name} created {created on} modified {last modified} other {size}}",
+            "sorted": "Sorted by {column, select, name {name} created {created on} modified {last modified} other {size}}, {dir, select, asc {ascending} other {descending}}",
+            "title": "Sort",
+            "ascending": "A-Z",
+            "descending": "Z-A"
+        },
+        "activity": {
+            "actions": {
+                "download": "Downloaded",
+                "upload": "Uploaded",
+                "create": "Created",
+                "mkdir": "Created",
+                "move": "Moved or renamed",
+                "copy": "Copied",
+                "trash": "Moved to Trash",
+                "delete": "Deleted"
+            },
+            "by": "{action} by <actor>{name}</actor>",
+            "title": "Activity",
+            "loading": "Loading...",
+            "empty": "No recorded activity yet."
+        },
+        "tally": {
+            "both": "{folders, plural, one {# folder} other {# folders}}, {files, plural, one {# file} other {# files}}",
+            "folders": "{folders, plural, one {# folder} other {# folders}}",
+            "files": "{files, plural, one {# file} other {# files}}",
+            "selected": "{count} selected",
+            "selectedWithSize": "{count} selected - {size}"
+        },
+        "size": {
+            "measuring": "Measuring this folder...",
+            "contents": "{files, plural, one {# file} other {# files}} in {folders, plural, one {# folder} other {# folders}}",
+            "partial": "{contents}. A locked folder inside was not counted.",
+            "atLeast": "min. {size}"
+        },
+        "moveErrors": {
+            "intoItself": "A folder cannot be moved into itself.",
+            "alreadyThere": "Already in that folder."
+        },
+        "selection": {
+            "downloadZip": "Download ZIP",
+            "download": "Download",
+            "getLink": "Get a link",
+            "getLinks": "Get {count} links",
+            "fetching": "Fetching",
+            "share": "Share",
+            "delete": "Delete",
+            "clearSelection": "Clear selection",
+            "clear": "Clear",
+            "hint": "Select files to download, zip, or delete them.",
+            "selectAll": "Select all",
+            "selectItem": "Select {name}"
+        },
+        "menu": {
+            "itemsSelected": "{count} items selected",
+            "downloadZip": "Download as ZIP",
+            "open": "Open",
+            "requestHere": "Request files here",
+            "pasteHere": "Paste here",
+            "pasteHereCount": "Paste here ({count})",
+            "download": "Download",
+            "openArchive": "Open archive",
+            "rename": "Rename",
+            "copy": "Copy",
+            "copyMany": "Copy {count} items",
+            "cut": "Cut",
+            "cutMany": "Cut {count} items",
+            "duplicate": "Duplicate",
+            "moveTo": "Move to...",
+            "copyPath": "Copy path",
+            "copyPaths": "Copy paths",
+            "sharePeople": "Share with people",
+            "send": "Send a copy",
+            "getLink": "Get a link",
+            "getLinks": "Get {count} links",
+            "favoriteAdd": "Add to favorites",
+            "favoriteRemove": "Remove from favorites",
+            "changeIcon": "Change icon",
+            "hide": "Hide",
+            "unhide": "Unhide",
+            "editNote": "Edit note",
+            "addNote": "Add note",
+            "details": "Details",
+            "permissions": "Permissions & lock",
+            "delete": "Delete",
+            "trash": "Move to Trash",
+            "deleteKey": "Del",
+            "deletePermanently": "Delete permanently",
+            "emptyToTrash": "Empty folder to Trash",
+            "emptyPermanently": "Empty folder permanently",
+            "empty": "Empty folder",
+            "deleteLater": "Delete later...",
+            "newFolder": "New folder",
+            "newFile": "New file",
+            "uploadFiles": "Upload files",
+            "uploadFolder": "Upload folder",
+            "shareFolder": "Share this folder with people",
+            "linkFolder": "Get a link to this folder",
+            "paste": "Paste",
+            "pasteCount": "Paste ({count})"
+        },
+        "viewer": {
+            "back": "Back",
+            "getLink": "Get a link",
+            "fetching": "Fetching",
+            "download": "Download"
+        },
+        "home": "Home",
+        "toolbar": {
+            "pasteItems": "Paste {count} items",
+            "pasteCount": "Paste ({count})",
+            "shareFolder": "Share this folder with people",
+            "share": "Share",
+            "linkFolder": "Get a link to this folder",
+            "requestFilesHint": "Request files ({shortcut})",
+            "requestFiles": "Request files",
+            "newFolderHint": "New folder ({shortcut})",
+            "newFolder": "New folder",
+            "upload": "Upload",
+            "readOnly": "You can read this, not change it",
+            "uploading": "Uploading...",
+            "uploadFiles": "Files",
+            "uploadFolder": "Folder"
+        },
+        "search": {
+            "placeholder": "Search - try *.pdf, ext:pptx,pdf, /regex/",
+            "help": "Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match",
+            "toggleScope": "Toggle search scope",
+            "recursive": "Searching this folder and all subfolders. Click to search only this folder.",
+            "current": "Searching only this folder. Click to search all subfolders too.",
+            "searchingRecursive": "Searching this folder and all subfolders...",
+            "results": "{count, plural, one {# result} other {# results}} across subfolders{truncated, select, yes { (first matches only - narrow your search)} other {}}"
+        },
+        "view": {
+            "list": "List view",
+            "grid": "Grid view"
+        },
+        "filters": {
+            "button": "Filters",
+            "showAll": "Show all items",
+            "starredOnly": "Show starred only",
+            "starred": "Starred",
+            "hideHidden": "Hide hidden items",
+            "showHidden": "Show hidden items",
+            "hidden": "Hidden",
+            "extension": "Extension",
+            "minSize": "Min size (MB)",
+            "maxSize": "Max size (MB)",
+            "after": "Modified after",
+            "before": "Modified before",
+            "clear": "Clear filters"
+        },
+        "empty": {
+            "searching": "Searching...",
+            "noMatchesRecursive": "No matches in this folder or its subfolders.",
+            "folderEmpty": "This folder is empty.",
+            "noMatches": "Nothing matches your search or filters."
+        },
+        "entry": {
+            "folder": "Folder",
+            "needsPassword": "Needs a password",
+            "inFolder": "in /{path}",
+            "favorite": "Favorite",
+            "gated": "Access-gated",
+            "hasNote": "Has a note",
+            "share": "Share {name}"
+        },
+        "dropHere": "Drop files to upload here",
+        "dragCount": "{count} items",
+        "panel": {
+            "passwordProtected": "Password-protected",
+            "type": "Type",
+            "folder": "Folder",
+            "fileOfType": "{extension} file",
+            "file": "File",
+            "size": "Size",
+            "owner": "Owner",
+            "unknown": "Unknown",
+            "location": "Location",
+            "created": "Created on",
+            "modified": "Last Modified",
+            "open": "Open",
+            "duplicate": "Duplicate",
+            "move": "Move",
+            "copyPath": "Copy path",
+            "starred": "Starred",
+            "star": "Star",
+            "note": "Note",
+            "edit": "Edit",
+            "add": "Add",
+            "noNote": "No note"
+        },
+        "uploadFolder": {
+            "title": "Upload folder",
+            "confirm": "Upload {count, plural, one {# file} other {# files}} ({size}) from \"{name}\"?",
+            "upload": "Upload"
+        },
+        "icon": {
+            "title": "Change icon",
+            "items": "{count} items",
+            "reset": "Reset to default",
+            "done": "Done",
+            "colors": {
+                "primary": "primary",
+                "slate": "slate",
+                "red": "red",
+                "orange": "orange",
+                "amber": "amber",
+                "green": "green",
+                "cyan": "cyan",
+                "violet": "violet",
+                "pink": "pink"
+            }
+        },
+        "details": {
+            "title": "Details",
+            "name": "Name",
+            "type": "Type",
+            "location": "Location",
+            "size": "Size",
+            "bytes": "{size} ({bytes} bytes)",
+            "modified": "Modified"
+        },
+        "note": {
+            "title": "Note",
+            "placeholder": "Add a note for this item...",
+            "remove": "Remove"
+        },
+        "move": {
+            "title": "Move {count, plural, =0 {item} one {item} other {# items}}",
+            "hint": "Pick the destination folder, or type its path.",
+            "placeholder": "e.g. Documents/Archive",
+            "submit": "Move"
+        },
+        "retry": "Try again"
+    },
+    "page": {
+        "title": "Drive",
+        "description": "Browse and manage files across every connected NAS and cloud.",
+        "personalDriveFailed": "Your own drive could not be opened"
+    },
+    "transferActions": {
+        "couldNotSend": "That could not be sent.",
+        "invalidSend": "That is not something Polaris can send.",
+        "notAnOffer": "That is not an offer."
+    },
+    "transfersPanel": {
+        "title": "Files on the way",
+        "givingUp": "they are giving it up",
+        "toOrganization": "to your organization",
+        "accept": "Accept",
+        "decline": "Decline",
+        "gotIt": "Got it",
+        "waiting": "Waiting to be answered. Nothing has left your Drive.",
+        "sending": "Sending it",
+        "copy": "Copy",
+        "takeBack": "Take back"
+    },
+    "zipMenu": {
+        "failed": "Could not create the archive",
+        "linkFailed": "Archive created, but the link failed",
+        "zip": "Zip",
+        "saveHere": "Save zip to this folder",
+        "saveAndLink": "Save zip and create a link",
+        "titleShare": "Zip and share",
+        "title": "Save as zip",
+        "description": "{count, plural, one {# item} other {# items}} into a zip in this folder. Set a password to encrypt the archive itself.",
+        "linkLabel": "Share link (copy it now):",
+        "done": "Done",
+        "name": "Name",
+        "password": "Password (optional, encrypts the zip)",
+        "creating": "Creating...",
+        "createAndLink": "Create and link",
+        "create": "Create zip"
+    }
+}

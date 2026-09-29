@@ -32,6 +32,8 @@ import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
 import { activityKey, prefetchListing } from "./listing-cache";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { useDisplayFormat } from "@/components/display-format";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { matchesStructured, parseSearch } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
@@ -142,14 +144,13 @@ const SORT_KEYS = ["name", "created", "modified", "size"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 type SortDir = "asc" | "desc";
 
+type DriveT = NamespaceTranslator<"drive">;
+
 /** What each column is called, in the heading and in the grid's menu, so the two
  *  cannot come to call the same thing different things. */
-const SORT_LABELS: Record<SortKey, string> = {
-    name: "Name",
-    created: "Created on",
-    modified: "Last Modified",
-    size: "Size"
-};
+function sortLabel(t: DriveT, column: SortKey): string {
+    return t(`filesView.sort.labels.${column}`);
+}
 
 /**
  * A column heading that sorts by itself.
@@ -176,6 +177,7 @@ function SortHeading({
     onChoose: (column: SortKey) => void;
     className?: string;
 }) {
+        const t = useTranslations("drive");
     const active = sortKey === column;
     return (
         <div className={cn("flex items-center", className)}>
@@ -184,15 +186,15 @@ function SortHeading({
                 onClick={() => onChoose(column)}
                 aria-label={
                     active
-                        ? `Sorted by ${SORT_LABELS[column].toLowerCase()}, ${sortDir === "asc" ? "ascending" : "descending"}. Reverse it.`
-                        : `Sort by ${SORT_LABELS[column].toLowerCase()}`
+                        ? t("filesView.sort.sortedReverse", { column, dir: sortDir })
+                        : t("filesView.sort.sortBy", { column })
                 }
                 className={cn(
                     "group/sort flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground",
                     active && "text-foreground"
                 )}
             >
-                <span className="truncate">{SORT_LABELS[column]}</span>
+                <span className="truncate">{sortLabel(t, column)}</span>
                 {active ? (
                     sortDir === "asc" ? (
                         <ArrowUp className="size-3 shrink-0" />
@@ -222,19 +224,10 @@ interface ActivityItem {
 const ACTIVITY_CACHE_TTL_MS = 30_000;
 
 /** Human label for an audit action shown in the activity feed. */
-const ACTIVITY_LABELS: Record<string, string> = {
-    "drive.download": "Downloaded",
-    "drive.upload": "Uploaded",
-    "drive.create": "Created",
-    "drive.mkdir": "Created",
-    "drive.move": "Moved or renamed",
-    "drive.copy": "Copied",
-    "drive.trash": "Moved to Trash",
-    "drive.delete": "Deleted"
-};
-
-function activityLabel(action: string): string {
-    return ACTIVITY_LABELS[action] ?? action.replace(/^drive\./, "");
+function activityLabel(t: DriveT, action: string): string {
+    const name = action.replace(/^drive\./, "");
+    const key = `filesView.activity.actions.${name}`;
+    return action.startsWith("drive.") && t.has(key) ? t(key) : name;
 }
 
 /** Icon for an audit action shown beside its activity label. */
@@ -296,23 +289,23 @@ function downloadSelection(connectionId: string, entries: DriveEntry[]) {
  * different place from one of 40 files, and the count on its own makes somebody
  * scroll to find out which.
  */
-function folderTally(entries: readonly DriveEntry[]): string {
+function folderTally(t: DriveT, entries: readonly DriveEntry[]): string {
     const folders = entries.filter((entry) => entry.kind === "dir").length;
     const files = entries.length - folders;
-    const parts: string[] = [];
-    if (folders > 0) parts.push(folders === 1 ? "1 folder" : `${folders} folders`);
-    if (files > 0) parts.push(files === 1 ? "1 file" : `${files} files`);
-    return parts.join(", ");
+    if (folders > 0 && files > 0) return t("filesView.tally.both", { folders, files });
+    if (folders > 0) return t("filesView.tally.folders", { folders });
+    if (files > 0) return t("filesView.tally.files", { files });
+    return "";
 }
 
 /** What has been picked, and how much it weighs when that is knowable. A folder
  *  has no size of its own here, so a selection holding one says nothing about
  *  bytes rather than under-reporting them. */
-function selectionTally(entries: readonly DriveEntry[]): string {
-    const count = entries.length === 1 ? "1 selected" : `${entries.length} selected`;
-    if (entries.some((entry) => entry.kind === "dir")) return count;
+function selectionTally(t: DriveT, entries: readonly DriveEntry[]): string {
+    const count = entries.length;
+    if (entries.some((entry) => entry.kind === "dir")) return t("filesView.tally.selected", { count });
     const bytes = entries.reduce((total, entry) => total + BigInt(entry.size || "0"), 0n);
-    return `${count} - ${formatBytes(bytes)}`;
+    return t("filesView.tally.selectedWithSize", { count, size: formatBytes(bytes) });
 }
 
 /** Nothing on its way out, shared so a view that is passed none does not mint a
@@ -445,6 +438,8 @@ export function FilesView({
     headerActions?: ReactNode;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("drive");
+    const tc = useTranslations("common");
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
     // Recursive by default so a search finds nested items without an extra click.
@@ -546,7 +541,7 @@ export function FilesView({
         const weight = insights.sizes.get(entry.path);
         if (!weight) return insights.pending.has(entry.path) ? "..." : "-";
         const total = formatBytes(weight.bytes);
-        return weight.partial ? `min. ${total}` : total;
+        return weight.partial ? t("filesView.size.atLeast", { size: total }) : total;
     }
 
     /** What the size of a folder means, spelled out for the cell's tooltip. */
@@ -554,12 +549,10 @@ export function FilesView({
         if (entry.kind !== "dir") return undefined;
         const weight = insights.sizes.get(entry.path);
         if (!weight) {
-            return insights.pending.has(entry.path) ? "Measuring this folder..." : undefined;
+                        return insights.pending.has(entry.path) ? t("filesView.size.measuring") : undefined;
         }
-        const files = `${weight.files} file${weight.files === 1 ? "" : "s"}`;
-        const folders = `${weight.folders} folder${weight.folders === 1 ? "" : "s"}`;
-        const contents = `${files} in ${folders}`;
-        return weight.partial ? `${contents}. A locked folder inside was not counted.` : contents;
+        const contents = t("filesView.size.contents", { files: weight.files, folders: weight.folders });
+        return weight.partial ? t("filesView.size.partial", { contents }) : contents;
     }
 
     function openNote(entry: DriveEntry) {
@@ -605,10 +598,10 @@ export function FilesView({
     const moveError = ((): string | null => {
         if (!moveTargets) return null;
         if (moveTargets.some((entry) => movesIntoSelf(entry.path, normalizedMoveDest))) {
-            return "A folder cannot be moved into itself.";
+            return t("filesView.moveErrors.intoItself");
         }
         if (moveTargets.every((entry) => parentOf(entry.path) === normalizedMoveDest)) {
-            return "Already in that folder.";
+            return t("filesView.moveErrors.alreadyThere");
         }
         return null;
     })();
@@ -1006,11 +999,13 @@ export function FilesView({
     // Anything but a single file comes down as an archive, and the button says so.
     const zipLabel =
         selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
-            ? "Download ZIP"
-            : "Download";
+                        ? t("filesView.selection.downloadZip")
+            : t("filesView.selection.download");
     // Each selected item gets its own link, so the count is worth saying out loud.
     const shareLabel =
-        selectedEntries.length > 1 ? `Get ${selectedEntries.length} links` : "Get a link";
+        selectedEntries.length > 1
+            ? t("filesView.selection.getLinks", { count: selectedEntries.length })
+            : t("filesView.selection.getLink");
     const searchError = useMemo(() => parseSearch(query).error, [query]);
 
     // Items marked for a cut are shown dimmed until pasted, the way a file
@@ -1090,7 +1085,7 @@ export function FilesView({
                 event.dataTransfer.setData("application/x-polaris-path", entry.path);
                 event.dataTransfer.effectAllowed = "move";
                 const carried = draggedGroup(entry.path).length;
-                if (carried > 1) showCountDragImage(event, carried);
+                if (carried > 1) showCountDragImage(event, t("filesView.dragCount", { count: carried }));
             },
             onDragEnd: () => {
                 dragPath.current = null;
@@ -1156,7 +1151,7 @@ export function FilesView({
     function entryMenu(entry: DriveEntry) {
         const targets = menuTargets(entry);
         const many = targets.length > 1;
-        const label = many ? `${targets.length} items selected` : entry.name;
+        const label = many ? t("filesView.menu.itemsSelected", { count: targets.length }) : entry.name;
         // A mixed selection commits to one direction rather than flipping each
         // item: anything not yet starred/hidden decides, so a second pass undoes
         // the first instead of leaving the group half-and-half.
@@ -1170,35 +1165,34 @@ export function FilesView({
                 {many ? (
                     <ContextMenuItem onSelect={() => downloadSelection(connectionId, targets)}>
                         <Download className="size-4" />
-                        Download as ZIP
+                        {t("filesView.menu.downloadZip")}
                     </ContextMenuItem>
                 ) : entry.kind === "dir" ? (
                     <>
                         <ContextMenuItem asChild>
                             <Link href={href(connectionId, entry.path)}>
                                 <Folder className="size-4" />
-                                Open
+                                {t("filesView.menu.open")}
                             </Link>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => downloadSelection(connectionId, [entry])}>
                             <Download className="size-4" />
-                            Download as ZIP
+                            {t("filesView.menu.downloadZip")}
                         </ContextMenuItem>
                         {onRequestFiles ? (
                             <ContextMenuItem
                                 onSelect={() => onRequestFiles(entry.path, entry.name)}
                             >
                                 <Inbox className="size-4" />
-                                Request files here
+                                {t("filesView.menu.requestHere")}
                             </ContextMenuItem>
                         ) : null}
                         {clipboard ? (
                             <ContextMenuItem onSelect={() => pasteInto(entry.path)}>
                                 <ClipboardPaste className="size-4" />
-                                Paste here
                                 {clipboard.entries.length > 1
-                                    ? ` (${clipboard.entries.length})`
-                                    : ""}
+                                    ? t("filesView.menu.pasteHereCount", { count: clipboard.entries.length })
+                                    : t("filesView.menu.pasteHere")}
                             </ContextMenuItem>
                         ) : null}
                     </>
@@ -1207,17 +1201,17 @@ export function FilesView({
                         {isViewable(entry.name) ? (
                             <ContextMenuItem onSelect={() => openViewer(entry)}>
                                 <Eye className="size-4" />
-                                Open
+                                {t("filesView.menu.open")}
                             </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem onSelect={() => triggerDownload(connectionId, entry)}>
                             <Download className="size-4" />
-                            Download
+                            {t("filesView.menu.download")}
                         </ContextMenuItem>
                         {/\.(zip|rar)$/i.test(entry.name) ? (
                             <ContextMenuItem onSelect={() => setArchiveTarget(entry)}>
                                 <FileArchive className="size-4" />
-                                Open archive
+                                {t("filesView.menu.openArchive")}
                             </ContextMenuItem>
                         ) : null}
                     </>
@@ -1225,18 +1219,19 @@ export function FilesView({
                 {many || !abilities.write ? null : (
                     <ContextMenuItem onSelect={() => startRename(entry)}>
                         <Pencil className="size-4" />
-                        Rename
+                        {t("filesView.menu.rename")}
+                        {/* i18n-ignore: a key on the keyboard */}
                         <MenuShortcut>F2</MenuShortcut>
                     </ContextMenuItem>
                 )}
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
-                    {many ? `Copy ${targets.length} items` : "Copy"}
+                    {many ? t("filesView.menu.copyMany", { count: targets.length }) : t("filesView.menu.copy")}
                     <MenuShortcut keys="Mod+C" />
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
-                    {many ? `Cut ${targets.length} items` : "Cut"}
+                    {many ? t("filesView.menu.cutMany", { count: targets.length }) : t("filesView.menu.cut")}
                     <MenuShortcut keys="Mod+X" />
                 </ContextMenuItem>
                 {abilities.write ? (
@@ -1247,11 +1242,11 @@ export function FilesView({
                             }}
                         >
                             <Files className="size-4" />
-                            Duplicate
+                            {t("filesView.menu.duplicate")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => openMove(targets)}>
                             <FolderInput className="size-4" />
-                            Move to...
+                            {t("filesView.menu.moveTo")}
                         </ContextMenuItem>
                     </>
                 ) : null}
@@ -1263,24 +1258,24 @@ export function FilesView({
                     }
                 >
                     <ClipboardCopy className="size-4" />
-                    {many ? "Copy paths" : "Copy path"}
+                    {many ? t("filesView.menu.copyPaths") : t("filesView.menu.copyPath")}
                 </ContextMenuItem>
                 {onSharePeople && !many ? (
                     <ContextMenuItem onSelect={() => onSharePeople(entry)}>
                         <Users className="size-4" />
-                        Share with people
+                        {t("filesView.menu.sharePeople")}
                     </ContextMenuItem>
                 ) : null}
                 {onSend && !many ? (
                     <ContextMenuItem onSelect={() => onSend(entry)}>
                         <Send className="size-4" />
-                        Send a copy
+                        {t("filesView.menu.send")}
                     </ContextMenuItem>
                 ) : null}
                 {onShare ? (
                     <ContextMenuItem onSelect={() => onShare(targets)}>
                         <Share2 className="size-4" />
-                        {many ? `Get ${targets.length} links` : "Get a link"}
+                        {many ? t("filesView.menu.getLinks", { count: targets.length }) : t("filesView.menu.getLink")}
                     </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />
@@ -1290,11 +1285,11 @@ export function FilesView({
                     }}
                 >
                     <Star className={cn("size-4", !starring && "fill-amber-400 text-amber-400")} />
-                    {starring ? "Add to favorites" : "Remove from favorites"}
+                    {starring ? t("filesView.menu.favoriteAdd") : t("filesView.menu.favoriteRemove")}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setIconTargets(targets)}>
                     <Palette className="size-4" />
-                    Change icon
+                    {t("filesView.menu.changeIcon")}
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() => {
@@ -1304,22 +1299,22 @@ export function FilesView({
                     }}
                 >
                     {hiding ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    {hiding ? "Hide" : "Unhide"}
+                    {hiding ? t("filesView.menu.hide") : t("filesView.menu.unhide")}
                 </ContextMenuItem>
                 {many ? null : (
                     <>
                         <ContextMenuItem onSelect={() => openNote(entry)}>
                             <StickyNote className="size-4" />
-                            {entry.note ? "Edit note" : "Add note"}
+                            {entry.note ? t("filesView.menu.editNote") : t("filesView.menu.addNote")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
                             <Info className="size-4" />
-                            Details
+                            {t("filesView.menu.details")}
                         </ContextMenuItem>
                         {onManageAccess ? (
                             <ContextMenuItem onSelect={() => onManageAccess(entry)}>
                                 <ShieldCheck className="size-4" />
-                                Permissions &amp; lock
+                                {t("filesView.menu.permissions")}
                             </ContextMenuItem>
                         ) : null}
                     </>
@@ -1330,14 +1325,14 @@ export function FilesView({
                         <ContextMenuSub>
                             <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger-soft focus:bg-danger-soft">
                                 <Trash2 className="size-4" />
-                                Delete
+                                {t("filesView.menu.delete")}
                             </ContextMenuSubTrigger>
                             <ContextMenuSubContent>
                                 {onDelete ? (
                                     <ContextMenuItem onSelect={() => onDelete(targets)}>
                                         <Trash2 className="size-4" />
-                                        Move to Trash
-                                        <MenuShortcut>Del</MenuShortcut>
+                                        {t("filesView.menu.trash")}
+                                        <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>
                                     </ContextMenuItem>
                                 ) : null}
                                 <ContextMenuItem
@@ -1345,8 +1340,8 @@ export function FilesView({
                                     onSelect={() => onDeletePermanent(targets)}
                                 >
                                     <Trash2 className="size-4" />
-                                    {onDelete ? "Delete permanently" : "Delete"}
-                                    {onDelete ? null : <MenuShortcut>Del</MenuShortcut>}
+                                    {onDelete ? t("filesView.menu.deletePermanently") : t("filesView.menu.delete")}
+                                    {onDelete ? null : <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
                                     <>
@@ -1356,7 +1351,7 @@ export function FilesView({
                                                 onSelect={() => onEmptyFolder(entry, false)}
                                             >
                                                 <Eraser className="size-4" />
-                                                Empty folder to Trash
+                                                {t("filesView.menu.emptyToTrash")}
                                             </ContextMenuItem>
                                         ) : null}
                                         <ContextMenuItem
@@ -1364,7 +1359,7 @@ export function FilesView({
                                             onSelect={() => onEmptyFolder(entry, true)}
                                         >
                                             <Eraser className="size-4" />
-                                            {onDelete ? "Empty folder permanently" : "Empty folder"}
+                                            {onDelete ? t("filesView.menu.emptyPermanently") : t("filesView.menu.empty")}
                                         </ContextMenuItem>
                                     </>
                                 ) : null}
@@ -1374,7 +1369,7 @@ export function FilesView({
                                     onSelect={() => onScheduleDelete(targets)}
                                 >
                                     <CalendarClock className="size-4" />
-                                    Delete later...
+                                    {t("filesView.menu.deleteLater")}
                                 </ContextMenuItem>
                             </ContextMenuSubContent>
                         </ContextMenuSub>
@@ -1723,7 +1718,7 @@ export function FilesView({
                         <div className="flex min-w-0 items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setViewerTarget(null)}>
                                 <ChevronLeft className="size-4" />
-                                Back
+                                {t("filesView.viewer.back")}
                             </Button>
                             <span className="min-w-0 truncate text-sm font-medium">
                                 {viewerTarget.name}
@@ -1733,7 +1728,7 @@ export function FilesView({
                             {onShare ? (
                                 <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
                                     <Share2 className="size-4" />
-                                    Get a link
+                                    {t("filesView.viewer.getLink")}
                                 </Button>
                             ) : null}
                             <Button
@@ -1752,7 +1747,7 @@ export function FilesView({
                                 ) : (
                                     <Download className="size-4" />
                                 )}
-                                {preparing > 0 ? "Fetching" : "Download"}
+                                {preparing > 0 ? t("filesView.viewer.fetching") : t("filesView.viewer.download")}
                             </Button>
                         </div>
                     </div>
@@ -1782,7 +1777,7 @@ export function FilesView({
                             {/* A location of your own starts at Home. One somebody
                                 shared starts at what they shared, and calling that
                                 Home would say the folder is the whole storage. */}
-                            {rootPath === "" ? "Home" : (rootPath.split("/").pop() ?? "Home")}
+                            {rootPath === "" ? t("filesView.home") : (rootPath.split("/").pop() ?? t("filesView.home"))}
                         </Link>
                         {segments.slice(depthOf(rootPath)).map((segment, index) => {
                             const target = segments
@@ -1816,12 +1811,12 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={paste}
                                 disabled={pending}
-                                title={`Paste ${clipboard.entries.length} items`}
-                                aria-label={`Paste ${clipboard.entries.length} items`}
+                                title={t("filesView.toolbar.pasteItems", { count: clipboard.entries.length })}
+                                aria-label={t("filesView.toolbar.pasteItems", { count: clipboard.entries.length })}
                             >
                                 <ClipboardPaste className="size-4" />
                                 <span className="hidden sm:inline">
-                                    Paste ({clipboard.entries.length})
+                                    {t("filesView.toolbar.pasteCount", { count: clipboard.entries.length })}
                                 </span>
                             </Button>
                         ) : null}
@@ -1831,11 +1826,11 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={onSharePeopleFolder}
                                 disabled={pending}
-                                title="Share this folder with people"
-                                aria-label="Share this folder with people"
+                                title={t("filesView.toolbar.shareFolder")}
+                                aria-label={t("filesView.toolbar.shareFolder")}
                             >
                                 <Users className="size-4" />
-                                <span className="hidden sm:inline">Share</span>
+                                <span className="hidden sm:inline">{t("filesView.toolbar.share")}</span>
                             </Button>
                         ) : null}
                         {onShareFolder ? (
@@ -1844,8 +1839,8 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={onShareFolder}
                                 disabled={pending}
-                                title="Get a link to this folder"
-                                aria-label="Get a link to this folder"
+                                title={t("filesView.toolbar.linkFolder")}
+                                aria-label={t("filesView.toolbar.linkFolder")}
                             >
                                 <Link2 className="size-4" />
                             </Button>
@@ -1858,11 +1853,11 @@ export function FilesView({
                                     onRequestFiles(path, segments[segments.length - 1] ?? "")
                                 }
                                 disabled={pending}
-                                title={`Request files (${SHORTCUT_HINTS["request-files"]})`}
-                                aria-label="Request files"
+                                title={t("filesView.toolbar.requestFilesHint", { shortcut: SHORTCUT_HINTS["request-files"] })}
+                                aria-label={t("filesView.toolbar.requestFiles")}
                             >
                                 <Inbox className="size-4" />
-                                <span className="hidden sm:inline">Request files</span>
+                                <span className="hidden sm:inline">{t("filesView.toolbar.requestFiles")}</span>
                             </Button>
                         ) : null}
                         {abilities.write ? (
@@ -1871,11 +1866,11 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={onNewFolder}
                                 disabled={pending}
-                                title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
-                                aria-label="New folder"
+                                title={t("filesView.toolbar.newFolderHint", { shortcut: SHORTCUT_HINTS["new-folder"] })}
+                                aria-label={t("filesView.toolbar.newFolder")}
                             >
                                 <FolderPlus className="size-4" />
-                                <span className="hidden sm:inline">New folder</span>
+                                <span className="hidden sm:inline">{t("filesView.toolbar.newFolder")}</span>
                             </Button>
                         ) : null}
                         <DropdownMenu>
@@ -1886,26 +1881,26 @@ export function FilesView({
                                     disabled={uploading || !abilities.write}
                                     title={
                                         abilities.write
-                                            ? "Upload"
-                                            : "You can read this, not change it"
+                                            ? t("filesView.toolbar.upload")
+                                            : t("filesView.toolbar.readOnly")
                                     }
-                                    aria-label="Upload"
+                                    aria-label={t("filesView.toolbar.upload")}
                                 >
                                     <Upload className="size-4" />
                                     <span className="hidden sm:inline">
-                                        {uploading ? "Uploading..." : "Upload"}
+                                        {uploading ? t("filesView.toolbar.uploading") : t("filesView.toolbar.upload")}
                                     </span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                                     <Upload className="size-4" />
-                                    Files
+                                    {t("filesView.toolbar.uploadFiles")}
                                     <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => void pickFolder()}>
                                     <FolderUp className="size-4" />
-                                    Folder
+                                    {t("filesView.toolbar.uploadFolder")}
                                     <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -1941,8 +1936,8 @@ export function FilesView({
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
-                            title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
+                            placeholder={t("filesView.search.placeholder")}
+                            title={t("filesView.search.help")}
                             className={cn("pl-8 pr-9", searchError && "border-danger")}
                         />
                         <button
@@ -1952,11 +1947,11 @@ export function FilesView({
                                     prev === "current" ? "recursive" : "current"
                                 )
                             }
-                            aria-label="Toggle search scope"
+                            aria-label={t("filesView.search.toggleScope")}
                             title={
                                 searchScope === "recursive"
-                                    ? "Searching this folder and all subfolders. Click to search only this folder."
-                                    : "Searching only this folder. Click to search all subfolders too."
+                                    ? t("filesView.search.recursive")
+                                    : t("filesView.search.current")
                             }
                             className={cn(
                                 "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
@@ -1987,12 +1982,12 @@ export function FilesView({
                             <DropdownMenuTrigger asChild>
                                 <button
                                     type="button"
-                                    aria-label={`Sorted by ${SORT_LABELS[sortKey].toLowerCase()}, ${sortDir === "asc" ? "ascending" : "descending"}`}
-                                    title="Sort"
+                                    aria-label={t("filesView.sort.sorted", { column: sortKey, dir: sortDir })}
+                                    title={t("filesView.sort.title")}
                                     className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
                                     <ArrowUpDown className="size-4 shrink-0" />
-                                    {SORT_LABELS[sortKey]}
+                                    {sortLabel(t, sortKey)}
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-[11rem]">
@@ -2002,10 +1997,10 @@ export function FilesView({
                                         onSelect={() => chooseSort(key)}
                                         className="gap-2"
                                     >
-                                        {SORT_LABELS[key]}
+                                                                                {sortLabel(t, key)}
                                         {sortKey === key ? (
                                             <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
-                                                {sortDir === "asc" ? "A-Z" : "Z-A"}
+                                                {sortDir === "asc" ? t("filesView.sort.ascending") : t("filesView.sort.descending")}
                                             </span>
                                         ) : null}
                                     </DropdownMenuItem>
@@ -2017,8 +2012,8 @@ export function FilesView({
                         <button
                             type="button"
                             onClick={() => setViewMode("list")}
-                            aria-label="List view"
-                            title="List view"
+                            aria-label={t("filesView.view.list")}
+                            title={t("filesView.view.list")}
                             className={cn(
                                 "rounded p-1 transition-colors hover:bg-muted",
                                 viewMode === "list"
@@ -2031,8 +2026,8 @@ export function FilesView({
                         <button
                             type="button"
                             onClick={() => setViewMode("grid")}
-                            aria-label="Grid view"
-                            title="Grid view"
+                            aria-label={t("filesView.view.grid")}
+                            title={t("filesView.view.grid")}
                             className={cn(
                                 "rounded p-1 transition-colors hover:bg-muted",
                                 viewMode === "grid"
@@ -2049,7 +2044,7 @@ export function FilesView({
                         onClick={() => setFiltersOpen((prev) => !prev)}
                     >
                         <SlidersHorizontal className="size-4" />
-                        Filters
+                        {t("filesView.filters.button")}
                         {hasFilters ? (
                             <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge>
                         ) : null}
@@ -2058,33 +2053,32 @@ export function FilesView({
                         size="sm"
                         variant={starredOnly ? "secondary" : "ghost"}
                         onClick={() => setStarredOnly((prev) => !prev)}
-                        aria-label={starredOnly ? "Show all items" : "Show starred only"}
+                        aria-label={starredOnly ? t("filesView.filters.showAll") : t("filesView.filters.starredOnly")}
                     >
                         <Star
                             className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")}
                         />
-                        Starred
+                        {t("filesView.filters.starred")}
                     </Button>
                     <Button
                         size="sm"
                         variant={showHidden ? "secondary" : "ghost"}
                         onClick={() => setShowHidden((prev) => !prev)}
-                        aria-label={showHidden ? "Hide hidden items" : "Show hidden items"}
+                        aria-label={showHidden ? t("filesView.filters.hideHidden") : t("filesView.filters.showHidden")}
                     >
                         {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        Hidden
+                        {t("filesView.filters.hidden")}
                     </Button>
                 </div>
 
                 {searchScope === "recursive" && query.trim() ? (
                     <p className="mb-3 -mt-1 text-xs text-muted-foreground">
                         {searching
-                            ? "Searching this folder and all subfolders..."
-                            : `${visible.length} result${visible.length === 1 ? "" : "s"} across subfolders${
-                                  searchTruncated
-                                      ? " (first matches only - narrow your search)"
-                                      : ""
-                              }`}
+                            ? t("filesView.search.searchingRecursive")
+                            : t("filesView.search.results", {
+                                  count: visible.length,
+                                  truncated: searchTruncated ? "yes" : "no"
+                              })}
                     </p>
                 ) : null}
 
@@ -2103,13 +2097,13 @@ export function FilesView({
                                             : "border-border text-muted-foreground hover:bg-muted"
                                     )}
                                 >
-                                    {category.label}
+                                                                        {t(`fileCategories.${category.id}`)}
                                 </button>
                             ))}
                         </div>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Extension
+                                {t("filesView.filters.extension")}
                                 <Input
                                     value={extFilter}
                                     onChange={(e) => setExtFilter(e.target.value)}
@@ -2117,7 +2111,7 @@ export function FilesView({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Min size (MB)
+                                {t("filesView.filters.minSize")}
                                 <Input
                                     value={minMb}
                                     onChange={(e) => setMinMb(e.target.value)}
@@ -2126,7 +2120,7 @@ export function FilesView({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Max size (MB)
+                                {t("filesView.filters.maxSize")}
                                 <Input
                                     value={maxMb}
                                     onChange={(e) => setMaxMb(e.target.value)}
@@ -2135,7 +2129,7 @@ export function FilesView({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Modified after
+                                {t("filesView.filters.after")}
                                 <Input
                                     value={dateFrom}
                                     onChange={(e) => setDateFrom(e.target.value)}
@@ -2143,7 +2137,7 @@ export function FilesView({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Modified before
+                                {t("filesView.filters.before")}
                                 <Input
                                     value={dateTo}
                                     onChange={(e) => setDateTo(e.target.value)}
@@ -2164,7 +2158,7 @@ export function FilesView({
                                 }}
                                 className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                             >
-                                Clear filters
+                                                                {t("filesView.filters.clear")}
                             </button>
                         ) : null}
                     </div>
@@ -2184,15 +2178,15 @@ export function FilesView({
                     {selectedEntries.length > 0 ? (
                         <>
                             <span className="shrink-0 font-medium">
-                                {selectedEntries.length} selected
+                                {t("filesView.tally.selected", { count: selectedEntries.length })}
                             </span>
                             <div className="ml-auto flex items-center gap-1">
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => downloadSelection(connectionId, selectedEntries)}
-                                    title={preparing > 0 ? "Fetching" : zipLabel}
-                                    aria-label={preparing > 0 ? "Fetching" : zipLabel}
+                                    title={preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
+                                    aria-label={preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
                                 >
                                     {preparing > 0 ? (
                                         <Loader2 className="size-4 animate-spin" />
@@ -2200,7 +2194,7 @@ export function FilesView({
                                         <Download className="size-4" />
                                     )}
                                     <span className="hidden sm:inline">
-                                        {preparing > 0 ? "Fetching" : zipLabel}
+                                        {preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
                                     </span>
                                 </Button>
                                 <SelectionZipMenu
@@ -2217,7 +2211,7 @@ export function FilesView({
                                         aria-label={shareLabel}
                                     >
                                         <Share2 className="size-4" />
-                                        <span className="hidden sm:inline">Share</span>
+                                        <span className="hidden sm:inline">{t("filesView.selection.share")}</span>
                                     </Button>
                                 ) : null}
                                 <Button
@@ -2225,27 +2219,27 @@ export function FilesView({
                                     variant="ghost"
                                     onClick={() => (onDelete ?? onDeletePermanent)(selectedEntries)}
                                     disabled={pending}
-                                    title="Delete"
-                                    aria-label="Delete"
+                                    title={t("filesView.selection.delete")}
+                                    aria-label={t("filesView.selection.delete")}
                                 >
                                     <Trash2 className="size-4" />
-                                    <span className="hidden sm:inline">Delete</span>
+                                    <span className="hidden sm:inline">{t("filesView.selection.delete")}</span>
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => setSelected(new Set())}
-                                    title="Clear selection"
-                                    aria-label="Clear selection"
+                                    title={t("filesView.selection.clearSelection")}
+                                    aria-label={t("filesView.selection.clearSelection")}
                                 >
                                     <X className="size-4" />
-                                    <span className="hidden sm:inline">Clear</span>
+                                    <span className="hidden sm:inline">{t("filesView.selection.clear")}</span>
                                 </Button>
                             </div>
                         </>
                     ) : (
                         <span className="text-xs text-muted-foreground">
-                            Select files to download, zip, or delete them.
+                            {t("filesView.selection.hint")}
                         </span>
                     )}
                 </div>
@@ -2282,7 +2276,7 @@ export function FilesView({
                                                             selectedEntries.length > 0
                                                         }
                                                         onChange={toggleAll}
-                                                        aria-label="Select all"
+                                                        aria-label={t("filesView.selection.selectAll")}
                                                     />
                                                 </label>
                                             </div>
@@ -2321,11 +2315,11 @@ export function FilesView({
                                         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                                             {searchScope === "recursive" && query.trim()
                                                 ? searching
-                                                    ? "Searching..."
-                                                    : "No matches in this folder or its subfolders."
+                                                    ? t("filesView.empty.searching")
+                                                    : t("filesView.empty.noMatchesRecursive")
                                                 : source.length === 0
-                                                  ? "This folder is empty."
-                                                  : "Nothing matches your search or filters."}
+                                                  ? t("filesView.empty.folderEmpty")
+                                                  : t("filesView.empty.noMatches")}
                                         </p>
                                     ) : viewMode === "grid" ? (
                                         <div className="max-h-[65vh] overflow-auto overscroll-contain p-1">
@@ -2424,7 +2418,7 @@ export function FilesView({
                                                                         !insights.sizes.has(
                                                                             entry.path
                                                                         )
-                                                                            ? "Folder"
+                                                                                                                                                        ? t("filesView.entry.folder")
                                                                             : sizeLabel(entry)}
                                                                     </span>
                                                                     <div className="flex items-center gap-1">
@@ -2439,7 +2433,7 @@ export function FilesView({
                                                                         ) ? (
                                                                             <KeyRound
                                                                                 className="size-3 text-warning"
-                                                                                aria-label="Needs a password"
+                                                                                aria-label={t("filesView.entry.needsPassword")}
                                                                             />
                                                                         ) : null}
                                                                         {entry.note ? (
@@ -2565,7 +2559,7 @@ export function FilesView({
                                                                                     onChange={() =>
                                                                                         undefined
                                                                                     }
-                                                                                    aria-label={`Select ${entry.name}`}
+                                                                                    aria-label={t("filesView.selection.selectItem", { name: entry.name })}
                                                                                 />
                                                                             </label>
                                                                         </div>
@@ -2647,28 +2641,27 @@ export function FilesView({
                                                                                         "/"
                                                                                     ) ? (
                                                                                         <span className="shrink truncate text-xs text-muted-foreground">
-                                                                                            in /
-                                                                                            {parentOf(
-                                                                                                entry.path
-                                                                                            )}
+                                                                                            {t("filesView.entry.inFolder", {
+                                                                                                path: parentOf(entry.path)
+                                                                                            })}
                                                                                         </span>
                                                                                     ) : null}
                                                                                     {entry.favorite ? (
                                                                                         <Star
                                                                                             className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                                            aria-label="Favorite"
+                                                                                            aria-label={t("filesView.entry.favorite")}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.locked ? (
                                                                                         <Lock
                                                                                             className="size-3 shrink-0 text-muted-foreground"
-                                                                                            aria-label="Access-gated"
+                                                                                            aria-label={t("filesView.entry.gated")}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.note ? (
                                                                                         <StickyNote
                                                                                             className="size-3 shrink-0 text-amber-500"
-                                                                                            aria-label="Has a note"
+                                                                                            aria-label={t("filesView.entry.hasNote")}
                                                                                         />
                                                                                     ) : null}
                                                                                 </Link>
@@ -2697,16 +2690,15 @@ export function FilesView({
                                                                                         "/"
                                                                                     ) ? (
                                                                                         <span className="shrink truncate text-xs text-muted-foreground">
-                                                                                            in /
-                                                                                            {parentOf(
-                                                                                                entry.path
-                                                                                            )}
+                                                                                            {t("filesView.entry.inFolder", {
+                                                                                                path: parentOf(entry.path)
+                                                                                            })}
                                                                                         </span>
                                                                                     ) : null}
                                                                                     {entry.favorite ? (
                                                                                         <Star
                                                                                             className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                                            aria-label="Favorite"
+                                                                                            aria-label={t("filesView.entry.favorite")}
                                                                                         />
                                                                                     ) : null}
                                                                                     {insights.locked.has(
@@ -2714,13 +2706,13 @@ export function FilesView({
                                                                                     ) ? (
                                                                                         <KeyRound
                                                                                             className="size-3 shrink-0 text-warning"
-                                                                                            aria-label="Needs a password"
+                                                                                            aria-label={t("filesView.entry.needsPassword")}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.note ? (
                                                                                         <StickyNote
                                                                                             className="size-3 shrink-0 text-amber-500"
-                                                                                            aria-label="Has a note"
+                                                                                            aria-label={t("filesView.entry.hasNote")}
                                                                                         />
                                                                                     ) : null}
                                                                                 </a>
@@ -2761,8 +2753,8 @@ export function FilesView({
                                                                                             )
                                                                                         );
                                                                                     }}
-                                                                                    title={`Share ${entry.name}`}
-                                                                                    aria-label={`Share ${entry.name}`}
+                                                                                    title={t("filesView.entry.share", { name: entry.name })}
+                                                                                    aria-label={t("filesView.entry.share", { name: entry.name })}
                                                                                 >
                                                                                     <Share2 className="size-4" />
                                                                                 </Button>
@@ -2793,15 +2785,15 @@ export function FilesView({
                                 that line is read for. */}
                             {visible.length > 0 ? (
                                 <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
-                                    <span>{folderTally(visible)}</span>
+                                    <span>{folderTally(t, visible)}</span>
                                     {selectedEntries.length > 0 ? (
-                                        <span>{selectionTally(selectedEntries)}</span>
+                                        <span>{selectionTally(t, selectedEntries)}</span>
                                     ) : null}
                                 </div>
                             ) : null}
                             {dragUpload ? (
                                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-primary/5 text-sm font-medium text-primary">
-                                    Drop files to upload here
+                                    {t("filesView.dropHere")}
                                 </div>
                             ) : null}
                         </div>
@@ -2809,35 +2801,35 @@ export function FilesView({
                     <ContextMenuContent>
                         <ContextMenuItem onSelect={onNewFolder}>
                             <FolderPlus className="size-4" />
-                            New folder
+                            {t("filesView.menu.newFolder")}
                             <MenuShortcut>{SHORTCUT_HINTS["new-folder"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onNewFile}>
                             <FilePlus className="size-4" />
-                            New file
+                            {t("filesView.menu.newFile")}
                             <MenuShortcut>{SHORTCUT_HINTS["new-file"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={() => fileInput.current?.click()}>
                             <Upload className="size-4" />
-                            Upload files
+                            {t("filesView.menu.uploadFiles")}
                             <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => void pickFolder()}>
                             <FolderUp className="size-4" />
-                            Upload folder
+                            {t("filesView.menu.uploadFolder")}
                             <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
                         </ContextMenuItem>
                         {onSharePeopleFolder ? (
                             <ContextMenuItem onSelect={onSharePeopleFolder}>
                                 <Users className="size-4" />
-                                Share this folder with people
+                                {t("filesView.menu.shareFolder")}
                             </ContextMenuItem>
                         ) : null}
                         {onShareFolder ? (
                             <ContextMenuItem onSelect={onShareFolder}>
                                 <Share2 className="size-4" />
-                                Get a link to this folder
+                                {t("filesView.menu.linkFolder")}
                             </ContextMenuItem>
                         ) : null}
                         {onRequestFiles ? (
@@ -2845,17 +2837,16 @@ export function FilesView({
                                 onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
                             >
                                 <Inbox className="size-4" />
-                                Request files here
+                                {t("filesView.menu.requestHere")}
                                 <MenuShortcut>{SHORTCUT_HINTS["request-files"]}</MenuShortcut>
                             </ContextMenuItem>
                         ) : null}
                         {clipboard ? (
                             <ContextMenuItem onSelect={paste}>
                                 <ClipboardPaste className="size-4" />
-                                Paste
                                 {clipboard.entries.length > 1
-                                    ? ` (${clipboard.entries.length})`
-                                    : ""}
+                                    ? t("filesView.menu.pasteCount", { count: clipboard.entries.length })
+                                    : t("filesView.menu.paste")}
                             </ContextMenuItem>
                         ) : null}
                     </ContextMenuContent>
@@ -2883,45 +2874,47 @@ export function FilesView({
                         {insights.locked.has(selectedEntries[0].path) ? (
                             <span className="flex items-center gap-1 text-xs text-warning">
                                 <KeyRound className="size-3" />
-                                Password-protected
+                                {t("filesView.panel.passwordProtected")}
                             </span>
                         ) : null}
                     </div>
                     <dl className="flex flex-col gap-2 text-xs">
                         <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Type</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.type")}</dt>
                             <dd className="truncate text-right">
                                 {selectedEntries[0].kind === "dir"
-                                    ? "Folder"
+                                    ? t("filesView.panel.folder")
                                     : extensionOf(selectedEntries[0].name)
-                                      ? `${extensionOf(selectedEntries[0].name).toUpperCase()} file`
-                                      : "File"}
+                                      ? t("filesView.panel.fileOfType", {
+                                            extension: extensionOf(selectedEntries[0].name).toUpperCase()
+                                        })
+                                      : t("filesView.panel.file")}
                             </dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Size</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.size")}</dt>
                             <dd className="text-right" title={sizeTitle(selectedEntries[0])}>
                                 {sizeLabel(selectedEntries[0])}
                             </dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Owner</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.owner")}</dt>
                             <dd className="truncate text-right">
-                                {selectedEntries[0].owner ?? "Unknown"}
+                                {selectedEntries[0].owner ?? t("filesView.panel.unknown")}
                             </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">Location</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.location")}</dt>
                             <dd className="break-all">
                                 /{selectedEntries[0].path.split("/").slice(0, -1).join("/")}
                             </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">Created on</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.created")}</dt>
                             <dd>{format.dateTime(selectedEntries[0].createdAt)}</dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">Last Modified</dt>
+                            <dt className="text-muted-foreground">{t("filesView.panel.modified")}</dt>
                             <dd>{format.dateTime(selectedEntries[0].modifiedAt)}</dd>
                         </div>
                     </dl>
@@ -2931,7 +2924,7 @@ export function FilesView({
                             variant="secondary"
                             onClick={() => selectedEntries[0] && openEntry(selectedEntries[0])}
                         >
-                            Open
+                            {t("filesView.panel.open")}
                         </Button>
                         <Button
                             size="sm"
@@ -2939,7 +2932,7 @@ export function FilesView({
                             onClick={() => selectedEntries[0] && duplicate(selectedEntries[0])}
                         >
                             <Files className="size-4" />
-                            Duplicate
+                            {t("filesView.panel.duplicate")}
                         </Button>
                         <Button
                             size="sm"
@@ -2947,7 +2940,7 @@ export function FilesView({
                             onClick={() => selectedEntries[0] && openMove([selectedEntries[0]])}
                         >
                             <FolderInput className="size-4" />
-                            Move
+                            {t("filesView.panel.move")}
                         </Button>
                         <Button
                             size="sm"
@@ -2958,7 +2951,7 @@ export function FilesView({
                             }
                         >
                             <ClipboardCopy className="size-4" />
-                            Copy path
+                            {t("filesView.panel.copyPath")}
                         </Button>
                         <Button
                             size="sm"
@@ -2974,16 +2967,16 @@ export function FilesView({
                                     selectedEntries[0].favorite && "fill-amber-400 text-amber-400"
                                 )}
                             />
-                            {selectedEntries[0].favorite ? "Starred" : "Star"}
+                            {selectedEntries[0].favorite ? t("filesView.panel.starred") : t("filesView.panel.star")}
                         </Button>
                     </div>
                     <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-                        <span className="text-xs font-medium text-muted-foreground">Activity</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("filesView.activity.title")}</span>
                         {activityLoading ? (
-                            <p className="text-xs text-muted-foreground/60">Loading...</p>
+                            <p className="text-xs text-muted-foreground/60">{t("filesView.activity.loading")}</p>
                         ) : activity.length === 0 ? (
                             <p className="text-xs text-muted-foreground/60">
-                                No recorded activity yet.
+                                {t("filesView.activity.empty")}
                             </p>
                         ) : (
                             <ul className="flex flex-col gap-1.5">
@@ -2998,26 +2991,30 @@ export function FilesView({
                                                 <Icon className="size-3" />
                                             </span>
                                             <div className="flex min-w-0 flex-col">
-                                                <span>
-                                                    {activityLabel(item.action)}
-                                                    {item.actor ? " by " : ""}
-                                                    {item.actor ? (
-                                                        item.actorId ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    setProfileUserId(item.actorId)
-                                                                }
-                                                                className="font-medium text-primary hover:underline"
-                                                            >
-                                                                {item.actor}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="font-medium">
-                                                                {item.actor}
-                                                            </span>
-                                                        )
-                                                    ) : null}
+                                                                                                <span>
+                                                    {item.actor
+                                                        ? t.rich("filesView.activity.by", {
+                                                              action: activityLabel(t, item.action),
+                                                              name: item.actor,
+                                                              actor: (chunks) =>
+                                                                  item.actorId ? (
+                                                                      <button
+                                                                          key="actor"
+                                                                          type="button"
+                                                                          onClick={() =>
+                                                                              setProfileUserId(item.actorId)
+                                                                          }
+                                                                          className="font-medium text-primary hover:underline"
+                                                                      >
+                                                                          {chunks}
+                                                                      </button>
+                                                                  ) : (
+                                                                      <span key="actor" className="font-medium">
+                                                                          {chunks}
+                                                                      </span>
+                                                                  )
+                                                          })
+                                                        : activityLabel(t, item.action)}
                                                 </span>
                                                 <span className="text-muted-foreground/70">
                                                     <RelativeTime iso={item.at} />
@@ -3031,13 +3028,13 @@ export function FilesView({
                     </div>
                     <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">Note</span>
+                            <span className="text-xs font-medium text-muted-foreground">{t("filesView.panel.note")}</span>
                             <button
                                 type="button"
                                 onClick={() => selectedEntries[0] && openNote(selectedEntries[0])}
                                 className="text-xs text-primary hover:underline"
                             >
-                                {selectedEntries[0].note ? "Edit" : "Add"}
+                                {selectedEntries[0].note ? t("filesView.panel.edit") : t("filesView.panel.add")}
                             </button>
                         </div>
                         {selectedEntries[0].note ? (
@@ -3045,7 +3042,7 @@ export function FilesView({
                                 {selectedEntries[0].note}
                             </p>
                         ) : (
-                            <p className="text-xs text-muted-foreground/60">No note</p>
+                            <p className="text-xs text-muted-foreground/60">{t("filesView.panel.noNote")}</p>
                         )}
                     </div>
                 </aside>
@@ -3070,17 +3067,19 @@ export function FilesView({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Upload folder</DialogTitle>
+                        <DialogTitle>{t("filesView.uploadFolder.title")}</DialogTitle>
                         <DialogDescription className="truncate">
                             {pendingFolder
-                                ? `Upload ${pendingFolder.items.length} file${
-                                      pendingFolder.items.length === 1 ? "" : "s"
-                                  } (${formatBytes(
-                                      pendingFolder.items.reduce(
-                                          (sum, item) => sum + BigInt(item.file.size),
-                                          0n
-                                      )
-                                  )}) from "${pendingFolder.name}"?`
+                                ? t("filesView.uploadFolder.confirm", {
+                                      count: pendingFolder.items.length,
+                                      size: formatBytes(
+                                          pendingFolder.items.reduce(
+                                              (sum, item) => sum + BigInt(item.file.size),
+                                              0n
+                                          )
+                                      ),
+                                      name: pendingFolder.name
+                                  })
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
@@ -3090,7 +3089,7 @@ export function FilesView({
                             variant="ghost"
                             onClick={() => setPendingFolder(null)}
                         >
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button
                             type="button"
@@ -3100,7 +3099,7 @@ export function FilesView({
                             }}
                         >
                             <Upload className="size-4" />
-                            Upload
+                            {t("filesView.uploadFolder.upload")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -3112,10 +3111,10 @@ export function FilesView({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Change icon</DialogTitle>
+                        <DialogTitle>{t("filesView.icon.title")}</DialogTitle>
                         <DialogDescription className="truncate">
                             {iconTargets && iconTargets.length > 1
-                                ? `${iconTargets.length} items`
+                                ? t("filesView.icon.items", { count: iconTargets.length })
                                 : iconPreview?.name}
                         </DialogDescription>
                     </DialogHeader>
@@ -3149,7 +3148,7 @@ export function FilesView({
                                 <button
                                     key={color.id}
                                     type="button"
-                                    aria-label={color.id}
+                                    aria-label={t(`filesView.icon.colors.${color.id}` as NamespaceKey<"drive">)}
                                     onClick={() =>
                                         applyIcon(iconPreview?.icon ?? "folder", color.id)
                                     }
@@ -3178,10 +3177,10 @@ export function FilesView({
                                     setIconTargets(null);
                                 }}
                             >
-                                Reset to default
+                                                                {t("filesView.icon.reset")}
                             </Button>
                             <Button type="button" size="sm" onClick={() => setIconTargets(null)}>
-                                Done
+                                {t("filesView.icon.done")}
                             </Button>
                         </div>
                     </div>
@@ -3194,31 +3193,36 @@ export function FilesView({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Details</DialogTitle>
+                        <DialogTitle>{t("filesView.details.title")}</DialogTitle>
                     </DialogHeader>
                     {detailsTarget ? (
                         <dl className="grid grid-cols-[7rem_1fr] gap-y-2 text-sm">
-                            <dt className="text-muted-foreground">Name</dt>
+                            <dt className="text-muted-foreground">{t("filesView.details.name")}</dt>
                             <dd className="truncate">{detailsTarget.name}</dd>
-                            <dt className="text-muted-foreground">Type</dt>
+                            <dt className="text-muted-foreground">{t("filesView.details.type")}</dt>
                             <dd>
                                 {detailsTarget.kind === "dir"
-                                    ? "Folder"
+                                    ? t("filesView.panel.folder")
                                     : extensionOf(detailsTarget.name)
-                                      ? `${extensionOf(detailsTarget.name).toUpperCase()} file`
-                                      : "File"}
+                                      ? t("filesView.panel.fileOfType", {
+                                            extension: extensionOf(detailsTarget.name).toUpperCase()
+                                        })
+                                      : t("filesView.panel.file")}
                             </dd>
-                            <dt className="text-muted-foreground">Location</dt>
+                            <dt className="text-muted-foreground">{t("filesView.details.location")}</dt>
                             <dd className="truncate">
                                 /{detailsTarget.path.split("/").slice(0, -1).join("/")}
                             </dd>
-                            <dt className="text-muted-foreground">Size</dt>
+                            <dt className="text-muted-foreground">{t("filesView.details.size")}</dt>
                             <dd title={sizeTitle(detailsTarget)}>
                                 {detailsTarget.kind === "dir"
                                     ? sizeLabel(detailsTarget)
-                                    : `${formatBytes(BigInt(detailsTarget.size))} (${Number(detailsTarget.size).toLocaleString()} bytes)`}
+                                    : t("filesView.details.bytes", {
+                                          size: formatBytes(BigInt(detailsTarget.size)),
+                                          bytes: Number(detailsTarget.size).toLocaleString()
+                                      })}
                             </dd>
-                            <dt className="text-muted-foreground">Modified</dt>
+                            <dt className="text-muted-foreground">{t("filesView.details.modified")}</dt>
                             <dd>{format.dateTime(detailsTarget.modifiedAt)}</dd>
                         </dl>
                     ) : null}
@@ -3231,7 +3235,7 @@ export function FilesView({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Note</DialogTitle>
+                        <DialogTitle>{t("filesView.note.title")}</DialogTitle>
                         <DialogDescription className="truncate">
                             {noteTarget?.name}
                         </DialogDescription>
@@ -3249,7 +3253,7 @@ export function FilesView({
                             value={noteValue}
                             onChange={(event) => setNoteValue(event.target.value)}
                             rows={4}
-                            placeholder="Add a note for this item..."
+                            placeholder={t("filesView.note.placeholder")}
                             className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
                         />
                         <div className="flex justify-between">
@@ -3262,10 +3266,10 @@ export function FilesView({
                                     setNoteTarget(null);
                                 }}
                             >
-                                Remove
+                                                                {t("filesView.note.remove")}
                             </Button>
                             <Button type="submit" size="sm">
-                                Save
+                                {tc("actions.save")}
                             </Button>
                         </div>
                     </form>
@@ -3279,13 +3283,10 @@ export function FilesView({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Move{" "}
-                            {moveTargets && moveTargets.length > 1
-                                ? `${moveTargets.length} items`
-                                : "item"}
+                            {t("filesView.move.title", { count: moveTargets?.length ?? 0 })}
                         </DialogTitle>
                         <DialogDescription>
-                            Pick the destination folder, or type its path.
+                            {t("filesView.move.hint")}
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitMove} className="flex flex-col gap-3">
@@ -3299,7 +3300,7 @@ export function FilesView({
                         <Input
                             value={moveDest}
                             onChange={(event) => setMoveDest(event.target.value)}
-                            placeholder="e.g. Documents/Archive"
+                            placeholder={t("filesView.move.placeholder")}
                         />
                         {moveError ? (
                             <p className="text-xs text-muted-foreground">{moveError}</p>
@@ -3310,10 +3311,10 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={() => setMoveTargets(null)}
                             >
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={moveError !== null}>
-                                Move
+                                {t("filesView.move.submit")}
                             </Button>
                         </div>
                     </form>
@@ -3383,9 +3384,9 @@ function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; classNa
  * draws only the row under the pointer, which reads as though the rest of the
  * selection stayed behind - and the whole selection is what moves.
  */
-function showCountDragImage(event: React.DragEvent, count: number) {
+function showCountDragImage(event: React.DragEvent, label: string) {
     const ghost = document.createElement("div");
-    ghost.textContent = `${count} items`;
+    ghost.textContent = label;
     ghost.style.cssText = `position:fixed;top:-1000px;left:-1000px;padding:4px 10px;border-radius:6px;
         font:500 12px/1.4 system-ui,sans-serif;white-space:nowrap;
         background:hsl(var(--primary));color:hsl(var(--primary-foreground))`;
@@ -3497,6 +3498,7 @@ function ListingSkeleton({ viewMode }: { viewMode: "list" | "grid" }) {
  * line to quote when the sentence above it was not enough.
  */
 function ListingError({ error, onRetry }: { error: ListingFailure; onRetry: () => void }) {
+    const t = useTranslations("drive");
     return (
         <div
             role="alert"
@@ -3515,7 +3517,7 @@ function ListingError({ error, onRetry }: { error: ListingFailure; onRetry: () =
                 <div className="pl-[1.625rem]">
                     <Button size="sm" variant="secondary" onClick={onRetry}>
                         <RotateCcw className="size-4" />
-                        Try again
+                        {t("filesView.retry")}
                     </Button>
                 </div>
             ) : null}

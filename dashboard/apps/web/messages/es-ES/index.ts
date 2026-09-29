@@ -12,6 +12,9 @@ import code from "./code.json";
 import home from "./home.json";
 import mail from "./mail.json";
 import admin from "./admin.json";
+import drive from "./drive.json";
+import files from "./files.json";
+import notes from "./notes.json";
 import tasks from "./tasks.json";
 import tools from "./tools.json";
 import vault from "./vault.json";
@@ -19,6 +22,7 @@ import watch from "./watch.json";
 import agents from "./agents.json";
 import common from "./common.json";
 import deploy from "./deploy.json";
+import office from "./office.json";
 import system from "./system.json";
 import account from "./account.json";
 import backups from "./backups.json";
@@ -82,6 +86,8 @@ export default {
     deployService,
     deploySettings,
     dns,
+    drive,
+    files,
     firewall,
     home,
     installed,
@@ -91,7 +97,9 @@ export default {
     mailSettings,
     marketplace,
     nav,
+    notes,
     notices,
+    office,
     publicPages,
     reference,
     runners,

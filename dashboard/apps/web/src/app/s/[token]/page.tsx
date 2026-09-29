@@ -24,6 +24,7 @@ import { baseName, normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { Badge } from "@polaris/ui";
+import { Messages } from "@/components/i18n/messages";
 import {
     logShareAccess,
     resolveShareByToken,
@@ -161,29 +162,32 @@ export default async function SharePage({
                     </Badge>
                 ) : null}
             </div>
-            {isFile ? (
-                <ShareFileCard
-                    token={token}
-                    name={baseName(current)}
-                    path={current}
-                    size={fileSize}
-                    allowDownload={share.allowDownload}
-                    allowPreview={share.allowPreview}
-                />
-            ) : (
-                <ShareExplorer
-                    token={token}
-                    rootName={share.connection.name}
-                    rootPath={root}
-                    initialPath={current}
-                    allowDownload={share.allowDownload}
-                    allowPreview={share.allowPreview}
-                    allowUpload={share.allowUpload}
-                    allowRename={share.allowRename}
-                    allowDelete={share.allowDelete}
-                    allowCreateFolder={share.allowCreateFolder}
-                />
-            )}
+            {/* The Drive viewer and the transfers corner inside, in the reader's words. */}
+            <Messages namespaces={["drive", "files"]}>
+                {isFile ? (
+                    <ShareFileCard
+                        token={token}
+                        name={baseName(current)}
+                        path={current}
+                        size={fileSize}
+                        allowDownload={share.allowDownload}
+                        allowPreview={share.allowPreview}
+                    />
+                ) : (
+                    <ShareExplorer
+                        token={token}
+                        rootName={share.connection.name}
+                        rootPath={root}
+                        initialPath={current}
+                        allowDownload={share.allowDownload}
+                        allowPreview={share.allowPreview}
+                        allowUpload={share.allowUpload}
+                        allowRename={share.allowRename}
+                        allowDelete={share.allowDelete}
+                        allowCreateFolder={share.allowCreateFolder}
+                    />
+                )}
+            </Messages>
         </PublicShell>
     );
 }
