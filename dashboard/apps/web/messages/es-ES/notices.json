@@ -236,5 +236,32 @@
     "cron": {
         "failedTitle": "Falló una tarea programada: {job}",
         "didNotFinish": "No terminó."
+    },
+    "router": {
+        "forward": "Reenvía los puertos 80 y 443 de tu router a este servidor.",
+        "port80": "El puerto 80 hace falta incluso para un sitio solo HTTPS: el certificado se emite a través de él.",
+        "certTitle": "Accesible, pero los navegadores avisarán del certificado",
+        "certDetail": "{hostname} llega a este servidor. HTTPS se sirve con el certificado propio de Polaris y no con uno emitido para este nombre, así que los navegadores no confiarán en él.",
+        "certWait": "Se pide un certificado la primera vez que se sirve el nombre; vuelve a comprobarlo en un minuto.",
+        "certContact": "Si no llega, la autoridad de certificación necesita una dirección de contacto: define POLARIS_ACME_EMAIL en el .env del despliegue y reinicia el edge.",
+        "okTitle": "Accesible desde internet",
+        "okDetail": "{hostname} llega a este servidor.",
+        "answers": " Responde{hasStatus, select, yes { {status}} other {}}{hasServer, select, yes {, y se llama a sí mismo \"{server}\".} other {.}}",
+        "routerTitle": "Tu router responde en lugar de Polaris",
+        "routerCgnat": "{hostname} llega a tu línea, pero la respuesta viene del router.{answers} Tu proveedor comparte una dirección entre sus clientes, así que ningún reenvío puede llevar la petición más allá.",
+        "routerHome": "{hostname} llega a tu línea, pero la respuesta viene del router.{answers} Los puertos 80 y 443 no llegan a este servidor, así que el router responde por su cuenta, y ese es el error que ves en el navegador.",
+        "remoteManagement": "Si el router sigue respondiendo después de guardar las reglas, se está quedando 80 y 443 para su propia página de administración: desactiva la administración remota (WAN) o muévela a otro puerto.",
+        "otherTitle": "Otra cosa está respondiendo en este dominio",
+        "otherDetail": "{hostname} llega al servidor, pero la respuesta no viene de Polaris.{answers}",
+        "findHolder": "Busca qué está ocupando los puertos 80 y 443 en este servidor y detenlo, o muévelo a otro puerto.",
+        "checkPointing": "Comprueba que el dominio apunta a este servidor y no a otro host.",
+        "cgnatTitle": "Tu línea no puede recibir conexiones entrantes",
+        "cgnatDetail": "Nada respondió en {hostname}. Tu proveedor te pone detrás de un NAT de operador, así que ningún reenvío de puertos puede funcionar: la dirección es compartida y no es tuya para abrirla.",
+        "useTunnel": "Usa un túnel para publicar el sitio, que no necesita ningún puerto abierto.",
+        "askProvider": "O pide a tu proveedor una dirección IP pública, que algunos ofrecen si se la pides.",
+        "silentTitle": "Puede que los puertos 80 y 443 no lleguen a este servidor",
+        "silentHome": "Nada respondió en {hostname} desde aquí. Muchos routers no devuelven hacia dentro su propia dirección pública, así que esto no es una prueba por sí solo: compruébalo desde fuera de la red, con datos móviles, para estar seguro.",
+        "silentDatacenter": "Nada respondió en {hostname} desde aquí.",
+        "allowInbound": "Permite la entrada por 80 y 443 en el firewall o grupo de seguridad de tu proveedor."
     }
 }

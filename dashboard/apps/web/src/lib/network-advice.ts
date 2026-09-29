@@ -17,7 +17,11 @@
 import { request as httpsRequest } from "node:https";
 import type { TLSSocket } from "node:tls";
 import { prisma, VISIBLE_USER } from "@polaris/db";
-import type { ServerEnvironment } from "@polaris/core";
+import { DEFAULT_LOCALE, type ServerEnvironment } from "@polaris/core";
+import { translatorFor } from "@/lib/i18n/translate";
+import { readerWords } from "@/lib/i18n/reader-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { getHostLanIp } from "./host-address";
 import { notify } from "./notifications/dispatch";
 import type { NotificationLevel } from "./notification-service";
@@ -76,11 +80,12 @@ export interface RouterAdvice {
     readonly lanIp: string | null;
 }
 
+type Words = NamespaceTranslator<"notices">;
+
 /** The forward, worded once: both ports, and why :80 is not optional. */
-const FORWARD_STEPS = [
-    "Forward ports 80 and 443 on your router to this server.",
-    "Port 80 is needed even for an HTTPS-only site: the certificate is issued over it."
-];
+function forwardSteps(t: Words): string[] {
+    return [t("router.forward"), t("router.port80")];
+}
 
 /** Whether the environment is a home line, where the router is the operator's to
  *  configure. A datacenter box has no router in the way, only a firewall. */
@@ -105,7 +110,9 @@ export function routerAdvice(
     environment: ServerEnvironment,
     hostname: string,
     probe: EdgeProbe,
-    lanIp: string | null = null
+    lanIp: string | null = null,
+    /** The reader's words; the default language when there is no reader. */
+    t: Words = translatorFor(DEFAULT_LOCALE, "notices")
 ): RouterAdvice {
     // Carried by every outcome: what answered, and what a forward would point at.
     const facts = { server: probe.server, lanIp };
@@ -117,15 +124,9 @@ export function routerAdvice(
             return {
                 ok: false,
                 level: "warning",
-                title: "Reachable, but browsers will warn about the certificate",
-                detail:
-                    `${hostname} reaches this server. HTTPS is being served with Polaris's own certificate` +
-                    " rather than one issued for this name, so browsers will not trust it.",
-                steps: [
-                    "A certificate is requested the first time the name is served; check again in a minute.",
-                    "If it does not arrive, the certificate authority needs a contact address:" +
-                        " set POLARIS_ACME_EMAIL in the deployment's .env and restart the edge."
-                ],
+                title: t("router.certTitle"),
+                detail: t("router.certDetail", { hostname }),
+                steps: [t("router.certWait"), t("router.certContact")],
                 key: "cert:untrusted",
                 forward: false,
                 ...facts
@@ -134,8 +135,8 @@ export function routerAdvice(
         return {
             ok: true,
             level: "success",
-            title: "Reachable from the internet",
-            detail: `${hostname} reaches this server.`,
+            title: t("router.okTitle"),
+            detail: t("router.okDetail", { hostname }),
             steps: [],
             key: "ok",
             forward: false,
@@ -146,8 +147,12 @@ export function routerAdvice(
     if (probe.answer === "other") {
         // What answered, in the two terms the operator can match against their own
         // browser: the status they are staring at, and the name in the header.
-        const status = probe.status ? ` It answers ${probe.status}` : " It answers";
-        const named = probe.server ? `, and calls itself "${probe.server}".` : ".";
+        const answers = t("router.answers", {
+            hasStatus: probe.status ? "yes" : "no",
+            status: probe.status ?? "",
+            hasServer: probe.server ? "yes" : "no",
+            server: probe.server ?? ""
+        });
         // Carrier NAT first: it is a home line, but the forward the home branch asks
         // for cannot be made on it, so the shared `atHome` answer would walk the
         // operator through a router that has no inbound port to give them.
@@ -155,15 +160,9 @@ export function routerAdvice(
             return {
                 ok: false,
                 level: "danger",
-                title: "Your router is answering instead of Polaris",
-                detail:
-                    `${hostname} reaches your line, but the reply comes from the router.${status}${named}` +
-                    " Your provider shares one address between its customers, so no forward can bring the" +
-                    " request any further than this.",
-                steps: [
-                    "Use a tunnel to publish the site, which needs no open port.",
-                    "Or ask your provider for a public IP address, which some offer on request."
-                ],
+                title: t("router.routerTitle"),
+                detail: t("router.routerCgnat", { hostname, answers }),
+                steps: [t("router.useTunnel"), t("router.askProvider")],
                 key: "other:cgnat",
                 forward: false,
                 ...facts
@@ -173,16 +172,9 @@ export function routerAdvice(
             ? {
                   ok: false,
                   level: "danger",
-                  title: "Your router is answering instead of Polaris",
-                  detail:
-                      `${hostname} reaches your line, but the reply comes from the router.${status}${named}` +
-                      " Ports 80 and 443 are not reaching this server, so the router answers on its own behalf -" +
-                      " which is the error you get in a browser.",
-                  steps: [
-                      ...FORWARD_STEPS,
-                      "If the router still answers once the rules are saved, it is keeping 80 and 443 for its own" +
-                          " admin page: turn off remote (WAN) management, or move it to another port."
-                  ],
+                  title: t("router.routerTitle"),
+                  detail: t("router.routerHome", { hostname, answers }),
+                  steps: [...forwardSteps(t), t("router.remoteManagement")],
                   key: "other:home",
                   forward: true,
                   ...facts
@@ -190,12 +182,9 @@ export function routerAdvice(
             : {
                   ok: false,
                   level: "danger",
-                  title: "Something else is answering on this domain",
-                  detail: `${hostname} reaches the server, but the reply does not come from Polaris.${status}${named}`,
-                  steps: [
-                      "Find what is holding ports 80 and 443 on this server and stop it, or move it to another port.",
-                      "Check that the domain points at this server and not at another host."
-                  ],
+                  title: t("router.otherTitle"),
+                  detail: t("router.otherDetail", { hostname, answers }),
+                  steps: [t("router.findHolder"), t("router.checkPointing")],
                   key: "other:datacenter",
                   forward: false,
                   ...facts
@@ -206,14 +195,9 @@ export function routerAdvice(
         return {
             ok: false,
             level: "danger",
-            title: "Your line cannot receive incoming connections",
-            detail:
-                `Nothing answered on ${hostname}. Your provider puts you behind carrier-grade NAT,` +
-                " so no port forward can work - the address is shared and it is not yours to open.",
-            steps: [
-                "Use a tunnel to publish the site, which needs no open port.",
-                "Or ask your provider for a public IP address, which some offer on request."
-            ],
+            title: t("router.cgnatTitle"),
+            detail: t("router.cgnatDetail", { hostname }),
+            steps: [t("router.useTunnel"), t("router.askProvider")],
             key: "silent:cgnat",
             forward: false,
             ...facts
@@ -224,12 +208,9 @@ export function routerAdvice(
         return {
             ok: false,
             level: "warning",
-            title: "Ports 80 and 443 may not reach this server",
-            detail:
-                `Nothing answered on ${hostname} from here. Plenty of routers will not route their own` +
-                " public address back inward, so this is not proof on its own - check it from outside the network," +
-                " on mobile data, to be sure.",
-            steps: FORWARD_STEPS,
+            title: t("router.silentTitle"),
+            detail: t("router.silentHome", { hostname }),
+            steps: forwardSteps(t),
             key: "silent:home",
             forward: true,
             ...facts
@@ -239,12 +220,9 @@ export function routerAdvice(
     return {
         ok: false,
         level: "warning",
-        title: "Ports 80 and 443 may not reach this server",
-        detail: `Nothing answered on ${hostname} from here.`,
-        steps: [
-            "Allow inbound 80 and 443 in your provider's firewall or security group.",
-            "Port 80 is needed even for an HTTPS-only site: the certificate is issued over it."
-        ],
+        title: t("router.silentTitle"),
+        detail: t("router.silentDatacenter", { hostname }),
+        steps: [t("router.allowInbound"), t("router.port80")],
         key: "silent:datacenter",
         forward: false,
         ...facts
@@ -404,27 +382,29 @@ export async function reportRouterAdvice(
     hostname: string
 ): Promise<RouterAdvice> {
     const [probe, lanIp] = await Promise.all([probeEdge(hostname), getHostLanIp()]);
-    const advice = routerAdvice(environment, hostname, probe, lanIp);
+    const advice = routerAdvice(environment, hostname, probe, lanIp, await readerWords("notices"));
     const previous = await getSetting(KEY);
     if (previous === advice.key) return advice;
     await setSetting(KEY, advice.key);
     // Nothing to announce the first time the check runs and everything is already
     // working - there was no problem to report solved.
     if (advice.ok && previous === null) return advice;
-    await notifyAdmins(advice);
+    await notifyAdmins((t) => routerAdvice(environment, hostname, probe, lanIp, t));
     return advice;
 }
 
 /** Raise the advice for every administrator: this is the deployment's problem, not
  *  one user's, and whoever opens the dashboard first should see it. */
-async function notifyAdmins(advice: RouterAdvice): Promise<void> {
+async function notifyAdmins(adviceIn: (t: Words) => RouterAdvice): Promise<void> {
     const admins = await prisma.user
         .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
         .catch(() => []);
-    const body = advice.steps.length > 0 ? `${advice.detail}\n\n${advice.steps.join("\n")}` : advice.detail;
     await Promise.all(
-        admins.map((admin) =>
-            notify({
+        admins.map(async (admin) => {
+            // Each administrator reads it in their own language.
+            const advice = adviceIn(await wordsFor(admin.id, "notices"));
+            const body = advice.steps.length > 0 ? `${advice.detail}\n\n${advice.steps.join("\n")}` : advice.detail;
+            return notify({
                 userId: admin.id,
                 event: "network.router",
                 title: advice.title,
@@ -434,7 +414,7 @@ async function notifyAdmins(advice: RouterAdvice): Promise<void> {
                 actionRequired: !advice.ok,
                 href: "/admin/domains",
                 metadata: { key: advice.key }
-            })
-        )
+            });
+        })
     );
 }

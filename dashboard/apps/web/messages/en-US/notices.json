@@ -236,5 +236,32 @@
     "cron": {
         "failedTitle": "Scheduled job failed: {job}",
         "didNotFinish": "It did not finish."
+    },
+    "router": {
+        "forward": "Forward ports 80 and 443 on your router to this server.",
+        "port80": "Port 80 is needed even for an HTTPS-only site: the certificate is issued over it.",
+        "certTitle": "Reachable, but browsers will warn about the certificate",
+        "certDetail": "{hostname} reaches this server. HTTPS is being served with Polaris''s own certificate rather than one issued for this name, so browsers will not trust it.",
+        "certWait": "A certificate is requested the first time the name is served; check again in a minute.",
+        "certContact": "If it does not arrive, the certificate authority needs a contact address: set POLARIS_ACME_EMAIL in the deployment''s .env and restart the edge.",
+        "okTitle": "Reachable from the internet",
+        "okDetail": "{hostname} reaches this server.",
+        "answers": " It answers{hasStatus, select, yes { {status}} other {}}{hasServer, select, yes {, and calls itself \"{server}\".} other {.}}",
+        "routerTitle": "Your router is answering instead of Polaris",
+        "routerCgnat": "{hostname} reaches your line, but the reply comes from the router.{answers} Your provider shares one address between its customers, so no forward can bring the request any further than this.",
+        "routerHome": "{hostname} reaches your line, but the reply comes from the router.{answers} Ports 80 and 443 are not reaching this server, so the router answers on its own behalf - which is the error you get in a browser.",
+        "remoteManagement": "If the router still answers once the rules are saved, it is keeping 80 and 443 for its own admin page: turn off remote (WAN) management, or move it to another port.",
+        "otherTitle": "Something else is answering on this domain",
+        "otherDetail": "{hostname} reaches the server, but the reply does not come from Polaris.{answers}",
+        "findHolder": "Find what is holding ports 80 and 443 on this server and stop it, or move it to another port.",
+        "checkPointing": "Check that the domain points at this server and not at another host.",
+        "cgnatTitle": "Your line cannot receive incoming connections",
+        "cgnatDetail": "Nothing answered on {hostname}. Your provider puts you behind carrier-grade NAT, so no port forward can work - the address is shared and it is not yours to open.",
+        "useTunnel": "Use a tunnel to publish the site, which needs no open port.",
+        "askProvider": "Or ask your provider for a public IP address, which some offer on request.",
+        "silentTitle": "Ports 80 and 443 may not reach this server",
+        "silentHome": "Nothing answered on {hostname} from here. Plenty of routers will not route their own public address back inward, so this is not proof on its own - check it from outside the network, on mobile data, to be sure.",
+        "silentDatacenter": "Nothing answered on {hostname} from here.",
+        "allowInbound": "Allow inbound 80 and 443 in your provider''s firewall or security group."
     }
 }

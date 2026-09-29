@@ -1438,6 +1438,7 @@
         "web/src/lib/integrations/tunnel-token.ts",
         "web/src/lib/messaging/discord-invite.ts",
         "web/src/lib/domain-strategies.ts",
-        "web/src/app/(app)/admin/domains/strategy-words.ts"
+        "web/src/app/(app)/admin/domains/strategy-words.ts",
+        "web/src/lib/network-advice.ts"
     ]
 }
