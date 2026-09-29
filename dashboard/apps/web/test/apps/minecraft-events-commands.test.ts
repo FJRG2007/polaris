@@ -250,6 +250,13 @@ describe("each kind's commands", () => {
         ).toBe(true);
         expect(lines.at(-1)).toBe("tag @e[tag=pe_new] remove pe_new");
         expect(lines.join("\n")).not.toContain("creeper");
+        // By players' homes too: no door broken down, no untagged reinforcement,
+        // nothing a player dropped picked up.
+        for (const line of lines.filter((one) => one.includes("summon")))
+            expect(line).toContain("CanPickUpLoot:0b,CanBreakDoors:0b");
+        expect(lines).toContain(
+            "execute as @e[tag=pe_new,type=minecraft:zombie] run attribute @s minecraft:spawn_reinforcements base set 0"
+        );
     });
 
     it("names a boss the way each version reads a name", () => {

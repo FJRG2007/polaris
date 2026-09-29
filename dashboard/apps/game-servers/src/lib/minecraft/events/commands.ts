@@ -1081,6 +1081,11 @@ const WAVE_SIZE: Readonly<Record<EventOptions<"blood-moon">["intensity"], number
  * One wave: mobs summoned on every player in survival in the Overworld, then
  * spread onto the surface a few blocks around them, so they come at the player
  * rather than inside them.
+ *
+ * They rise wherever players are - by their homes too - so none of them may
+ * take anything that is not the event's: no zombie breaks a door down on Hard
+ * or calls for help (a reinforcement is a zombie nobody tagged, which the end
+ * would never take away), and nothing picks up what a player dropped.
  */
 export function wave(options: EventOptions<"blood-moon">, number: number): string[] {
     const kinds = [...WAVE_MOBS, ...(options.creepers ? ["creeper"] : [])];
@@ -1089,13 +1094,19 @@ export function wave(options: EventOptions<"blood-moon">, number: number): strin
     for (let index = 0; index < WAVE_SIZE[options.intensity]; index += 1) {
         const kind = kinds[(number + index) % kinds.length] as string;
         lines.push(
-            `execute in minecraft:overworld as ${players} at @s run summon minecraft:${kind} ~ ~ ~ {Tags:["${MOB_TAG}","${NEW_TAG}"]}`
+            `execute in minecraft:overworld as ${players} at @s run summon minecraft:${kind} ~ ~ ~ {Tags:["${MOB_TAG}","${NEW_TAG}"],CanPickUpLoot:0b,CanBreakDoors:0b}`
         );
     }
     lines.push(
-        `execute in minecraft:overworld as ${players} at @s run spreadplayers ~ ~ 4 16 false @e[tag=${NEW_TAG},distance=..1]`,
-        `tag @e[tag=${NEW_TAG}] remove ${NEW_TAG}`
+        `execute in minecraft:overworld as ${players} at @s run spreadplayers ~ ~ 4 16 false @e[tag=${NEW_TAG},distance=..1]`
     );
+    // The attribute lost its `zombie.` in 1.21.2; both are tried.
+    for (const id of ["minecraft:spawn_reinforcements", "minecraft:zombie.spawn_reinforcements"]) {
+        lines.push(
+            `execute as @e[tag=${NEW_TAG},type=minecraft:zombie] run attribute @s ${id} base set 0`
+        );
+    }
+    lines.push(`tag @e[tag=${NEW_TAG}] remove ${NEW_TAG}`);
     return lines;
 }
 
