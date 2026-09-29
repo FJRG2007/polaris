@@ -88,6 +88,7 @@
     "web/backups:plans.for (es-ES)",
     "web/backups:plans.under (es-ES)",
     "web/backups:table.default (es-ES)",
+    "web/code:detail.mergeCommit (es-ES)",
     "web/common:pages.error.trying (es-ES)",
     "web/components:audience.admins (es-ES)",
     "web/components:calls.missed (es-ES)",

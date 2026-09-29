@@ -10,17 +10,19 @@
 import { CodeView } from "./code-view";
 import { PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function CodePage() {
     await requirePermission("agents.read");
+    const t = await getTranslations("code");
 
     return (
         <>
             <PageHeader
-                title="Code"
-                description="Pull requests and issues across the GitHub accounts you have linked."
+                title={t("page.title")}
+                description={t("page.description")}
             />
             <CodeView />
         </>

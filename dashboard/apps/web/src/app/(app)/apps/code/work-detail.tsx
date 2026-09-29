@@ -39,6 +39,7 @@ import {
     Textarea,
     cn
 } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function WorkDetail({
     owner,
@@ -53,6 +54,8 @@ export function WorkDetail({
     number: number;
     canWrite: boolean;
 }) {
+    const t = useTranslations("code");
+    const tcommon = useTranslations("common");
     const [item, setItem] = useState<CodeDetail | null>(null);
     const [comments, setComments] = useState<readonly CodeComment[] | null>(null);
     const [body, setBody] = useState("");
@@ -66,14 +69,14 @@ export function WorkDetail({
     const load = useCallback(async () => {
         const result = await actions.readWorkAction(target);
         if (result.error || !result.item) {
-            setError(result.error ?? "That could not be opened");
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- target is three primitives, listed individually
+            setError(result.error ?? t("detail.openFailed"));
             return;
         }
         setItem(result.item);
         const thread = await actions.readConversationAction({ ...target, kind: result.item.kind });
         setComments(thread.comments ?? []);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- target is three primitives, listed individually
-    }, [owner, repo, number]);
+    }, [owner, repo, number, t]);
 
     useEffect(() => {
         void load();
@@ -117,13 +120,23 @@ export function WorkDetail({
                         {item.title} <span className="text-muted-foreground">#{item.number}</span>
                     </h1>
                     <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-                        {item.repo} - opened by {item.authorLogin}{" "}
-                        <RelativeTime iso={item.createdAt} />
+                        {t.rich("detail.opened", {
+                            repo: item.repo,
+                            author: item.authorLogin,
+                            time: () => <RelativeTime key="time" iso={item.createdAt} />
+                        })}
                         {item.branches && (
                             <>
                                 {" "}
-                                - <code className="text-xs">{item.branches.head}</code> into{" "}
-                                <code className="text-xs">{item.branches.base}</code>
+                                {t.rich("detail.branches", {
+                                    head: item.branches.head,
+                                    base: item.branches.base,
+                                    code: (chunks: React.ReactNode[]) => (
+                                        <code key={String(chunks)} className="text-xs">
+                                            {chunks}
+                                        </code>
+                                    )
+                                })}
                             </>
                         )}
                     </p>
@@ -135,6 +148,7 @@ export function WorkDetail({
                     className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <ExternalLink className="size-3.5" />
+                    {/* i18n-ignore a brand name */}
                     GitHub
                 </a>
             </div>
@@ -178,8 +192,8 @@ export function WorkDetail({
                                         )}
                                     >
                                         {comment.review === "approved"
-                                            ? "Approved"
-                                            : "Changes requested"}
+                                            ? t("detail.approved")
+                                            : t("detail.changesRequested")}
                                     </span>
                                 )}
                             </p>
@@ -194,8 +208,8 @@ export function WorkDetail({
                     <Textarea
                         value={body}
                         rows={4}
-                        aria-label="Say something"
-                        placeholder="Say something. Markdown, the same as on GitHub."
+                        aria-label={t("detail.say")}
+                        placeholder={t("detail.sayPlaceholder")}
                         onChange={(event) => setBody(event.target.value)}
                     />
                     <div className="flex flex-wrap gap-2">
@@ -215,7 +229,7 @@ export function WorkDetail({
                             }}
                         >
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Comment
+                            {t("detail.comment")}
                         </Button>
 
                         <Button
@@ -237,21 +251,18 @@ export function WorkDetail({
                             }}
                         >
                             {open ? <X className="size-4" /> : <Check className="size-4" />}
-                            {open ? "Close" : "Reopen"}
+                            {open ? t("detail.close") : t("detail.reopen")}
                         </Button>
 
                         {item.kind === "pr" && open && !item.merged && (
                             <Button size="sm" variant="secondary" onClick={() => setMerging(true)}>
                                 <GitMerge className="size-4" />
-                                Merge
+                                {t("detail.merge")}
                             </Button>
                         )}
                     </div>
                     {item.kind === "pr" && item.mergeable === false && (
-                        <p className="text-xs text-muted-foreground">
-                            GitHub reports conflicts on this branch. Merging will be refused until
-                            they are resolved.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("detail.conflicts")}</p>
                     )}
                 </div>
             )}
@@ -259,27 +270,29 @@ export function WorkDetail({
             <Dialog open={merging} onOpenChange={setMerging}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Merge this pull request</DialogTitle>
+                        <DialogTitle>{t("detail.mergeTitle")}</DialogTitle>
                         <DialogDescription>
-                            Into <code>{item.branches?.base ?? "the base branch"}</code>. This
-                            cannot be undone from here.
+                            {t.rich("detail.mergeInto", {
+                                base: item.branches?.base ?? t("detail.baseBranch"),
+                                code: (chunks) => <code key="base">{chunks}</code>
+                            })}
                         </DialogDescription>
                     </DialogHeader>
 
                     <SegmentedControl
                         value={method}
                         onValueChange={setMethod}
-                        aria-label="How to merge"
+                        aria-label={t("detail.how")}
                         options={[
-                            { value: "squash", label: "Squash" },
-                            { value: "merge", label: "Merge commit" },
-                            { value: "rebase", label: "Rebase" }
+                            { value: "squash", label: t("detail.squash") },
+                            { value: "merge", label: t("detail.mergeCommit") },
+                            { value: "rebase", label: t("detail.rebase") }
                         ]}
                     />
 
                     <DialogFooter>
                         <Button variant="ghost" size="sm" onClick={() => setMerging(false)}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button
                             size="sm"
@@ -296,7 +309,7 @@ export function WorkDetail({
                             }}
                         >
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Merge
+                            {t("detail.merge")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -306,13 +319,14 @@ export function WorkDetail({
 }
 
 function BackLink() {
+    const t = useTranslations("code");
     return (
         <Link
             href="/apps/code"
             className="flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
             <ArrowLeft className="size-3.5" />
-            Code
+            {t("page.title")}
         </Link>
     );
 }

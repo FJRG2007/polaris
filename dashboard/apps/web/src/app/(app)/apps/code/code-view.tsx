@@ -32,6 +32,7 @@ import {
     MessageSquare,
     Search
 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How long typing pauses before the list is asked again. GitHub's search takes
  *  thirty requests a minute and a qualifier is thirty keystrokes, so a request
@@ -40,15 +41,10 @@ import {
 const SEARCH_AFTER = 300;
 
 /** The filters, in the order somebody reaches for them. */
-const SCOPES: { value: CodeScope; label: string }[] = [
-    { value: "review", label: "Waiting on my review" },
-    { value: "assigned", label: "Assigned to me" },
-    { value: "created", label: "Opened by me" },
-    { value: "mentioned", label: "I was mentioned" },
-    { value: "all", label: "Everything I am in" }
-];
+const SCOPES: readonly CodeScope[] = ["review", "assigned", "created", "mentioned", "all"];
 
 export function CodeView() {
+    const t = useTranslations("code");
     const [kind, setKind] = useState<CodeKind>("pr");
     const [scope, setScope] = useState<CodeScope>("review");
     const [state, setState] = useState<CodeState>("open");
@@ -83,7 +79,7 @@ export function CodeView() {
     }, [kind, effectiveScope, state, query]);
 
     const scopes = useMemo(
-        () => (kind === "issue" ? SCOPES.filter((entry) => entry.value !== "review") : SCOPES),
+        () => (kind === "issue" ? SCOPES.filter((entry) => entry !== "review") : SCOPES),
         [kind]
     );
 
@@ -93,21 +89,21 @@ export function CodeView() {
                 <SegmentedControl
                     value={kind}
                     onValueChange={(next) => setKind(next as CodeKind)}
-                    aria-label="What to list"
+                    aria-label={t("list.what")}
                     options={[
-                        { value: "pr", label: "Pull requests" },
-                        { value: "issue", label: "Issues" }
+                        { value: "pr", label: t("list.prs") },
+                        { value: "issue", label: t("list.issues") }
                     ]}
                 />
                 <SegmentedControl
                     value={state}
                     onValueChange={(next) => setState(next as CodeState)}
                     size="sm"
-                    aria-label="Which ones"
+                    aria-label={t("list.which")}
                     options={[
-                        { value: "open", label: "Open" },
-                        { value: "closed", label: "Closed" },
-                        { value: "all", label: "All" }
+                        { value: "open", label: t("states.open") },
+                        { value: "closed", label: t("states.closed") },
+                        { value: "all", label: t("list.all") }
                     ]}
                 />
                 <div className="relative ml-auto min-w-[12rem] flex-1 sm:max-w-xs">
@@ -115,8 +111,8 @@ export function CodeView() {
                     <input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Narrow it: repo:owner/name, label:bug"
-                        aria-label="Narrow the list"
+                        placeholder={t("list.narrowPlaceholder")}
+                        aria-label={t("list.narrow")}
                         className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
@@ -125,17 +121,17 @@ export function CodeView() {
             <div className="flex flex-wrap gap-1">
                 {scopes.map((entry) => (
                     <button
-                        key={entry.value}
+                        key={entry}
                         type="button"
-                        onClick={() => setScope(entry.value)}
+                        onClick={() => setScope(entry)}
                         className={cn(
                             "rounded-md px-2 py-1 text-xs transition-colors",
-                            effectiveScope === entry.value
+                            effectiveScope === entry
                                 ? "bg-card-hover font-medium text-foreground"
                                 : "text-muted-foreground hover:bg-muted"
                         )}
                     >
-                        {entry.label}
+                        {t(`scopes.${entry}`)}
                     </button>
                 ))}
             </div>
@@ -158,12 +154,8 @@ export function CodeView() {
             ) : items.length === 0 && !error ? (
                 <EmptyState
                     icon={<GitPullRequest />}
-                    title="Nothing here."
-                    description={
-                        kind === "pr"
-                            ? "No pull request matches that filter."
-                            : "No issue matches that filter."
-                    }
+                    title={t("list.none")}
+                    description={kind === "pr" ? t("list.noPr") : t("list.noIssue")}
                 />
             ) : (
                 <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
@@ -179,6 +171,7 @@ export function CodeView() {
 }
 
 function WorkRow({ item }: { item: CodeItem }) {
+    const t = useTranslations("code");
     const [owner, repo] = item.repo.split("/");
     const href = owner && repo ? `/apps/code/${owner}/${repo}/${item.number}` : item.url;
 
@@ -195,7 +188,10 @@ function WorkRow({ item }: { item: CodeItem }) {
                     </span>
                     <span>#{item.number}</span>
                     <span>
-                        by {item.authorLogin}, updated <RelativeTime iso={item.updatedAt} />
+                        {t.rich("list.byUpdated", {
+                            author: item.authorLogin,
+                            time: () => <RelativeTime key="time" iso={item.updatedAt} />
+                        })}
                     </span>
                     {item.labels.slice(0, 3).map((label) => (
                         <span
@@ -221,8 +217,8 @@ function WorkRow({ item }: { item: CodeItem }) {
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Open on GitHub"
-                title="Open on GitHub"
+                aria-label={t("list.openGithub")}
+                title={t("list.openGithub")}
                 className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
                 <ExternalLink className="size-3.5" />
@@ -235,28 +231,29 @@ function WorkRow({ item }: { item: CodeItem }) {
  *  what GitHub itself settled on and what everybody who reads these already
  *  knows. */
 export function StateIcon({ state, kind }: { state: CodeItem["state"]; kind: CodeKind }) {
+    const t = useTranslations("code");
     if (kind === "issue") {
         return state === "closed" ? (
-            <CircleSlash className="mt-0.5 size-4 shrink-0 text-[#8957e5]" aria-label="Closed" />
+            <CircleSlash className="mt-0.5 size-4 shrink-0 text-[#8957e5]" aria-label={t("states.closed")} />
         ) : (
-            <CircleDot className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label="Open" />
+            <CircleDot className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />
         );
     }
     if (state === "merged") {
-        return <GitMerge className="mt-0.5 size-4 shrink-0 text-[#a371f7]" aria-label="Merged" />;
+        return <GitMerge className="mt-0.5 size-4 shrink-0 text-[#a371f7]" aria-label={t("states.merged")} />;
     }
     if (state === "closed") {
         return (
-            <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#f85149]" aria-label="Closed" />
+            <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#f85149]" aria-label={t("states.closed")} />
         );
     }
     if (state === "draft") {
         return (
             <GitPullRequestDraft
                 className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                aria-label="Draft"
+                aria-label={t("states.draft")}
             />
         );
     }
-    return <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label="Open" />;
+    return <GitPullRequest className="mt-0.5 size-4 shrink-0 text-[#3fb950]" aria-label={t("states.open")} />;
 }

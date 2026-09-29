@@ -1184,6 +1184,11 @@
         "web/src/app/(app)/apps/analytics/actions.ts",
         "web/src/app/(app)/apps/analytics/analytics-view.tsx",
         "web/src/app/(app)/apps/analytics/site-catalog.ts",
-        "web/src/app/(app)/apps/analytics/layout.tsx"
+        "web/src/app/(app)/apps/analytics/layout.tsx",
+        "web/src/app/(app)/apps/code/actions.ts",
+        "web/src/app/(app)/apps/code/code-view.tsx",
+        "web/src/app/(app)/apps/code/page.tsx",
+        "web/src/app/(app)/apps/code/work-detail.tsx",
+        "web/src/app/(app)/apps/code/layout.tsx"
     ]
 }

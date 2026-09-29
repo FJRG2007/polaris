@@ -1,1 +1,71 @@
-{}
+{
+    "scopes": {
+        "review": "Esperan mi revisión",
+        "assigned": "Asignados a mí",
+        "created": "Abiertos por mí",
+        "mentioned": "Me mencionaron",
+        "all": "Todo lo mío"
+    },
+    "list": {
+        "what": "Qué listar",
+        "prs": "Pull requests",
+        "issues": "Issues",
+        "which": "Cuáles",
+        "all": "Todos",
+        "narrowPlaceholder": "Acota: repo:owner/name, label:bug",
+        "narrow": "Acotar la lista",
+        "none": "Aquí no hay nada.",
+        "noPr": "Ninguna pull request coincide con ese filtro.",
+        "noIssue": "Ninguna issue coincide con ese filtro.",
+        "byUpdated": "de {author}, actualizado <time></time>",
+        "openGithub": "Abrir en GitHub"
+    },
+    "states": {
+        "open": "Abierto",
+        "closed": "Cerrado",
+        "merged": "Fusionado",
+        "draft": "Borrador"
+    },
+    "detail": {
+        "openFailed": "No se pudo abrir",
+        "opened": "{repo} - abierto por {author} <time></time>",
+        "branches": "- <code>{head}</code> en <code>{base}</code>",
+        "approved": "Aprobado",
+        "changesRequested": "Cambios pedidos",
+        "say": "Escribe algo",
+        "sayPlaceholder": "Escribe algo. Markdown, igual que en GitHub.",
+        "comment": "Comentar",
+        "close": "Cerrar",
+        "reopen": "Reabrir",
+        "merge": "Fusionar",
+        "conflicts": "GitHub informa de conflictos en esta rama. La fusión se rechazará hasta que se resuelvan.",
+        "mergeTitle": "Fusionar esta pull request",
+        "mergeInto": "En <code>{base}</code>. No se puede deshacer desde aquí.",
+        "baseBranch": "la rama base",
+        "how": "Cómo fusionar",
+        "squash": "Squash",
+        "mergeCommit": "Commit de fusión",
+        "rebase": "Rebase"
+    },
+    "page": {
+        "title": "Código",
+        "description": "Pull requests e issues de las cuentas de GitHub que has vinculado."
+    },
+    "errors": {
+        "linkFirst": "Vincula antes una cuenta de GitHub, en Mi cuenta > Cuentas conectadas.",
+        "linkReaching": "Vincula una cuenta de GitHub que tenga acceso a ese repositorio.",
+        "reconnect": "GitHub ya no acepta ese vínculo. Vuelve a conectar la cuenta.",
+        "rateLimited": "GitHub está limitando esta cuenta. Vuelve a intentarlo en breve.",
+        "cannot": "Esa cuenta no puede hacer eso en este repositorio.",
+        "notThere": "Eso no existe, o no lo puedes ver.",
+        "notMergeable": "GitHub rechazó la fusión: no está en un estado fusionable.",
+        "noAnswer": "GitHub no pudo responder a eso ahora mismo.",
+        "writeFirst": "Escribe algo primero",
+        "readFailed": "No se pudo leer de GitHub.",
+        "filter": "No se pudo leer ese filtro",
+        "notOpenable": "Eso no es algo que se pueda abrir",
+        "post": "No se pudo publicar",
+        "change": "No se pudo cambiar",
+        "merge": "No se pudo fusionar"
+    }
+}

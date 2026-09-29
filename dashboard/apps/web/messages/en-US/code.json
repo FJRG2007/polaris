@@ -1,1 +1,71 @@
-{}
+{
+    "scopes": {
+        "review": "Waiting on my review",
+        "assigned": "Assigned to me",
+        "created": "Opened by me",
+        "mentioned": "I was mentioned",
+        "all": "Everything I am in"
+    },
+    "list": {
+        "what": "What to list",
+        "prs": "Pull requests",
+        "issues": "Issues",
+        "which": "Which ones",
+        "all": "All",
+        "narrowPlaceholder": "Narrow it: repo:owner/name, label:bug",
+        "narrow": "Narrow the list",
+        "none": "Nothing here.",
+        "noPr": "No pull request matches that filter.",
+        "noIssue": "No issue matches that filter.",
+        "byUpdated": "by {author}, updated <time></time>",
+        "openGithub": "Open on GitHub"
+    },
+    "states": {
+        "open": "Open",
+        "closed": "Closed",
+        "merged": "Merged",
+        "draft": "Draft"
+    },
+    "detail": {
+        "openFailed": "That could not be opened",
+        "opened": "{repo} - opened by {author} <time></time>",
+        "branches": "- <code>{head}</code> into <code>{base}</code>",
+        "approved": "Approved",
+        "changesRequested": "Changes requested",
+        "say": "Say something",
+        "sayPlaceholder": "Say something. Markdown, the same as on GitHub.",
+        "comment": "Comment",
+        "close": "Close",
+        "reopen": "Reopen",
+        "merge": "Merge",
+        "conflicts": "GitHub reports conflicts on this branch. Merging will be refused until they are resolved.",
+        "mergeTitle": "Merge this pull request",
+        "mergeInto": "Into <code>{base}</code>. This cannot be undone from here.",
+        "baseBranch": "the base branch",
+        "how": "How to merge",
+        "squash": "Squash",
+        "mergeCommit": "Merge commit",
+        "rebase": "Rebase"
+    },
+    "page": {
+        "title": "Code",
+        "description": "Pull requests and issues across the GitHub accounts you have linked."
+    },
+    "errors": {
+        "linkFirst": "Link a GitHub account first, under My account > Connected accounts.",
+        "linkReaching": "Link a GitHub account that reaches that repository.",
+        "reconnect": "GitHub no longer accepts that link. Reconnect the account.",
+        "rateLimited": "GitHub is rate limiting this account. Try again shortly.",
+        "cannot": "That account cannot do that on this repository.",
+        "notThere": "That is not there, or not visible to you.",
+        "notMergeable": "GitHub refused the merge: it is not in a mergeable state.",
+        "noAnswer": "GitHub could not answer that just now.",
+        "writeFirst": "Write something first",
+        "readFailed": "That could not be read from GitHub.",
+        "filter": "That filter could not be read",
+        "notOpenable": "That is not something to open",
+        "post": "That could not be posted",
+        "change": "That could not be changed",
+        "merge": "That could not be merged"
+    }
+}

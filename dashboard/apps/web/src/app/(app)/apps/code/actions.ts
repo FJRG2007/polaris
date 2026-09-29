@@ -23,6 +23,34 @@ import * as code from "@/lib/code/code-service";
 import { requirePermission } from "@/lib/session";
 import { CodeError } from "@/lib/code/code-service";
 import type { CodeComment, CodeDetail, CodeItem } from "@/lib/code/code-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+type CodeKey = NamespaceKey<"code">;
+
+/** A reply in the reader's language. */
+async function say(key: CodeKey): Promise<string> {
+    return (await getTranslations("code"))(key);
+}
+
+/** What the code service refuses with, by its English. */
+const REFUSALS: Readonly<Record<string, CodeKey>> = {
+    "Link a GitHub account first, under My account > Connected accounts.": "errors.linkFirst",
+    "Link a GitHub account that reaches that repository.": "errors.linkReaching",
+    "GitHub no longer accepts that link. Reconnect the account.": "errors.reconnect",
+    "GitHub is rate limiting this account. Try again shortly.": "errors.rateLimited",
+    "That account cannot do that on this repository.": "errors.cannot",
+    "That is not there, or not visible to you.": "errors.notThere",
+    "GitHub refused the merge: it is not in a mergeable state.": "errors.notMergeable",
+    "GitHub could not answer that just now.": "errors.noAnswer",
+    "Write something first": "errors.writeFirst"
+};
+
+/** A known sentence in the reader's words; anything else as it came. */
+async function refusal(message: string): Promise<string> {
+    const key = REFUSALS[message];
+    return key ? say(key) : message;
+}
 
 const listSchema = z.object({
     kind: z.enum(code.CODE_KINDS),
@@ -43,9 +71,9 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     try {
         return { value: await run() };
     } catch (caught) {
-        if (caught instanceof CodeError) return { error: caught.message };
+        if (caught instanceof CodeError) return { error: await refusal(caught.message) };
         console.error(caught);
-        return { error: "That could not be read from GitHub." };
+        return { error: await say("errors.readFailed") };
     }
 }
 
@@ -54,7 +82,7 @@ export async function listWorkAction(
 ): Promise<{ items?: CodeItem[]; error?: string }> {
     const user = await requirePermission("agents.read");
     const parsed = listSchema.safeParse(input);
-    if (!parsed.success) return { error: "That filter could not be read" };
+    if (!parsed.success) return { error: await say("errors.filter") };
 
     const result = await guard(() => code.listWork(user.id, parsed.data));
     return result.error ? { error: result.error } : { items: result.value };
@@ -65,7 +93,7 @@ export async function readWorkAction(
 ): Promise<{ item?: CodeDetail; error?: string }> {
     const user = await requirePermission("agents.read");
     const parsed = targetSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not something to open" };
+    if (!parsed.success) return { error: await say("errors.notOpenable") };
 
     const result = await guard(() =>
         code.readWork(user.id, parsed.data.owner, parsed.data.repo, parsed.data.number)
@@ -78,7 +106,7 @@ export async function readConversationAction(
 ): Promise<{ comments?: CodeComment[]; error?: string }> {
     const user = await requirePermission("agents.read");
     const parsed = targetSchema.extend({ kind: z.enum(code.CODE_KINDS) }).safeParse(input);
-    if (!parsed.success) return { error: "That is not something to open" };
+    if (!parsed.success) return { error: await say("errors.notOpenable") };
 
     const result = await guard(() =>
         code.readConversation(
@@ -95,10 +123,11 @@ export async function readConversationAction(
 export async function commentAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = targetSchema
-        .extend({ body: z.string().trim().min(1, "Write something first").max(60000) })
+        .extend({ body: z.string().trim().min(1, "Write something first") /* i18n-ignore said through REFUSALS */.max(60000) })
         .safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That could not be posted" };
+        const message = parsed.error.issues[0]?.message;
+        return { error: message ? await refusal(message) : await say("errors.post") };
     }
 
     return guard(() =>
@@ -115,7 +144,7 @@ export async function commentAction(input: unknown): Promise<{ error?: string }>
 export async function setStateAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = targetSchema.extend({ state: z.enum(["open", "closed"]) }).safeParse(input);
-    if (!parsed.success) return { error: "That could not be changed" };
+    if (!parsed.success) return { error: await say("errors.change") };
 
     return guard(() =>
         code.setState(
@@ -133,7 +162,7 @@ export async function mergeAction(input: unknown): Promise<{ error?: string }> {
     const parsed = targetSchema
         .extend({ method: z.enum(["merge", "squash", "rebase"]) })
         .safeParse(input);
-    if (!parsed.success) return { error: "That could not be merged" };
+    if (!parsed.success) return { error: await say("errors.merge") };
 
     return guard(() =>
         code.merge(
