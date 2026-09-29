@@ -9,6 +9,8 @@
  */
 
 import { Loader2, MessagesSquare } from "lucide-react";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import { Button, Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -24,7 +26,7 @@ import { readChatLinkAction, saveChatLinkAction, type ChatLinkState } from "./ch
 const NONE = "none";
 
 /** Why a use that reads or writes the conversation cannot be turned on here. */
-const OUTSIDER = "Only somebody who could link this conversation can turn this on.";
+const OUTSIDER: GameKey<"minecraft"> = "chatLink.outsider";
 
 type Kind = "none" | "group" | "space";
 
@@ -104,18 +106,17 @@ function linkOf(draft: Draft): ChatLink | null | undefined {
 
 /** The card's name and what linking a chat does. */
 function ChatLinkHeading() {
+    const t = useGameText("minecraft");
     return (
         <div>
-            <p className="text-sm font-medium">Linked chat</p>
-            <p className="text-xs text-muted-foreground">
-                The chat group or space this server talks through. Its call feeds {"{call.*}"} on
-                the side panel and in announcements, and it shows the server&apos;s badge in Chat.
-            </p>
+            <p className="text-sm font-medium">{t("chatLink.linkedChat")}</p>
+            <p className="text-xs text-muted-foreground">{t("chatLink.intro")}</p>
         </div>
     );
 }
 
 export function MinecraftChatLink({ installedAppId }: { installedAppId: string }) {
+    const t = useGameText("minecraft");
     const [state, setState] = useState<ChatLinkState | null>(null);
     const [draft, setDraft] = useState<Draft>(draftOf(null));
     const [error, setError] = useState<string | null>(null);
@@ -130,7 +131,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
     useEffect(() => {
         void readChatLinkAction(installedAppId).then((answer) => {
             if (answer.state) load(answer.state);
-            else setError(answer.error ?? "The linked chat could not be read");
+            else setError(answer.error ?? t("chatLink.readFailed"));
         });
     }, [installedAppId, load]);
 
@@ -157,7 +158,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
         startTransition(async () => {
             const result = await saveChatLinkAction({ installedAppId, link });
             if (result.error || !result.state) {
-                setError(result.error ?? "That could not be saved");
+                setError(result.error ?? t("chatLink.saveFailed"));
                 return;
             }
             load(result.state);
@@ -178,7 +179,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                         </p>
                     ) : (
                         <div className="flex flex-col gap-1" aria-busy="true">
-                            <span className="text-sm font-medium">Link to</span>
+                            <span className="text-sm font-medium">{t("chatLink.linkTo")}</span>
                             <Skeleton className="h-9 w-full" />
                         </div>
                     )}
@@ -199,12 +200,12 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
             ? saved.spaceId
             : null;
     const rooms = (kind: "text" | "voice", chosen: string | null) => [
-        { value: NONE, label: "None" },
+        { value: NONE, label: t("chatLink.none") },
         ...(space?.channels ?? [])
             .filter((channel) => channel.kind === kind)
             .map((channel) => ({ value: channel.id, label: `#${channel.name}` })),
         ...(chosen && !space?.channels.some((channel) => channel.id === chosen)
-            ? [{ value: chosen, label: "A channel you cannot see" }]
+            ? [{ value: chosen, label: t("chatLink.aChannelYouCannotSee") }]
             : [])
     ];
     const outsider = link ? linkRefusal(link, state.linkable) !== null : false;
@@ -221,40 +222,45 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                 <ChatLinkHeading />
 
                 <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium">Link to</span>
+                    <span className="font-medium">{t("chatLink.linkTo")}</span>
                     <Select
                         value={draft.kind}
                         onValueChange={(value) => change({ kind: value as Kind })}
                         options={[
-                            { value: "none", label: "Nothing" },
-                            { value: "group", label: "A chat group" },
-                            { value: "space", label: "Channels of a space" }
+                            { value: "none", label: t("chatLink.nothing") },
+                            { value: "group", label: t("chatLink.aChatGroup") },
+                            { value: "space", label: t("chatLink.channelsOfASpace") }
                         ]}
-                        aria-label="What the server is linked to"
+                        aria-label={t("chatLink.whatTheServerIsLinked")}
                     />
                 </label>
 
                 {draft.kind === "group" && (
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Group *</span>
+                        <span className="font-medium">{t("chatLink.group")}</span>
                         <Select
                             value={draft.groupId ?? NONE}
                             onValueChange={(value) =>
                                 change({ groupId: value === NONE ? null : value })
                             }
-                            placeholder="Choose a group"
+                            placeholder={t("chatLink.chooseAGroup")}
                             options={[
                                 ...groups.map((one) => ({ value: one.id, label: one.name })),
                                 ...(foreignGroup
-                                    ? [{ value: foreignGroup, label: "A group you are not in" }]
+                                    ? [
+                                          {
+                                              value: foreignGroup,
+                                              label: t("chatLink.aGroupYouAreNot")
+                                          }
+                                      ]
                                     : [])
                             ]}
-                            aria-label="Chat group"
+                            aria-label={t("chatLink.chatGroup")}
                         />
                         <span className="text-xs text-muted-foreground">
                             {groups.length === 0
-                                ? "You are in no chat group yet. Create one in Chat first."
-                                : "Its call is the one {call.*} reads, and commands are answered in it."}
+                                ? t("chatLink.youAreInNoChat")
+                                : t("chatLink.groupHint")}
                         </span>
                     </label>
                 )}
@@ -262,7 +268,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                 {draft.kind === "space" && (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Space *</span>
+                            <span className="font-medium">{t("chatLink.space")}</span>
                             <Select
                                 value={draft.spaceId ?? NONE}
                                 onValueChange={(value) =>
@@ -272,48 +278,55 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                                         textChannelId: null
                                     })
                                 }
-                                placeholder="Choose a space"
+                                placeholder={t("chatLink.chooseASpace")}
                                 options={[
                                     ...spaces.map((one) => ({ value: one.id, label: one.name })),
                                     ...(foreignSpace
-                                        ? [{ value: foreignSpace, label: "A space you do not run" }]
+                                        ? [
+                                              {
+                                                  value: foreignSpace,
+                                                  label: t("chatLink.aSpaceYouDoNot")
+                                              }
+                                          ]
                                         : [])
                                 ]}
-                                aria-label="Chat space"
+                                aria-label={t("chatLink.chatSpace")}
                             />
                             {spaces.length === 0 && (
                                 <span className="text-xs text-muted-foreground">
-                                    Only a space you own or administer can be linked.
+                                    {t("chatLink.onlyASpaceYouOwn")}
                                 </span>
                             )}
                         </label>
                         {draft.spaceId && (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Voice channel for the call</span>
+                                    <span className="font-medium">
+                                        {t("chatLink.voiceChannelForTheCall")}
+                                    </span>
                                     <Select
                                         value={draft.callChannelId ?? NONE}
                                         onValueChange={(value) =>
                                             change({ callChannelId: value === NONE ? null : value })
                                         }
                                         options={rooms("voice", draft.callChannelId)}
-                                        aria-label="Voice channel for the call"
+                                        aria-label={t("chatLink.voiceChannelForTheCall")}
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Text channel</span>
+                                    <span className="font-medium">{t("chatLink.textChannel")}</span>
                                     <Select
                                         value={draft.textChannelId ?? NONE}
                                         onValueChange={(value) =>
                                             change({ textChannelId: value === NONE ? null : value })
                                         }
                                         options={rooms("text", draft.textChannelId)}
-                                        aria-label="Text channel"
+                                        aria-label={t("chatLink.textChannel")}
                                     />
                                 </label>
                                 {!draft.callChannelId && !draft.textChannelId && (
                                     <span className="text-xs text-muted-foreground sm:col-span-2">
-                                        Choose a voice channel, a text channel, or both.
+                                        {t("chatLink.chooseAVoiceChannelA")}
                                     </span>
                                 )}
                             </div>
@@ -324,18 +337,22 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                 {draft.kind !== "none" && (
                     <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
                         <Use
-                            label="Answer commands"
-                            detail={`Members can type ${CHAT_COMMANDS.map((one) => `/${one.name}`).join(" or ")} there to ask about the server.`}
+                            label={t("chatLink.answerCommands")}
+                            detail={t("chatLink.commandsHint", {
+                                commands: CHAT_COMMANDS.map((one) => `/${one.name}`).join(
+                                    ` ${t("chatLink.or")} `
+                                )
+                            })}
                             checked={draft.commands}
                             disabled={draft.kind === "space" && !draft.textChannelId}
                             onChange={(commands) => change({ commands })}
                         />
                         <Use
-                            label="Repeat announcements"
+                            label={t("chatLink.repeatAnnouncements")}
                             detail={
                                 locked("announcements")
-                                    ? OUTSIDER
-                                    : "An announcement sent to everybody also appears there."
+                                    ? t(OUTSIDER)
+                                    : t("chatLink.announcementsHint")
                             }
                             checked={draft.announcements}
                             disabled={
@@ -345,13 +362,13 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                             onChange={(announcements) => change({ announcements })}
                         />
                         <Use
-                            label="Show its messages in the game"
+                            label={t("chatLink.showItsMessagesInThe")}
                             detail={
                                 !state.java
-                                    ? "Only a Java server can show them."
+                                    ? t("chatLink.javaOnly")
                                     : locked("relay")
-                                      ? OUTSIDER
-                                      : "Everybody playing sees them in their chat, whether or not they are in the conversation."
+                                      ? t(OUTSIDER)
+                                      : t("chatLink.relayHint")
                             }
                             checked={draft.relay}
                             disabled={
@@ -378,7 +395,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                                     className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline"
                                 >
                                     <MessagesSquare className="size-3.5 shrink-0" />
-                                    Open in Chat
+                                    {t("chatLink.openInChat")}
                                 </a>
                             ) : (
                                 ""
@@ -390,7 +407,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                         onClick={save}
                     >
                         {pending && <Loader2 className="size-4 animate-spin" />}
-                        Save
+                        {t("chatLink.save")}
                     </Button>
                 </div>
             </CardBody>

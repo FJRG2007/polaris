@@ -20,7 +20,7 @@
  */
 
 import { GAME_RULES } from "../../lib/minecraft/rules";
-import { useGameText } from "../game-text";
+import { useGameText, type GameText } from "../game-text";
 import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
@@ -57,7 +57,8 @@ import {
     useRef,
     useState,
     useTransition,
-    type KeyboardEvent
+    type KeyboardEvent,
+    type ReactNode
 } from "react";
 import {
     Button,
@@ -135,7 +136,7 @@ export function GameConsole({
     applicationId,
     running,
     logName = "minecraft",
-    hint = "say Hello, or time set day",
+    hint,
     game = "java",
     players = []
 }: {
@@ -370,8 +371,8 @@ export function GameConsole({
                     [
                         ...current,
                         {
-                            command: "Run several",
-                            output: `Stopped after ${done} of ${total}.`,
+                            command: t("console.runSeveral"),
+                            output: t("console.stoppedAfter", { done, total }),
                             failed: true
                         }
                     ].slice(-KEPT_REPLIES)
@@ -405,7 +406,7 @@ export function GameConsole({
                 command: keeping.command
             });
             if (result.error || !result.commands) {
-                setKeepError(result.error ?? "That command could not be kept");
+                setKeepError(result.error ?? t("console.keepFailed"));
                 return;
             }
             setSaved(result.commands);
@@ -506,7 +507,7 @@ export function GameConsole({
                     log={log}
                     name={logName}
                     searchable
-                    emptyText={running ? "Waiting for output..." : "The server is stopped."}
+                    emptyText={running ? t("console.waitingForOutput") : t("console.serverStopped")}
                     className="h-96"
                 />
 
@@ -544,7 +545,7 @@ export function GameConsole({
                                 <DropdownMenuTrigger asChild>
                                     <button
                                         type="button"
-                                        aria-label={`More for ${entry.label}`}
+                                        aria-label={t("console.moreFor", { name: entry.label })}
                                         disabled={!heard}
                                         className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                     >
@@ -642,7 +643,11 @@ export function GameConsole({
                         onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
                         onBlur={() => setChoice(null)}
                         onKeyDown={onKeyDown}
-                        placeholder={running ? hint : t("console.startTheServerToSend")}
+                        placeholder={
+                            running
+                                ? (hint ?? t("console.defaultHint"))
+                                : t("console.startTheServerToSend")
+                        }
                         disabled={!running || pending || queue !== null}
                         aria-label={t("console.serverCommand")}
                         className="font-mono"
@@ -722,8 +727,15 @@ export function GameConsole({
                     >
                         <span className="text-muted-foreground">
                             {queue.waiting > 0
-                                ? `Waiting ${Math.round(queue.waiting / 100) / 10}s - ${queue.done} of ${queue.total} sent`
-                                : `Sending ${Math.min(queue.done + 1, queue.total)} of ${queue.total}...`}
+                                ? t("console.waitingSent", {
+                                      seconds: Math.round(queue.waiting / 100) / 10,
+                                      done: queue.done,
+                                      total: queue.total
+                                  })
+                                : t("console.sending", {
+                                      at: Math.min(queue.done + 1, queue.total),
+                                      total: queue.total
+                                  })}
                         </span>
                         <Button
                             size="sm"
@@ -743,9 +755,10 @@ export function GameConsole({
                             <DialogHeader>
                                 <DialogTitle>{t("console.runSeveralCommands")}</DialogTitle>
                                 <DialogDescription>
-                                    One per line, sent in order, each after the last is answered.
-                                    Put <code>wait 10</code> on a line of its own to pause for ten
-                                    seconds; lines starting with <code>#</code> are skipped.
+                                    {t.rich<ReactNode>("console.batchHelp", {
+                                        wait: () => <code key="wait">wait 10</code>,
+                                        hash: () => <code key="hash">#</code>
+                                    })}
                                 </DialogDescription>
                             </DialogHeader>
                             <Textarea
@@ -754,6 +767,7 @@ export function GameConsole({
                                 rows={12}
                                 spellCheck={false}
                                 className="font-mono text-xs"
+                                // i18n-ignore: commands as the server takes them
                                 placeholder={`title @a title {"text":"Reloading..."}\neffect give @a minecraft:slowness 10 255 true\nwait 10\ntitle @a title {"text":"Done!"}`}
                                 onChange={(event) => setBatch(event.target.value)}
                                 aria-label={t("console.commandsOnePerLine")}
@@ -764,7 +778,7 @@ export function GameConsole({
                                 </p>
                             ) : parsedBatch && !parsedBatch.problem ? (
                                 <p className="text-sm text-muted-foreground">
-                                    {queueSummary(parsedBatch.steps)}
+                                    {queueSummary(t, parsedBatch.steps)}
                                 </p>
                             ) : null}
                             <DialogFooter>
@@ -785,7 +799,9 @@ export function GameConsole({
                                 >
                                     <ListOrdered className="size-4" />
                                     {parsedBatch && !parsedBatch.problem
-                                        ? `Run ${commandCount(parsedBatch.steps)} ${commandCount(parsedBatch.steps) === 1 ? "command" : "commands"}`
+                                        ? t("console.runCount", {
+                                              count: commandCount(parsedBatch.steps)
+                                          })
                                         : t("console.run")}
                                 </Button>
                             </DialogFooter>
@@ -803,10 +819,11 @@ export function GameConsole({
                                         : t("console.keepACommand")}
                                 </DialogTitle>
                                 <DialogDescription>
-                                    It sits above the console for everybody who runs this server.
-                                    Put a blank in angle brackets -{" "}
-                                    <code>Broadcast &lt;message&gt;</code> - and pressing it fills
-                                    the box instead of sending.
+                                    {t.rich<ReactNode>("console.keepHelp", {
+                                        example: () => (
+                                            <code key="example">Broadcast &lt;message&gt;</code>
+                                        )
+                                    })}
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="flex flex-col gap-3">
@@ -819,7 +836,7 @@ export function GameConsole({
                                         value={keeping.command}
                                         maxLength={MAX_SAVED_COMMAND}
                                         className="font-mono"
-                                        placeholder={hint}
+                                        placeholder={hint ?? t("console.defaultHint")}
                                         onChange={(event) =>
                                             setKeeping({ ...keeping, command: event.target.value })
                                         }
@@ -862,9 +879,10 @@ export function GameConsole({
 }
 
 /** What a sequence will do, in one line under the box it is written in. */
-function queueSummary(steps: readonly QueueStep[]): string {
+function queueSummary(t: GameText<"games">, steps: readonly QueueStep[]): string {
     const commands = commandCount(steps);
     const waited = steps.reduce((total, step) => total + (step.kind === "wait" ? step.ms : 0), 0);
-    const said = `${commands} ${commands === 1 ? "command" : "commands"}`;
-    return waited > 0 ? `${said}, with ${Math.round(waited / 100) / 10}s of waiting.` : `${said}.`;
+    return waited > 0
+        ? t("console.summaryWaiting", { count: commands, seconds: Math.round(waited / 100) / 10 })
+        : t("console.summary", { count: commands });
 }

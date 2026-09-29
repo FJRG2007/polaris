@@ -46,7 +46,8 @@
  * would be advice about software their edition does not have.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { useGameText } from "../game-text";
 import * as modrinth from "../../lib/minecraft/modrinth";
 import { setLoginAction } from "./minecraft-login-actions";
 import { KeyRound, Loader2, TriangleAlert } from "lucide-react";
@@ -108,6 +109,7 @@ export function MinecraftJoinPassword({
     onOpenPlayers?: () => void;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [confirm, confirmElement] = useConfirm();
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
@@ -146,8 +148,8 @@ export function MinecraftJoinPassword({
 
     const restartNote =
         playersOnline > 0
-            ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-            : "The server restarts to apply it.";
+            ? t("joinPassword.playersWillDrop", { count: playersOnline })
+            : t("joinPassword.restartsToApply");
 
     /**
      * Run one of the switches, busy until it settles.
@@ -164,7 +166,7 @@ export function MinecraftJoinPassword({
             await task();
         } catch (cause) {
             console.error(cause);
-            setError("Polaris did not answer. Reload the page and try again.");
+            setError(t("joinPassword.noAnswer"));
         } finally {
             setPending(false);
         }
@@ -174,11 +176,15 @@ export function MinecraftJoinPassword({
         setError(null);
         void run(async () => {
             const asked = await confirm({
-                title: wanted ? "Restart onto Polaris login?" : "Restart to stop asking?",
+                title: wanted
+                    ? t("joinPassword.restartOntoPolarisLogin")
+                    : t("joinPassword.restartToStopAsking"),
                 description: wanted
-                    ? `${restartNote} Everybody registers with /register the next time they join${listed ? `, and the passwords kept by ${listed} stop working` : ""}. While the server cannot reach Polaris, nobody can join and it does not start.`
-                    : `${restartNote} Anybody on the player list gets in on their name alone afterwards. The passwords stay here in case you turn it back on.`,
-                confirmLabel: wanted ? "Use Polaris login" : "Turn off and restart",
+                    ? `${restartNote} ${listed ? t("joinPassword.modOnListed", { name: listed }) : t("joinPassword.modOn")}`
+                    : `${restartNote} ${t("joinPassword.modOff")}`,
+                confirmLabel: wanted
+                    ? t("joinPassword.usePolarisLogin")
+                    : t("joinPassword.turnOffAndRestart"),
                 danger: !wanted
             });
             if (!asked) return;
@@ -206,7 +212,12 @@ export function MinecraftJoinPassword({
                 const fit = await projectFitsAction({ installedAppId, slug: guard.slug });
                 if (!fit.fits) {
                     setError(
-                        `${guard.slug} has no build for the release this server runs${fit.version ? ` (${fit.version})` : ""}. The server would start without it and nobody would be asked for a password, so this is left off rather than left looking on.`
+                        fit.version
+                            ? t("joinPassword.noBuildFor", {
+                                  name: guard.slug,
+                                  version: fit.version
+                              })
+                            : t("joinPassword.noBuild", { name: guard.slug })
                     );
                     return;
                 }
@@ -214,12 +225,14 @@ export function MinecraftJoinPassword({
             const said = restartNote;
             const asked = await confirm({
                 title: wanted
-                    ? "Restart to ask players for a password?"
-                    : "Restart to stop asking?",
+                    ? t("joinPassword.restartToAskPlayersFor")
+                    : t("joinPassword.restartToStopAsking"),
                 description: wanted
-                    ? `${said} Everybody sets their own the next time they join.`
-                    : `${said} Anybody on the player list gets in on their name alone afterwards.`,
-                confirmLabel: wanted ? "Turn on and restart" : "Turn off and restart",
+                    ? `${said} ${t("joinPassword.guardOn")}`
+                    : `${said} ${t("joinPassword.guardOff")}`,
+                confirmLabel: wanted
+                    ? t("joinPassword.turnOnAndRestart")
+                    : t("joinPassword.turnOffAndRestart"),
                 danger: !wanted
             });
             if (!asked) return;
@@ -245,28 +258,24 @@ export function MinecraftJoinPassword({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <KeyRound className="size-4 text-primary" />
-                    Password on join
-                    {shownOn && <Badge variant="success">On</Badge>}
+                    {t("joinPassword.passwordOnJoin")}
+                    {shownOn && <Badge variant="success">{t("joinPassword.on")}</Badge>}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    Players set a password the first time they join and give it every time after.
-                    Worth having when Mojang authentication is off, because without it the server
-                    has only a name to go on and anyone who knows a listed name can use it.
+                    {t("joinPassword.playersSetAPasswordThe")}
                 </p>
 
                 {!java ? (
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                        Bedrock has no equivalent. It loads neither plugins nor mods, so the player
-                        list and the addresses it is bound to are what closes this server.
+                        {t("joinPassword.bedrockHasNoEquivalentIt")}
                     </p>
                 ) : guard === null ? (
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                        This server runs neither plugins nor mods, so there is nothing to install.
-                        Switch it to Paper, or to a mod loader, from Settings first.
+                        {t("joinPassword.thisServerRunsNeitherPlugins")}
                     </p>
                 ) : modCapable && !login.loaded ? (
                     <LoginSkeleton />
@@ -274,27 +283,26 @@ export function MinecraftJoinPassword({
                     <LoginDetails state={login.state} onOpenPlayers={onOpenPlayers} />
                 ) : locked ? (
                     <p className="text-xs text-muted-foreground">
-                        Players already log in with <span className="font-mono">{foreign}</span>,
-                        which Polaris does not manage. Remove it from the Mods screen to use a login
-                        from here instead.
+                        {t.rich<ReactNode>("joinPassword.foreign", {
+                            name: foreign ?? "",
+                            mono: monoTags()
+                        })}
                     </p>
                 ) : preferMod ? (
                     <>
                         <p className="text-xs text-muted-foreground">
-                            Uses Polaris login: players get{" "}
-                            <span className="font-mono">/register</span> and{" "}
-                            <span className="font-mono">/login</span> with text passwords, kept in
-                            Polaris so you can reset one here. While the server cannot reach
-                            Polaris, nobody can join and the server does not start.
+                            {t.rich<ReactNode>("joinPassword.usesLogin", { mono: monoTags() })}
                         </p>
                         {listed !== null && (
                             <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                 <span>
-                                    Players still log in with{" "}
-                                    <span className="font-mono">{listed}</span>
-                                    {guard.entry === "trigger" ? " and numeric passwords" : ""}.
-                                    Turning this on replaces it, and every player registers again.
+                                    {t.rich<ReactNode>(
+                                        guard.entry === "trigger"
+                                            ? "joinPassword.stillNumeric"
+                                            : "joinPassword.still",
+                                        { name: listed, mono: monoTags() }
+                                    )}
                                 </span>
                             </p>
                         )}
@@ -302,11 +310,10 @@ export function MinecraftJoinPassword({
                 ) : (
                     <>
                         <p className="text-xs text-muted-foreground">
-                            Installs <span className="font-mono">{installed}</span> from Modrinth,
-                            which the Mods screen shows afterwards like anything else on the list. A
-                            release it has no build for is skipped and the server starts without it
-                            rather than failing to start, so check the Mods screen once the server
-                            is back up.
+                            {t.rich<ReactNode>("joinPassword.installs", {
+                                name: installed,
+                                mono: monoTags()
+                            })}
                         </p>
                         {/* The commands, because nobody reading this is the person who
                             will need them: the player is in the game, locked out, with
@@ -315,31 +322,18 @@ export function MinecraftJoinPassword({
                             The plugin's own are not repeated here unverified. */}
                         {guard.entry === "trigger" ? (
                             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-                                Players register with{" "}
-                                <span className="font-mono">/trigger register set 1234</span> and
-                                come back with{" "}
-                                <span className="font-mono">/trigger login set 1234</span>. The
-                                password can only be a number: this runs as a data pack, and the
-                                only thing vanilla lets an unauthenticated player send the server is
-                                a scoreboard value. Writing{" "}
-                                <span className="font-mono">/trigger register</span> without{" "}
-                                <span className="font-mono">set</span> does not fail - it registers
-                                the password 1, and the next login says the password is wrong.
+                                {t.rich<ReactNode>("joinPassword.triggerHelp", {
+                                    mono: monoTags()
+                                })}
                             </p>
                         ) : (
                             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-                                Players register on their first join with the commands{" "}
-                                <span className="font-mono">{installed}</span> documents on its
-                                Modrinth page. Tell them before turning this on: nobody can look
-                                that up from inside the server they have just been locked out of.
+                                {t.rich<ReactNode>("joinPassword.pluginHelp", {
+                                    name: installed,
+                                    mono: monoTags()
+                                })}
                                 {installed === guard.slug && (
-                                    <>
-                                        {" "}
-                                        Their password can appear in the server log, which the
-                                        Console screen shows - it is hidden only by a library
-                                        Modrinth does not carry, so treat these as passwords for
-                                        this server and nothing else.
-                                    </>
+                                    <> {t("joinPassword.theirPasswordCanAppearIn")}</>
                                 )}
                             </p>
                         )}
@@ -364,11 +358,22 @@ export function MinecraftJoinPassword({
                             }
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            {shownOn ? "Turn off" : "Turn on"}
+                            {shownOn ? t("joinPassword.turnOff") : t("joinPassword.turnOn")}
                         </Button>
                     </div>
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/** A command in a sentence, set in the monospace it is typed in. Each call keys
+ *  its spans afresh, since one sentence can hold several. */
+function monoTags(): (chunks: ReactNode[]) => ReactNode {
+    let next = 0;
+    return (chunks) => (
+        <span key={`mono-${next++}`} className="font-mono">
+            {chunks}
+        </span>
     );
 }

@@ -17,6 +17,7 @@
  */
 
 import Image from "next/image";
+import { useGameText } from "../game-text";
 import * as mc from "../../lib/minecraft/motd";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { AlignCenter, AlignLeft, Check, ImageUp, Loader2, RotateCw, Save } from "lucide-react";
@@ -74,6 +75,7 @@ function NameCard({
     name: string;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [value, setValue] = useState(name);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -83,15 +85,15 @@ function NameCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-2">
-                <p className="text-sm font-medium">Name</p>
+                <p className="text-sm font-medium">{t("appearance.name")}</p>
                 <p className="text-xs text-muted-foreground">
-                    What this server is called in Polaris. Its address does not change with it.
+                    {t("appearance.whatThisServerIsCalled")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                     <Input
                         value={value}
                         onChange={(event) => setValue(event.target.value)}
-                        aria-label="Server name"
+                        aria-label={t("appearance.serverName")}
                         className="min-w-48 flex-1"
                         maxLength={60}
                     />
@@ -110,7 +112,8 @@ function NameCard({
                             });
                         }}
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Rename
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{" "}
+                        {t("appearance.rename")}
                     </Button>
                 </div>
                 {error && <p className="text-xs text-danger">{error}</p>}
@@ -132,6 +135,7 @@ function MotdCard({
     playersOnline: number;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const saved = useMemo(() => mc.decodeMotd(motd), [motd]);
     const [text, setText] = useState(saved);
     const [error, setError] = useState<string | null>(null);
@@ -150,12 +154,12 @@ function MotdCard({
         if (restart) {
             const warning =
                 playersOnline > 0
-                    ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
-                    : "The server restarts to pick the new description up.";
+                    ? t("joinPassword.playersWillDrop", { count: playersOnline })
+                    : t("appearance.restartsForDescription");
             const agreed = await confirm({
-                title: "Restart with the new description?",
+                title: t("appearance.restartWithTheNewDescription"),
                 description: warning,
-                confirmLabel: "Save and restart"
+                confirmLabel: t("appearance.saveAndRestart")
             });
             if (!agreed) return;
         }
@@ -178,11 +182,9 @@ function MotdCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <p className="text-sm font-medium">Description</p>
+                    <p className="text-sm font-medium">{t("appearance.description")}</p>
                     <p className="text-xs text-muted-foreground">
-                        The two lines under the server in a player&apos;s multiplayer list. Select some text and pick a
-                        color or a style for it; press the same one again to take it off. With nothing selected it
-                        applies from the cursor on. The preview is what the server list will actually draw.
+                        {t("appearance.theTwoLinesUnderThe")}
                     </p>
                 </div>
 
@@ -190,8 +192,8 @@ function MotdCard({
                     value={text}
                     onChange={setText}
                     rows={mc.MOTD_MAX_LINES}
-                    label="Server description"
-                    footnote={`${mc.MOTD_MAX_LINES} lines. Anything after them is not shown.`}
+                    label={t("appearance.serverDescription")}
+                    footnote={t("appearance.linesFootnote", { count: mc.MOTD_MAX_LINES })}
                     actions={
                         // A button and not a switch: it pads the text that is
                         // there now, so there is no state to be in afterwards.
@@ -203,8 +205,8 @@ function MotdCard({
                             onClick={() => setText((current) => mc.toggleCenterMotd(current))}
                             title={
                                 centered
-                                    ? "Put the lines back against the left"
-                                    : "Pad the lines so they sit in the middle of the list"
+                                    ? t("appearance.putTheLinesBackAgainst")
+                                    : t("appearance.padTheLinesSoThey")
                             }
                             aria-pressed={centered}
                         >
@@ -213,7 +215,7 @@ function MotdCard({
                             ) : (
                                 <AlignCenter className="size-3.5" />
                             )}
-                            {centered ? "Align left" : "Center the lines"}
+                            {centered ? t("appearance.alignLeft") : t("appearance.centerTheLines")}
                         </Button>
                     }
                 />
@@ -225,10 +227,10 @@ function MotdCard({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                         {changed
-                            ? "Not saved yet."
+                            ? t("appearance.notSavedYet")
                             : stored
-                              ? "Saved. The server shows it from its next restart."
-                              : "This is what the server is running on."}
+                              ? t("appearance.savedTheServerShowsIt")
+                              : t("appearance.thisIsWhatTheServer")}
                     </p>
                     <div className="flex items-center gap-2">
                         {/* The image writes server.properties at boot, so saving
@@ -236,11 +238,11 @@ function MotdCard({
                             the text and leaves whoever is playing alone. */}
                         <Button variant="secondary" onClick={() => void save(false)} disabled={pending || !changed}>
                             {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                            Save
+                            {t("appearance.save")}
                         </Button>
                         <Button onClick={() => void save(true)} disabled={pending || !changed}>
                             <RotateCw className="size-4" />
-                            Save and restart
+                            {t("appearance.saveAndRestart")}
                         </Button>
                     </div>
                 </div>
@@ -259,9 +261,10 @@ function MotdCard({
  * dashboard's own type and colours would answer a different one.
  */
 function MotdPreview({ name, lines }: { name: string; lines: mc.MotdSpan[][] }) {
+    const t = useGameText("minecraft");
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Preview</span>
+            <span className="text-xs text-muted-foreground">{t("appearance.preview")}</span>
             <div
                 className="overflow-x-auto rounded-md border border-border p-3 font-mono text-sm leading-tight"
                 style={{ backgroundColor: mc.MOTD_BACKGROUND }}
@@ -277,7 +280,7 @@ function MotdPreview({ name, lines }: { name: string; lines: mc.MotdSpan[][] }) 
                 ))}
             </div>
             <span className="text-xs text-muted-foreground">
-                Minecraft draws its own font, so the spacing here is close rather than exact.
+                {t("appearance.minecraftDrawsItsOwnFont")}
             </span>
         </div>
     );
@@ -300,6 +303,7 @@ function IconCard({
     iconSetAt: string | null;
     onSaved: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [preview, setPreview] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
@@ -336,17 +340,16 @@ function IconCard({
                     onSaved();
                 });
             })
-            .catch(() => setError("That file could not be read as an image"));
+            .catch(() => setError(t("appearance.notAnImage")));
     }
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <p className="text-sm font-medium">Icon</p>
+                    <p className="text-sm font-medium">{t("appearance.icon")}</p>
                     <p className="text-xs text-muted-foreground">
-                        Shown beside the server in the multiplayer list. Any image will do - it is scaled to{" "}
-                        {ICON_SIDE}x{ICON_SIDE} for you. The server picks it up on its next restart.
+                        {t("appearance.iconHelp", { size: `${ICON_SIDE}x${ICON_SIDE}` })}
                     </p>
                 </div>
 
@@ -358,7 +361,7 @@ function IconCard({
                         {shown ? (
                             <Image
                                 src={shown}
-                                alt="The server's icon"
+                                alt={t("appearance.theServerSIcon")}
                                 width={ICON_SIDE}
                                 height={ICON_SIDE}
                                 unoptimized
@@ -376,16 +379,16 @@ function IconCard({
                             disabled={pending}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
-                            Choose an image
+                            {t("appearance.chooseAnImage")}
                         </Button>
                         <span className="text-xs text-muted-foreground">
                             {done
-                                ? "Saved. The server shows it from its next restart."
+                                ? t("appearance.savedTheServerShowsIt")
                                 : !iconSetAt
-                                  ? "No icon yet."
+                                  ? t("appearance.noIconYet")
                                   : unreadable
-                                    ? "An icon is set. It cannot be shown while the server is down."
-                                    : "This is the icon it carries. Choosing one replaces it."}
+                                    ? t("appearance.anIconIsSetIt")
+                                    : t("appearance.thisIsTheIconIt")}
                         </span>
                     </div>
                 </div>

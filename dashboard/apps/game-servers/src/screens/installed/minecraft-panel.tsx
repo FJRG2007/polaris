@@ -19,6 +19,8 @@
  */
 
 import Link from "next/link";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
@@ -186,8 +188,9 @@ export function MinecraftPanel({
     /** Told what the server is actually doing, so the page has one answer rather
      *  than a header that reports what Polaris intends and a card beneath it
      *  reporting what the container is up to. */
-    onStatus?: (label: string | null) => void;
+    onStatus?: (label: string | null, tone?: "danger") => void;
 }) {
+    const t = useGameText("minecraft");
     const router = useRouter();
     const pathname = usePathname();
     // The screen the URL names. Read from the path rather than held in state, so a
@@ -279,7 +282,7 @@ export function MinecraftPanel({
                 error?: string;
             };
             if (!response.ok || !data.status) {
-                setError(data.error ?? "Could not read the server");
+                setError(data.error ?? t("panel.readFailed"));
                 return;
             }
             setError(null);
@@ -418,8 +421,12 @@ export function MinecraftPanel({
     // The shell draws the badge in the header; only this component polls, so it is
     // the one that knows.
     useEffect(() => {
-        onStatus?.(statusLabel(status, isRunning));
-    }, [onStatus, status, isRunning]);
+        const state = statusState(status, isRunning);
+        onStatus?.(
+            state === null ? null : t(STATE_LABEL[state]),
+            state === "notRunning" ? "danger" : undefined
+        );
+    }, [onStatus, status, isRunning, t]);
 
     // Polaris login, read once for every screen that shows it: the players table
     // carries who has a password, and the overview says when the server runs an
@@ -467,9 +474,9 @@ export function MinecraftPanel({
                     installedAppId={installedAppId}
                     running={isRunning}
                     changed
-                    reason="Polaris login update"
-                    title="Polaris login has an update"
-                    detail="This server runs an older build. It installs the new one when it restarts; passwords are kept."
+                    reason={t("panel.loginUpdateReason")}
+                    title={t("panel.polarisLoginHasAnUpdate")}
+                    detail={t("panel.loginUpdateDetail")}
                     onRestarted={() => void login.reload()}
                 />
             )}
@@ -558,8 +565,7 @@ export function MinecraftPanel({
                 ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            Anti-cheat reads what the game counts for each player, which only Java
-                            keeps.
+                            {t("panel.antiCheatReadsWhatThe")}
                         </CardBody>
                     </Card>
                 ) : (
@@ -617,7 +623,7 @@ export function MinecraftPanel({
                 ) : (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            Usage is measured once the server has deployed.
+                            {t("panel.usageIsMeasuredOnceThe")}
                         </CardBody>
                     </Card>
                 ))}
@@ -806,6 +812,7 @@ function ConnectCard({
     onOpenPlayers: () => void;
     onOpenConsole: () => void;
 }) {
+    const t = useGameText("minecraft");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState<string | null>(null);
     const [fixing, setFixing] = useState(false);
@@ -829,10 +836,7 @@ function ConnectCard({
         const result = await resetServerConfigAction(installedAppId);
         setFixing(false);
         setFixed(
-            result.error ??
-                (result.moved
-                    ? "The old settings were moved beside the world and the server is starting."
-                    : "There was nothing left to move. The server is starting.")
+            result.error ?? (result.moved ? t("panel.settingsMoved") : t("panel.nothingToMove"))
         );
     }
 
@@ -840,26 +844,28 @@ function ConnectCard({
         setSaving(true);
         const result = await saveWorldAction(installedAppId);
         setSaving(false);
-        setSaved(result.error ?? "World saved");
+        setSaved(result.error ?? t("panel.worldSaved"));
     }
 
     return (
         <Card>
             <CardBody className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Server address</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("panel.serverAddress")}
+                    </span>
                     {address ? (
                         <div className="flex items-center gap-2">
                             <code className="truncate font-mono text-lg" title={address}>
                                 {address}
                             </code>
-                            <CopyButton value={address} label="Copy the server address" />
+                            <CopyButton value={address} label={t("panel.copyTheServerAddress")} />
                         </div>
                     ) : !heard ? (
                         <Skeleton className="h-7 w-48" />
                     ) : (
                         <span className="text-sm text-muted-foreground">
-                            Not published yet - the address appears once the server has deployed.
+                            {t("panel.notPublishedYetTheAddress")}
                         </span>
                     )}
                     <span className="text-xs text-muted-foreground">
@@ -876,9 +882,9 @@ function ConnectCard({
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                title="Browse this server's files in Drive"
+                                title={t("panel.browseThisServerSFiles")}
                             >
-                                <FolderOpen className="size-4" /> Files
+                                <FolderOpen className="size-4" /> {t("panel.files")}
                             </Button>
                         </Link>
                     )}
@@ -888,14 +894,14 @@ function ConnectCard({
                             variant="secondary"
                             onClick={() => void saveWorld()}
                             disabled={saving || !heard || !(status?.answering ?? false)}
-                            title="Write the world to disk now"
+                            title={t("panel.writeTheWorldToDisk")}
                         >
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
                                 <Save className="size-4" />
                             )}
-                            Save world
+                            {t("panel.saveWorld")}
                         </Button>
                     )}
                 </div>
@@ -911,11 +917,10 @@ function ConnectCard({
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                         <div className="flex flex-col items-start gap-1 text-xs">
                             <p className="font-medium text-foreground">
-                                This server keeps failing to start
+                                {t("panel.thisServerKeepsFailingTo")}
                             </p>
                             <p className="text-muted-foreground">
-                                It restarted {status.crashLoop.restarts} times without starting, so
-                                it has been stopped.
+                                {t("panel.crashLoopDetail", { count: status.crashLoop.restarts })}
                             </p>
                             {status.crashLoop.cause && (
                                 <p className="font-mono text-muted-foreground">
@@ -937,7 +942,7 @@ function ConnectCard({
                                         className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60"
                                     >
                                         {fixing && <Loader2 className="size-3 animate-spin" />}
-                                        Reset the settings and start it
+                                        {t("panel.resetTheSettingsAndStart")}
                                     </button>
                                 )}
                                 <button
@@ -945,7 +950,7 @@ function ConnectCard({
                                     onClick={onOpenConsole}
                                     className="text-primary hover:underline"
                                 >
-                                    Read the console
+                                    {t("panel.readTheConsole")}
                                 </button>
                             </div>
                             {fixed && <p className="text-muted-foreground">{fixed}</p>}
@@ -961,19 +966,20 @@ function ConnectCard({
                     <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                         <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div className="flex flex-col items-start gap-1 text-xs">
-                            <p className="font-medium text-foreground">Nobody can join yet</p>
+                            <p className="font-medium text-foreground">
+                                {t("panel.nobodyCanJoinYet")}
+                            </p>
                             <p className="text-muted-foreground">
-                                No player is registered, so the server refuses everyone - including
-                                you. Add your{" "}
-                                {access.edition === "bedrock" ? "gamertag" : "Minecraft username"}{" "}
-                                and the address you play from, then connect on the address above.
+                                {access.edition === "bedrock"
+                                    ? t("panel.closedBedrock")
+                                    : t("panel.closedJava")}
                             </p>
                             <button
                                 type="button"
                                 onClick={onOpenPlayers}
                                 className="text-primary hover:underline"
                             >
-                                Add yourself in Players
+                                {t("panel.addYourselfInPlayers")}
                             </button>
                         </div>
                     </div>
@@ -1000,7 +1006,7 @@ function ConnectCard({
                                     href="/admin/domains#game-ports"
                                     className="w-fit text-primary hover:underline"
                                 >
-                                    Open the router walkthrough
+                                    {t("panel.openTheRouterWalkthrough")}
                                 </Link>
                             )}
                         </div>
@@ -1048,27 +1054,42 @@ function withPresence(
  * desired state while the card under it read Starting off a container that had
  * been dead for an hour. One function decides now, and the header is told.
  */
-function statusLabel(status: MinecraftStatus | null, running: boolean): string | null {
+type ServerState = "crashLoop" | "stopped" | "notRunning" | "online" | "starting";
+
+/** Each state in one word, for the page header. */
+const STATE_LABEL: Readonly<Record<ServerState, GameKey<"minecraft">>> = {
+    crashLoop: "panel.crashLoop",
+    stopped: "panel.stopped",
+    notRunning: "panel.notRunning",
+    online: "panel.online",
+    starting: "panel.starting"
+};
+
+function statusState(status: MinecraftStatus | null, running: boolean): ServerState | null {
     if (status === null) return null;
-    // Before either of the two words below, both of which a looping container is
+    // Before either of the two states below, both of which a looping container is
     // momentarily entitled to and neither of which is the useful one.
-    if (status.crashLoop) return "Crash loop";
-    if (!running || !status.running) return "Stopped";
-    if (status.containerRunning === false) return "Not running";
-    return status.answering ? "Online" : "Starting";
+    if (status.crashLoop) return "crashLoop";
+    if (!running || !status.running) return "stopped";
+    if (status.containerRunning === false) return "notRunning";
+    return status.answering ? "online" : "starting";
 }
 
 function StatusBadge({ status, running }: { status: MinecraftStatus | null; running: boolean }) {
-    const label = statusLabel(status, running);
-    if (label === null) return <Skeleton className="h-6 w-20" />;
-    if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
-    if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting")
-        return <Badge className="border-warning-edge text-warning">Starting</Badge>;
-    if (label === "Stopped") return <Badge>Stopped</Badge>;
+    const t = useGameText("minecraft");
+    const state = statusState(status, running);
+    if (state === null) return <Skeleton className="h-6 w-20" />;
+    if (state === "crashLoop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
+    if (state === "notRunning") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
+    if (state === "starting")
+        return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
+    if (state === "stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return (
         <Badge className="border-success-edge text-success">
-            {status?.players.online} / {status?.players.max} online
+            {t("panel.playersOnline", {
+                online: status?.players.online ?? 0,
+                max: status?.players.max ?? 0
+            })}
         </Badge>
     );
 }
@@ -1103,6 +1124,7 @@ function OverviewTab({
     /** Whether the poll has answered on this visit: a kept reading only paints. */
     heard: boolean;
 }) {
+    const t = useGameText("minecraft");
     const shown = useMemo(
         () =>
             settings.filter((setting) =>
@@ -1119,14 +1141,14 @@ function OverviewTab({
               title: map.name,
               text: map.setup,
               docs: map.source,
-              docsLabel: "Where this map came from"
+              docsLabel: t("panel.mapSource")
           }
         : blueprint?.setup
           ? {
-                title: `${blueprint.name}: what is left to do`,
+                title: t("panel.setupLeft", { name: blueprint.name }),
                 text: blueprint.setup,
                 docs: blueprint.docs,
-                docsLabel: "The plugin's own instructions"
+                docsLabel: t("panel.pluginDocs")
             }
           : null;
 
@@ -1144,7 +1166,10 @@ function OverviewTab({
                         <p className="text-sm font-medium">{note.title}</p>
                         {map && (
                             <p className="text-sm text-muted-foreground">
-                                Built by {map.author}, for Minecraft {map.minecraft.version}.
+                                {t("panel.mapBuiltBy", {
+                                    author: map.author,
+                                    version: map.minecraft.version
+                                })}
                             </p>
                         )}
                         {note.text && <p className="text-sm text-muted-foreground">{note.text}</p>}
@@ -1163,16 +1188,16 @@ function OverviewTab({
             )}
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm font-medium">Playing now</p>
+                    <p className="text-sm font-medium">{t("panel.playingNow")}</p>
                     {status === null ? (
                         <Skeleton className="h-8 w-full" />
                     ) : !status.answering ? (
                         <p className="text-sm text-muted-foreground">
-                            {status.message ?? "The server is not answering."}
+                            {status.message ?? t("panel.theServerIsNotAnswering")}
                         </p>
                     ) : status.players.players.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            Nobody is playing right now.
+                            {t("panel.nobodyIsPlayingRightNow")}
                         </p>
                     ) : (
                         <div className="flex flex-wrap gap-1">
@@ -1182,7 +1207,7 @@ function OverviewTab({
                                     type="button"
                                     disabled={!heard}
                                     onClick={onOpenPlayers}
-                                    title={`Manage ${player}`}
+                                    title={t("panel.manageNamed", { name: player })}
                                     className="rounded-md border border-border px-2 py-1 text-sm transition-colors hover:border-primary/50"
                                 >
                                     {player}
@@ -1195,17 +1220,17 @@ function OverviewTab({
 
             <Card>
                 <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">Machine</p>
+                    <p className="text-sm font-medium">{t("panel.machine")}</p>
                     {status === null ? (
                         <Skeleton className="h-10 w-full" />
                     ) : status.cpuPercent === null && status.memUsedBytes === null ? (
                         <p className="text-sm text-muted-foreground">
-                            Usage is measured on servers Polaris runs itself.
+                            {t("panel.usageIsMeasuredOnServers")}
                         </p>
                     ) : (
                         <dl className="flex flex-col gap-1 text-sm">
                             <div className="flex items-baseline justify-between gap-3">
-                                <dt className="text-muted-foreground">Processor</dt>
+                                <dt className="text-muted-foreground">{t("panel.processor")}</dt>
                                 <dd>
                                     {status.cpuPercent === null
                                         ? "-"
@@ -1213,7 +1238,7 @@ function OverviewTab({
                                 </dd>
                             </div>
                             <div className="flex items-baseline justify-between gap-3">
-                                <dt className="text-muted-foreground">Memory</dt>
+                                <dt className="text-muted-foreground">{t("panel.memory")}</dt>
                                 <dd>
                                     {status.memUsedBytes === null
                                         ? "-"
@@ -1227,7 +1252,7 @@ function OverviewTab({
 
             <Card>
                 <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">World</p>
+                    <p className="text-sm font-medium">{t("panel.world")}</p>
                     <dl className="flex flex-col gap-1 text-sm">
                         {shown.map((setting) => {
                             // A description is the long one here, and clipping it

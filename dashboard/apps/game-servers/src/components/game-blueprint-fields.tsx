@@ -22,6 +22,8 @@
  */
 
 import { ChevronDown, Search } from "lucide-react";
+import type { GameKey } from "../../messages";
+import { useGameText } from "../screens/game-text";
 import { hostUi } from "@polaris/app-host/client";
 import * as world from "../lib/minecraft/world";
 import { useEffect, useMemo, useState } from "react";
@@ -93,18 +95,26 @@ export const LATEST = "LATEST";
 const JAVA_CHANNELS = [
     {
         value: "SNAPSHOT",
-        label: "Snapshot - the newest, unfinished",
-        detail: "Mojang's weekly builds. Almost nothing has a plugin or mod built for one."
+        label: "blueprint.channels.snapshot",
+        detail: "blueprint.channels.snapshotDetail"
     }
-] as const;
+] as const satisfies readonly {
+    value: string;
+    label: GameKey<"games">;
+    detail: GameKey<"games">;
+}[];
 
 const BEDROCK_CHANNELS = [
     {
         value: "PREVIEW",
-        label: "Preview - the newest, unfinished",
-        detail: "Mojang's preview builds. Only players on a preview client can join."
+        label: "blueprint.channels.preview",
+        detail: "blueprint.channels.previewDetail"
     }
-] as const;
+] as const satisfies readonly {
+    value: string;
+    label: GameKey<"games">;
+    detail: GameKey<"games">;
+}[];
 
 /** The value both dialogs open on, before a blueprint has been chosen. */
 export const DEFAULT_SHAPE: BlueprintShape = {
@@ -133,6 +143,7 @@ export function BlueprintFields({
     onChange: (next: BlueprintShape) => void;
     ready?: boolean;
 }) {
+    const t = useGameText("games");
     const [advanced, setAdvanced] = useState(false);
     /** Null until the releases are known, which is a wait worth showing rather
      *  than a list that silently starts as one entry and grows. */
@@ -227,7 +238,7 @@ export function BlueprintFields({
     return (
         <>
             <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Blueprint</span>
+                <span className="text-sm font-medium">{t("blueprint.blueprint")}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {blueprints.map((entry) => (
                         <Choice
@@ -263,17 +274,20 @@ export function BlueprintFields({
                 </div>
                 <p className="text-xs text-muted-foreground">
                     {pinned ? (
-                        `${map?.name} plays on Minecraft ${pinned}, so the server is built on it.`
+                        t("blueprint.mapPins", { name: map?.name ?? "", version: pinned })
                     ) : offered === null ? (
                         <span className="inline-block align-middle">
                             <Skeleton className="h-3 w-56" />
                         </span>
                     ) : running === null ? (
-                        "The release is chosen when the server starts."
+                        t("blueprint.theReleaseIsChosenWhen")
                     ) : offered.pinned && isLatest ? (
-                        `${blueprint?.name} runs on Minecraft ${running}, so the server is built on it.`
+                        t("blueprint.blueprintPins", {
+                            name: blueprint?.name ?? "",
+                            version: running ?? ""
+                        })
                     ) : (
-                        `Minecraft ${running}.`
+                        t("blueprint.runsOn", { version: running ?? "" })
                     )}
                     {/* What is left to do is the map's when there is one: it is
                         the thing that decides, and the blueprint's note is about
@@ -285,7 +299,7 @@ export function BlueprintFields({
 
             {maps.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">Map</span>
+                    <span className="text-sm font-medium">{t("blueprint.map")}</span>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {maps.map((entry) => (
                             <Choice
@@ -299,24 +313,35 @@ export function BlueprintFields({
                                 onSelect={() => set({ mapId: entry.id, version: LATEST, seed: "" })}
                                 title={entry.name}
                                 detail={entry.summary}
-                                note={`${entry.author} - ${entry.players.min === entry.players.max ? entry.players.max : `${entry.players.min} to ${entry.players.max}`} players`}
+                                note={
+                                    entry.players.min === entry.players.max
+                                        ? t("blueprint.mapNote", {
+                                              author: entry.author,
+                                              count: entry.players.max
+                                          })
+                                        : t("blueprint.mapNoteRange", {
+                                              author: entry.author,
+                                              min: entry.players.min,
+                                              max: entry.players.max
+                                          })
+                                }
                             />
                         ))}
                         <Choice
                             selected={value.mapId.length === 0}
                             onSelect={() => set({ mapId: "", version: LATEST })}
-                            title="Generate a world"
+                            title={t("blueprint.generateAWorld")}
                             detail={
                                 blueprint?.projects.length
-                                    ? "A new world for the plugin to run its game in."
-                                    : "A new world and nothing built in it."
+                                    ? t("blueprint.newWorldForPlugin")
+                                    : t("blueprint.newWorldEmpty")
                             }
                         />
                     </div>
                     <p className="text-xs text-muted-foreground">
                         {map
-                            ? `Downloaded onto the server while it is being created. Built by ${map.author}.`
-                            : "The server generates its own world on its first start."}
+                            ? t("blueprint.mapDownloaded", { author: map.author })
+                            : t("blueprint.theServerGeneratesItsOwn")}
                     </p>
                 </div>
             )}
@@ -331,7 +356,7 @@ export function BlueprintFields({
                     <ChevronDown
                         className={cn("size-4 transition-transform", advanced && "rotate-180")}
                     />
-                    Advanced
+                    {t("blueprint.advanced")}
                 </button>
 
                 {advanced && (
@@ -346,7 +371,9 @@ export function BlueprintFields({
                                 />
                             )}
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Minecraft version</span>
+                                <span className="font-medium">
+                                    {t("blueprint.minecraftVersion")}
+                                </span>
                                 {pinned ? (
                                     <Select
                                         value={pinned}
@@ -369,12 +396,14 @@ export function BlueprintFields({
                                             {
                                                 value: LATEST,
                                                 label: offered.latest
-                                                    ? `Latest (${offered.latest})`
-                                                    : "Latest"
+                                                    ? t("blueprint.latestIs", {
+                                                          version: offered.latest
+                                                      })
+                                                    : t("blueprint.latest")
                                             },
                                             ...channels.map((entry) => ({
                                                 value: entry.value,
-                                                label: entry.label
+                                                label: t(entry.label)
                                             })),
                                             ...offered.versions.map((entry) => ({
                                                 value: entry,
@@ -390,14 +419,17 @@ export function BlueprintFields({
                                     )}
                                 >
                                     {pinned
-                                        ? `${map?.name} was built for this release and its game does not run on later ones.`
+                                        ? t("blueprint.mapOnlyThis", { name: map?.name ?? "" })
                                         : channel
-                                          ? channel.detail
+                                          ? t(channel.detail)
                                           : unsupported
-                                            ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
+                                            ? t("blueprint.nothingBuiltFor", {
+                                                  name: blueprint?.name ?? "",
+                                                  version: value.version.trim()
+                                              })
                                             : offered?.pinned
-                                              ? "Only the releases this blueprint's plugins have a build for."
-                                              : "Players have to be on the same release to join."}
+                                              ? t("blueprint.onlyTheReleasesThisBlueprint")
+                                              : t("blueprint.playersHaveToBeOn")}
                                 </span>
                             </label>
                         </div>
@@ -407,11 +439,11 @@ export function BlueprintFields({
                         {!map && (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">World seed</span>
+                                    <span className="font-medium">{t("blueprint.worldSeed")}</span>
                                     <Input
                                         value={value.seed}
                                         onChange={(event) => set({ seed: event.target.value })}
-                                        placeholder="Leave blank for a random world"
+                                        placeholder={t("blueprint.leaveBlankForARandom")}
                                     />
                                     <span
                                         className={cn(
@@ -419,13 +451,15 @@ export function BlueprintFields({
                                             seedError ? "text-danger" : "text-muted-foreground"
                                         )}
                                     >
-                                        {seedError ??
-                                            "A number or any words. The same seed always generates the same map."}
+                                        {(seedError && t(seedError)) ??
+                                            t("blueprint.aNumberOrAnyWords")}
                                     </span>
                                 </label>
                                 {edition === "java" && (
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">World type</span>
+                                        <span className="font-medium">
+                                            {t("blueprint.worldType")}
+                                        </span>
                                         <Select
                                             value={value.levelType}
                                             onValueChange={(levelType) => set({ levelType })}
@@ -448,7 +482,7 @@ export function BlueprintFields({
 
                         {!map && edition === "java" && world.usesBiome(value.levelType) && (
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Biome</span>
+                                <span className="font-medium">{t("blueprint.biome")}</span>
                                 <Select
                                     value={value.biome}
                                     onValueChange={(biome) => set({ biome })}
@@ -458,8 +492,7 @@ export function BlueprintFields({
                                     }))}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    The whole overworld is this one biome. The Nether and the End
-                                    are unchanged.
+                                    {t("blueprint.theWholeOverworldIsThis")}
                                 </span>
                             </label>
                         )}
@@ -472,25 +505,22 @@ export function BlueprintFields({
 
 /** Whether what is in this shape can be submitted at all. The same rule the
  *  schema applies, so a refusal lands on the field rather than on a container. */
-export function shapeError(shape: BlueprintShape): string | null {
+export function shapeError(shape: BlueprintShape): GameKey<"games"> | null {
     if (shape.seed.trim().length > 0 && !world.isSeed(shape.seed.trim()))
-        return "A seed is up to 64 characters of ordinary text";
+        return "blueprint.errors.seed";
     return sourceError(shape.software, shape.source);
 }
 
 /** What is wrong with the value the chosen software asks for, or null. Null for
  *  the software that asks for nothing, whatever is left in the field. */
-export function sourceError(software: string, source: string): string | null {
+export function sourceError(software: string, source: string): GameKey<"games"> | null {
     const asks = findSoftware(software)?.asks;
     if (!asks) return null;
     const value = source.trim();
     if (value.length === 0)
-        return asks === "modpack"
-            ? "Name the modpack to install"
-            : "Give the URL of the server jar";
-    if (asks === "modpack" && !isModpackReference(value))
-        return "That is a modpack short name, or the link to its page";
-    if (asks === "jar" && !isServerJarUrl(value)) return "That is an https link ending in .jar";
+        return asks === "modpack" ? "blueprint.errors.nameModpack" : "blueprint.errors.giveJarUrl";
+    if (asks === "modpack" && !isModpackReference(value)) return "blueprint.errors.notModpack";
+    if (asks === "jar" && !isServerJarUrl(value)) return "blueprint.errors.notJarUrl";
     return null;
 }
 
@@ -520,6 +550,7 @@ function SoftwarePicker({
      *  thing, and choosing another is a server that boots without them. */
     pinnedBy: string | null;
 }) {
+    const t = useGameText("games");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const chosen = findSoftware(value);
@@ -537,14 +568,14 @@ function SoftwarePicker({
     return (
         <div className="flex flex-col gap-2 text-sm">
             <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">Server software</span>
+                <span className="font-medium">{t("blueprint.serverSoftware")}</span>
                 {!pinnedBy && (
                     <button
                         type="button"
                         onClick={() => setOpen((shown) => !shown)}
                         className="text-xs text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {open ? "Done" : "Change"}
+                        {open ? t("blueprint.done") : t("blueprint.change")}
                     </button>
                 )}
             </div>
@@ -553,8 +584,8 @@ function SoftwarePicker({
                 <p className="text-sm font-medium">{chosen?.name ?? value}</p>
                 <p className="text-xs text-muted-foreground">
                     {pinnedBy
-                        ? `${pinnedBy} loads its plugins into this, so it is what the server runs.`
-                        : (chosen?.summary ?? "Installed exactly as it is written here.")}
+                        ? t("blueprint.pinnedBy", { name: pinnedBy })
+                        : (chosen?.summary ?? t("blueprint.installedExactlyAsItIs"))}
                 </p>
                 {chosen?.caveat && !pinnedBy && (
                     <p className="mt-1 text-xs text-warning">{chosen.caveat}</p>
@@ -564,24 +595,26 @@ function SoftwarePicker({
             {chosen?.asks && !pinnedBy && (
                 <label className="flex flex-col gap-1">
                     <span className="font-medium">
-                        {chosen.asks === "modpack" ? "Modpack" : "Server jar"}
+                        {chosen.asks === "modpack"
+                            ? t("blueprint.modpack")
+                            : t("blueprint.serverJar")}
                     </span>
                     <Input
                         value={source}
                         onChange={(event) => onChange(value, event.target.value)}
                         placeholder={
                             chosen.asks === "modpack"
-                                ? "cobblemon-fabric, or the link to its page"
+                                ? t("blueprint.cobblemonFabricOrTheLink")
                                 : "https://example.com/server.jar"
                         }
                     />
                     <span
                         className={cn("text-xs", wrong ? "text-danger" : "text-muted-foreground")}
                     >
-                        {wrong ??
+                        {(wrong && t(wrong)) ??
                             (chosen.asks === "modpack"
-                                ? "The pack brings its own mod loader and its own mods."
-                                : "Fetched once, the first time the server starts.")}
+                                ? t("blueprint.thePackBringsItsOwn")
+                                : t("blueprint.fetchedOnceTheFirstTime"))}
                     </span>
                 </label>
             )}
@@ -593,7 +626,7 @@ function SoftwarePicker({
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search software"
+                            placeholder={t("blueprint.searchSoftware")}
                             className="pl-8"
                         />
                     </div>
@@ -630,8 +663,7 @@ function SoftwarePicker({
                         ))}
                         {shelves.length === 0 && (
                             <p className="text-xs text-muted-foreground">
-                                Nothing here is called that. Anything this list is missing can be
-                                run as a custom server jar.
+                                {t("blueprint.nothingHereIsCalledThat")}
                             </p>
                         )}
                     </div>

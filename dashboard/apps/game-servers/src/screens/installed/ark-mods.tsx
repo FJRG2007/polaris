@@ -107,7 +107,7 @@ export function ArkMods({
             setFresh(true);
         } else {
             if (!freshRef.current) setMods(null);
-            setError(result.error ?? "The mods could not be read");
+            setError(result.error ?? t("mods.readFailed"));
         }
     }, [installedAppId]);
 
@@ -126,7 +126,7 @@ export function ArkMods({
         const result = await actions.setArkModsAction(installedAppId, [...ids]);
         setBusy(false);
         if (result.error || !result.mods) {
-            setError(result.error ?? "That could not be saved");
+            setError(result.error ?? t("mods.saveFailed"));
             return;
         }
         setMods(result.mods);
@@ -139,7 +139,7 @@ export function ArkMods({
         const result = await actions.setArkMapModAction(installedAppId, id);
         setBusy(false);
         if (result.error || !result.mods) {
-            setError(result.error ?? "That could not be saved");
+            setError(result.error ?? t("mods.saveFailed"));
             return;
         }
         setMods(result.mods);
@@ -247,7 +247,9 @@ export function ArkMods({
 
             <div className="flex flex-col gap-1">
                 <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Mods{ids.length > 0 ? ` - ${ids.length} of ${MAX_MODS}` : ""}
+                    {ids.length > 0
+                        ? t("mods.headingCount", { count: ids.length, max: MAX_MODS })
+                        : t("mods.heading")}
                 </p>
                 <Card>
                     <CardBody className="py-0">
@@ -402,7 +404,9 @@ function ModShelves({
                                             {[
                                                 size(item?.sizeBytes ?? null),
                                                 item?.subscriptions
-                                                    ? `${item.subscriptions.toLocaleString()} subscribers`
+                                                    ? t("mods.subscribers", {
+                                                          count: item.subscriptions
+                                                      })
                                                     : ""
                                             ]
                                                 .filter(Boolean)
@@ -414,7 +418,9 @@ function ModShelves({
                                         target="_blank"
                                         rel="noreferrer noopener"
                                         title={t("mods.openItOnSteam")}
-                                        aria-label={`Open ${item?.title ?? suggestion.name} on Steam`}
+                                        aria-label={t("mods.openNamed", {
+                                            name: item?.title ?? suggestion.name
+                                        })}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <ExternalLink className="size-4" />
@@ -478,8 +484,7 @@ function AddMod({
         if (/^\d{6,12}$/.test(text) || text.includes("id=")) {
             const answer = await actions.lookUpArkModAction(installedAppId, text);
             setLooking(false);
-            if (answer.error || !answer.item)
-                setError(answer.error ?? "Steam does not know that id");
+            if (answer.error || !answer.item) setError(answer.error ?? t("mods.unknownId"));
             else setFound(answer.item);
             return;
         }
@@ -617,7 +622,7 @@ function Candidate({
                     {[
                         size(item.sizeBytes),
                         item.subscriptions
-                            ? `${item.subscriptions.toLocaleString()} subscribers`
+                            ? t("mods.subscribers", { count: item.subscriptions })
                             : ""
                     ]
                         .filter(Boolean)
@@ -711,8 +716,12 @@ function ModRow({
                 <p className="truncate text-xs text-muted-foreground">
                     {[
                         size(item?.sizeBytes ?? null),
-                        item?.updatedAt ? `updated ${new Date(item.updatedAt).getFullYear()}` : "",
-                        item ? "" : "Steam could not be asked about this one"
+                        item?.updatedAt
+                            ? t("mods.updated", {
+                                  year: String(new Date(item.updatedAt).getFullYear())
+                              })
+                            : "",
+                        item ? "" : t("mods.steamUnasked")
                     ]
                         .filter(Boolean)
                         .join(" - ")}
@@ -722,9 +731,9 @@ function ModRow({
                 {item?.gone && <Badge variant="danger">{t("mods.takenDown")}</Badge>}
                 {item && !item.forArk && <Badge variant="warning">{t("mods.notAnArkMod")}</Badge>}
                 {!knowsDisk ? (
-                    <Badge title={t("mods.theServerIsNotRunning")}>unknown</Badge>
+                    <Badge title={t("mods.theServerIsNotRunning")}>{t("mods.unknown")}</Badge>
                 ) : installed ? (
-                    <Badge variant="success">installed</Badge>
+                    <Badge variant="success">{t("mods.installed")}</Badge>
                 ) : (
                     <Badge variant="warning">{t("mods.installsAtTheNextStart")}</Badge>
                 )}
@@ -733,7 +742,7 @@ function ModRow({
                     target="_blank"
                     rel="noreferrer noopener"
                     title={t("mods.openItOnSteam")}
-                    aria-label={`Open ${item?.title ?? id} on Steam`}
+                    aria-label={t("mods.openNamed", { name: item?.title ?? id })}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <ExternalLink className="size-4" />
@@ -743,7 +752,7 @@ function ModRow({
                         size="icon"
                         variant="ghost"
                         disabled={busy}
-                        aria-label={`Load ${item?.title ?? id} earlier`}
+                        aria-label={t("mods.earlierNamed", { name: item?.title ?? id })}
                         title={t("mods.loadItEarlier")}
                         onClick={onUp}
                     >
@@ -755,7 +764,7 @@ function ModRow({
                         size="icon"
                         variant="ghost"
                         disabled={busy}
-                        aria-label={`Load ${item?.title ?? id} later`}
+                        aria-label={t("mods.laterNamed", { name: item?.title ?? id })}
                         title={t("mods.loadItLater")}
                         onClick={onDown}
                     >
@@ -768,7 +777,7 @@ function ModRow({
                         variant="ghost"
                         disabled={busy}
                         className="text-danger hover:text-danger"
-                        aria-label={`Remove ${item?.title ?? id}`}
+                        aria-label={t("mods.removeNamed", { name: item?.title ?? id })}
                         title={t("mods.removeIt")}
                         onClick={onRemove}
                     >

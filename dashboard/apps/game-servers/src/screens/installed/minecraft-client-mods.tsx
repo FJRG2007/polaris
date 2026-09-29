@@ -18,6 +18,7 @@
  */
 
 import { CopyButton } from "@polaris/ui";
+import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "../../lib/minecraft/modrinth";
@@ -47,11 +48,12 @@ function packKey(subject: string, player: readonly string[], server: readonly st
     return `client-pack:${subject}:${player.join(",")}|${server.join(",")}`;
 }
 
-/** What each command is for, in the order somebody scans for their own machine. */
+/** What each command is for, in the order somebody scans for their own machine.
+ *  The names are the systems' own, the same in every language. */
 const SYSTEMS = [
-    { key: "windows", label: "Windows" },
-    { key: "mac", label: "macOS" },
-    { key: "linux", label: "Linux" }
+    { key: "windows", label: "Windows" }, // i18n-ignore: a product name
+    { key: "mac", label: "macOS" }, // i18n-ignore: a product name
+    { key: "linux", label: "Linux" } // i18n-ignore: a product name
 ] as const;
 
 export function MinecraftClientMods({
@@ -72,6 +74,7 @@ export function MinecraftClientMods({
     serverEntries: readonly string[];
     packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
 }) {
+    const t = useGameText("minecraft");
     const [list, setList] = useState<string[]>([...entries]);
     const [rows, setRows] = useState<modrinth.InstalledProject[] | null>(null);
     const [query, setQuery] = useState("");
@@ -262,7 +265,7 @@ export function MinecraftClientMods({
             .then(async () => {
                 if (mine !== epoch.current) return;
                 const result = await updateClientModsAction(installedAppId, next).catch(() => ({
-                    error: "Could not save the list"
+                    error: t("clientMods.couldNotSaveTheList")
                 }));
                 if (result.error) {
                     epoch.current += 1;
@@ -284,16 +287,17 @@ export function MinecraftClientMods({
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                        <h3 className="text-sm font-medium">What the players install</h3>
+                        <h3 className="text-sm font-medium">
+                            {t("clientMods.whatThePlayersInstall")}
+                        </h3>
                         <p className="text-xs text-muted-foreground">
-                            Everything a player needs in their own game to join: the server&apos;s
-                            mods, and the ones that only run in the game.
+                            {t("clientMods.everythingAPlayerNeedsIn")}
                         </p>
                     </div>
                     {saving > 0 && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Loader2 className="size-3.5 animate-spin" />
-                            Saving
+                            {t("clientMods.saving")}
                         </span>
                     )}
                 </div>
@@ -302,21 +306,20 @@ export function MinecraftClientMods({
 
                 <div className="flex flex-col gap-2">
                     <div>
-                        <h4 className="text-xs font-medium">From the server</h4>
+                        <h4 className="text-xs font-medium">{t("clientMods.fromTheServer")}</h4>
                         <p className="text-xs text-muted-foreground">
-                            These run on both sides. Change them in the server&apos;s list above.
+                            {t("clientMods.theseRunOnBothSides")}
                         </p>
                     </div>
                     {pack === null ? (
                         <Skeleton className="h-12 w-full" />
                     ) : pack === "unread" ? (
                         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            Modrinth could not be reached, so this list is not shown. The command
-                            below still installs all of it.
+                            {t("clientMods.modrinthCouldNotBeReached")}
                         </p>
                     ) : fromServer.length === 0 ? (
                         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            None of the server&apos;s mods run in the game.
+                            {t("clientMods.noneOfTheServerS")}
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-2">
@@ -338,7 +341,9 @@ export function MinecraftClientMods({
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {project.neededBy.length > 0
-                                                ? `Needed by ${project.neededBy.join(", ")}`
+                                                ? t("clientMods.neededBy", {
+                                                      names: project.neededBy.join(", ")
+                                                  })
                                                 : project.description}
                                         </p>
                                     </div>
@@ -347,7 +352,7 @@ export function MinecraftClientMods({
                                         target="_blank"
                                         rel="noreferrer noopener"
                                         className="text-muted-foreground hover:text-foreground"
-                                        title={`Open ${project.title} on Modrinth`}
+                                        title={t("clientMods.openNamed", { name: project.title })}
                                     >
                                         <ExternalLink className="size-3.5" />
                                     </a>
@@ -357,17 +362,17 @@ export function MinecraftClientMods({
                     )}
                     {Array.isArray(pack) && serverOnly.length > 0 && (
                         <p className="text-xs text-muted-foreground">
-                            Only on the server, so players need nothing for them:{" "}
-                            {serverOnly.map((mod) => mod.title).join(", ")}.
+                            {t("clientMods.serverOnly", {
+                                names: serverOnly.map((mod) => mod.title).join(", ")
+                            })}
                         </p>
                     )}
                 </div>
 
                 <div>
-                    <h4 className="text-xs font-medium">Only in the game</h4>
+                    <h4 className="text-xs font-medium">{t("clientMods.onlyInTheGame")}</h4>
                     <p className="text-xs text-muted-foreground">
-                        A minimap, a world map, a HUD. The server never loads these, so nothing here
-                        restarts it.
+                        {t("clientMods.aMinimapAWorldMap")}
                     </p>
                 </div>
 
@@ -375,8 +380,7 @@ export function MinecraftClientMods({
                     <Skeleton className="h-12 w-full" />
                 ) : rows.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                        Nothing yet. What you add here is handed to the players along with the
-                        server&apos;s own mods.
+                        {t("clientMods.nothingYetWhatYouAdd")}
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -398,21 +402,25 @@ export function MinecraftClientMods({
                                     </p>
                                 </div>
                                 {project.fitsVersion === false && version && (
-                                    <Badge variant="warning">No build for {version}</Badge>
+                                    <Badge variant="warning">
+                                        {t("clientMods.noBuildFor", { version })}
+                                    </Badge>
                                 )}
                                 <a
                                     href={`https://modrinth.com/project/${project.slug}`}
                                     target="_blank"
                                     rel="noreferrer noopener"
                                     className="text-muted-foreground hover:text-foreground"
-                                    title={`Open ${project.title} on Modrinth`}
+                                    title={t("clientMods.openNamed", { name: project.title })}
                                 >
                                     <ExternalLink className="size-3.5" />
                                 </a>
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={`Remove ${project.title}`}
+                                    aria-label={t("clientMods.removeNamed", {
+                                        name: project.title
+                                    })}
                                     onClick={() =>
                                         change(list.filter((item) => item !== project.entry))
                                     }
@@ -430,8 +438,8 @@ export function MinecraftClientMods({
                         className="pl-9"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search mods the players install"
-                        aria-label="Search Modrinth for a client mod"
+                        placeholder={t("clientMods.searchModsThePlayersInstall")}
+                        aria-label={t("clientMods.searchModrinthForAClient")}
                     />
                     {searching && (
                         <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -472,7 +480,7 @@ export function MinecraftClientMods({
                                         onClick={() => change([...list, project.slug])}
                                     >
                                         <Plus className="size-4" />
-                                        {added ? "Added" : "Add"}
+                                        {added ? t("clientMods.added") : t("clientMods.add")}
                                     </Button>
                                 </li>
                             );
@@ -483,16 +491,13 @@ export function MinecraftClientMods({
                 {packCommands && (
                     <div className="flex flex-col gap-2 border-t border-border pt-4">
                         <div>
-                            <h3 className="text-sm font-medium">Send this to the players</h3>
+                            <h3 className="text-sm font-medium">
+                                {t("clientMods.sendThisToThePlayers")}
+                            </h3>
                             <p className="text-xs text-muted-foreground">
-                                One line installs{" "}
-                                {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
-                                this server into their game, and running it again is how they
-                                update: it replaces what changed and takes away what came off the
-                                lists. A mod of theirs that is another copy of one here, or that one
-                                here cannot run beside, is moved to a mods-polaris-removed folder;
-                                anything else of theirs is left alone. The link needs no account
-                                here.
+                                {Array.isArray(pack)
+                                    ? t("clientMods.oneLineCount", { count: pack.length })
+                                    : t("clientMods.oneLine")}
                             </p>
                         </div>
                         {SYSTEMS.map((system) => (
@@ -505,14 +510,12 @@ export function MinecraftClientMods({
                                 </code>
                                 <CopyButton
                                     value={packCommands[system.key]}
-                                    label={`the ${system.label} command`}
+                                    label={t("clientMods.commandFor", { system: system.label })}
                                 />
                             </div>
                         ))}
                         <p className="text-xs text-muted-foreground">
-                            A launcher that keeps its instances elsewhere - Prism, MultiMC,
-                            CurseForge - is told where to install by setting POLARIS_MC_DIR to that
-                            instance&apos;s mods folder before running the line.
+                            {t("clientMods.aLauncherThatKeepsIts")}
                         </p>
                     </div>
                 )}

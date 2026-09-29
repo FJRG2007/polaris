@@ -1303,6 +1303,16 @@
         "web/src/lib/address-health.ts",
         "web/src/lib/deploy/leftover-volumes.ts",
         "web/src/lib/integrations/github-permission-notice.ts",
-        "web/src/lib/update-runner.ts"
+        "web/src/lib/update-runner.ts",
+        "game-servers/src/components/game-blueprint-fields.tsx",
+        "game-servers/src/screens/installed/ark-mods.tsx",
+        "game-servers/src/screens/installed/minecraft-access.tsx",
+        "game-servers/src/screens/installed/minecraft-appearance.tsx",
+        "game-servers/src/screens/installed/minecraft-chat-link.tsx",
+        "game-servers/src/screens/installed/minecraft-client-mods.tsx",
+        "game-servers/src/screens/installed/minecraft-join-password.tsx",
+        "game-servers/src/screens/installed/minecraft-panel.tsx",
+        "game-servers/src/screens/installed/minecraft-sidebar.tsx",
+        "game-servers/src/screens/installed/sidebar-line-editor.tsx"
     ]
 }

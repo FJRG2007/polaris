@@ -11,6 +11,8 @@
  */
 
 import { useState } from "react";
+import type { GameKey } from "../../../messages";
+import { useGameText, type GameText } from "../game-text";
 import { FieldNote } from "./minecraft-announce";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { FormattedTextField } from "../../components/formatted-text-field";
@@ -20,37 +22,37 @@ import { WholeNumberInput } from "../../components/whole-number-input";
 import * as side from "../../lib/minecraft/sidebar";
 import type { KnownValues } from "../../lib/minecraft/text-vars";
 
-/** What each effect is called, and what it does, in a few words. */
-export const EFFECT_LABEL: Readonly<
-    Record<side.SidebarEffectKind, { name: string; hint: string }>
-> = {
-    none: { name: "None", hint: "Stays as written" },
-    rainbow: { name: "Rainbow", hint: "Colours running along the line" },
-    wave: { name: "Wave", hint: "Two colours flowing across it" },
-    shine: { name: "Shine", hint: "A glint sweeping over it, its own colours kept" },
-    typewriter: { name: "Typewriter", hint: "Typed out letter by letter" },
-    blink: { name: "Blink", hint: "Dims and lights up again" },
-    scroll: { name: "Scroll", hint: "Slides a longer text through a window" }
-};
+/** What each effect is called, and what it does, in a few words - under
+ *  `lineEditor.effects.<kind>` in the catalogs. */
+function effectName(t: GameText<"minecraft">, kind: side.SidebarEffectKind): string {
+    return t(`lineEditor.effects.${kind}.name`);
+}
 
-const SPEED_LABEL: Readonly<Record<side.SidebarSpeed, string>> = {
-    2000: "Slow",
-    1000: "Normal",
-    500: "Fast"
+function effectHint(t: GameText<"minecraft">, kind: side.SidebarEffectKind): string {
+    return t(`lineEditor.effects.${kind}.hint`);
+}
+
+const SPEED_LABEL: Readonly<Record<side.SidebarSpeed, GameKey<"minecraft">>> = {
+    2000: "lineEditor.speeds.slow",
+    1000: "lineEditor.speeds.normal",
+    500: "lineEditor.speeds.fast"
 };
 
 /** Which of an effect's colours can be chosen, and what each is called. */
-const EFFECT_COLORS: Readonly<Partial<Record<side.SidebarEffectKind, readonly string[]>>> = {
-    wave: ["From", "To"],
-    shine: ["Glint"],
-    blink: ["Dimmed to"]
+const EFFECT_COLORS: Readonly<
+    Partial<Record<side.SidebarEffectKind, readonly GameKey<"minecraft">[]>>
+> = {
+    wave: ["lineEditor.colors.from", "lineEditor.colors.to"],
+    shine: ["lineEditor.colors.glint"],
+    blink: ["lineEditor.colors.dimmedTo"]
 };
 
 /** What a line does beyond its first text, in one line, or null when nothing. */
-export function lineSummary(line: side.SidebarLine): string | null {
+export function lineSummary(t: GameText<"minecraft">, line: side.SidebarLine): string | null {
     const parts: string[] = [];
-    if (line.frames.length > 1) parts.push(`${line.frames.length} texts, ${line.every} s each`);
-    if (line.effect.kind !== "none") parts.push(EFFECT_LABEL[line.effect.kind].name);
+    if (line.frames.length > 1)
+        parts.push(t("lineEditor.texts", { count: line.frames.length, every: line.every }));
+    if (line.effect.kind !== "none") parts.push(effectName(t, line.effect.kind));
     return parts.length > 0 ? parts.join(" · ") : null;
 }
 
@@ -79,8 +81,9 @@ export function SidebarLineEditor({
     /** The server's values already settled, for the counters. */
     known?: KnownValues;
 }) {
+    const t = useGameText("minecraft");
     const [open, setOpen] = useState(false);
-    const summary = lineSummary(line);
+    const summary = lineSummary(t, line);
     const max = side.textMax(line, fits);
     const setFrame = (index: number, value: string) =>
         onChange({
@@ -89,7 +92,7 @@ export function SidebarLineEditor({
         });
     const setEffect = (patch: Partial<side.SidebarLine["effect"]>) =>
         onChange({ ...line, effect: { ...line.effect, ...patch } });
-    const colorNames = EFFECT_COLORS[line.effect.kind] ?? [];
+    const colorNames = (EFFECT_COLORS[line.effect.kind] ?? []).map((key) => t(key));
 
     return (
         <div className="flex min-w-0 flex-col gap-2">
@@ -108,11 +111,11 @@ export function SidebarLineEditor({
                         variant={open || summary ? "secondary" : "ghost"}
                         onClick={() => setOpen((shown) => !shown)}
                         aria-expanded={open}
-                        aria-label={`Animate ${label.toLowerCase()}: take turns between texts, or an effect`}
-                        title="Take turns between texts, or add an effect"
+                        aria-label={t("lineEditor.animateLabel", { line: label.toLowerCase() })}
+                        title={t("lineEditor.takeTurnsBetweenTextsOr")}
                     >
                         <Sparkles className="size-3.5" />
-                        Animate
+                        {t("lineEditor.animate")}
                     </Button>
                 }
                 footnote={
@@ -136,7 +139,7 @@ export function SidebarLineEditor({
                     className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3"
                 >
                     <div className="flex flex-col gap-2">
-                        <span className="text-xs font-medium">Take turns with</span>
+                        <span className="text-xs font-medium">{t("lineEditor.takeTurnsWith")}</span>
                         {line.frames.slice(1).map((frame, offset) => {
                             const index = offset + 1;
                             return (
@@ -147,8 +150,11 @@ export function SidebarLineEditor({
                                             onChange={(value) => setFrame(index, value)}
                                             rows={1}
                                             singleLine
-                                            label={`${label}, text ${index + 1}`}
-                                            placeholder="Leave empty for a gap"
+                                            label={t("lineEditor.textLabel", {
+                                                line: label,
+                                                number: index + 1
+                                            })}
+                                            placeholder={t("lineEditor.leaveEmptyForAGap")}
                                             inserts={inserts}
                                             footnote={
                                                 <FieldNote
@@ -170,8 +176,11 @@ export function SidebarLineEditor({
                                                 frames: line.frames.filter((_, at) => at !== index)
                                             })
                                         }
-                                        aria-label={`Remove text ${index + 1} of ${label.toLowerCase()}`}
-                                        title={`Remove text ${index + 1}`}
+                                        aria-label={t("lineEditor.removeTextOf", {
+                                            number: index + 1,
+                                            line: label.toLowerCase()
+                                        })}
+                                        title={t("lineEditor.removeText", { number: index + 1 })}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>
@@ -190,31 +199,32 @@ export function SidebarLineEditor({
                                     })
                                 }
                             >
-                                <Plus className="size-4" /> Add a text
+                                <Plus className="size-4" /> {t("lineEditor.addAText")}
                             </Button>
                             {line.frames.length > 1 ? (
                                 <label className="flex items-center gap-2 text-xs">
-                                    Each for
+                                    {t("lineEditor.eachFor")}
                                     <WholeNumberInput
                                         min={side.SIDEBAR_EVERY_MIN}
                                         max={side.SIDEBAR_EVERY_MAX}
                                         value={line.every}
                                         onValueChange={(every) => onChange({ ...line, every })}
                                         className="h-8 w-20"
-                                        aria-label={`Seconds each text of ${label.toLowerCase()} shows`}
+                                        aria-label={t("lineEditor.secondsLabel", {
+                                            line: label.toLowerCase()
+                                        })}
                                     />
-                                    seconds
+                                    {t("lineEditor.seconds")}
                                 </label>
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Lines that change every as many seconds change together, so a heading
-                            and the list under it stay matched.
+                            {t("lineEditor.linesThatChangeEveryAs")}
                         </p>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-xs font-medium">Effect</span>
+                        <span className="text-xs font-medium">{t("lineEditor.effect")}</span>
                         <div className="flex flex-wrap items-center gap-2">
                             <Select
                                 value={line.effect.kind}
@@ -232,11 +242,11 @@ export function SidebarLineEditor({
                                 }}
                                 options={side.SIDEBAR_EFFECTS.map((kind) => ({
                                     value: kind,
-                                    label: EFFECT_LABEL[kind].name
+                                    label: effectName(t, kind)
                                 }))}
                                 disabled={disabled}
                                 className="w-40"
-                                aria-label={`Effect on ${label.toLowerCase()}`}
+                                aria-label={t("lineEditor.effectOn", { line: label.toLowerCase() })}
                             />
                             {line.effect.kind !== "none" ? (
                                 <SegmentedControl
@@ -249,27 +259,31 @@ export function SidebarLineEditor({
                                     }}
                                     options={side.SIDEBAR_SPEEDS.map((speed) => ({
                                         value: String(speed),
-                                        label: SPEED_LABEL[speed]
+                                        label: t(SPEED_LABEL[speed])
                                     }))}
-                                    aria-label={`Speed of the effect on ${label.toLowerCase()}`}
+                                    aria-label={t("lineEditor.speedOn", {
+                                        line: label.toLowerCase()
+                                    })}
                                 />
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {EFFECT_LABEL[line.effect.kind].hint}.
+                            {effectHint(t, line.effect.kind)}.
                         </p>
                         {line.effect.kind === "scroll" ? (
                             <label className="flex items-center gap-2 text-xs">
-                                Shows
+                                {t("lineEditor.shows")}
                                 <WholeNumberInput
                                     min={8}
                                     max={fits}
                                     value={line.effect.width}
                                     onValueChange={(width) => setEffect({ width })}
                                     className="h-8 w-20"
-                                    aria-label={`Characters the scrolling ${label.toLowerCase()} shows at once`}
+                                    aria-label={t("lineEditor.widthLabel", {
+                                        line: label.toLowerCase()
+                                    })}
                                 />
-                                characters at a time
+                                {t("lineEditor.charactersAtATime")}
                             </label>
                         ) : null}
                         {colorNames.length > 0 ? (

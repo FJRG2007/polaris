@@ -199,6 +199,20 @@
         "installsAtTheNextStart": "se instala al arrancar",
         "loadItEarlier": "Cargarlo antes",
         "loadItLater": "Cargarlo después",
-        "removeIt": "Quitarlo"
+        "removeIt": "Quitarlo",
+        "readFailed": "No se pudieron leer los mods",
+        "saveFailed": "No se pudo guardar",
+        "heading": "Mods",
+        "headingCount": "Mods - {count} de {max}",
+        "subscribers": "{count, number} suscriptores",
+        "openNamed": "Abrir {name} en Steam",
+        "unknownId": "Steam no conoce ese id",
+        "updated": "actualizado en {year}",
+        "steamUnasked": "No se pudo consultar a Steam sobre este",
+        "unknown": "sin datos",
+        "installed": "instalado",
+        "earlierNamed": "Cargar {name} antes",
+        "laterNamed": "Cargar {name} después",
+        "removeNamed": "Quitar {name}"
     }
 }

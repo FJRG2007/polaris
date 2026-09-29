@@ -147,7 +147,7 @@ export function MinecraftSidebar({
         void readLiveDisplayAction(installedAppId).then((answer) => {
             const fresh = answer.state;
             if (!fresh) {
-                setError(answer.error ?? "The panel could not be read");
+                setError(answer.error ?? t("sidebar.readFailed"));
                 if (!answered.current) {
                     setState(null);
                     setDraft(side.DEFAULT_SIDEBAR);
@@ -201,13 +201,11 @@ export function MinecraftSidebar({
                 sidebar: { ...draft, lines: [...draft.lines] }
             });
             if (result.error || !result.state) {
-                setError(result.error ?? "That could not be saved");
+                setError(result.error ?? t("sidebar.saveFailed"));
                 return;
             }
             load(result.state);
-            setNote(
-                result.state.sidebar.enabled ? "On every screen now." : "Saved. The panel is off."
-            );
+            setNote(result.state.sidebar.enabled ? t("sidebar.savedOn") : t("sidebar.savedOff"));
         });
     }
 
@@ -301,7 +299,9 @@ export function MinecraftSidebar({
                                             type="button"
                                             {...order.handleProps(index, draft.lines.length)}
                                             className="mt-1.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
-                                            aria-label={`Move line ${index + 1}. Drag it, or use the up and down arrow keys`}
+                                            aria-label={t("sidebar.moveLine", {
+                                                number: index + 1
+                                            })}
                                             title={t("sidebar.dragToMoveOrUse")}
                                         >
                                             <GripVertical className="size-4" />
@@ -311,7 +311,7 @@ export function MinecraftSidebar({
                                         <SidebarLineEditor
                                             line={line}
                                             onChange={(value) => setLine(index, value)}
-                                            label={`Line ${index + 1}`}
+                                            label={t("sidebar.lineNumber", { number: index + 1 })}
                                             fits={side.SIDEBAR_LINE_MAX}
                                             problems={problems.lines[index] ?? []}
                                             known={known}
@@ -332,8 +332,8 @@ export function MinecraftSidebar({
                                                     if (pair) setRotating({ ...pair, at: index });
                                                 }}
                                             >
-                                                <Trophy className="size-4" /> Choose the
-                                                leaderboards taking turns here
+                                                <Trophy className="size-4" />{" "}
+                                                {t("sidebar.chooseRotating")}
                                             </Button>
                                         ) : null}
                                     </div>
@@ -347,8 +347,8 @@ export function MinecraftSidebar({
                                                 lines: draft.lines.filter((_, at) => at !== index)
                                             });
                                         }}
-                                        aria-label={`Remove line ${index + 1}`}
-                                        title={`Remove line ${index + 1}`}
+                                        aria-label={t("sidebar.removeLine", { number: index + 1 })}
+                                        title={t("sidebar.removeLine", { number: index + 1 })}
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>
@@ -432,10 +432,7 @@ export function MinecraftSidebar({
                                 </DropdownMenu>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                An empty line is a gap. Drag one under the title to space it from
-                                the lines below. Type {"{"} in a line for any value: players online,
-                                the call, the last death, a leaderboard. Animate makes a line take
-                                turns between texts or move.
+                                {t("sidebar.linesHelp")}
                             </p>
                         </div>
 
@@ -443,8 +440,8 @@ export function MinecraftSidebar({
                             with everything else that chat is used for. */}
                         <p className="text-xs text-muted-foreground">
                             {state.callLinked
-                                ? "{call.count}, {call.members} and {call.max} read the call of the chat this server is linked to. "
-                                : "{call.count}, {call.members} and {call.max} need a chat with a call. "}
+                                ? t("sidebar.callVarsLinked")
+                                : t("sidebar.callVarsUnlinked")}{" "}
                             <a
                                 href={`/apps/installed/${installedAppId}/chat`}
                                 className="font-medium text-foreground underline-offset-2 hover:underline"
@@ -561,7 +558,10 @@ function RotatingDialog({
                 <p className="text-sm text-muted-foreground">{t("sidebar.twoLinesThatShowEach")}</p>
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>
-                        {rotating.ids.length} of {SIDEBAR_BLOCKS.length} chosen
+                        {t("sidebar.chosen", {
+                            count: rotating.ids.length,
+                            total: SIDEBAR_BLOCKS.length
+                        })}
                     </span>
                     <span className="flex gap-1">
                         <Button
@@ -631,7 +631,7 @@ function RotatingDialog({
                         className="h-8 w-20"
                         aria-label={t("sidebar.secondsEachLeaderboardShows")}
                     />
-                    seconds
+                    {t("sidebar.seconds")}
                 </label>
                 {rotating.ids.length < 2 ? (
                     <p className="text-xs text-muted-foreground">{t("sidebar.chooseAtLeastTwo")}</p>

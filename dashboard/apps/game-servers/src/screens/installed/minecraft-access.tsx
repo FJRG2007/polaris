@@ -14,6 +14,8 @@
  */
 
 import { Crown, Loader2, Trash2, UserPlus } from "lucide-react";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
     PERMISSION_META,
@@ -56,14 +58,15 @@ const { mergeUnchanged } = hostUi.structuralMerge;
 const KEPT_ACCESS_MS = 24 * 3_600_000;
 
 /** How long access may last, in the shape somebody actually thinks about it. */
-const DURATIONS: { value: string; label: string; days: number | null }[] = [
-    { value: "forever", label: "No end date", days: null },
-    { value: "1", label: "24 hours", days: 1 },
-    { value: "7", label: "7 days", days: 7 },
-    { value: "30", label: "30 days", days: 30 }
+const DURATIONS: { value: string; label: GameKey<"minecraft">; days: number | null }[] = [
+    { value: "forever", label: "access.durations.forever", days: null },
+    { value: "1", label: "access.durations.day", days: 1 },
+    { value: "7", label: "access.durations.week", days: 7 },
+    { value: "30", label: "access.durations.month", days: 30 }
 ];
 
 export function MinecraftAccess({ installedAppId }: { installedAppId: string }) {
+    const t = useGameText("minecraft");
     // What this tab last read paints first, so the list is there at once on a
     // revisit; the read below replaces what moved.
     const viewKey = `install-access:${installedAppId}`;
@@ -102,15 +105,14 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex flex-col gap-1">
-                        <h2 className="text-sm font-medium">Who can reach this server</h2>
+                        <h2 className="text-sm font-medium">{t("access.whoCanReachThisServer")}</h2>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            Access given here applies to this server only. It does not open anything
-                            else in Polaris.
+                            {t("access.accessGivenHereAppliesTo")}
                         </p>
                     </div>
                     {heard && view?.canShare && (
                         <Button size="sm" onClick={() => setSharing(true)}>
-                            <UserPlus className="size-4" /> Give access
+                            <UserPlus className="size-4" /> {t("access.giveAccess")}
                         </Button>
                     )}
                 </div>
@@ -137,8 +139,7 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                         ))}
                         {view.entries.length === 1 && (
                             <p className="pt-3 text-sm text-muted-foreground">
-                                Nobody else has access. Give somebody access to let them help run
-                                this server.
+                                {t("access.nobodyElseHasAccessGive")}
                             </p>
                         )}
                     </div>
@@ -165,8 +166,8 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                 onOpenChange={(open) => !pending && !open && setRemoving(null)}
                 name={removing?.label ?? ""}
                 kind="access"
-                confirmLabel="Remove"
-                description="They lose this server the next time a page loads. Nothing else about their account changes."
+                confirmLabel={t("access.remove")}
+                description={t("access.theyLoseThisServerThe")}
                 error={removeError}
                 pending={pending}
                 onConfirm={() =>
@@ -205,6 +206,7 @@ function AccessRow({
     pending: boolean;
     onRemove: () => void;
 }) {
+    const t = useGameText("minecraft");
     const display = useDisplayFormat();
     const isOwner = entry.principalType === "owner";
     return (
@@ -215,15 +217,18 @@ function AccessRow({
                     <span className="truncate text-sm" title={entry.label}>
                         {entry.label}
                     </span>
-                    {isOwner && <Badge>owner</Badge>}
-                    {entry.canShare && !isOwner && <Badge>can invite others</Badge>}
+                    {isOwner && <Badge>{t("access.owner")}</Badge>}
+                    {entry.canShare && !isOwner && <Badge>{t("access.canInviteOthers")}</Badge>}
                     {entry.expired && (
-                        <Badge className="border-danger-edge text-danger">ended</Badge>
+                        <Badge className="border-danger-edge text-danger">
+                            {t("access.ended")}
+                        </Badge>
                     )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                    {isOwner ? "Everything on this server" : summarize(entry.actions)}
-                    {entry.expiresAt && ` - until ${display.date(entry.expiresAt)}`}
+                    {isOwner ? t("access.everythingOnThisServer") : summarize(entry.actions)}
+                    {entry.expiresAt &&
+                        ` - ${t("access.until", { date: display.date(entry.expiresAt) })}`}
                 </span>
             </div>
             {entry.grantId && (
@@ -232,8 +237,8 @@ function AccessRow({
                     variant="ghost"
                     disabled={pending}
                     onClick={onRemove}
-                    aria-label={`Remove ${entry.label}'s access`}
-                    title={`Remove ${entry.label}'s access`}
+                    aria-label={t("access.removeNamed", { name: entry.label })}
+                    title={t("access.removeNamed", { name: entry.label })}
                 >
                     <Trash2 className="size-4" />
                 </Button>
@@ -257,6 +262,7 @@ function ShareDialog({
     canInvite: boolean;
     onDone: () => void;
 }) {
+    const t = useGameText("minecraft");
     const presets = RESOURCE_PRESETS.install.filter((preset) =>
         preset.actions.every((action) => grantable.includes(action))
     );
@@ -326,17 +332,13 @@ function ShareDialog({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Give access</DialogTitle>
-                    <DialogDescription>
-                        They get what you tick, on this server. Nothing else in Polaris opens.
-                    </DialogDescription>
+                    <DialogTitle>{t("access.giveAccess")}</DialogTitle>
+                    <DialogDescription>{t("access.theyGetWhatYouTick")}</DialogDescription>
                 </DialogHeader>
 
                 {issued ? (
                     <div className="flex flex-col gap-2">
-                        <p className="text-sm">
-                            Send them this link. It is shown once, and it expires if it is not used.
-                        </p>
+                        <p className="text-sm">{t("access.sendThemThisLinkIt")}</p>
                         <div className="flex items-center gap-2 rounded-md border border-border/60 bg-surface px-3 py-2">
                             <code
                                 className="min-w-0 flex-1 truncate font-mono text-xs"
@@ -344,7 +346,7 @@ function ShareDialog({
                             >
                                 {issued}
                             </code>
-                            <CopyButton value={issued} label="Copy the invite link" />
+                            <CopyButton value={issued} label={t("access.copyTheInviteLink")} />
                         </div>
                         <Button
                             className="self-end"
@@ -353,28 +355,28 @@ function ShareDialog({
                                 reset();
                             }}
                         >
-                            Done
+                            {t("access.done")}
                         </Button>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Email or username</span>
+                            <span className="font-medium">{t("access.emailOrUsername")}</span>
                             <AccountInput
                                 value={identifier}
                                 onValueChange={setIdentifier}
                                 placeholder="ana@example.com"
-                                aria-label="Email or username"
+                                aria-label={t("access.emailOrUsername")}
                             />
                             <span className="text-xs text-muted-foreground">
                                 {canInvite
-                                    ? "If they have no account yet, they get an invite link to make one."
-                                    : "They need a Polaris account already. Ask an administrator to invite them otherwise."}
+                                    ? t("access.ifTheyHaveNoAccount")
+                                    : t("access.theyNeedAPolarisAccount")}
                             </span>
                         </label>
 
                         <div className="flex flex-col gap-2">
-                            <span className="text-sm font-medium">What they may do</span>
+                            <span className="text-sm font-medium">{t("access.whatTheyMayDo")}</span>
                             <div className="flex flex-wrap gap-2">
                                 {presets.map((preset) => (
                                     <Button
@@ -408,23 +410,25 @@ function ShareDialog({
                         </div>
 
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Access ends</span>
+                            <span className="font-medium">{t("access.accessEnds")}</span>
                             <Select
                                 value={duration}
                                 onValueChange={setDuration}
                                 options={DURATIONS.map((entry) => ({
                                     value: entry.value,
-                                    label: entry.label
+                                    label: t(entry.label)
                                 }))}
-                                aria-label="When their access ends"
+                                aria-label={t("access.whenTheirAccessEnds")}
                             />
                         </label>
 
                         <label className="flex items-center justify-between gap-3 text-sm">
                             <span className="flex flex-col">
-                                <span className="font-medium">Let them give access to others</span>
+                                <span className="font-medium">
+                                    {t("access.letThemGiveAccessTo")}
+                                </span>
                                 <span className="text-xs text-muted-foreground">
-                                    They can pass on the same things you gave them, and no more.
+                                    {t("access.theyCanPassOnThe")}
                                 </span>
                             </span>
                             <Switch checked={canShare} onChange={setCanShare} />
@@ -441,7 +445,7 @@ function ShareDialog({
                                     reset();
                                 }}
                             >
-                                Cancel
+                                {t("access.cancel")}
                             </Button>
                             <Button
                                 disabled={
@@ -450,7 +454,7 @@ function ShareDialog({
                                 onClick={submit}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
-                                Give access
+                                {t("access.giveAccess")}
                             </Button>
                         </div>
                     </div>

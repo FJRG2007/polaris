@@ -199,6 +199,20 @@
         "installsAtTheNextStart": "installs at the next start",
         "loadItEarlier": "Load it earlier",
         "loadItLater": "Load it later",
-        "removeIt": "Remove it"
+        "removeIt": "Remove it",
+        "readFailed": "The mods could not be read",
+        "saveFailed": "That could not be saved",
+        "heading": "Mods",
+        "headingCount": "Mods - {count} of {max}",
+        "subscribers": "{count, number} subscribers",
+        "openNamed": "Open {name} on Steam",
+        "unknownId": "Steam does not know that id",
+        "updated": "updated {year}",
+        "steamUnasked": "Steam could not be asked about this one",
+        "unknown": "unknown",
+        "installed": "installed",
+        "earlierNamed": "Load {name} earlier",
+        "laterNamed": "Load {name} later",
+        "removeNamed": "Remove {name}"
     }
 }
