@@ -109,6 +109,28 @@ value they never typed.
   session or be reported as an error. A machine that already has the tool
   signed in needs none of them.
 
+## Every word on screen goes through i18n
+
+Polaris is read in US English and Spanish of Spain, switched live per account.
+`dashboard/docs/i18n.md` is the how; these are the rules that hold for every
+change:
+
+- **No new user-visible text is a literal.** A label, heading, button, hint,
+  placeholder, `aria-label`, toast, dialog, empty/error state, an action's
+  reply, a notification or email, a line sent into a game, and the browser
+  extension's words: all come from the catalogs, in both `en-US` and `es-ES`,
+  in the same change. A file that is added or touched is added to
+  `apps/web/scripts/i18n-migrated.json`, which holds it at zero findings.
+- **A translation takes the room of the English.** Buttons, tabs, menus,
+  headers and badges are sized by their words, and a Spanish label a few
+  characters longer wraps or stretches what fit in English. Write the shorter
+  natural wording; when none fits, give the layout the room (truncate with the
+  full text in `title`) instead of letting it break.
+  `test/i18n/lengths.test.ts` fails on a label over the budget.
+- Text that reaches someone with no request around it - a notification, a job,
+  a game - is translated in that person's language (`getUserLocale`), not the
+  sender's.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
