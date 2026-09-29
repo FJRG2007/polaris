@@ -22,6 +22,16 @@ import type { StepUpProofInput } from "@polaris/core";
 import { useEffect, useId, useRef, useState } from "react";
 import { sendStepUpCodeAction, stepUpOptionsAction } from "@/app/(app)/account/step-up-actions";
 import { codeDigits } from "@/components/code-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+
+const PROOFS = new Set(["totp", "email", "whatsapp", "password"]);
+
+/** How a proof is named, from its id; one this build has no words for keeps the
+ *  label the service gave it. */
+function proofLabel(t: NamespaceTranslator<"components">, choice: StepUpChoice): string {
+    return PROOFS.has(choice.proof) ? t(`stepUp.proofs.${choice.proof}` as NamespaceKey<"components">) : choice.label;
+}
 
 export function StepUpFields({
     open,
@@ -35,6 +45,7 @@ export function StepUpFields({
     /** The completed proof, or null while it is still incomplete. */
     onChange: (proof: StepUpProofInput | null) => void;
 }) {
+    const t = useTranslations("components");
     const fieldId = useId();
     const [choices, setChoices] = useState<StepUpChoice[] | null>(null);
     const [proof, setProof] = useState<StepUpChoice | null>(null);
@@ -55,7 +66,7 @@ export function StepUpFields({
                 setChoices(result.choices);
                 setProof(result.choices[0] ?? null);
             })
-            .catch(() => live && setError("Could not work out how to confirm this."));
+            .catch(() => live && setError(t("stepUp.optionsFailed")));
         return () => {
             live = false;
         };
@@ -84,7 +95,7 @@ export function StepUpFields({
     if (!choices) {
         return (
             <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                <Loader2 className="size-3.5 shrink-0 animate-spin" /> Working out how to confirm this
+                <Loader2 className="size-3.5 shrink-0 animate-spin" /> {t("stepUp.working")}
             </p>
         );
     }
@@ -99,19 +110,19 @@ export function StepUpFields({
             setError(result.error);
             return;
         }
-        setSent(proof.target ? `Code sent to ${proof.target}.` : "Code sent.");
+        setSent(proof.target ? t("stepUp.sentTo", { target: proof.target }) : t("stepUp.sent"));
     };
 
     return (
         <div className="flex flex-col gap-2">
             {choices.length > 1 && (
                 <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                    Confirm with
+                    {t("stepUp.confirmWith")}
                     <Select
                         value={proof?.proof ?? ""}
                         className="h-9"
-                        aria-label="How to confirm"
-                        options={choices.map((choice) => ({ value: choice.proof, label: choice.label }))}
+                        aria-label={t("stepUp.how")}
+                        options={choices.map((choice) => ({ value: choice.proof, label: proofLabel(t, choice) }))}
                         onValueChange={(next) => {
                             setProof(choices.find((choice) => choice.proof === next) ?? null);
                             setValue("");
@@ -123,7 +134,7 @@ export function StepUpFields({
             )}
 
             <label className="text-muted-foreground flex flex-col gap-1 text-xs" htmlFor={fieldId}>
-                {proof?.label ?? "Confirm"}
+                {proof ? proofLabel(t, proof) : t("stepUp.confirm")}
                 <div className="flex items-center gap-2">
                     <Input
                         id={fieldId}
@@ -132,7 +143,7 @@ export function StepUpFields({
                         autoComplete={proof?.proof === "password" ? "current-password" : "one-time-code"}
                         type={proof?.proof === "password" ? "password" : "text"}
                         inputMode={proof?.proof === "password" ? undefined : "numeric"}
-                        placeholder={proof?.proof === "password" ? "Your password" : "6-digit code"}
+                        placeholder={proof?.proof === "password" ? t("stepUp.proofs.password") : t("stepUp.codePlaceholder")}
                         disabled={Boolean(proof?.sends) && !sent}
                         onChange={(event) =>
                             setValue(proof?.proof === "password" ? event.target.value : codeDigits(event.target.value))
@@ -141,7 +152,7 @@ export function StepUpFields({
                     {proof?.sends && (
                         <Button type="button" size="sm" variant="secondary" disabled={sending} onClick={() => void send()}>
                             {sending ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Send className="size-4 shrink-0" />}
-                            {sent ? "Resend" : "Send code"}
+                            {sent ? t("stepUp.resend") : t("stepUp.send")}
                         </Button>
                     )}
                 </div>

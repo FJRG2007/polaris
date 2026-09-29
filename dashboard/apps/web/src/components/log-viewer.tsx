@@ -19,6 +19,7 @@ import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { Check, Copy, Download, Search } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
     error: "text-danger",
@@ -39,7 +40,7 @@ export function LogViewer({
     header,
     searchable = false,
     autoScroll = true,
-    emptyText = "Waiting for output...",
+    emptyText,
     className,
     withDates = false,
     onReachStart,
@@ -60,6 +61,7 @@ export function LogViewer({
     /** Shown above the first line, inside the scrolling region. */
     startSlot?: ReactNode;
 }) {
+    const t = useTranslations("components");
     const [search, setSearch] = useState("");
     const [copiedAll, setCopiedAll] = useState(false);
     // Follows the tail as new output streams in, matching a live console - and
@@ -132,7 +134,7 @@ export function LogViewer({
                         <Input
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Filter and search logs"
+                            placeholder={t("logViewer.search")}
                             className="pl-8 font-mono text-xs"
                         />
                     </div>
@@ -150,7 +152,7 @@ export function LogViewer({
                     ) : (
                         <Copy className="size-4" />
                     )}
-                    {copiedAll ? "Copied" : "Copy all"}
+                    {copiedAll ? t("logViewer.copied") : t("logViewer.copyAll")}
                 </Button>
                 <Button
                     type="button"
@@ -161,7 +163,7 @@ export function LogViewer({
                     className="shrink-0"
                 >
                     <Download className="size-4" />
-                    Export
+                    {t("logViewer.export")}
                 </Button>
             </div>
 
@@ -180,14 +182,13 @@ export function LogViewer({
                 {startSlot}
                 {filtered.length === 0 ? (
                     <p className="px-3 py-2 text-muted-foreground">
-                        {log ? "No matching lines." : emptyText}
+                        {log ? t("logViewer.noMatch") : (emptyText ?? t("logViewer.waiting"))}
                     </p>
                 ) : (
                     <>
                         {hiddenCount > 0 && (
                             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
-                                {hiddenCount.toLocaleString()} earlier lines hidden - showing the
-                                latest {MAX_LOG_ROWS.toLocaleString()}.
+                                {t("logViewer.hidden", { hidden: hiddenCount, shown: MAX_LOG_ROWS })}
                             </p>
                         )}
                         {filtered.map((entry, index) => (
@@ -201,6 +202,7 @@ export function LogViewer({
 }
 
 function LogRow({ entry, gutter, withDates }: { entry: LogEntry; gutter: boolean; withDates: boolean }) {
+    const t = useTranslations("components");
     const [copied, setCopied] = useState(false);
     const format = useDisplayFormat();
     const time = entry.time ? formatLogTime(entry.time, format, withDates) : null;
@@ -238,7 +240,7 @@ function LogRow({ entry, gutter, withDates }: { entry: LogEntry; gutter: boolean
             <button
                 type="button"
                 onClick={copy}
-                aria-label="Copy log entry"
+                aria-label={t("logViewer.copyEntry")}
                 className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
                 {copied ? (

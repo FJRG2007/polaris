@@ -18,6 +18,10 @@ import { notify } from "./dispatch";
 import { prisma } from "@polaris/db";
 import { parseProjectCapabilities } from "@polaris/core";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import { wordsFor } from "./notice-words";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** Where a domain sits, in words, plus who is answerable for it. */
 interface DomainContext {
@@ -40,9 +44,9 @@ export interface DomainHealthChange {
  *  list is not what anybody is reading it for - the count is. */
 const NAMES_SHOWN = 3;
 
-function listNames(labels: readonly string[]): string {
+function listNames(labels: readonly string[], t: NamespaceTranslator<"notices">): string {
     if (labels.length <= NAMES_SHOWN) return labels.join(", ");
-    return `${labels.slice(0, NAMES_SHOWN).join(", ")} and ${labels.length - NAMES_SHOWN} more`;
+    return t("domains.andMore", { names: labels.slice(0, NAMES_SHOWN).join(", "), count: labels.length - NAMES_SHOWN });
 }
 
 /**
@@ -61,24 +65,25 @@ function listNames(labels: readonly string[]): string {
 export function domainHealthMessage(
     status: "up" | "down",
     labels: readonly string[],
-    detail: string | null
+    detail: string | null,
+    // The recipient's words; a webhook, which has no reader, gets the default's.
+    t: NamespaceTranslator<"notices"> = translatorFor(DEFAULT_LOCALE, "notices")
 ): { title: string; body: string } {
     const down = status === "down";
     if (labels.length === 1) {
+        const name = labels[0] ?? "";
         return {
-            title: down ? `Domain not serving: ${labels[0]}` : `Domain serving again: ${labels[0]}`,
+            title: down ? t("domains.downOne", { name }) : t("domains.upOne", { name }),
             body: down
-                ? `${detail ?? "It stopped answering"}. The service itself may still be running - check the domain's route and the port it points at.`
-                : "It is answering again."
+                ? t("domains.downOneBody", { detail: detail ?? t("domains.stoppedAnswering") })
+                : t("domains.upOneBody")
         };
     }
     return {
-        title: down
-            ? `${labels.length} domains stopped serving`
-            : `${labels.length} domains are answering again`,
+        title: down ? t("domains.downMany", { count: labels.length }) : t("domains.upMany", { count: labels.length }),
         body: down
-            ? `${listNames(labels)}. They went down together, so this is usually the connection or the edge rather than the services themselves.`
-            : `${listNames(labels)}.`
+            ? t("domains.downManyBody", { names: listNames(labels, t) })
+            : t("domains.upManyBody", { names: listNames(labels, t) })
     };
 }
 
@@ -193,11 +198,13 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
         const { title, body } = domainHealthMessage(input.status, [context.label], input.detail);
 
         for (const userId of context.recipients) {
+            // Each recipient reads it in their own language.
+            const said = domainHealthMessage(input.status, [context.label], input.detail, await wordsFor(userId, "notices"));
             await notify({
                 userId,
                 event,
-                title,
-                body,
+                title: said.title,
+                body: said.body,
                 href: context.href,
                 shelf: { orgId: context.orgId },
                 actionRequired: down,
@@ -292,7 +299,8 @@ export async function notifyDomainHealthChanges(
                 const { title, body } = domainHealthMessage(
                     status,
                     bucket.map((item) => item.context.label),
-                    one?.detail ?? null
+                    one?.detail ?? null,
+                    await wordsFor(userId, "notices")
                 );
                 await notify({
                     userId,

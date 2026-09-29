@@ -23,6 +23,7 @@
 import { resolveSession } from "@/lib/session";
 import { subscribeLocale } from "@/lib/i18n/locale-live";
 import { concerns, subscribeAccess } from "@/lib/access-live";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
     const session = await resolveSession();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
 
     // Held rather than read off `session` inside the closures: the narrowing
     // above does not survive into a callback.

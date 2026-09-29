@@ -30,7 +30,9 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
 import type { KeyActionResult } from "@/lib/agents/model-key-actions";
-import { MODEL_KEY_NAME_HINT, modelKeyNameSchema } from "@polaris/core";
+import { modelKeyNameSchema } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
 import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import {
@@ -115,12 +117,15 @@ function namesTaken(rows: ModelKeyView[], exceptId: string | null): Set<string> 
  * "Expires" next to the word "expires", and the ones that matter would read the
  * same as the ones that do not.
  */
-function expiryStanding(iso: string | null): { label: string; tone: "warning" | "danger" } | null {
+function expiryStanding(
+    iso: string | null,
+    t: NamespaceTranslator<"components">
+): { label: string; tone: "warning" | "danger" } | null {
     if (!iso) return null;
     const remaining = new Date(iso).getTime() - Date.now();
-    if (remaining <= 0) return { label: "Expired", tone: "danger" };
+    if (remaining <= 0) return { label: t("modelKeys.expired"), tone: "danger" };
     const days = Math.ceil(remaining / 86_400_000);
-    return days <= 7 ? { label: `${days}d left`, tone: "warning" } : null;
+    return days <= 7 ? { label: t("modelKeys.daysLeft", { days }), tone: "warning" } : null;
 }
 
 /** A picked day ends at the end of it, local time - the day itself still works. */
@@ -171,6 +176,7 @@ export function ModelKeysView({
     footer?: ReactNode;
 }) {
     const router = useRouter();
+    const t = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [rows, setRows] = useState(keys);
     const [editing, setEditing] = useState<ModelKeyView | null>(null);
@@ -224,9 +230,9 @@ export function ModelKeysView({
     const remove = async (key: ModelKeyView) => {
         const provider = byslug.get(key.provider);
         const ok = await confirm({
-            title: `Delete "${key.name}"?`,
-            description: `Runs stop using this ${provider?.name ?? key.provider} key. Anything below it in the list moves up.`,
-            confirmLabel: "Delete",
+            title: t("modelKeys.deleteTitle", { name: key.name }),
+            description: t("modelKeys.deleteBody", { provider: provider?.name ?? key.provider }),
+            confirmLabel: t("modelKeys.delete"),
             danger: true
         });
         if (!ok) return;
@@ -263,7 +269,7 @@ export function ModelKeysView({
                         </div>
                         <Button size="sm" onClick={() => setAdding(true)}>
                             <Plus className="size-4 shrink-0" />
-                            {copy.action ?? "Add key"}
+                            {copy.action ?? t("modelKeys.addKey")}
                         </Button>
                     </div>
 
@@ -275,17 +281,17 @@ export function ModelKeysView({
                                 earlier. */}
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="w-10 px-2 py-2 font-medium" aria-label="Order" />
-                                    <th className="px-3 py-2 font-medium">Provider</th>
+                                    <th className="w-10 px-2 py-2 font-medium" aria-label={t("modelKeys.order")} />
+                                    <th className="px-3 py-2 font-medium">{t("modelKeys.provider")}</th>
                                     {/* w-full max-w-0: the name is the column that gives, so
                                         a long one truncates instead of spilling the table
                                         sideways. */}
-                                    <th className="w-full max-w-0 px-3 py-2 font-medium">Name</th>
+                                    <th className="w-full max-w-0 px-3 py-2 font-medium">{t("modelKeys.name")}</th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
-                                        Expires
+                                        {t("modelKeys.expires")}
                                     </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium lg:table-cell">
-                                        Last used
+                                        {t("modelKeys.lastUsed")}
                                     </th>
                                     <th className="px-3 py-2" />
                                 </tr>
@@ -382,9 +388,10 @@ function KeyRow({
     onEdit: () => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("components");
     const [over, setOver] = useState(false);
     const label = provider?.name ?? row.provider;
-    const standing = expiryStanding(row.expiresAt);
+    const standing = expiryStanding(row.expiresAt, t);
     const expired = standing?.tone === "danger";
 
     return (
@@ -447,11 +454,11 @@ function KeyRow({
                         {standing ? <Badge variant={standing.tone}>{standing.label}</Badge> : null}
                     </span>
                 ) : (
-                    <span className="text-muted-foreground">Never</span>
+                    <span className="text-muted-foreground">{t("modelKeys.never")}</span>
                 )}
             </td>
             <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 lg:table-cell">
-                {row.lastUsedAt ? <RelativeTime iso={row.lastUsedAt} /> : "Never"}
+                {row.lastUsedAt ? <RelativeTime iso={row.lastUsedAt} /> : t("modelKeys.never")}
             </td>
             <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-1">
@@ -460,8 +467,8 @@ function KeyRow({
                         size="icon"
                         disabled={index === 0}
                         onClick={() => onMove(index, index - 1)}
-                        aria-label={`Try ${row.name} earlier`}
-                        title="Move up"
+                        aria-label={t("modelKeys.earlier", { name: row.name })}
+                        title={t("modelKeys.moveUp")}
                     >
                         <ChevronUp className="size-4 shrink-0" />
                     </Button>
@@ -470,8 +477,8 @@ function KeyRow({
                         size="icon"
                         disabled={index === total - 1}
                         onClick={() => onMove(index, index + 1)}
-                        aria-label={`Try ${row.name} later`}
-                        title="Move down"
+                        aria-label={t("modelKeys.later", { name: row.name })}
+                        title={t("modelKeys.moveDown")}
                     >
                         <ChevronDown className="size-4 shrink-0" />
                     </Button>
@@ -479,8 +486,8 @@ function KeyRow({
                         variant="ghost"
                         size="icon"
                         onClick={onEdit}
-                        aria-label={`Edit ${row.name}`}
-                        title="Edit"
+                        aria-label={t("modelKeys.editNamed", { name: row.name })}
+                        title={t("modelKeys.edit")}
                     >
                         <Pencil className="size-4 shrink-0" />
                     </Button>
@@ -488,8 +495,8 @@ function KeyRow({
                         variant="ghost"
                         size="icon"
                         onClick={onRemove}
-                        aria-label={`Delete ${row.name}`}
-                        title="Delete"
+                        aria-label={t("modelKeys.deleteNamed", { name: row.name })}
+                        title={t("modelKeys.delete")}
                     >
                         <Trash2 className="size-4 shrink-0" />
                     </Button>
@@ -534,6 +541,8 @@ function KeyDialog({
     onClose: () => void;
     onSaved: (warning?: string) => void;
 }) {
+    const t = useTranslations("components");
+    const tcommon = useTranslations("common");
     const [provider, setProvider] = useState(existing?.provider ?? providers[0]?.slug ?? "");
     const [name, setName] = useState(existing?.name ?? "");
     const [secret, setSecret] = useState("");
@@ -553,10 +562,10 @@ function KeyDialog({
     const nameError =
         touched && name.length > 0
             ? taken
-                ? "There is already a key by that name."
+                ? t("modelKeys.nameTaken")
                 : nameCheck.success
                   ? null
-                  : MODEL_KEY_NAME_HINT
+                  : t("modelKeys.nameHint")
             : null;
     // A gateway with no token is a real setup - plenty accept unauthenticated
     // calls from inside the network - so only a provider needs the field filled.
@@ -630,18 +639,20 @@ function KeyDialog({
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>
-                        {existing ? `Edit ${thing(action)}` : (action ?? "Add provider key")}
+                        {existing
+                            ? t("modelKeys.editTitle", { thing: thing(action, t("modelKeys.providerKey")) })
+                            : (action ?? t("modelKeys.addProviderKey"))}
                     </DialogTitle>
                     <DialogDescription>
                         {existing
-                            ? "Rename it, or paste a new key to replace the stored one."
+                            ? t("modelKeys.editHint")
                             : adding}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1 text-sm">
-                        Provider
+                        {t("modelKeys.provider")}
                         {existing ? (
                             <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
                                 <IntegrationLogo
@@ -666,10 +677,10 @@ function KeyDialog({
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("modelKeys.name")}
                         <Input
                             value={name}
-                            placeholder="e.g. prod-main"
+                            placeholder={t("modelKeys.namePlaceholder")}
                             autoComplete="off"
                             aria-invalid={nameError !== null}
                             onChange={(event) => {
@@ -681,27 +692,27 @@ function KeyDialog({
                         <span
                             className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}
                         >
-                            {nameError ?? MODEL_KEY_NAME_HINT}
+                            {nameError ?? t("modelKeys.nameHint")}
                         </span>
                     </label>
 
                     {entry?.isGateway ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Endpoint
+                                {t("modelKeys.endpoint")}
                                 <Input
                                     value={gateway.baseUrl}
-                                    placeholder="https://gateway.example/v1"
+                                    placeholder="https://gateway.example/v1" // i18n-ignore an example address
                                     onChange={(event) =>
                                         setGateway({ ...gateway, baseUrl: event.target.value })
                                     }
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Model
+                                {t("modelKeys.model")}
                                 <Input
                                     value={gateway.model}
-                                    placeholder="the id your endpoint serves"
+                                    placeholder={t("modelKeys.modelPlaceholder")}
                                     onChange={(event) =>
                                         setGateway({ ...gateway, model: event.target.value })
                                     }
@@ -709,7 +720,7 @@ function KeyDialog({
                             </label>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Context window
+                                    {t("modelKeys.context")}
                                     <Input
                                         value={gateway.context}
                                         inputMode="numeric"
@@ -720,7 +731,7 @@ function KeyDialog({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Max output
+                                    {t("modelKeys.maxOutput")}
                                     <Input
                                         value={gateway.maxOutput}
                                         inputMode="numeric"
@@ -734,11 +745,7 @@ function KeyDialog({
                                     />
                                 </label>
                             </div>
-                            <p className="text-muted-foreground -mt-2 text-xs">
-                                An endpoint publishes no catalog, so both numbers are needed:
-                                without them a run answers in 32,000-token slices and never
-                                compacts.
-                            </p>
+                            <p className="text-muted-foreground -mt-2 text-xs">{t("modelKeys.gatewayHint")}</p>
                         </>
                     ) : null}
 
@@ -749,40 +756,38 @@ function KeyDialog({
                     {signin && !existing ? (
                         <div className="border-primary/40 bg-primary/10 flex flex-wrap items-center gap-2 rounded-md border p-3">
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm">Polaris can sign you in</p>
+                                <p className="text-sm">{t("modelKeys.canSignIn")}</p>
                                 <p className="text-muted-foreground text-xs">
-                                    It runs {signin.serves[0]?.label ?? "the tool"}&apos;s own login
-                                    on a machine of its own. You authorise it in your browser; the
-                                    credential lands in the field below.
+                                    {t("modelKeys.canSignInHint", { tool: signin.serves[0]?.label ?? t("modelKeys.theTool") })}
                                 </p>
                             </div>
                             <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
                                 <Wand2 className="size-4 shrink-0" />
-                                Sign in here
+                                {t("modelKeys.signInHere")}
                             </Button>
                         </div>
                     ) : null}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        {entry?.apiKeyLabel ?? "API key"}
+                        {entry?.apiKeyLabel ?? t("modelKeys.apiKey")}
                         <Input
                             type="password"
                             value={secret}
                             autoComplete="off"
                             placeholder={
                                 existing
-                                    ? "Leave blank to keep the stored key"
+                                    ? t("modelKeys.keepStored")
                                     : entry?.isGateway
-                                      ? "Leave blank if your endpoint needs none"
-                                      : "Paste your provider API key"
+                                      ? t("modelKeys.gatewayNoKey")
+                                      : t("modelKeys.pasteKey")
                             }
                             onChange={(event) => setSecret(event.target.value)}
                         />
                         <span className="text-muted-foreground text-xs">
-                            Stored encrypted.{" "}
+                            {t("modelKeys.encrypted")}{" "}
                             {entry?.checkable
-                                ? `Validated against ${entry.name} before saving (no credits used).`
-                                : "Proven by the first run."}
+                                ? t("modelKeys.validated", { provider: entry.name })
+                                : t("modelKeys.provenByRun")}
                         </span>
                         {entry?.apiKeyHelp ? (
                             <span className="text-muted-foreground text-xs">
@@ -794,14 +799,14 @@ function KeyDialog({
                             whether to go and make an account at all. */}
                         {entry?.freeTier && !existing ? (
                             <span className="text-success text-xs">
-                                {entry.freeTier.kind === "free" ? "Free tier." : "Free trial."}{" "}
+                                {entry.freeTier.kind === "free" ? t("modelKeys.freeTier") : t("modelKeys.freeTrial")}{" "}
                                 {entry.freeTier.note}
                             </span>
                         ) : null}
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        Expires
+                        {t("modelKeys.expires")}
                         <Input
                             type="date"
                             value={expiry}
@@ -809,9 +814,7 @@ function KeyDialog({
                             onChange={(event) => setExpiry(event.target.value)}
                         />
                         <span className="text-muted-foreground text-xs">
-                            Optional. If the key was given an end date at{" "}
-                            {entry?.name ?? "the provider"}, put it here: Polaris warns a week ahead
-                            and stops using the key on the day.
+                            {t("modelKeys.expiryHint", { provider: entry?.name ?? t("modelKeys.theProvider") })}
                         </span>
                         {expiry ? (
                             <button
@@ -819,15 +822,13 @@ function KeyDialog({
                                 onClick={() => setExpiry("")}
                                 className="text-muted-foreground hover:text-foreground self-start text-xs underline"
                             >
-                                Clear the date
+                                {t("modelKeys.clearDate")}
                             </button>
                         ) : null}
                     </label>
 
                     {existing ? null : (
-                        <p className="text-muted-foreground text-xs">
-                            Added at the bottom of the list. Drag rows in the table to reorder.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("modelKeys.addedAtBottom")}</p>
                     )}
 
                     {error ? <p className="text-danger text-sm">{error}</p> : null}
@@ -840,14 +841,14 @@ function KeyDialog({
                                 rel="noreferrer noopener"
                                 className="text-muted-foreground hover:text-foreground mr-auto text-xs"
                             >
-                                Create one at {entry.name}
+                                {t("modelKeys.createAt", { provider: entry.name })}
                             </a>
                         ) : null}
                         <Button variant="ghost" onClick={onClose} disabled={busy}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button onClick={() => void submit()} disabled={busy || !ready}>
-                            {busy ? "Checking..." : existing ? "Save" : (action ?? "Add key")}
+                            {busy ? t("modelKeys.checking") : existing ? t("modelKeys.save") : (action ?? t("modelKeys.addKey"))}
                         </Button>
                     </div>
                 </div>
@@ -877,9 +878,11 @@ function KeyDialog({
     );
 }
 
-/** What this screen calls the thing it lists, from the word on its button. */
-function thing(action: string | undefined): string {
-    return action?.toLowerCase().replace(/^add /, "") ?? "provider key";
+/** What this screen calls the thing it lists, from the words on its button:
+ *  everything after the verb ("Add account" is an account, "Añadir cuenta" a
+ *  cuenta), or `fallback` when the screen gave none. */
+function thing(action: string | undefined, fallback: string): string {
+    return action ? action.replace(/^\S+\s+/, "").toLowerCase() : fallback;
 }
 
 /** The gateway settings a stored key carries, as the form's strings. */

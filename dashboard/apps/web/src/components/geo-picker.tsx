@@ -11,6 +11,19 @@ import { X } from "lucide-react";
 import { cn } from "@polaris/ui";
 import { useMemo, useState } from "react";
 import { CONTINENTS, COUNTRY_CODES, countryName } from "@polaris/core";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** A country as the reader's language names it. English keeps core's names, which
+ *  are the same list the server writes. */
+function regionName(code: string, locale: string): string {
+    if (locale === "en-US") return countryName(code);
+    try {
+        return new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ?? countryName(code);
+    } catch {
+        return countryName(code);
+    }
+}
 
 export function GeoPicker({
     countries,
@@ -23,12 +36,14 @@ export function GeoPicker({
     onCountries: (next: string[]) => void;
     onContinents: (next: string[]) => void;
 }) {
+    const t = useTranslations("components");
+    const locale = useLocale();
     const options = useMemo(
         () =>
-            COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) =>
-                a.name.localeCompare(b.name)
+            COUNTRY_CODES.map((code) => ({ code, name: regionName(code, locale) })).sort((a, b) =>
+                a.name.localeCompare(b.name, locale)
             ),
-        []
+        [locale]
     );
 
     const [query, setQuery] = useState("");
@@ -68,7 +83,7 @@ export function GeoPicker({
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 p-2">
             <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Continents</span>
+                <span className="text-xs text-muted-foreground">{t("geo.continents")}</span>
                 <div className="flex flex-wrap gap-1.5">
                     {CONTINENTS.map((continent) => (
                         <button
@@ -82,18 +97,18 @@ export function GeoPicker({
                                     : "border-border text-muted-foreground hover:bg-muted"
                             )}
                         >
-                            {continent.name}
+                            {t(`geo.continentNames.${continent.code}` as NamespaceKey<"components">)}
                         </button>
                     ))}
                 </div>
             </div>
 
             <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Countries</span>
+                <span className="text-xs text-muted-foreground">{t("geo.countries")}</span>
                 <div className="relative">
                     <input
                         value={query}
-                        placeholder="Type a country to add"
+                        placeholder={t("geo.typeCountry")}
                         autoComplete="off"
                         className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm"
                         onChange={(event) => {
@@ -138,11 +153,11 @@ export function GeoPicker({
                                 key={code}
                                 className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-primary"
                             >
-                                {countryName(code)}
+                                {regionName(code, locale)}
                                 <button
                                     type="button"
                                     onClick={() => onCountries(countries.filter((c) => c !== code))}
-                                    aria-label={`Remove ${code}`}
+                                    aria-label={t("ruleList.remove", { entry: code })}
                                 >
                                     <X className="size-3" />
                                 </button>
@@ -151,10 +166,7 @@ export function GeoPicker({
                     </div>
                 ) : null}
             </div>
-            <span className="text-xs text-muted-foreground">
-                Leave both empty to allow every location. Otherwise, only the selected countries and
-                continents are allowed.
-            </span>
+            <span className="text-xs text-muted-foreground">{t("geo.hint")}</span>
         </div>
     );
 }

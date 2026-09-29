@@ -93,9 +93,12 @@ async function activeSender(
         where: { ownerId, platform: SMS_PLATFORM, status: "connected" },
         orderBy: { createdAt: "asc" }
     });
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (!row) return { error: "No working SMS sender is configured." };
     const parsed = parseSmsConfig(row.provider ?? "", parseStored(row.config).settings);
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (!parsed.ok) return { error: "The SMS sender's settings are no longer valid." };
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (!row.encryptedSecret || !row.secretNonce) return { error: "The SMS sender has no credential stored." };
     try {
         const secret = decryptSecret(
@@ -108,6 +111,7 @@ async function activeSender(
         );
         return { config: parsed.value, secret };
     } catch {
+        // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
         return { error: "The SMS sender's credential cannot be read. Re-enter it." };
     }
 }
@@ -145,12 +149,14 @@ async function sendWithTwilio(
         );
     } catch (caught) {
         const timedOut = caught instanceof Error && caught.name === "TimeoutError";
+        // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
         return { error: timedOut ? "Twilio did not answer in time." : "Twilio could not be reached." };
     }
     if (res.ok) return {};
     // Twilio explains itself well - an unverified number or an unreachable
     // country is exactly the kind of thing the operator has to be told.
     const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     return { error: payload?.message ?? `Twilio refused the message (HTTP ${res.status}).` };
 }
 
@@ -168,11 +174,14 @@ async function verifySender(config: SmsConfig, secret: string): Promise<string |
             }
         );
     } catch {
+        // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
         return "Twilio could not be reached to check the credential.";
     }
     if (res.ok) return null;
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (res.status === 401) return "Twilio rejected that account SID and auth token.";
     const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     return payload?.message ?? `Twilio answered HTTP ${res.status}.`;
 }
 
@@ -195,11 +204,13 @@ export async function saveSmsSender(
     const parsed = parseSmsConfig(input.provider, input.settings);
     if (!parsed.ok) return { error: parsed.error };
     const name = input.name.trim();
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (!name) return { error: "Give the sender a name." };
 
     const existing = input.id
         ? await prisma.channel.findFirst({ where: { id: input.id, ownerId, platform: SMS_PLATFORM } })
         : null;
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (input.id && !existing) return { error: "That sender no longer exists." };
 
     let secret = input.secret?.trim();
@@ -214,9 +225,11 @@ export async function saveSmsSender(
                 loadEnv().POLARIS_MASTER_KEY
             );
         } catch {
+            // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
             return { error: "The stored auth token cannot be read. Enter it again." };
         }
     }
+    // i18n-ignore stored or handed on, and read in the reader's words through delivery-words
     if (!secret) return { error: "Enter the auth token for this provider." };
 
     const failure = await verifySender(parsed.value, secret);
@@ -237,6 +250,7 @@ export async function saveSmsSender(
         ? await prisma.channel.update({ where: { id: existing.id }, data })
         : await prisma.channel.create({ data });
     const view = toView(row);
+    // i18n-ignore read in the reader's words through delivery-words
     return view ? { sender: view } : { error: "Could not store the sender." };
 }
 

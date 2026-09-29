@@ -17,6 +17,7 @@ import { z } from "zod";
 import { apiUser } from "@/lib/api-session";
 
 import { allowedBy } from "@/lib/privacy-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,10 +36,10 @@ export async function POST(request: Request): Promise<Response> {
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
     }
     const asked = askSchema.safeParse(body);
-    if (!asked.success) return Response.json({ error: "That could not be read" }, { status: 400 });
+    if (!asked.success) return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
 
     const allowed = await allowedBy(
         { id: viewer.id, isAdmin: Boolean(viewer.isAdmin) },

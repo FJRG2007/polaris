@@ -15,8 +15,10 @@ import { Button } from "@polaris/ui";
 import { Eye, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { stopViewAsAction } from "@/app/(app)/view-as-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ViewAsBanner({ mode, label, actorName }: { mode: "user" | "role"; label: string; actorName: string }) {
+    const t = useTranslations("components");
     const router = useRouter();
     const [leaving, setLeaving] = useState(false);
 
@@ -34,20 +36,19 @@ export function ViewAsBanner({ mode, label, actorName }: { mode: "user" | "role"
             <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-full border border-warning-edge bg-warning-soft py-1.5 pl-4 pr-1.5 shadow-popover backdrop-blur">
                 <Eye className="size-4 shrink-0 text-warning" aria-hidden="true" />
                 <p className="min-w-0 truncate text-sm">
-                    {mode === "user" ? (
-                        <>
-                            Using Polaris as <span className="font-medium">{label}</span>
-                        </>
-                    ) : (
-                        <>
-                            Seeing Polaris as the <span className="font-medium">{label}</span> role
-                        </>
-                    )}
-                    <span className="hidden text-muted-foreground sm:inline"> - you are {actorName}</span>
+                    {t.rich(mode === "user" ? "viewAs.asUser" : "viewAs.asRole", {
+                        label,
+                        name: (chunks) => (
+                            <span key="name" className="font-medium">
+                                {chunks}
+                            </span>
+                        )
+                    })}
+                    <span className="hidden text-muted-foreground sm:inline"> - {t("viewAs.youAre", { name: actorName })}</span>
                 </p>
                 <Button size="sm" variant="ghost" className="rounded-full" disabled={leaving} onClick={() => void leave()}>
                     <LogOut className="size-4" />
-                    {leaving ? "Leaving..." : "Back to my account"}
+                    {leaving ? t("viewAs.leaving") : t("viewAs.back")}
                 </Button>
             </div>
         </div>

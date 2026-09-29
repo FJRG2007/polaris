@@ -21,10 +21,11 @@ import {
     ExtensionDownloadOffer,
     ExtensionFilesOffer
 } from "@/components/app-download";
+import { withMessages } from "../setup/i18n";
 
 describe("the desktop app's offer", () => {
     it("offers the download when a release exists, and names the version", () => {
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <DesktopDownloadOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
@@ -32,7 +33,7 @@ describe("the desktop app's offer", () => {
                     files: []
                 }}
             />
-        );
+        ));
         expect(html).toContain(
             'href="https://github.com/example/polaris/releases/tag/desktop-v0.2.0"'
         );
@@ -41,7 +42,7 @@ describe("the desktop app's offer", () => {
     });
 
     it("says the app exists but gives nothing to press when it has no release", () => {
-        const html = renderToStaticMarkup(<DesktopDownloadOffer download={null} />);
+        const html = renderToStaticMarkup(withMessages(<DesktopDownloadOffer download={null} />));
         expect(html).toContain("Download the desktop app");
         expect(html).toContain("Not released yet");
         expect(html).toContain("disabled");
@@ -68,7 +69,7 @@ describe("the desktop app's files", () => {
     ];
 
     it("gives every platform its own file", () => {
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <DesktopFilesOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
@@ -76,7 +77,7 @@ describe("the desktop app's files", () => {
                     files
                 }}
             />
-        );
+        ));
         expect(html).toContain("0.2.0");
         expect(html).toContain('href="https://example.test/Polaris-Setup.exe"');
         expect(html).toContain('href="https://example.test/arm64.dmg"');
@@ -89,7 +90,7 @@ describe("the desktop app's files", () => {
     it("keeps the two Mac images apart", () => {
         // One `.dmg` match for both architectures would hand an Intel Mac the
         // Apple-silicon image, which opens and then refuses to run.
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <DesktopFilesOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
@@ -97,7 +98,7 @@ describe("the desktop app's files", () => {
                     files: [files[1]!, files[2]!]
                 }}
             />
-        );
+        ));
         const silicon = html.indexOf("Apple silicon");
         const intel = html.indexOf("macOS, Intel");
         expect(silicon).toBeGreaterThan(-1);
@@ -107,7 +108,7 @@ describe("the desktop app's files", () => {
     });
 
     it("says which platform is missing from a release that has the others", () => {
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <DesktopFilesOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/desktop-v0.2.0",
@@ -115,13 +116,13 @@ describe("the desktop app's files", () => {
                     files: [files[0]!]
                 }}
             />
-        );
+        ));
         expect(html).toContain('href="https://example.test/Polaris-Setup.exe"');
         expect(html).toContain("Not in this release");
     });
 
     it("offers nothing to press when nothing has been released", () => {
-        const html = renderToStaticMarkup(<DesktopFilesOffer download={null} />);
+        const html = renderToStaticMarkup(withMessages(<DesktopFilesOffer download={null} />));
         expect(html).toContain("No version has been published yet");
         expect(html).toContain("in a window of its own");
         expect(html).not.toContain("href=");
@@ -132,7 +133,7 @@ describe("the extension's files", () => {
     it("offers the package for each browser, never the sources archive", () => {
         // The sources archive is a zip on the same release, and handing it to
         // somebody as the add-on is a download that installs nothing.
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <ExtensionFilesOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
@@ -144,14 +145,14 @@ describe("the extension's files", () => {
                     ]
                 }}
             />
-        );
+        ));
         expect(html).toContain('href="https://example.test/chrome.zip"');
         expect(html).toContain('href="https://example.test/firefox.zip"');
         expect(html).not.toContain("sources.zip");
     });
 
     it("says none has been published rather than drawing empty rows", () => {
-        const html = renderToStaticMarkup(<ExtensionFilesOffer download={null} />);
+        const html = renderToStaticMarkup(withMessages(<ExtensionFilesOffer download={null} />));
         expect(html).toContain("No version has been published yet");
         expect(html).toContain("one per browser");
         expect(html).not.toContain("href=");
@@ -160,7 +161,7 @@ describe("the extension's files", () => {
 
 describe("the extension's offer", () => {
     it("offers the package when one has been published, and names the version", () => {
-        const html = renderToStaticMarkup(
+        const html = renderToStaticMarkup(withMessages(
             <ExtensionDownloadOffer
                 download={{
                     url: "https://github.com/example/polaris/releases/tag/extension-v0.1.0",
@@ -168,7 +169,7 @@ describe("the extension's offer", () => {
                     files: []
                 }}
             />
-        );
+        ));
         expect(html).toContain(
             'href="https://github.com/example/polaris/releases/tag/extension-v0.1.0"'
         );
@@ -177,7 +178,7 @@ describe("the extension's offer", () => {
     });
 
     it("says why there is nothing to press when none has been", () => {
-        const html = renderToStaticMarkup(<ExtensionDownloadOffer download={null} />);
+        const html = renderToStaticMarkup(withMessages(<ExtensionDownloadOffer download={null} />));
         expect(html).toContain("Download the extension");
         expect(html).toContain("nothing to load");
         expect(html).toContain("disabled");

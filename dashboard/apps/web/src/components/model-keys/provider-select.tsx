@@ -19,12 +19,14 @@ import { Check, Search } from "lucide-react";
 import { IntegrationLogo } from "@/components/logos";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Only what the list itself needs of a provider. */
 type ProviderOption = Pick<ProviderRow, "slug" | "name" | "aliases" | "freeTier">;
 
 /** What the badge says, and what typing it finds. */
-const FREE_LABEL = { free: "Free tier", trial: "Free trial" } as const;
+/** The free-tier badge's words, as `providerSelect.free.<kind>`. */
+const FREE_KEYS = { free: "providerSelect.free.free", trial: "providerSelect.free.trial" } as const;
 
 export function ProviderSelect({
     options,
@@ -37,6 +39,7 @@ export function ProviderSelect({
     onChange: (slug: string) => void;
     disabled?: boolean;
 }) {
+    const t = useTranslations("components");
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const box = useRef<HTMLDivElement>(null);
@@ -60,10 +63,10 @@ export function ProviderSelect({
                 option.name,
                 option.slug,
                 ...option.aliases,
-                ...(option.freeTier ? [FREE_LABEL[option.freeTier.kind], option.freeTier.kind] : [])
+                ...(option.freeTier ? [t(FREE_KEYS[option.freeTier.kind]), option.freeTier.kind] : [])
             ].some((term) => term.toLowerCase().includes(needle))
         );
-    }, [options, query]);
+    }, [options, query, t]);
 
     const chosen = options.find((option) => option.slug === value) ?? null;
 
@@ -82,7 +85,7 @@ export function ProviderSelect({
                     className="min-w-0 flex-1 truncate text-left"
                     title={chosen?.name ?? undefined}
                 >
-                    {chosen?.name ?? "Pick a provider"}
+                    {chosen?.name ?? t("providerSelect.pick")}
                 </span>
             </button>
 
@@ -97,7 +100,7 @@ export function ProviderSelect({
                             autoFocus
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search providers"
+                            placeholder={t("providerSelect.search")}
                             bare
                             className="h-7"
                         />
@@ -136,14 +139,14 @@ export function ProviderSelect({
                                         }
                                         title={option.freeTier.note}
                                     >
-                                        {FREE_LABEL[option.freeTier.kind]}
+                                        {t(FREE_KEYS[option.freeTier.kind])}
                                     </Badge>
                                 ) : null}
                             </Button>
                         ))}
                         {results.length === 0 ? (
                             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-                                Nothing matches.
+                                {t("providerSelect.none")}
                             </p>
                         ) : null}
                     </div>

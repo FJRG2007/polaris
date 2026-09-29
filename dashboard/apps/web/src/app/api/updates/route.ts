@@ -8,12 +8,13 @@
 import { NextResponse } from "next/server";
 import { backgroundUser } from "@/lib/session";
 import { getUpdateStatus } from "@/lib/update-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
     const user = await backgroundUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return NextResponse.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     const status = await getUpdateStatus();
     return NextResponse.json(status);
 }

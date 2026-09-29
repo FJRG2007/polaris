@@ -25,8 +25,10 @@ import type { ReactNode } from "react";
 import { LogIn, Ticket } from "lucide-react";
 import { PUBLIC_PATHS } from "@/lib/legal/service";
 import { Button, PolarisMark, cn } from "@polaris/ui";
+import { readerWords } from "@/lib/i18n/reader-words";
 
-export function PublicChrome({ children, className }: { children: ReactNode; className?: string }) {
+export async function PublicChrome({ children, className }: { children: ReactNode; className?: string }) {
+    const t = await readerWords("components");
     return (
         <div className="flex min-h-screen flex-col bg-background">
             {/* Deliberately the signed-in header's own measurements. A public
@@ -35,7 +37,7 @@ export function PublicChrome({ children, className }: { children: ReactNode; cla
             <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <Link
                     href={PUBLIC_PATHS.home}
-                    aria-label="Polaris"
+                    aria-label="Polaris" // i18n-ignore the product's name
                     className="flex shrink-0 items-center rounded-sm text-foreground outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <PolarisMark />
@@ -47,14 +49,14 @@ export function PublicChrome({ children, className }: { children: ReactNode; cla
                             {/* The label is the reader's situation, not ours.
                                 "Accept an invite" asks them to have one; this
                                 asks whether they do. */}
-                            <span className="hidden sm:inline">I have an invite</span>
-                            <span className="sm:hidden">Invite</span>
+                            <span className="hidden sm:inline">{t("publicChrome.haveInvite")}</span>
+                            <span className="sm:hidden">{t("publicChrome.invite")}</span>
                         </Link>
                     </Button>
                     <Button asChild size="sm">
                         <Link href="/oauth/login">
                             <LogIn className="size-4" />
-                            Sign in
+                            {t("publicChrome.signIn")}
                         </Link>
                     </Button>
                 </div>
@@ -66,13 +68,13 @@ export function PublicChrome({ children, className }: { children: ReactNode; cla
 
             <footer className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-5 gap-y-1 px-4 pb-8 text-xs text-muted-foreground sm:px-6">
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
-                    About
+                    {t("publicChrome.about")}
                 </Link>
                 <Link href={PUBLIC_PATHS.privacy} className="transition-colors hover:text-foreground">
-                    Privacy
+                    {t("publicChrome.privacy")}
                 </Link>
                 <Link href={PUBLIC_PATHS.terms} className="transition-colors hover:text-foreground">
-                    Terms
+                    {t("publicChrome.terms")}
                 </Link>
             </footer>
         </div>

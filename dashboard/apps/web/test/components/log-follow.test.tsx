@@ -16,6 +16,7 @@
 import { LogViewer } from "@/components/log-viewer";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 afterEach(cleanup);
 
@@ -36,7 +37,7 @@ const BOTTOM = HEIGHT - VIEWPORT;
 
 describe("a log that is still being written", () => {
     it("shows the newest output while the reader is at the tail", () => {
-        const { container, rerender } = render(<LogViewer log="first line" />);
+        const { container, rerender } = render(<LogViewer log="first line" />, { wrapper: MessagesWrapper });
         const element = scroller(container);
 
         rerender(<LogViewer log={"first line\nsecond line"} />);
@@ -45,7 +46,7 @@ describe("a log that is still being written", () => {
     });
 
     it("stays where it was put once the reader scrolls back into what went past", () => {
-        const { container, rerender } = render(<LogViewer log="first line" />);
+        const { container, rerender } = render(<LogViewer log="first line" />, { wrapper: MessagesWrapper });
         const element = scroller(container);
 
         element.scrollTop = 120;
@@ -56,7 +57,7 @@ describe("a log that is still being written", () => {
     });
 
     it("follows the tail again as soon as the reader returns to it", () => {
-        const { container, rerender } = render(<LogViewer log="first line" />);
+        const { container, rerender } = render(<LogViewer log="first line" />, { wrapper: MessagesWrapper });
         const element = scroller(container);
 
         element.scrollTop = 120;
@@ -71,7 +72,7 @@ describe("a log that is still being written", () => {
     });
 
     it("leaves the view alone entirely where following was not asked for", () => {
-        const { container, rerender } = render(<LogViewer log="first line" autoScroll={false} />);
+        const { container, rerender } = render(<LogViewer log="first line" autoScroll={false} />, { wrapper: MessagesWrapper });
         const element = scroller(container);
 
         rerender(<LogViewer log={"first line\nsecond line"} autoScroll={false} />);

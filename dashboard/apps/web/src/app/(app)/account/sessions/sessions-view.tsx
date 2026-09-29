@@ -23,7 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
-import { describeSignIn, signInSummary } from "@polaris/core";
+import { signInParts, signInText } from "@/lib/sign-in-words";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
@@ -49,20 +49,21 @@ import {
 
 function Origin({ session }: { session: SessionView }) {
     const t = useTranslations("accountSecurity");
+    const tc = useTranslations("components");
     return (
         <>
             <p className="text-xs text-muted-foreground">
                 {t.rich("sessions.origin", {
-                    origin: sessionOrigin(session),
+                    origin: sessionOrigin(session, tc("sessionsTable.unknownLocation")),
                     time: <RelativeTime key="time" iso={session.lastSeenAt} />
                 })}
             </p>
             {/* Most of what this decision rests on, next to where it came from:
                 a sign-in that already answered a code is a different thing to
                 allow than one that only had the password. */}
-            {describeSignIn(session.signIn).length > 0 ? (
+            {signInParts(tc, session.signIn).length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    {t("sessions.signedInWith", { summary: signInSummary(session.signIn) })}
+                    {t("sessions.signedInWith", { summary: signInText(tc, session.signIn) })}
                 </p>
             ) : null}
         </>

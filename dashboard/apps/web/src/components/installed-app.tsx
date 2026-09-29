@@ -21,6 +21,7 @@
 import { Download } from "lucide-react";
 import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
@@ -68,6 +69,7 @@ function runningInstalled(): boolean {
 }
 
 export function InstallAppCard({ nativeApp }: { nativeApp: ReactNode }) {
+    const t = useTranslations("components");
     const prompt = useSyncExternalStore(
         subscribe,
         () => held,
@@ -90,41 +92,31 @@ export function InstallAppCard({ nativeApp }: { nativeApp: ReactNode }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Desktop app</CardTitle>
+                <CardTitle>{t("installApp.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 {desktop ? (
                     <p className="text-sm">
-                        You are using the Polaris desktop app
-                        {desktop.version ? `, version ${desktop.version}` : ""}.
+                        {desktop.version
+                            ? t("installApp.usingDesktopVersion", { version: desktop.version })
+                            : t("installApp.usingDesktop")}
                     </p>
                 ) : (
                     <>
-                        <p className="text-sm text-muted-foreground">
-                            Install Polaris to open it in its own window, with its own icon in the
-                            dock, taskbar or home screen. It updates with Polaris itself.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("installApp.intro")}</p>
                         {installed ? (
-                            <p className="text-sm">You are using the installed app.</p>
+                            <p className="text-sm">{t("installApp.installed")}</p>
                         ) : prompt ? (
                             <div>
                                 <Button onClick={() => void install()}>
-                                    <Download className="size-4" /> Install Polaris
+                                    <Download className="size-4" /> {t("installApp.install")}
                                 </Button>
                             </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Your browser installs it from its own menu: Install Polaris in
-                                Chrome and Edge, Add to Dock in Safari, Add to Home Screen on a
-                                phone. It needs Polaris to be open over https.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("installApp.fromMenu")}</p>
                         )}
                         <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-                            <p className="text-sm text-muted-foreground">
-                                There is also a native app for Windows, macOS and Linux: it pushes a
-                                build from your own computer and follows a service&apos;s logs in a
-                                window of its own.
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("installApp.native")}</p>
                             {nativeApp}
                         </div>
                     </>

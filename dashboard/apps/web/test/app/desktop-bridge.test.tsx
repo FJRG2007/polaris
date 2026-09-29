@@ -17,6 +17,7 @@ import {
     isDesktopBridge,
     type PolarisDesktop
 } from "@/lib/desktop-bridge";
+import { withMessages } from "../setup/i18n";
 
 function fakeBridge(overrides: Partial<PolarisDesktop> = {}): PolarisDesktop {
     return {
@@ -142,13 +143,13 @@ describe("the install card", () => {
         // page: the card does not wait on it, so everything saying the native app
         // exists is on screen before GitHub has answered. The two states of the
         // offer itself are asserted in `app-download`.
-        const html = renderToStaticMarkup(<InstallAppCard nativeApp={null} />);
+        const html = renderToStaticMarkup(withMessages(<InstallAppCard nativeApp={null} />));
         expect(html).toContain("There is also a native app");
         expect(html).not.toContain("Download the desktop app");
     });
 
     it("draws the offer it is handed", () => {
-        const html = renderToStaticMarkup(<InstallAppCard nativeApp={<b>An offer</b>} />);
+        const html = renderToStaticMarkup(withMessages(<InstallAppCard nativeApp={<b>An offer</b>} />));
         expect(html).toContain("<b>An offer</b>");
     });
 });

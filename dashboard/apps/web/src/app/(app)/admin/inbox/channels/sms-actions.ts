@@ -21,6 +21,7 @@ import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { smsChannelInputSchema } from "@polaris/core";
 import { deleteSmsSender, saveSmsSender, type SmsSenderView } from "@/lib/notifications/sms-service";
+import { deliveryText } from "@/lib/notifications/delivery-words";
 
 export async function saveSmsSenderAction(
     input: unknown
@@ -32,7 +33,8 @@ export async function saveSmsSenderAction(
     }
     const result = await saveSmsSender(user.id, parsed.data);
     if (!result.error) revalidatePath("/admin/inbox/channels");
-    return result;
+    // The sender answers in English; the reader gets their own words.
+    return result.error ? { ...result, error: deliveryText(await getTranslations("notices"), result.error) } : result;
 }
 
 export async function deleteSmsSenderAction(id: unknown): Promise<void> {

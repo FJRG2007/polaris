@@ -17,6 +17,7 @@
 import { Button, Input, Select } from "@polaris/ui";
 import { Check, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const LOWER = "abcdefghijkmnopqrstuvwxyz";
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -107,6 +108,7 @@ export function generate(options: GeneratorOptions): string {
 }
 
 export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }) {
+    const t = useTranslations("components");
     const [options, setOptions] = useState<GeneratorOptions>(DEFAULTS);
     const [value, setValue] = useState("");
     const [copied, setCopied] = useState(false);
@@ -125,14 +127,14 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                     readOnly
                     value={value}
                     className="font-mono text-sm"
-                    aria-label="Generated"
+                    aria-label={t("generator.generated")}
                 />
                 <Button
                     type="button"
                     size="icon"
                     variant="secondary"
-                    title="Generate another"
-                    aria-label="Generate another"
+                    title={t("generator.another")}
+                    aria-label={t("generator.another")}
                     onClick={roll}
                 >
                     <RefreshCw className="size-4" />
@@ -141,8 +143,8 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                     type="button"
                     size="icon"
                     variant="secondary"
-                    title="Copy"
-                    aria-label="Copy the generated value"
+                    title={t("ui.copy")}
+                    aria-label={t("generator.copy")}
                     onClick={async () => {
                         await navigator.clipboard.writeText(value);
                         setCopied(true);
@@ -158,7 +160,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
 
             <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 text-sm">
-                    Kind
+                    {t("generator.kind")}
                     <Select
                         value={options.kind}
                         onValueChange={(kind) =>
@@ -169,14 +171,14 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                             }))
                         }
                         options={[
-                            { value: "password", label: "Password" },
-                            { value: "passphrase", label: "Passphrase" }
+                            { value: "password", label: t("generator.password") },
+                            { value: "passphrase", label: t("generator.passphrase") }
                         ]}
-                        aria-label="Kind"
+                        aria-label={t("generator.kind")}
                     />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
-                    {options.kind === "passphrase" ? "Words" : "Length"}
+                    {options.kind === "passphrase" ? t("generator.words") : t("generator.length")}
                     <Input
                         type="number"
                         min={options.kind === "passphrase" ? 3 : 8}
@@ -199,7 +201,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                             setOptions((prev) => ({ ...prev, upper: event.target.checked }))
                         }
                     />
-                    {options.kind === "passphrase" ? "Capitalize" : "A-Z"}
+                    {options.kind === "passphrase" ? t("generator.capitalize") : "A-Z" /* i18n-ignore a character range */}
                 </label>
                 <label className="flex items-center gap-2">
                     <input
@@ -210,7 +212,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                             setOptions((prev) => ({ ...prev, digits: event.target.checked }))
                         }
                     />
-                    {options.kind === "passphrase" ? "A number" : "0-9"}
+                    {options.kind === "passphrase" ? t("generator.aNumber") : "0-9"}
                 </label>
                 {options.kind === "password" ? (
                     <label className="flex items-center gap-2">
@@ -222,7 +224,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
                                 setOptions((prev) => ({ ...prev, symbols: event.target.checked }))
                             }
                         />
-                        Symbols
+                        {t("generator.symbols")}
                     </label>
                 ) : null}
             </div>
@@ -230,7 +232,7 @@ export function PasswordGenerator({ onUse }: { onUse?: (value: string) => void }
             {onUse ? (
                 <div className="flex justify-end">
                     <Button type="button" onClick={() => onUse(value)}>
-                        Use this
+                        {t("generator.use")}
                     </Button>
                 </div>
             ) : null}

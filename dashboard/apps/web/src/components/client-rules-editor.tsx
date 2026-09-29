@@ -18,6 +18,8 @@
 
 import { RuleListInput } from "@/components/rule-list-input";
 import { userAgentMatches, USER_AGENT_PATTERN_MAX, type UserAgentRules } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 export const EMPTY_CLIENT_RULES: UserAgentRules = {
     allowedUserAgents: [],
@@ -31,11 +33,11 @@ export function clientRulesAreEmpty(value: UserAgentRules): boolean {
 
 /** A pattern is anything non-empty and not absurdly long: what it matches is
  *  decided at request time, and there is no shape to check it against. */
-function validatePattern(draft: string): { value: string } | { error: string } {
+function validatePattern(draft: string, t: NamespaceTranslator<"components">): { value: string } | { error: string } {
     const pattern = draft.trim();
-    if (!pattern) return { error: "Enter a pattern." };
+    if (!pattern) return { error: t("clientRules.enterPattern") };
     if (pattern.length > USER_AGENT_PATTERN_MAX) {
-        return { error: `Keep it under ${USER_AGENT_PATTERN_MAX} characters.` };
+        return { error: t("clientRules.tooLong", { max: USER_AGENT_PATTERN_MAX }) };
     }
     return { value: pattern };
 }
@@ -47,23 +49,24 @@ export function ClientRulesEditor({
     value: UserAgentRules;
     onChange: (next: UserAgentRules) => void;
 }) {
+    const t = useTranslations("components");
     return (
         <div className="flex flex-col gap-3">
             <RuleListInput
-                label="Only these clients"
+                label={t("clientRules.only")}
                 placeholder="curl"
-                hint="Matched anywhere in the client's user-agent, ignoring case. Use * for any run of characters. Leave empty to allow any client."
+                hint={t("clientRules.onlyHint")}
                 values={value.allowedUserAgents}
-                validate={validatePattern}
+                validate={(draft) => validatePattern(draft, t)}
                 onChange={(allowedUserAgents) => onChange({ ...value, allowedUserAgents })}
             />
             <RuleListInput
-                label="Never these clients"
-                placeholder="Mozilla*"
+                label={t("clientRules.never")}
+                placeholder="Mozilla*" // i18n-ignore an example user-agent pattern
                 tone="deny"
-                hint="Refused even when they match the list above."
+                hint={t("clientRules.neverHint")}
                 values={value.deniedUserAgents}
-                validate={validatePattern}
+                validate={(draft) => validatePattern(draft, t)}
                 onChange={(deniedUserAgents) => onChange({ ...value, deniedUserAgents })}
             />
             {!clientRulesAreEmpty(value) ? <ClientRulesPreview value={value} /> : null}
@@ -80,6 +83,7 @@ export function ClientRulesEditor({
  * usually the intent; a key that would refuse everything is not.
  */
 function ClientRulesPreview({ value }: { value: UserAgentRules }) {
+    const t = useTranslations("components");
     const client = typeof navigator === "undefined" ? "" : navigator.userAgent;
     const denied = value.deniedUserAgents.some((pattern) => userAgentMatches(client, pattern));
     const allowed =
@@ -88,9 +92,7 @@ function ClientRulesPreview({ value }: { value: UserAgentRules }) {
 
     return (
         <p className="text-xs text-muted-foreground">
-            {denied || !allowed
-                ? "The browser you are using now would be refused. That is fine for a key meant for a script."
-                : "The browser you are using now would be accepted."}
+            {denied || !allowed ? t("clientRules.refused") : t("clientRules.accepted")}
         </p>
     );
 }

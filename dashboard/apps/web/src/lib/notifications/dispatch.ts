@@ -31,6 +31,7 @@ import {
     type WebhookFormat
 } from "@polaris/core";
 import { recipientShelf } from "@/lib/workspace-scope";
+import { deliveryText } from "./delivery-words";
 
 /** One thing worth telling somebody about. */
 export interface NotifyInput {
@@ -178,6 +179,7 @@ async function deliverDestination(
                   input.body ? `${input.title}\n${input.body}` : input.title
               )
             : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
+                  openLabel: (await wordsFor(input.userId, "notices"))("delivery.openInPolaris"),
                   event: input.event,
                   level,
                   title: input.title,
@@ -295,6 +297,7 @@ export async function testDestination(userId: string, destinationId: string): Pr
         destination.kind === "sms"
             ? await sendSms(userId, destination.target, `${title}: ${body}`)
             : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
+                  openLabel: t("delivery.openInPolaris"),
                   event: "test",
                   level: "info",
                   title,
@@ -304,5 +307,5 @@ export async function testDestination(userId: string, destinationId: string): Pr
               });
 
     await recordDestinationResult(destination.id, result.error ?? null);
-    return result;
+    return result.error ? { error: deliveryText(t, result.error) } : result;
 }

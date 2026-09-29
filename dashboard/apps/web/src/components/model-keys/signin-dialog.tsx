@@ -31,6 +31,7 @@ import type { AgentSignin } from "@/lib/agents/agent-signins";
 import type { SigninIdentity, SigninView } from "@/lib/agents/signin-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CornerDownLeft, ExternalLink, Loader2, Terminal } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -67,6 +68,8 @@ export function SigninDialog({
     onClose: () => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("components");
+    const tcommon = useTranslations("common");
     const [id, setId] = useState<string | null>(null);
     const [screen, setScreen] = useState("");
     const [url, setUrl] = useState<string | null>(null);
@@ -174,15 +177,11 @@ export function SigninDialog({
                 scrollbar and made every line of the login half-visible. */}
             <DialogContent className="max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>Sign in to {signin.serves[0]?.label ?? signin.label}</DialogTitle>
+                    <DialogTitle>{t("signinDialog.title", { tool: signin.serves[0]?.label ?? signin.label })}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
-                    <p className="text-muted-foreground text-xs">
-                        Polaris is running the sign-in on a machine of its own. Open the page it
-                        asks for, authorise it in your browser, and paste the code it gives you into
-                        the line below the terminal.
-                    </p>
+                    <p className="text-muted-foreground text-xs">{t("signinDialog.intro")}</p>
                     {/* Worth saying before rather than after. This is a login on
                         a machine with nothing signed in to it, so it cannot
                         disturb the tool on your own computer - but the vendor may
@@ -190,11 +189,7 @@ export function SigninDialog({
                         out from a session that stopped working is finding it out
                         in the worst place. */}
                     {signin.subscription ? (
-                        <p className="text-muted-foreground text-xs">
-                            This runs on a machine with nothing signed in to it, so it leaves the
-                            tool on your own computer alone. It may retire a credential you linked
-                            here before, though - some vendors allow one at a time.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("signinDialog.subscription")}</p>
                     ) : null}
 
                     {/* The address, lifted out of the terminal. Every one of these
@@ -211,7 +206,7 @@ export function SigninDialog({
                             className="bg-primary/10 border-primary/40 hover:bg-primary/15 flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                         >
                             <ExternalLink className="size-4 shrink-0" />
-                            <span className="min-w-0 flex-1">Open the sign-in page</span>
+                            <span className="min-w-0 flex-1">{t("signinDialog.openPage")}</span>
                         </a>
                     ) : null}
 
@@ -229,11 +224,9 @@ export function SigninDialog({
                         <div className="bg-elevated flex h-[26rem] flex-col items-center justify-center gap-2 rounded-md border border-border">
                             <Loader2 className="text-muted-foreground size-5 shrink-0 animate-spin" />
                             <p className="text-muted-foreground text-xs">
-                                {id ? "Installing the tool on it." : "Starting a machine."}
+                                {id ? t("signinDialog.installing") : t("signinDialog.starting")}
                             </p>
-                            <p className="text-muted-foreground text-xs">
-                                This takes a minute the first time.
-                            </p>
+                            <p className="text-muted-foreground text-xs">{t("signinDialog.firstTime")}</p>
                         </div>
                     )}
 
@@ -248,7 +241,7 @@ export function SigninDialog({
                                     send();
                                 }
                             }}
-                            placeholder="Type into it, then press enter"
+                            placeholder={t("signinDialog.typeHere")}
                             className="min-w-0 flex-1"
                             disabled={!ready || busy}
                         />
@@ -263,22 +256,17 @@ export function SigninDialog({
                     </div>
 
                     <label className="block space-y-1 border-t border-border pt-3">
-                        <span className="text-xs text-muted-foreground">
-                            What to call this account here. Leave it empty and Polaris names it
-                            after whoever it turns out to belong to.
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("signinDialog.nameHint")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Work subscription"
+                            placeholder={t("signinDialog.namePlaceholder")}
                         />
                     </label>
 
                     <label className="block space-y-1">
                         <span className="text-xs text-muted-foreground">
-                            When it prints the {signin.label.toLowerCase()}, copy it in here.
-                            Polaris does not read it off the screen for you - storing the wrong line
-                            would not show up until a session failed to sign in.
+                            {t("signinDialog.copyIn", { what: signin.label.toLowerCase() })}
                         </span>
                         <Input
                             type="password"
@@ -293,11 +281,11 @@ export function SigninDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={close}>
-                        Cancel
+                        {tcommon("actions.cancel")}
                     </Button>
                     <Button onClick={save} disabled={busy || secret.trim().length === 0}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        Link it
+                        {t("signinDialog.link")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

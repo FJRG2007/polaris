@@ -9,6 +9,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import { auditExportResponse } from "@/lib/audit-routes";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const session = sessionSchema.safeParse(new URL(request.url).searchParams.get("session") || undefined);
-    if (!session.success) return NextResponse.json({ error: "Not a session" }, { status: 400 });
+    if (!session.success) return NextResponse.json({ error: (await readerWords("api"))("errors.notASession") }, { status: 400 });
 
     // The session parameter is read here and nowhere else, so stripping it from
     // the URL leaves the narrowing the shared parser knows.

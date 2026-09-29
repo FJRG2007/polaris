@@ -16,6 +16,7 @@ import { backgroundUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { reportGame } from "@/lib/presence-activity/service";
 import { activitySettingsOf } from "@/lib/presence-activity/settings";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export async function GET(): Promise<Response> {
     // Sent by the desktop app on its own while a game runs, not by anybody
     // using Polaris, so it must not keep the idle lock from closing.
     const user = await backgroundUser();
-    if (!user) return Response.json({ error: "Sign in to continue" }, { status: 401 });
+    if (!user) return Response.json({ error: (await readerWords("api"))("errors.signIn") }, { status: 401 });
     const { settings } = await activitySettingsOf(user.id);
     return Response.json(
         { customGames: settings.customGames },
@@ -45,12 +46,12 @@ export async function POST(request: Request): Promise<Response> {
     // Sent by the desktop app on its own while a game runs, not by anybody
     // using Polaris, so it must not keep the idle lock from closing.
     const user = await backgroundUser();
-    if (!user) return Response.json({ error: "Sign in to continue" }, { status: 401 });
+    if (!user) return Response.json({ error: (await readerWords("api"))("errors.signIn") }, { status: 401 });
 
     const throttle = await rateLimit(`activity-game:${user.id}`, REPORT_LIMIT, REPORT_WINDOW_MS);
     if (!throttle.ok) {
         return Response.json(
-            { error: "Too many reports, try again in a moment" },
+            { error: (await readerWords("api"))("errors.tooManyReports") },
             {
                 status: 429,
                 headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) }
@@ -62,10 +63,10 @@ export async function POST(request: Request): Promise<Response> {
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
     }
     const report = core.gameReportSchema.safeParse(body);
-    if (!report.success) return Response.json({ error: "That could not be read" }, { status: 400 });
+    if (!report.success) return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
 
     const outcome = await reportGame(user.id, report.data);
     return Response.json(outcome, { headers: { "Cache-Control": "private, no-store" } });

@@ -25,6 +25,7 @@ import {
     unbanUserAction,
     type UserProfile
 } from "@/app/(app)/drive/activity-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function UserProfileDialog({
     userId,
@@ -33,6 +34,7 @@ export function UserProfileDialog({
     userId: string | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("components");
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -89,11 +91,11 @@ export function UserProfileDialog({
         <Dialog open={userId !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>User</DialogTitle>
+                    <DialogTitle>{t("userProfile.title")}</DialogTitle>
                 </DialogHeader>
                 {loading ? (
                     <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Loading...
+                        <Loader2 className="size-4 animate-spin" /> {t("userProfile.loading")}
                     </div>
                 ) : profile ? (
                     <div className="flex flex-col gap-4">
@@ -110,9 +112,9 @@ export function UserProfileDialog({
                                         <PersonName id={userId} name={profile.name} />
                                     </span>
                                     {profile.isAdmin ? (
-                                        <Badge variant="neutral">Admin</Badge>
+                                        <Badge variant="neutral">{t("userProfile.admin")}</Badge>
                                     ) : null}
-                                    {profile.banned ? <Badge variant="danger">Banned</Badge> : null}
+                                    {profile.banned ? <Badge variant="danger">{t("userProfile.banned")}</Badge> : null}
                                 </p>
                                 {profile.email ? (
                                     <p className="truncate text-sm text-muted-foreground">
@@ -123,27 +125,27 @@ export function UserProfileDialog({
                         </div>
                         {profile.banned && profile.banReason ? (
                             <p className="text-sm text-muted-foreground">
-                                Reason: {profile.banReason}
+                                {t("userProfile.reason", { reason: profile.banReason })}
                             </p>
                         ) : null}
                         {profile.viewerIsAdmin && !profile.self ? (
                             profile.banned ? (
                                 <Button variant="secondary" onClick={onUnban} disabled={busy}>
-                                    {busy ? "Working..." : "Unban user"}
+                                    {busy ? t("userProfile.working") : t("userProfile.unban")}
                                 </Button>
                             ) : (
                                 <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Ban reason (optional)
+                                        {t("userProfile.banReason")}
                                         <Input
                                             value={reason}
                                             onChange={(event) => setReason(event.target.value)}
-                                            placeholder="Why is this account being banned?"
+                                            placeholder={t("userProfile.banPlaceholder")}
                                         />
                                     </label>
                                     <Button variant="danger" onClick={onBan} disabled={busy}>
                                         <Ban className="size-4" />
-                                        {busy ? "Banning..." : "Ban user"}
+                                        {busy ? t("userProfile.banning") : t("userProfile.ban")}
                                     </Button>
                                 </div>
                             )

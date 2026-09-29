@@ -11,6 +11,7 @@ import { z } from "zod";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { claimExtensionConnection } from "@/lib/extension/sessions";
 import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,13 +29,13 @@ export async function POST(request: Request): Promise<Response> {
         WINDOW_MS
     );
     if (!throttle.ok) {
-        return Response.json({ error: "Too many requests from here." }, { status: 429 });
+        return Response.json({ error: (await readerWords("api"))("errors.tooManyRequests") }, { status: 429 });
     }
 
     const body = await request.json().catch(() => null);
     const asked = claimSchema.safeParse(body);
     if (!asked.success)
-        return Response.json({ error: "A device code is required." }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.deviceCodeRequired") }, { status: 400 });
 
     const claim = await claimExtensionConnection(asked.data.deviceCode, {
         ip: (await clientIp()) ?? null,

@@ -26,6 +26,7 @@ import {
     touchLiveClient
 } from "@/lib/notifications/live-clients";
 import { openShelfFor } from "@/lib/workspace-scope";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up instead of reconnecting every few
     // seconds against a session that is gone.
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
 
     const userId = session.id;
     // Nobody, where it was not said. Only a connection that declared itself is

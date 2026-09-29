@@ -10,20 +10,23 @@
  */
 
 import { useState } from "react";
-import { Input, Select, type SelectOption } from "@polaris/ui";
+import { Input, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 type Mode = "never" | "5m" | "10m" | "30m" | "1h" | "hours" | "days" | "weeks" | "date";
 
-const MODE_OPTIONS: SelectOption[] = [
-    { value: "never", label: "Never" },
-    { value: "5m", label: "In 5 minutes" },
-    { value: "10m", label: "In 10 minutes" },
-    { value: "30m", label: "In 30 minutes" },
-    { value: "1h", label: "In 1 hour" },
-    { value: "hours", label: "In a number of hours..." },
-    { value: "days", label: "In a number of days..." },
-    { value: "weeks", label: "In a number of weeks..." },
-    { value: "date", label: "On a specific date..." }
+/** Each choice, and its words: `expiry.modes.<key>`. */
+const MODES: readonly { readonly value: Mode; readonly key: NamespaceKey<"components"> }[] = [
+    { value: "never", key: "expiry.modes.never" },
+    { value: "5m", key: "expiry.modes.m5" },
+    { value: "10m", key: "expiry.modes.m10" },
+    { value: "30m", key: "expiry.modes.m30" },
+    { value: "1h", key: "expiry.modes.h1" },
+    { value: "hours", key: "expiry.modes.hours" },
+    { value: "days", key: "expiry.modes.days" },
+    { value: "weeks", key: "expiry.modes.weeks" },
+    { value: "date", key: "expiry.modes.date" }
 ];
 
 const PRESET_MS: Partial<Record<Mode, number>> = {
@@ -40,6 +43,7 @@ const UNIT_MS: Record<"hours" | "days" | "weeks", number> = {
 };
 
 export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) {
+    const t = useTranslations("components");
     const [mode, setMode] = useState<Mode>("never");
     const [amount, setAmount] = useState(1);
     const [dateStr, setDateStr] = useState("");
@@ -67,7 +71,7 @@ export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) 
                     setMode(next);
                     emit(next, amount, dateStr);
                 }}
-                options={MODE_OPTIONS}
+                options={MODES.map((option) => ({ value: option.value, label: t(option.key) }))}
             />
 
             {mode === "hours" || mode === "days" || mode === "weeks" ? (
@@ -83,7 +87,7 @@ export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) 
                         }}
                         className="w-24"
                     />
-                    <span className="text-sm text-muted-foreground">{unit}</span>
+                    <span className="text-sm text-muted-foreground">{t(`expiry.units.${unit}`)}</span>
                 </div>
             ) : null}
 

@@ -24,11 +24,9 @@ vi.mock("@/lib/legal/service", () => ({
 
 const { PublicChrome } = await import("@/components/public-chrome");
 
-const html = renderToStaticMarkup(
-    <PublicChrome>
-        <p>a profile</p>
-    </PublicChrome>
-);
+// A server component that reads the reader's language first, so it is awaited
+// rather than rendered as an element.
+const html = renderToStaticMarkup(await PublicChrome({ children: <p>a profile</p> }));
 
 describe("the public bar", () => {
     it("offers the way in", () => {

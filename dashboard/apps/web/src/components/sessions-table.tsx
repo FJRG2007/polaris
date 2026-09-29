@@ -19,21 +19,27 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { signInSummary } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { clientKindText, signInText } from "@/lib/sign-in-words";
 import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { addressLine, DeviceAddress } from "@/components/device-address";
-import { clientKindLabel, readClientDevice } from "@/lib/vault/client-device";
+import { readClientDevice } from "@/lib/vault/client-device";
 import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
 import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
-export function sessionOrigin(session: SessionView): string {
-    return [addressLine(session), session.host].filter(Boolean).join(" - ") || "Unknown location";
+export function sessionOrigin(
+    session: SessionView,
+    // The reader's words for it where there is a reader; the English default
+    // keeps callers that have none, and the tests, as they were.
+    unknown = "Unknown location" // i18n-ignore
+): string {
+    return [addressLine(session), session.host].filter(Boolean).join(" - ") || unknown;
 }
 
 /**
@@ -58,9 +64,10 @@ export function AuthorizedBy({
     session: SessionView;
     ownHistory: boolean;
 }) {
+    const t = useTranslations("components");
     const authorizer = session.authorizedBy;
     if (!authorizer) return null;
-    const how = session.signIn.method === "qr-code" ? "Code scanned by" : "Allowed by";
+    const how = session.signIn.method === "qr-code" ? t("sessionsTable.scannedBy") : t("sessionsTable.allowedBy");
     return (
         <p className="flex flex-wrap items-center gap-1 truncate text-xs text-muted-foreground">
             <KeyRound className="size-3 shrink-0" aria-hidden />
@@ -75,8 +82,8 @@ export function AuthorizedBy({
             ) : (
                 <span className="min-w-0 truncate">{authorizer.device}</span>
             )}
-            {authorizer.current ? <Badge variant="neutral">This device</Badge> : null}
-            {!authorizer.live ? <Badge variant="warning">Signed out since</Badge> : null}
+            {authorizer.current ? <Badge variant="neutral">{t("sessionsTable.thisDevice")}</Badge> : null}
+            {!authorizer.live ? <Badge variant="warning">{t("sessionsTable.signedOutSince")}</Badge> : null}
         </p>
     );
 }
@@ -172,6 +179,7 @@ export function SessionsTable({
      *  a breakpoint that would put the table on a scrollbar at every size. */
     compact?: boolean;
 }) {
+    const t = useTranslations("components");
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
@@ -184,25 +192,25 @@ export function SessionsTable({
                             nowrap text and sets a floor under the column that no
                             amount of truncating gets below, so the table spills
                             sideways. Capped, the column takes what is left instead. */}
-                        <th className="w-full max-w-0 px-3 py-2 font-medium">Device</th>
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">{t("sessionsTable.device")}</th>
                         {compact ? null : (
                             <>
                                 {/* The two halves of what the device claims to be,
                                     each its own column so a list can be scanned down
                                     one of them. They arrive before the address: what
                                     it is is asked more often than where it was. */}
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">App</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">{t("sessionsTable.app")}</th>
                                 <th className="hidden px-3 py-2 font-medium md:table-cell">
-                                    System
+                                    {t("sessionsTable.system")}
                                 </th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                    Address
+                                    {t("sessionsTable.address")}
                                 </th>
                                 <th className="hidden px-3 py-2 font-medium xl:table-cell">
-                                    Domain
+                                    {t("sessionsTable.domain")}
                                 </th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                    Last active
+                                    {t("sessionsTable.lastActive")}
                                 </th>
                             </>
                         )}
@@ -246,18 +254,18 @@ export function SessionsTable({
                                                     {session.device}
                                                 </span>
                                                 {session.current ? (
-                                                    <Badge variant="primary">This device</Badge>
+                                                    <Badge variant="primary">{t("sessionsTable.thisDevice")}</Badge>
                                                 ) : null}
-                                                {session.locked ? <Badge>Locked</Badge> : null}
+                                                {session.locked ? <Badge>{t("sessionsTable.locked")}</Badge> : null}
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
-                                                <Badge>{signInSummary(session.signIn)}</Badge>
+                                                <Badge>{signInText(t, session.signIn)}</Badge>
                                                 {/* Only where it is actually on. A
                                                     badge on every row saying a session
                                                     is not pinned is a column of "no". */}
                                                 {(session.pinToAddress ?? session.pinnedByRule) ? (
-                                                    <Badge title="This session only works from the address it was opened at">
-                                                        Address-locked
+                                                    <Badge title={t("sessionsTable.sessionLockedHint")}>
+                                                        {t("sessionsTable.addressLocked")}
                                                     </Badge>
                                                 ) : null}
                                             </p>
@@ -268,12 +276,13 @@ export function SessionsTable({
                                                     !compact && "lg:hidden"
                                                 )}
                                             >
-                                                {sessionOrigin(session)}
+                                                {sessionOrigin(session, t("sessionsTable.unknownLocation"))}
                                             </p>
                                             {compact ? (
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    Last active{" "}
-                                                    <RelativeTime iso={session.lastSeenAt} />
+                                                    {t.rich("sessionsTable.lastActiveAt", {
+                                                        time: <RelativeTime key="time" iso={session.lastSeenAt} />
+                                                    })}
                                                 </p>
                                             ) : null}
                                             {/* Whether this reader may open a session's
@@ -307,7 +316,7 @@ export function SessionsTable({
                                         </td>
                                         <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
                                             <span className="block truncate">
-                                                {session.host ?? "Not recorded"}
+                                                {session.host ?? t("sessionsTable.notRecorded")}
                                             </span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
@@ -321,8 +330,8 @@ export function SessionsTable({
                                             <Button variant="ghost" size="icon" asChild>
                                                 <Link
                                                     href={activityHref(session)}
-                                                    title="Activity from this session"
-                                                    aria-label={`Activity from ${session.device}`}
+                                                    title={t("sessionsTable.activity")}
+                                                    aria-label={t("sessionsTable.activityFrom", { device: session.device })}
                                                 >
                                                     <History className="size-4" />
                                                 </Link>
@@ -340,8 +349,8 @@ export function SessionsTable({
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            title="Sign out"
-                                            aria-label={`Sign ${session.device} out`}
+                                            title={t("sessionsTable.signOut")}
+                                            aria-label={t("sessionsTable.signOutNamed", { device: session.device })}
                                             disabled={busyId !== null}
                                             onClick={() => onRevoke(session)}
                                         >
@@ -374,10 +383,10 @@ export function SessionsTable({
                                             <span className="min-w-0 truncate text-muted-foreground">
                                                 {extension.os}
                                             </span>
-                                            <Badge variant="neutral">Extension</Badge>
+                                            <Badge variant="neutral">{t("sessionsTable.extension")}</Badge>
                                             {(extension.pinToAddress ?? extension.pinnedByRule) ? (
-                                                <Badge title="This extension only works from the address it was last seen at">
-                                                    Address-locked
+                                                <Badge title={t("sessionsTable.extensionLockedHint")}>
+                                                    {t("sessionsTable.addressLocked")}
                                                 </Badge>
                                             ) : null}
                                         </p>
@@ -387,8 +396,10 @@ export function SessionsTable({
                                                 !compact && "lg:hidden"
                                             )}
                                         >
-                                            {extension.ip ?? "Address not recorded"} - last active{" "}
-                                            <RelativeTime iso={extension.lastSeenAt} />
+                                            {t.rich("sessionsTable.whereAndWhen", {
+                                                where: extension.ip ?? t("sessionsTable.addressNotRecorded"),
+                                                time: <RelativeTime key="time" iso={extension.lastSeenAt} />
+                                            })}
                                         </p>
                                     </div>
                                 </div>
@@ -396,7 +407,7 @@ export function SessionsTable({
                             {compact ? null : (
                                 <>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
-                                        Extension
+                                        {t("sessionsTable.extension")}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
                                         <ClientCell
@@ -408,13 +419,13 @@ export function SessionsTable({
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
                                         {extension.ip ?? (
                                             <span className="text-muted-foreground">
-                                                Not recorded
+                                                {t("sessionsTable.notRecorded")}
                                             </span>
                                         )}
                                     </td>
                                     <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
                                         <span className="block truncate">
-                                            {extension.host ?? "Not recorded"}
+                                            {extension.host ?? t("sessionsTable.notRecorded")}
                                         </span>
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
@@ -426,7 +437,7 @@ export function SessionsTable({
                                 <div className="flex justify-end gap-1">
                                     {onPinExtension ? (
                                         <PinButton
-                                            label={`${extension.browser} extension`}
+                                            label={t("sessionsTable.extensionNamed", { browser: extension.browser })}
                                             pinToAddress={extension.pinToAddress}
                                             pinnedByRule={extension.pinnedByRule}
                                             busy={busyId !== null}
@@ -437,8 +448,8 @@ export function SessionsTable({
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            title="Disconnect"
-                                            aria-label={`Disconnect ${extension.browser}`}
+                                            title={t("sessionsTable.disconnect")}
+                                            aria-label={t("sessionsTable.disconnectNamed", { browser: extension.browser })}
                                             disabled={busyId !== null}
                                             onClick={() => onDisconnect(extension)}
                                         >
@@ -456,7 +467,7 @@ export function SessionsTable({
                         compiled for. */}
                     {clients.map((client) => {
                         const device = readClientDevice(client.name);
-                        const kind = clientKindLabel(client.kind);
+                        const kind = clientKindText(t, client.kind);
                         // The browser's mark where the name gave one, and what kind
                         // of client it is where it did not. A name that is not a
                         // browser answers `BrowserMark` with the neutral globe, so
@@ -494,8 +505,10 @@ export function SessionsTable({
                                                     !compact && "lg:hidden"
                                                 )}
                                             >
-                                                {client.label} - last active{" "}
-                                                <RelativeTime iso={client.lastSeenAt} />
+                                                {t.rich("sessionsTable.whereAndWhen", {
+                                                    where: client.label,
+                                                    time: <RelativeTime key="time" iso={client.lastSeenAt} />
+                                                })}
                                             </p>
                                         </div>
                                     </div>
@@ -514,7 +527,7 @@ export function SessionsTable({
                                                 />
                                             ) : (
                                                 <span className="text-muted-foreground">
-                                                    Not recorded
+                                                    {t("sessionsTable.notRecorded")}
                                                 </span>
                                             )}
                                         </td>
@@ -523,10 +536,10 @@ export function SessionsTable({
                                             rather than left blank: an empty cell
                                             reads as a value that went missing. */}
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                            Not recorded
+                                            {t("sessionsTable.notRecorded")}
                                         </td>
                                         <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                            <span className="block truncate">Not recorded</span>
+                                            <span className="block truncate">{t("sessionsTable.notRecorded")}</span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <RelativeTime iso={client.lastSeenAt} />
@@ -542,8 +555,8 @@ export function SessionsTable({
                                         <Button variant="ghost" size="icon" asChild>
                                             <Link
                                                 href="/vault/clients"
-                                                title="Manage connected apps"
-                                                aria-label={`Manage ${device.browser}`}
+                                                title={t("sessionsTable.manageApps")}
+                                                aria-label={t("sessionsTable.manageNamed", { name: device.browser })}
                                             >
                                                 <PanelRightOpen className="size-4" />
                                             </Link>
@@ -582,29 +595,32 @@ function PinButton({
     busy: boolean;
     onPin: (pinned: boolean | null) => void;
 }) {
+    const t = useTranslations("components");
     const state = pinToAddress;
     const effective = state ?? pinnedByRule;
     const next = state === null ? true : state === true ? false : null;
     const says =
         state === null
-            ? `Following your account setting, which is currently ${pinnedByRule ? "locked" : "not locked"}`
+            ? pinnedByRule
+                ? t("sessionsTable.pin.followingLocked")
+                : t("sessionsTable.pin.followingUnlocked")
             : state
-              ? "Locked to the address it was opened at"
-              : "Not locked, whatever your account setting says";
+              ? t("sessionsTable.pin.locked")
+              : t("sessionsTable.pin.unlocked");
     const then =
         next === true
-            ? "lock it"
+            ? t("sessionsTable.pin.lockIt")
             : next === false
-              ? "leave it unlocked"
-              : "follow your account setting";
+              ? t("sessionsTable.pin.leaveUnlocked")
+              : t("sessionsTable.pin.follow");
 
     return (
         <Button
             variant="ghost"
             size="icon"
             disabled={busy}
-            title={`${says}. Press to ${then}.`}
-            aria-label={`Address lock for ${label}: ${says}`}
+            title={t("sessionsTable.pin.title", { says, then })}
+            aria-label={t("sessionsTable.pin.label", { label, says })}
             onClick={() => onPin(next)}
         >
             {effective ? (

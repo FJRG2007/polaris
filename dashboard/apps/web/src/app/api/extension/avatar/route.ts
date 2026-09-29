@@ -17,6 +17,7 @@ import { scopeChoices } from "@/lib/workspace-scope";
 import { resolveAvatar, resolveOrgAvatar } from "@/lib/avatar-service";
 import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
 import { bearerToken, readExtensionToken } from "@/lib/extension/sessions";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function GET(request: Request): Promise<Response> {
     } else {
         const orgId = orgSchema.safeParse(asked);
         if (!orgId.success)
-            return Response.json({ error: "Unknown organization." }, { status: 400 });
+            return Response.json({ error: (await readerWords("api"))("errors.unknownOrganization") }, { status: 400 });
         // Only an organization this account is part of. Anything else is answered
         // exactly as one with no picture, so this cannot be used to test ids.
         const mine = await scopeChoices(principal.userId);

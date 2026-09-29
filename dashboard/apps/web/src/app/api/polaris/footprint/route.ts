@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiPermission } from "@/lib/api-session";
 
 import { readPolarisFootprint } from "@/lib/polaris-footprint";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function GET(request: Request): Promise<Response> {
         // being unreachable, hostd refusing, an inspect timing out - so it is
         // reported as what it is, and stays legible to logs and retries.
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not measure Polaris" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.footprintFailed") },
             { status: 502 }
         );
     }

@@ -29,7 +29,13 @@ export interface WebhookPayload {
     /** Absolute link back into Polaris, when the alert has somewhere to go. */
     url: string | null;
     at: string;
+    /** The link's words, in the recipient's language. Optional so a caller with
+     *  no reader - a project webhook - still gets a label. */
+    openLabel?: string;
 }
+
+/** The link's words when nobody's language is known. */
+const OPEN_IN_POLARIS = "Open in Polaris"; // i18n-ignore the fallback for a caller with no reader
 
 /** Accent colour per severity, as Discord's integer and Slack's hex. */
 const COLORS: Record<NotificationLevel, number> = {
@@ -67,7 +73,7 @@ function slackBody(payload: WebhookPayload): unknown {
     if (payload.url) {
         blocks.push({
             type: "context",
-            elements: [{ type: "mrkdwn", text: `<${payload.url}|Open in Polaris>` }]
+            elements: [{ type: "mrkdwn", text: `<${payload.url}|${payload.openLabel ?? OPEN_IN_POLARIS}>` }]
         });
     }
     return {
@@ -101,7 +107,7 @@ function teamsBody(payload: WebhookPayload): unknown {
                               actions: [
                                   {
                                       type: "Action.OpenUrl",
-                                      title: "Open in Polaris",
+                                      title: payload.openLabel ?? OPEN_IN_POLARIS,
                                       url: payload.url
                                   }
                               ]
@@ -137,9 +143,12 @@ export async function sendWebhook(
     // Telegram is addressed by the chat in the URL it was given, and posted to the
     // method itself with the chat in the body.
     const telegram = format === "telegram" ? telegramTarget(url) : null;
+    // i18n-ignore every reason here is stored, and read in the reader's words through delivery-words
     if (format === "telegram" && !telegram)
+        // i18n-ignore
         return { error: "That is not a Telegram sendMessage URL with a chat_id." };
     const target = safeUrl(telegram ? telegram.endpoint : url);
+    // i18n-ignore
     if (!target) return { error: "The endpoint could not be reached." };
     // Timed out, refused, or an address that is not on the public internet all
     // read the same here: the status of a request to a private address is exactly
@@ -156,12 +165,17 @@ export async function sendWebhook(
                 : bodyFor(format, payload)
         )
     });
+    // i18n-ignore
     if (!res) return { error: "The endpoint could not be reached." };
     if (res.ok) return {};
     if (res.status === 404)
+        // i18n-ignore
         return { error: "The endpoint is gone (404). It was probably deleted." };
     if (res.status === 401 || res.status === 403)
+        // i18n-ignore
         return { error: "The endpoint refused the message (unauthorized)." };
+    // i18n-ignore
     if (res.status === 429) return { error: "The endpoint is rate limiting Polaris (429)." };
+    // i18n-ignore
     return { error: `The endpoint answered HTTP ${res.status}.` };
 }

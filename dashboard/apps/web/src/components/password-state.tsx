@@ -21,6 +21,16 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+
+/** The catalog's words for each of `WORDS`, in the same order. */
+const WORD_KEYS = [
+    "passwordState.words.veryWeak",
+    "passwordState.words.weak",
+    "passwordState.words.fair",
+    "passwordState.words.strong",
+    "passwordState.words.fantastic"
+] as const;
 import { passwordBreachCount } from "@/lib/pwned-passwords";
 import { rememberBreach, rememberedBreach } from "@/lib/breach-cache";
 import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
@@ -138,6 +148,7 @@ export function PasswordState({
     scope?: string;
     className?: string;
 }) {
+    const t = useTranslations("components");
     const breach = usePasswordBreach(password, scope);
     const strength = passwordStrength(password);
     if (!password) return null;
@@ -156,7 +167,7 @@ export function PasswordState({
                               : "bg-danger"
                     )}
                 />
-                <span className="text-muted-foreground">{strength.word}</span>
+                <span className="text-muted-foreground">{t(WORD_KEYS[WORDS.indexOf(strength.word)] ?? WORD_KEYS[0])}</span>
             </span>
 
             {breach.state === "breached" ? (
@@ -164,19 +175,19 @@ export function PasswordState({
                     <ShieldAlert className="size-3.5 shrink-0" />
                     {/* The number, because it is what changes behaviour. "Weak"
                         is an opinion; "seen 3,730,471 times" is not. */}
-                    Found in breaches {breach.count.toLocaleString()} times
+                    {t("passwordState.breached", { count: breach.count })}
                 </span>
             ) : breach.state === "clear" ? (
                 <span className="flex items-center gap-1 text-success">
                     <ShieldCheck className="size-3.5 shrink-0" />
-                    Not in any known breach
+                    {t("passwordState.clear")}
                 </span>
             ) : breach.state === "checking" ? (
-                <span className="text-muted-foreground">Checking breaches...</span>
+                <span className="text-muted-foreground">{t("passwordState.checking")}</span>
             ) : password.length >= MIN_ASKED ? (
                 <span className="flex items-center gap-1 text-muted-foreground">
                     <ShieldQuestion className="size-3.5 shrink-0" />
-                    Breach check unavailable
+                    {t("passwordState.unavailable")}
                 </span>
             ) : null}
         </span>

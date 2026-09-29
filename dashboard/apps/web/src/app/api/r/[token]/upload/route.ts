@@ -25,6 +25,7 @@ import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { claimUploadPath, replaceWithStaged } from "@/lib/upload-naming";
 import { cappedStream } from "@/lib/stream-cap";
 import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -211,7 +212,7 @@ export async function PUT(
         await notify({
             userId: fileRequest.ownerId,
             event: "drive.dropPoint.received",
-            title: `A file arrived at "${fileRequest.title}"`,
+            title: (await wordsFor(fileRequest.ownerId, "notices"))("dropPoint.received", { title: fileRequest.title }),
             body: safeName,
             href: `/drive/drop-points/${fileRequest.id}`
         });

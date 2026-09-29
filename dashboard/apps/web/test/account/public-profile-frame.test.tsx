@@ -18,6 +18,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { withMessages } from "../setup/i18n";
 import type { ReactNode } from "react";
 
 let viewer: { id: string; isAdmin: boolean } | null = null;
@@ -61,7 +62,7 @@ const { default: OrganizationPage } = await import("@/app/o/[slug]/page");
 
 /** The frame a page came back in, and the markup inside it. */
 async function drawn(page: Promise<unknown>): Promise<{ frame: string | null; html: string }> {
-    const html = renderToStaticMarkup((await page) as never);
+    const html = renderToStaticMarkup(withMessages((await page) as never));
     return { frame: html.match(/data-frame="(\w+)"/)?.[1] ?? null, html };
 }
 

@@ -24,7 +24,13 @@ import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const page = readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
-const files = readFile(`${SRC}components/app-download.tsx`, "utf8");
+// The offer is drawn by `app-download-offers` and awaited by `app-download`, and
+// its sentences live in the English catalog, so all three are what it says.
+const files = Promise.all([
+    readFile(`${SRC}components/app-download.tsx`, "utf8"),
+    readFile(`${SRC}components/app-download-offers.tsx`, "utf8"),
+    readFile(`${SRC}../messages/en-US/components.json`, "utf8")
+]).then((parts) => parts.join(" "));
 
 /**
  * The file with its line wrapping taken out.

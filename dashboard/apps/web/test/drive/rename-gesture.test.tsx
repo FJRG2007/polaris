@@ -16,6 +16,7 @@ import { FilesView } from "@/app/(app)/drive/files-view";
 import type { DriveEntry } from "@/app/(app)/drive/types";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));

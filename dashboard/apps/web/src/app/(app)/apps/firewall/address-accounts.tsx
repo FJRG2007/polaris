@@ -22,7 +22,7 @@ import { Badge } from "@polaris/ui";
 import { Users } from "lucide-react";
 import { grouped } from "./page-parts";
 import { Avatar } from "@/components/avatar";
-import { signInSummary } from "@polaris/core";
+import { signInText } from "@/lib/sign-in-words";
 import { RelativeTime } from "@/components/relative-time";
 import type { AddressAccount, AddressAccounts as AddressAccountsView } from "@/lib/address-accounts";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -35,6 +35,7 @@ const SESSION_ROWS = 3;
 
 export function AddressAccounts({ accounts }: { accounts: AddressAccountsView }) {
     const t = useTranslations("firewall");
+    const tc = useTranslations("components");
     const { list, more } = accounts;
     return (
         <div>
@@ -90,7 +91,7 @@ export function AddressAccounts({ accounts }: { accounts: AddressAccountsView })
                                                         {session.host}
                                                     </span>
                                                 ) : null}
-                                                <span>{signInSummary(session.signIn)}</span>
+                                                <span>{signInText(tc, session.signIn)}</span>
                                                 <span>
                                                     {session.live ? t("accounts.active") : t("accounts.lastActive")}{" "}
                                                     <RelativeTime iso={session.lastSeenAt} />

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
+import { withMessages } from "../setup/i18n";
 
 function session(overrides: Partial<SessionView> = {}): SessionView {
     return {
@@ -53,7 +54,7 @@ function authorizer(overrides: Partial<NonNullable<SessionView["authorizedBy"]>>
 /** The table as the account's own list draws it: the reader may open a session's
  *  history, which is what `activityHref` says. */
 function render(sessions: SessionView[]): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <SessionsTable
             sessions={sessions}
             busyId={null}
@@ -61,20 +62,20 @@ function render(sessions: SessionView[]): string {
             activityHref={(session) => `/account/activity?session=${session.id}`}
             onRevoke={() => {}}
         />
-    );
+    ));
 }
 
 /** The table as an administrator reading somebody else's account draws it: no
  *  history to open, because that log is the account holder's own. */
 function renderForAdmin(sessions: SessionView[]): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <SessionsTable
             sessions={sessions}
             busyId={null}
             emptyLabel="Nothing is signed in."
             onRevoke={() => {}}
         />
-    );
+    ));
 }
 
 describe("the session table", () => {
@@ -256,7 +257,7 @@ describe("the session table", () => {
     });
 
     it("links a row to that session's own history rather than to the whole log", () => {
-        const markup = renderToStaticMarkup(
+        const markup = renderToStaticMarkup(withMessages(
             <SessionsTable
                 sessions={[session({ id: "session-1" })]}
                 busyId={null}
@@ -264,7 +265,7 @@ describe("the session table", () => {
                 activityHref={(entry) => `/account/activity?session=${entry.id}`}
                 onRevoke={() => {}}
             />
-        );
+        ));
         expect(markup).toContain('href="/account/activity?session=session-1"');
         expect(markup).toContain('aria-label="Activity from Chrome on Windows"');
     });
@@ -338,7 +339,7 @@ describe("a browser extension's connection", () => {
             pinToAddress: pin?.pinToAddress ?? null,
             pinnedByRule: pin?.pinnedByRule ?? false
         };
-        return renderToStaticMarkup(
+        return renderToStaticMarkup(withMessages(
             <SessionsTable
                 sessions={[]}
                 extensions={[shown]}
@@ -348,7 +349,7 @@ describe("a browser extension's connection", () => {
                 {...(onDisconnect ? { onDisconnect } : {})}
                 {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
             />
-        );
+        ));
     }
 
     it("is a row beside the browsers, with what it was seen from", () => {

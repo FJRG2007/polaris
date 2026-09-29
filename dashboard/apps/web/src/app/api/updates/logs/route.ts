@@ -13,6 +13,7 @@ import { open, stat } from "node:fs/promises";
 import { backgroundUser } from "@/lib/session";
 import type { UpdateLogTail } from "@/lib/update-log";
 import { UPDATE_LOG_PATH as LOG_PATH } from "@/lib/update-runner";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ const MARKER = /POLARIS_UPDATE_EXIT=(-?\d+)/;
 
 export async function GET(request: NextRequest): Promise<Response> {
     if (!(await backgroundUser())?.isAdmin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const raw = Number(request.nextUrl.searchParams.get("offset") ?? "0");

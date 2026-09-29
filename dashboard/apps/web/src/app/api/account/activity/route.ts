@@ -19,6 +19,7 @@ import { apiUser } from "@/lib/api-session";
 import { sessionDeviceLabels } from "@/lib/session-device";
 import { auditFacets, queryAudit } from "@/lib/audit-query";
 import { listUserActivitySessions } from "@/lib/audit-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export async function GET(request: Request): Promise<Response> {
     const filter = core.auditFilterSchema.safeParse(query);
     if (!session.success || !filter.success) {
         const issue = (!session.success ? session.error : filter.error)?.issues[0];
-        return NextResponse.json({ error: issue?.message ?? "Invalid request" }, { status: 400 });
+        return NextResponse.json({ error: issue?.message ?? (await readerWords("api"))("errors.invalidRequest") }, { status: 400 });
     }
 
     // Absent asks for everything; "none" asks for the entries stamped with no

@@ -22,6 +22,7 @@ import {
     startListenAlong,
     stopListenAlong
 } from "@/lib/presence-activity/listen-along";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,15 +48,15 @@ export async function POST(request: Request): Promise<Response> {
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
     }
     const asked = startSchema.safeParse(body);
-    if (!asked.success) return Response.json({ error: "That could not be read" }, { status: 400 });
+    if (!asked.success) return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
 
     const throttle = await rateLimit(`listen-along:${user.id}`, START_LIMIT, START_WINDOW_MS);
     if (!throttle.ok) {
         return Response.json(
-            { error: "That is a lot of songs at once. Try again in a minute." },
+            { error: (await readerWords("api"))("errors.tooManySongs") },
             { status: 429, headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) } }
         );
     }
@@ -67,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
             return Response.json({ error: caught.message, kind: caught.kind }, { status: 409 });
         }
         console.error("polaris: listen along could not start:", caught);
-        return Response.json({ error: "Listening along could not start. Try again in a moment." }, { status: 500 });
+        return Response.json({ error: (await readerWords("api"))("errors.listenAlongFailed") }, { status: 500 });
     }
     return Response.json({ hostId: asked.data.hostId }, { headers: NO_STORE });
 }

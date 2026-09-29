@@ -11,6 +11,7 @@ import { useToast } from "@polaris/ui";
 import { useSyncExternalStore } from "react";
 import { MonitorUp, ScrollText } from "lucide-react";
 import { desktopBridge, type DesktopOutcome, type PolarisDesktop } from "@/lib/desktop-bridge";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const never = () => () => undefined;
 
@@ -39,6 +40,7 @@ export function DesktopServiceActions({
     canReadLogs: boolean;
     canDeploy: boolean;
 }) {
+    const t = useTranslations("components");
     const bridge = useDesktopBridge();
     const toast = useToast();
     if (!bridge) return null;
@@ -56,11 +58,11 @@ export function DesktopServiceActions({
                     type="button"
                     onClick={() =>
                         void bridge
-                            .openWindow({ path: `/apps/deploy/${projectId}/logs?service=${serviceId}`, title: `Logs - ${label}` })
+                            .openWindow({ path: `/apps/deploy/${projectId}/logs?service=${serviceId}`, title: t("desktop.logsTitle", { label }) })
                             .then(report)
                     }
-                    aria-label="Follow logs in a window"
-                    title="Follow logs in a window"
+                    aria-label={t("desktop.followLogs")}
+                    title={t("desktop.followLogs")}
                     className={ICON_BUTTON}
                 >
                     <ScrollText className="size-4" />
@@ -74,8 +76,8 @@ export function DesktopServiceActions({
                             .pushLocal({ serviceId, name: label, href: `/apps/deploy/${projectId}?service=${serviceId}` })
                             .then(report)
                     }
-                    aria-label="Push from this computer"
-                    title="Push from this computer - build with its Docker and deploy the image"
+                    aria-label={t("desktop.push")}
+                    title={t("desktop.pushHint")}
                     className={ICON_BUTTON}
                 >
                     <MonitorUp className="size-4" />

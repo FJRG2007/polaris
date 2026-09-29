@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
+import { MessagesWrapper } from "../setup/i18n";
 
 afterEach(cleanup);
 
@@ -34,7 +35,7 @@ async function open(user: ReturnType<typeof userEvent.setup>) {
 describe("the provider list", () => {
     it("badges the providers a key can be had from for nothing", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         await open(user);
 
         // Groq's is an allowance that comes back; Cohere's runs out. Both are
@@ -45,7 +46,7 @@ describe("the provider list", () => {
 
     it("says nothing about a provider that bills from the first token", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         await open(user);
 
         const anthropic = screen.getByRole("option", { name: /Anthropic/ });
@@ -54,7 +55,7 @@ describe("the provider list", () => {
 
     it("narrows to them when that is what is typed", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
         await user.type(field, "free tier");
@@ -65,7 +66,7 @@ describe("the provider list", () => {
 
     it("still finds a provider by the family it serves rather than its name", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
         await user.type(field, "qwen");
@@ -75,7 +76,7 @@ describe("the provider list", () => {
 
     it("draws a provider with no mark of its own as its own letters, never the generic block", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
         await user.type(field, "hugging");

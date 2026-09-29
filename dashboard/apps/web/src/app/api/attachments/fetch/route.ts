@@ -16,6 +16,7 @@
 import { apiUser } from "@/lib/api-session";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { AttachRefused, fileFromAddress, fileFromDrive } from "@/lib/attachments/from-elsewhere";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
             : connectionId
               ? await fileFromDrive(user.id, connectionId, path, MAX_BYTES)
               : null;
-        if (!file) return Response.json({ error: "Nothing was asked for." }, { status: 400 });
+        if (!file) return Response.json({ error: (await readerWords("api"))("errors.nothingAsked") }, { status: 400 });
 
         return new Response(new Uint8Array(file.bytes), {
             headers: {
@@ -64,6 +65,6 @@ export async function GET(request: Request): Promise<Response> {
         if (caught instanceof AttachRefused) {
             return Response.json({ error: caught.message }, { status: 400 });
         }
-        return Response.json({ error: "That file could not be fetched." }, { status: 500 });
+        return Response.json({ error: (await readerWords("api"))("errors.fetchFailed") }, { status: 500 });
     }
 }

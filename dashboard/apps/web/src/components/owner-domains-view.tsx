@@ -21,6 +21,8 @@ import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { Badge, Button, ConfirmDeleteDialog, DnsRecordTable, EmptyState, Input } from "@polaris/ui";
 import { AlertTriangle, CheckCircle2, Clock, Globe, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
@@ -39,6 +41,23 @@ const RECHECK_SECONDS = 30;
 /** How often a certificate being ordered is asked about. An order waits on DNS
  *  and Let's Encrypt and usually lands inside a minute. */
 const ORDER_POLL_MS = 10_000;
+
+type Words = NamespaceTranslator<"components">;
+
+/** What the shared domain policy refuses with, in the reader's words. It writes
+ *  English because the server holds the same rules; anything else passes. */
+function policyText(t: Words, message: string): string {
+    if (message === "That is an address, not a domain") return t("ownerDomains.policy.address");
+    if (message === "A domain needs a suffix, like example.com") return t("ownerDomains.policy.suffix");
+    if (message === "Enter a domain like example.com") return t("ownerDomains.policy.shape");
+    let match = /^(.+) is this Polaris's own domain$/.exec(message);
+    if (match) return t("ownerDomains.policy.own", { host: match[1] ?? "" });
+    match = /^This Polaris answers on (.+), so (.+) is not yours to claim$/.exec(message);
+    if (match) return t("ownerDomains.policy.parent", { host: match[1] ?? "", domain: match[2] ?? "" });
+    match = /^(.+) is part of this Polaris's own domain$/.exec(message);
+    if (match) return t("ownerDomains.policy.child", { domain: match[1] ?? "" });
+    return message;
+}
 
 export function OwnerDomainsView({
     owner,
@@ -63,6 +82,7 @@ export function OwnerDomainsView({
      *  input for the same reason, which is what actually enforces it. */
     instanceDomains: string[];
 }) {
+    const t = useTranslations("components");
     const [domains, setDomains] = useState(initial);
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
@@ -78,7 +98,11 @@ export function OwnerDomainsView({
     // What stops the Add button. A single letter is not a domain, and a button
     // that offers itself for input it will refuse has to be pressed before it
     // can be understood.
-    const refusal = malformed ?? (reserved ? `${reserved}. Pick a domain of your own.` : null);
+    const refusal = malformed
+        ? policyText(t, malformed)
+        : reserved
+          ? t("ownerDomains.pickYourOwn", { reason: policyText(t, reserved) })
+          : null;
 
     // The list is kept here rather than re-read from the server on every check,
     // so pressing Check on one domain does not blank the others while a DNS
@@ -97,8 +121,8 @@ export function OwnerDomainsView({
             {domains.length === 0 ? (
                 <EmptyState
                     icon={<Globe />}
-                    title="No domain of your own yet"
-                    description="Add one you already own and Polaris will give services here hostnames under it. Until then they take this Polaris's own domains."
+                    title={t("ownerDomains.none")}
+                    description={t("ownerDomains.noneHint")}
                 />
             ) : (
                 domains.map((entry) => (
@@ -115,7 +139,7 @@ export function OwnerDomainsView({
             )}
 
             {canAdd ? (
-                <PageSection title="Add a domain">
+                <PageSection title={t("ownerDomains.add")}>
                     <form
                         className="flex flex-wrap items-end gap-2"
                         onSubmit={async (event) => {
@@ -137,10 +161,10 @@ export function OwnerDomainsView({
                         }}
                     >
                         <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
-                            Domain
+                            {t("ownerDomains.domain")}
                             <Input
                                 value={value}
-                                placeholder="example.com"
+                                placeholder="example.com" // i18n-ignore an example domain
                                 className="h-9"
                                 aria-invalid={refusal ? true : undefined}
                                 aria-describedby={refusal ? "owner-domain-refusal" : undefined}
@@ -153,17 +177,14 @@ export function OwnerDomainsView({
                             aria-disabled={busy || !value.trim() || refusal !== null}
                             disabled={busy || !value.trim() || refusal !== null}
                         >
-                            <Plus className="size-4 shrink-0" /> Add
+                            <Plus className="size-4 shrink-0" /> {t("ownerDomains.addShort")}
                         </Button>
                         {refusal ? (
                             <p id="owner-domain-refusal" className="text-danger w-full text-xs">
                                 {refusal}
                             </p>
                         ) : (
-                            <p className="text-muted-foreground w-full text-xs">
-                                A domain or a subdomain you have delegated - `example.com` or
-                                `apps.example.com`. Polaris will show you the two records to publish.
-                            </p>
+                            <p className="text-muted-foreground w-full text-xs">{t("ownerDomains.addHint")}</p>
                         )}
                     </form>
                 </PageSection>
@@ -191,6 +212,7 @@ function DomainSection({
     onRemoved: (id: string) => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("components");
     const format = useDisplayFormat();
     const [busy, setBusy] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -228,19 +250,21 @@ function DomainSection({
                     <span className="min-w-0 break-all">{domain.domain}</span>
                     {ready ? (
                         <Badge variant="success">
-                            <CheckCircle2 className="size-3 shrink-0" /> Ready
+                            <CheckCircle2 className="size-3 shrink-0" /> {t("ownerDomains.ready")}
                         </Badge>
                     ) : (
                         <Badge variant="neutral">
-                            <Clock className="size-3 shrink-0" /> Waiting on DNS
+                            <Clock className="size-3 shrink-0" /> {t("ownerDomains.waitingDns")}
                         </Badge>
                     )}
                 </>
             }
             description={
                 <span aria-live="polite">
-                    {domain.checkedAt ? `Last checked ${format.dateTime(domain.checkedAt)}.` : "Not checked yet."}
-                    {!ready && secondsLeft !== null && ` Checking again in ${secondsLeft}s.`}
+                    {domain.checkedAt
+                        ? t("ownerDomains.lastChecked", { when: format.dateTime(domain.checkedAt) })
+                        : t("ownerDomains.notChecked")}
+                    {!ready && secondsLeft !== null && ` ${t("ownerDomains.checkingIn", { seconds: secondsLeft })}`}
                 </span>
             }
             actions={
@@ -249,19 +273,19 @@ function DomainSection({
                         size="sm"
                         variant="ghost"
                         disabled={busy}
-                        aria-label={`Check ${domain.domain}`}
-                        title="Check DNS now"
+                        aria-label={t("ownerDomains.checkNamed", { domain: domain.domain })}
+                        title={t("ownerDomains.checkNow")}
                         onClick={() => void check()}
                     >
                         <RefreshCw className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} />
-                        Check
+                        {t("ownerDomains.check")}
                     </Button>
                     <Button
                         size="icon-sm"
                         variant="ghost"
                         disabled={busy}
-                        aria-label={`Remove ${domain.domain}`}
-                        title="Remove"
+                        aria-label={t("ownerDomains.removeNamed", { domain: domain.domain })}
+                        title={t("ownerDomains.remove")}
                         onClick={() => setRemoving(true)}
                     >
                         <Trash2 className="size-4 shrink-0" />
@@ -279,15 +303,15 @@ function DomainSection({
                             name: domain.txtName,
                             value: domain.txtValue,
                             status: domain.verified ? "done" : "waiting",
-                            note: "Proves the domain is yours."
+                            note: t("ownerDomains.txtNote")
                         },
                         {
                             type: "A",
                             name: domain.wildcard,
                             value: publicIp,
-                            valueFallback: "this server's public address, once it is detected",
+                            valueFallback: t("ownerDomains.addressFallback"),
                             status: domain.wildcardOk ? "done" : "waiting",
-                            note: "Makes every hostname Polaris mints under it arrive here."
+                            note: t("ownerDomains.aNote")
                         }
                     ]}
                 />
@@ -301,7 +325,7 @@ function DomainSection({
                 token may reach the zone, but it was never handed over for this. */}
             {domain.verified && domain.hasDnsToken && (
                 <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-medium">DNS records</h3>
+                    <h3 className="text-sm font-medium">{t("ownerDomains.records")}</h3>
                     <DnsZoneEditor scope={{ kind: "owner", ref: owner, domainId: domain.id }} />
                 </div>
             )}
@@ -309,17 +333,20 @@ function DomainSection({
             <ConfirmDeleteDialog
                 open={removing}
                 onOpenChange={setRemoving}
-                kind="domain"
+                kind={t("ownerDomains.kind")}
                 name={domain.domain}
                 requireTyping={false}
-                title="Remove domain"
-                question={
-                    <>
-                        Remove <span className="font-medium text-foreground">{domain.domain}</span>?
-                    </>
-                }
-                description="New services stop being offered hostnames under it. Anything already deployed on one keeps its address until you change it."
-                confirmLabel="Remove"
+                title={t("ownerDomains.removeTitle")}
+                question={t.rich("ownerDomains.removeQuestion", {
+                    domain: domain.domain,
+                    name: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("ownerDomains.removeBody")}
+                confirmLabel={t("ownerDomains.remove")}
                 onConfirm={() => void remove()}
             />
         </PageSection>
@@ -370,6 +397,7 @@ function CertificatePanel({
     onChanged: (domain: OwnerDomainView) => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("components");
     const format = useDisplayFormat();
     const [token, setToken] = useState("");
     const [saving, setSaving] = useState(false);
@@ -412,24 +440,24 @@ function CertificatePanel({
         else if (result?.error) onError(result.error);
     }
 
-    const covered = `${domain.wildcard} and ${domain.domain}`;
+    const names = { wildcard: domain.wildcard, domain: domain.domain };
     const summary =
         certificate?.status === "issued" && certificate.expiresAt
-            ? `Covers ${covered} until ${format.date(certificate.expiresAt)}. Renewed automatically 30 days before it expires.`
+            ? t("ownerDomains.cert.covers", { ...names, until: format.date(certificate.expiresAt) })
             : ordering
-              ? `Ordering for ${covered}. This usually takes under a minute.`
-              : `Covers ${covered} once it is issued.`;
+              ? t("ownerDomains.cert.ordering", names)
+              : t("ownerDomains.cert.once", names);
 
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-                <h3 className="font-medium">Wildcard certificate</h3>
+                <h3 className="font-medium">{t("ownerDomains.cert.title")}</h3>
                 {certificate?.status === "issued" ? (
-                    <Badge variant="success">Issued</Badge>
+                    <Badge variant="success">{t("ownerDomains.cert.issued")}</Badge>
                 ) : certificate?.status === "failed" ? (
-                    <Badge variant="danger">Not issued</Badge>
+                    <Badge variant="danger">{t("ownerDomains.cert.notIssued")}</Badge>
                 ) : (
-                    <Badge variant="neutral">{ordering ? "Ordering" : "Waiting"}</Badge>
+                    <Badge variant="neutral">{ordering ? t("ownerDomains.cert.orderingBadge") : t("ownerDomains.cert.waiting")}</Badge>
                 )}
                 {ordering && <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />}
             </div>
@@ -439,23 +467,24 @@ function CertificatePanel({
                     <AlertTriangle className="mt-px size-3.5 shrink-0" />
                     <span>
                         {certificate.detail}
-                        {certificate.nextAttemptAt && ` Next try ${format.dateTime(certificate.nextAttemptAt)}.`}
+                        {certificate.nextAttemptAt &&
+                            ` ${t("ownerDomains.cert.nextTry", { when: format.dateTime(certificate.nextAttemptAt) })}`}
                     </span>
                 </p>
             )}
             {certificate?.nextAttemptAt && (
                 <div>
                     <Button size="sm" variant="ghost" disabled={saving} onClick={() => void retry()}>
-                        <RefreshCw className="size-4 shrink-0" /> Try now
+                        <RefreshCw className="size-4 shrink-0" /> {t("ownerDomains.cert.tryNow")}
                     </Button>
                 </div>
             )}
             {domain.hasDnsToken ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                     <KeyRound className="text-muted-foreground size-3.5 shrink-0" />
-                    <span className="text-muted-foreground">Ordered with this domain&rsquo;s own Cloudflare token.</span>
+                    <span className="text-muted-foreground">{t("ownerDomains.cert.ownToken")}</span>
                     <Button size="sm" variant="ghost" disabled={saving} onClick={() => void saveToken("")}>
-                        Remove token
+                        {t("ownerDomains.cert.removeToken")}
                     </Button>
                 </div>
             ) : (
@@ -467,22 +496,21 @@ function CertificatePanel({
                     }}
                 >
                     <label className="text-muted-foreground flex min-w-56 flex-1 flex-col gap-1 text-xs">
-                        Cloudflare API token
+                        {t("ownerDomains.cert.token")}
                         <Input
                             type="password"
                             value={token}
                             autoComplete="off"
-                            placeholder="Only if the domain is in your own Cloudflare account"
+                            placeholder={t("ownerDomains.cert.tokenPlaceholder")}
                             className="h-9"
                             onChange={(event) => setToken(event.target.value)}
                         />
                     </label>
                     <Button type="submit" size="sm" variant="secondary" disabled={saving || !token.trim()}>
-                        {saving && <Loader2 className="size-4 shrink-0 animate-spin" />} Save token
+                        {saving && <Loader2 className="size-4 shrink-0 animate-spin" />} {t("ownerDomains.cert.saveToken")}
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
-                        Needs Zone: DNS: Edit and Zone: Read on {domain.domain}. Without one, the token this Polaris has
-                        connected is used when it can edit this domain.
+                        {t("ownerDomains.cert.tokenHint", { domain: domain.domain })}
                     </p>
                 </form>
             )}

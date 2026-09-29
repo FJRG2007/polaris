@@ -18,6 +18,7 @@ import { apiUser } from "@/lib/api-session";
 
 import { OVERVIEW_WIDGET_IDS } from "@polaris/core";
 import { getOverviewData } from "@/lib/overview/overview-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export async function GET(request: Request): Promise<Response> {
     const parsed = querySchema.safeParse({
         widgets: new URL(request.url).searchParams.get("widgets") ?? ""
     });
-    if (!parsed.success) return Response.json({ error: "Unsupported request" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: (await readerWords("api"))("errors.unsupported") }, { status: 400 });
 
     return Response.json(await getOverviewData(user, parsed.data.widgets));
 }

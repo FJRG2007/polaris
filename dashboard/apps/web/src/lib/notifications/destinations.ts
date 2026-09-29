@@ -22,6 +22,8 @@ import {
     type WebhookFormat
 } from "@polaris/core";
 import { forgetDestination } from "./preferences";
+import { wordsFor } from "./notice-words";
+import { deliveryText } from "./delivery-words";
 
 /** A destination as the UI sees it. Never carries the target itself. */
 export interface DestinationView {
@@ -91,7 +93,12 @@ export async function listDestinations(userId: string): Promise<DestinationView[
         orderBy: { createdAt: "asc" },
         select: ROW_FIELDS
     });
-    return rows.map(toView);
+    // The stored reason is the sender's English; the owner reads it in theirs.
+    const t = await wordsFor(userId, "notices");
+    return rows.map((row) => {
+        const view = toView(row);
+        return view.lastError ? { ...view, lastError: deliveryText(t, view.lastError) } : view;
+    });
 }
 
 /** Whether every id belongs to this account. Guards a saved rule, so a tampered

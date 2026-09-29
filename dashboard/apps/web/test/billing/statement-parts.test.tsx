@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StatementTable, StatementTotals, type BillingResponse } from "@/components/billing/statement-parts";
+import { withMessages } from "../setup/i18n";
 
 const USAGE = { cpuHours: 1.5, memoryGbHours: 2048, storageGbHours: 0, egressGb: 0, cpuUnmeasuredHours: 0 };
 
@@ -38,7 +39,7 @@ const VIEW: BillingResponse = {
 
 describe("a statement's table", () => {
     it("opens the project from its line and writes money in the prices' currency", () => {
-        const html = renderToStaticMarkup(<StatementTable view={VIEW} showOwner emptyLabel="None" />);
+        const html = renderToStaticMarkup(withMessages(<StatementTable view={VIEW} showOwner emptyLabel="None" />));
         expect(html).toContain('href="/apps/deploy/p1"');
         expect(html).toContain("Storefront");
         // The reader's default is euros; the statement is in dollars.
@@ -48,19 +49,19 @@ describe("a statement's table", () => {
     });
 
     it("leaves the owner out of an organization's own statement", () => {
-        const html = renderToStaticMarkup(<StatementTable view={VIEW} showOwner={false} emptyLabel="None" />);
+        const html = renderToStaticMarkup(withMessages(<StatementTable view={VIEW} showOwner={false} emptyLabel="None" />));
         expect(html).not.toContain(">Owner<");
         expect(html).not.toContain("/account/organizations/acme/billing");
     });
 
     it("says so when there are no projects", () => {
         const empty = { ...VIEW, statement: { ...VIEW.statement, lines: [] } };
-        const html = renderToStaticMarkup(<StatementTable view={empty} showOwner emptyLabel="No projects yet." />);
+        const html = renderToStaticMarkup(withMessages(<StatementTable view={empty} showOwner emptyLabel="No projects yet." />));
         expect(html).toContain("No projects yet.");
     });
 
     it("keeps its headings and draws skeleton rows while the statement is on its way", () => {
-        const html = renderToStaticMarkup(<StatementTable view={null} showOwner emptyLabel="None" />);
+        const html = renderToStaticMarkup(withMessages(<StatementTable view={null} showOwner emptyLabel="None" />));
         expect(html).toContain(">Project<");
         expect(html).toContain("animate-pulse");
         expect(html).not.toContain("None");
@@ -69,7 +70,7 @@ describe("a statement's table", () => {
 
 describe("a statement's totals", () => {
     it("marks what has no price instead of inventing one", () => {
-        const html = renderToStaticMarkup(<StatementTotals view={VIEW} />);
+        const html = renderToStaticMarkup(withMessages(<StatementTotals view={VIEW} />));
         expect(html).toContain("Not priced");
         expect(html).toContain("So far this month");
     });
@@ -84,7 +85,7 @@ describe("a statement's totals", () => {
                 lines: VIEW.statement.lines.map((line) => ({ ...line, cost: null }))
             }
         };
-        const html = renderToStaticMarkup(<StatementTotals view={unpriced} />);
+        const html = renderToStaticMarkup(withMessages(<StatementTotals view={unpriced} />));
         expect(html).toContain("No prices set");
         expect(html).not.toContain("$");
     });

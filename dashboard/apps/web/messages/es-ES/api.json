@@ -1,1 +1,22 @@
-{}
+{
+    "errors": {
+        "unauthorized": "No autorizado",
+        "notASession": "No es una sesión",
+        "invalidRequest": "Solicitud no válida",
+        "signIn": "Inicia sesión primero",
+        "tooManyReports": "Demasiados avisos, vuelve a intentarlo en un momento",
+        "unreadable": "No se pudo leer",
+        "tooManySongs": "Son muchas canciones a la vez. Vuelve a intentarlo en un minuto.",
+        "listenAlongFailed": "No se pudo empezar a escuchar a la vez. Vuelve a intentarlo en un momento.",
+        "nothingAsked": "No se pidió nada.",
+        "fetchFailed": "No se pudo obtener ese archivo.",
+        "tooManyRequests": "Demasiadas solicitudes desde aquí.",
+        "deviceCodeRequired": "Hace falta un código de dispositivo.",
+        "unknownOrganization": "Organización desconocida.",
+        "unsupported": "Solicitud no admitida",
+        "footprintFailed": "No se pudo medir Polaris",
+        "unknownScope": "Ámbito desconocido",
+        "searchFailed": "No se pudo hacer esa búsqueda",
+        "forbidden": "Prohibido"
+    }
+}

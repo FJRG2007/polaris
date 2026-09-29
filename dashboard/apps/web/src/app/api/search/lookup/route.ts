@@ -14,6 +14,7 @@
 import { searchLookupSchema } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { lookup } from "@/lib/search/lookup-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,13 +25,13 @@ export async function GET(request: Request): Promise<Response> {
     const params = new URL(request.url).searchParams;
     const parsed = searchLookupSchema.safeParse({ scope: params.get("scope"), query: params.get("q") ?? "" });
     if (!parsed.success) {
-        return Response.json({ error: parsed.error.issues[0]?.message ?? "Unknown scope" }, { status: 400 });
+        return Response.json({ error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("errors.unknownScope") }, { status: 400 });
     }
 
     try {
         return Response.json({ hits: await lookup(user, parsed.data) });
     } catch (caught) {
         console.error(caught);
-        return Response.json({ error: "That search could not be run" }, { status: 500 });
+        return Response.json({ error: (await readerWords("api"))("errors.searchFailed") }, { status: 500 });
     }
 }

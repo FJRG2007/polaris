@@ -27,6 +27,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Cpu, Download, HardDrive, MemoryStick, Network, Wallet } from "lucide-react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     Button,
     DropdownMenu,
@@ -107,9 +109,23 @@ export function quantity(value: number): string {
 }
 
 /** A month as the picker reads it, with the running one marked as so far. */
-function monthOption(month: string, current: boolean): { value: string; label: string } {
-    const label = core.billingMonthLabel(month);
-    return { value: month, label: current ? `${label} (so far)` : label };
+/** "2026-01" as the reader's language names that month: "January 2026", "enero de 2026". */
+function monthName(month: string, locale: string): string {
+    const [year, number] = month.split("-").map(Number);
+    if (!year || !number) return core.billingMonthLabel(month);
+    return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(
+        new Date(Date.UTC(year, number - 1, 1))
+    );
+}
+
+function monthOption(
+    month: string,
+    current: boolean,
+    locale: string,
+    t: NamespaceTranslator<"components">
+): { value: string; label: string } {
+    const label = monthName(month, locale);
+    return { value: month, label: current ? t("statement.soFar", { month: label }) : label };
 }
 
 /** The month picker and the export menu, the toolbar every statement has. */
@@ -124,17 +140,19 @@ export function StatementToolbar({
     exportEndpoint: string;
     children?: ReactNode;
 }) {
+    const t = useTranslations("components");
+    const locale = useLocale();
     const go = useMonthNavigation();
     const exportHref = (format: core.AuditExportFormat) =>
         `${exportEndpoint}?${new URLSearchParams({ month, format }).toString()}`;
     return (
         <div className="flex flex-wrap items-center gap-2">
             <Select
-                aria-label="Month"
+                aria-label={t("statement.month")}
                 className="w-52"
                 value={month}
                 onValueChange={go}
-                options={months.map((entry, index) => monthOption(entry, index === 0))}
+                options={months.map((entry, index) => monthOption(entry, index === 0, locale, t))}
             />
             <div className="ml-auto flex items-center gap-1">
                 {children}
@@ -143,8 +161,8 @@ export function StatementToolbar({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Export the statement"
-                            title="Export"
+                            aria-label={t("statement.exportStatement")}
+                            title={t("auditFeed.export")}
                         >
                             <Download className="size-4" aria-hidden />
                         </Button>
@@ -152,12 +170,12 @@ export function StatementToolbar({
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
                             <a href={exportHref("csv")} download>
-                                Export as CSV
+                                {t("auditFeed.exportCsv")}
                             </a>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                             <a href={exportHref("json")} download>
-                                Export as JSON
+                                {t("auditFeed.exportJson")}
                             </a>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -183,6 +201,7 @@ function Tile({
     cost: string | null;
     loading: boolean;
 }) {
+    const t = useTranslations("components");
     return (
         <div className="border-border flex min-w-0 flex-col gap-1 rounded-lg border p-3">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
@@ -201,7 +220,7 @@ function Tile({
                 <Skeleton className="h-4 w-16" />
             ) : (
                 <span className="text-muted-foreground text-xs tabular-nums">
-                    {cost ?? "Not priced"}
+                    {cost ?? t("statement.notPriced")}
                 </span>
             )}
         </div>
@@ -210,6 +229,7 @@ function Tile({
 
 /** The month's totals, one tile per thing measured and one for the money. */
 export function StatementTotals({ view }: { view: BillingResponse | null }) {
+    const t = useTranslations("components");
     const statement = view?.statement ?? null;
     const format = useStatementFormat(statement?.rates?.currency);
     const loading = statement === null;
@@ -223,7 +243,7 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Tile
                 icon={<Cpu className="size-3.5" aria-hidden />}
-                label="CPU"
+                label="CPU" // i18n-ignore the same abbreviation in every language here
                 value={quantity(usage.cpuHours)}
                 unit="vCPU-h"
                 cost={priced(cost?.cpu)}
@@ -231,7 +251,7 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
             />
             <Tile
                 icon={<MemoryStick className="size-3.5" aria-hidden />}
-                label="Memory"
+                label={t("statement.memory")}
                 value={quantity(usage.memoryGbHours)}
                 unit="GB-h"
                 cost={priced(cost?.memory)}
@@ -239,15 +259,15 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
             />
             <Tile
                 icon={<HardDrive className="size-3.5" aria-hidden />}
-                label="Storage"
+                label={t("statement.storage")}
                 value={quantity(usage.storageGbHours / hours)}
-                unit="GB-month"
+                unit={t("statement.gbMonth")}
                 cost={priced(cost?.storage)}
                 loading={loading}
             />
             <Tile
                 icon={<Network className="size-3.5" aria-hidden />}
-                label="Network out"
+                label={t("statement.networkOut")}
                 value={quantity(usage.egressGb)}
                 unit="GB"
                 cost={priced(cost?.egress)}
@@ -256,7 +276,7 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
             <div className="border-border col-span-2 flex min-w-0 flex-col gap-1 rounded-lg border p-3 lg:col-span-1">
                 <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <Wallet className="size-3.5" aria-hidden />
-                    Total
+                    {t("statement.total")}
                 </span>
                 {loading ? (
                     <Skeleton className="h-7 w-28" />
@@ -270,9 +290,9 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
                         ? ""
                         : cost
                           ? view?.current
-                              ? "So far this month"
-                              : "For the month"
-                          : "No prices set"}
+                              ? t("statement.soFarThisMonth")
+                              : t("statement.forTheMonth")
+                          : t("statement.noPrices")}
                 </span>
             </div>
         </div>
@@ -281,24 +301,14 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
 
 /** What the reader has to know about how complete the figures are. */
 export function StatementNotes({ view }: { view: BillingResponse | null }) {
+    const t = useTranslations("components");
     const display = useDisplayFormat();
     if (!view) return null;
     const notes: string[] = [];
-    if (view.current)
-        notes.push(
-            `Figures run to ${display.dateTime(view.through)} and fill in as the month goes on.`
-        );
-    if (view.keptFrom) {
-        notes.push(
-            `Usage before ${display.date(view.keptFrom)} is no longer kept, so this month starts there.`
-        );
-    }
-    if (view.statement.usage.cpuUnmeasuredHours > 0) {
-        notes.push(
-            "Some CPU is not counted: a server has not reported how many cores it has yet. It is counted from the next reading on."
-        );
-    }
-    notes.push("Months run on UTC. A service that was deleted took its usage with it.");
+    if (view.current) notes.push(t("statement.notes.through", { when: display.dateTime(view.through) }));
+    if (view.keptFrom) notes.push(t("statement.notes.keptFrom", { when: display.date(view.keptFrom) }));
+    if (view.statement.usage.cpuUnmeasuredHours > 0) notes.push(t("statement.notes.cpuUnmeasured"));
+    notes.push(t("statement.notes.utc"));
     return (
         <ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
             {notes.map((note) => (
@@ -354,19 +364,21 @@ export function StatementTable({
     const format = useStatementFormat(statement?.rates?.currency);
     const hours = statement ? core.hoursInMonth(statement.month) || 1 : 1;
     const columns = showOwner ? 7 : 6;
+    const t = useTranslations("components");
 
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[40rem] text-sm">
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                     <tr>
-                        <th className="w-full max-w-0 px-3 py-2 font-medium">Project</th>
-                        {showOwner ? <th className="px-3 py-2 font-medium">Owner</th> : null}
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">{t("statement.project")}</th>
+                        {showOwner ? <th className="px-3 py-2 font-medium">{t("statement.owner")}</th> : null}
+                        {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                         <th className="px-3 py-2 font-medium text-right">CPU</th>
-                        <th className="px-3 py-2 font-medium text-right">Memory</th>
-                        <th className="px-3 py-2 font-medium text-right">Storage</th>
-                        <th className="px-3 py-2 font-medium text-right">Network out</th>
-                        <th className="px-3 py-2 font-medium text-right">Cost</th>
+                        <th className="px-3 py-2 font-medium text-right">{t("statement.memory")}</th>
+                        <th className="px-3 py-2 font-medium text-right">{t("statement.storage")}</th>
+                        <th className="px-3 py-2 font-medium text-right">{t("statement.networkOut")}</th>
+                        <th className="px-3 py-2 font-medium text-right">{t("statement.cost")}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -403,15 +415,18 @@ export function StatementTable({
                                     </td>
                                 ) : null}
                                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                    {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.cpuHours)} vCPU-h
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                    {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.memoryGbHours)} GB-h
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                                    {quantity(line.usage.storageGbHours / hours)} GB-mo
+                                    {quantity(line.usage.storageGbHours / hours)} {t("statement.gbMo")}
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                    {/* i18n-ignore unit symbols and the CPU abbreviation read the same in every language here */}
                                     {quantity(line.usage.egressGb)} GB
                                 </td>
                                 <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">

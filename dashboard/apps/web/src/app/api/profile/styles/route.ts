@@ -29,6 +29,7 @@ import {
     stylesFor,
     styleChangesSince
 } from "@/lib/profile-style-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,16 +52,16 @@ export async function POST(request: Request): Promise<Response> {
     // Asked on a timer by every open tab, so it must not count as the person
     // being here: that would keep the idle lock from ever closing.
     const viewer = await backgroundUser();
-    if (!viewer) return Response.json({ error: "Sign in to continue" }, { status: 401 });
+    if (!viewer) return Response.json({ error: (await readerWords("api"))("errors.signIn") }, { status: 401 });
 
     let body: unknown;
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
     }
     const asked = askSchema.safeParse(body);
-    if (!asked.success) return Response.json({ error: "That could not be read" }, { status: 400 });
+    if (!asked.success) return Response.json({ error: (await readerWords("api"))("errors.unreadable") }, { status: 400 });
 
     const at = new Date();
     const { ids, since, styled } = asked.data;

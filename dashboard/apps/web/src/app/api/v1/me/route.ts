@@ -9,6 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import { requireApiKey } from "@/lib/api-key-auth";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export async function GET(request: Request): Promise<Response> {
         where: { id: principal.userId },
         select: { id: true, name: true, email: true, username: true }
     });
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
 
     return Response.json({
         user,

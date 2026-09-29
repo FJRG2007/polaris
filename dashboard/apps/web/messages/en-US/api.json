@@ -1,1 +1,22 @@
-{}
+{
+    "errors": {
+        "unauthorized": "Unauthorized",
+        "notASession": "Not a session",
+        "invalidRequest": "Invalid request",
+        "signIn": "Sign in to continue",
+        "tooManyReports": "Too many reports, try again in a moment",
+        "unreadable": "That could not be read",
+        "tooManySongs": "That is a lot of songs at once. Try again in a minute.",
+        "listenAlongFailed": "Listening along could not start. Try again in a moment.",
+        "nothingAsked": "Nothing was asked for.",
+        "fetchFailed": "That file could not be fetched.",
+        "tooManyRequests": "Too many requests from here.",
+        "deviceCodeRequired": "A device code is required.",
+        "unknownOrganization": "Unknown organization.",
+        "unsupported": "Unsupported request",
+        "footprintFailed": "Could not measure Polaris",
+        "unknownScope": "Unknown scope",
+        "searchFailed": "That search could not be run",
+        "forbidden": "Forbidden"
+    }
+}

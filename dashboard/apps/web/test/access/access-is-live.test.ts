@@ -54,7 +54,8 @@ describe("what travels", () => {
 
     it("is refused to anybody without a session", async () => {
         const route = await readFile(`${SRC}app/api/access/stream/route.ts`, "utf8");
-        expect(route).toContain('if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });');
+        // The refusal is worded in the reader's language; what matters is that it is a 401.
+        expect(route).toContain('if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });');
     });
 
     it("is coalesced, because moving somebody between roles is several writes", async () => {

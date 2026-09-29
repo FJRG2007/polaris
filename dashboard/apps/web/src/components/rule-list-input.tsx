@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button, Input, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function RuleListInput({
     label,
@@ -39,6 +40,7 @@ export function RuleListInput({
     validate: (draft: string) => { value: string } | { error: string };
     onChange: (next: string[]) => void;
 }) {
+    const t = useTranslations("components");
     const [draft, setDraft] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +79,7 @@ export function RuleListInput({
                 />
                 <Button type="button" variant="ghost" onClick={add} disabled={draft.trim() === ""}>
                     <Plus className="size-4" />
-                    Add
+                    {t("ruleList.add")}
                 </Button>
             </div>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
@@ -97,7 +99,7 @@ export function RuleListInput({
                             {entry}
                             <button
                                 type="button"
-                                aria-label={`Remove ${entry}`}
+                                aria-label={t("ruleList.remove", { entry })}
                                 onClick={() => onChange(values.filter((value) => value !== entry))}
                             >
                                 <X className="size-3" />

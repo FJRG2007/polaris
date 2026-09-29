@@ -27,6 +27,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useLiveResource } from "@/components/use-live-resource";
 import { Download, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { ActivityTable, type ActivityRow } from "@/components/activity-table";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     Button,
@@ -136,6 +137,7 @@ export function AuditFeed({
     const query = filters.toString();
     const narrowed = FILTER_KEYS.some((key) => params.get(key));
 
+    const t = useTranslations("components");
     const [older, setOlder] = useState<AuditEntry[]>([]);
     const [cursor, setCursor] = useState<string | null>(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
@@ -181,16 +183,16 @@ export function AuditFeed({
             const body = (await response.json().catch(() => null)) as Partial<AuditPage> & {
                 error?: string;
             } | null;
-            if (!response.ok || !body) throw new Error(body?.error ?? "Older entries could not be loaded");
+            if (!response.ok || !body) throw new Error(body?.error ?? t("auditFeed.olderFailed"));
             const items = Array.isArray(body.items) ? body.items : [];
             setOlder((held) => [...held, ...items]);
             setCursor(typeof body.nextCursor === "string" ? body.nextCursor : null);
         } catch (caught) {
-            setOlderError(caught instanceof Error ? caught.message : "Older entries could not be loaded");
+            setOlderError(caught instanceof Error ? caught.message : t("auditFeed.olderFailed"));
         } finally {
             setLoadingOlder(false);
         }
-    }, [endpoint, filters, loadingOlder, nextCursor]);
+    }, [endpoint, filters, loadingOlder, nextCursor, t]);
 
     // The next page is asked for as the end of the list comes into view, so the
     // trail reads as one long list rather than a pager.
@@ -262,10 +264,10 @@ export function AuditFeed({
                     <Select
                         value={params.get("actor") ?? ALL}
                         onValueChange={(value) => setFilter("actor", value === ALL ? null : value)}
-                        aria-label="Filter by person"
+                        aria-label={t("auditFeed.byPerson")}
                         className="h-8 w-full sm:w-48"
                         options={[
-                            { value: ALL, label: "Everybody" },
+                            { value: ALL, label: t("auditFeed.everybody") },
                             ...(facets?.actors ?? []).map((actor) => ({ value: actor.id, label: actor.name }))
                         ]}
                     />
@@ -273,20 +275,20 @@ export function AuditFeed({
                 <Select
                     value={params.get("area") ?? ALL}
                     onValueChange={(value) => setFilter("area", value === ALL ? null : value)}
-                    aria-label="Filter by area"
+                    aria-label={t("auditFeed.byArea")}
                     className="h-8 w-full sm:w-40"
                     options={[
-                        { value: ALL, label: "Every area" },
+                        { value: ALL, label: t("auditFeed.everyArea") },
                         ...(facets?.areas ?? []).map((area) => ({ value: area, label: areaLabel(area) }))
                     ]}
                 />
                 <Select
                     value={params.get("resource") ?? ALL}
                     onValueChange={(value) => setFilter("resource", value === ALL ? null : value)}
-                    aria-label="Filter by what was acted on"
+                    aria-label={t("auditFeed.byResource")}
                     className="h-8 w-full sm:w-40"
                     options={[
-                        { value: ALL, label: "Anything" },
+                        { value: ALL, label: t("auditFeed.anything") },
                         ...(facets?.resources ?? []).map((resource) => ({
                             value: resource,
                             label: areaLabel(resource)
@@ -301,8 +303,8 @@ export function AuditFeed({
                     <Input
                         value={phrase}
                         onChange={(event) => setPhrase(event.target.value)}
-                        placeholder="Search actions and details"
-                        aria-label="Search actions and details"
+                        placeholder={t("auditFeed.search")}
+                        aria-label={t("auditFeed.search")}
                         maxLength={200}
                         className="h-8 pl-8"
                     />
@@ -311,40 +313,40 @@ export function AuditFeed({
                     type="datetime-local"
                     value={toInput(params.get("from"))}
                     onChange={(event) => setFilter("from", fromInput(event.target.value))}
-                    aria-label="From"
-                    title="From"
+                    aria-label={t("auditFeed.from")}
+                    title={t("auditFeed.from")}
                     className="h-8 w-full sm:w-auto"
                 />
                 <Input
                     type="datetime-local"
                     value={toInput(params.get("to"))}
                     onChange={(event) => setFilter("to", fromInput(event.target.value))}
-                    aria-label="To"
-                    title="To"
+                    aria-label={t("auditFeed.to")}
+                    title={t("auditFeed.to")}
                     className="h-8 w-full sm:w-auto"
                 />
                 {narrowed ? (
                     <Button variant="ghost" size="sm" onClick={clear}>
                         <X className="size-3.5" aria-hidden />
-                        Clear
+                        {t("auditFeed.clear")}
                     </Button>
                 ) : null}
                 <div className="ml-auto flex items-center gap-1">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="Export" title="Export">
+                            <Button variant="ghost" size="icon" aria-label={t("auditFeed.export")} title={t("auditFeed.export")}>
                                 <Download className="size-4" aria-hidden />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
                                 <a href={exportHref("csv")} download>
-                                    Export as CSV
+                                    {t("auditFeed.exportCsv")}
                                 </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                                 <a href={exportHref("json")} download>
-                                    Export as JSON
+                                    {t("auditFeed.exportJson")}
                                 </a>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -354,8 +356,8 @@ export function AuditFeed({
                         size="icon"
                         onClick={refresh}
                         disabled={refreshing}
-                        aria-label="Refresh"
-                        title="Refresh"
+                        aria-label={t("auditFeed.refresh")}
+                        title={t("auditFeed.refresh")}
                     >
                         <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
                     </Button>
@@ -369,14 +371,14 @@ export function AuditFeed({
                 loading={loading}
                 error={error}
                 contextLabel={contextLabel}
-                emptyLabel={narrowed ? "Nothing matches these filters." : emptyLabel}
+                emptyLabel={narrowed ? t("auditFeed.noMatch") : emptyLabel}
             />
 
             {nextCursor ? (
                 <div ref={sentinel} className="flex justify-center py-2">
                     <Button variant="ghost" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
                         {loadingOlder ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-                        {loadingOlder ? "Loading older entries" : "Load older entries"}
+                        {loadingOlder ? t("auditFeed.loadingOlder") : t("auditFeed.loadOlder")}
                     </Button>
                 </div>
             ) : null}
