@@ -36,6 +36,7 @@ import { revokeUserSessions } from "./user-admin-service";
 import { notifyOperators } from "./notifications/operators";
 import { DEFAULT_LOCALE } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
+import { readerWords } from "@/lib/i18n/reader-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { listSecurityQuestions, resetUserPassword, verifySecurityAnswers } from "@polaris/auth";
@@ -136,7 +137,7 @@ export async function requestAccountRecovery(input: {
     ]);
     if (!byAccount.ok || !byNetwork.ok) {
         const wait = Math.ceil(Math.max(byAccount.retryAfterMs, byNetwork.retryAfterMs) / 60000);
-        return { ticket: "", error: `Too many attempts. Try again in ${wait} minutes.` };
+        return { ticket: "", error: (await readerWords("auth"))("recover.errors.tooMany", { minutes: wait }) };
     }
 
     const ticket = generateToken();
@@ -238,10 +239,10 @@ export async function completeAccountRecovery(
     newPassword: string
 ): Promise<{ error?: string }> {
     const row = await prisma.accountRecovery.findUnique({ where: { tokenHash: hashToken(ticket) } });
-    if (!row || row.status !== "approved") return { error: "That request is not approved." };
+    if (!row || row.status !== "approved") return { error: (await readerWords("auth"))("recover.errors.notApproved") };
     if (row.expiresAt.getTime() < Date.now()) {
         await prisma.accountRecovery.update({ where: { id: row.id }, data: { status: "expired" } });
-        return { error: "That request has expired. Start again from the sign-in page." };
+        return { error: (await readerWords("auth"))("recover.errors.expired") };
     }
 
     const refusal = await unacceptablePassword(row.userId, newPassword);
@@ -253,7 +254,7 @@ export async function completeAccountRecovery(
         where: { id: row.id, status: "approved" },
         data: { status: "used" }
     });
-    if (spent.count !== 1) return { error: "That request has already been used." };
+    if (spent.count !== 1) return { error: (await readerWords("auth"))("recover.errors.used") };
 
     const result = await resetUserPassword(auth, row.userId, newPassword);
     if (result.error) {
@@ -312,7 +313,7 @@ export async function decideRecoveryRequest(
         where: { id, status: "pending" },
         data: { status: approve ? "approved" : "denied", decidedById: adminId, decidedAt: new Date() }
     });
-    if (decided.count === 0) return { error: "That request has already been decided." };
+    if (decided.count === 0) return { error: (await readerWords("admin"))("users.errors.alreadyDecided") };
     const row = await prisma.accountRecovery.findUnique({ where: { id }, select: { userId: true } });
     await recordAudit({
         actorId: adminId,

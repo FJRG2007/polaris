@@ -33,6 +33,8 @@ import { prisma } from "@polaris/db";
 import { readCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { readGithubAccount } from "@/lib/github-service";
 import { linkScopesSatisfied, missingLinkScopes } from "./oauth";
 
@@ -147,20 +149,19 @@ async function record(
     if (health === "unknown") return;
 
     if (health === "expired" && row.healthNotice !== "expired") {
+        const t = await wordsFor(row.userId, "notices");
         await notify({
             userId: row.userId,
             event: "account.connection.expired",
-            title: `Your GitHub account ${row.label} stopped working`,
-            body:
-                row.method === "token"
-                    ? "The token you pasted has run out or been withdrawn. Until it is replaced, deploys from your private repositories will be refused."
-                    : "GitHub no longer accepts that link. Until it is connected again, deploys from your private repositories will be refused.",
+            title: t("connections.expiredTitle", { label: row.label }),
+            body: row.method === "token" ? t("connections.expiredToken") : t("connections.expiredLink"),
             href: "/account/connections"
         });
     }
 
     if (health === "stale-scopes" && row.healthNotice !== "scopes") {
-        const name = findConnectionProvider(row.provider ?? "")?.name ?? row.provider ?? "That service";
+        const t = await wordsFor(row.userId, "notices");
+        const name = findConnectionProvider(row.provider ?? "")?.name ?? row.provider ?? t("connections.thatService");
         // Named rather than counted. "Polaris needs one more permission" tells
         // somebody nothing about whether to grant it, and this is a consent -
         // the whole point is that they get to decide with the facts.
@@ -168,8 +169,8 @@ async function record(
         await notify({
             userId: row.userId,
             event: "account.connection.scopes",
-            title: `Connect ${name} again to finish setting it up`,
-            body: `Polaris now asks ${name} for ${listed(missing)}, which your account ${row.label} was not linked with. Nothing you have has stopped working - connecting it again is what grants the new part.`,
+            title: t("connections.scopesTitle", { name }),
+            body: t("connections.scopesBody", { name, asked: listed(t, missing), label: row.label }),
             href: "/account/connections"
         });
     }
@@ -187,10 +188,14 @@ async function record(
 
 /** The missing permissions as a person would read them out, rather than a JSON
  *  array printed into a sentence. */
-function listed(scopes: string[]): string {
-    if (scopes.length === 0) return "more than it used to";
-    if (scopes.length === 1) return `one more permission (${scopes[0]})`;
-    return `${scopes.length} more permissions (${scopes.slice(0, -1).join(", ")} and ${scopes[scopes.length - 1]})`;
+function listed(t: NamespaceTranslator<"notices">, scopes: string[]): string {
+    if (scopes.length === 0) return t("connections.moreThanBefore");
+    if (scopes.length === 1) return t("connections.oneMore", { scope: scopes[0] ?? "" });
+    return t("connections.severalMore", {
+        count: scopes.length,
+        first: scopes.slice(0, -1).join(", "),
+        last: scopes[scopes.length - 1] ?? ""
+    });
 }
 
 /**
@@ -233,17 +238,18 @@ export async function noteDeploymentsRefused(
         where: { userId, provider: "github" },
         select: { id: true, label: true, method: true, healthNotice: true }
     });
+    const t = await wordsFor(userId, "notices");
     for (const row of rows) {
         // An expired link already says "link it again", which grants this too.
         if (row.healthNotice === "expired" || row.healthNotice === "deployments") continue;
         await notify({
             userId,
             event: "account.connection.scopes",
-            title: `Your deploys are not showing on ${owner}/${repo}`,
+            title: t("connections.deploysHiddenTitle", { repo: `${owner}/${repo}` }),
             body:
                 row.method === "token"
-                    ? `GitHub refused to put the deploy on the commit: the token for ${row.label} does not carry Deployments: Read and write on that repository. Everything else about the deploy worked. Replace the token with one that has it, and the next deploy appears on the commit the way Vercel's and Railway's do.`
-                    : `GitHub refused to put the deploy on the commit: the account ${row.label} cannot write deployments on that repository. Everything else about the deploy worked. Installing the GitHub App on it, or connecting an account that may, is what puts the deploy on the commit.`,
+                    ? t("connections.deploysHiddenToken", { label: row.label })
+                    : t("connections.deploysHiddenAccount", { label: row.label }),
             href: "/account/connections"
         }).catch(() => undefined);
         await prisma.userConnection

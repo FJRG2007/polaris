@@ -89,8 +89,13 @@ export async function recordConnectionFailure(provider: string, reason: string):
         await notifyOperators({
             permission: "settings.manage",
             event: "integration.attention",
+            // i18n-ignore the fallback; each operator reads `say` in their language
             title: `${name} could not complete an authorization`,
             body: `Somebody tried to connect their ${name} account and it was refused. ${name} said: ${reason}`,
+            say: (t) => ({
+                title: t("connections.refusedTitle", { name }),
+                body: t("connections.refusedBody", { name, reason })
+            }),
             href: "/admin/integrations",
             level: "warning",
             actionRequired: true

@@ -18,6 +18,8 @@ import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-ser
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
 import { lookupBySha256, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { NotificationLevel } from "@/lib/notification-service";
 import { QUARANTINE_DIR } from "@/lib/system-paths";
 
@@ -98,29 +100,34 @@ interface Alert {
 }
 
 /** Compose the owner's alert for a completed scan. */
-function buildAlert(request: ScanRequest, verdict: VtVerdict, action: ScanOutcome["action"]): Alert {
+function buildAlert(
+    t: NamespaceTranslator<"notices">,
+    request: ScanRequest,
+    verdict: VtVerdict,
+    action: ScanOutcome["action"]
+): Alert {
     const engines = verdict.malicious + verdict.suspicious;
-    const where = `"${request.fileName}" uploaded to "${request.dropPointTitle}"`;
+    const where = { file: request.fileName, dropPoint: request.dropPointTitle };
     if (verdict.kind === "malicious" || verdict.kind === "suspicious") {
         const tail =
             action === "blocked"
-                ? "The upload was blocked and removed."
+                ? t("scan.blocked")
                 : action === "quarantined"
-                  ? "It was moved to quarantine."
-                  : "It was kept - review it before opening.";
+                  ? t("scan.quarantined")
+                  : t("scan.kept");
         return {
             level: verdict.kind === "malicious" ? "danger" : "warning",
-            title: verdict.kind === "malicious" ? "Malicious upload detected" : "Suspicious upload detected",
-            body: `${where} was flagged by VirusTotal (${engines} engine${engines === 1 ? "" : "s"}). ${tail}`
+            title: verdict.kind === "malicious" ? t("scan.maliciousTitle") : t("scan.suspiciousTitle"),
+            body: t("scan.flagged", { ...where, engines, tail })
         };
     }
     if (verdict.kind === "clean") {
-        return { level: "success", title: "Upload scanned clean", body: `${where} passed the VirusTotal scan.` };
+        return { level: "success", title: t("scan.cleanTitle"), body: t("scan.clean", where) };
     }
     return {
         level: "info",
-        title: "Upload could not be fully scanned",
-        body: `${where} could not be scanned (${verdict.detail ?? "scanner unavailable"}). It was kept.`
+        title: t("scan.partialTitle"),
+        body: t("scan.notScanned", { ...where, detail: verdict.detail ?? t("scan.unavailable") })
     };
 }
 
@@ -154,11 +161,12 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
         // Scanner failure: fail open, but still tell the owner it did not complete.
         const detail = caught instanceof Error ? caught.message : "scan failed";
         await recordScan(request, { kind: "error", malicious: 0, suspicious: 0, detail }, "none", null);
+        const t = await wordsFor(request.ownerId, "notices");
         await notify({
             userId: request.ownerId,
             event: "scan.error",
-            title: "Upload could not be scanned",
-            body: `"${request.fileName}" uploaded to "${request.dropPointTitle}" could not be scanned (${detail}). It was kept.`,
+            title: t("scan.failedTitle"),
+            body: t("scan.notScanned", { file: request.fileName, dropPoint: request.dropPointTitle, detail }),
             href: "/drive/drop-points",
             metadata: { connectionId: request.connectionId, submissionId: request.submissionId }
         });
@@ -206,7 +214,7 @@ async function enforce(
     // Alert the owner on anything actionable - a detection or a scan that could not
     // complete - but stay quiet on a clean pass so drop points do not spam the bell.
     if (verdict.kind !== "clean") {
-        const alert = buildAlert(request, verdict, action);
+        const alert = buildAlert(await wordsFor(request.ownerId, "notices"), request, verdict, action);
         // One event covers every non-clean verdict; the verdict itself rides in
         // the metadata and sets the severity, so a rule is "tell me when a drop
         // point catches something" rather than one rule per verdict word.

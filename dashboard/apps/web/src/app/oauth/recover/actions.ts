@@ -57,5 +57,7 @@ export async function recoveryStatusAction(ticket: string): Promise<AccountRecov
 export async function completeRecoveryAction(input: unknown): Promise<{ error?: string }> {
     const parsed = recoveryResetSchema.safeParse(input);
     if (!parsed.success) return { error: await formError(parsed.error.issues[0]?.message) };
-    return completeAccountRecovery(parsed.data.ticket, parsed.data.newPassword);
+    const result = await completeAccountRecovery(parsed.data.ticket, parsed.data.newPassword);
+    // A password refused for its own sake is written in the shared schema's words.
+    return result.error ? { error: validationMessage(await getTranslations("validation"), result.error) } : result;
 }

@@ -21,6 +21,7 @@ import { alertAdmins } from "@/lib/notifications/admins";
 import { translatorFor } from "@/lib/i18n/translate";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { wordsFor } from "@/lib/notifications/notice-words";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** One case, as the queue draws it. */
 export interface SafetyCaseView {
@@ -148,6 +149,7 @@ export async function reportUser(
     reporterId: string,
     input: core.UserReportInput
 ): Promise<{ error?: string }> {
+    // i18n-ignore said in the reader's words by the report action
     if (input.subjectId === reporterId) return { error: "You cannot report yourself." };
     const subject = await prisma.user.findUnique({
         where: { id: input.subjectId },
@@ -155,6 +157,7 @@ export async function reportUser(
     });
     // The same answer whether the account is not there or not reachable: a
     // refusal that told them apart would answer a question about who exists.
+    // i18n-ignore said in the reader's words by the report action
     if (!subject) return { error: "That account could not be reported." };
 
     // One open report per person per reporter. A second press is the same
@@ -218,7 +221,7 @@ export async function settleSafetyCase(
             handledAt: new Date()
         }
     });
-    if (written.count === 0) return { error: "That case has already been settled." };
+    if (written.count === 0) return { error: (await readerWords("admin"))("safety.errors.alreadySettled") };
 
     const settled = await prisma.safetyCase.findUnique({
         where: { id: input.caseId },

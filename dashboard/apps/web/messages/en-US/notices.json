@@ -129,5 +129,44 @@
         "joined": "{who} joined {org}",
         "couldNotJoinTitle": "Somebody you invited to {org} made an account but could not join",
         "inviteAgain": "Invite them again from People."
+    },
+    "scan": {
+        "blocked": "The upload was blocked and removed.",
+        "quarantined": "It was moved to quarantine.",
+        "kept": "It was kept - review it before opening.",
+        "maliciousTitle": "Malicious upload detected",
+        "suspiciousTitle": "Suspicious upload detected",
+        "flagged": "\"{file}\" uploaded to \"{dropPoint}\" was flagged by VirusTotal ({engines, plural, one {# engine} other {# engines}}). {tail}",
+        "cleanTitle": "Upload scanned clean",
+        "clean": "\"{file}\" uploaded to \"{dropPoint}\" passed the VirusTotal scan.",
+        "partialTitle": "Upload could not be fully scanned",
+        "failedTitle": "Upload could not be scanned",
+        "notScanned": "\"{file}\" uploaded to \"{dropPoint}\" could not be scanned ({detail}). It was kept.",
+        "unavailable": "scanner unavailable"
+    },
+    "connections": {
+        "expiredTitle": "Your GitHub account {label} stopped working",
+        "expiredToken": "The token you pasted has run out or been withdrawn. Until it is replaced, deploys from your private repositories will be refused.",
+        "expiredLink": "GitHub no longer accepts that link. Until it is connected again, deploys from your private repositories will be refused.",
+        "thatService": "That service",
+        "scopesTitle": "Connect {name} again to finish setting it up",
+        "scopesBody": "Polaris now asks {name} for {asked}, which your account {label} was not linked with. Nothing you have has stopped working - connecting it again is what grants the new part.",
+        "moreThanBefore": "more than it used to",
+        "oneMore": "one more permission ({scope})",
+        "severalMore": "{count} more permissions ({first} and {last})",
+        "deploysHiddenTitle": "Your deploys are not showing on {repo}",
+        "deploysHiddenToken": "GitHub refused to put the deploy on the commit: the token for {label} does not carry Deployments: Read and write on that repository. Everything else about the deploy worked. Replace the token with one that has it, and the next deploy appears on the commit the way Vercel's and Railway's do.",
+        "deploysHiddenAccount": "GitHub refused to put the deploy on the commit: the account {label} cannot write deployments on that repository. Everything else about the deploy worked. Installing the GitHub App on it, or connecting an account that may, is what puts the deploy on the commit.",
+        "suggestTitle": "Link your {name} account",
+        "suggestBody": "You signed up with a {name} address. Linking it confirms the address, and lets you sign in without a password.",
+        "refusedTitle": "{name} could not complete an authorization",
+        "refusedBody": "Somebody tried to connect their {name} account and it was refused. {name} said: {reason}"
+    },
+    "modelKeys": {
+        "expiringTitle": "{whose, select, mine {Your} other {The deployment''s}} {provider} key \"{name}\" expires soon",
+        "expiredTitle": "{whose, select, mine {Your} other {The deployment''s}} {provider} key \"{name}\" expired",
+        "expiringBody": "{count} day(s) left. Replace the key here and runs keep working; leave it and they stop on the day.",
+        "expiredMine": "It is no longer used. Runs fall back to the next key in your list, or to the deployment's.",
+        "expiredDeployment": "It is no longer used. Runs fall back to the next key in the list, or to whatever each account brought itself."
     }
 }

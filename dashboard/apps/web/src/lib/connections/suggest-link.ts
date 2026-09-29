@@ -14,6 +14,7 @@
  */
 
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { connectionLinkAvailable } from "@/lib/connections/oauth";
 import { findConnectionProvider, providerForMailbox } from "@polaris/core";
 
@@ -36,11 +37,12 @@ export async function suggestConnectionLink(userId: string, email: string): Prom
         // a different sentence to a different reader.
         if (!(await connectionLinkAvailable(slug, { admin: false }))) return;
 
+        const t = await wordsFor(userId, "notices");
         await notify({
             userId,
             event: "account.link.suggested",
-            title: `Link your ${provider.name} account`,
-            body: `You signed up with a ${provider.name} address. Linking it confirms the address, and lets you sign in without a password.`,
+            title: t("connections.suggestTitle", { name: provider.name }),
+            body: t("connections.suggestBody", { name: provider.name }),
             href: "/account/connections"
         });
     } catch {

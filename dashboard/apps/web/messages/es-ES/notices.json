@@ -129,5 +129,44 @@
         "joined": "{who} se ha unido a {org}",
         "couldNotJoinTitle": "Alguien a quien invitaste a {org} creó una cuenta pero no pudo unirse",
         "inviteAgain": "Vuelve a invitarle desde Personas."
+    },
+    "scan": {
+        "blocked": "La subida se bloqueó y se eliminó.",
+        "quarantined": "Se movió a cuarentena.",
+        "kept": "Se ha conservado: revísala antes de abrirla.",
+        "maliciousTitle": "Subida maliciosa detectada",
+        "suspiciousTitle": "Subida sospechosa detectada",
+        "flagged": "VirusTotal marcó \"{file}\", subido a \"{dropPoint}\" ({engines, plural, one {# motor} other {# motores}}). {tail}",
+        "cleanTitle": "Subida sin amenazas",
+        "clean": "\"{file}\", subido a \"{dropPoint}\", superó el análisis de VirusTotal.",
+        "partialTitle": "No se pudo analizar la subida por completo",
+        "failedTitle": "No se pudo analizar la subida",
+        "notScanned": "No se pudo analizar \"{file}\", subido a \"{dropPoint}\" ({detail}). Se ha conservado.",
+        "unavailable": "analizador no disponible"
+    },
+    "connections": {
+        "expiredTitle": "Tu cuenta de GitHub {label} ha dejado de funcionar",
+        "expiredToken": "El token que pegaste ha caducado o se ha retirado. Hasta que lo sustituyas, se rechazarán los despliegues de tus repositorios privados.",
+        "expiredLink": "GitHub ya no acepta ese vínculo. Hasta que vuelvas a conectarla, se rechazarán los despliegues de tus repositorios privados.",
+        "thatService": "Ese servicio",
+        "scopesTitle": "Vuelve a conectar {name} para terminar de configurarlo",
+        "scopesBody": "Polaris ahora pide a {name} {asked}, con lo que no se vinculó tu cuenta {label}. Nada de lo que tienes ha dejado de funcionar: volver a conectarla es lo que concede la parte nueva.",
+        "moreThanBefore": "más que antes",
+        "oneMore": "un permiso más ({scope})",
+        "severalMore": "{count} permisos más ({first} y {last})",
+        "deploysHiddenTitle": "Tus despliegues no aparecen en {repo}",
+        "deploysHiddenToken": "GitHub se negó a poner el despliegue en el commit: el token de {label} no tiene Deployments: Read and write en ese repositorio. Todo lo demás del despliegue funcionó. Sustituye el token por uno que lo tenga y el siguiente despliegue aparecerá en el commit, como los de Vercel y Railway.",
+        "deploysHiddenAccount": "GitHub se negó a poner el despliegue en el commit: la cuenta {label} no puede escribir despliegues en ese repositorio. Todo lo demás del despliegue funcionó. Instalar la GitHub App en él, o conectar una cuenta que pueda, es lo que pone el despliegue en el commit.",
+        "suggestTitle": "Vincula tu cuenta de {name}",
+        "suggestBody": "Te registraste con una dirección de {name}. Vincularla confirma la dirección y te permite iniciar sesión sin contraseña.",
+        "refusedTitle": "{name} no pudo completar una autorización",
+        "refusedBody": "Alguien intentó conectar su cuenta de {name} y se rechazó. {name} dijo: {reason}"
+    },
+    "modelKeys": {
+        "expiringTitle": "{whose, select, mine {Tu clave} other {La clave del despliegue}} de {provider} \"{name}\" caduca pronto",
+        "expiredTitle": "{whose, select, mine {Tu clave} other {La clave del despliegue}} de {provider} \"{name}\" ha caducado",
+        "expiringBody": "{count, plural, one {Queda # día} other {Quedan # días}}. Sustituye la clave aquí y las ejecuciones seguirán funcionando; si no, se detendrán ese día.",
+        "expiredMine": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de tu lista, o a la del despliegue.",
+        "expiredDeployment": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de la lista, o a la que haya traído cada cuenta."
     }
 }

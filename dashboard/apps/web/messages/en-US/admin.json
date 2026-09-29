@@ -1833,7 +1833,8 @@
             "description": "Everything this instance has been asked to look at: accounts that have locked themselves down, people who have been reported, and messages somebody objected to."
         },
         "errors": {
-            "unreadable": "That could not be read."
+            "unreadable": "That could not be read.",
+            "alreadySettled": "That case has already been settled."
         },
         "filters": {
             "label": "Which cases to show",
@@ -2156,7 +2157,8 @@
             "tooLong": "That is longer than {max} days.",
             "checkDays": "Check the number of days.",
             "audience": "That is not an audience a default can be.",
-            "checkSettings": "Check the settings and try again"
+            "checkSettings": "Check the settings and try again",
+            "alreadyDecided": "That request has already been decided."
         }
     },
     "usersDetail": {

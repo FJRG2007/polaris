@@ -1293,6 +1293,11 @@
         "web/src/lib/session-guard.ts",
         "web/src/lib/account-lifecycle.ts",
         "web/src/lib/safety-queue.ts",
-        "web/src/lib/orgs/invitation-service.ts"
+        "web/src/lib/orgs/invitation-service.ts",
+        "web/src/lib/scan-service.ts",
+        "web/src/lib/connections/health.ts",
+        "web/src/lib/connections/suggest-link.ts",
+        "web/src/lib/connections/attention.ts",
+        "web/src/lib/agents/model-key-expiry.ts"
     ]
 }

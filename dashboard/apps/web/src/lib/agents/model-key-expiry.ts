@@ -19,6 +19,7 @@
 
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { modelProviderName } from "@/lib/agents/model-key-providers";
 
 /** How long before the date the first warning goes out. A week is enough to
@@ -91,11 +92,7 @@ export async function sweepExpiringModelKeys(now = new Date()): Promise<void> {
         const provider = modelProviderName(row.provider);
         const expiring = phase === "soon" && row.expiresAt;
         const mine = row.userId !== null;
-        const whose = mine ? "Your" : "The deployment's";
         const href = mine ? "/account/ai-keys" : "/admin/integrations/models";
-        const fallback = mine
-            ? "Runs fall back to the next key in your list, or to the deployment's."
-            : "Runs fall back to the next key in the list, or to whatever each account brought itself.";
         // Nobody to tell is not the same as nothing to say: the row is left
         // alone so the next pass tries again, rather than recorded as announced
         // to an empty room.
@@ -103,20 +100,22 @@ export async function sweepExpiringModelKeys(now = new Date()): Promise<void> {
         if (told.length === 0) continue;
 
         await Promise.all(
-            told.map((userId) =>
-                notify({
+            told.map(async (userId) => {
+                const t = await wordsFor(userId, "notices");
+                const words = { provider, name: row.name, whose: mine ? "mine" : "deployment" };
+                return notify({
                     userId,
                     event: expiring ? "account.aiKey.expiring" : "account.aiKey.expired",
-                    title: expiring
-                        ? `${whose} ${provider} key "${row.name}" expires soon`
-                        : `${whose} ${provider} key "${row.name}" expired`,
+                    title: expiring ? t("modelKeys.expiringTitle", words) : t("modelKeys.expiredTitle", words),
                     body: expiring
-                        ? `${daysLeft(row.expiresAt as Date, now)} day(s) left. Replace the key here and runs keep working; leave it and they stop on the day.`
-                        : `It is no longer used. ${fallback}`,
+                        ? t("modelKeys.expiringBody", { count: daysLeft(row.expiresAt as Date, now) })
+                        : mine
+                          ? t("modelKeys.expiredMine")
+                          : t("modelKeys.expiredDeployment"),
                     audience: mine ? undefined : "admins",
                     href
-                })
-            )
+                });
+            })
         );
 
         // Written after the announcement, so a failure to send is retried on the

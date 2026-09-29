@@ -1833,7 +1833,8 @@
             "description": "Todo lo que se ha pedido revisar en esta instancia: cuentas que se han bloqueado a sí mismas, personas denunciadas y mensajes que alguien ha objetado."
         },
         "errors": {
-            "unreadable": "No se pudo leer."
+            "unreadable": "No se pudo leer.",
+            "alreadySettled": "Ese caso ya se ha resuelto."
         },
         "filters": {
             "label": "Qué casos mostrar",
@@ -2156,7 +2157,8 @@
             "tooLong": "Es más de {max} días.",
             "checkDays": "Revisa el número de días.",
             "audience": "Ese público no puede ser el predeterminado.",
-            "checkSettings": "Revisa los ajustes y vuelve a intentarlo"
+            "checkSettings": "Revisa los ajustes y vuelve a intentarlo",
+            "alreadyDecided": "Esa solicitud ya se ha decidido."
         }
     },
     "usersDetail": {
