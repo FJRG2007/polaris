@@ -14,8 +14,8 @@
 
 import { stripFormatting } from "../parse";
 import { javaComponent } from "../announcement";
-import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import { duelTeardown } from "./kinds/team-duel";
+import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
 
 export const SCORE = "pe_score";
@@ -971,10 +971,19 @@ export function summonBoss(boss: EventOptions<"world-boss">["boss"]): string[] {
     ];
 }
 
-/** The name over the boss's head, written the way this version reads it. */
+/**
+ * The name over the boss's head, written the way this version reads it.
+ *
+ * Before 1.21.5 the name is JSON inside a quoted SNBT string, and that string
+ * knows two escapes only: a backslash and the quote. Every accent in the JSON
+ * is a `\u` escape, so its backslash is doubled before the quote is escaped -
+ * left single, "El Señor de la Guerra" was refused as an invalid escape and the
+ * boss went without a name.
+ */
 export function bossNameCommand(name: string, modernText: boolean): string {
     const component = text(`&c&l${name}`);
-    const value = modernText ? componentAsSnbt(name) : `'${component.replace(/'/g, "\\'")}'`;
+    const quoted = component.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const value = modernText ? componentAsSnbt(name) : `'${quoted}'`;
     return `data merge entity @e[tag=${BOSS_TAG},limit=1] {CustomName:${value}}`;
 }
 

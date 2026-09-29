@@ -255,6 +255,41 @@ describe("each kind's commands", () => {
         expect(legacy).toMatch(/\{CustomName:'\[.*The Warlord.*\]'\}/);
     });
 
+    it("names a boss with an accent, a quote or a backslash on a server before 1.21.5", () => {
+        // A quoted SNBT string as brigadier's StringReader reads one up to
+        // 1.21.4: `\\` and `\'` are the only escapes, anything else is refused.
+        const readQuoted = (line: string): string => {
+            const start = line.indexOf("{CustomName:'") + "{CustomName:'".length;
+            let out = "";
+            for (let index = start; index < line.length; index += 1) {
+                const char = line[index] as string;
+                if (char === "\\") {
+                    const next = line[index + 1] as string;
+                    if (next !== "\\" && next !== "'")
+                        throw new Error(`Invalid escape sequence '\\${next}' in quoted string`);
+                    out += next;
+                    index += 1;
+                } else if (char === "'") return out;
+                else out += char;
+            }
+            throw new Error("Unclosed quoted string");
+        };
+        const plain = (json: string): string => {
+            const walk = (part: unknown): string =>
+                typeof part === "string"
+                    ? part
+                    : Array.isArray(part)
+                      ? part.map(walk).join("")
+                      : `${(part as { text?: string }).text ?? ""}${walk((part as { extra?: unknown[] }).extra ?? [])}`;
+            return walk(JSON.parse(json));
+        };
+        for (const name of ["El Señor de la Guerra", "Ana's \"Rex\"", "back\\slash"]) {
+            const line = commands.bossNameCommand(name, false);
+            expect(/^[\x20-\x7e]*$/.test(line)).toBe(true);
+            expect(plain(readQuoted(line))).toBe(name);
+        }
+    });
+
     it("tries the attribute ids of both eras", () => {
         expect(commands.bossAttributes(400, true)[0]).toContain(
             "minecraft:max_health base set 400"
