@@ -43,7 +43,8 @@
         "oneGone": "One of those variables no longer exists - reload and try again",
         "saveFailed": "Could not save the variables",
         "nothingToRedeploy": "Nothing to redeploy",
-        "redeployFailed": "Could not start the redeploy"
+        "redeployFailed": "Could not start the redeploy",
+        "setTwice": "{key} is set twice"
     },
     "notes": {
         "invalid": "That note cannot be posted",

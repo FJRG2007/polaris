@@ -43,7 +43,8 @@
         "oneGone": "Una de esas variables ya no existe: recarga y vuelve a intentarlo",
         "saveFailed": "No se guardaron las variables",
         "nothingToRedeploy": "Nada que redesplegar",
-        "redeployFailed": "No se pudo volver a desplegar"
+        "redeployFailed": "No se pudo volver a desplegar",
+        "setTwice": "{key} está definida dos veces"
     },
     "notes": {
         "invalid": "No se puede publicar esa nota",

@@ -203,7 +203,8 @@
             "redeployFailed": "{name} could not be deployed on the new server: {failure}"
         },
         "domains": {
-            "recordsFailed": "The records could not be written"
+            "recordsFailed": "The records could not be written",
+            "notFound": "Domain not found"
         }
     },
     "words": {

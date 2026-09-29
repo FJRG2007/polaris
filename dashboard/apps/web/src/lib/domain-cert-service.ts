@@ -25,6 +25,7 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { mkdir, readdir, unlink } from "node:fs/promises";
 import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { judgeCertificate, type CertificateVerdict } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** Prefix for every file this writes, so publishing can clear its own and never
  *  anything the local CA or the wildcard put there. */
@@ -123,7 +124,7 @@ export async function setDomainCertificate(
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
         select: { hostname: true }
     });
-    if (!domain) return { error: "Domain not found" };
+    if (!domain) return { error: (await readerWords("api"))("refusals.domains.notFound") };
 
     if (!input || !input.certPem.trim()) {
         await prisma.domain.update({

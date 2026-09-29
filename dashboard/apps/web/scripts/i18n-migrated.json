@@ -1439,6 +1439,9 @@
         "web/src/lib/messaging/discord-invite.ts",
         "web/src/lib/domain-strategies.ts",
         "web/src/app/(app)/admin/domains/strategy-words.ts",
-        "web/src/lib/network-advice.ts"
+        "web/src/lib/network-advice.ts",
+        "web/src/lib/domain-cert-service.ts",
+        "web/src/lib/deploy/variable-links.ts",
+        "web/src/lib/deploy/variable-changes.ts"
     ]
 }

@@ -15,6 +15,10 @@ import { z } from "zod";
 import { ENV_VALUE_MAX, envValueMessage, hasControlCharacter } from "@polaris/core";
 
 /** What an environment variable may be called. */
+/** The refusal for a key written twice in one save, as the schema words it, so the
+ *  action can say it in the reader's language with the key carried over. */
+export const SET_TWICE = /^(.+) is set twice$/;
+
 export const VARIABLE_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const VARIABLE_KEY_MESSAGE = "Letters, digits and underscores, not starting with a digit";
 
@@ -69,6 +73,7 @@ export const variableChangesSchema = z
         const seen = new Set<string>();
         input.set.forEach((item, index) => {
             if (seen.has(item.key)) {
+                // i18n-ignore said in the reader's words by the action, through SET_TWICE
                 context.addIssue({ code: "custom", message: `${item.key} is set twice`, path: ["set"] });
             }
             if (hasControlCharacter(item.value)) {

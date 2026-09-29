@@ -18,9 +18,10 @@ import * as activity from "@/lib/activity/activity";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import { redeployForEnvScope } from "@/lib/deploy-service";
 import { requireEnvScopeAccess } from "@/lib/deploy-project-access";
-import { variableChangesSchema } from "@/lib/deploy/variable-changes";
+import { SET_TWICE, variableChangesSchema } from "@/lib/deploy/variable-changes";
 import { variableLinks, type VariableLink } from "@/lib/deploy/variable-links";
 import { deleteEnvVar, envVarScope, setEnvVar, setEnvVarSecrecy, type EnvScope } from "@/lib/env-var-service";
+import { getTranslations } from "@/lib/i18n/request";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -58,7 +59,11 @@ export async function saveEnvVarChangesAction(
 ): Promise<{ error?: string; saved?: number; redeployed?: boolean }> {
     const user = await requirePermission("deploy.manage");
     const parsed = variableChangesSchema.safeParse(input);
-    if (!parsed.success) return { error: await firstIssue(parsed.error, "variables.check") };
+    if (!parsed.success) {
+        const twice = SET_TWICE.exec(parsed.error.issues[0]?.message ?? "");
+        if (twice?.[1]) return { error: (await getTranslations("deployServer"))("variables.setTwice", { key: twice[1] }) };
+        return { error: await firstIssue(parsed.error, "variables.check") };
+    }
     const { scope, scopeId, set, secrecy, remove, redeploy } = parsed.data;
     if (set.length + secrecy.length + remove.length === 0 && !redeploy) return { saved: 0 };
 

@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { slugify } from "@polaris/deploy";
 import { decryptedValue } from "./env-values";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export interface VariableLink {
     /** Exactly as written, e.g. `${{postgres.DATABASE_URL}}`. */
@@ -101,11 +102,12 @@ export async function variableLinks(
         for (const row of keys) serviceKeys.get(row.scopeId)?.add(row.key);
     }
     const sharedKeys = new Set(shared.map((row) => row.key));
+    const sharedLabel = (await readerWords("deploySettings"))("sharedVariables.title");
 
     function link(reference: core.VariableReference): VariableLink {
         const base = { written: reference.written, name: reference.name, key: reference.key };
         if (reference.name === "shared") {
-            return { ...base, target: { kind: "shared", label: "Shared variables" }, keyKnown: sharedKeys.has(reference.key) };
+            return { ...base, target: { kind: "shared", label: sharedLabel }, keyKnown: sharedKeys.has(reference.key) };
         }
         const app = applications.find((one) => one.slug === reference.name || slugify(one.name) === reference.name);
         if (app) {
