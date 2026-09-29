@@ -18,6 +18,7 @@ import { Card, CardBody, cn } from "@polaris/ui";
 import { Bug, CircleCheck } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { ProjectSummary } from "@/lib/telemetry/project-service";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface GridProject extends ProjectSummary {
     readonly dsn: string;
@@ -34,11 +35,12 @@ export function ProjectsGrid({
      *  owns a dialog and a reload, and neither belongs to a list. */
     action: React.ReactNode;
 }) {
+    const t = useTranslations("telemetry");
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
-                    {projects.length === 1 ? "One project" : `${projects.length} projects`}
+                    {t("grid.count", { count: projects.length })}
                 </p>
                 {action}
             </div>
@@ -52,6 +54,7 @@ export function ProjectsGrid({
 }
 
 function ProjectCard({ project, href }: { project: GridProject; href: string }) {
+    const t = useTranslations("telemetry");
     const failing = project.openIssues > 0;
     return (
         <Link href={href} className="group block rounded-xl focus-ring">
@@ -74,22 +77,20 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                                 {/* The platform is what the first event said it
                                     was, so a project nothing has reported into
                                     yet says so rather than inventing a runtime. */}
-                                {project.platform ?? "Nothing has reported yet"}
-                                {project.system ? " · Polaris itself" : ""}
+                                {project.platform ?? t("grid.nothingYet")}
+                                {project.system ? ` · ${t("grid.itself")}` : ""}
                             </p>
                         </div>
                         {!project.enabled && (
                             <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
-                                Off
+                                {t("grid.off")}
                             </span>
                         )}
                     </div>
 
                     <div className="mt-auto flex items-baseline justify-between gap-2 text-xs">
                         <span className={cn(failing ? "font-medium text-danger" : "text-muted-foreground")}>
-                            {failing
-                                ? `${project.openIssues} ${project.openIssues === 1 ? "fault" : "faults"} open`
-                                : "Nothing open"}
+                            {failing ? t("grid.open", { count: project.openIssues }) : t("grid.nothingOpen")}
                         </span>
                         {project.lastSeen && (
                             <span className="shrink-0 text-muted-foreground">

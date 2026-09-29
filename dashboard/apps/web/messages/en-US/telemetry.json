@@ -1,1 +1,162 @@
-{}
+{
+    "sections": {
+        "issues": {
+            "label": "Issues",
+            "hint": "What is failing, and how often"
+        },
+        "client": {
+            "label": "Client",
+            "hint": "The address to point a reporter at"
+        },
+        "reporters": {
+            "label": "Reporters",
+            "hint": "Who is allowed to report into this project"
+        },
+        "settings": {
+            "label": "Settings",
+            "hint": "How long events are kept"
+        }
+    },
+    "view": {
+        "statuses": {
+            "unresolved": "Unresolved",
+            "resolved": "Resolved",
+            "ignored": "Ignored",
+            "all": "All"
+        },
+        "none": "Nothing is reporting yet.",
+        "noneHint": "Make a project and point an application at the address it gives you. Polaris opens one for itself the first time it has something to report.",
+        "projects": "Projects",
+        "find": "Find a fault",
+        "newProject": "New project",
+        "name": "Name"
+    },
+    "settings": {
+        "keepFor": "Keep events for",
+        "keepHint": "Between 1 and 365 days. How often each fault happened is kept for a year whatever this says, so a chart never develops a hole where the events were removed.",
+        "daysLabel": "Days to keep events for",
+        "days": "days",
+        "save": "Save",
+        "accept": "Accept reports",
+        "acceptHint": "Turned off, the address keeps answering and nothing is stored - which is what stops a crash loop filling this project while somebody works on it."
+    },
+    "client": {
+        "reportTo": "Report to",
+        "copy": "Copy the address",
+        "rotate": "Replace the key",
+        "delete": "Delete this project",
+        "hint": "Set it as the DSN of any Sentry client. Events older than {days} days are removed; how often each fault happened is kept.",
+        "kind": "project",
+        "deleteBody": "Every fault it recorded goes with it, and the address stops being accepted.",
+        "deleteConfirm": "Delete project"
+    },
+    "issues": {
+        "none": "Nothing here.",
+        "noneHint": "No fault in this project matches what you are looking at.",
+        "noStack": "No stack",
+        "howOften": "How often over the last {days} days"
+    },
+    "issue": {
+        "back": "Back to the list",
+        "resolved": "Resolved",
+        "resolve": "Resolve",
+        "ignored": "Ignored",
+        "ignore": "Ignore",
+        "delete": "Delete this fault",
+        "timesSeen": "Times seen",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "where": "Where",
+        "notStated": "Not stated",
+        "pruned": "Every occurrence of this has been removed by the project's retention. How often it happened is kept.",
+        "kind": "fault",
+        "deleteBody": "Every occurrence goes with it. If it happens again it comes back as a new fault.",
+        "deleteConfirm": "Delete"
+    },
+    "errors": {
+        "readProjects": "Those projects could not be read",
+        "readIssue": "That issue could not be read",
+        "changeIssue": "That issue could not be changed",
+        "deleteIssue": "That issue could not be deleted",
+        "makeProject": "That project could not be made",
+        "changeProject": "That project could not be changed",
+        "rotateKey": "That key could not be replaced",
+        "deleteProject": "That project could not be deleted",
+        "saveRules": "Those rules could not be saved",
+        "projectGone": "That project no longer exists",
+        "noAccess": "You do not have access to that project",
+        "nameAddress": "Name at least one address, or nothing will be able to report",
+        "issueGone": "That issue no longer exists",
+        "badStatus": "That is not something an issue can be",
+        "name": "Give it a name",
+        "retention": "Keep events for between 1 and 365 days",
+        "ownProject": "Polaris' own project cannot be deleted",
+        "readRules": "Those rules could not be read",
+        "makeKey": "That key could not be made",
+        "removeKey": "That key could not be removed",
+        "clear": "That could not be cleared"
+    },
+    "grid": {
+        "count": "{count, plural, one {One project} other {# projects}}",
+        "nothingYet": "Nothing has reported yet",
+        "itself": "Polaris itself",
+        "off": "Off",
+        "open": "{count, plural, one {# fault} other {# faults}} open",
+        "nothingOpen": "Nothing open"
+    },
+    "event": {
+        "hide": "Hide this value",
+        "show": "Show this value",
+        "mostRecent": "Most recent of {count, plural, one {one kept occurrence} other {# kept occurrences}}",
+        "on": "on {server}",
+        "from": "from {ip}",
+        "for": "for {user}",
+        "via": "via {sdk}",
+        "stack": "Stack",
+        "request": "The request",
+        "query": "Query",
+        "headers": "Headers",
+        "body": "Body",
+        "before": "What happened before it"
+    },
+    "page": {
+        "title": "Telemetry",
+        "description": "What your applications report when they break, and what Polaris reports about itself. Open a project for its faults and the address to point a Sentry client at."
+    },
+    "rules": {
+        "policies": {
+            "internal": {
+                "label": "This network, and anything listed",
+                "hint": "Where an application deployed by Polaris reports from. Reports arriving from the open internet are turned away."
+            },
+            "listed": {
+                "label": "Only the addresses listed",
+                "hint": "For a reporter that lives somewhere known - one server, one build runner."
+            },
+            "anywhere": {
+                "label": "Anywhere",
+                "hint": "What a browser client needs, because its reports come from the addresses of the people using it. The client rules and the key still apply."
+            }
+        },
+        "reasons": {
+            "address": "the address is not one this project accepts",
+            "client": "the client does not match the rules",
+            "secret": "the key was missing or wrong"
+        },
+        "listed": "{count} listed",
+        "keyRequired": "key required",
+        "whoMayReport": "Who may report",
+        "refused": "{count, plural, one {One report was turned away} other {# reports were turned away}}{hasIp, select, yes { - the last from {ip}} other {}}{hasAgent, select, yes { ({agent})} other {}}{hasReason, select, yes {, because {reason}} other {}}{hasTime, select, yes { <time></time>} other {}}",
+        "allow": "Allow {ip}",
+        "dismiss": "Dismiss",
+        "acceptedFrom": "Reports are accepted from",
+        "addresses": "Addresses and ranges",
+        "onlyThese": "Only these may report. Name at least one.",
+        "onTop": "Accepted on top of this network.",
+        "discard": "Discard",
+        "requireKey": "Also require a key",
+        "keyHint": "A second value the reporter has to send, as an <header></header> header or an ordinary bearer token. A Sentry client that lets you set transport headers can carry it; one that does not cannot, which is why this is off unless you turn it on.",
+        "copyKey": "Copy the key",
+        "keyInUse": "A key ending {tail} is in use. It is stored as a digest and cannot be shown again - turn this off and on to make another."
+    }
+}

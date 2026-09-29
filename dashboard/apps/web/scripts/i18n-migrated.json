@@ -1172,6 +1172,14 @@
         "web/src/components/runtime-logs.tsx",
         "web/src/app/(app)/admin/agents/layout.tsx",
         "web/src/app/(app)/apps/agents/layout.tsx",
-        "web/src/lib/agents/words.ts"
+        "web/src/lib/agents/words.ts",
+        "web/src/app/(app)/apps/telemetry/actions.ts",
+        "web/src/app/(app)/apps/telemetry/event-detail.tsx",
+        "web/src/app/(app)/apps/telemetry/page.tsx",
+        "web/src/app/(app)/apps/telemetry/project-sections.ts",
+        "web/src/app/(app)/apps/telemetry/projects-grid.tsx",
+        "web/src/app/(app)/apps/telemetry/reporter-rules.tsx",
+        "web/src/app/(app)/apps/telemetry/telemetry-view.tsx",
+        "web/src/app/(app)/apps/telemetry/layout.tsx"
     ]
 }

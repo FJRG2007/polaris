@@ -19,25 +19,28 @@ export interface Section {
     /** What it is called in the URL. Short and stable: it ends up in links
      *  people send each other. */
     readonly key: string;
+    /** In English; drawn as `sections.<key>.label` and `.hint` in the reader's words. */
     readonly label: string;
     readonly icon: LucideIcon;
     readonly hint: string;
 }
 
 export const SECTIONS: readonly Section[] = [
+    // i18n-ignore these labels and hints are drawn as telemetry.sections.<key>
     { key: "issues", label: "Issues", icon: Bug, hint: "What is failing, and how often" },
     {
         key: "client",
-        label: "Client",
+        label: "Client", // i18n-ignore
         icon: KeyRound,
-        hint: "The address to point a reporter at"
+        hint: "The address to point a reporter at" // i18n-ignore
     },
     {
         key: "reporters",
-        label: "Reporters",
+        label: "Reporters", // i18n-ignore
         icon: ShieldCheck,
-        hint: "Who is allowed to report into this project"
+        hint: "Who is allowed to report into this project" // i18n-ignore
     },
+    // i18n-ignore
     { key: "settings", label: "Settings", icon: Settings, hint: "How long events are kept" }
 ];
 

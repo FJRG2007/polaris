@@ -31,32 +31,19 @@ import { RuleListInput } from "@/components/rule-list-input";
 import { ClientRulesEditor } from "@/components/client-rules-editor";
 import { ipRuleField, type TelemetryReporters } from "@polaris/core";
 import type { ProjectSummary } from "@/lib/telemetry/project-service";
-import { ChevronDown, KeyRound, ShieldCheck, ShieldAlert } from "lucide-react";
-
-const POLICIES: { value: TelemetryReporters; label: string; hint: string; }[] = [
-    {
-        value: "internal",
-        label: "This network, and anything listed",
-        hint: "Where an application deployed by Polaris reports from. Reports arriving from the open internet are turned away."
-    },
-    {
-        value: "listed",
-        label: "Only the addresses listed",
-        hint: "For a reporter that lives somewhere known - one server, one build runner."
-    },
-    {
-        value: "anywhere",
-        label: "Anywhere",
-        hint: "What a browser client needs, because its reports come from the addresses of the people using it. The client rules and the key still apply."
-    }
-];
-
 /** What each refusal reason means to somebody who did not write the rule. */
-const REASONS: Record<string, string> = {
-    address: "the address is not one this project accepts",
-    client: "the client does not match the rules",
-    secret: "the key was missing or wrong"
-};
+import { ChevronDown, KeyRound, ShieldCheck, ShieldAlert } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** Each policy, said as `rules.policies.<value>.label` and `.hint`. */
+const POLICIES: readonly TelemetryReporters[] = ["internal", "listed", "anywhere"];
+
+/** Why a report was turned away, said as `rules.reasons.<reason>`. */
+const REASONS = new Set(["address", "client", "secret"]);
+
+/** The one sentence the shared IP rule refuses with, as core writes it. */
+const IP_RULE_MESSAGE = "Must be an IP address or CIDR range";
 
 type Draft = {
     reporters: TelemetryReporters;
@@ -87,6 +74,8 @@ export function ReporterRules({
     project: ProjectSummary;
     onDone: () => Promise<void>;
 }) {
+    const t = useTranslations("telemetry");
+    const tc = useTranslations("components");
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<Draft>(() => draftOf(project));
     const [error, setError] = useState("");
@@ -100,13 +89,15 @@ export function ReporterRules({
     }, [project]);
 
     const dirty = !same(draft, draftOf(project));
-    const chosen = POLICIES.find((policy) => policy.value === draft.reporters);
+    const chosen = POLICIES.includes(draft.reporters) ? draft.reporters : null;
+    const policyWord = (policy: TelemetryReporters, part: "label" | "hint") =>
+        t(`rules.policies.${policy}.${part}` as NamespaceKey<"telemetry">);
     /** The one-line reading of the rules, built once so the clipped element can
      *  carry the whole of it. */
     const summary = [
-        chosen?.label,
-        draft.allowedCidrs.length > 0 ? `${draft.allowedCidrs.length} listed` : null,
-        draft.requireSecret ? "key required" : null
+        chosen ? policyWord(chosen, "label") : null,
+        draft.allowedCidrs.length > 0 ? t("rules.listed", { count: draft.allowedCidrs.length }) : null,
+        draft.requireSecret ? t("rules.keyRequired") : null
     ]
         .filter(Boolean)
         .join(" - ");
@@ -154,7 +145,7 @@ export function ReporterRules({
                 ) : (
                     <ShieldCheck className="size-4 shrink-0 text-success" />
                 )}
-                <span className="text-xs font-medium">Who may report</span>
+                <span className="text-xs font-medium">{t("rules.whoMayReport")}</span>
                 <span
                     className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
                     title={summary}
@@ -169,22 +160,26 @@ export function ReporterRules({
             {project.refused.count > 0 && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning-foreground">
                     <span className="min-w-0 flex-1">
-                        {project.refused.count === 1
-                            ? "One report was turned away"
-                            : `${project.refused.count} reports were turned away`}
-                        {project.refused.ip && ` - the last from ${project.refused.ip}`}
-                        {project.refused.agent && ` (${project.refused.agent.slice(0, 60)})`}
-                        {project.refused.reason && `, because ${REASONS[project.refused.reason]}`}
-                        {project.refused.at && (
-                            <>
-                                {" "}
-                                <RelativeTime iso={project.refused.at} />
-                            </>
-                        )}
+                        {t.rich("rules.refused", {
+                            count: project.refused.count,
+                            hasIp: project.refused.ip ? "yes" : "no",
+                            ip: project.refused.ip ?? "",
+                            hasAgent: project.refused.agent ? "yes" : "no",
+                            agent: project.refused.agent?.slice(0, 60) ?? "",
+                            hasReason: project.refused.reason ? "yes" : "no",
+                            reason: project.refused.reason
+                                ? REASONS.has(project.refused.reason)
+                                    ? t(`rules.reasons.${project.refused.reason}` as NamespaceKey<"telemetry">)
+                                    : project.refused.reason
+                                : "",
+                            hasTime: project.refused.at ? "yes" : "no",
+                            time: () =>
+                                project.refused.at ? <RelativeTime key="time" iso={project.refused.at} /> : null
+                        })}
                     </span>
                     {project.refused.ip && project.refused.reason === "address" && (
                         <Button size="sm" variant="outline" disabled={busy} onClick={admitRefused}>
-                            Allow {project.refused.ip}
+                            {t("rules.allow", { ip: project.refused.ip })}
                         </Button>
                     )}
                     <Button
@@ -199,7 +194,7 @@ export function ReporterRules({
                             await onDone();
                         }}
                     >
-                        Dismiss
+                        {t("rules.dismiss")}
                     </Button>
                 </div>
             )}
@@ -207,7 +202,7 @@ export function ReporterRules({
             {open && (
                 <div className="flex flex-col gap-3 border-t border-border pt-3">
                     <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Reports are accepted from</span>
+                        <span className="text-xs text-muted-foreground">{t("rules.acceptedFrom")}</span>
                         <Select
                             value={draft.reporters}
                             onValueChange={(value) =>
@@ -215,28 +210,28 @@ export function ReporterRules({
                             }
                             className="w-full max-w-md"
                             options={POLICIES.map((policy) => ({
-                                value: policy.value,
-                                label: policy.label
+                                value: policy,
+                                label: policyWord(policy, "label")
                             }))}
                         />
-                        {chosen && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
+                        {chosen && <p className="text-xs text-muted-foreground">{policyWord(chosen, "hint")}</p>}
                     </div>
 
                     {draft.reporters !== "anywhere" && (
                         <RuleListInput
-                            label="Addresses and ranges"
-                            placeholder="203.0.113.7 or 10.0.0.0/8"
-                            hint={
-                                draft.reporters === "listed"
-                                    ? "Only these may report. Name at least one."
-                                    : "Accepted on top of this network."
-                            }
+                            label={t("rules.addresses")}
+                            placeholder={tc("accessRules.ipsPlaceholder")}
+                            hint={draft.reporters === "listed" ? t("rules.onlyThese") : t("rules.onTop")}
                             values={draft.allowedCidrs}
                             validate={(value) => {
                                 const parsed = ipRuleField.safeParse(value);
-                                return parsed.success
-                                    ? { value: parsed.data }
-                                    : { error: parsed.error.issues[0]?.message ?? "Invalid rule" };
+                                if (parsed.success) return { value: parsed.data };
+                                return {
+                                    error:
+                                        parsed.error.issues[0]?.message === IP_RULE_MESSAGE
+                                            ? tc("accessRules.ipInvalid")
+                                            : tc("accessRules.invalid")
+                                };
                             }}
                             onChange={(allowedCidrs) => setDraft({ ...draft, allowedCidrs })}
                         />
@@ -284,7 +279,7 @@ export function ReporterRules({
 
                     <div className="flex items-center gap-2">
                         <Button size="sm" disabled={!dirty || busy} onClick={() => save(draft)}>
-                            Save
+                            {t("settings.save")}
                         </Button>
                         {dirty && (
                             <Button
@@ -293,7 +288,7 @@ export function ReporterRules({
                                 disabled={busy}
                                 onClick={() => setDraft(draftOf(project))}
                             >
-                                Discard
+                                {t("rules.discard")}
                             </Button>
                         )}
                     </div>
@@ -328,22 +323,24 @@ function ProjectKey({
     onMint: () => Promise<void>;
     onClear: () => Promise<void>;
 }) {
+    const t = useTranslations("telemetry");
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-2.5">
             <div className="flex items-center gap-2">
                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 text-xs font-medium">Also require a key</span>
+                <span className="min-w-0 flex-1 text-xs font-medium">{t("rules.requireKey")}</span>
                 <Switch
                     checked={project.rules.requireSecret}
                     disabled={busy}
-                    aria-label="Also require a key"
+                    aria-label={t("rules.requireKey")}
                     onChange={(checked) => void (checked ? onMint() : onClear())}
                 />
             </div>
             <p className="text-xs text-muted-foreground">
-                A second value the reporter has to send, as an <code>X-Polaris-Key</code> header or an
-                ordinary bearer token. A Sentry client that lets you set transport headers can carry
-                it; one that does not cannot, which is why this is off unless you turn it on.
+                {t.rich("rules.keyHint", {
+                    // i18n-ignore a header name
+                    header: () => <code key="header">X-Polaris-Key</code>
+                })}
             </p>
             {issued ? (
                 <div className="flex items-center gap-2">
@@ -356,12 +353,11 @@ function ProjectKey({
                     >
                         {issued}
                     </code>
-                    <CopyButton value={issued} label="Copy the key" />
+                    <CopyButton value={issued} label={t("rules.copyKey")} />
                 </div>
             ) : project.rules.hasSecret ? (
                 <p className="text-xs text-muted-foreground">
-                    A key ending {project.rules.secretTail} is in use. It is stored as a digest and
-                    cannot be shown again - turn this off and on to make another.
+                    {t("rules.keyInUse", { tail: project.rules.secretTail ?? "" })}
                 </p>
             ) : null}
         </div>

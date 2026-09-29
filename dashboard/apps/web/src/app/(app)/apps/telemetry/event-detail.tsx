@@ -24,6 +24,7 @@ import { cn, Button } from "@polaris/ui";
 import { Eye, EyeOff } from "lucide-react";
 import type { EventDetail } from "@/lib/telemetry/report-service";
 import type { ContextGroup, HeaderField, StackFrame } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** A titled box. Every section on this screen is one, so the screen reads as a
  *  list of answers rather than as a wall. */
@@ -64,6 +65,7 @@ function Pair({ name, children }: { name: string; children: React.ReactNode }) {
  * them - so this component asks no questions and simply draws what it was told.
  */
 function Secret({ value }: { value: string }) {
+    const t = useTranslations("telemetry");
     const [shown, setShown] = useState(false);
     return (
         <span className="flex items-baseline gap-2">
@@ -75,7 +77,7 @@ function Secret({ value }: { value: string }) {
                 variant="ghost"
                 size="icon-sm"
                 className="shrink-0"
-                aria-label={shown ? "Hide this value" : "Show this value"}
+                aria-label={shown ? t("event.hide") : t("event.show")}
                 onClick={() => setShown((was) => !was)}
             >
                 {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -202,28 +204,28 @@ function sized(key: string, value: string): string {
 
 /** The occurrence itself: what threw, where, and everything around it. */
 export function EventPanel({ event, kept }: { event: EventDetail; kept: number }) {
+    const t = useTranslations("telemetry");
     const tags = Object.entries(event.tags);
     const request = event.request;
     const body = request?.body ?? null;
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>
-                    Most recent of {kept === 1 ? "one kept occurrence" : `${kept} kept occurrences`}
-                </span>
-                {event.serverName && <span>on {event.serverName}</span>}
-                {event.ip && <span>from {event.ip}</span>}
-                {event.userLabel && <span>for {event.userLabel}</span>}
+                <span>{t("event.mostRecent", { count: kept })}</span>
+                {event.serverName && <span>{t("event.on", { server: event.serverName })}</span>}
+                {event.ip && <span>{t("event.from", { ip: event.ip })}</span>}
+                {event.userLabel && <span>{t("event.for", { user: event.userLabel })}</span>}
                 {event.sdk && (
                     <span>
-                        via {event.sdk.name}
-                        {event.sdk.version ? ` ${event.sdk.version}` : ""}
+                        {t("event.via", {
+                            sdk: event.sdk.version ? `${event.sdk.name} ${event.sdk.version}` : event.sdk.name
+                        })}
                     </span>
                 )}
             </div>
 
             {event.frames.length > 0 && (
-                <Panel title="Stack">
+                <Panel title={t("event.stack")}>
                     {/* Innermost last, which is the order every client sends and
                         every debugger prints. */}
                     <ol className="divide-y divide-border">
@@ -239,13 +241,13 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                     title={
                         request.method && request.url
                             ? `${request.method} ${request.url}`
-                            : "The request"
+                            : t("event.request")
                     }
                 >
                     {request.query.length > 0 && (
                         <>
                             <p className="bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-                                Query
+                                {t("event.query")}
                             </p>
                             <Fields fields={request.query} />
                         </>
@@ -253,7 +255,7 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                     {request.headers.length > 0 && (
                         <>
                             <p className="bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-                                Headers
+                                {t("event.headers")}
                             </p>
                             <Fields fields={request.headers} />
                         </>
@@ -261,7 +263,7 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                     {body && (
                         <>
                             <p className="bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-                                Body
+                                {t("event.body")}
                             </p>
                             <pre className="overflow-x-auto px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
                                 {body}
@@ -285,7 +287,7 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
             )}
 
             {event.breadcrumbs.length > 0 && (
-                <Panel title="What happened before it">
+                <Panel title={t("event.before")}>
                     <ol className="divide-y divide-border">
                         {event.breadcrumbs.map((crumb, at) => (
                             <li key={`${crumb.at ?? at}:${at}`} className="px-3 py-1.5 text-xs">

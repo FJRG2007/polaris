@@ -1,1 +1,162 @@
-{}
+{
+    "sections": {
+        "issues": {
+            "label": "Fallos",
+            "hint": "Qué falla y con qué frecuencia"
+        },
+        "client": {
+            "label": "Cliente",
+            "hint": "La dirección a la que apuntar un informador"
+        },
+        "reporters": {
+            "label": "Informadores",
+            "hint": "Quién puede informar a este proyecto"
+        },
+        "settings": {
+            "label": "Ajustes",
+            "hint": "Cuánto se guardan los eventos"
+        }
+    },
+    "view": {
+        "statuses": {
+            "unresolved": "Sin resolver",
+            "resolved": "Resueltos",
+            "ignored": "Ignorados",
+            "all": "Todos"
+        },
+        "none": "Aún no informa nada.",
+        "noneHint": "Crea un proyecto y apunta una aplicación a la dirección que te da. Polaris abre uno para sí mismo la primera vez que tiene algo que informar.",
+        "projects": "Proyectos",
+        "find": "Buscar un fallo",
+        "newProject": "Nuevo proyecto",
+        "name": "Nombre"
+    },
+    "settings": {
+        "keepFor": "Guardar eventos",
+        "keepHint": "Entre 1 y 365 días. Cuántas veces ocurrió cada fallo se guarda un año diga lo que diga esto, para que un gráfico nunca tenga un hueco donde se eliminaron eventos.",
+        "daysLabel": "Días que se guardan",
+        "days": "días",
+        "save": "Guardar",
+        "accept": "Aceptar informes",
+        "acceptHint": "Desactivado, la dirección sigue respondiendo y no se guarda nada, que es lo que evita que un bucle de fallos llene este proyecto mientras alguien trabaja en él."
+    },
+    "client": {
+        "reportTo": "Informar a",
+        "copy": "Copiar la dirección",
+        "rotate": "Sustituir la clave",
+        "delete": "Eliminar este proyecto",
+        "hint": "Ponla como DSN de cualquier cliente de Sentry. Los eventos de más de {days} días se eliminan; se conserva cuántas veces ocurrió cada fallo.",
+        "kind": "proyecto",
+        "deleteBody": "Se van todos los fallos que registró, y la dirección deja de aceptarse.",
+        "deleteConfirm": "Eliminar proyecto"
+    },
+    "issues": {
+        "none": "Aquí no hay nada.",
+        "noneHint": "Ningún fallo de este proyecto coincide con lo que estás mirando.",
+        "noStack": "Sin traza",
+        "howOften": "Frecuencia en los últimos {days} días"
+    },
+    "issue": {
+        "back": "Volver a la lista",
+        "resolved": "Resuelto",
+        "resolve": "Resolver",
+        "ignored": "Ignorado",
+        "ignore": "Ignorar",
+        "delete": "Eliminar este fallo",
+        "timesSeen": "Veces visto",
+        "firstSeen": "Primera vez",
+        "lastSeen": "Última vez",
+        "where": "Dónde",
+        "notStated": "Sin indicar",
+        "pruned": "La retención del proyecto ha eliminado todas sus apariciones. Se conserva cuántas veces ocurrió.",
+        "kind": "fallo",
+        "deleteBody": "Se van todas sus apariciones. Si vuelve a ocurrir, aparece como un fallo nuevo.",
+        "deleteConfirm": "Eliminar"
+    },
+    "errors": {
+        "readProjects": "No se pudieron leer los proyectos",
+        "readIssue": "No se pudo leer ese fallo",
+        "changeIssue": "No se pudo cambiar ese fallo",
+        "deleteIssue": "No se pudo eliminar ese fallo",
+        "makeProject": "No se pudo crear ese proyecto",
+        "changeProject": "No se pudo cambiar ese proyecto",
+        "rotateKey": "No se pudo sustituir la clave",
+        "deleteProject": "No se pudo eliminar ese proyecto",
+        "saveRules": "No se pudieron guardar las reglas",
+        "projectGone": "Ese proyecto ya no existe",
+        "noAccess": "No tienes acceso a ese proyecto",
+        "nameAddress": "Indica al menos una dirección, o nada podrá informar",
+        "issueGone": "Ese fallo ya no existe",
+        "badStatus": "Un fallo no puede estar en ese estado",
+        "name": "Ponle un nombre",
+        "retention": "Guarda los eventos entre 1 y 365 días",
+        "ownProject": "El proyecto propio de Polaris no se puede eliminar",
+        "readRules": "No se pudieron leer esas reglas",
+        "makeKey": "No se pudo crear esa clave",
+        "removeKey": "No se pudo quitar esa clave",
+        "clear": "No se pudo borrar"
+    },
+    "grid": {
+        "count": "{count, plural, one {Un proyecto} other {# proyectos}}",
+        "nothingYet": "Aún no ha informado nada",
+        "itself": "el propio Polaris",
+        "off": "Inactivo",
+        "open": "{count, plural, one {# fallo abierto} other {# fallos abiertos}}",
+        "nothingOpen": "Nada abierto"
+    },
+    "event": {
+        "hide": "Ocultar este valor",
+        "show": "Mostrar este valor",
+        "mostRecent": "La más reciente de {count, plural, one {una aparición guardada} other {# apariciones guardadas}}",
+        "on": "en {server}",
+        "from": "desde {ip}",
+        "for": "para {user}",
+        "via": "mediante {sdk}",
+        "stack": "Traza",
+        "request": "La petición",
+        "query": "Consulta",
+        "headers": "Cabeceras",
+        "body": "Cuerpo",
+        "before": "Lo que pasó antes"
+    },
+    "page": {
+        "title": "Telemetría",
+        "description": "Lo que informan tus aplicaciones cuando fallan, y lo que Polaris informa de sí mismo. Abre un proyecto para ver sus fallos y la dirección a la que apuntar un cliente de Sentry."
+    },
+    "rules": {
+        "policies": {
+            "internal": {
+                "label": "Esta red, y lo que se liste",
+                "hint": "Desde donde informa una aplicación desplegada por Polaris. Se rechazan los informes que llegan desde internet abierto."
+            },
+            "listed": {
+                "label": "Solo las direcciones listadas",
+                "hint": "Para un informador que está en un sitio conocido: un servidor, un runner de compilación."
+            },
+            "anywhere": {
+                "label": "Cualquier sitio",
+                "hint": "Lo que necesita un cliente de navegador, porque sus informes llegan desde las direcciones de quienes lo usan. Las reglas de cliente y la clave siguen aplicándose."
+            }
+        },
+        "reasons": {
+            "address": "la dirección no es una que acepte este proyecto",
+            "client": "el cliente no cumple las reglas",
+            "secret": "faltaba la clave o era incorrecta"
+        },
+        "listed": "{count} listadas",
+        "keyRequired": "con clave",
+        "whoMayReport": "Quién informa",
+        "refused": "{count, plural, one {Se rechazó un informe} other {Se rechazaron # informes}}{hasIp, select, yes { - el último desde {ip}} other {}}{hasAgent, select, yes { ({agent})} other {}}{hasReason, select, yes {, porque {reason}} other {}}{hasTime, select, yes { <time></time>} other {}}",
+        "allow": "Permitir {ip}",
+        "dismiss": "Descartar",
+        "acceptedFrom": "Se aceptan informes desde",
+        "addresses": "Direcciones y rangos",
+        "onlyThese": "Solo estas pueden informar. Indica al menos una.",
+        "onTop": "Se aceptan además de esta red.",
+        "discard": "Descartar",
+        "requireKey": "Pedir también una clave",
+        "keyHint": "Un segundo valor que el informador tiene que enviar, como cabecera <header></header> o como token bearer normal. Un cliente de Sentry que permita definir cabeceras de transporte puede llevarlo; uno que no, no puede, y por eso está desactivado salvo que lo actives.",
+        "copyKey": "Copiar la clave",
+        "keyInUse": "Hay en uso una clave que termina en {tail}. Se guarda como resumen y no se puede volver a mostrar: desactiva esto y actívalo para crear otra."
+    }
+}

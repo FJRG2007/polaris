@@ -22,6 +22,26 @@ import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as report from "@/lib/telemetry/report-service";
 import * as projects from "@/lib/telemetry/project-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+type TelemetryKey = NamespaceKey<"telemetry">;
+
+/** A reply in the reader's language. */
+async function say(key: TelemetryKey): Promise<string> {
+    return (await getTranslations("telemetry"))(key);
+}
+
+/** The access refusals the project service throws, by their English. */
+const ACCESS_WORDS: Readonly<Record<string, TelemetryKey>> = {
+    "That project no longer exists": "errors.projectGone",
+    "You do not have access to that project": "errors.noAccess"
+};
+
+/** The shared schema's own sentences. */
+const SCHEMA_WORDS: Readonly<Record<string, TelemetryKey>> = {
+    "Name at least one address, or nothing will be able to report": "errors.nameAddress"
+};
 
 const PATH = "/apps/telemetry";
 
@@ -30,10 +50,13 @@ async function actor(): Promise<projects.TelemetryActor> {
     return { id: user.id, isAdmin: user.isAdmin };
 }
 
-function failure(caught: unknown, fallback: string): { error: string } {
-    if (caught instanceof projects.TelemetryAccessError) return { error: caught.message };
+async function failure(caught: unknown, fallback: TelemetryKey): Promise<{ error: string }> {
+    if (caught instanceof projects.TelemetryAccessError) {
+        const key = ACCESS_WORDS[caught.message];
+        return { error: key ? await say(key) : caught.message };
+    }
     console.error("polaris: a telemetry action failed:", caught);
-    return { error: fallback };
+    return { error: await say(fallback) };
 }
 
 export interface TelemetryOverview {
@@ -78,7 +101,7 @@ export async function telemetryOverviewAction(input: {
             data: { projects: withDsn, issues, counts, windowDays: report.TELEMETRY_WINDOW_DAYS }
         };
     } catch (caught) {
-        return failure(caught, "Those projects could not be read");
+        return await failure(caught, "errors.readProjects");
     }
 }
 
@@ -90,10 +113,10 @@ export async function openIssueAction(
     try {
         await projects.requireProject(caller, projectId);
         const issue = await report.getIssue(projectId, issueId);
-        if (!issue) return { error: "That issue no longer exists" };
+        if (!issue) return { error: await say("errors.issueGone") };
         return { issue };
     } catch (caught) {
-        return failure(caught, "That issue could not be read");
+        return await failure(caught, "errors.readIssue");
     }
 }
 
@@ -104,7 +127,7 @@ export async function setIssueStatusAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     if (!(core.TELEMETRY_STATUSES as readonly string[]).includes(status)) {
-        return { error: "That is not something an issue can be" };
+        return { error: await say("errors.badStatus") };
     }
     try {
         await projects.requireProject(caller, projectId);
@@ -112,7 +135,7 @@ export async function setIssueStatusAction(
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That issue could not be changed");
+        return await failure(caught, "errors.changeIssue");
     }
 }
 
@@ -124,14 +147,14 @@ export async function deleteIssueAction(projectId: string, issueId: string): Pro
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That issue could not be deleted");
+        return await failure(caught, "errors.deleteIssue");
     }
 }
 
 export async function createTelemetryProjectAction(name: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const said = String(name ?? "").trim();
-    if (!said || said.length > 80) return { error: "Give it a name" };
+    if (!said || said.length > 80) return { error: await say("errors.name") };
     try {
         const orgId = await scopeOrgIdFor(caller.id);
         const made = await projects.createProject({
@@ -143,7 +166,7 @@ export async function createTelemetryProjectAction(name: unknown): Promise<{ id?
         revalidatePath(PATH);
         return { id: made.id };
     } catch (caught) {
-        return failure(caught, "That project could not be made");
+        return await failure(caught, "errors.makeProject");
     }
 }
 
@@ -156,13 +179,13 @@ export async function updateTelemetryProjectAction(
         await projects.requireProject(caller, projectId);
         const days = input.retentionDays;
         if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > 365)) {
-            return { error: "Keep events for between 1 and 365 days" };
+            return { error: await say("errors.retention") };
         }
         await projects.updateProject(projectId, input);
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That project could not be changed");
+        return await failure(caught, "errors.changeProject");
     }
 }
 
@@ -178,7 +201,7 @@ export async function rotateTelemetryKeyAction(
         revalidatePath(PATH);
         return { dsn: projects.dsnFor({ number: project.number, publicKey }, await appBaseUrl()) };
     } catch (caught) {
-        return failure(caught, "That key could not be replaced");
+        return await failure(caught, "errors.rotateKey");
     }
 }
 
@@ -187,12 +210,12 @@ export async function deleteTelemetryProjectAction(projectId: string): Promise<{
     try {
         await projects.requireProject(caller, projectId);
         if (!(await projects.deleteProject(projectId))) {
-            return { error: "Polaris' own project cannot be deleted" };
+            return { error: await say("errors.ownProject") };
         }
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That project could not be deleted");
+        return await failure(caught, "errors.deleteProject");
     }
 }
 
@@ -211,7 +234,9 @@ export async function setReporterRulesAction(
     const caller = await actor();
     const parsed = core.reporterRulesSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those rules could not be read" };
+        const message = parsed.error.issues[0]?.message;
+        const key = message ? SCHEMA_WORDS[message] : undefined;
+        return { error: await say(key ?? "errors.readRules") };
     }
     try {
         await projects.requireProject(caller, projectId);
@@ -219,7 +244,7 @@ export async function setReporterRulesAction(
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "Those rules could not be saved");
+        return await failure(caught, "errors.saveRules");
     }
 }
 
@@ -240,7 +265,7 @@ export async function mintTelemetrySecretAction(
         revalidatePath(PATH);
         return { secret };
     } catch (caught) {
-        return failure(caught, "That key could not be made");
+        return await failure(caught, "errors.makeKey");
     }
 }
 
@@ -253,7 +278,7 @@ export async function clearTelemetrySecretAction(projectId: string): Promise<{ e
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That key could not be removed");
+        return await failure(caught, "errors.removeKey");
     }
 }
 
@@ -266,6 +291,6 @@ export async function clearTelemetryRefusalsAction(projectId: string): Promise<{
         revalidatePath(PATH);
         return {};
     } catch (caught) {
-        return failure(caught, "That could not be cleared");
+        return await failure(caught, "errors.clear");
     }
 }
