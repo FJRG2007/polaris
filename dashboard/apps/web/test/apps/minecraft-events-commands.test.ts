@@ -283,7 +283,7 @@ describe("each kind's commands", () => {
                       : `${(part as { text?: string }).text ?? ""}${walk((part as { extra?: unknown[] }).extra ?? [])}`;
             return walk(JSON.parse(json));
         };
-        for (const name of ["El Señor de la Guerra", "Ana's \"Rex\"", "back\\slash"]) {
+        for (const name of ["El Señor de la Guerra", 'Ana\'s "Rex"', "back\\slash"]) {
             const line = commands.bossNameCommand(name, false);
             expect(/^[\x20-\x7e]*$/.test(line)).toBe(true);
             expect(plain(readQuoted(line))).toBe(name);
@@ -896,6 +896,38 @@ describe("a horde defence", () => {
             "execute as @e[tag=pe_wnew,type=minecraft:zombie] run attribute @s minecraft:zombie.spawn_reinforcements base set 0"
         );
         expect(lines).toContain("effect give @e[tag=pe_wnew] minecraft:fire_resistance 600 0 true");
+    });
+
+    it("keeps a wave's archers from dropping the bow they were handed, before and after 1.21.5", () => {
+        // What each era reads a mob's drop chances from; any other key is ignored.
+        const chances = (line: string, modern: boolean): Record<string, string> => {
+            if (modern) {
+                const found = /drop_chances:\{([^}]*)\}/.exec(line);
+                return Object.fromEntries(
+                    (found?.[1] ?? "")
+                        .split(",")
+                        .filter(Boolean)
+                        .map((pair) => pair.split(":"))
+                );
+            }
+            const hands = /HandDropChances:\[([^\]]*)\]/.exec(line)?.[1]?.split(",") ?? [];
+            return { mainhand: hands[0] ?? "", offhand: hands[1] ?? "" };
+        };
+        const summons = waves
+            .summonWave(point, "undead", 8, 0, 600)
+            .filter(
+                (line) =>
+                    line.includes(" summon minecraft:skeleton ") ||
+                    line.includes(" summon minecraft:stray ")
+            );
+        expect(summons.length).toBeGreaterThan(0);
+        for (const line of summons) {
+            for (const modern of [false, true]) {
+                const read = chances(line, modern);
+                expect(read.mainhand).toBe("0.0f");
+                expect(read.offhand).toBe("0.0f");
+            }
+        }
     });
 
     it("grows with every wave and every defender, never past the cap", () => {

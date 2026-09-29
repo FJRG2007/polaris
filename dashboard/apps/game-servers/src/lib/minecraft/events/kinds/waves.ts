@@ -63,9 +63,12 @@ const ZOMBIES = ["zombie", "husk"];
  * What every monster is summoned with: tagged, never despawning (a wave that
  * vanishes when players step away is not cleared), never picking anything up,
  * never breaking a door, and dropping none of the gear it was handed. A key a
- * mob does not have is ignored by the game.
+ * mob does not have is ignored by the game, so the drop chances are written
+ * both ways they have been: two lists up to 1.21.4, one `drop_chances` from
+ * 1.21.5, which reads nothing else - an archer there dropped the bow it was
+ * handed.
  */
-const SUMMON_DATA = `{Tags:["${MOB_TAG}","${NEW_TAG}"],PersistenceRequired:1b,CanPickUpLoot:0b,CanBreakDoors:0b,HandDropChances:[0.0f,0.0f],ArmorDropChances:[0.0f,0.0f,0.0f,0.0f]}`;
+const SUMMON_DATA = `{Tags:["${MOB_TAG}","${NEW_TAG}"],PersistenceRequired:1b,CanPickUpLoot:0b,CanBreakDoors:0b,HandDropChances:[0.0f,0.0f],ArmorDropChances:[0.0f,0.0f,0.0f,0.0f],drop_chances:{mainhand:0.0f,offhand:0.0f,head:0.0f,chest:0.0f,legs:0.0f,feet:0.0f}}`;
 
 /** One kill counter per kind of monster in the mix. */
 function killObjectives(mix: WaveMix): { objective: string; criterion: string }[] {
