@@ -15,6 +15,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { stopViewAs, viewAsRole, viewAsUser } from "@/lib/view-as-service";
 
 const idSchema = z.string().uuid();
@@ -33,9 +34,9 @@ async function actor(): Promise<{ id: string; sessionId: string } | null> {
 
 export async function viewAsUserAction(userId: unknown): Promise<{ error?: string }> {
     const admin = await actor();
-    if (!admin) return { error: "Only an administrator can open another account." };
+    if (!admin) return { error: (await getTranslations("nav"))("viewAs.adminOnlyAccount") };
     const parsed = idSchema.safeParse(userId);
-    if (!parsed.success) return { error: "Unknown account." };
+    if (!parsed.success) return { error: (await getTranslations("nav"))("viewAs.unknownAccount") };
 
     const result = await viewAsUser(admin, parsed.data);
     if (!result.error) revalidatePath("/", "layout");
@@ -44,9 +45,9 @@ export async function viewAsUserAction(userId: unknown): Promise<{ error?: strin
 
 export async function viewAsRoleAction(roleId: unknown): Promise<{ error?: string }> {
     const admin = await actor();
-    if (!admin) return { error: "Only an administrator can preview a role." };
+    if (!admin) return { error: (await getTranslations("nav"))("viewAs.adminOnlyRole") };
     const parsed = idSchema.safeParse(roleId);
-    if (!parsed.success) return { error: "Unknown role." };
+    if (!parsed.success) return { error: (await getTranslations("nav"))("viewAs.unknownRole") };
 
     const result = await viewAsRole(admin, parsed.data);
     if (!result.error) revalidatePath("/", "layout");
@@ -56,7 +57,7 @@ export async function viewAsRoleAction(roleId: unknown): Promise<{ error?: strin
 /** Go back to being yourself. */
 export async function stopViewAsAction(): Promise<{ error?: string }> {
     const admin = await actor();
-    if (!admin) return { error: "Nothing to leave." };
+    if (!admin) return { error: (await getTranslations("nav"))("viewAs.nothingToLeave") };
     await stopViewAs(admin);
     revalidatePath("/", "layout");
     return {};

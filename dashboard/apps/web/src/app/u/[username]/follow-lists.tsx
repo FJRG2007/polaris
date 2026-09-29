@@ -32,6 +32,7 @@ import Fuse from "fuse.js";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2, Search } from "lucide-react";
 import { loadFollowListAction } from "./actions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -61,17 +62,18 @@ export function FollowLists({
     showsNames: boolean;
 }) {
     const [open, setOpen] = useState<Which | null>(null);
+    const t = useTranslations("publicPages");
 
     return (
         <>
             <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4 text-sm">
                 <Count
-                    label="followers"
+                    label={t("profile.followersCount", { count: followers })}
                     value={followers}
                     onOpen={showsNames ? () => setOpen("followers") : null}
                 />
                 <Count
-                    label="following"
+                    label={t("profile.followingCount", { count: following })}
                     value={following}
                     onOpen={showsNames ? () => setOpen("following") : null}
                 />
@@ -136,6 +138,7 @@ function PeopleDialog({
     name: string;
     onClose: () => void;
 }) {
+    const t = useTranslations("publicPages");
     const [typed, setTyped] = useState("");
     const [query, setQuery] = useState("");
     const [people, setPeople] = useState<Person[]>([]);
@@ -254,7 +257,7 @@ function PeopleDialog({
             <DialogContent className="max-w-sm">
                 <PlainNames>
                     <DialogTitle>
-                        {which === "followers" ? `People following ${name}` : `Who ${name} follows`}
+                        {which === "followers" ? t("profile.followersTitle", { name }) : t("profile.followingTitle", { name })}
                     </DialogTitle>
 
                     <div className="relative">
@@ -263,8 +266,8 @@ function PeopleDialog({
                             autoFocus
                             value={typed}
                             onChange={(event) => setTyped(event.target.value)}
-                            placeholder="Search by name or username"
-                            aria-label="Search these people"
+                            placeholder={t("profile.searchPlaceholder")}
+                            aria-label={t("profile.searchLabel")}
                             className="pl-8"
                         />
                     </div>
@@ -293,7 +296,7 @@ function PeopleDialog({
                         ))}
                         {shown.length === 0 && loaded && !busy && !error ? (
                             <li className="text-muted-foreground px-2 py-6 text-center text-sm">
-                                {query ? "Nobody here matches that." : "Nobody here."}
+                                {query ? t("profile.noMatch") : t("profile.nobody")}
                             </li>
                         ) : null}
                         {/* The end of what has been loaded. Only drawn while there is
@@ -312,7 +315,7 @@ function PeopleDialog({
                     box it has not been given a reason to enter. */}
                     {cursor && !busy ? (
                         <Button size="sm" variant="ghost" onClick={() => void load(cursor, query)}>
-                            Show more
+                            {t("profile.showMore")}
                         </Button>
                     ) : null}
                 </PlainNames>

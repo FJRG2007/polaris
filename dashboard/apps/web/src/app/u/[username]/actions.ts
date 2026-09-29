@@ -20,6 +20,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { FriendError, removeFriend, requestFriend } from "@/lib/friends-service";
 import { FollowError, followPerson, listFollow, unfollowPerson } from "@/lib/people-follow";
 
@@ -27,21 +28,23 @@ const personSchema = z.object({ personId: z.string().uuid() });
 
 /** One sentence, whichever of the two threw it. Anything else is logged and
  *  replaced: those messages name internals nobody asked to publish. */
-function refusal(caught: unknown, fallback: string): { error: string } {
+type ProfileFailure = "profile.errors.couldNotDo" | "profile.errors.requestNotSent";
+
+async function refusal(caught: unknown, key: ProfileFailure): Promise<{ error: string }> {
     if (caught instanceof FollowError || caught instanceof FriendError) return { error: caught.message };
     console.error("polaris: a profile action failed:", caught);
-    return { error: fallback };
+    return { error: (await getTranslations("publicPages"))(key) };
 }
 
 export async function followAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = personSchema.safeParse(input);
-    if (!parsed.success) return { error: "There is nobody to follow here" };
+    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.nobodyToFollow") };
     try {
         await followPerson(user.id, parsed.data.personId);
         return {};
     } catch (caught) {
-        return refusal(caught, "That could not be done");
+        return refusal(caught, "profile.errors.couldNotDo");
     }
 }
 
@@ -58,13 +61,13 @@ export async function unfollowAction(input: unknown): Promise<{ error?: string }
 export async function askToBeFriendsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = personSchema.safeParse(input);
-    if (!parsed.success) return { error: "That request could not be sent" };
+    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.requestNotSent") };
     try {
         await requestFriend(user.id, parsed.data.personId);
         revalidatePath("/account/friends");
         return {};
     } catch (caught) {
-        return refusal(caught, "That request could not be sent");
+        return refusal(caught, "profile.errors.requestNotSent");
     }
 }
 
@@ -77,7 +80,7 @@ export async function stopBeingFriendsAction(input: unknown): Promise<{ error?: 
         revalidatePath("/account/friends");
         return {};
     } catch (caught) {
-        return refusal(caught, "That could not be done");
+        return refusal(caught, "profile.errors.couldNotDo");
     }
 }
 
@@ -102,7 +105,7 @@ export async function loadFollowListAction(
 ): Promise<{ items?: { id: string; name: string; username: string }[]; cursor?: string | null; error?: string }> {
     const user = await requireUser();
     const parsed = listSchema.safeParse(input);
-    if (!parsed.success) return { error: "That list could not be read" };
+    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.listUnreadable") };
 
     const { maySee } = await import("@/lib/privacy-service");
     // Never as an administrator, exactly as the page itself is drawn: running
@@ -110,7 +113,7 @@ export async function loadFollowListAction(
     // administration screens, not a reason for somebody's profile to quietly
     // show more to one reader than it says it shows to anybody.
     const allowed = await maySee(parsed.data.personId, "followers", { id: user.id, isAdmin: false });
-    if (!allowed) return { error: "That list is not shown" };
+    if (!allowed) return { error: (await getTranslations("publicPages"))("profile.errors.listHidden") };
 
     const page = await listFollow(parsed.data.personId, parsed.data.which, {
         before: parsed.data.before ?? null,

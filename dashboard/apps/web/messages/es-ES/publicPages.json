@@ -1,1 +1,80 @@
-{}
+{
+    "layout": {
+        "signIn": "Iniciar sesión",
+        "about": "Acerca de",
+        "privacy": "Privacidad",
+        "terms": "Condiciones",
+        "source": "Código fuente"
+    },
+    "about": {
+        "metaDescription": "Polaris es un panel de control autoalojado para archivos, tareas, despliegues y servidores de juegos.",
+        "intro": "Un panel de control autoalojado. Un solo sitio para guardar archivos, llevar tareas, desplegar aplicaciones y gestionar servidores de juegos, en un equipo que es de su operador y no en el servicio de otro. Este es uno de esos despliegues, gestionado por la persona o la organización que lo instaló.",
+        "account": "Todo lo que hay más allá de esta página necesita una cuenta aquí, que entrega su operador. No hay registro abierto.",
+        "connecting": {
+            "title": "Conectar una cuenta",
+            "body": "Quien tiene una cuenta aquí puede conectar sus propias cuentas externas, y cada conexión pide lo mínimo posible. Una cuenta de Google conectada es de solo lectura, y solo para mostrar el calendario junto a las tareas: Polaris no puede cambiar ni borrar nada en ella. Microsoft y Dropbox se limitan a la carpeta que Polaris crea para las copias de seguridad. Steam, Epic Games y Minecraft entregan un id de cuenta y un nombre visible, para que un servidor de juegos distinga a un jugador de otro, y ninguna credencial. Discord entrega eso, el correo de la cuenta y los nombres de los servidores en los que está; nada de lo que hay dentro, y nunca la posibilidad de publicar como tú.",
+            "owner": "La conexión siempre la inicia el titular de la cuenta, y desvincularla aquí destruye la credencial y el acceso con ella. La <link>política de privacidad</link> explica qué se guarda y durante cuánto tiempo."
+        },
+        "software": {
+            "title": "El software",
+            "body": "Polaris es software libre, publicado bajo la licencia Apache 2.0. Quienes lo escriben no gestionan ningún servicio y nunca ven este despliegue: funciona por completo en el equipo de su operador."
+        }
+    },
+    "legal": {
+        "heading": "{title} <suffix>- Polaris</suffix>",
+        "updated": "Última actualización: {date}.",
+        "privacyTitle": "Privacidad - Polaris",
+        "privacyDescription": "Qué guarda Polaris, dónde se queda y qué pasa con ello cuando desvinculas algo o te vas.",
+        "termsTitle": "Condiciones - Polaris",
+        "termsDescription": "Las condiciones con las que se ofrece este despliegue de Polaris."
+    },
+    "profile": {
+        "metaTitle": "Perfil - Polaris",
+        "errors": {
+            "couldNotDo": "No se ha podido hacer",
+            "requestNotSent": "No se ha podido enviar esa solicitud",
+            "nobodyToFollow": "Aquí no hay nadie a quien seguir",
+            "listUnreadable": "No se ha podido leer esa lista",
+            "listHidden": "Esa lista no se muestra"
+        },
+        "dropTitle": "¿Dejar de ser amigo de {name}?",
+        "dropDescription": "Pierde lo que muestras a tus amigos y conserva todo lo demás. Cualquiera de los dos puede volver a pedirlo.",
+        "drop": "Dejar de ser amigos",
+        "blockTitle": "¿Bloquear a {name}?",
+        "blockDescription": "Deja de poder contactarte aquí, y no se le avisa. Puedes deshacerlo desde esta página.",
+        "blockConfirm": "Bloquearle",
+        "youBlocked": "Has bloqueado a {name}.",
+        "message": "Mensaje",
+        "requestSent": "Solicitud de amistad enviada",
+        "answer": "Responder a su solicitud",
+        "addFriend": "Añadir amigo",
+        "following": "Siguiendo",
+        "follow": "Seguir",
+        "moreAbout": "Más sobre {name}",
+        "more": "Más",
+        "removeFriend": "Quitar de amigos",
+        "unblock": "Desbloquear",
+        "block": "Bloquear",
+        "report": "Denunciar esta cuenta",
+        "yourPage": "Esta es tu página",
+        "edit": "Editar",
+        "orgHere": "Una organización de este Polaris",
+        "typedCompany": "Escrito por esta persona. Polaris no sabe nada de ello.",
+        "hereSince": "Aquí desde el {date}",
+        "followersCount": "{count, plural, one {seguidor} other {seguidores}}",
+        "followingCount": "{count, plural, other {siguiendo}}",
+        "followersTitle": "Personas que siguen a {name}",
+        "followingTitle": "A quién sigue {name}",
+        "searchPlaceholder": "Busca por nombre o nombre de usuario",
+        "searchLabel": "Buscar entre estas personas",
+        "noMatch": "Aquí nadie coincide.",
+        "nobody": "Aquí no hay nadie.",
+        "showMore": "Mostrar más"
+    },
+    "org": {
+        "metaTitle": "Organización - Polaris",
+        "manage": "Gestionar",
+        "badge": "Organización",
+        "people": "{count, plural, one {Una persona muestra esta organización en su perfil.} other {# personas muestran esta organización en su perfil.}}"
+    }
+}

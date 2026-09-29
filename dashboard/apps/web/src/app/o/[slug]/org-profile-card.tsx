@@ -19,6 +19,7 @@ import Link from "next/link";
 import type { OrgProfile } from "@/lib/profile-service";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AtSign, CalendarDays, Settings2 } from "lucide-react";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { ProfileBanner } from "@/components/profile-banner";
@@ -26,6 +27,7 @@ import { PersonName, PersonRow } from "@/components/person-name";
 
 export function OrgProfileCard({ org }: { org: OrgProfile }) {
     const format = useDisplayFormat();
+    const t = useTranslations("publicPages");
 
     return (
         <Card className="overflow-hidden">
@@ -43,7 +45,7 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                         <Button asChild size="xs" variant="outline" className="mb-1">
                             <Link href={`/account/organizations/${org.slug}`}>
                                 <Settings2 className="size-3 shrink-0" />
-                                Manage
+                                {t("org.manage")}
                             </Link>
                         </Button>
                     ) : null}
@@ -52,7 +54,7 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                 <div className="flex flex-col gap-0.5">
                     <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight tracking-tight">
                         {org.name}
-                        <Badge variant="neutral">Organization</Badge>
+                        <Badge variant="neutral">{t("org.badge")}</Badge>
                     </h1>
                     <p className="text-muted-foreground flex items-center gap-1 text-sm">
                         <AtSign className="size-3.5 shrink-0" />
@@ -67,9 +69,7 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                 {org.people.length > 0 ? (
                     <div className="flex flex-col gap-2 border-t border-border pt-4">
                         <p className="text-muted-foreground text-xs">
-                            {org.people.length === 1
-                                ? "One person shows this organization on their profile."
-                                : `${org.people.length} people show this organization on their profile.`}
+                            {t("org.people", { count: org.people.length })}
                         </p>
                         <ul className="flex flex-col gap-1">
                             {org.people.map((person) => (
@@ -97,7 +97,7 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                 <div className="text-muted-foreground flex flex-col gap-1.5 border-t border-border pt-4 text-sm">
                     <p className="flex items-center gap-1.5">
                         <CalendarDays className="size-3.5 shrink-0" />
-                        Here since {format.date(org.createdAt)}
+                        {t("profile.hereSince", { date: format.date(org.createdAt) })}
                     </p>
                 </div>
             </CardBody>

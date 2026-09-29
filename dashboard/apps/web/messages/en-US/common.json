@@ -6,5 +6,37 @@
     },
     "meta": {
         "description": "Home-lab control plane - drive, connections, and more."
+    },
+    "pages": {
+        "error": {
+            "updatedTitle": "Polaris was updated while this page was open",
+            "brokeTitle": "This page stopped working",
+            "updatedBody": "This tab is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost.",
+            "againBody": "It failed the same way again, so trying once more will not clear it. Reload to pick up a new build, or send what is below to whoever is looking at it.",
+            "brokeBody": "The rest of Polaris is still running. Try again - and if an update landed under this tab, Polaris says so at the corner of the screen.",
+            "reference": "Reference: {digest}",
+            "reload": "Reload",
+            "trying": "Trying",
+            "tryAgain": "Try again"
+        },
+        "notFound": {
+            "appTitle": "This is not here any more",
+            "appDescription": "It may have been removed, renamed, or never existed. Nothing else has changed - everything else is where you left it.",
+            "back": "Back",
+            "overview": "Overview",
+            "title": "There is nothing at this address",
+            "description": "The link may be out of date, or the thing it pointed at may have been removed.",
+            "toOverview": "Go to the overview"
+        }
+    },
+    "share": {
+        "unreadable": "That could not be read",
+        "notWritten": "That share could not be written",
+        "nobodyFound": "Nobody could be looked up",
+        "notTakenBack": "That share could not be taken back"
+    },
+    "mentions": {
+        "unreadable": "That search could not be read",
+        "lookupFailed": "Those could not be looked up"
     }
 }

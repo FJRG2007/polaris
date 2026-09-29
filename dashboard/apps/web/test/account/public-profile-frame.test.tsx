@@ -51,6 +51,10 @@ vi.mock("@/app/u/[username]/profile-card", () => ({
     ProfileCard: ({ signedIn }: { signedIn: boolean }) => <p>card signedIn={String(signedIn)}</p>
 }));
 vi.mock("@/app/o/[slug]/org-profile-card", () => ({ OrgProfileCard: () => <p>org card</p> }));
+// The catalogs a page hands its cards come from the request; there is none here.
+vi.mock("@/components/i18n/messages", () => ({
+    Messages: ({ children }: { children: ReactNode }) => <>{children}</>
+}));
 
 const { default: ProfilePage } = await import("@/app/u/[username]/page");
 const { default: OrganizationPage } = await import("@/app/o/[slug]/page");

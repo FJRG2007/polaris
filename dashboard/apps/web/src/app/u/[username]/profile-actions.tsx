@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { openDirectAction } from "@/app/(app)/chat/actions";
 import type { ProfileStanding } from "@/lib/profile-service";
 import { ReportPersonDialog } from "@/components/report-person-dialog";
@@ -59,6 +60,7 @@ export function ProfileActions({
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
+    const t = useTranslations("publicPages");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState("");
     const [reporting, setReporting] = useState(false);
@@ -101,10 +103,9 @@ export function ProfileActions({
 
     const drop = async () => {
         const sure = await confirm({
-            title: `Stop being friends with ${name}?`,
-            description:
-                "They lose what you show your friends and keep everything else. Either of you can ask again.",
-            confirmLabel: "Stop being friends",
+            title: t("profile.dropTitle", { name }),
+            description: t("profile.dropDescription"),
+            confirmLabel: t("profile.drop"),
             danger: true
         });
         if (!sure) return;
@@ -125,10 +126,9 @@ export function ProfileActions({
     const toggleBlock = async () => {
         if (!blocked) {
             const sure = await confirm({
-                title: `Block ${name}?`,
-                description:
-                    "They stop being able to reach you here, and they are not told. You can undo it from this page.",
-                confirmLabel: "Block them",
+                title: t("profile.blockTitle", { name }),
+                description: t("profile.blockDescription"),
+                confirmLabel: t("profile.blockConfirm"),
                 danger: true
             });
             if (!sure) return;
@@ -156,26 +156,26 @@ export function ProfileActions({
                     out beyond letting them back in, so the row says that and
                     stops. */}
                 {blocked ? (
-                    <span className="text-muted-foreground text-sm">You blocked {name}.</span>
+                    <span className="text-muted-foreground text-sm">{t("profile.youBlocked", { name })}</span>
                 ) : (
                     <>
                         {friendship === "friends" ? (
                             <Button size="sm" disabled={pending} onClick={message}>
                                 <MessageSquare className="size-3.5 shrink-0" />
-                                Message
+                                {t("profile.message")}
                             </Button>
                         ) : friendship === "sent" ? (
                             // Not a button: the request is out and only they can
                             // answer it, so a control here would do nothing.
-                            <span className="text-muted-foreground text-sm">Friend request sent</span>
+                            <span className="text-muted-foreground text-sm">{t("profile.requestSent")}</span>
                         ) : friendship === "received" ? (
                             <Button size="sm" asChild>
-                                <a href="/account/friends">Answer their request</a>
+                                <a href="/account/friends">{t("profile.answer")}</a>
                             </Button>
                         ) : standing.canAskToBeFriends ? (
                             <Button size="sm" disabled={pending} onClick={ask}>
                                 <UserPlus className="size-3.5 shrink-0" />
-                                Add friend
+                                {t("profile.addFriend")}
                             </Button>
                         ) : null}
 
@@ -188,10 +188,10 @@ export function ProfileActions({
                             {following ? (
                                 <>
                                     <Check className="size-3.5 shrink-0" />
-                                    Following
+                                    {t("profile.following")}
                                 </>
                             ) : (
-                                "Follow"
+                                t("profile.follow")
                             )}
                         </Button>
                     </>
@@ -202,8 +202,8 @@ export function ProfileActions({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`More about ${name}`}
-                            title="More"
+                            aria-label={t("profile.moreAbout", { name })}
+                            title={t("profile.more")}
                             disabled={pending}
                         >
                             <MoreHorizontal className="size-4 shrink-0" />
@@ -214,7 +214,7 @@ export function ProfileActions({
                             <>
                                 <DropdownMenuItem className="gap-2" onSelect={() => void drop()}>
                                     <UserMinus className="size-3.5" />
-                                    Remove friend
+                                    {t("profile.removeFriend")}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                             </>
@@ -225,7 +225,7 @@ export function ProfileActions({
                             onSelect={() => void toggleBlock()}
                         >
                             <ShieldBan className="size-3.5" />
-                            {blocked ? "Unblock" : "Block"}
+                            {blocked ? t("profile.unblock") : t("profile.block")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             variant="danger"
@@ -233,7 +233,7 @@ export function ProfileActions({
                             onSelect={() => setReporting(true)}
                         >
                             <Flag className="size-3.5" />
-                            Report this account
+                            {t("profile.report")}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

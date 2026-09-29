@@ -17,6 +17,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { findPeople } from "@/lib/people-search";
 import { recordAudit } from "@/lib/audit-service";
 import { publishAccessChange } from "@/lib/access-live";
@@ -37,13 +38,15 @@ import {
 /** What a refusal reads as. Anything else is logged and replaced, the same rule
  *  the rest of the app follows: an internal message names paths nobody asked to
  *  publish. */
-function refusal(caught: unknown, fallback: string): { error: string } {
+type ShareFailure = "share.unreadable" | "share.notWritten" | "share.nobodyFound" | "share.notTakenBack";
+
+async function refusal(caught: unknown, key: ShareFailure): Promise<{ error: string }> {
     if (caught instanceof GrantError) return { error: caught.message };
     if (caught instanceof Error && caught.name.endsWith("AccessError")) {
         return { error: caught.message };
     }
     console.error("[access] share failed", caught);
-    return { error: fallback };
+    return { error: (await getTranslations("common"))(key) };
 }
 
 /** Read the subject off the wire. An unknown one is refused rather than guessed
@@ -78,7 +81,7 @@ export async function listGrantsAction(
         ]);
         return { grants, candidates };
     } catch (caught) {
-        return refusal(caught, "That could not be read");
+        return refusal(caught, "share.unreadable");
     }
 }
 
@@ -93,7 +96,7 @@ export async function shareAction(
         await requireMayShare(user, kind, String(subjectId));
         const parsed = core.accessGrantSchema.safeParse(input);
         if (!parsed.success) {
-            return { error: parsed.error.issues[0]?.message ?? "That share could not be written" };
+            return { error: parsed.error.issues[0]?.message ?? (await getTranslations("common"))("share.notWritten") };
         }
         // The same scoping the picker was filled from, asked again here: what a
         // form offered is not what a call has to carry.
@@ -130,7 +133,7 @@ export async function shareAction(
         );
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
     } catch (caught) {
-        return refusal(caught, "That share could not be written");
+        return refusal(caught, "share.notWritten");
     }
 }
 
@@ -156,7 +159,7 @@ export async function findSharePeopleAction(
         const found = await findPeople({ id: user.id }, String(query), { reachableOnly: false });
         return { people: found.people };
     } catch (caught) {
-        return refusal(caught, "Nobody could be looked up");
+        return refusal(caught, "share.nobodyFound");
     }
 }
 
@@ -183,6 +186,6 @@ export async function revokeShareAction(
         publishAccessChange();
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
     } catch (caught) {
-        return refusal(caught, "That share could not be taken back");
+        return refusal(caught, "share.notTakenBack");
     }
 }

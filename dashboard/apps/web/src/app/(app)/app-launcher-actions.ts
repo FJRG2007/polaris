@@ -11,6 +11,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { favoriteAppsSchema } from "@/lib/app-launcher";
 import { saveFavoriteApps } from "@/lib/app-launcher-service";
 
@@ -18,7 +19,7 @@ export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: 
     const user = await requireUser();
     const parsed = favoriteAppsSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Those favorites could not be saved." };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("nav"))("errors.favoritesNotSaved") };
     await saveFavoriteApps(user.id, parsed.data);
     return {};
 }

@@ -38,6 +38,7 @@ import { ActivityCards } from "@/components/activity-card";
 import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { effectOf, linkLabel, nameLookOf } from "@polaris/core";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
@@ -62,6 +63,7 @@ export function ProfileCard({
     signedIn: boolean;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("publicPages");
     const person = { id: profile.id, name: profile.name };
     // Where they are, and the line they are showing. The same two facts the panel
     // beside a direct message draws, from the same store, because they are the
@@ -121,14 +123,14 @@ export function ProfileCard({
                     </span>
                     {own ? (
                         <span className="mb-1 flex flex-wrap items-center gap-2">
-                            <Badge variant="neutral">This is your page</Badge>
+                            <Badge variant="neutral">{t("profile.yourPage")}</Badge>
                             {/* What everybody else sees, which is why there is a
                                 way to change it right here: the page is the
                                 preview and Account is where it is written. */}
                             <Button asChild size="xs" variant="outline">
                                 <Link href="/account">
                                     <Pencil className="size-3 shrink-0" />
-                                    Edit
+                                    {t("profile.edit")}
                                 </Link>
                             </Button>
                         </span>
@@ -230,7 +232,7 @@ export function ProfileCard({
                                 {org.name}
                                 <BadgeCheck
                                     className="text-primary size-3.5 shrink-0"
-                                    aria-label="An organization on this Polaris"
+                                    aria-label={t("profile.orgHere")}
                                 />
                             </Link>
                         ))}
@@ -241,7 +243,7 @@ export function ProfileCard({
                                 // Said rather than implied: the tick above means
                                 // Polaris holds the roster, and its absence has to
                                 // mean something legible.
-                                title="Typed by them. Polaris knows nothing about it."
+                                title={t("profile.typedCompany")}
                             >
                                 <span className="flex size-5 shrink-0 items-center justify-center">
                                     <Building2 className="size-3.5 shrink-0" />
@@ -287,7 +289,7 @@ export function ProfileCard({
                     ) : null}
                     <p className="flex items-center gap-1.5">
                         <CalendarDays className="size-3.5 shrink-0" />
-                        Here since {format.date(profile.joinedAt)}
+                        {t("profile.hereSince", { date: format.date(profile.joinedAt) })}
                     </p>
                 </div>
             </CardBody>

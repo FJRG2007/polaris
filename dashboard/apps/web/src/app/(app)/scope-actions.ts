@@ -20,6 +20,7 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE } from "@/lib/workspace-scope";
 
 export async function setWorkspaceScopeAction(value: string): Promise<{ error?: string }> {
@@ -32,7 +33,7 @@ export async function setWorkspaceScopeAction(value: string): Promise<{ error?: 
             where: { id: orgId, OR: [{ ownerId: user.id }, { members: { some: { userId: user.id } } }] },
             select: { id: true }
         });
-        if (!member) return { error: "You are not part of that organization" };
+        if (!member) return { error: (await getTranslations("nav"))("errors.notInOrganization") };
     }
 
     (await cookies()).set(SCOPE_COOKIE, core.formatScope(scope), {

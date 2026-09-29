@@ -273,5 +273,16 @@
         "Where the room went": "Where the room went",
         "Who gets in": "Who gets in",
         "World": "World"
+    },
+    "errors": {
+        "favoritesNotSaved": "Those favorites could not be saved.",
+        "notInOrganization": "You are not part of that organization"
+    },
+    "viewAs": {
+        "adminOnlyAccount": "Only an administrator can open another account.",
+        "unknownAccount": "Unknown account.",
+        "adminOnlyRole": "Only an administrator can preview a role.",
+        "unknownRole": "Unknown role.",
+        "nothingToLeave": "Nothing to leave."
     }
 }

@@ -19,6 +19,7 @@ export default function manifest(): MetadataRoute.Manifest {
         id: "/",
         name: "Polaris",
         short_name: "Polaris",
+        // i18n-ignore: the install manifest is built once and cached by browsers, not drawn per reader
         description: "Your home lab and servers: deploys, drive, mail, chat and more.",
         start_url: "/home",
         scope: "/",

@@ -15,6 +15,7 @@
  * /apps/deploy/<id>/admin/settings since it was written.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
@@ -28,17 +29,17 @@ afterEach(cleanup);
 
 describe("an address that matches nothing", () => {
     it("says so in the product's own words rather than the framework's", () => {
-        render(<NotFound />);
+        render(<NotFound />, { wrapper: MessagesWrapper });
         expect(screen.getByRole("heading").textContent).toContain("nothing at this address");
     });
 
     it("shows the address, which is the whole of the bug report when the link was ours", () => {
-        render(<NotFound />);
+        render(<NotFound />, { wrapper: MessagesWrapper });
         expect(screen.getByText("/apps/deploy/019fc9e3/admin/settings")).toBeTruthy();
     });
 
     it("offers a way out, since a dead end with no exit is the actual complaint", () => {
-        render(<NotFound />);
+        render(<NotFound />, { wrapper: MessagesWrapper });
         const overview = screen.getByRole("link", { name: /overview/i });
         expect(overview.getAttribute("href")).toBe("/home");
         expect(screen.getByRole("button", { name: /back/i })).toBeTruthy();
@@ -48,14 +49,14 @@ describe("an address that matches nothing", () => {
         // usePathname is null for a moment on some transitions, and a 404 page
         // that throws is a 500 wearing its clothes.
         pathname.mockReturnValueOnce(null as unknown as string);
-        render(<NotFound />);
+        render(<NotFound />, { wrapper: MessagesWrapper });
         expect(screen.getByRole("heading")).toBeTruthy();
     });
 });
 
 describe("something that has gone, inside the dashboard", () => {
     it("keeps the reader where they are instead of sending them to the front door", () => {
-        render(<AppNotFound />);
+        render(<AppNotFound />, { wrapper: MessagesWrapper });
         expect(screen.getByText(/not here any more/i)).toBeTruthy();
         // Back first: what they wanted next is almost never the overview.
         const actions = screen.getAllByRole("button").map((node) => node.textContent ?? "");

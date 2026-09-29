@@ -23,6 +23,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
@@ -37,6 +38,7 @@ export default function AppError({
     reset: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("common");
     const [retrying, startRetry] = useTransition();
     const [attempts, setAttempts] = useState(1);
     const staleBuild = isStaleBuildError(error);
@@ -73,16 +75,14 @@ export default function AppError({
                         <TriangleAlert className="mt-0.5 size-5 shrink-0 text-danger" />
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">
-                                {staleBuild
-                                    ? "Polaris was updated while this page was open"
-                                    : "This page stopped working"}
+                                {staleBuild ? t("pages.error.updatedTitle") : t("pages.error.brokeTitle")}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {staleBuild
-                                    ? "This tab is still running the old build, and the server no longer answers it. Reloading picks up the new one; anything typed into the page is lost."
+                                    ? t("pages.error.updatedBody")
                                     : attempts > 1
-                                      ? "It failed the same way again, so trying once more will not clear it. Reload to pick up a new build, or send what is below to whoever is looking at it."
-                                      : "The rest of Polaris is still running. Try again - and if an update landed under this tab, Polaris says so at the corner of the screen."}
+                                      ? t("pages.error.againBody")
+                                      : t("pages.error.brokeBody")}
                             </p>
                         </div>
                     </div>
@@ -96,22 +96,22 @@ export default function AppError({
                     ) : null}
                     {error.digest && !staleBuild ? (
                         <p className="font-mono text-xs text-muted-foreground">
-                            Reference: {error.digest}
+                            {t("pages.error.reference", { digest: error.digest })}
                         </p>
                     ) : null}
                     <div className="flex justify-end gap-2">
                         {staleBuild ? (
                             <Button onClick={() => window.location.reload()}>
-                                <RotateCcw className="size-4" /> Reload
+                                <RotateCcw className="size-4" /> {t("pages.error.reload")}
                             </Button>
                         ) : (
                             <>
                                 <Button variant="ghost" onClick={() => window.location.reload()}>
-                                    Reload
+                                    {t("pages.error.reload")}
                                 </Button>
                                 <Button onClick={retry} disabled={retrying}>
                                     <RotateCcw className="size-4" />
-                                    {retrying ? "Trying" : "Try again"}
+                                    {retrying ? t("pages.error.trying") : t("pages.error.tryAgain")}
                                 </Button>
                             </>
                         )}

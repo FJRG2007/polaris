@@ -3,15 +3,16 @@ import { Reveal } from "../reveal";
 import type { Metadata } from "next";
 import { LogIn } from "lucide-react";
 import { PUBLIC_PATHS } from "@/lib/legal/service";
+import { getTranslations } from "@/lib/i18n/request";
 import { Button, Card, CardBody } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-    title: "Polaris",
-    description:
-        "Polaris is a self-hosted control plane for files, tasks, deployments and game servers."
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("publicPages");
+    // i18n-ignore: the product's name is the page's title
+    return { title: "Polaris", description: t("about.metaDescription") };
+}
 
 /**
  * The public front door, and the page a review desk is asking for when it wants
@@ -27,69 +28,51 @@ export const metadata: Metadata = {
  * connected, not who is on it. What a reviewer needs is what the app does with
  * an account somebody connects, and that is the same everywhere.
  */
-export default function AboutPage() {
+export default async function AboutPage() {
+    const t = await getTranslations("publicPages");
     return (
         <>
             <Reveal className="flex flex-col gap-5">
+                {/* i18n-ignore: the product's name */}
                 <h1 className="text-4xl font-medium tracking-tight sm:text-5xl">Polaris</h1>
-                <p className="text-lg leading-relaxed text-muted-foreground">
-                    A self-hosted control plane. One place to keep files, run tasks, deploy
-                    applications and manage game servers, on hardware its operator owns rather than
-                    on somebody else&apos;s service. This is one such deployment, run by the person
-                    or organization that installed it.
-                </p>
-                <p className="text-base leading-relaxed text-muted-foreground">
-                    Everything past this page needs an account here, which its operator hands out.
-                    There is nothing to sign up for.
-                </p>
+                <p className="text-lg leading-relaxed text-muted-foreground">{t("about.intro")}</p>
+                <p className="text-base leading-relaxed text-muted-foreground">{t("about.account")}</p>
                 <div className="pt-1">
                     <Button asChild>
                         <Link href="/oauth/login">
                             <LogIn className="size-4" />
-                            Sign in
+                            {t("layout.signIn")}
                         </Link>
                     </Button>
                 </div>
             </Reveal>
 
             <Reveal className="flex flex-col gap-4">
-                <h2 className="text-xl font-medium tracking-tight">Connecting an account</h2>
+                <h2 className="text-xl font-medium tracking-tight">{t("about.connecting.title")}</h2>
+                <p className="text-base leading-relaxed text-muted-foreground">{t("about.connecting.body")}</p>
                 <p className="text-base leading-relaxed text-muted-foreground">
-                    People with an account here can connect outside accounts of their own, and each
-                    connection asks for the least it can. A connected Google account is read-only,
-                    and only so the calendar can be shown beside the tasks - Polaris cannot change
-                    or delete anything in it. Microsoft and Dropbox are limited to the folder
-                    Polaris creates for backups. Steam, Epic Games and Minecraft hand over an
-                    account id and a display name, so a game server can tell one player from
-                    another, and no credential at all. Discord hands over those, the address on the
-                    account, and the names of the servers it is in - nothing inside them, and never
-                    the ability to post as you.
-                </p>
-                <p className="text-base leading-relaxed text-muted-foreground">
-                    Connecting is always started by the account&apos;s owner, and unlinking it here
-                    destroys the credential and the access with it. The{" "}
-                    <Link href={PUBLIC_PATHS.privacy} className="text-primary hover:underline">
-                        privacy policy
-                    </Link>{" "}
-                    sets out what is stored and for how long.
+                    {t.rich("about.connecting.owner", {
+                        link: (chunks) => (
+                            <Link key="link" href={PUBLIC_PATHS.privacy} className="text-primary hover:underline">
+                                {chunks}
+                            </Link>
+                        )
+                    })}
                 </p>
             </Reveal>
 
             <Reveal>
                 <Card>
                     <CardBody className="flex flex-col gap-3">
-                        <h2 className="text-xl font-medium tracking-tight">The software</h2>
-                        <p className="text-base leading-relaxed text-muted-foreground">
-                            Polaris is open source, published under the Apache 2.0 license. The
-                            people who write it operate no service and never see this deployment: it
-                            runs entirely on its operator&apos;s own machine.
-                        </p>
+                        <h2 className="text-xl font-medium tracking-tight">{t("about.software.title")}</h2>
+                        <p className="text-base leading-relaxed text-muted-foreground">{t("about.software.body")}</p>
                         <a
                             href="https://github.com/FJRG2007/polaris"
                             target="_blank"
                             rel="noreferrer noopener"
                             className="w-fit text-sm text-primary hover:underline"
                         >
+                            {/* i18n-ignore: an address */}
                             github.com/FJRG2007/polaris
                         </a>
                     </CardBody>

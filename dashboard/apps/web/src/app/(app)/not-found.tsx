@@ -18,21 +18,23 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { EmptyState } from "@polaris/ui";
 import { ArrowLeft, SearchX } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export default function AppNotFound() {
+    const t = useTranslations("common");
     return (
         <EmptyState
             icon={<SearchX />}
-            title="This is not here any more"
-            description="It may have been removed, renamed, or never existed. Nothing else has changed - everything else is where you left it."
+            title={t("pages.notFound.appTitle")}
+            description={t("pages.notFound.appDescription")}
             action={
                 <>
                     <Button variant="ghost" onClick={() => window.history.back()}>
                         <ArrowLeft className="size-4 shrink-0" />
-                        Back
+                        {t("pages.notFound.back")}
                     </Button>
                     <Button asChild variant="ghost">
-                        <Link href="/home">Overview</Link>
+                        <Link href="/home">{t("pages.notFound.overview")}</Link>
                     </Button>
                 </>
             }

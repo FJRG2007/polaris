@@ -273,5 +273,16 @@
         "Where the room went": "Qué ocupa espacio",
         "Who gets in": "Quién entra",
         "World": "Mundo"
+    },
+    "errors": {
+        "favoritesNotSaved": "No se han podido guardar esos favoritos.",
+        "notInOrganization": "No formas parte de esa organización"
+    },
+    "viewAs": {
+        "adminOnlyAccount": "Solo un administrador puede abrir otra cuenta.",
+        "unknownAccount": "Cuenta desconocida.",
+        "adminOnlyRole": "Solo un administrador puede previsualizar un rol.",
+        "unknownRole": "Rol desconocido.",
+        "nothingToLeave": "No hay nada que abandonar."
     }
 }

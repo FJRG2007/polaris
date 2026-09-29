@@ -6,5 +6,37 @@
     },
     "meta": {
         "description": "Panel de control para tu home lab: archivos, conexiones y más."
+    },
+    "pages": {
+        "error": {
+            "updatedTitle": "Polaris se ha actualizado mientras esta página estaba abierta",
+            "brokeTitle": "Esta página ha dejado de funcionar",
+            "updatedBody": "Esta pestaña sigue con la versión antigua y el servidor ya no le responde. Al recargar se carga la nueva; se perderá lo que hayas escrito en la página.",
+            "againBody": "Ha vuelto a fallar igual, así que intentarlo otra vez no lo arreglará. Recarga para cargar una versión nueva, o envía lo de abajo a quien lo esté revisando.",
+            "brokeBody": "El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta pestaña, Polaris lo indica en la esquina de la pantalla.",
+            "reference": "Referencia: {digest}",
+            "reload": "Recargar",
+            "trying": "Intentándolo",
+            "tryAgain": "Volver a intentarlo"
+        },
+        "notFound": {
+            "appTitle": "Esto ya no está aquí",
+            "appDescription": "Puede que se haya eliminado, se haya renombrado o que nunca existiera. No ha cambiado nada más: todo lo demás está donde lo dejaste.",
+            "back": "Atrás",
+            "overview": "Resumen",
+            "title": "No hay nada en esta dirección",
+            "description": "Puede que el enlace esté desactualizado o que lo que enlazaba se haya eliminado.",
+            "toOverview": "Ir al resumen"
+        }
+    },
+    "share": {
+        "unreadable": "No se ha podido leer",
+        "notWritten": "No se ha podido guardar esa compartición",
+        "nobodyFound": "No se ha podido buscar a nadie",
+        "notTakenBack": "No se ha podido retirar esa compartición"
+    },
+    "mentions": {
+        "unreadable": "No se ha podido leer esa búsqueda",
+        "lookupFailed": "No se han podido consultar"
     }
 }

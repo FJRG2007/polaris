@@ -14,6 +14,8 @@
 
 import type { Metadata } from "next";
 import { guardedUser } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { OrgProfileCard } from "./org-profile-card";
 import { orgProfile, profilesArePublic } from "@/lib/profile-service";
 import { NothingToShow, ProfileFrame } from "@/components/profile-frame";
@@ -23,7 +25,9 @@ export const dynamic = "force-dynamic";
 /** The same title whether or not the organization exists: a page that named it
  *  in the tab before saying whether it would show it answers "does this handle
  *  exist" to anybody who asks. */
-export const metadata: Metadata = { title: "Organization - Polaris" };
+export async function generateMetadata(): Promise<Metadata> {
+    return { title: (await getTranslations("publicPages"))("org.metaTitle") };
+}
 
 export default async function OrganizationPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
@@ -44,7 +48,9 @@ export default async function OrganizationPage({ params }: { params: Promise<{ s
 
     return (
         <ProfileFrame viewer={viewer}>
-            <OrgProfileCard org={org} />
+            <Messages namespaces={["publicPages"]}>
+                <OrgProfileCard org={org} />
+            </Messages>
         </ProfileFrame>
     );
 }

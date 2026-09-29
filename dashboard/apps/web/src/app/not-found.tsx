@@ -24,20 +24,19 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, Compass } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export default function NotFound() {
     const pathname = usePathname();
+    const t = useTranslations("common");
 
     return (
         <main className="flex min-h-screen items-center justify-center p-6">
             <div className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
                 <div className="flex flex-col gap-1">
                     <p className="font-mono text-xs text-muted-foreground">404</p>
-                    <h1 className="text-sm font-medium">There is nothing at this address</h1>
-                    <p className="text-sm text-muted-foreground">
-                        The link may be out of date, or the thing it pointed at may have been
-                        removed.
-                    </p>
+                    <h1 className="text-sm font-medium">{t("pages.notFound.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("pages.notFound.description")}</p>
                 </div>
 
                 {pathname ? (
@@ -50,14 +49,14 @@ export default function NotFound() {
                     <Button asChild>
                         <Link href="/home">
                             <Compass className="size-4 shrink-0" />
-                            Go to the overview
+                            {t("pages.notFound.toOverview")}
                         </Link>
                     </Button>
                     {/* history.back() rather than a router call: the page before
                         this one may not be a page of ours at all. */}
                     <Button variant="ghost" onClick={() => window.history.back()}>
                         <ArrowLeft className="size-4 shrink-0" />
-                        Back
+                        {t("pages.notFound.back")}
                     </Button>
                 </div>
             </div>

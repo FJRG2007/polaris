@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import * as mentions from "@/lib/rich-text/mention-service";
 import { REFERENCE_KINDS } from "@/components/rich-text/references";
 
@@ -33,7 +34,7 @@ export async function searchMentionsAction(
     input: unknown
 ): Promise<{ results?: mentions.MentionCandidate[]; error?: string }> {
     const parsed = searchInput.safeParse(input);
-    if (!parsed.success) return { error: "That search could not be read" };
+    if (!parsed.success) return { error: (await getTranslations("common"))("mentions.unreadable") };
 
     const user = await requireUser();
     try {
@@ -47,7 +48,7 @@ export async function searchMentionsAction(
         return { results };
     } catch (caught) {
         console.error(caught);
-        return { error: "Those could not be looked up" };
+        return { error: (await getTranslations("common"))("mentions.lookupFailed") };
     }
 }
 
@@ -65,7 +66,7 @@ export async function searchAccountsAction(
     input: unknown
 ): Promise<{ results?: mentions.AccountCandidate[]; error?: string }> {
     const parsed = accountInput.safeParse(input);
-    if (!parsed.success) return { error: "That search could not be read" };
+    if (!parsed.success) return { error: (await getTranslations("common"))("mentions.unreadable") };
 
     const user = await requireUser();
     try {
@@ -76,7 +77,7 @@ export async function searchAccountsAction(
         return { results };
     } catch (caught) {
         console.error(caught);
-        return { error: "Those could not be looked up" };
+        return { error: (await getTranslations("common"))("mentions.lookupFailed") };
     }
 }
 

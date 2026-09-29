@@ -11,6 +11,7 @@
  * actually meets.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -27,28 +28,28 @@ function thrown(message: string, digest?: string): Error & { digest?: string } {
 describe("the dashboard error boundary", () => {
     it("shows what was thrown rather than only logging it", () => {
         const markup = renderToStaticMarkup(
-            <AppError error={thrown("Cannot read properties of undefined (reading 'id')")} reset={vi.fn()} />
+            withMessages(<AppError error={thrown("Cannot read properties of undefined (reading 'id')")} reset={vi.fn()} />)
         );
 
         expect(markup).toContain("Cannot read properties of undefined");
     });
 
     it("keeps the digest, which is what ties the screen to the server log", () => {
-        const markup = renderToStaticMarkup(<AppError error={thrown("boom", "1a2b3c")} reset={vi.fn()} />);
+        const markup = renderToStaticMarkup(withMessages(<AppError error={thrown("boom", "1a2b3c")} reset={vi.fn()} />));
 
         expect(markup).toContain("1a2b3c");
         expect(markup).toContain("boom");
     });
 
     it("offers both a retry and a reload, since only one of them picks up a new build", () => {
-        const markup = renderToStaticMarkup(<AppError error={thrown("boom")} reset={vi.fn()} />);
+        const markup = renderToStaticMarkup(withMessages(<AppError error={thrown("boom")} reset={vi.fn()} />));
 
         expect(markup).toContain("Try again");
         expect(markup).toContain("Reload");
     });
 
     it("says nothing where there is nothing to say", () => {
-        const markup = renderToStaticMarkup(<AppError error={thrown("")} reset={vi.fn()} />);
+        const markup = renderToStaticMarkup(withMessages(<AppError error={thrown("")} reset={vi.fn()} />));
 
         // An error with no message and no digest must not leave an empty box behind
         // pretending to hold detail.

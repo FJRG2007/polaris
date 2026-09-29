@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { SmoothScroll } from "./smooth-scroll";
 import { Button, PolarisMark } from "@polaris/ui";
 import { PUBLIC_PATHS } from "@/lib/legal/service";
+import { getTranslations } from "@/lib/i18n/request";
 
 /**
  * The pages that exist outside the login: what this deployment is, and the terms
@@ -15,7 +16,8 @@ import { PUBLIC_PATHS } from "@/lib/legal/service";
  * a link to the sign-in screen, which is the only thing anybody who belongs here
  * needs from these pages.
  */
-export default function PublicLayout({ children }: { children: ReactNode }) {
+export default async function PublicLayout({ children }: { children: ReactNode }) {
+    const t = await getTranslations("publicPages");
     return (
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-10 sm:py-16">
             {/* Drives the document that is already here, and renders nothing - so the
@@ -29,6 +31,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                     title. Named for a screen reader, which cannot see a mark. */}
                 <Link
                     href={PUBLIC_PATHS.home}
+                    // i18n-ignore: the product's name, for a screen reader
                     aria-label="Polaris"
                     className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -39,7 +42,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                 <Button asChild size="sm" variant="ghost">
                     <Link href="/oauth/login">
                         <LogIn className="size-4" />
-                        Sign in
+                        {t("layout.signIn")}
                     </Link>
                 </Button>
             </header>
@@ -51,13 +54,13 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
 
             <footer className="mt-24 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border pt-6 text-xs text-muted-foreground">
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
-                    About
+                    {t("layout.about")}
                 </Link>
                 <Link href={PUBLIC_PATHS.privacy} className="transition-colors hover:text-foreground">
-                    Privacy
+                    {t("layout.privacy")}
                 </Link>
                 <Link href={PUBLIC_PATHS.terms} className="transition-colors hover:text-foreground">
-                    Terms
+                    {t("layout.terms")}
                 </Link>
                 <a
                     href="https://github.com/FJRG2007/polaris"
@@ -65,7 +68,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                     rel="noreferrer noopener"
                     className="transition-colors hover:text-foreground"
                 >
-                    Source
+                    {t("layout.source")}
                 </a>
             </footer>
         </div>

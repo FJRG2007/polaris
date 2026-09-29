@@ -16,6 +16,8 @@
 
 import type { Metadata } from "next";
 import { guardedUser } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { ProfileCard } from "./profile-card";
 import { publicProfile, profilesArePublic } from "@/lib/profile-service";
 import { NothingToShow, ProfileFrame } from "@/components/profile-frame";
@@ -25,7 +27,9 @@ export const dynamic = "force-dynamic";
 /** Deliberately the same title whether or not the person exists: a page that
  *  named them in the tab before saying whether it would show them is a page that
  *  answers "does this username exist" to anybody who asks. */
-export const metadata: Metadata = { title: "Profile - Polaris" };
+export async function generateMetadata(): Promise<Metadata> {
+    return { title: (await getTranslations("publicPages"))("profile.metaTitle") };
+}
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const { username } = await params;
@@ -50,7 +54,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
 
     return (
         <ProfileFrame viewer={viewer}>
-            <ProfileCard profile={profile} own={viewer?.id === profile.id} signedIn={viewer !== null} />
+            <Messages namespaces={["publicPages"]}>
+                <ProfileCard profile={profile} own={viewer?.id === profile.id} signedIn={viewer !== null} />
+            </Messages>
         </ProfileFrame>
     );
 }
