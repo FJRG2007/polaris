@@ -1708,6 +1708,9 @@
         "forgetPrize": "Olvidar el premio de {name}",
         "participants": "{count} dentro",
         "disqualified": "excluidos por el anti-trampas: {names}",
+        "delivered": "Entregado - {list}",
+        "deliveredDropped": "{count} cayeron al suelo: inventario lleno",
+        "deliveredLevels": "{count} niveles",
         "materials": {
             "random": "Sorteado cada vez",
             "wheat": "Trigo",

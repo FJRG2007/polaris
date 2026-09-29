@@ -50,6 +50,8 @@ import { readEventState } from "../events/state";
 import { readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import * as speechService from "../speech-service";
+import * as delivery from "../delivery";
+import * as eventMessages from "../events/messages";
 import * as service from "../service";
 import { editionOf, type ServerContainer } from "../service";
 
@@ -1791,13 +1793,25 @@ async function carry(
             owed.levels += effect.payout.levels;
             continue;
         }
-        const lines = commands.giveLines(name, effect.payout);
-        for (const [index, line] of lines.items.entries()) {
-            if (!commands.arrived(await sweep.server.say([line])))
-                owed.items.push(effect.payout.items[index]!);
+        // Counted onto them (`delivery`): what the game refused stays owed, and
+        // what a full inventory dropped at their feet they are told about.
+        const handed = await delivery.deliver(
+            (line) => sweep.server.say([line]),
+            name,
+            effect.payout
+        );
+        if (handed.left) {
+            owed.items.push(...handed.left.items);
+            owed.levels += handed.left.levels;
         }
-        if (lines.levels && !commands.arrived(await sweep.server.say([lines.levels])))
-            owed.levels += effect.payout.levels;
+        for (const one of delivery.droppedOf(handed.delivery))
+            said.push(
+                commands.tell(
+                    name,
+                    eventMessages.tag(language) +
+                        eventMessages.droppedAtFeet(one.dropped, one.label ?? one.id, language)
+                )
+            );
     }
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;

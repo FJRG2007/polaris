@@ -130,6 +130,16 @@ interface World {
     /** Players linked to a Polaris account, and each account's language. */
     links: Record<string, string>;
     locales: Record<string, string>;
+    /** What each player carries, by item, and how many more items fit: a
+     *  player with no entry takes any amount and is never counted. */
+    bag: Record<string, Record<string, number>>;
+    room: Record<string, number>;
+    levels: Record<string, number>;
+    /** The boss's health, and each player's melee near it since the last look. */
+    bossHealth: number;
+    raw: Record<string, number>;
+    /** Who shot a bow near the boss since the last look. */
+    shooters: string[];
 }
 
 const world: World = {
@@ -198,7 +208,13 @@ const world: World = {
     tags: {},
     stormTicks: 0,
     links: {},
-    locales: {}
+    locales: {},
+    bag: {},
+    room: {},
+    levels: {},
+    bossHealth: 400,
+    raw: {},
+    shooters: []
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -324,6 +340,13 @@ function answer(sent: string): string {
             return refuse(line, "Can't find element of type 'minecraft:attribute'");
         world.bossMaxHealth = Number(maxHealth[2]);
         return `Set base value of attribute Max Health for entity Wither Skeleton to ${maxHealth[2]}.0`;
+    }
+    const counting = /^clear (\w+) (\S+) 0$/.exec(line);
+    if (counting && world.bag[counting[1]!]) {
+        const held = world.bag[counting[1]!]![counting[2]!] ?? 0;
+        return held > 0
+            ? `Found ${held} matching item(s) on player ${counting[1]}`
+            : `No items were found on player ${counting[1]}`;
     }
     const cleared = /^clear (\S+) (\S+)(?: (\d+))?$/.exec(line);
     if (cleared) {
@@ -668,13 +691,36 @@ function answer(sent: string): string {
         // 1.17 on: at most a hundred stacks in one give; a sword stacks to one.
         if (item.endsWith("_sword") && Number(count) > 100)
             return "Can't give more than 100 of [Diamond Sword]";
+        // What does not fit falls at their feet, and the game still says "Gave".
+        const bag = world.bag[name];
+        if (bag) {
+            const fits = Math.min(Number(count), world.room[name] ?? Number(count));
+            world.room[name] = (world.room[name] ?? fits) - fits;
+            bag[item] = (bag[item] ?? 0) + fits;
+        }
         return `Gave ${count} [Item] to ${name}`;
     }
     const levels = /^xp add (\S+) (\d+) levels$/.exec(line);
     if (levels) {
-        return world.online.includes(levels[1]!)
-            ? `Gave ${levels[2]} experience levels to ${levels[1]}`
+        if (!world.online.includes(levels[1]!)) return "No player was found";
+        world.levels[levels[1]!] = (world.levels[levels[1]!] ?? 0) + Number(levels[2]);
+        return `Gave ${levels[2]} experience levels to ${levels[1]}`;
+    }
+    const level = /^xp query (\S+) levels$/.exec(line);
+    if (level)
+        return world.online.includes(level[1]!)
+            ? `${level[1]} has ${world.levels[level[1]!] ?? 0} experience levels`
             : "No player was found";
+    if (line === "data get entity @e[tag=pe_boss,limit=1] Health")
+        return world.bossAlive
+            ? `Wither Skeleton has the following entity data: ${world.bossHealth}.0f`
+            : "No entity was found";
+    if (/ as @a\[distance=\.\.40,scores=\{pe_shot=1\.\.\}\] run scoreboard players get @s pe_shot$/.test(line))
+        return world.shooters.map((name) => `${name} has 1 [pe_shot]`).join("\n");
+    if (/ as @a\[distance=\.\.40\] run scoreboard players get @s pe_raw$/.test(line)) {
+        const near = Object.entries(world.raw);
+        world.raw = {};
+        return near.map(([name, raw]) => `${name} has ${raw} [pe_raw]`).join("\n");
     }
     if (line === "execute if entity @e[tag=pe_boss]")
         return world.bossAlive ? "Test passed, count: 1" : "Test failed";
@@ -976,6 +1022,12 @@ beforeEach(() => {
     world.tags = {};
     world.links = {};
     world.locales = {};
+    world.bag = {};
+    world.room = {};
+    world.levels = {};
+    world.bossHealth = 400;
+    world.raw = {};
+    world.shooters = [];
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -1633,6 +1685,97 @@ describe("a world boss", () => {
         const after = state();
         expect(after.history[0]?.podium).toEqual([]);
         expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+});
+
+describe("a world boss fought at range", () => {
+    const boss = () => ({ ...catalog.newPreset("world-boss", "boss"), minutes: 10 });
+
+    it("shares the health nobody's melee accounts for among those fighting it, and always places the killer", async () => {
+        setUp([boss()]);
+        await startArena("boss");
+        await play(8_100);
+        // Arrows: the boss loses 100 health and nobody's melee counts any of it -
+        // with nobody seen shooting, everybody near it shares.
+        world.raw = { Ana: 0, Ben: 0 };
+        world.bossHealth = 300;
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players add Ana pe_acc 500");
+        expect(world.sent).toContain("scoreboard players add Ben pe_acc 500");
+        // Ana is seen shooting: all of the next 50 is hers, not the bystander's.
+        world.raw = { Ana: 0, Ben: 0 };
+        world.shooters = ["Ana"];
+        world.bossHealth = 250;
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players add Ana pe_acc 500");
+        expect(world.sent.filter((line) => line === "scoreboard players add Ben pe_acc 500")).toHaveLength(1);
+        world.shooters = [];
+        // Some melee: only the rest is shared, among those who hit it.
+        world.raw = { Ana: 400, Ben: 0 };
+        world.bossHealth = 200;
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players add Ana pe_acc 100");
+        // It falls to an arrow: its last 200 health counted where it fell, before
+        // anything empties the counts, and the killer placed whatever they scored.
+        world.raw = { Ana: 0, Ben: 0 };
+        world.scores = { Ben: 90 };
+        world.bossAlive = false;
+        await play(2_100);
+        const sent = world.sent;
+        const last = sent.lastIndexOf("scoreboard players add Ana pe_acc 1000");
+        expect(last).toBeGreaterThanOrEqual(0);
+        expect(
+            sent.findIndex(
+                (line, index) =>
+                    index > last &&
+                    /^execute in minecraft:overworld positioned \S+ \S+ \S+ as @a\[distance=\.\.40\] run scoreboard players operation @s pe_acc \+= @s pe_raw$/.test(line)
+            )
+        ).toBeGreaterThan(last);
+        const after = state();
+        expect(after.history[0]?.note).toBe("Defeated; the final blow by Ana");
+        const podium = after.history[0]?.podium ?? [];
+        expect(podium.map((one) => one.name).sort()).toEqual(["Ana", "Ben"]);
+        expect(podium.find((one) => one.name === "Ana")?.score).toBeGreaterThanOrEqual(20);
+        // The killer is paid, and nobody is paid twice.
+        const gives = world.sent.filter((line) => line.startsWith("give "));
+        expect(gives.some((line) => line.startsWith("give Ana "))).toBe(true);
+        expect(new Set(gives).size).toBe(gives.length);
+    });
+});
+
+describe("a prize a full inventory has no room for", () => {
+    it("is dropped at their feet as the operator chose, the player told how much, and the history says so", async () => {
+        world.bag = { Ana: { "minecraft:diamond": 2 }, Ben: {} };
+        world.room = { Ana: 1, Ben: 64 };
+        world.levels = { Ana: 10 };
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await startArena("rush");
+        world.scores = { Ana: 40, Ben: 12 };
+        await play(3 * 60_000 + 4_000);
+        const entry = state().history[0]!;
+        const ana = entry.delivered.find((one) => one.name === "Ana");
+        // One slot's room: a diamond went in; the rest of the first place and the
+        // whole of the taking-part prize fell at her feet.
+        expect(ana?.items).toEqual([
+            { id: "minecraft:diamond", count: 5, dropped: 4 },
+            { id: "minecraft:experience_bottle", count: 8, dropped: 8 }
+        ]);
+        expect(ana?.levels).toBe(15);
+        const ben = entry.delivered.find((one) => one.name === "Ben");
+        expect(ben?.items.every((one) => one.dropped === 0)).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw Ana ") &&
+                    line.includes("Your inventory was full") &&
+                    line.includes("4 [Item]")
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => line.startsWith("tellraw Ben ") && line.includes("inventory was full"))).toBe(false);
+        // Given once: the dropped ones are not kept owed.
+        expect(world.sent.filter((line) => line === "give Ana minecraft:diamond 5")).toHaveLength(1);
+        expect(state().pending).toEqual([]);
     });
 });
 
@@ -2752,7 +2895,7 @@ describe("a rare catch", () => {
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 1 }]);
         expect(world.sent).toContain("give Ben minecraft:diamond 5");
         // Nothing of anybody's taken - not even the name tag.
-        expect(world.sent.filter((line) => /(^|run )clear /.test(line))).toEqual([]);
+        expect(takesItems(world.sent)).toEqual([]);
         expect(world.sent).toContain("scoreboard objectives remove pe_rod");
     });
 
@@ -3327,7 +3470,7 @@ function keptTheRules(): void {
         );
     const { built, removed } = builtAndRemoved();
     for (const one of built) expect(removed).toContain(one);
-    for (const line of world.sent.filter((one) => one.startsWith("clear ")))
+    for (const line of takesItems(world.sent).filter((one) => one.startsWith("clear ")))
         expect(line).toContain("custom_data={polaris_event:1b}");
     expect(world.sent.some((line) => /minecraft:(lava|fire|tnt|water)\b/.test(line))).toBe(false);
 }
@@ -3802,7 +3945,7 @@ function onlyOurBlocks(): void {
             line.endsWith(" keep") || / minecraft:air replace minecraft:[a-z_]+$/.test(line)
         ).toBe(true);
     }
-    for (const line of world.sent.filter((one) => one.startsWith("clear "))) {
+    for (const line of takesItems(world.sent).filter((one) => one.startsWith("clear "))) {
         expect(line).toContain("polaris_event:1b");
     }
 }

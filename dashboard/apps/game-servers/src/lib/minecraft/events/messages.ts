@@ -7,8 +7,8 @@
  * accident.
  */
 
-import type { EventKind, GatherMaterial, Language, RareCatch } from "./catalog";
 import type { Heading } from "./commands";
+import type { EventKind, GatherMaterial, Language, RareCatch } from "./catalog";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -251,6 +251,13 @@ export function rewardGiven(event: string, language: Language): string {
     return language === "es"
         ? `&aHas recibido tu premio de &e${event}&a.`
         : `&aYou received your prize from &e${event}&a.`;
+}
+
+/** Part of a prize the inventory had no room for, dropped where they stand. */
+export function droppedAtFeet(count: number, item: string, language: Language): string {
+    return language === "es"
+        ? `&6Tu inventario estaba lleno: &e${count} ${item}&6 han caído a tus pies. Recógelos antes de que desaparezcan.`
+        : `&6Your inventory was full: &e${count} ${item}&6 fell at your feet. Pick them up before they despawn.`;
 }
 
 export function rewardWaiting(language: Language): string {

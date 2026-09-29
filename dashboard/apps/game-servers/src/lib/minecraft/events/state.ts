@@ -199,6 +199,23 @@ export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };
 export const OUTCOMES = ["finished", "cancelled", "skipped", "failed"] as const;
 export type EventOutcome = (typeof OUTCOMES)[number];
 
+/** One player's prize as it reached them. */
+export const deliveredSchema = z.object({
+    name: z.string(),
+    items: z
+        .array(
+            z.object({
+                id: z.string(),
+                count: z.number().int(),
+                dropped: z.number().int().default(0)
+            })
+        )
+        .default([]),
+    levels: z.number().int().default(0)
+});
+
+export type DeliveredPrize = z.infer<typeof deliveredSchema>;
+
 const historySchema = z.object({
     id: z.string(),
     presetId: z.string(),
@@ -214,7 +231,10 @@ const historySchema = z.object({
     podium: z
         .array(z.object({ place: z.number().int(), name: z.string(), score: z.number() }))
         .default([]),
-    disqualified: z.array(z.string()).default([])
+    disqualified: z.array(z.string()).default([]),
+    /** What each player was handed, and how much of it fell at their feet for
+     *  want of room: what `give` answers cannot tell. */
+    delivered: z.array(deliveredSchema).default([])
 });
 
 export type EventHistoryEntry = z.infer<typeof historySchema>;

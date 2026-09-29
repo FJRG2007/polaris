@@ -25,6 +25,7 @@ import * as waves from "./kinds/waves";
 import * as commands from "./commands";
 import * as speech from "../speech";
 import * as speechService from "../speech-service";
+import * as delivery from "../delivery";
 import * as written from "./messages";
 import * as stage from "./kinds/stage";
 import * as playing from "../activity";
@@ -200,6 +201,8 @@ interface Loop {
     finishing: boolean;
     /** World boss: where it was last seen standing. */
     bossAt: stored.Point | null;
+    /** World boss: its health at the last look, to tell what it lost since. */
+    bossHealth: number | null;
     /** How this server writes a name into an entity, and its attribute ids. */
     modern: { ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
@@ -686,6 +689,7 @@ function startLoop(
         lastSave: Date.now(),
         finishing: false,
         bossAt: null,
+        bossHealth: null,
         modern: null,
         logFrom: null,
         ground: null,
@@ -1620,6 +1624,11 @@ async function worldBoss(
     );
     if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "failed") {
         loop.bossAt = commands.readPoint(await server.say([commands.BOSS_WHERE])) ?? loop.bossAt;
+        const health = commands.readHealth(await server.say([commands.BOSS_HEALTH]));
+        if (health !== null) {
+            await creditUnseen(server, loop.bossHealth === null ? 0 : loop.bossHealth - health, null);
+            loop.bossHealth = health;
+        }
         lines.push(commands.BOSS_KILLS_RESET);
         return null;
     }
@@ -1635,9 +1644,39 @@ async function worldBoss(
         );
     if (killers.length === 0) return null;
     const by = killers[0]!.name;
+    // The rest of its health went in its last moments: the final blows, counted
+    // where it fell before anything else empties them.
+    if (loop.bossAt) {
+        await creditUnseen(server, loop.bossHealth ?? 0, loop.bossAt);
+        await server.sayAll(commands.bossDamageAt(loop.bossAt));
+        loop.bossHealth = 0;
+    }
     loop.run = { ...loop.run, decidedBy: by };
     lines.push(commands.say(messages.tag(language) + messages.bossFell(name, by, language)));
     return `Defeated; the final blow by ${by}`;
+}
+
+/**
+ * What the boss lost that nobody's melee accounts for - arrows, a trident, magic,
+ * a mod's weapon, none of which the game's `damage_dealt` counts - shared evenly
+ * among the players fighting near it (`commands.unseenShares`). `lost` is in
+ * health points; `at` is where it fell, once it has.
+ */
+async function creditUnseen(
+    server: ServerContainer,
+    lost: number,
+    at: stored.Point | null
+): Promise<void> {
+    // Shots that hit nothing are kept until something is lost: they did shoot.
+    if (!(lost > 0)) return;
+    const melee = commands.readScores(await server.say([commands.readRawNear(at)]));
+    await server.sayAll(commands.SHOTS_SUMMED);
+    const shooters = [...commands.readScores(await server.say([commands.readShootersNear(at)])).keys()];
+    const shares = commands.unseenShares(lost * 10, melee, shooters);
+    await server.sayAll([
+        ...[...shares].map(([name, share]) => commands.shareLine(name, share)),
+        ...commands.SHOTS_RESET
+    ]);
 }
 
 async function kingOfTheHill(
@@ -2635,6 +2674,7 @@ async function finish(
     let placed: plan.Placed[] = [];
     let disqualified = new Set<string>();
     const pending: stored.PendingReward[] = [];
+    const delivered: stored.DeliveredPrize[] = [];
     const lines: string[] = [];
     /** A parkour's or spleef's blocks and players, until they are all put back. */
     let stageLeftover = stage.leftoverOf(run.id, run.stage, run.keepForced);
@@ -2665,12 +2705,25 @@ async function finish(
             }
             const { scores, took } = await results(server, run);
             const minimum = catalog.minScoreOf(preset);
+            if (preset.kind === "world-boss" && run.decidedBy) {
+                // The final blow always places, whatever it was dealt with.
+                const killer =
+                    [...scores.keys()].find(
+                        (name) => name.toLowerCase() === run.decidedBy!.toLowerCase()
+                    ) ?? run.decidedBy;
+                scores.set(killer, Math.max(scores.get(killer) ?? 0, minimum));
+                if (!took.some((name) => name.toLowerCase() === killer.toLowerCase()))
+                    took.push(killer);
+            }
             placed = plan.podium(scores, disqualified, minimum);
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
             // defence's holding the point, which are their own bars.
             const counted =
-                preset.kind === "blood-moon" || preset.kind === "waves"
+                preset.kind === "blood-moon" ||
+                preset.kind === "waves" ||
+                // A boss is fought together: any damage to it is taking part.
+                preset.kind === "world-boss"
                     ? took
                     : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
             const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
@@ -2686,9 +2739,12 @@ async function finish(
             );
             for (const { name, reward } of owed) {
                 if (!catalog.PLAYER_NAME.test(name)) continue;
-                const left = online.has(name.toLowerCase())
-                    ? await give(server, name, reward)
-                    : reward;
+                let left: catalog.Reward | null = reward;
+                if (online.has(name.toLowerCase())) {
+                    const handed = await give(server, name, reward);
+                    left = handed.left;
+                    delivered.push(handed.delivered);
+                }
                 if (!left)
                     lines.push(
                         `tellraw ${name} ${commands.text(messages.rewardGiven(preset.name, language))}`
@@ -2827,7 +2883,8 @@ async function finish(
         endedAt: Date.now(),
         participants: run.participants.length,
         podium: placed,
-        disqualified: run.participants.filter((name) => disqualified.has(name.toLowerCase()))
+        disqualified: run.participants.filter((name) => disqualified.has(name.toLowerCase())),
+        delivered
     };
     await updateEventState(installedAppId, (state) => ({
         ...stored.withHistory(
@@ -2974,7 +3031,8 @@ async function abandon(
         endedAt: now,
         participants: run.participants.length,
         podium: [],
-        disqualified: []
+        disqualified: [],
+        delivered: []
     };
     // An arena and whoever is in it are the minute sweep's to undo from here.
     const arenaLeftover = catalog.playsInArena(run.preset)
@@ -3150,26 +3208,39 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
 }
 
 /**
- * Hand one player their prize, a line at a time. Answers what of it did not
- * arrive, to be kept for later - never what did, which would be given twice -
- * or null when all of it did.
+ * Hand one player their prize (`delivery.deliver`): what arrived, what fell at
+ * their feet for want of room - each told so, in their own language - and what
+ * the game did not take at all, to be kept for later. Never what it took, which
+ * would then be given twice.
  */
 async function give(
     server: ServerContainer,
     name: string,
     reward: catalog.Reward
-): Promise<catalog.Reward | null> {
-    const items: catalog.RewardItem[] = [];
-    for (const item of reward.items) {
-        for (const line of commands.rewardCommands(name, { items: [item], levels: 0 })) {
-            if (!commands.gaveIt(await server.say([line]))) items.push(item);
+): Promise<{ left: catalog.Reward | null; delivered: stored.DeliveredPrize }> {
+    const handed = await delivery.deliver((line) => server.say([line]), name, reward);
+    const told = delivery
+        .droppedOf(handed.delivery)
+        .map(
+            (one) =>
+                `tellraw ${name} ${commands.text(
+                    messages.tag(speech.EVERY) +
+                        messages.droppedAtFeet(one.dropped, one.label ?? one.id, speech.EVERY)
+                )}`
+        );
+    if (told.length > 0) await server.sayAll(told);
+    return {
+        left: handed.left ? { items: [...handed.left.items], levels: handed.left.levels } : null,
+        delivered: {
+            name,
+            items: handed.delivery.items.map((one) => ({
+                id: one.id,
+                count: one.count,
+                dropped: one.dropped
+            })),
+            levels: handed.delivery.levels
         }
-    }
-    let levels = 0;
-    for (const line of commands.rewardCommands(name, { items: [], levels: reward.levels })) {
-        if (!commands.gaveIt(await server.say([line]))) levels = reward.levels;
-    }
-    return items.length === 0 && levels === 0 ? null : { items, levels };
+    };
 }
 
 /** Whether this server's attribute ids have lost their `generic.`: the one tried first. */
@@ -3470,7 +3541,8 @@ async function skip(
             endedAt: now,
             participants: 0,
             podium: [],
-            disqualified: []
+            disqualified: [],
+            delivered: []
         })
     );
 }
@@ -3489,12 +3561,20 @@ async function deliverPending(
     if (owed.length === 0) return;
     /** What is still owed after this, by pending id: null when all of it arrived. */
     const left = new Map<string, catalog.Reward | null>();
-    const language = settingsOf(row.config).settings.language;
+    /** What reached whom, for the history of the run it was won in. */
+    const arrived: { runId: string; prize: stored.DeliveredPrize }[] = [];
+    // Each told in their own language.
+    const language = speech.EVERY;
+    const home = await speechService.homeLanguage(ownerId, catalog.chosenLanguage(row.config));
+    homes.set(installedAppId, home);
     await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return;
+        await speechService.hear(installedAppId, server, home);
         for (const one of owed) {
             if (!catalog.PLAYER_NAME.test(one.player)) continue;
-            const rest = await give(server, one.player, one.reward);
+            const handed = await give(server, one.player, one.reward);
+            const rest = handed.left;
+            arrived.push({ runId: one.id.slice(0, -(one.player.length + 1)), prize: handed.delivered });
             if (!rest) {
                 left.set(one.id, null);
                 await server.say([
@@ -3508,13 +3588,18 @@ async function deliverPending(
             }
         }
     });
-    if (left.size === 0) return;
+    if (left.size === 0 && arrived.length === 0) return;
     await updateEventState(installedAppId, (current) => ({
         ...current,
         pending: current.pending.flatMap((one) => {
             if (!left.has(one.id)) return [one];
             const rest = left.get(one.id);
             return rest ? [{ ...one, reward: rest }] : [];
+        }),
+        // Written into the run it was won in, when that is still in the history.
+        history: current.history.map((entry) => {
+            const more = arrived.filter((one) => one.runId === entry.id).map((one) => one.prize);
+            return more.length > 0 ? { ...entry, delivered: [...entry.delivered, ...more] } : entry;
         })
     }));
 }

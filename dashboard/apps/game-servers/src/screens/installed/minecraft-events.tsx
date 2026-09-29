@@ -1369,6 +1369,30 @@ export function MinecraftEvents({
                                         {entry.disqualified.length > 0 &&
                                             ` - ${t("events.disqualified", { names: entry.disqualified.join(", ") })}`}
                                     </p>
+                                    {(entry.delivered ?? []).length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("events.delivered", {
+                                                list: (entry.delivered ?? [])
+                                                    .map((one) =>
+                                                        [
+                                                            ...one.items.map(
+                                                                (item) =>
+                                                                    `${item.count} ${item.id.replace(/^minecraft:/, "")}${
+                                                                        item.dropped > 0
+                                                                            ? ` (${t("events.deliveredDropped", { count: item.dropped })})`
+                                                                            : ""
+                                                                    }`
+                                                            ),
+                                                            ...(one.levels > 0
+                                                                ? [t("events.deliveredLevels", { count: one.levels })]
+                                                                : [])
+                                                        ].join(", ")
+                                                    )
+                                                    .map((what, index) => `${entry.delivered[index]!.name}: ${what}`)
+                                                    .join("; ")
+                                            })}
+                                        </p>
+                                    )}
                                 </li>
                             ))}
                         </ul>

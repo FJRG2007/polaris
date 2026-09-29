@@ -25,6 +25,10 @@ const CONST = "pe_const";
 const DEATHS = "pe_death";
 const KILLS = "pe_kill";
 const RAW_DAMAGE = "pe_raw";
+/** Shots at the boss since the last look - a bow, a crossbow, a thrown trident -
+ *  summed into the first. */
+const SHOTS = ["pe_shot", "pe_shotc", "pe_shott"] as const;
+const SHOT_ITEMS = ["bow", "crossbow", "trident"] as const;
 const DAMAGE = "pe_acc";
 export const BAR = "polaris:event";
 
@@ -1273,7 +1277,7 @@ export const BOSS_ALIVE = `execute if entity @e[tag=${BOSS_TAG}]`;
  * was dealt within `reach` of the boss is kept. Shown in hearts (the statistic
  * is tenths of one).
  */
-export function bossDamageTick(reach = 40): string[] {
+export function bossDamageTick(reach = BOSS_FIGHT_REACH): string[] {
     return [
         `scoreboard players add @a ${RAW_DAMAGE} 0`,
         `scoreboard players add @a ${DAMAGE} 0`,
@@ -1297,12 +1301,107 @@ export function bossScoreboard(boss: EventOptions<"world-boss">["boss"]): string
         `scoreboard objectives add ${CONST} dummy`,
         `scoreboard players set #w10 ${CONST} 10`,
         `scoreboard objectives remove ${KILLS}`,
-        `scoreboard objectives add ${KILLS} minecraft.killed:minecraft.${BOSS_ENTITY[boss]}`
+        `scoreboard objectives add ${KILLS} minecraft.killed:minecraft.${BOSS_ENTITY[boss]}`,
+        ...SHOTS.flatMap((objective, index) => [
+            `scoreboard objectives remove ${objective}`,
+            `scoreboard objectives add ${objective} minecraft.used:minecraft.${SHOT_ITEMS[index]}`
+        ])
     ];
 }
 
 /** Where the boss is, while it is loaded. */
 export const BOSS_WHERE = `data get entity @e[tag=${BOSS_TAG},limit=1] Pos`;
+
+/** The boss's health right now: `... has the following entity data: 312.5f`. */
+export const BOSS_HEALTH = `data get entity @e[tag=${BOSS_TAG},limit=1] Health`;
+
+export function readHealth(output: string): number | null {
+    const found = /entity data: (-?[\d.]+)f?\b/.exec(stripFormatting(output));
+    return found ? Number(found[1]) : null;
+}
+
+/** How far from the boss a player counts as fighting it. */
+export const BOSS_FIGHT_REACH = 40;
+
+/**
+ * The melee damage each player near the boss has dealt since the last tick
+ * (`damage_dealt`, tenths of a health point): at the boss while it stands, or at
+ * the spot it was last seen once it is down.
+ */
+export function readRawNear(at: { x: number; y: number; z: number } | null): string {
+    const from = at
+        ? `execute in minecraft:overworld positioned ${at.x} ${at.y} ${at.z}`
+        : `execute as @e[tag=${BOSS_TAG},limit=1] at @s`;
+    return `${from} as @a[distance=..${BOSS_FIGHT_REACH}] run scoreboard players get @s ${RAW_DAMAGE}`;
+}
+
+/** Every shot since the last look summed into one count, ready to be read. */
+export const SHOTS_SUMMED = SHOTS.slice(1).map(
+    (objective) => `execute as @a run scoreboard players operation @s ${SHOTS[0]} += @s ${objective}`
+);
+
+/** Who near the boss (or where it fell) has shot since the last look. */
+export function readShootersNear(at: { x: number; y: number; z: number } | null): string {
+    const from = at
+        ? `execute in minecraft:overworld positioned ${at.x} ${at.y} ${at.z}`
+        : `execute as @e[tag=${BOSS_TAG},limit=1] at @s`;
+    return `${from} as @a[distance=..${BOSS_FIGHT_REACH},scores={${SHOTS[0]}=1..}] run scoreboard players get @s ${SHOTS[0]}`;
+}
+
+/** The shots counted from zero again. */
+export const SHOTS_RESET = SHOTS.map((objective) => `scoreboard players set @a ${objective} 0`);
+
+/**
+ * The boss's lost health nobody's melee accounts for - arrows, a trident,
+ * magic, a mod's weapon: the game's `damage_dealt` counts none of those - split
+ * evenly among whoever near it shot since the last look; with nobody shooting,
+ * among those who hit it; and with neither, among everybody near it. `lost` and
+ * `melee` are in the same tenths of a health point.
+ */
+export function unseenShares(
+    lost: number,
+    melee: ReadonlyMap<string, number>,
+    shooters: readonly string[] = []
+): Map<string, number> {
+    const near = [...melee.keys()];
+    const meleeTotal = [...melee.values()].reduce((sum, one) => sum + Math.max(0, one), 0);
+    const rest = Math.round(lost) - meleeTotal;
+    const shares = new Map<string, number>();
+    const hitters = near.filter((name) => (melee.get(name) ?? 0) > 0);
+    const takers =
+        shooters.length > 0 ? [...shooters] : hitters.length > 0 ? hitters : near;
+    if (rest <= 0 || takers.length === 0) return shares;
+    const each = Math.floor(rest / takers.length);
+    let spare = rest - each * takers.length;
+    for (const name of takers) {
+        const share = each + (spare > 0 ? 1 : 0);
+        if (spare > 0) spare -= 1;
+        if (share > 0) shares.set(name, share);
+    }
+    return shares;
+}
+
+/** A share added to a player's damage near the boss. */
+export function shareLine(name: string, share: number): string {
+    return `scoreboard players add ${name} ${DAMAGE} ${share}`;
+}
+
+/**
+ * The last tick's melee near where the boss fell, moved into the count: done at
+ * the spot, since there is no boss left to count round - what the tick counting
+ * round the boss would do, which would throw the killing blows away.
+ */
+export function bossDamageAt(at: { x: number; y: number; z: number }): string[] {
+    return [
+        `scoreboard players add @a ${RAW_DAMAGE} 0`,
+        `scoreboard players add @a ${DAMAGE} 0`,
+        `execute in minecraft:overworld positioned ${at.x} ${at.y} ${at.z} as @a[distance=..${BOSS_FIGHT_REACH}] run scoreboard players operation @s ${DAMAGE} += @s ${RAW_DAMAGE}`,
+        `scoreboard players set @a ${RAW_DAMAGE} 0`,
+        `execute as @a run scoreboard players operation @s ${SUM} = @s ${DAMAGE}`,
+        `execute as @a run scoreboard players operation @s ${SUM} /= #w10 ${CONST}`,
+        `execute as @a[scores={${SUM}=1..}] run scoreboard players operation @s ${SCORE} = @s ${SUM}`
+    ];
+}
 
 /**
  * Kills of the boss's kind counted from now, only while the boss still stands:
@@ -1580,6 +1679,7 @@ export function cleanup(
         `scoreboard objectives remove ${KILLS}`,
         `scoreboard objectives remove ${RAW_DAMAGE}`,
         `scoreboard objectives remove ${DAMAGE}`,
+        ...SHOTS.map((objective) => `scoreboard objectives remove ${objective}`),
         `scoreboard objectives remove ${JOIN_TRIGGER}`,
         `scoreboard objectives remove ${JOIN_LIST}`,
         CLEAR_MARK
