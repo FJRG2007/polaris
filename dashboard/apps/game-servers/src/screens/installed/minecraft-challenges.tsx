@@ -1034,10 +1034,10 @@ function SettingsFields({
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
                     <span className="font-medium">{t("settings.timezone")}</span>
-                    {/* i18n-ignore: a zone id reads the same in every language */}
                     <ui.Input
                         value={settings.timezone}
                         disabled={locked}
+                        // i18n-ignore: a zone id reads the same in every language
                         placeholder="Europe/Madrid"
                         onChange={(event) => change({ timezone: event.target.value })}
                     />
