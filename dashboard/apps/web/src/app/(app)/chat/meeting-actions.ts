@@ -597,7 +597,7 @@ export async function sayInMeetingAction(
     body: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };
     return guard(() => room.sayInMeeting(seat, String(body ?? "")));
 }
 
@@ -627,7 +627,7 @@ export async function pollInMeetingAction(input: unknown): Promise<{ error?: str
         return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notAsked") };
 
     const seat = await resolveSeat(parsed.data.meetingId);
-    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };
     const { question, options, multiple, hideResults } = parsed.data;
     return guard(() => room.pollInMeeting(seat, { question, options, multiple, hideResults }));
 }
@@ -638,7 +638,7 @@ export async function voteInMeetingAction(
     optionId: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };
     return guard(() => room.voteInMeeting(seat, String(optionId ?? "")));
 }
 
@@ -648,7 +648,7 @@ export async function closePollInMeetingAction(
     messageId: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };
     return guard(() => room.closePollInMeeting(seat, String(messageId ?? "")));
 }
 
