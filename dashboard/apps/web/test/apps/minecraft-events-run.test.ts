@@ -95,6 +95,10 @@ interface World {
     dealt: Record<string, number>;
     died: Record<string, number>;
     pk: Record<string, number>;
+    /** The version the server's log says it started as. */
+    version: string;
+    /** How long the storm lasts, in ticks, as the last `weather thunder` left it. */
+    stormTicks: number;
 }
 
 const world: World = {
@@ -146,7 +150,9 @@ const world: World = {
     hp: {},
     dealt: {},
     died: {},
-    pk: {}
+    pk: {},
+    version: "1.21.4",
+    stormTicks: 0
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -312,6 +318,18 @@ function answer(line: string): string {
             .join("\n");
     }
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
+    // Seconds as a whole number up to 1.19.3; a time from 1.19.4, where a bare
+    // number is ticks and `s` makes it seconds.
+    const storm = /^weather thunder (\d+)(s?)$/.exec(line);
+    if (storm) {
+        const seconds = storm[2] === "s";
+        if (!events.atLeast(world.version, [1, 19, 4])) {
+            if (seconds)
+                return `Expected whitespace to end one argument, but found trailing data\n...r thunder ${storm[1]}<--[HERE]`;
+            world.stormTicks = Number(storm[1]) * 20;
+        } else world.stormTicks = Number(storm[1]) * (seconds ? 20 : 1);
+        return "Changing to rain and thunder";
+    }
     if (line === "time query daytime") return "The time is 6000";
     if (world.renamedRules && /^gamerule do\w+$/.test(line))
         return "Unknown or incomplete command, see below for error";
@@ -510,7 +528,7 @@ const server = {
     run: async (argv: readonly string[]) =>
         argv[0] === "stat"
             ? { code: 0, output: String(world.log.length) }
-            : { code: 0, output: "Starting minecraft server version 1.21.4" },
+            : { code: 0, output: `Starting minecraft server version ${world.version}` },
     runOk: async () => "",
     readFile: async () => new ReadableStream(),
     trimWorld: null
@@ -656,6 +674,8 @@ beforeEach(() => {
     world.dealt = {};
     world.died = {};
     world.pk = {};
+    world.version = "1.21.4";
+    world.stormTicks = 0;
     events.forgetPlayers();
     held.length = 0;
     released.length = 0;
@@ -1756,6 +1776,25 @@ describe("what the audit found", () => {
             "gamerule advance_time false"
         );
     });
+
+    it.each(["1.21.4", "1.19.4", "1.19.2", "1.16.5"])(
+        "keeps the blood moon's storm for the whole event on %s",
+        async (version) => {
+            world.version = version;
+            const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+            setUp([moon]);
+            await events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "moon",
+                trigger: "manual",
+                startedBy: null
+            });
+            await play(4_100);
+            // What is left of the three minutes once it has started, in ticks.
+            expect(world.stormTicks).toBeGreaterThanOrEqual(170 * 20);
+        }
+    );
 
     it("gives a server whose clock stands still its own time back after a blood moon", async () => {
         world.daylightCycle = "false";

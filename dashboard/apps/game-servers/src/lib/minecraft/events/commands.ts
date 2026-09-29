@@ -841,8 +841,16 @@ export function roughly(value: number, step: number): number {
 
 // ------------------------------------------------------------------ blood moon
 
+/**
+ * Night, and a storm for as long as it lasts. The storm's length is seconds up
+ * to 1.19.3 and ticks from 1.19.4, where `s` asks for seconds - which the older
+ * versions refuse. Both are sent, the bare number first: an older server takes
+ * it as seconds and refuses the second; a newer one takes it as ticks and the
+ * second puts it right.
+ */
 export function nightfall(seconds: number): string[] {
-    return ["time set 13000", `weather thunder ${Math.max(60, Math.round(seconds))}`];
+    const storm = Math.max(60, Math.round(seconds));
+    return ["time set 13000", `weather thunder ${storm}`, `weather thunder ${storm}s`];
 }
 
 /**
