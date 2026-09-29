@@ -21,6 +21,7 @@
 import { Copy } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Feedback } from "./setting-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { authClient } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { beginSessionRotationAction } from "./actions";
@@ -63,6 +64,8 @@ export function EnableTwoFactorDialog({
     /** Who the backup codes minted here belong to, for the file they are saved to. */
     account: string;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [step, setStep] = useState<"password" | "verify">("password");
     const [totpUri, setTotpUri] = useState("");
     const [backupCodes, setBackupCodes] = useState<string[]>([]);
@@ -87,7 +90,7 @@ export function EnableTwoFactorDialog({
         const { data, error: enableError } = await authClient.twoFactor.enable({ password });
         setBusy(false);
         if (enableError || !data) {
-            setError(enableError?.message ?? "Could not start setup. Check your password.");
+            setError(enableError?.message ?? t("authenticator.startFailed"));
             return;
         }
         setTotpUri(data.totpURI);
@@ -105,7 +108,7 @@ export function EnableTwoFactorDialog({
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
         if (verifyError) {
             setBusy(false);
-            setError("That code did not match. Check the clock on your device and try again.");
+            setError(t("authenticator.codeMismatch"));
             return;
         }
         // An account that had met the requirement with an emailed code was carrying
@@ -130,27 +133,25 @@ export function EnableTwoFactorDialog({
         >
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Set up an authenticator</DialogTitle>
+                    <DialogTitle>{t("authenticator.setUpTitle")}</DialogTitle>
                     <DialogDescription>
-                        {step === "password"
-                            ? "Confirm your password to generate a new secret."
-                            : "Add the secret to your authenticator app, then enter the code it shows."}
+                        {step === "password" ? t("authenticator.confirmPassword") : t("authenticator.addSecret")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {step === "password" ? (
                     <form onSubmit={onPassword} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Password
+                            {t("authenticator.password")}
                             <Input name="password" type="password" required autoComplete="current-password" />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy}>
-                                {busy ? "Working..." : "Continue"}
+                                {busy ? t("authenticator.working") : t("dialog.continue")}
                             </Button>
                         </div>
                     </form>
@@ -162,12 +163,12 @@ export function EnableTwoFactorDialog({
                                 <QRCodeSVG value={totpUri} size={148} bgColor="#ffffff" fgColor="#000000" />
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                Scan this with your authenticator, or use the key below.
+                                {t("authenticator.scan")}
                             </span>
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Setup key</span>
+                            <span className="text-xs text-muted-foreground">{t("authenticator.setupKey")}</span>
                             <div className="flex items-center gap-2">
                                 <code className="flex-1 break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-sm">
                                     {groupSecret(secret)}
@@ -176,30 +177,30 @@ export function EnableTwoFactorDialog({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Copy setup key"
+                                    aria-label={t("authenticator.copyKey")}
                                     onClick={() => void navigator.clipboard.writeText(secret)}
                                 >
                                     <Copy className="size-4" />
                                 </Button>
                             </div>
                             <a href={totpUri} className="text-xs text-primary underline-offset-2 hover:underline">
-                                Open in an authenticator app
+                                {t("authenticator.openInApp")}
                             </a>
                         </div>
 
                         <BackupCodesPanel codes={backupCodes} account={account} />
 
                         <label className="flex flex-col gap-1 text-sm">
-                            Code from your app
+                            {t("authenticator.codeFromApp")}
                             <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                                {busy ? "Verifying..." : "Turn on"}
+                                {busy ? t("authenticator.verifying") : t("authenticator.turnOn")}
                             </Button>
                         </div>
                     </form>
@@ -218,6 +219,8 @@ export function DisableTwoFactorDialog({
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -231,7 +234,7 @@ export function DisableTwoFactorDialog({
         const { error: disableError } = await authClient.twoFactor.disable({ password });
         setBusy(false);
         if (disableError) {
-            setError(disableError.message ?? "Could not turn it off. Check your password.");
+            setError(disableError.message ?? t("authenticator.turnOffFailed"));
             return;
         }
         onOpenChange(false);
@@ -242,23 +245,21 @@ export function DisableTwoFactorDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Turn off the authenticator</DialogTitle>
-                    <DialogDescription>
-                        Your account will be protected by its password alone. Your backup codes stop working.
-                    </DialogDescription>
+                    <DialogTitle>{t("authenticator.turnOffTitle")}</DialogTitle>
+                    <DialogDescription>{t("authenticator.turnOffDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Password
+                        {t("authenticator.password")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? "Working..." : "Turn off"}
+                            {busy ? t("authenticator.working") : t("view.turnOff")}
                         </Button>
                     </div>
                 </form>

@@ -28,6 +28,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DeviceDialog } from "./device-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -39,12 +41,13 @@ import { PanelRightOpen, ShieldOff, ShieldQuestion, Smartphone } from "lucide-re
 
 /** Where a pass was granted, as one line, for the layouts too narrow to hold the
  *  columns. */
-function origin(device: TrustedDeviceRow): string {
-    return [addressLine(device), device.host].filter(Boolean).join(" - ") || "Not recorded";
+function origin(device: TrustedDeviceRow, t: NamespaceTranslator<"accountSecurity">): string {
+    return [addressLine(device), device.host].filter(Boolean).join(" - ") || t("passkeys.notRecorded");
 }
 
 export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -52,9 +55,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
 
     async function forget(device: TrustedDeviceRow) {
         const ok = await confirm({
-            title: "Ask this device for a code again?",
-            description: `${device.device} will have to answer the challenge the next time it signs in.`,
-            confirmLabel: "Forget it",
+            title: t("sessions.trusted.forgetTitle"),
+            description: t("sessions.trusted.forgetDescription", { device: device.device }),
+            confirmLabel: t("sessions.trusted.forgetConfirm"),
             danger: true
         });
         if (!ok) return;
@@ -68,9 +71,9 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
 
     async function forgetAll() {
         const ok = await confirm({
-            title: "Forget every remembered device?",
-            description: `${devices.length} device${devices.length === 1 ? "" : "s"} will be asked for a code again, this one included.`,
-            confirmLabel: "Forget them all",
+            title: t("sessions.trusted.forgetAllTitle"),
+            description: t("sessions.trusted.forgetAllDescription", { count: devices.length }),
+            confirmLabel: t("sessions.trusted.forgetAll"),
             danger: true
         });
         if (!ok) return;
@@ -86,10 +89,8 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Remembered devices</h2>
-                        <p className="text-xs text-muted-foreground">
-                            These sign in with the password alone until their 30 days run out.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("sessions.trusted.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("sessions.trusted.description")}</p>
                     </div>
                     {devices.length > 1 ? (
                         <Button
@@ -99,7 +100,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                             onClick={() => void forgetAll()}
                         >
                             <ShieldOff className="size-4" />
-                            Forget them all
+                            {t("sessions.trusted.forgetAll")}
                         </Button>
                     ) : null}
                 </div>
@@ -117,11 +118,11 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                 {/* w-full max-w-0: the folded origin line under the name is
                                     nowrap, and without the cap it sets a floor under this
                                     column that spills the table sideways. */}
-                                <th className="w-full max-w-0 px-3 py-2 font-medium">Device</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
-                                <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Remembered</th>
-                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Until</th>
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">{t("sessions.trusted.columns.device")}</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("sessions.trusted.columns.address")}</th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">{t("sessions.trusted.columns.domain")}</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("sessions.trusted.columns.remembered")}</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">{t("sessions.trusted.columns.until")}</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -129,7 +130,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                             {devices.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                                        Nothing is remembered. Every sign-in answers the challenge.
+                                        {t("sessions.trusted.empty")}
                                     </td>
                                 </tr>
                             ) : (
@@ -157,14 +158,14 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                                 className="min-w-0 truncate text-left hover:underline"
                                                                 onClick={() => setOpened(device)}
                                                             >
-                                                                {named ? device.device : "Remembered earlier"}
+                                                                {named ? device.device : t("sessions.trusted.rememberedEarlier")}
                                                             </button>
                                                             {device.current ? (
-                                                                <Badge variant="primary">This device</Badge>
+                                                                <Badge variant="primary">{t("sessions.trusted.thisDevice")}</Badge>
                                                             ) : null}
                                                         </p>
                                                         <p className="truncate text-xs text-muted-foreground lg:hidden">
-                                                            {origin(device)}
+                                                            {origin(device, t)}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -173,13 +174,13 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 <DeviceAddress address={device} />
                                             </td>
                                             <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                                <span className="block truncate">{device.host ?? "Not recorded"}</span>
+                                                <span className="block truncate">{device.host ?? t("passkeys.notRecorded")}</span>
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                                 {device.rememberedAt ? (
                                                     <RelativeTime iso={device.rememberedAt} />
                                                 ) : (
-                                                    "Not recorded"
+                                                    t("passkeys.notRecorded")
                                                 )}
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
@@ -190,8 +191,12 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        title="What this device can reach"
-                                                        aria-label={`Open ${named ? device.device : "this device"}`}
+                                                        title={t("sessions.trusted.openTitle")}
+                                                        aria-label={
+                                                            named
+                                                                ? t("sessions.trusted.openNamed", { device: device.device })
+                                                                : t("sessions.trusted.openThis")
+                                                        }
                                                         onClick={() => setOpened(device)}
                                                     >
                                                         <PanelRightOpen className="size-4" />
@@ -199,8 +204,12 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        title="Ask this device for a code again"
-                                                        aria-label={`Stop remembering ${named ? device.device : "this device"}`}
+                                                        title={t("sessions.trusted.forgetButton")}
+                                                        aria-label={
+                                                            named
+                                                                ? t("sessions.trusted.stopNamed", { device: device.device })
+                                                                : t("sessions.trusted.stopThis")
+                                                        }
                                                         disabled={busyId !== null}
                                                         onClick={() => void forget(device)}
                                                     >

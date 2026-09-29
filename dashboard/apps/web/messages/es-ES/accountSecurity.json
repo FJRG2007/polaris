@@ -102,7 +102,94 @@
         "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."
     },
     "sessions": {
-        "signedItselfOut": "{name} cerró su propia sesión."
+        "signedItselfOut": "{name} cerró su propia sesión.",
+        "page": {
+            "title": "Sesiones",
+            "intro": "Dónde está iniciada tu cuenta y a qué dispositivos deja de preguntar."
+        },
+        "origin": "{origin} - última actividad {time}",
+        "signedInWith": "Inició sesión con {summary}",
+        "revoke": {
+            "title": "¿Cerrar la sesión en este dispositivo?",
+            "description": "{device} tendrá que volver a iniciar sesión.",
+            "confirm": "Cerrar sesión"
+        },
+        "disconnect": {
+            "title": "¿Desconectar esta extensión?",
+            "withVault": "{browser} en {os} perderá esta cuenta y la bóveda a la que tenía acceso. Se puede volver a conectar desde la extensión.",
+            "description": "{browser} en {os} tendrá que volver a conectarse desde la extensión.",
+            "confirm": "Desconectar"
+        },
+        "others": {
+            "title": "¿Cerrar la sesión en todos los demás sitios?",
+            "withExtensions": "{sessions, plural, one {# otra sesión} other {# otras sesiones}} y {extensions, plural, one {# extensión del navegador} other {# extensiones del navegador}} terminarán al momento.",
+            "description": "{sessions, plural, one {# otra sesión terminará} other {# otras sesiones terminarán}} al momento.",
+            "confirm": "Cerrarlas"
+        },
+        "pending": {
+            "title": "Esperando tu aprobación",
+            "hint": "Permite este inicio de sesión solo si lo reconoces.",
+            "deny": "Denegar",
+            "approve": "Aprobar"
+        },
+        "active": {
+            "title": "Sesiones activas",
+            "scan": "Escanear un código",
+            "signOutOthers": "Cerrar la sesión en todos los demás sitios",
+            "empty": "No hay nada con la sesión iniciada.",
+            "nothingElse": "No hay nada más conectado. La extensión del navegador aparece aquí cuando se conecta a esta cuenta. <link>Conectar una</link>"
+        },
+        "approve": {
+            "title": "¿Permitir este inicio de sesión?",
+            "description": "{device} entrará como tú. Introduce tu PIN de desbloqueo para confirmarlo.",
+            "pin": "PIN de desbloqueo",
+            "checking": "Comprobando..."
+        },
+        "device": {
+            "couldNotOpen": "No se ha podido abrir este dispositivo.",
+            "signOutHere": "{count, plural, one {Termina # sesión} other {Terminan # sesiones}}, incluida la que estás leyendo ahora.",
+            "signOutElsewhere": "{count, plural, one {Termina # sesión} other {Terminan # sesiones}}, en todas las direcciones desde las que inició sesión.",
+            "signItOut": "Cerrar su sesión",
+            "forgetDescription": "{device} tendrá que responder al desafío la próxima vez que inicie sesión. Lo que tenga abierto sigue abierto.",
+            "fallbackTitle": "Dispositivo",
+            "until": "Inicia sesión solo con la contraseña hasta el {date}.",
+            "untilUnknown": "Inicia sesión solo con la contraseña hasta que caduque su pase.",
+            "unidentified": "No se registró nada de este dispositivo cuando se recordó, así que sus sesiones y llaves de acceso no se pueden distinguir de las de otro. Iniciar sesión en él una vez lo describe.",
+            "signedIn": "Sesión iniciada",
+            "signedInHint": "Todas las direcciones en las que este dispositivo tiene la sesión iniciada. Los dispositivos que se identifican igual cuentan como uno.",
+            "notSignedIn": "Ahora mismo no tiene la sesión iniciada en ningún sitio.",
+            "passkeysHint": "Credenciales que registró este dispositivo. Quita una desde Seguridad.",
+            "noPasskeys": "No se registró ninguna desde este dispositivo.",
+            "added": "añadida el {date}",
+            "signOutEverywhere": "Cerrar su sesión en todas partes",
+            "forget": "Olvidar este dispositivo"
+        },
+        "trusted": {
+            "title": "Dispositivos recordados",
+            "description": "Inician sesión solo con la contraseña hasta que se cumplan sus 30 días.",
+            "forgetTitle": "¿Volver a pedir un código a este dispositivo?",
+            "forgetDescription": "{device} tendrá que responder al desafío la próxima vez que inicie sesión.",
+            "forgetConfirm": "Olvidarlo",
+            "forgetAllTitle": "¿Olvidar todos los dispositivos recordados?",
+            "forgetAllDescription": "Se volverá a pedir un código a {count, plural, one {# dispositivo} other {# dispositivos}}, incluido este.",
+            "forgetAll": "Olvidarlos todos",
+            "columns": {
+                "device": "Dispositivo",
+                "address": "Dirección",
+                "domain": "Dominio",
+                "remembered": "Recordado",
+                "until": "Hasta"
+            },
+            "empty": "No se recuerda nada. Todos los inicios de sesión responden al desafío.",
+            "rememberedEarlier": "Recordado antes",
+            "thisDevice": "Este dispositivo",
+            "openTitle": "A qué puede llegar este dispositivo",
+            "openNamed": "Abrir {device}",
+            "openThis": "Abrir este dispositivo",
+            "forgetButton": "Volver a pedir un código a este dispositivo",
+            "stopNamed": "Dejar de recordar {device}",
+            "stopThis": "Dejar de recordar este dispositivo"
+        }
     },
     "stepUp": {
         "title": "Confirma que eres tú"
@@ -244,13 +331,35 @@
     },
     "methods": {
         "totp": {
-            "label": "App de autenticación"
+            "label": "App de autenticación",
+            "description": "Un código que genera tu móvil por sí solo, sin red de por medio."
         },
         "email": {
-            "label": "Código por correo"
+            "label": "Código por correo",
+            "description": "Un código enviado a un correo confirmado de tu cuenta."
         },
         "whatsapp": {
-            "label": "Código por WhatsApp"
+            "label": "Código por WhatsApp",
+            "description": "Un código enviado a tu número confirmado como mensaje de WhatsApp."
+        },
+        "title": "Cómo terminas de iniciar sesión",
+        "description": "Después de tu contraseña, elige qué más pide la cuenta.",
+        "alwaysOn": "Siempre activado",
+        "use": "Usar {method}",
+        "off": "{method} - desactivado",
+        "offerFirst": "Ofrecer primero",
+        "remembered": "{count, plural, one {Un dispositivo inicia sesión sin código hasta que se cumplan sus 30 días.} other {# dispositivos inician sesión sin código hasta que se cumplan sus 30 días.}}",
+        "review": "Revisar",
+        "noSms": "No se ofrecen mensajes de texto. Un SMS se puede leer en una pantalla bloqueada y lo puede desviar cualquiera que convenza a una operadora de mover el número, así que es una prueba más débil que el resto de esta lista.",
+        "confirmDescription": "Cambiar qué métodos acepta tu cuenta cambia cómo se puede llegar a ella.",
+        "approval": {
+            "title": "Aprobar desde una sesión abierta",
+            "description": "Un inicio de sesión nuevo espera hasta que lo permitas con tu PIN desde una sesión que ya esté abierta.",
+            "oneOfTwo": "Un inicio de sesión pide uno de los dos. Desactiva la app de autenticación para usar esto en su lugar.",
+            "pinFirst": "Primero configura un PIN de desbloqueo rápido: permitir un inicio de sesión lo pide.",
+            "noOtherSession": "No hay otra sesión abierta: aprobarías desde esta.",
+            "otherSessions": "{count, plural, one {# otra sesión abierta} other {# otras sesiones abiertas}}.",
+            "label": "Pedir aprobación para los inicios de sesión nuevos"
         }
     },
     "password": {
@@ -343,5 +452,73 @@
         "enterPassword": "Introduce tu contraseña",
         "passwordMinLength": "La contraseña nueva debe tener al menos {count} caracteres.",
         "setQuestions": "Configura {count} preguntas"
+    },
+    "binding": {
+        "title": "Dónde se pueden usar tus sesiones",
+        "description": "Una cookie de sesión es de quien la tenga. Estas opciones atan las tuyas al dispositivo y a la red en los que se abrieron, así que una copia hecha en otro sitio deja de funcionar.",
+        "client": {
+            "label": "Solo el navegador en el que se abrió",
+            "hint": "Una sesión usada desde otro navegador se termina y se te avisa, igual que una usada desde otro sistema operativo en otro sitio. Nada de lo que haces normalmente cruza esta línea: una actualización cambia una versión, no un nombre."
+        },
+        "address": {
+            "label": "Atar también a la dirección de red"
+        },
+        "scopes": {
+            "off": {
+                "label": "Ningún dispositivo",
+                "note": "Una sesión sigue funcionando desde donde se use."
+            },
+            "all": {
+                "label": "Todos los dispositivos",
+                "note": "La opción más estricta, y con la que habrá cierres de sesión: un móvil cambia de dirección cada vez que pasa de los datos móviles al wifi."
+            },
+            "desktop": {
+                "label": "Solo ordenadores",
+                "note": "Lo que quiere la mayoría. Un ordenador con conexión fija queda protegido y el móvil que llevas en el bolsillo se deja en paz."
+            },
+            "mobile": {
+                "label": "Solo móviles y tabletas",
+                "note": "Solo para un móvil que nunca sale de una misma red."
+            }
+        },
+        "perSession": "Un dispositivo puede responder distinto a esto: abre Sesiones y configúralo en la propia sesión."
+    },
+    "usernameSignIn": {
+        "title": "Iniciar sesión con tu nombre de usuario",
+        "descriptionNamed": "Tanto {username} como tu correo abren la cuenta. Tu nombre de usuario es público (es como la gente te menciona y te encuentra), así que dejar esto activado significa que media credencial ya se conoce. Desactivado, también hace falta tu correo, y Polaris no lo comparte.",
+        "description": "Tanto tu nombre de usuario como tu correo abren la cuenta. Tu nombre de usuario es público (es como la gente te menciona y te encuentra), así que dejar esto activado significa que media credencial ya se conoce. Desactivado, también hace falta tu correo, y Polaris no lo comparte.",
+        "label": "Iniciar sesión con mi nombre de usuario"
+    },
+    "successor": {
+        "title": "Sucesor",
+        "description": "Alguien que puede cerrar las organizaciones de las que eres propietario si mueres. No recibe nada más: ni tu trabajo, ni tus sesiones, ni una forma de iniciar sesión como tú.",
+        "add": "Añadir sucesor",
+        "change": "Cambiar sucesor",
+        "none": "No has designado ningún sucesor.",
+        "removeTitle": "Quitar a tu sucesor",
+        "changeTitle": "Cambiar a tu sucesor",
+        "addTitle": "Añadir un sucesor",
+        "removeBody": "{name} deja de poder cerrar las organizaciones de las que eres propietario. Puedes volver a nombrar a alguien cuando quieras.",
+        "search": "Busca por nombre de usuario, nombre completo o correo",
+        "consent": "Al añadir un sucesor reconoces que eres el titular de esta cuenta y autorizas a Polaris a permitir que la persona indicada cierre las organizaciones de las que eres propietario en caso de tu fallecimiento. Esto no prevalece sobre las normas de herederos ni sobre el derecho sucesorio de donde vives, y no es un testamento."
+    },
+    "authenticator": {
+        "startFailed": "No se ha podido empezar la configuración. Revisa tu contraseña.",
+        "codeMismatch": "Ese código no coincide. Revisa la hora de tu dispositivo y vuelve a intentarlo.",
+        "setUpTitle": "Configurar una app de autenticación",
+        "confirmPassword": "Confirma tu contraseña para generar un secreto nuevo.",
+        "addSecret": "Añade el secreto a tu app de autenticación y luego introduce el código que muestra.",
+        "password": "Contraseña",
+        "working": "Procesando...",
+        "scan": "Escanéalo con tu app de autenticación o usa la clave de abajo.",
+        "setupKey": "Clave de configuración",
+        "copyKey": "Copiar la clave de configuración",
+        "openInApp": "Abrir en una app de autenticación",
+        "codeFromApp": "Código de tu app",
+        "verifying": "Verificando...",
+        "turnOn": "Activar",
+        "turnOffFailed": "No se ha podido desactivar. Revisa tu contraseña.",
+        "turnOffTitle": "Desactivar la app de autenticación",
+        "turnOffDescription": "Tu cuenta quedará protegida solo por su contraseña. Tus códigos de respaldo dejan de funcionar."
     }
 }

@@ -102,7 +102,94 @@
         "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."
     },
     "sessions": {
-        "signedItselfOut": "{name} signed itself out."
+        "signedItselfOut": "{name} signed itself out.",
+        "page": {
+            "title": "Sessions",
+            "intro": "Where your account is signed in, and which devices it stops asking."
+        },
+        "origin": "{origin} - last active {time}",
+        "signedInWith": "Signed in with {summary}",
+        "revoke": {
+            "title": "Sign this device out?",
+            "description": "{device} will need to sign in again.",
+            "confirm": "Sign out"
+        },
+        "disconnect": {
+            "title": "Disconnect this extension?",
+            "withVault": "{browser} on {os} will lose this account and the vault it was let into. It can be connected again from the extension.",
+            "description": "{browser} on {os} will have to be connected again from the extension.",
+            "confirm": "Disconnect"
+        },
+        "others": {
+            "title": "Sign out everywhere else?",
+            "withExtensions": "{sessions, plural, one {# other session} other {# other sessions}} and {extensions, plural, one {# browser extension} other {# browser extensions}} will end immediately.",
+            "description": "{sessions, plural, one {# other session} other {# other sessions}} will end immediately.",
+            "confirm": "Sign them out"
+        },
+        "pending": {
+            "title": "Waiting for your approval",
+            "hint": "Allow this sign-in only if you recognize it.",
+            "deny": "Deny",
+            "approve": "Approve"
+        },
+        "active": {
+            "title": "Active sessions",
+            "scan": "Scan a code",
+            "signOutOthers": "Sign out everywhere else",
+            "empty": "Nothing is signed in.",
+            "nothingElse": "Nothing else is connected. The browser extension appears here once it is connected to this account. <link>Connect one</link>"
+        },
+        "approve": {
+            "title": "Allow this sign-in?",
+            "description": "{device} gets in as you. Enter your unlock PIN to confirm.",
+            "pin": "Unlock PIN",
+            "checking": "Checking..."
+        },
+        "device": {
+            "couldNotOpen": "Could not open this device.",
+            "signOutHere": "{count, plural, one {# session} other {# sessions}} end, including the one you are reading this on.",
+            "signOutElsewhere": "{count, plural, one {# session} other {# sessions}} end, on every address it signed in on.",
+            "signItOut": "Sign it out",
+            "forgetDescription": "{device} answers the challenge the next time it signs in. Anything it has open stays open.",
+            "fallbackTitle": "Device",
+            "until": "Signs in with the password alone until {date}.",
+            "untilUnknown": "Signs in with the password alone until its pass runs out.",
+            "unidentified": "Nothing was recorded about this device when it was remembered, so its sessions and passkeys cannot be told from another device's. Signing in on it once describes it.",
+            "signedIn": "Signed in",
+            "signedInHint": "Every address this device is signed in on. Devices that report themselves the same way are counted as one.",
+            "notSignedIn": "Not signed in anywhere right now.",
+            "passkeysHint": "Credentials this device registered. Remove one from Security.",
+            "noPasskeys": "None registered from this device.",
+            "added": "added {date}",
+            "signOutEverywhere": "Sign it out everywhere",
+            "forget": "Forget this device"
+        },
+        "trusted": {
+            "title": "Remembered devices",
+            "description": "These sign in with the password alone until their 30 days run out.",
+            "forgetTitle": "Ask this device for a code again?",
+            "forgetDescription": "{device} will have to answer the challenge the next time it signs in.",
+            "forgetConfirm": "Forget it",
+            "forgetAllTitle": "Forget every remembered device?",
+            "forgetAllDescription": "{count, plural, one {# device} other {# devices}} will be asked for a code again, this one included.",
+            "forgetAll": "Forget them all",
+            "columns": {
+                "device": "Device",
+                "address": "Address",
+                "domain": "Domain",
+                "remembered": "Remembered",
+                "until": "Until"
+            },
+            "empty": "Nothing is remembered. Every sign-in answers the challenge.",
+            "rememberedEarlier": "Remembered earlier",
+            "thisDevice": "This device",
+            "openTitle": "What this device can reach",
+            "openNamed": "Open {device}",
+            "openThis": "Open this device",
+            "forgetButton": "Ask this device for a code again",
+            "stopNamed": "Stop remembering {device}",
+            "stopThis": "Stop remembering this device"
+        }
     },
     "stepUp": {
         "title": "Confirm it is you"
@@ -244,13 +331,35 @@
     },
     "methods": {
         "totp": {
-            "label": "Authenticator app"
+            "label": "Authenticator app",
+            "description": "A code your phone generates on its own, with no network involved."
         },
         "email": {
-            "label": "Email code"
+            "label": "Email code",
+            "description": "A code sent to a confirmed address on your account."
         },
         "whatsapp": {
-            "label": "WhatsApp code"
+            "label": "WhatsApp code",
+            "description": "A code sent to your confirmed number as a WhatsApp message."
+        },
+        "title": "How you finish signing in",
+        "description": "After your password, pick what else the account asks for.",
+        "alwaysOn": "Always on",
+        "use": "Use {method}",
+        "off": "{method} - off",
+        "offerFirst": "Offer first",
+        "remembered": "{count, plural, one {One device signs in without a code until its 30 days run out.} other {# devices sign in without a code until their 30 days run out.}}",
+        "review": "Review",
+        "noSms": "Text messages are not offered. An SMS can be read off a locked screen and redirected by anyone who can talk a carrier into moving the number, so it is a weaker proof than the rest of this list.",
+        "confirmDescription": "Changing which methods your account accepts changes how it can be reached.",
+        "approval": {
+            "title": "Approve from an open session",
+            "description": "A new sign-in waits until you allow it with your PIN from a session that is already open.",
+            "oneOfTwo": "A sign-in asks for one of the two. Turn the authenticator app off to use this instead.",
+            "pinFirst": "Set a quick unlock PIN first - allowing a sign-in asks for it.",
+            "noOtherSession": "No other session open - you would approve from this one.",
+            "otherSessions": "{count, plural, one {# other session} other {# other sessions}} open.",
+            "label": "Require approval for new sign-ins"
         }
     },
     "password": {
@@ -343,5 +452,73 @@
         "enterPassword": "Enter your password",
         "passwordMinLength": "New password must be at least {count} characters.",
         "setQuestions": "Set {count} questions"
+    },
+    "binding": {
+        "title": "Where your sessions may be used",
+        "description": "A session cookie is whoever holds it. These tie yours to the device and the network they were opened on, so a copy taken somewhere else stops working.",
+        "client": {
+            "label": "Only the browser it was opened in",
+            "hint": "A session used from a different browser is ended and you are told, as is one used from a different operating system somewhere else. Nothing you do normally crosses this: an update changes a version, not a name."
+        },
+        "address": {
+            "label": "Also tie to the network address"
+        },
+        "scopes": {
+            "off": {
+                "label": "No devices",
+                "note": "A session keeps working wherever it is used from."
+            },
+            "all": {
+                "label": "Every device",
+                "note": "Strongest, and the one to expect sign-outs from: a phone changes address whenever it moves between mobile data and wifi."
+            },
+            "desktop": {
+                "label": "Computers only",
+                "note": "What most people want. A computer on a fixed connection is protected, and the phone in your pocket is left alone."
+            },
+            "mobile": {
+                "label": "Phones and tablets only",
+                "note": "Only for a phone that never leaves one network."
+            }
+        },
+        "perSession": "One device can answer differently from this: open Sessions and set it on the session itself."
+    },
+    "usernameSignIn": {
+        "title": "Sign in with your username",
+        "descriptionNamed": "Either {username} or your email address opens the account. Your username is public - it is how people mention you and find you - so leaving this on means half the credential is already known. Off, your address is needed as well, and Polaris does not hand that out.",
+        "description": "Either your username or your email address opens the account. Your username is public - it is how people mention you and find you - so leaving this on means half the credential is already known. Off, your address is needed as well, and Polaris does not hand that out.",
+        "label": "Sign in with my username"
+    },
+    "successor": {
+        "title": "Successor",
+        "description": "Somebody who can close the organizations you own if you die. They get nothing else: not your work, not your sessions, not a way to sign in as you.",
+        "add": "Add successor",
+        "change": "Change successor",
+        "none": "You have not designated a successor.",
+        "removeTitle": "Remove your successor",
+        "changeTitle": "Change your successor",
+        "addTitle": "Add a successor",
+        "removeBody": "{name} stops being able to close the organizations you own. You can name somebody again at any time.",
+        "search": "Search by username, full name, or email address",
+        "consent": "By adding a successor you acknowledge that you own this account, and you authorize Polaris to let the person named above close the organizations you own in the event of your death. This does not override next-of-kin rules or estate law where you live, and it is not a will."
+    },
+    "authenticator": {
+        "startFailed": "Could not start setup. Check your password.",
+        "codeMismatch": "That code did not match. Check the clock on your device and try again.",
+        "setUpTitle": "Set up an authenticator",
+        "confirmPassword": "Confirm your password to generate a new secret.",
+        "addSecret": "Add the secret to your authenticator app, then enter the code it shows.",
+        "password": "Password",
+        "working": "Working...",
+        "scan": "Scan this with your authenticator, or use the key below.",
+        "setupKey": "Setup key",
+        "copyKey": "Copy setup key",
+        "openInApp": "Open in an authenticator app",
+        "codeFromApp": "Code from your app",
+        "verifying": "Verifying...",
+        "turnOn": "Turn on",
+        "turnOffFailed": "Could not turn it off. Check your password.",
+        "turnOffTitle": "Turn off the authenticator",
+        "turnOffDescription": "Your account will be protected by its password alone. Your backup codes stop working."
     }
 }

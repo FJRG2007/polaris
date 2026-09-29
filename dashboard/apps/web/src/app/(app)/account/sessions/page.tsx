@@ -11,6 +11,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { SessionsView } from "./sessions-view";
 import { listVaultClients } from "@/lib/vault/devices";
 import { listExtensionSessions } from "@/lib/extension/sessions";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SessionsPage() {
     const user = await requireUser();
+    const t = await getTranslations("accountSecurity");
     // The apps as well as the browsers. A client is a different credential from a
     // session and was listed only under the vault, so somebody who connected the
     // extension and came here to check found no trace of it.
@@ -44,10 +46,8 @@ export default async function SessionsPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Sessions</h1>
-                <p className="text-sm text-muted-foreground">
-                    Where your account is signed in, and which devices it stops asking.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sessions.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("sessions.page.intro")}</p>
             </div>
             <SessionsView
                 sessions={sessions}

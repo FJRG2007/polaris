@@ -22,6 +22,7 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { setUsernameSignInAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Feedback, type SettingLock } from "./setting-card";
 
 export function UsernameSignInCard({
@@ -35,6 +36,7 @@ export function UsernameSignInCard({
     username: string;
     lock?: SettingLock;
 }) {
+    const t = useTranslations("accountSecurity");
     const [on, setOn] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -56,21 +58,18 @@ export function UsernameSignInCard({
             <CardBody className="flex flex-col gap-1">
                 <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Sign in with your username</h2>
+                        <h2 className="text-sm font-medium">{t("usernameSignIn.title")}</h2>
                         <p className="text-xs text-muted-foreground">
                             {username
-                                ? `Either ${username} or your email address opens the account.`
-                                : "Either your username or your email address opens the account."}{" "}
-                            Your username is public - it is how people mention you and find you -
-                            so leaving this on means half the credential is already known. Off,
-                            your address is needed as well, and Polaris does not hand that out.
+                                ? t("usernameSignIn.descriptionNamed", { username })
+                                : t("usernameSignIn.description")}
                         </p>
                     </div>
                     <Switch
                         checked={on}
                         disabled={Boolean(lock) || pending}
                         onChange={toggle}
-                        aria-label="Sign in with my username"
+                        aria-label={t("usernameSignIn.label")}
                     />
                 </div>
                 {lock ? <p className="text-xs text-muted-foreground">{lock.reason}</p> : null}

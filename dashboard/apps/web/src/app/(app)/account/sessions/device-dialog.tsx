@@ -27,6 +27,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { DeviceAddress } from "@/components/device-address";
 import { SessionsTable } from "@/components/sessions-table";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SessionView, TrustedDeviceDetail, TrustedDeviceRow } from "@/lib/session-directory";
 import {
     Badge,
@@ -68,6 +69,7 @@ export function DeviceDialog({
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
+    const t = useTranslations("accountSecurity");
     const [confirm, confirmElement] = useConfirm();
     const [detail, setDetail] = useState<TrustedDeviceDetail | null>(null);
     const [busy, setBusy] = useState(false);
@@ -82,7 +84,7 @@ export function DeviceDialog({
         void trustedDeviceAction(deviceId).then((result) => {
             if (!active) return;
             if (!result.detail) {
-                setError(result.error ?? "Could not open this device.");
+                setError(result.error ?? t("sessions.device.couldNotOpen"));
                 return;
             }
             setDetail(result.detail);
@@ -125,11 +127,11 @@ export function DeviceDialog({
         if (!detail) return;
         const here = detail.sessions.some((session) => session.current);
         const ok = await confirm({
-            title: "Sign this device out?",
+            title: t("sessions.revoke.title"),
             description: here
-                ? `${detail.sessions.length} session${detail.sessions.length === 1 ? "" : "s"} end, including the one you are reading this on.`
-                : `${detail.sessions.length} session${detail.sessions.length === 1 ? "" : "s"} end, on every address it signed in on.`,
-            confirmLabel: "Sign it out",
+                ? t("sessions.device.signOutHere", { count: detail.sessions.length })
+                : t("sessions.device.signOutElsewhere", { count: detail.sessions.length }),
+            confirmLabel: t("sessions.device.signItOut"),
             danger: true
         });
         if (!ok) return;
@@ -151,9 +153,9 @@ export function DeviceDialog({
     async function forget() {
         if (!detail) return;
         const ok = await confirm({
-            title: "Ask this device for a code again?",
-            description: `${detail.device.device} answers the challenge the next time it signs in. Anything it has open stays open.`,
-            confirmLabel: "Forget it",
+            title: t("sessions.trusted.forgetTitle"),
+            description: t("sessions.device.forgetDescription", { device: detail.device.device }),
+            confirmLabel: t("sessions.trusted.forgetConfirm"),
             danger: true
         });
         if (!ok) return;
@@ -174,12 +176,13 @@ export function DeviceDialog({
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex flex-wrap items-center gap-2">
-                            {device?.device ?? "Device"}
-                            {device?.current ? <Badge variant="primary">This device</Badge> : null}
+                            {device?.device ?? t("sessions.device.fallbackTitle")}
+                            {device?.current ? <Badge variant="primary">{t("sessions.trusted.thisDevice")}</Badge> : null}
                         </DialogTitle>
                         <DialogDescription>
-                            Signs in with the password alone until{" "}
-                            {device ? format.date(device.expiresAt) : "its pass runs out"}.
+                            {device
+                                ? t("sessions.device.until", { date: format.date(device.expiresAt) })
+                                : t("sessions.device.untilUnknown")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -188,21 +191,21 @@ export function DeviceDialog({
                     {device ? (
                         <div className="flex flex-col gap-4">
                             <div className="rounded-lg border border-border px-3 py-1 text-sm">
-                                <Fact label="Address">
+                                <Fact label={t("sessions.trusted.columns.address")}>
                                     <DeviceAddress address={device} />
                                 </Fact>
-                                <Fact label="Domain">{device.host ?? "Not recorded"}</Fact>
-                                <Fact label="Remembered">
+                                <Fact label={t("sessions.trusted.columns.domain")}>{device.host ?? t("passkeys.notRecorded")}</Fact>
+                                <Fact label={t("sessions.trusted.columns.remembered")}>
                                     {device.rememberedAt ? (
                                         <RelativeTime iso={device.rememberedAt} />
                                     ) : (
-                                        "Not recorded"
+                                        t("passkeys.notRecorded")
                                     )}
                                 </Fact>
-                                <Fact label="Last used">
-                                    {device.lastSeenAt ? <RelativeTime iso={device.lastSeenAt} /> : "Not recorded"}
+                                <Fact label={t("passkeys.columns.lastUsed")}>
+                                    {device.lastSeenAt ? <RelativeTime iso={device.lastSeenAt} /> : t("passkeys.notRecorded")}
                                 </Fact>
-                                <Fact label="Until">
+                                <Fact label={t("sessions.trusted.columns.until")}>
                                     <RelativeTime iso={device.expiresAt} tense="future" />
                                 </Fact>
                             </div>
@@ -215,42 +218,37 @@ export function DeviceDialog({
                             ) : null}
 
                             {detail && !detail.identified ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Nothing was recorded about this device when it was remembered, so its
-                                    sessions and passkeys cannot be told from another device&apos;s. Signing in
-                                    on it once describes it.
-                                </p>
+                                <p className="text-sm text-muted-foreground">{t("sessions.device.unidentified")}</p>
                             ) : null}
 
                             {detail?.identified ? (
                                 <>
                                     <section className="flex flex-col gap-2">
                                         <div>
-                                            <h3 className="text-sm font-medium">Signed in</h3>
+                                            <h3 className="text-sm font-medium">{t("sessions.device.signedIn")}</h3>
                                             <p className="text-xs text-muted-foreground">
-                                                Every address this device is signed in on. Devices that report
-                                                themselves the same way are counted as one.
+                                                {t("sessions.device.signedInHint")}
                                             </p>
                                         </div>
                                         <SessionsTable
                                             compact
                                             sessions={detail.sessions}
                                             busyId={busy ? "all" : null}
-                                            emptyLabel="Not signed in anywhere right now."
+                                            emptyLabel={t("sessions.device.notSignedIn")}
                                             onRevoke={(session) => void signOutSession(session)}
                                         />
                                     </section>
 
                                     <section className="flex flex-col gap-2">
                                         <div>
-                                            <h3 className="text-sm font-medium">Passkeys</h3>
+                                            <h3 className="text-sm font-medium">{t("passkeys.title")}</h3>
                                             <p className="text-xs text-muted-foreground">
-                                                Credentials this device registered. Remove one from Security.
+                                                {t("sessions.device.passkeysHint")}
                                             </p>
                                         </div>
                                         {detail.passkeys.length === 0 ? (
                                             <p className="rounded-lg border border-border px-3 py-4 text-center text-sm text-muted-foreground">
-                                                None registered from this device.
+                                                {t("sessions.device.noPasskeys")}
                                             </p>
                                         ) : (
                                             <ul className="overflow-hidden rounded-lg border border-border">
@@ -267,7 +265,7 @@ export function DeviceDialog({
                                                             </code>
                                                         </div>
                                                         <span className="shrink-0 text-xs text-muted-foreground">
-                                                            added {format.date(passkey.addedAt)}
+                                                            {t("sessions.device.added", { date: format.date(passkey.addedAt) })}
                                                         </span>
                                                     </li>
                                                 ))}
@@ -285,12 +283,12 @@ export function DeviceDialog({
                                         onClick={() => void signOutEverywhere()}
                                     >
                                         <LogOut className="size-4" />
-                                        Sign it out everywhere
+                                        {t("sessions.device.signOutEverywhere")}
                                     </Button>
                                 ) : null}
                                 <Button variant="danger" disabled={busy} onClick={() => void forget()}>
                                     <ShieldOff className="size-4" />
-                                    Forget this device
+                                    {t("sessions.device.forget")}
                                 </Button>
                             </div>
                         </div>

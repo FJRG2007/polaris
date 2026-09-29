@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { TrustedDeviceRow } from "@/lib/session-directory";
 
@@ -48,7 +49,7 @@ function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
 }
 
 function render(devices: TrustedDeviceRow[]): string {
-    return renderToStaticMarkup(<TrustedDevicesCard devices={devices} />);
+    return renderToStaticMarkup(withMessages(<TrustedDevicesCard devices={devices} />));
 }
 
 describe("the remembered-devices card", () => {

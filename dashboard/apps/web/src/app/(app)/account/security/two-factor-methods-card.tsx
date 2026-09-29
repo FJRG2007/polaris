@@ -26,6 +26,8 @@
 
 import Link from "next/link";
 import { Feedback, type SettingLock } from "./setting-card";
+import { knownMessage, methodLabel } from "./known-sentences";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { setLoginApprovalAction } from "./actions";
@@ -33,7 +35,6 @@ import { saveTwoFactorPreferencesAction } from "./two-factor-actions";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
-    TWO_FACTOR_METHOD_INFO,
     TWO_FACTOR_METHODS,
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod
@@ -78,11 +79,14 @@ export function TwoFactorMethodsCard({
     approval: LoginApprovalStatus;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
     const [methods, setMethods] = useState<TwoFactorDeliveryMethod[]>(
         TWO_FACTOR_DELIVERY_METHODS.filter(
             (method) => statuses.find((status) => status.method === method)?.enabled === true
         )
     );
+    const tc = useTranslations("common");
     const [choice, setChoice] = useState<TwoFactorMethod>(preferred);
     const [approve, setApprove] = useState(approval.enabled);
     const [confirming, setConfirming] = useState(false);
@@ -107,15 +111,13 @@ export function TwoFactorMethodsCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">How you finish signing in</h2>
-                    <p className="text-xs text-muted-foreground">
-                        After your password, pick what else the account asks for.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("methods.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("methods.description")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-md border border-border">
                     {statuses.map((status) => {
-                        const info = TWO_FACTOR_METHOD_INFO[status.method];
+                        const label = methodLabel(t, status.method);
                         const isAuthenticator = status.method === "totp";
                         const on = isAuthenticator || methods.includes(status.method as TwoFactorDeliveryMethod);
                         return (
@@ -124,21 +126,21 @@ export function TwoFactorMethodsCard({
                                 className="flex items-start justify-between gap-3 border-t border-border px-3 py-2 first:border-t-0"
                             >
                                 <div className="min-w-0">
-                                    <p className="text-sm">{info.label}</p>
+                                    <p className="text-sm">{label}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {status.target ?? info.description}
+                                        {status.target ?? t(`methods.${status.method}.description` as const)}
                                     </p>
                                     {status.blocker ? (
-                                        <p className="text-xs text-warning">{status.blocker}</p>
+                                        <p className="text-xs text-warning">{knownMessage(t, tv, status.blocker)}</p>
                                     ) : null}
                                 </div>
                                 {isAuthenticator ? (
-                                    <span className="shrink-0 text-xs text-muted-foreground">Always on</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">{t("methods.alwaysOn")}</span>
                                 ) : (
                                     <Switch
                                         checked={on}
                                         disabled={locked || !twoFactorEnabled || (!status.available && !on)}
-                                        aria-label={`Use ${info.label}`}
+                                        aria-label={t("methods.use", { method: label })}
                                         onChange={(next) =>
                                             toggle(status.method as TwoFactorDeliveryMethod, next)
                                         }
@@ -150,35 +152,27 @@ export function TwoFactorMethodsCard({
 
                     <div className="flex items-start justify-between gap-3 border-t border-border px-3 py-2">
                         <div className="min-w-0">
-                            <p className="text-sm">Approve from an open session</p>
-                            <p className="text-xs text-muted-foreground">
-                                A new sign-in waits until you allow it with your PIN from a session
-                                that is already open.
-                            </p>
+                            <p className="text-sm">{t("methods.approval.title")}</p>
+                            <p className="text-xs text-muted-foreground">{t("methods.approval.description")}</p>
                             {twoFactorEnabled ? (
-                                <p className="text-xs text-warning">
-                                    A sign-in asks for one of the two. Turn the authenticator app
-                                    off to use this instead.
-                                </p>
+                                <p className="text-xs text-warning">{t("methods.approval.oneOfTwo")}</p>
                             ) : !approval.hasPin ? (
-                                <p className="text-xs text-warning">
-                                    Set a quick unlock PIN first - allowing a sign-in asks for it.
-                                </p>
+                                <p className="text-xs text-warning">{t("methods.approval.pinFirst")}</p>
                             ) : (
                                 <Link
                                     href="/account/sessions"
                                     className="text-xs text-muted-foreground underline-offset-2 hover:underline"
                                 >
                                     {approval.otherSessions === 0
-                                        ? "No other session open - you would approve from this one."
-                                        : `${approval.otherSessions} other session${approval.otherSessions === 1 ? "" : "s"} open.`}
+                                        ? t("methods.approval.noOtherSession")
+                                        : t("methods.approval.otherSessions", { count: approval.otherSessions })}
                                 </Link>
                             )}
                         </div>
                         <Switch
                             checked={approve}
                             disabled={locked || ((twoFactorEnabled || !approval.hasPin) && !approve)}
-                            aria-label="Require approval for new sign-ins"
+                            aria-label={t("methods.approval.label")}
                             onChange={setApprove}
                         />
                     </div>
@@ -186,7 +180,7 @@ export function TwoFactorMethodsCard({
 
                 {twoFactorEnabled ? (
                     <label className="flex flex-col gap-1 text-sm">
-                        Offer first
+                        {t("methods.offerFirst")}
                         {/* Every method is listed, including the ones that are off: a list
                             with one entry looks like the account has one way in, when what
                             it means is that nothing else has been turned on yet. */}
@@ -200,7 +194,7 @@ export function TwoFactorMethodsCard({
                                     !methods.includes(method as TwoFactorDeliveryMethod);
                                 return {
                                     value: method,
-                                    label: `${TWO_FACTOR_METHOD_INFO[method].label}${off ? " - off" : ""}`,
+                                    label: off ? t("methods.off", { method: methodLabel(t, method) }) : methodLabel(t, method),
                                     disabled: off
                                 };
                             })}
@@ -215,30 +209,24 @@ export function TwoFactorMethodsCard({
                 {twoFactorEnabled && trustedDevices > 0 ? (
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                         <div className="min-w-0">
-                            <p className="text-sm">Remembered devices</p>
+                            <p className="text-sm">{t("sessions.trusted.title")}</p>
                             <p className="text-xs text-muted-foreground">
-                                {trustedDevices === 1
-                                    ? "One device signs in without a code until its 30 days run out."
-                                    : `${trustedDevices} devices sign in without a code until their 30 days run out.`}
+                                {t("methods.remembered", { count: trustedDevices })}
                             </p>
                         </div>
                         <Link href="/account/sessions">
                             <Button variant="outline" size="sm">
-                                Review
+                                {t("methods.review")}
                             </Button>
                         </Link>
                     </div>
                 ) : null}
 
-                <p className="text-xs text-muted-foreground">
-                    Text messages are not offered. An SMS can be read off a locked screen and
-                    redirected by anyone who can talk a carrier into moving the number, so it is a
-                    weaker proof than the rest of this list.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("methods.noSms")}</p>
 
                 <div className="flex justify-end">
                     <Button disabled={locked || !changed} onClick={() => setConfirming(true)}>
-                        Save
+                        {tc("actions.save")}
                     </Button>
                 </div>
             </CardBody>
@@ -278,6 +266,8 @@ function ConfirmDialog({
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -307,23 +297,21 @@ function ConfirmDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Confirm your password</DialogTitle>
-                    <DialogDescription>
-                        Changing which methods your account accepts changes how it can be reached.
-                    </DialogDescription>
+                    <DialogTitle>{t("passkeys.confirmTitle")}</DialogTitle>
+                    <DialogDescription>{t("methods.confirmDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Current password
+                        {t("dialog.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </form>

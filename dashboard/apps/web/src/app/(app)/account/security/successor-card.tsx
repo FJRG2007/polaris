@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import type { StepUpProofInput } from "@polaris/core";
 import { AccountInput } from "@/components/account-input";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpFields } from "@/components/step-up-fields";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
@@ -60,6 +61,7 @@ export function SuccessorCard({
     lock?: SettingLock;
 }) {
     const [mode, setMode] = useState<Mode>(null);
+    const t = useTranslations("accountSecurity");
 
     return (
         <Card>
@@ -67,13 +69,9 @@ export function SuccessorCard({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                         <h2 className="flex items-center gap-2 text-sm font-medium">
-                            <HeartHandshake className="size-4 shrink-0" /> Successor
+                            <HeartHandshake className="size-4 shrink-0" /> {t("successor.title")}
                         </h2>
-                        <p className="text-muted-foreground text-xs">
-                            Somebody who can close the organizations you own if you die. They get
-                            nothing else: not your work, not your sessions, not a way to sign in as
-                            you.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("successor.description")}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {lock ? (
@@ -86,14 +84,14 @@ export function SuccessorCard({
                                     onClick={() => setMode("set")}
                                 >
                                     <UserPlus className="size-4 shrink-0" />
-                                    {successor ? "Change" : "Add successor"}
+                                    {successor ? t("view.change") : t("successor.add")}
                                 </Button>
                                 {successor && (
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label="Remove your successor"
-                                        title="Remove"
+                                        aria-label={t("successor.removeTitle")}
+                                        title={t("passkeys.remove")}
                                         onClick={() => setMode("clear")}
                                     >
                                         <Trash2 className="size-4 shrink-0" />
@@ -121,7 +119,7 @@ export function SuccessorCard({
                     </div>
                 ) : (
                     <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-xs">
-                        You have not designated a successor.
+                        {t("successor.none")}
                     </p>
                 )}
             </CardBody>
@@ -141,6 +139,8 @@ function SuccessorDialog({
     onClose: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [identifier, setIdentifier] = useState("");
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [error, setError] = useState("");
@@ -179,10 +179,10 @@ function SuccessorDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {clearing
-                            ? "Remove your successor"
+                            ? t("successor.removeTitle")
                             : current
-                              ? "Change your successor"
-                              : "Add a successor"}
+                              ? t("successor.changeTitle")
+                              : t("successor.addTitle")}
                     </DialogTitle>
                 </DialogHeader>
                 <form
@@ -194,18 +194,17 @@ function SuccessorDialog({
                 >
                     {clearing ? (
                         <p className="text-muted-foreground text-sm">
-                            {current?.name} stops being able to close the organizations you own. You
-                            can name somebody again at any time.
+                            {t("successor.removeBody", { name: current?.name ?? "" })}
                         </p>
                     ) : (
                         <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-                            Search by username, full name, or email address
+                            {t("successor.search")}
                             <AccountInput
                                 autoFocus
                                 value={identifier}
                                 className="h-9"
                                 placeholder="someone@example.com"
-                                aria-label="Search by username, full name, or email address"
+                                aria-label={t("successor.search")}
                                 onValueChange={setIdentifier}
                             />
                         </label>
@@ -214,19 +213,14 @@ function SuccessorDialog({
                     <StepUpFields open={open} purpose="account-successor" onChange={setProof} />
 
                     {!clearing && (
-                        <p className="text-muted-foreground text-xs">
-                            By adding a successor you acknowledge that you own this account, and you
-                            authorize Polaris to let the person named above close the organizations
-                            you own in the event of your death. This does not override next-of-kin
-                            rules or estate law where you live, and it is not a will.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("successor.consent")}</p>
                     )}
 
                     <Feedback error={error} />
 
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={close} disabled={busy}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button
                             type="submit"
@@ -234,7 +228,7 @@ function SuccessorDialog({
                             disabled={busy || !ready}
                         >
                             {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                            {clearing ? "Remove" : current ? "Change successor" : "Add successor"}
+                            {clearing ? t("passkeys.remove") : current ? t("successor.change") : t("successor.add")}
                         </Button>
                     </DialogFooter>
                 </form>

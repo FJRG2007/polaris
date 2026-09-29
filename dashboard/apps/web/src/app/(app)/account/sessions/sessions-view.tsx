@@ -19,6 +19,7 @@ import { codeDigits } from "@/components/code-input";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
@@ -47,17 +48,21 @@ import {
 } from "@polaris/ui";
 
 function Origin({ session }: { session: SessionView }) {
+    const t = useTranslations("accountSecurity");
     return (
         <>
             <p className="text-xs text-muted-foreground">
-                {sessionOrigin(session)} - last active <RelativeTime iso={session.lastSeenAt} />
+                {t.rich("sessions.origin", {
+                    origin: sessionOrigin(session),
+                    time: <RelativeTime key="time" iso={session.lastSeenAt} />
+                })}
             </p>
             {/* Most of what this decision rests on, next to where it came from:
                 a sign-in that already answered a code is a different thing to
                 allow than one that only had the password. */}
             {describeSignIn(session.signIn).length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Signed in with {signInSummary(session.signIn)}
+                    {t("sessions.signedInWith", { summary: signInSummary(session.signIn) })}
                 </p>
             ) : null}
         </>
@@ -84,6 +89,7 @@ export function SessionsView({
     clients: VaultClientRow[];
 }) {
     const router = useRouter();
+    const t = useTranslations("accountSecurity");
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -107,9 +113,9 @@ export function SessionsView({
 
     async function revoke(session: SessionView) {
         const ok = await confirm({
-            title: "Sign this device out?",
-            description: `${session.device} will need to sign in again.`,
-            confirmLabel: "Sign out",
+            title: t("sessions.revoke.title"),
+            description: t("sessions.revoke.description", { device: session.device }),
+            confirmLabel: t("sessions.revoke.confirm"),
             danger: true
         });
         if (!ok) return;
@@ -130,12 +136,12 @@ export function SessionsView({
      */
     async function disconnect(extension: ExtensionSessionView) {
         const ok = await confirm({
-            title: "Disconnect this extension?",
+            title: t("sessions.disconnect.title"),
             description:
                 extension.vaultClients > 0
-                    ? `${extension.browser} on ${extension.os} will lose this account and the vault it was let into. It can be connected again from the extension.`
-                    : `${extension.browser} on ${extension.os} will have to be connected again from the extension.`,
-            confirmLabel: "Disconnect",
+                    ? t("sessions.disconnect.withVault", { browser: extension.browser, os: extension.os })
+                    : t("sessions.disconnect.description", { browser: extension.browser, os: extension.os }),
+            confirmLabel: t("sessions.disconnect.confirm"),
             danger: true
         });
         if (!ok) return;
@@ -180,12 +186,12 @@ export function SessionsView({
 
     async function revokeOthers() {
         const ok = await confirm({
-            title: "Sign out everywhere else?",
+            title: t("sessions.others.title"),
             description:
                 extensions.length > 0
-                    ? `${others.length} other session${others.length === 1 ? "" : "s"} and ${extensions.length} browser extension${extensions.length === 1 ? "" : "s"} will end immediately.`
-                    : `${others.length} other session${others.length === 1 ? "" : "s"} will end immediately.`,
-            confirmLabel: "Sign them out",
+                    ? t("sessions.others.withExtensions", { sessions: others.length, extensions: extensions.length })
+                    : t("sessions.others.description", { sessions: others.length }),
+            confirmLabel: t("sessions.others.confirm"),
             danger: true
         });
         if (!ok) return;
@@ -203,10 +209,8 @@ export function SessionsView({
                 <Card className="border-warning-edge">
                     <CardBody className="flex flex-col gap-3">
                         <div>
-                            <h2 className="text-sm font-medium">Waiting for your approval</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Allow this sign-in only if you recognize it.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("sessions.pending.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("sessions.pending.hint")}</p>
                         </div>
                         {pending.map((session) => (
                             <div
@@ -225,7 +229,7 @@ export function SessionsView({
                                         onClick={() => void deny(session.id)}
                                     >
                                         <X className="size-4" />
-                                        Deny
+                                        {t("sessions.pending.deny")}
                                     </Button>
                                     <Button
                                         size="sm"
@@ -233,7 +237,7 @@ export function SessionsView({
                                         onClick={() => setApproving(session)}
                                     >
                                         <Check className="size-4" />
-                                        Approve
+                                        {t("sessions.pending.approve")}
                                     </Button>
                                 </div>
                             </div>
@@ -245,7 +249,7 @@ export function SessionsView({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-sm font-medium">Active sessions</h2>
+                        <h2 className="text-sm font-medium">{t("sessions.active.title")}</h2>
                         <div className="flex flex-wrap gap-2">
                             {/* The other way a sign-in gets let in: the code on the
                                 sign-in screen, answered here instead of waiting for
@@ -253,7 +257,7 @@ export function SessionsView({
                             <Link href="/account/scan">
                                 <Button variant="outline" size="sm">
                                     <ScanLine className="size-4" />
-                                    Scan a code
+                                    {t("sessions.active.scan")}
                                 </Button>
                             </Link>
                             {elsewhere > 0 ? (
@@ -264,7 +268,7 @@ export function SessionsView({
                                     onClick={() => void revokeOthers()}
                                 >
                                     <LogOut className="size-4" />
-                                    Sign out everywhere else
+                                    {t("sessions.active.signOutOthers")}
                                 </Button>
                             ) : null}
                         </div>
@@ -277,7 +281,7 @@ export function SessionsView({
                         sessions={active}
                         clients={clients}
                         busyId={busyId}
-                        emptyLabel="Nothing is signed in."
+                        emptyLabel={t("sessions.active.empty")}
                         activityHref={(session) => `/account/activity?session=${session.id}`}
                         onRevoke={(session) =>
                             void (session.current ? signOutHere() : revoke(session))
@@ -292,14 +296,17 @@ export function SessionsView({
                         question that brings people here. */}
                     {extensions.length === 0 && clients.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            Nothing else is connected. The browser extension appears here once it is
-                            connected to this account.{" "}
-                            <Link
-                                href="/account/extension"
-                                className="underline-offset-2 hover:text-foreground hover:underline"
-                            >
-                                Connect one
-                            </Link>
+                            {t.rich("sessions.active.nothingElse", {
+                                link: (chunks) => (
+                                    <Link
+                                        key="link"
+                                        href="/account/extension"
+                                        className="underline-offset-2 hover:text-foreground hover:underline"
+                                    >
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
                         </p>
                     ) : null}
                 </CardBody>
@@ -337,6 +344,8 @@ function ApproveSignInDialog({
     onOpenChange: (open: boolean) => void;
     onApproved: () => void;
 }) {
+    const t = useTranslations("accountSecurity");
+    const tc = useTranslations("common");
     const [pin, setPin] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -369,14 +378,14 @@ function ApproveSignInDialog({
         >
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Allow this sign-in?</DialogTitle>
+                    <DialogTitle>{t("sessions.approve.title")}</DialogTitle>
                     <DialogDescription>
-                        {session?.device} gets in as you. Enter your unlock PIN to confirm.
+                        {t("sessions.approve.description", { device: session?.device ?? "" })}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Unlock PIN
+                        {t("sessions.approve.pin")}
                         <Input
                             type="password"
                             inputMode="numeric"
@@ -390,10 +399,10 @@ function ApproveSignInDialog({
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy || pin.length < 4}>
-                            {busy ? "Checking..." : "Approve"}
+                            {busy ? t("sessions.approve.checking") : t("sessions.pending.approve")}
                         </Button>
                     </div>
                 </form>
