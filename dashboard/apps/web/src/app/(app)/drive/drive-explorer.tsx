@@ -19,26 +19,26 @@
  * up nothing but itself.
  */
 
-import { sendFile } from "@/components/transfers/move-file";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import Link from "next/link";
 import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
-import * as serverActions from "../apps/servers/actions";
-import { driveJobFraction, driveJobSummary } from "@polaris/core";
+import { SendDialog } from "./send-dialog";
+import { useRouter } from "next/navigation";
+import { TransfersPanel } from "./transfers-panel";
 import type { DriveJobView } from "@/lib/drive-jobs";
 import type { DriveAbilities } from "@/lib/drive-authz";
-import { useRouter } from "next/navigation";
+import * as serverActions from "../apps/servers/actions";
+import { sendFile } from "@/components/transfers/move-file";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
-import { PeopleShareDialog, type PeopleShareTarget } from "./people-share-dialog";
-import { SendDialog } from "./send-dialog";
-import { TransfersPanel } from "./transfers-panel";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { driveJobFraction, driveJobSummary } from "@polaris/core";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
+import { PeopleShareDialog, type PeopleShareTarget } from "./people-share-dialog";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import {
     abortPrefetchesOutside,
@@ -1373,7 +1373,7 @@ function ScheduleDeleteDialog({
                     <div className="flex justify-end gap-2">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">
-                                Cancel
+                                {t("explorer.cancel")}
                             </Button>
                         </DialogClose>
                         <Button
