@@ -17,7 +17,7 @@ import { connectionSections, minecraftNameSchema, type ConnectionCategory } from
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { ExternalLink, KeyRound, Loader2, Pencil, Plus, RefreshCw, Unlink } from "lucide-react";
 import {
     connectAwsAction,
@@ -366,7 +366,7 @@ function ProviderCard({
                     {provider.canSignIn ? (
                         <>
                             {" "}
-                            {t.rich("connections.canSignIn", {
+                            {t.rich<ReactNode>("connections.canSignIn", {
                                 link: (chunks) => (
                                     <Link
                                         key="link"

@@ -43,7 +43,6 @@ import { openShelfFor } from "@/lib/workspace-scope";
 import { chatRelayReady } from "@/lib/app-extensions/registry";
 import {
     IN_GAME_CHOICES,
-    IN_GAME_NOT_READY,
     storedInGame,
     type InGameChoice
 } from "@/lib/chat/in-game-choice";

@@ -213,7 +213,7 @@ export async function signOutTrustedDeviceAction(
     if (!parsed.success) return refuse("errors.deviceForgotten");
     const result = await revokeDeviceSessions(user.id, user.sessionId, parsed.data);
     revalidatePath("/account/sessions");
-    return localized(result);
+    return result;
 }
 
 /** Stop remembering every browser at once. */
