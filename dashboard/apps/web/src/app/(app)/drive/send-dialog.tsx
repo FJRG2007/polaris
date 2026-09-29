@@ -13,6 +13,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Building2, Send, User, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -53,6 +54,7 @@ export function SendDialog({
     readonly name: string;
     readonly onSent?: (count: number) => void;
 }) {
+    const t = useTranslations("drive");
     const [query, setQuery] = useState("");
     const [found, setFound] = useState<Candidate[]>([]);
     const [orgs, setOrgs] = useState<Candidate[]>([]);
@@ -146,8 +148,8 @@ export function SendDialog({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search for a person"
-                        aria-label="Search for a person"
+                        placeholder={t("send.searchForAPerson")}
+                        aria-label={t("send.searchForAPerson")}
                     />
 
                     {/* Who is chosen, shown outside the results. The results are
@@ -207,7 +209,7 @@ export function SendDialog({
                                     </span>
                                     {candidate.allowed ? null : (
                                         <span className="shrink-0 text-xs text-muted-foreground">
-                                            Not accepting files
+                                            {t("send.notAcceptingFiles")}
                                         </span>
                                     )}
                                 </button>
@@ -215,7 +217,7 @@ export function SendDialog({
                         })}
                         {rows.length === 0 && query.trim().length >= 2 ? (
                             <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                                Nobody by that name.
+                                {t("send.nobodyByThatName")}
                             </p>
                         ) : null}
                     </div>
@@ -223,8 +225,8 @@ export function SendDialog({
                     <Textarea
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
-                        placeholder="Say something about it (optional)"
-                        aria-label="Say something about it"
+                        placeholder={t("send.saySomethingAboutItOptional")}
+                        aria-label={t("send.saySomethingAboutIt")}
                         rows={2}
                     />
 
@@ -233,25 +235,25 @@ export function SendDialog({
                             checked={mode === "move"}
                             disabled={!canGiveUp}
                             onChange={setGiveUp}
-                            aria-label="Send the file itself"
+                            aria-label={t("send.sendTheFileItself")}
                         />
                         <div className="text-sm">
-                            <p>Send the file itself</p>
+                            <p>{t("send.sendTheFileItself")}</p>
                             <p className="text-xs text-muted-foreground">
                                 {canGiveUp
-                                    ? "It leaves your Drive once they accept it. Off, they get a copy and you keep yours."
-                                    : "Only when you are sending to one person. Everybody else gets a copy."}
+                                    ? t("send.itLeavesYourDriveOnce")
+                                    : t("send.onlyWhenYouAreSending")}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("send.cancel")}
                         </Button>
                         <Button onClick={send} disabled={busy || chosen.length === 0}>
                             <Send className="size-4 shrink-0" />
-                            {chosen.length > 1 ? `Send to ${chosen.length}` : "Send"}
+                            {chosen.length > 1 ? `Send to ${chosen.length}` : t("send.send")}
                         </Button>
                     </div>
                 </div>

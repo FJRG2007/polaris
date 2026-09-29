@@ -10,6 +10,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
@@ -35,23 +37,24 @@ export interface TextDropPointRow {
 }
 
 function status(row: TextDropPointRow): {
-    label: string;
+    label: NamespaceKey<"drivePoints">;
     variant: "success" | "neutral" | "warning";
 } {
-    if (row.revokedAt) return { label: "Closed", variant: "neutral" };
+    if (row.revokedAt) return { label: "status.closed", variant: "neutral" };
     if (row.startsAt && new Date(row.startsAt).getTime() > Date.now()) {
-        return { label: "Scheduled", variant: "warning" };
+        return { label: "status.scheduled", variant: "warning" };
     }
     if (row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", variant: "warning" };
+        return { label: "status.expired", variant: "warning" };
     }
     if (row.maxSubmissions !== null && row.submissionCount >= row.maxSubmissions) {
-        return { label: "Full", variant: "warning" };
+        return { label: "status.full", variant: "warning" };
     }
-    return { label: "Open", variant: "success" };
+    return { label: "status.open", variant: "success" };
 }
 
 export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] }) {
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     const [rows, setRows] = useState(requests);
     const [pending, startTransition] = useTransition();
@@ -67,8 +70,8 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
         setBusy(null);
         if (result.error || !result.url) {
             await confirm({
-                title: "No link to copy",
-                description: result.error ?? "This drop point has no link.",
+                title: t("textList.noLinkToCopy"),
+                description: result.error ?? t("textList.thisDropPointHasNo"),
                 alert: true
             });
             return;
@@ -80,9 +83,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
 
     async function onClose(row: TextDropPointRow) {
         const confirmed = await confirm({
-            title: `Close "${row.title}"?`,
-            description: "It stops accepting anything immediately. What it collected stays.",
-            confirmLabel: "Close",
+            title: t("list.closeTitle", { name: row.title }),
+            description: t("textList.itStopsAcceptingAnythingImmediately"),
+            confirmLabel: t("textList.close"),
             danger: true
         });
         if (!confirmed) return;
@@ -111,9 +114,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
 
     async function onDelete(row: TextDropPointRow) {
         const confirmed = await confirm({
-            title: `Delete "${row.title}"?`,
-            description: "The link stops working. What it collected stays in your snippets.",
-            confirmLabel: "Delete",
+            title: t("list.deleteTitle", { name: row.title }),
+            description: t("textList.theLinkStopsWorkingWhat"),
+            confirmLabel: t("textList.delete"),
             danger: true
         });
         if (!confirmed) return;
@@ -123,7 +126,7 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
             setBusy(null);
             if (result.error) {
                 await confirm({
-                    title: "Could not delete it",
+                    title: t("textList.couldNotDeleteIt"),
                     description: result.error,
                     alert: true
                 });
@@ -137,8 +140,7 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
         return (
             <Card>
                 <CardBody className="p-6 text-center text-sm text-muted-foreground">
-                    No text drop points yet. Use &quot;Ask for text&quot; to get a link somebody can
-                    paste an .env or a key into.
+                    {t("textList.noTextDropPointsYet")}
                 </CardBody>
             </Card>
         );
@@ -165,27 +167,28 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                         ) : null}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {row.submissionCount}
-                                        {row.maxSubmissions !== null
-                                            ? `/${row.maxSubmissions}`
-                                            : ""}{" "}
-                                        collected
+                                        {t("list.collected", {
+                                            count:
+                                                row.maxSubmissions !== null
+                                                    ? `${row.submissionCount}/${row.maxSubmissions}`
+                                                    : String(row.submissionCount)
+                                        })}
                                         {scheduled && row.startsAt
-                                            ? ` - opens ${format.date(row.startsAt)}`
+                                            ? t("list.opens", { date: format.date(row.startsAt) })
                                             : row.expiresAt
-                                              ? ` - until ${format.date(row.expiresAt)}`
+                                              ? t("list.until", { date: format.date(row.expiresAt) })
                                               : ""}
                                     </p>
                                 </div>
                             </Link>
                             <div className="flex items-center gap-1">
-                                <Badge variant={state.variant}>{state.label}</Badge>
+                                <Badge variant={state.variant}>{t(state.label)}</Badge>
                                 {row.canReveal && !row.revokedAt ? (
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        title="Copy the link"
-                                        aria-label={`Copy the link to ${row.title}`}
+                                        title={t("textList.copyTheLink")}
+                                        aria-label={t("list.copyLinkTo", { name: row.title })}
                                         onClick={() => onCopyLink(row)}
                                         disabled={busy === row.id}
                                     >
@@ -200,8 +203,8 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        title="Reopen"
-                                        aria-label={`Reopen ${row.title}`}
+                                        title={t("textList.reopen")}
+                                        aria-label={t("list.reopenNamed", { name: row.title })}
                                         onClick={() => onReopen(row)}
                                         disabled={pending && busy === row.id}
                                     >
@@ -211,8 +214,8 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        title="Close"
-                                        aria-label={`Close ${row.title}`}
+                                        title={t("textList.close")}
+                                        aria-label={t("list.closeNamed", { name: row.title })}
                                         onClick={() => onClose(row)}
                                         disabled={pending && busy === row.id}
                                     >
@@ -222,8 +225,8 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    title="Delete"
-                                    aria-label={`Delete ${row.title}`}
+                                    title={t("textList.delete")}
+                                    aria-label={t("list.deleteNamed", { name: row.title })}
                                     onClick={() => onDelete(row)}
                                     disabled={pending && busy === row.id}
                                 >

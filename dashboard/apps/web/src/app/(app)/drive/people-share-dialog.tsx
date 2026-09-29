@@ -16,6 +16,7 @@
  */
 
 import { Avatar } from "@/components/avatar";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ItemShare } from "./sharing-types";
 import { DRIVE_GRANT_NOTE_MAX } from "@polaris/core";
 import { Loader2, Trash2, Users } from "lucide-react";
@@ -72,6 +73,7 @@ export function PeopleShareDialog({
     /** Something changed, so whatever drew the item should look again. */
     onChanged?: () => void;
 }) {
+    const t = useTranslations("drive");
     const format = useDisplayFormat();
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [groups, setGroups] = useState<SharePerson[]>([]);
@@ -175,8 +177,8 @@ export function PeopleShareDialog({
                     <DialogTitle>Share {target.name}</DialogTitle>
                     <DialogDescription>
                         {target.isDir
-                            ? "Whoever you name can open this folder and everything in it."
-                            : "Whoever you name can open this file from their own Drive."}
+                            ? t("peopleShare.whoeverYouNameCanOpen")
+                            : t("peopleShare.whoeverYouNameCanOpen2")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -185,17 +187,17 @@ export function PeopleShareDialog({
                         picked={picked}
                         onChange={setPicked}
                         exclude={alreadyHeld}
-                        label="Share with"
+                        label={t("peopleShare.shareWith")}
                         search={findSharePeopleAction}
                     />
 
                     {groupOptions.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">Or a group</span>
+                            <span className="text-xs text-muted-foreground">{t("peopleShare.orAGroup")}</span>
                             <Select
                                 value={groupId}
                                 onValueChange={setGroupId}
-                                placeholder="No group"
+                                placeholder={t("peopleShare.noGroup")}
                                 options={groupOptions.map((group) => ({
                                     value: group.id,
                                     label: group.name
@@ -206,7 +208,7 @@ export function PeopleShareDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">They may</span>
+                            <span className="text-xs text-muted-foreground">{t("peopleShare.theyMay")}</span>
                             <Select
                                 value={role}
                                 onValueChange={(value) => setRole(value as DriveShareRole)}
@@ -214,27 +216,27 @@ export function PeopleShareDialog({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">Until</span>
+                            <span className="text-xs text-muted-foreground">{t("peopleShare.until")}</span>
                             <ExpirySelect onChange={setExpiresAt} />
                         </label>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="text-xs text-muted-foreground">
-                            A line for them (optional)
+                            {t("peopleShare.aLineForThemOptional")}
                         </span>
                         <Input
                             value={note}
                             maxLength={DRIVE_GRANT_NOTE_MAX}
                             onChange={(event) => setNote(event.target.value)}
-                            placeholder="What this is"
+                            placeholder={t("peopleShare.whatThisIs")}
                         />
                     </label>
 
                     <div className="flex justify-end">
                         <Button onClick={() => void share()} disabled={busy || nobodyChosen}>
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Share
+                            {t("peopleShare.share")}
                         </Button>
                     </div>
 
@@ -242,12 +244,12 @@ export function PeopleShareDialog({
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
                         <h3 className="text-xs font-medium text-muted-foreground">
-                            People with access
+                            {t("peopleShare.peopleWithAccess")}
                         </h3>
                         {holders === null ? (
-                            <p className="text-sm text-muted-foreground">Looking</p>
+                            <p className="text-sm text-muted-foreground">{t("peopleShare.looking")}</p>
                         ) : holders.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">Only you, so far.</p>
+                            <p className="text-sm text-muted-foreground">{t("peopleShare.onlyYouSoFar")}</p>
                         ) : (
                             <ul className="flex flex-col gap-1">
                                 {holders.map((holder) => {
@@ -279,7 +281,7 @@ export function PeopleShareDialog({
                                             <Badge>{ROLE_LABELS[holder.role]}</Badge>
                                             {holder.expiresAt && (
                                                 <Badge variant={lapsed ? "neutral" : "warning"}>
-                                                    {lapsed ? "Lapsed" : "Until"}{" "}
+                                                    {lapsed ? t("peopleShare.lapsed") : t("peopleShare.until")}{" "}
                                                     {format.date(holder.expiresAt)}
                                                 </Badge>
                                             )}
@@ -287,7 +289,7 @@ export function PeopleShareDialog({
                                                 size="icon"
                                                 variant="ghost"
                                                 disabled={busy}
-                                                title="Stop sharing"
+                                                title={t("peopleShare.stopSharing")}
                                                 aria-label={`Stop sharing with ${holder.name}`}
                                                 onClick={() => void stop(holder)}
                                             >

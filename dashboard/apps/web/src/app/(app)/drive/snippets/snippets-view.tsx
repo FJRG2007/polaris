@@ -11,6 +11,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
@@ -53,21 +55,21 @@ export interface SnippetRow {
 }
 
 function status(snippet: SnippetRow): {
-    label: string;
+    label: NamespaceKey<"drive">;
     variant: "success" | "neutral" | "warning";
 } {
     if (snippet.visibility === "private" && !snippet.revokedAt) {
-        return { label: "Private", variant: "neutral" };
+        return { label: "snippets.status.private", variant: "neutral" };
     }
-    if (snippet.revokedAt) return { label: "Revoked", variant: "neutral" };
+    if (snippet.revokedAt) return { label: "snippets.status.revoked", variant: "neutral" };
     if (snippet.expiresAt && new Date(snippet.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", variant: "warning" };
+        return { label: "snippets.status.expired", variant: "warning" };
     }
     if (snippet.maxViews !== null && snippet.viewCount >= snippet.maxViews) {
-        return { label: "Used up", variant: "warning" };
+        return { label: "snippets.status.usedUp", variant: "warning" };
     }
     return {
-        label: snippet.visibility === "invite" ? "Shared with people" : "Link",
+        label: snippet.visibility === "invite" ? "snippets.status.people" : "snippets.status.link",
         variant: "success"
     };
 }
@@ -91,6 +93,7 @@ function summary(snippet: SnippetRow, expires: string | null): string {
 }
 
 export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
+    const t = useTranslations("drive");
     const format = useDisplayFormat();
     const [rows, setRows] = useState(snippets);
     const [query, setQuery] = useState("");
@@ -120,8 +123,8 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
         setBusy(null);
         if (result.error || !result.url) {
             await confirm({
-                title: "No link to copy",
-                description: result.error ?? "This snippet has not been shared yet.",
+                title: t("snippets.noLinkToCopy"),
+                description: result.error ?? t("snippets.thisSnippetHasNotBeen"),
                 alert: true
             });
             return;
@@ -133,9 +136,9 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
 
     async function onDelete(row: SnippetRow) {
         const confirmed = await confirm({
-            title: `Delete "${row.title}"?`,
-            description: "The text is deleted with it, and any link stops working.",
-            confirmLabel: "Delete",
+            title: t("snippets.deleteTitle", { name: row.title }),
+            description: t("snippets.theTextIsDeletedWith"),
+            confirmLabel: t("snippets.delete"),
             danger: true
         });
         if (!confirmed) return;
@@ -145,7 +148,7 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
             setBusy(null);
             if (result.error) {
                 await confirm({
-                    title: "Could not delete it",
+                    title: t("snippets.couldNotDeleteIt"),
                     description: result.error,
                     alert: true
                 });
@@ -159,8 +162,7 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    Nothing here yet. A snippet is text you can hand out by link - a config file, an
-                    .env, a stack trace - under the same limits as a shared file.
+                    {t("snippets.nothingHereYetASnippet")}
                 </CardBody>
             </Card>
         );
@@ -173,7 +175,7 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search snippets"
+                    placeholder={t("snippets.searchSnippets")}
                     className="pl-9"
                 />
             </div>
@@ -181,7 +183,7 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
             {filtered.length === 0 ? (
                 <Card>
                     <CardBody className="p-6 text-center text-sm text-muted-foreground">
-                        No snippets match &quot;{query}&quot;.
+                        {t("snippets.noMatch", { query })}
                     </CardBody>
                 </Card>
             ) : (
@@ -203,13 +205,13 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                                 {row.clientSealed ? (
                                                     <EyeOff
                                                         className="size-3 shrink-0 text-muted-foreground"
-                                                        aria-label="Sealed - Polaris cannot read this"
+                                                        aria-label={t("snippets.sealedPolarisCannotReadThis")}
                                                     />
                                                 ) : null}
                                                 {row.burnAfterRead ? (
                                                     <Flame
                                                         className="size-3 shrink-0 text-muted-foreground"
-                                                        aria-label="Deleted after it is read once"
+                                                        aria-label={t("snippets.deletedAfterItIsRead")}
                                                     />
                                                 ) : null}
                                             </p>
@@ -219,13 +221,13 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                         </div>
                                     </Link>
                                     <div className="flex items-center gap-1">
-                                        <Badge variant={state.variant}>{state.label}</Badge>
+                                        <Badge variant={state.variant}>{t(state.label)}</Badge>
                                         {row.canReveal && !row.revokedAt ? (
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
-                                                title="Copy the link"
-                                                aria-label={`Copy the link to ${row.title}`}
+                                                title={t("snippets.copyTheLink")}
+                                                aria-label={t("snippets.copyLinkTo", { name: row.title })}
                                                 onClick={() => onCopyLink(row)}
                                                 disabled={busy === row.id}
                                             >
@@ -239,8 +241,8 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Sharing"
-                                            aria-label={`Change how ${row.title} is shared`}
+                                            title={t("snippets.sharing")}
+                                            aria-label={t("snippets.changeSharing", { name: row.title })}
                                             onClick={() =>
                                                 setSharing({
                                                     id: row.id,
@@ -257,8 +259,8 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Who opened it"
-                                            aria-label={`Access log for ${row.title}`}
+                                            title={t("snippets.whoOpenedIt")}
+                                            aria-label={t("snippets.accessLogFor", { name: row.title })}
                                             onClick={() => setLogsFor(row)}
                                         >
                                             <ScrollText className="size-4" />
@@ -266,8 +268,8 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Delete"
-                                            aria-label={`Delete ${row.title}`}
+                                            title={t("snippets.delete")}
+                                            aria-label={t("snippets.deleteNamed", { name: row.title })}
                                             onClick={() => onDelete(row)}
                                             disabled={pending && busy === row.id}
                                         >
@@ -318,6 +320,7 @@ function SnippetLogsDialog({
     snippet: SnippetRow | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("drive");
     const format = useDisplayFormat();
     const [logs, setLogs] = useState<SnippetLogRow[] | null>(null);
 
@@ -339,23 +342,23 @@ function SnippetLogsDialog({
         <Dialog open={snippet !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Access log</DialogTitle>
+                    <DialogTitle>{t("snippets.accessLog")}</DialogTitle>
                     <DialogDescription>{snippet?.title}</DialogDescription>
                 </DialogHeader>
                 {logs === null ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">Loading...</p>
+                    <p className="py-6 text-center text-sm text-muted-foreground">{t("snippets.loading")}</p>
                 ) : logs.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nobody has opened this link yet.
+                        {t("snippets.nobodyHasOpenedThisLink")}
                     </p>
                 ) : (
                     <div className="max-h-80 overflow-auto overscroll-contain">
                         <table className="w-full text-left text-xs">
                             <thead className="text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">When</th>
-                                    <th className="py-1 pr-3 font-medium">Address</th>
-                                    <th className="py-1 font-medium">What</th>
+                                    <th className="py-1 pr-3 font-medium">{t("snippets.when")}</th>
+                                    <th className="py-1 pr-3 font-medium">{t("snippets.address")}</th>
+                                    <th className="py-1 font-medium">{t("snippets.what")}</th>
                                 </tr>
                             </thead>
                             <tbody>

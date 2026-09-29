@@ -8,6 +8,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
@@ -45,6 +46,7 @@ export function UnasMetrics({
     /** Why these readings stopped updating, when the device stopped answering. */
     stale?: string | null;
 }) {
+    const t = useTranslations("drive");
     const format = useDisplayFormat();
     const atRisk = metrics.health !== "healthy";
 
@@ -65,8 +67,7 @@ export function UnasMetrics({
                 <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
-                        Storage is at risk. Check the pool below - a degraded RAID keeps serving data but has no
-                        redundancy until the missing disk is replaced.
+                        {t("unas.storageIsAtRiskCheck")}
                     </span>
                 </div>
             ) : null}
@@ -95,13 +96,13 @@ export function UnasMetrics({
             <div className="grid grid-cols-2 gap-3">
                 <Stat
                     icon={<HardDrive className="size-4" />}
-                    label="Bays in use"
+                    label={t("unas.baysInUse")}
                     value={`${metrics.slotsPopulated} / ${metrics.slotsTotal}`}
                     hint={`${metrics.slotsTotal - metrics.slotsPopulated} free`}
                 />
                 <Stat
                     icon={<Clock className="size-4" />}
-                    label="Uptime"
+                    label={t("unas.uptime")}
                     value={formatUptime(metrics.system.uptimeSeconds)}
                     hint={`since ${format.dateTime(Date.now() - metrics.system.uptimeSeconds * 1000)}`}
                 />
@@ -109,11 +110,11 @@ export function UnasMetrics({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Storage pools</CardTitle>
+                    <CardTitle>{t("unas.storagePools")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     {metrics.pools.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No pools reported.</p>
+                        <p className="text-sm text-muted-foreground">{t("unas.noPoolsReported")}</p>
                     ) : (
                         metrics.pools.map((pool) => (
                             <div key={pool.device}>
@@ -144,7 +145,7 @@ export function UnasMetrics({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Drive bays</CardTitle>
+                    <CardTitle>{t("unas.driveBays")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -172,7 +173,7 @@ export function UnasMetrics({
                                 </div>
                                 {disk.present ? (
                                     <div className="mt-2 flex flex-col gap-0.5 text-xs text-muted-foreground">
-                                        <span className="truncate text-foreground">{disk.model ?? "Disk"}</span>
+                                        <span className="truncate text-foreground">{disk.model ?? t("unas.disk")}</span>
                                         <span>
                                             {formatBytes(disk.sizeBytes)}
                                             {disk.type ? ` ${disk.type}` : ""}
@@ -195,7 +196,7 @@ export function UnasMetrics({
                     {metrics.system.firmware ? ` - firmware ${metrics.system.firmware}` : ""}
                 </span>
                 {refreshing ? (
-                    <RefreshCw className="size-3 animate-spin" aria-label="Refreshing" />
+                    <RefreshCw className="size-3 animate-spin" aria-label={t("unas.refreshing")} />
                 ) : updatedAt !== null ? (
                     <span>- updated {format.time(updatedAt)}</span>
                 ) : null}

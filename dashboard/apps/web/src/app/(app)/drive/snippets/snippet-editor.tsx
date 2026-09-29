@@ -16,6 +16,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { CodeSurface } from "@/components/code-surface";
 import { useMemo, useState, type FormEvent } from "react";
@@ -61,9 +63,9 @@ const GRAMMARS = CODE_LANGUAGES.map((language) => ({
 }));
 
 const VISIBILITY_OPTIONS = [
-    { value: "private", label: "Private - only you" },
-    { value: "link", label: "Anyone with the link" }
-];
+    { value: "private", label: "snippetShare.visibility.private" },
+    { value: "link", label: "snippetShare.visibility.link" }
+] as const satisfies readonly { value: string; label: NamespaceKey<"drive"> }[];
 
 function emptyFile(index: number): EditorFile {
     return { name: index === 0 ? "snippet.txt" : `file-${index + 1}.txt`, language: AUTO, body: "" };
@@ -76,6 +78,7 @@ function resolvedLanguage(file: EditorFile): string {
 }
 
 export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
+    const t = useTranslations("drive");
     const router = useRouter();
     const editing = snippet !== undefined;
     const [title, setTitle] = useState(snippet?.title ?? "");
@@ -130,8 +133,8 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     const languageOptions = useMemo(() => {
         const detected = languageForFile(current.name);
         return [
-            { value: AUTO, label: detected ? `Auto - ${detected.label}` : "Auto - plain text" },
-            { value: PLAIN, label: "Plain text" },
+            { value: AUTO, label: detected ? t("snippetEditor.autoNamed", { language: detected.label }) : t("snippetEditor.autoPlainText") },
+            { value: PLAIN, label: t("snippetEditor.plainText") },
             ...GRAMMARS
         ];
     }, [current.name]);
@@ -209,11 +212,11 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <h2 className="text-sm font-medium">Your link</h2>
+                        <h2 className="text-sm font-medium">{t("snippetEditor.yourLink")}</h2>
                         <p className="text-sm text-muted-foreground">
                             {sealed
-                                ? "The key is part of this link. Polaris cannot read the snippet, and cannot get it back for you - copy it now."
-                                : "Anyone with this link can read the snippet under the limits you set."}
+                                ? t("snippetEditor.theKeyIsPartOf")
+                                : t("snippetEditor.anyoneWithThisLinkCan")}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -222,8 +225,8 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                             type="button"
                             size="icon"
                             variant="secondary"
-                            title="Copy the link"
-                            aria-label="Copy the link"
+                            title={t("snippetEditor.copyTheLink")}
+                            aria-label={t("snippetEditor.copyTheLink")}
                             onClick={async () => {
                                 await navigator.clipboard.writeText(link);
                                 setCopied(true);
@@ -238,7 +241,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                     </div>
                     <div className="flex justify-end gap-2">
                         <Button asChild variant="secondary">
-                            <Link href="/drive/snippets">Back to snippets</Link>
+                            <Link href="/drive/snippets">{t("snippetEditor.backToSnippets")}</Link>
                         </Button>
                     </div>
                 </CardBody>
@@ -251,20 +254,20 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Title
+                        {t("snippetEditor.title")}
                         <Input
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
-                            placeholder="Named after the first file if you leave it blank"
+                            placeholder={t("snippetEditor.namedAfterTheFirstFile")}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Note (optional)
+                        {t("snippetEditor.noteOptional")}
                         <Textarea
                             value={description}
                             onChange={(event) => setDescription(event.target.value)}
                             rows={2}
-                            placeholder="What this is, or what to do with it"
+                            placeholder={t("snippetEditor.whatThisIsOrWhat")}
                         />
                     </label>
                 </CardBody>
@@ -281,15 +284,15 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                                     variant={index === active ? "secondary" : "ghost"}
                                     onClick={() => setActive(index)}
                                 >
-                                    {file.name || "Untitled"}
+                                    {file.name || t("snippetEditor.untitled")}
                                 </Button>
                                 {files.length > 1 ? (
                                     <Button
                                         type="button"
                                         size="icon"
                                         variant="ghost"
-                                        title="Remove this file"
-                                        aria-label={`Remove ${file.name}`}
+                                        title={t("snippetEditor.removeThisFile")}
+                                        aria-label={t("snippetEditor.removeNamed", { name: file.name })}
                                         onClick={() => removeFile(index)}
                                     >
                                         <X className="size-3" />
@@ -303,10 +306,10 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                                 size="sm"
                                 variant="ghost"
                                 onClick={addFile}
-                                title="Add another file"
+                                title={t("snippetEditor.addAnotherFile")}
                             >
                                 <Plus className="size-4" />
-                                Add file
+                                {t("snippetEditor.addFile")}
                             </Button>
                         ) : null}
                     </div>
@@ -315,14 +318,14 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                         <Input
                             value={current.name}
                             onChange={(event) => patchFile(active, { name: event.target.value })}
-                            aria-label="File name"
+                            aria-label={t("snippetEditor.fileName")}
                             className="max-w-xs font-mono text-xs"
                         />
                         <Select
                             value={current.language}
                             onValueChange={(value) => patchFile(active, { language: value })}
                             options={languageOptions}
-                            aria-label="Language"
+                            aria-label={t("snippetEditor.language")}
                             className="max-w-[12rem]"
                         />
                         <span className="ml-auto text-xs text-muted-foreground">
@@ -347,15 +350,15 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                 <Card>
                     <CardBody className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Who can open it
+                            {t("snippetEditor.whoCanOpenIt")}
                             <Select
                                 value={visibility}
                                 onValueChange={setVisibility}
-                                options={VISIBILITY_OPTIONS}
-                                aria-label="Who can open it"
+                                options={VISIBILITY_OPTIONS.map((one) => ({ value: one.value, label: t(one.label) }))}
+                                aria-label={t("snippetEditor.whoCanOpenIt")}
                             />
                             <span className="text-xs text-muted-foreground">
-                                A password, an expiry and a view cap can be set once it exists.
+                                {t("snippetEditor.aPasswordAnExpiryAnd")}
                             </span>
                         </label>
                         {visibility !== "private" ? (
@@ -367,11 +370,9 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                                     onChange={(event) => setSealed(event.target.checked)}
                                 />
                                 <span>
-                                    Seal it in this browser
+                                    {t("snippetEditor.sealItInThisBrowser")}
                                     <span className="block text-xs text-muted-foreground">
-                                        The key goes in the link and never reaches the server.
-                                        Polaris cannot preview, search or recover it, and a lost
-                                        link is a lost snippet.
+                                        {t("snippetEditor.theKeyGoesInThe")}
                                     </span>
                                 </span>
                             </label>
@@ -384,7 +385,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
 
             <div className="flex justify-end gap-2">
                 <Button asChild variant="secondary" type="button">
-                    <Link href="/drive/snippets">Cancel</Link>
+                    <Link href="/drive/snippets">{t("snippetEditor.cancel")}</Link>
                 </Button>
                 <Button type="submit" disabled={pending}>
                     {pending ? (
@@ -392,7 +393,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                     ) : (
                         <Save className="size-4" />
                     )}
-                    {editing ? "Save changes" : "Create snippet"}
+                    {editing ? t("snippetEditor.saveChanges") : t("snippetEditor.createSnippet")}
                 </Button>
             </div>
         </form>

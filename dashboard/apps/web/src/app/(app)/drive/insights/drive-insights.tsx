@@ -9,6 +9,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState } from "react";
 import type { StorageProviderKind } from "@polaris/core";
 import type { DriveBreakdown } from "@/lib/drive-breakdown";
@@ -48,6 +49,7 @@ function Ranking({
     hint: string;
     rows: Array<{ key: string; label: string; note: string; bytes: number; href?: string }>;
 }) {
+    const t = useTranslations("drive");
     const largest = rows[0]?.bytes ?? 0;
     return (
         <Card>
@@ -57,7 +59,7 @@ function Ranking({
                     <p className="text-muted-foreground text-xs">{hint}</p>
                 </div>
                 {rows.length === 0 ? (
-                    <p className="text-muted-foreground text-xs">Nothing here.</p>
+                    <p className="text-muted-foreground text-xs">{t("insights.nothingHere")}</p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {rows.map((row) => (
@@ -102,6 +104,7 @@ export function DriveInsights({
     locations: InsightLocation[];
     initial: string | null;
 }) {
+    const t = useTranslations("drive");
     const [connectionId, setConnectionId] = useState(initial);
     const [report, setReport] = useState<DriveBreakdown | null>(null);
     const [busy, setBusy] = useState(false);
@@ -136,8 +139,8 @@ export function DriveInsights({
         return (
             <EmptyState
                 icon={<HardDrive />}
-                title="No locations"
-                description="Connect a NAS or a folder in Drive and this will say what is filling it."
+                title={t("insights.noLocations")}
+                description={t("insights.connectANasOrA")}
             />
         );
     }
@@ -148,7 +151,7 @@ export function DriveInsights({
                 <Select
                     value={connectionId ?? ""}
                     onValueChange={setConnectionId}
-                    aria-label="Location"
+                    aria-label={t("insights.location")}
                     className="w-64"
                     options={locations.map((location) => ({ value: location.id, label: location.name }))}
                 />
@@ -159,13 +162,13 @@ export function DriveInsights({
                     onClick={() => connectionId && void measure(connectionId)}
                 >
                     {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Search className="size-4 shrink-0" />}
-                    {busy ? "Walking" : "Measure again"}
+                    {busy ? t("insights.walking") : t("insights.measureAgain")}
                 </Button>
                 {connectionId ? (
                     <Button variant="ghost" size="sm" asChild>
                         <Link href={driveHref(connectionId, "")}>
                             <FolderOpen className="size-4 shrink-0" />
-                            Open in Drive
+                            {t("insights.openInDrive")}
                         </Link>
                     </Button>
                 ) : null}
@@ -176,7 +179,7 @@ export function DriveInsights({
             {busy && !report ? (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">
                     <Loader2 className="size-4 shrink-0 animate-spin" />
-                    Walking this location. It stops after a few seconds and reports what it reached.
+                    {t("insights.walkingThisLocationItStops")}
                 </p>
             ) : null}
 
@@ -189,15 +192,15 @@ export function DriveInsights({
                         </span>
                         {report.partial ? (
                             <Badge variant="warning">
-                                Stopped early - everything here is at least this much
+                                {t("insights.stoppedEarlyEverythingHereIs")}
                             </Badge>
                         ) : null}
                     </p>
 
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                         <Ranking
-                            title="Heaviest folders"
-                            hint="Top level, by what everything under it adds up to."
+                            title={t("insights.heaviestFolders")}
+                            hint={t("insights.topLevelByWhatEverything")}
                             rows={report.folders.map((folder) => ({
                                 key: folder.path,
                                 label: folder.name,
@@ -207,8 +210,8 @@ export function DriveInsights({
                             }))}
                         />
                         <Ranking
-                            title="Biggest files"
-                            hint="One file each. Opens the folder it is in."
+                            title={t("insights.biggestFiles")}
+                            hint={t("insights.oneFileEachOpensThe")}
                             rows={report.files.map((file) => ({
                                 key: file.path,
                                 label: file.name,
@@ -218,8 +221,8 @@ export function DriveInsights({
                             }))}
                         />
                         <Ranking
-                            title="What the formats weigh"
-                            hint="Every file of a kind, added up."
+                            title={t("insights.whatTheFormatsWeigh")}
+                            hint={t("insights.everyFileOfAKind")}
                             rows={report.formats.map((format) => ({
                                 key: format.ext || "none",
                                 label: format.label,

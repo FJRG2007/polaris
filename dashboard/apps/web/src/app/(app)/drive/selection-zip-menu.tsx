@@ -9,6 +9,7 @@
  */
 
 import type { DriveEntry } from "./types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { generateZipAction } from "./actions";
 import { useState, type FormEvent } from "react";
@@ -38,6 +39,7 @@ export function SelectionZipMenu({
     entries: DriveEntry[];
     currentPath: string;
 }) {
+    const t = useTranslations("drive");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [withLink, setWithLink] = useState(false);
@@ -103,26 +105,26 @@ export function SelectionZipMenu({
         <Dialog open={open} onOpenChange={setOpen}>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="ghost" title="Zip" aria-label="Zip">
+                    <Button size="sm" variant="ghost" title={t("zip.zip")} aria-label={t("zip.zip")}>
                         <FileArchive className="size-4" />
-                        <span className="hidden sm:inline">Zip</span>
+                        <span className="hidden sm:inline">{t("zip.zip")}</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => start(false)}>
                         <FileArchive className="size-4" />
-                        Save zip to this folder
+                        {t("zip.saveZipToThisFolder")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => start(true)}>
                         <FileArchive className="size-4" />
-                        Save zip and create a link
+                        {t("zip.saveZipAndCreateA")}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{withLink ? "Zip and share" : "Save as zip"}</DialogTitle>
+                    <DialogTitle>{withLink ? t("zip.zipAndShare") : t("zip.saveAsZip")}</DialogTitle>
                     <DialogDescription>
                         {entries.length} item{entries.length === 1 ? "" : "s"} into a zip in this folder. Set a password
                         to encrypt the archive itself.
@@ -131,7 +133,7 @@ export function SelectionZipMenu({
 
                 {link ? (
                     <div className="flex flex-col gap-2">
-                        <p className="text-sm text-muted-foreground">Share link (copy it now):</p>
+                        <p className="text-sm text-muted-foreground">{t("zip.shareLinkCopyItNow")}</p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={link} className="font-mono text-xs" />
                             <Button type="button" size="icon" variant="secondary" onClick={copyLink}>
@@ -140,18 +142,18 @@ export function SelectionZipMenu({
                         </div>
                         <div className="mt-2 flex justify-end">
                             <DialogClose asChild>
-                                <Button type="button">Done</Button>
+                                <Button type="button">{t("zip.done")}</Button>
                             </DialogClose>
                         </div>
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Name
+                            {t("zip.name")}
                             <Input name="name" required defaultValue="archive" placeholder="archive" />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Password (optional, encrypts the zip)
+                            {t("zip.passwordOptionalEncryptsTheZip")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password -
                                 this is the archive's own passphrase, not a credential: it
                                 authenticates nothing and there is no account behind it to
@@ -162,11 +164,11 @@ export function SelectionZipMenu({
                         <div className="mt-2 flex justify-end gap-2">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Cancel
+                                    {t("zip.cancel")}
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={pending}>
-                                {pending ? "Creating..." : withLink ? "Create and link" : "Create zip"}
+                                {pending ? t("zip.creating") : withLink ? t("zip.createAndLink") : t("zip.createZip")}
                             </Button>
                         </div>
                     </form>

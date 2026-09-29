@@ -10,6 +10,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
@@ -37,23 +39,24 @@ export interface DropPointRow {
 }
 
 function status(request: DropPointRow): {
-    label: string;
+    label: NamespaceKey<"drivePoints">;
     variant: "success" | "neutral" | "warning";
 } {
-    if (request.revokedAt) return { label: "Closed", variant: "neutral" };
+    if (request.revokedAt) return { label: "status.closed", variant: "neutral" };
     if (request.startsAt && new Date(request.startsAt).getTime() > Date.now()) {
-        return { label: "Scheduled", variant: "warning" };
+        return { label: "status.scheduled", variant: "warning" };
     }
     if (request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", variant: "warning" };
+        return { label: "status.expired", variant: "warning" };
     }
     if (request.maxFiles !== null && request.submissionCount >= request.maxFiles) {
-        return { label: "Full", variant: "warning" };
+        return { label: "status.full", variant: "warning" };
     }
-    return { label: "Open", variant: "success" };
+    return { label: "status.open", variant: "success" };
 }
 
 export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     const [rows, setRows] = useState(requests);
     const [query, setQuery] = useState("");
@@ -82,9 +85,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     async function onRevoke(id: string) {
         if (
             !(await confirm({
-                title: "Close this drop point?",
-                description: "It will stop accepting uploads immediately.",
-                confirmLabel: "Close",
+                title: t("list.closeThisDropPoint"),
+                description: t("list.itWillStopAcceptingUploads"),
+                confirmLabel: t("list.close"),
                 danger: true
             }))
         )
@@ -124,7 +127,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                 // there, so the row stays and the reason is put in front of the user.
                 setDeleting(null);
                 await confirm({
-                    title: "Couldn't delete this drop point",
+                    title: t("list.couldnTDeleteThisDrop"),
                     description: result.error,
                     alert: true
                 });
@@ -139,8 +142,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    No drop points yet. Use &quot;New drop point&quot; above, or &quot;Request
-                    files&quot; on a folder in Files.
+                    {t("list.noDropPointsYetUse")}
                 </CardBody>
             </Card>
         );
@@ -153,7 +155,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search drop points"
+                    placeholder={t("list.searchDropPoints")}
                     className="pl-9"
                 />
             </div>
@@ -161,7 +163,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
             {filtered.length === 0 ? (
                 <Card>
                     <CardBody className="p-6 text-center text-sm text-muted-foreground">
-                        No drop points match &quot;{query}&quot;.
+                        {t("list.noMatch", { query })}
                     </CardBody>
                 </Card>
             ) : (
@@ -193,18 +195,18 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 {` - ${request.submissionCount}`}
                                                 {request.maxFiles !== null
                                                     ? `/${request.maxFiles}`
-                                                    : ""}{" "}
-                                                uploaded
+                                                    : ""}
+                                                {t("list.uploaded")}
                                                 {scheduled && request.startsAt
-                                                    ? ` - opens ${format.date(request.startsAt)}`
+                                                    ? t("list.opens", { date: format.date(request.startsAt) })
                                                     : request.expiresAt
-                                                      ? ` - until ${format.date(request.expiresAt)}`
+                                                      ? t("list.until", { date: format.date(request.expiresAt) })
                                                       : ""}
                                             </p>
                                         </div>
                                     </Link>
                                     <div className="flex items-center gap-2">
-                                        <Badge variant={state.variant}>{state.label}</Badge>
+                                        <Badge variant={state.variant}>{t(state.label)}</Badge>
                                         {request.revokedAt ? (
                                             <Button
                                                 size="sm"
@@ -213,7 +215,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 disabled={pending && busy === request.id}
                                             >
                                                 <RotateCcw className="size-4" />
-                                                Reopen
+                                                {t("list.reopen")}
                                             </Button>
                                         ) : (
                                             <Button
@@ -223,14 +225,14 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 disabled={pending && busy === request.id}
                                             >
                                                 <Ban className="size-4" />
-                                                Close
+                                                {t("list.close")}
                                             </Button>
                                         )}
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            aria-label={`Delete ${request.title}`}
-                                            title="Delete"
+                                            aria-label={t("list.deleteNamed", { name: request.title })}
+                                            title={t("list.delete")}
                                             onClick={() =>
                                                 setDeleting({
                                                     id: request.id,

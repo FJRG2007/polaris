@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Inbox, LayoutTemplate, Trash2 } from "lucide-react";
 import { RequestDialog, type RequestInitial, type RequestTarget } from "../request-dialog";
@@ -83,6 +84,7 @@ export function NewDropPointButton({
 }: {
     connections: { id: string; name: string }[];
 }) {
+    const t = useTranslations("drivePoints");
     const router = useRouter();
     const [target, setTarget] = useState<RequestTarget | null>(null);
     const [scheduleFocus, setScheduleFocus] = useState(false);
@@ -114,7 +116,7 @@ export function NewDropPointButton({
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" onClick={() => open()} disabled={disabled}>
                     <Inbox className="size-4" />
-                    New drop point
+                    {t("newButton.newDropPoint")}
                 </Button>
                 <Button
                     size="sm"
@@ -123,11 +125,11 @@ export function NewDropPointButton({
                     disabled={disabled}
                 >
                     <CalendarClock className="size-4" />
-                    Schedule drop point
+                    {t("newButton.scheduleDropPoint")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={openTemplates}>
                     <LayoutTemplate className="size-4" />
-                    Templates
+                    {t("newButton.templates")}
                 </Button>
             </div>
 
@@ -147,17 +149,16 @@ export function NewDropPointButton({
             <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Templates</DialogTitle>
+                        <DialogTitle>{t("newButton.templates")}</DialogTitle>
                         <DialogDescription>
-                            Reusable drop-point settings you have saved.
+                            {t("newButton.reusableDropPointSettingsYou")}
                         </DialogDescription>
                     </DialogHeader>
                     {templates === null ? (
-                        <p className="p-3 text-sm text-muted-foreground">Loading...</p>
+                        <p className="p-3 text-sm text-muted-foreground">{t("newButton.loading")}</p>
                     ) : templates.length === 0 ? (
                         <p className="p-3 text-sm text-muted-foreground">
-                            No templates yet. Open a drop point and choose &quot;Save as
-                            template&quot;.
+                            {t("newButton.noTemplatesYetOpenA")}
                         </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -178,13 +179,13 @@ export function NewDropPointButton({
                                                 });
                                             }}
                                         >
-                                            Use
+                                            {t("newButton.use")}
                                         </Button>
                                         <button
                                             type="button"
                                             onClick={() => removeTemplate(template.id)}
                                             className="text-muted-foreground hover:text-danger"
-                                            aria-label="Delete template"
+                                            aria-label={t("newButton.deleteTemplate")}
                                         >
                                             <Trash2 className="size-4" />
                                         </button>

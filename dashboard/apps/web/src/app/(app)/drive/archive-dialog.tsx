@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { ChevronRight, File as FileIcon, Folder, FolderInput, Loader2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
@@ -88,6 +89,7 @@ export function ArchiveDialog({
     currentPath: string;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("drive");
     const router = useRouter();
     const base = target ? target.name.replace(/\.(zip|rar)$/i, "") : "";
     const [password, setPassword] = useState("");
@@ -174,7 +176,7 @@ export function ArchiveDialog({
                                     value={password}
                                     onChange={(event) => setPassword(event.target.value)}
                                     onKeyDown={(event) => event.key === "Enter" && loadPreview()}
-                                    placeholder="Password"
+                                    placeholder={t("archiveDialog.password")}
                                     autoComplete="new-password"
                                 />
                                 <Button
@@ -183,7 +185,7 @@ export function ArchiveDialog({
                                     onClick={loadPreview}
                                     disabled={loading}
                                 >
-                                    {loading ? "..." : "Unlock"}
+                                    {loading ? "..." : t("archiveDialog.unlock")}
                                 </Button>
                             </div>
                             <p className="text-xs text-danger">{previewError}</p>
@@ -218,7 +220,7 @@ export function ArchiveDialog({
                             <div className="max-h-64 overflow-auto overscroll-contain">
                                 {level.folders.length === 0 && level.files.length === 0 ? (
                                     <p className="p-3 text-sm text-muted-foreground">
-                                        Empty folder.
+                                        {t("archiveDialog.emptyFolder")}
                                     </p>
                                 ) : (
                                     <ul className="divide-y divide-border text-sm">
@@ -265,11 +267,11 @@ export function ArchiveDialog({
                     {entries !== null ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Extract to
+                                {t("archiveDialog.extractTo")}
                                 <Input
                                     value={dest}
                                     onChange={(event) => setDest(event.target.value)}
-                                    placeholder="folder path"
+                                    placeholder={t("archiveDialog.folderPath")}
                                 />
                             </label>
                             {extractError ? (
@@ -279,7 +281,7 @@ export function ArchiveDialog({
                                         type="password"
                                         value={password}
                                         onChange={(event) => setPassword(event.target.value)}
-                                        placeholder="Password (if encrypted)"
+                                        placeholder={t("archiveDialog.passwordIfEncrypted")}
                                         autoComplete="new-password"
                                     />
                                 </div>
@@ -287,12 +289,12 @@ export function ArchiveDialog({
                             <div className="mt-1 flex justify-end gap-2">
                                 <DialogClose asChild>
                                     <Button type="button" variant="ghost">
-                                        Close
+                                        {t("archiveDialog.close")}
                                     </Button>
                                 </DialogClose>
                                 <Button type="button" onClick={onExtract} disabled={pending}>
                                     <FolderInput className="size-4" />
-                                    {pending ? "Extracting..." : "Extract"}
+                                    {pending ? t("archiveDialog.extracting") : t("archiveDialog.extract")}
                                 </Button>
                             </div>
                         </>
@@ -300,7 +302,7 @@ export function ArchiveDialog({
                         <div className="mt-1 flex justify-end">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Close
+                                    {t("archiveDialog.close")}
                                 </Button>
                             </DialogClose>
                         </div>

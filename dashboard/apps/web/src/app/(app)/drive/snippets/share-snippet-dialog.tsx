@@ -11,6 +11,8 @@
  */
 
 import { GeoPicker } from "@/components/geo-picker";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { shareSnippetAction } from "./snippet-actions";
 import { AccountInput } from "@/components/account-input";
 import { Check, Copy, Link2, Loader2 } from "lucide-react";
@@ -37,10 +39,10 @@ export interface SnippetSharing {
 }
 
 const VISIBILITIES = [
-    { value: "private", label: "Private - only you" },
-    { value: "link", label: "Anyone with the link" },
-    { value: "invite", label: "Named people, signed in" }
-];
+    { value: "private", label: "snippetShare.visibility.private" },
+    { value: "link", label: "snippetShare.visibility.link" },
+    { value: "invite", label: "snippetShare.visibility.invite" }
+] as const satisfies readonly { value: string; label: NamespaceKey<"drive"> }[];
 
 /** Split a comma or space separated field into its entries. */
 function entries(value: string): string[] {
@@ -59,6 +61,7 @@ export function ShareSnippetDialog({
     onOpenChange: (open: boolean) => void;
     onSaved: (id: string, visibility: string) => void;
 }) {
+    const t = useTranslations("drive");
     const [visibility, setVisibility] = useState("link");
     const [burn, setBurn] = useState(false);
     const [countries, setCountries] = useState<string[]>([]);
@@ -124,14 +127,14 @@ export function ShareSnippetDialog({
         <Dialog open={snippet !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Share this snippet</DialogTitle>
+                    <DialogTitle>{t("snippetShare.shareThisSnippet")}</DialogTitle>
                     <DialogDescription>{snippet?.title}</DialogDescription>
                 </DialogHeader>
 
                 {url ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            Anyone with this link can read the snippet under the limits you set.
+                            {t("snippetShare.anyoneWithThisLinkCan")}
                         </p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={url} className="font-mono text-xs" />
@@ -139,8 +142,8 @@ export function ShareSnippetDialog({
                                 type="button"
                                 size="icon"
                                 variant="secondary"
-                                title="Copy the link"
-                                aria-label="Copy the link"
+                                title={t("snippetShare.copyTheLink")}
+                                aria-label={t("snippetShare.copyTheLink")}
                                 onClick={async () => {
                                     await navigator.clipboard.writeText(url);
                                     setCopied(true);
@@ -158,62 +161,62 @@ export function ShareSnippetDialog({
                                 type="button"
                                 onClick={() => snippet && onSaved(snippet.id, visibility)}
                             >
-                                Done
+                                {t("snippetShare.done")}
                             </Button>
                         </div>
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Who can open it
+                            {t("snippetShare.whoCanOpenIt")}
                             <Select
                                 value={visibility}
                                 onValueChange={setVisibility}
-                                options={VISIBILITIES}
-                                aria-label="Who can open it"
+                                options={VISIBILITIES.map((one) => ({ value: one.value, label: t(one.label) }))}
+                                aria-label={t("snippetShare.whoCanOpenIt")}
                             />
                         </label>
 
                         {visibility === "invite" ? (
                             <label className="flex flex-col gap-1 text-sm">
-                                People
+                                {t("snippetShare.people")}
                                 <AccountInput
                                     name="inviteUsers"
                                     multiple
-                                    placeholder="username or email, comma separated"
-                                    aria-label="People who may open it"
+                                    placeholder={t("snippetShare.usernameOrEmailCommaSeparated")}
+                                    aria-label={t("snippetShare.peopleWhoMayOpenIt")}
                                 />
                             </label>
                         ) : null}
 
                         {visibility === "private" ? (
                             <p className="text-sm text-muted-foreground">
-                                Any link this snippet has stops working.
+                                {t("snippetShare.anyLinkThisSnippetHas")}
                             </p>
                         ) : (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Password (optional)
+                                    {t("snippetShare.passwordOptional")}
                                     <Input
                                         name="password"
                                         type="password"
-                                        placeholder="No password"
+                                        placeholder={t("snippetShare.noPassword")}
                                         autoComplete="off"
                                     />
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Max views
+                                        {t("snippetShare.maxViews")}
                                         <Input
                                             name="maxViews"
                                             type="number"
                                             min="1"
-                                            placeholder="Unlimited"
+                                            placeholder={t("snippetShare.unlimited")}
                                             disabled={burn}
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Expires
+                                        {t("snippetShare.expires")}
                                         <Input name="expiresAt" type="date" />
                                     </label>
                                 </div>
@@ -224,21 +227,21 @@ export function ShareSnippetDialog({
                                         checked={burn}
                                         onChange={(event) => setBurn(event.target.checked)}
                                     />
-                                    Delete the text once it has been read
+                                    {t("snippetShare.deleteTheTextOnceIt")}
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Restrict to IPs / ranges (optional)
+                                    {t("snippetShare.restrictToIpsRangesOptional")}
                                     <Input
                                         name="allowedCidrs"
-                                        placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                        placeholder={t("snippetShare.eG2030113")}
                                         autoComplete="off"
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Comma or space separated. Empty means anyone with the link.
+                                        {t("snippetShare.commaOrSpaceSeparatedEmpty")}
                                     </span>
                                 </label>
                                 <div className="flex flex-col gap-1 text-sm">
-                                    Restrict by location (optional)
+                                    {t("snippetShare.restrictByLocationOptional")}
                                     <GeoPicker
                                         countries={countries}
                                         continents={continents}
@@ -257,7 +260,7 @@ export function ShareSnippetDialog({
                                 ) : (
                                     <Link2 className="size-4" />
                                 )}
-                                {visibility === "private" ? "Make it private" : "Share"}
+                                {visibility === "private" ? t("snippetShare.makeItPrivate") : t("snippetShare.share")}
                             </Button>
                         </div>
                     </form>

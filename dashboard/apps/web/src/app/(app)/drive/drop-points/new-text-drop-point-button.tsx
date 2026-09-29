@@ -11,6 +11,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type FormEvent } from "react";
 import { GeoPicker } from "@/components/geo-picker";
 import { AccountInput } from "@/components/account-input";
@@ -37,6 +38,7 @@ function entries(value: string): string[] {
 }
 
 export function NewTextDropPointButton() {
+    const t = useTranslations("drivePoints");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
@@ -102,7 +104,7 @@ export function NewTextDropPointButton() {
                 }}
             >
                 <MessageSquarePlus className="size-4" />
-                Ask for text
+                {t("newText.askForText")}
             </Button>
 
             <Dialog
@@ -114,17 +116,16 @@ export function NewTextDropPointButton() {
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Ask somebody for text</DialogTitle>
+                        <DialogTitle>{t("newText.askSomebodyForText")}</DialogTitle>
                         <DialogDescription>
-                            They get a page to paste into. What they send becomes one of your
-                            snippets.
+                            {t("newText.theyGetAPageTo")}
                         </DialogDescription>
                     </DialogHeader>
 
                     {url ? (
                         <div className="flex flex-col gap-3">
                             <p className="text-sm text-muted-foreground">
-                                Send this link to whoever should fill it in. It is shown only once.
+                                {t("newText.sendThisLinkToWhoever")}
                             </p>
                             <div className="flex items-center gap-2">
                                 <Input readOnly value={url} className="font-mono text-xs" />
@@ -132,8 +133,8 @@ export function NewTextDropPointButton() {
                                     type="button"
                                     size="icon"
                                     variant="secondary"
-                                    title="Copy the link"
-                                    aria-label="Copy the link"
+                                    title={t("newText.copyTheLink")}
+                                    aria-label={t("newText.copyTheLink")}
                                     onClick={async () => {
                                         await navigator.clipboard.writeText(url);
                                         setCopied(true);
@@ -148,30 +149,30 @@ export function NewTextDropPointButton() {
                             </div>
                             <div className="flex justify-end">
                                 <Button type="button" onClick={() => setOpen(false)}>
-                                    Done
+                                    {t("newText.done")}
                                 </Button>
                             </div>
                         </div>
                     ) : (
                         <form onSubmit={onSubmit} className="flex flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                Title
+                                {t("newText.title")}
                                 <Input
                                     name="title"
-                                    placeholder="Named for you if you leave it blank"
+                                    placeholder={t("newText.namedForYouIfYou")}
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                What to send
+                                {t("newText.whatToSend")}
                                 <Textarea
                                     name="instructions"
                                     rows={2}
-                                    placeholder="Shown on the page, e.g. paste your .env here"
+                                    placeholder={t("newText.shownOnThePageE")}
                                 />
                             </label>
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Max characters
+                                    {t("newText.maxCharacters")}
                                     <Input
                                         name="maxLength"
                                         type="number"
@@ -180,27 +181,27 @@ export function NewTextDropPointButton() {
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Max submissions
+                                    {t("newText.maxSubmissions")}
                                     <Input
                                         name="maxSubmissions"
                                         type="number"
                                         min="1"
-                                        placeholder="Unlimited"
+                                        placeholder={t("newText.unlimited")}
                                     />
                                 </label>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Password (optional)
+                                    {t("newText.passwordOptional")}
                                     <Input
                                         name="password"
                                         type="password"
-                                        placeholder="No password"
+                                        placeholder={t("newText.noPassword")}
                                         autoComplete="off"
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Closes
+                                    {t("newText.closes")}
                                     <Input name="expiresAt" type="date" />
                                 </label>
                             </div>
@@ -211,18 +212,18 @@ export function NewTextDropPointButton() {
                                     checked={requireLogin}
                                     onChange={(event) => setRequireLogin(event.target.checked)}
                                 />
-                                They must sign in to Polaris first
+                                {t("newText.theyMustSignInTo")}
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Only these people (optional)
+                                {t("newText.onlyThesePeopleOptional")}
                                 <AccountInput
                                     name="allowedUsers"
                                     multiple
-                                    placeholder="username or email, comma separated"
-                                    aria-label="People who may send to this drop point"
+                                    placeholder={t("newText.usernameOrEmailCommaSeparated")}
+                                    aria-label={t("newText.peopleWhoMaySendTo")}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Naming anybody means they have to sign in.
+                                    {t("newText.namingAnybodyMeansTheyHave")}
                                 </span>
                             </label>
                             <label className="flex items-start gap-2 text-sm">
@@ -233,23 +234,22 @@ export function NewTextDropPointButton() {
                                     onChange={(event) => setAllowSealed(event.target.checked)}
                                 />
                                 <span>
-                                    Let them seal it in their browser
+                                    {t("newText.letThemSealItIn")}
                                     <span className="block text-xs text-muted-foreground">
-                                        Then Polaris cannot read it either, and they have to send
-                                        you the key separately. Off by default.
+                                        {t("newText.thenPolarisCannotReadIt")}
                                     </span>
                                 </span>
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Restrict to IPs / ranges (optional)
+                                {t("newText.restrictToIpsRangesOptional")}
                                 <Input
                                     name="allowedCidrs"
-                                    placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                    placeholder={t("newText.eG2030113")}
                                     autoComplete="off"
                                 />
                             </label>
                             <div className="flex flex-col gap-1 text-sm">
-                                Restrict by location (optional)
+                                {t("newText.restrictByLocationOptional")}
                                 <GeoPicker
                                     countries={countries}
                                     continents={continents}
@@ -261,7 +261,7 @@ export function NewTextDropPointButton() {
                             <div className="mt-1 flex justify-end">
                                 <Button type="submit" disabled={pending}>
                                     {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                                    Create the link
+                                    {t("newText.createTheLink")}
                                 </Button>
                             </div>
                         </form>

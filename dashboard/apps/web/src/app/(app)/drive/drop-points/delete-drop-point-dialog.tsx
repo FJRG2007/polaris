@@ -15,6 +15,7 @@
  */
 
 import { Trash2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { normalizeRelPath } from "@polaris/core";
 import {
@@ -48,6 +49,7 @@ export function DeleteDropPointDialog({
     onCancel: () => void;
     onConfirm: (deleteFolder: boolean) => void;
 }) {
+    const t = useTranslations("drivePoints");
     const [deleteFolder, setDeleteFolder] = useState(true);
     // A drop point pointed at the connection itself has no folder of its own, and
     // "the folder" there is every other folder on it. Nothing to offer.
@@ -67,9 +69,9 @@ export function DeleteDropPointDialog({
         <Dialog open={target !== null} onOpenChange={(open) => !open && onCancel()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Delete {target?.title}?</DialogTitle>
+                    <DialogTitle>{t("deleteDialog.title", { name: target?.title ?? "" })}</DialogTitle>
                     <DialogDescription>
-                        The link stops working and the record of what was collected goes with it.
+                        {t("deleteDialog.theLinkStopsWorkingAnd")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -81,20 +83,16 @@ export function DeleteDropPointDialog({
                         <div className="flex items-start gap-3 rounded-md border border-border p-3">
                             <Switch
                                 checked={deleteFolder}
-                                aria-label="Delete the folder too"
+                                aria-label={t("deleteDialog.deleteTheFolderToo")}
                                 onChange={setDeleteFolder}
                             />
                             <div className="min-w-0 text-sm">
-                                <p className="font-medium">Delete the folder too</p>
+                                <p className="font-medium">{t("deleteDialog.deleteTheFolderToo")}</p>
                                 <p className="mt-0.5 break-words text-xs text-muted-foreground">
                                     {target ? (
                                         <>
                                             {target.connectionName} / {target.destinationPath}
-                                            {target.submissionCount > 0
-                                                ? ` - ${target.submissionCount} collected file${
-                                                      target.submissionCount === 1 ? "" : "s"
-                                                  }`
-                                                : " - empty"}
+                                            {t("deleteDialog.files", { count: target.submissionCount })}
                                         </>
                                     ) : null}
                                 </p>
@@ -102,14 +100,13 @@ export function DeleteDropPointDialog({
                         </div>
                     ) : (
                         <p className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-                            This one collects straight into {target?.connectionName}, so it has no
-                            folder of its own. Whatever was collected stays where it is.
+                            {t("deleteDialog.noFolder", { name: target?.connectionName ?? "" })}
                         </p>
                     )}
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onCancel} disabled={busy}>
-                            Cancel
+                            {t("deleteDialog.cancel")}
                         </Button>
                         <Button
                             variant="danger"
@@ -117,7 +114,7 @@ export function DeleteDropPointDialog({
                             disabled={busy}
                         >
                             <Trash2 className="size-4" />
-                            {busy ? "Deleting..." : "Delete"}
+                            {busy ? t("deleteDialog.deleting") : t("deleteDialog.delete")}
                         </Button>
                     </div>
                 </div>

@@ -7,6 +7,7 @@
  */
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { FileText, FolderClosed, RotateCcw, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Card, CardBody } from "@polaris/ui";
@@ -25,6 +26,7 @@ export interface TrashRow {
 }
 
 export function TrashView({ items }: { items: TrashRow[] }) {
+    const t = useTranslations("drive");
     const [rows, setRows] = useState(items);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
             setBusy(null);
             if (result.error) {
                 await confirm({
-                    title: "Could not restore it",
+                    title: t("trash.couldNotRestoreIt"),
                     description: result.error,
                     alert: true
                 });
@@ -57,9 +59,9 @@ export function TrashView({ items }: { items: TrashRow[] }) {
     async function onDelete(id: string) {
         if (
             !(await confirm({
-                title: "Permanently delete this item?",
-                description: "This cannot be undone.",
-                confirmLabel: "Delete",
+                title: t("trash.permanentlyDeleteThisItem"),
+                description: t("trash.thisCannotBeUndone"),
+                confirmLabel: t("trash.delete"),
                 danger: true
             }))
         )
@@ -70,7 +72,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
             setBusy(null);
             if (result.error) {
                 await confirm({
-                    title: "Could not delete it",
+                    title: t("trash.couldNotDeleteIt"),
                     description: result.error,
                     alert: true
                 });
@@ -83,9 +85,9 @@ export function TrashView({ items }: { items: TrashRow[] }) {
     async function onEmpty() {
         if (
             !(await confirm({
-                title: "Empty the Trash?",
-                description: "Permanently delete everything in the Trash. This cannot be undone.",
-                confirmLabel: "Empty Trash",
+                title: t("trash.emptyTheTrash"),
+                description: t("trash.permanentlyDeleteEverythingInThe"),
+                confirmLabel: t("trash.emptyTrash"),
                 danger: true
             }))
         )
@@ -94,7 +96,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
             const result = await emptyTrashAction();
             if (result.error) {
                 await confirm({
-                    title: "Could not empty the bin",
+                    title: t("trash.couldNotEmptyTheBin"),
                     description: result.error,
                     alert: true
                 });
@@ -108,15 +110,15 @@ export function TrashView({ items }: { items: TrashRow[] }) {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Trash</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("trash.trash")}</h1>
                     <p className="text-sm text-muted-foreground">
-                        Deleted items are kept here until you restore or permanently delete them.
+                        {t("trash.deletedItemsAreKeptHere")}
                     </p>
                 </div>
                 {rows.length > 0 ? (
                     <Button size="sm" variant="danger" onClick={onEmpty} disabled={pending}>
                         <Trash2 className="size-4" />
-                        Empty Trash
+                        {t("trash.emptyTrash")}
                     </Button>
                 ) : null}
             </div>
@@ -124,7 +126,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
             {rows.length === 0 ? (
                 <Card>
                     <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        The Trash is empty.
+                        {t("trash.theTrashIsEmpty")}
                     </CardBody>
                 </Card>
             ) : (
@@ -157,7 +159,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
                                         disabled={pending && busy === row.id}
                                     >
                                         <RotateCcw className="size-4" />
-                                        Restore
+                                        {t("trash.restore")}
                                     </Button>
                                     <Button
                                         size="sm"
@@ -166,7 +168,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
                                         disabled={pending && busy === row.id}
                                     >
                                         <Trash2 className="size-4" />
-                                        Delete forever
+                                        {t("trash.deleteForever")}
                                     </Button>
                                 </div>
                             </CardBody>
