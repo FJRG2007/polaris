@@ -1234,5 +1234,10 @@
         "normal": "Normal",
         "low": "Low",
         "none": "No priority"
+    },
+    "network": {
+        "offline": "You're offline. Polaris will catch up when you reconnect.",
+        "back": "Back online",
+        "slowCall": "Your connection is slow: video and voice may break up."
     }
 }

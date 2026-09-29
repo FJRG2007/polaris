@@ -50,6 +50,7 @@ import {
 } from "./camera-background";
 import { searchPeopleAction } from "./actions";
 import { NoAudioNotice } from "./no-audio-notice";
+import { SlowConnectionNotice } from "@/components/connection-banner";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import type { FilteredMic, MicFilter } from "./mic-filter";
@@ -681,6 +682,9 @@ export function CallRoom({
                 a noise filter running they are two different tracks, and a graph
                 that has stopped producing anything leaves the device reading
                 perfectly while the call carries silence. */}
+                {/* A thin line is felt in a call before anywhere else. */}
+                <SlowConnectionNotice />
+
                 <NoAudioNotice
                     track={call.outgoing}
                     device={call.localStream?.getAudioTracks()[0] ?? null}

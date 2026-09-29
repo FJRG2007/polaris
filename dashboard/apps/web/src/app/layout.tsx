@@ -10,6 +10,7 @@ import { resolveSession } from "@/lib/session";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
+import { ConnectionBanner } from "@/components/connection-banner";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
 
 /**
@@ -200,6 +201,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <I18nProvider locale={locale} messages={pickMessages(locale, ["common", "components"])}>
                     <LocaleSync locale={locale} signedIn={session !== null} />
                     <DropGuard />
+                    <ConnectionBanner />
                     {children}
                 </I18nProvider>
             </body>

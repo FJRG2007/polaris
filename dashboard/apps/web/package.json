@@ -16,6 +16,7 @@
     },
     "dependencies": {
         "@better-auth/passkey": "1.6.25",
+        "@enigmax/primitives": "0.28.0",
         "@excalidraw/excalidraw": "0.18.1",
         "@giphy/js-fetch-api": "5.8.0",
         "@github/relative-time-element": "4.4.4",

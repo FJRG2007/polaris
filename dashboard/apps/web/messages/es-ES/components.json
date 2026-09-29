@@ -1234,5 +1234,10 @@
         "normal": "Normal",
         "low": "Baja",
         "none": "Sin prioridad"
+    },
+    "network": {
+        "offline": "Sin conexión. Polaris se pondrá al día al reconectar.",
+        "back": "Reconectado",
+        "slowCall": "Tu conexión es lenta: el vídeo y la voz pueden cortarse."
     }
 }
