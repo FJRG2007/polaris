@@ -26,6 +26,7 @@ import {
     matchesStructured,
     normalizePathTarget
 } from "@/app/(app)/drive/search-query";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,19 +40,19 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
     const rawQuery = url.searchParams.get("q") ?? "";
-    if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
+    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
 
     let base: string;
     try {
         base = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: "Invalid path" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
     }
 
     const parsed = parseSearch(rawQuery);
@@ -72,7 +73,7 @@ export async function GET(request: Request): Promise<Response> {
             });
         }
         if (caught instanceof DriveAccessError)
-            return Response.json({ error: "Forbidden" }, { status: 403 });
+            return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
         throw caught;
     }
 

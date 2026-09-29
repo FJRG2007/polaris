@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import { openMessage } from "@/lib/mailbox/open";
 import { apiPermission } from "@/lib/api-session";
 import { MailAccessError } from "@/lib/mailbox/access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function GET(
         const opened = await openMessage(user.id, messageId);
         if (!opened) {
             return NextResponse.json(
-                { error: "That message is no longer here." },
+                { error: (await readerWords("api"))("errors.messageGone") },
                 { status: 404, headers: { "cache-control": "private, no-store" } }
             );
         }
@@ -49,7 +50,7 @@ export async function GET(
         // A message of somebody else's answers exactly as one that is not there.
         if (caught instanceof MailAccessError) {
             return NextResponse.json(
-                { error: "That message is no longer here." },
+                { error: (await readerWords("api"))("errors.messageGone") },
                 { status: 404, headers: { "cache-control": "private, no-store" } }
             );
         }
@@ -57,7 +58,7 @@ export async function GET(
         // published: the pane says the message could not be opened.
         console.warn("mail open failed", messageId, caught);
         return NextResponse.json(
-            { error: "That message could not be opened." },
+            { error: (await readerWords("api"))("errors.messageOpenFailed") },
             { status: 502, headers: { "cache-control": "private, no-store" } }
         );
     }

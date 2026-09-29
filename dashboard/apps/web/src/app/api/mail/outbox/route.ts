@@ -12,6 +12,7 @@ import * as core from "@polaris/core";
 import { queueSend } from "@/lib/mailbox/compose";
 import { apiPermission } from "@/lib/api-session";
 import { answer, jsonBody, refusal } from "@/lib/mailbox/outbox-answer";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return answer(
-            { error: issue?.message ?? "Check the message.", field: String(issue?.path[0] ?? "") },
+            { error: issue?.message ?? (await readerWords("api"))("errors.checkMessage"), field: String(issue?.path[0] ?? "") },
             400
         );
     }

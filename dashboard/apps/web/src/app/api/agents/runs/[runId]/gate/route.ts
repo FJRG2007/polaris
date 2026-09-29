@@ -40,10 +40,13 @@ export async function POST(
     const { runId } = await params;
 
     const caller = await authenticateRun(request.headers);
+    // i18n-ignore read by a machine, not shown to a person
     if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
+    // i18n-ignore read by a machine, not shown to a person
     if (caller.runId !== runId) return Response.json({ error: "not that run" }, { status: 404 });
 
     const parsed = reportSchema.safeParse(await request.json().catch(() => null));
+    // i18n-ignore read by a machine, not shown to a person
     if (!parsed.success) return Response.json({ error: "not a gate step" }, { status: 400 });
 
     const detail = parsed.data.detail?.trim().slice(-MAX_DETAIL) || null;
@@ -51,6 +54,7 @@ export async function POST(
     // Read, append, write. A run reports its steps one at a time from a single
     // hook, so there is no second writer to lose an update to.
     const row = await prisma.agentRun.findUnique({ where: { id: runId }, select: { gateSteps: true } });
+    // i18n-ignore read by a machine, not shown to a person
     if (!row) return Response.json({ error: "not that run" }, { status: 404 });
 
     const steps = parseGateSteps(row.gateSteps);

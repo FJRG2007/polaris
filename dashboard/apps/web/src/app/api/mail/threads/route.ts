@@ -24,6 +24,7 @@ import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
 import { EMPTY_QUERY, listThreads } from "@/lib/mailbox/views";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function GET(request: Request): Promise<Response> {
     // list says it could not be loaded rather than showing an empty mailbox,
     // which reads as "you have no mail".
     if (!parsed.success) {
-        return NextResponse.json({ error: "That list could not be loaded." }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.listLoadFailed") }, { status: 400 });
     }
 
     const { cursor, query, ...narrow } = parsed.data;

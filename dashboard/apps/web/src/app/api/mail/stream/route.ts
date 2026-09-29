@@ -23,6 +23,7 @@ import { subscribeMail } from "@/lib/mailbox/live";
 import { watchMailboxes } from "@/lib/mailbox/watch";
 import { everyAccountId } from "@/lib/mailbox/access";
 import { backgroundUser, sessionCan } from "@/lib/session";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,9 +45,9 @@ export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (!(await sessionCan(session, "mail.use"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     // Held rather than re-read off `session` inside the closures: the narrowing

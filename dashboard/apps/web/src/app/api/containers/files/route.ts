@@ -8,6 +8,7 @@
 
 import { listFiles } from "@/lib/container-service";
 import { authorizeConnection, filesQuerySchema, parseQuery } from "../query";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,14 +18,14 @@ export async function GET(request: Request): Promise<Response> {
     if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
     const caller = await authorizeConnection(parsed.data.c);
-    if (!caller) return Response.json({ error: "Forbidden" }, { status: 403 });
+    if (!caller) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
 
     try {
         const entries = await listFiles(parsed.data.c, caller.userId, parsed.data.id, parsed.data.p);
         return Response.json({ entries });
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Could not list this directory" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.directoryListFailed") },
             { status: 502 }
         );
     }

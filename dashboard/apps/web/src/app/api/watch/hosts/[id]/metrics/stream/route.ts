@@ -2,6 +2,7 @@ import { apiPermission } from "@/lib/api-session";
 import { hostSubject } from "@/lib/metrics-shared";
 import { metricTickStream, subjectKey } from "@/lib/metrics-live";
 import { subjectBelongsToOwner } from "@/lib/metrics-history-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const subject = hostSubject(id);
     if (!(await subjectBelongsToOwner("host", subject, user.id).catch(() => false))) {
-        return Response.json({ error: "Not found" }, { status: 404 });
+        return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     }
     return metricTickStream(request, [subjectKey("host", subject)]);
 }

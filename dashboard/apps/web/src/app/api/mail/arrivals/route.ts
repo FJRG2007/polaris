@@ -20,6 +20,7 @@ const querySchema = z.object({
     since: z
         .string()
         .max(40)
+        // i18n-ignore never shown: an unreadable cursor is treated as a first ask
         .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Not a moment" })
         .transform((value) => new Date(value))
         .nullable()

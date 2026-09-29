@@ -9,6 +9,7 @@ import { basename } from "node:path";
 import { readFile } from "@/lib/container-service";
 import { authorizeConnection, filesQuerySchema, parseQuery } from "../query";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
     const caller = await authorizeConnection(parsed.data.c);
-    if (!caller) return Response.json({ error: "Forbidden" }, { status: 403 });
+    if (!caller) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
 
     try {
         const content = await readFile(parsed.data.c, caller.userId, parsed.data.id, parsed.data.p);
@@ -35,7 +36,7 @@ export async function GET(request: Request): Promise<Response> {
         });
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Could not read this file" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.fileReadFailed") },
             { status: 502 }
         );
     }

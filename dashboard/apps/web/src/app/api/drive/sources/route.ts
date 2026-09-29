@@ -14,6 +14,7 @@ import { apiUser } from "@/lib/api-session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { sessionCan } from "@/lib/session";
 import { listAccessibleConnections } from "@/lib/storage-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET(): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const connections = await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id));

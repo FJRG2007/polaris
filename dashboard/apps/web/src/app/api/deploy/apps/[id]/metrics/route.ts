@@ -3,6 +3,7 @@ import { apiPermission } from "@/lib/api-session";
 
 import { readAppContainerMetrics } from "@/lib/app-container-metrics";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,12 +19,12 @@ export async function GET(
     const { id } = await params;
     // As whoever owns the project, once the reader's standing on it is checked.
     const access = await requireApplicationAccess(id, user.id, "project.read").catch(() => null);
-    if (!access) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    if (!access) return NextResponse.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
     try {
         return NextResponse.json(await readAppContainerMetrics(id, access.ownerId));
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read metrics" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.metricsFailed") },
             { status: 400 }
         );
     }

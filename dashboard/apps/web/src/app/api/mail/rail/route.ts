@@ -21,15 +21,16 @@ import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
     const session = await backgroundUser();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (!(await sessionCan(session, "mail.use"))) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
     // The shelf being worked from, exactly as the layout reads it: a rail holds
     // somebody's own mailboxes or an organization's, never the two at once.

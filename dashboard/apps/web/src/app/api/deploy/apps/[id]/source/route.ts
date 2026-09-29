@@ -16,6 +16,7 @@ import { deployApplication } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { stageBody, stagedPath, TooLarge } from "@/lib/deploy/staging";
 import { MAX_SOURCE_ZIP, SourceRefusal, storeUploadedSource, type UploadedSource } from "@/lib/deploy/source-upload";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         ownerId = (await requireApplicationAccess(id, user.id, "service.configure")).ownerId;
         if (deploy) await requireApplicationAccess(id, user.id, "deploy.run");
     } catch {
-        return NextResponse.json({ error: "Service not found" }, { status: 404 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
     }
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > MAX_SOURCE_ZIP) {
@@ -60,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         // Worded for the sender; anything else names internals, so it stays in the log.
         if (caught instanceof SourceRefusal) return NextResponse.json({ error: caught.message }, { status: 400 });
         console.error("polaris: could not take an uploaded source:", caught);
-        return NextResponse.json({ error: "Could not take the upload. Try again." }, { status: 500 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.uploadFailed") }, { status: 500 });
     } finally {
         await rm(file, { force: true });
     }

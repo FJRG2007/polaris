@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { mailWaitingOnShelf, NO_MAIL_WAITING } from "@/lib/shelf-counts";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(): Promise<Response> {
     const session = await backgroundUser();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (!(await sessionCan(session, "mail.use"))) return NextResponse.json(NO_MAIL_WAITING);
     return NextResponse.json(await mailWaitingOnShelf(session.id));
 }

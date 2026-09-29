@@ -2,6 +2,7 @@ import { apiPermission } from "@/lib/api-session";
 import { resolveRange } from "@/lib/metrics-shared";
 import { readAppHttpMetrics } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(
     const { id } = await params;
     // As whoever owns the project, once the reader's standing on it is checked.
     const access = await requireApplicationAccess(id, user.id, "project.read").catch(() => null);
-    if (!access) return Response.json({ error: "Service not found" }, { status: 404 });
+    if (!access) return Response.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
     const url = new URL(request.url);
     const { from, to } = resolveRange(
         url.searchParams.get("range"),
@@ -30,7 +31,7 @@ export async function GET(
         return Response.json({ points });
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Could not read HTTP metrics" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.httpMetricsFailed") },
             { status: 400 }
         );
     }

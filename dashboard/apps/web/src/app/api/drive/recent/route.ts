@@ -24,6 +24,7 @@ import {
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
 import { isReservedRootPath } from "@/lib/system-paths";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,12 +63,12 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
+    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
     const byParam = url.searchParams.get("by");
     const by: RecentSort =
         byParam === "created" ? "created" : byParam === "opened" ? "opened" : "modified";
@@ -83,7 +84,7 @@ export async function GET(request: Request): Promise<Response> {
             });
         }
         if (caught instanceof DriveAccessError)
-            return Response.json({ error: "Forbidden" }, { status: 403 });
+            return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
         throw caught;
     }
 

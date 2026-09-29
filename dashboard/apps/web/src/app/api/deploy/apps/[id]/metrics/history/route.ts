@@ -2,6 +2,7 @@ import { apiPermission } from "@/lib/api-session";
 import { resolveRange } from "@/lib/metrics-shared";
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(
     // The series belongs to the project, not to the reader: check the reader's
     // standing on it, then read as the owner - as the volume series does.
     const access = await requireApplicationAccess(id, user.id, "project.read").catch(() => null);
-    if (!access) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!access) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     const url = new URL(request.url);
     const { from, to } = resolveRange(
         url.searchParams.get("range"),
@@ -26,6 +27,6 @@ export async function GET(
         url.searchParams.get("to")
     );
     const points = await getMetricSeries({ subjectType: "app", subjectId: id, ownerId: access.ownerId, from, to });
-    if (points === null) return Response.json({ error: "Not found" }, { status: 404 });
+    if (points === null) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     return Response.json({ points });
 }

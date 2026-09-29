@@ -20,8 +20,10 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
     const body = (await request.json().catch(() => null)) as { token?: string } | null;
+    // i18n-ignore read by a machine, not shown to a person
     if (!body?.token) return NextResponse.json({ error: "token required" }, { status: 400 });
     const ticket = await redeemTerminalTicket(body.token);
+    // i18n-ignore read by a machine, not shown to a person
     if (!ticket) return NextResponse.json({ error: "invalid ticket" }, { status: 401 });
     return NextResponse.json(ticket);
 }

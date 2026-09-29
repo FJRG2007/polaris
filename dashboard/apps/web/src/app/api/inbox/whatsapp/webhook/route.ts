@@ -55,12 +55,14 @@ interface WaPayload {
 export async function POST(request: Request): Promise<Response> {
     const raw = await request.text();
     if (!verifySignature(raw, request.headers.get("x-hub-signature-256"))) {
+        // i18n-ignore read by a machine, not shown to a person
         return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
     let payload: WaPayload;
     try {
         payload = JSON.parse(raw) as WaPayload;
     } catch {
+        // i18n-ignore read by a machine, not shown to a person
         return NextResponse.json({ error: "Malformed payload" }, { status: 400 });
     }
 

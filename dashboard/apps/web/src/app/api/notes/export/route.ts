@@ -20,6 +20,7 @@ import { NoteAccessError } from "@/lib/notes/access";
 import { apiPermission } from "@/lib/api-session";
 import { exportArchive, type ExportScope } from "@/lib/notes/export-service";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export async function GET(request: Request): Promise<Response> {
     if (kind === "note" && id) scope = { kind: "note", id };
     else if (kind === "folder" && id) scope = { kind: "folder", id };
     else if (kind === "space") scope = { kind: "space", id: id || null };
-    else return Response.json({ error: "Say what to export" }, { status: 400 });
+    else return Response.json({ error: (await readerWords("api"))("errors.sayExport") }, { status: 400 });
 
     try {
         const archive = await exportArchive({ id: user.id, isAdmin: user.isAdmin }, scope);
@@ -58,6 +59,6 @@ export async function GET(request: Request): Promise<Response> {
         // No detail: this answers an authenticated caller, but the failure could
         // name a path or a row nobody asked to have published.
         console.error("polaris: a notes export failed:", caught);
-        return Response.json({ error: "That could not be exported" }, { status: 500 });
+        return Response.json({ error: (await readerWords("api"))("errors.exportFailed") }, { status: 500 });
     }
 }

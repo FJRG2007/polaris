@@ -11,6 +11,7 @@
 import { accessFor, withDockerDriver } from "@/lib/container-service";
 import type { OverviewData } from "@/app/(app)/apps/containers/types";
 import { authorizeConnection, listQuerySchema, parseQuery } from "../query";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
     const caller = await authorizeConnection(parsed.data.c);
-    if (!caller) return Response.json({ error: "Forbidden" }, { status: 403 });
+    if (!caller) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
 
     try {
         const payload = await withDockerDriver(parsed.data.c, caller.userId, async (driver) => {
@@ -46,7 +47,7 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json(payload);
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Unable to reach this Docker host" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.dockerUnreachable") },
             { status: 502 }
         );
     }

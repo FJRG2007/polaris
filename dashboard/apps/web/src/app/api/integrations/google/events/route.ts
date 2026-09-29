@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 
 import { listConnections, readCredential } from "@/lib/connections/store";
 import { getGoogleOAuthClient, listGoogleEvents, GoogleAuthExpiredError } from "@/lib/google-calendar/service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const parsed = rangeSchema.safeParse({ from: url.searchParams.get("from"), to: url.searchParams.get("to") });
     if (!parsed.success) {
-        return NextResponse.json({ status: "error", error: "Unreadable window.", events: [] }, { status: 400 });
+        return NextResponse.json({ status: "error", error: (await readerWords("api"))("errors.unreadableWindow"), events: [] }, { status: 400 });
     }
 
     const client = await getGoogleOAuthClient();
@@ -70,6 +71,6 @@ export async function GET(request: Request): Promise<Response> {
         // The reason stays in the server log; the screen is told the calendar
         // could not be reached, which is all it can act on.
         console.error("google calendar events failed", caught);
-        return NextResponse.json({ status: "error", error: "Google Calendar could not be reached.", events: [] });
+        return NextResponse.json({ status: "error", error: (await readerWords("api"))("errors.googleCalendarUnreachable"), events: [] });
     }
 }

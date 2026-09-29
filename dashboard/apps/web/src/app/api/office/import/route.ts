@@ -19,6 +19,7 @@ import { apiPermission } from "@/lib/api-session";
 import { readCappedBody } from "@/lib/request-body";
 import { importFile, OfficeImportError } from "@/lib/office/import";
 import { applyUpdate, createDocument, OfficeAccessError } from "@/lib/office/documents";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,9 +35,10 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 /** The one sentence for a file past that, said the same way whether the size was
  *  declared or measured. */
-function tooLarge(): Response {
+async function tooLarge(): Promise<Response> {
+    const t = await readerWords("api");
     return NextResponse.json(
-        { error: `That file is larger than ${Math.round(MAX_BYTES / (1024 * 1024))} MB.` },
+        { error: t("errors.fileLargerThan", { megabytes: Math.round(MAX_BYTES / (1024 * 1024)) }) },
         { status: 413 }
     );
 }
@@ -58,7 +60,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = await readCappedBody(request, MAX_BYTES);
     if (!body) return tooLarge();
     if (body.byteLength === 0) {
-        return NextResponse.json({ error: "No file was sent." }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.noFileSentDot") }, { status: 400 });
     }
 
     const form = await new Response(body, {
@@ -68,7 +70,7 @@ export async function POST(request: Request): Promise<Response> {
         .catch(() => null);
     const file = form?.get("file");
     if (!(file instanceof File)) {
-        return NextResponse.json({ error: "No file was sent." }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.noFileSentDot") }, { status: 400 });
     }
 
     // The organization shelf the reader is working from, when they are on one.
@@ -78,7 +80,7 @@ export async function POST(request: Request): Promise<Response> {
     const sent = form?.get("orgId");
     const shelf = shelfSchema.safeParse({ orgId: typeof sent === "string" ? sent : null });
     if (!shelf.success) {
-        return NextResponse.json({ error: "That is not an organization." }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.notAnOrganization") }, { status: 400 });
     }
 
     try {
@@ -100,6 +102,6 @@ export async function POST(request: Request): Promise<Response> {
             return NextResponse.json({ error: caught.message }, { status: 403 });
         }
         console.error("polaris: an office import failed:", caught);
-        return NextResponse.json({ error: "That file could not be opened." }, { status: 500 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.fileOpenFailed") }, { status: 500 });
     }
 }

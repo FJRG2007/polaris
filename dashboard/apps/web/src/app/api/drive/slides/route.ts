@@ -29,6 +29,7 @@ import { guardedUser } from "@/lib/session";
 import { gateShareRequest } from "@/lib/share-access";
 import { readCappedBody } from "@/lib/request-body";
 import { renderPptxDeck, DEFAULT_DECK_WIDTH } from "@/lib/office/pptx-deck";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,9 +50,9 @@ export async function POST(request: Request): Promise<Response> {
     if (token) {
         const gate = await gateShareRequest(token, "slides.render");
         if (!gate.ok)
-            return NextResponse.json({ error: "Not available." }, { status: gate.status });
+            return NextResponse.json({ error: (await readerWords("api"))("errors.notAvailable") }, { status: gate.status });
     } else if (!(await guardedUser())) {
-        return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.notSignedIn") }, { status: 401 });
     }
 
     const asked = Number(url.searchParams.get("w"));
@@ -62,13 +63,13 @@ export async function POST(request: Request): Promise<Response> {
     // counts as well.
     const claimed = Number(request.headers.get("content-length"));
     if (Number.isFinite(claimed) && claimed > MOST_BYTES)
-        return NextResponse.json({ error: "This presentation is too large." }, { status: 413 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.presentationTooLarge") }, { status: 413 });
 
     const body = await readCappedBody(request, MOST_BYTES);
     if (!body)
-        return NextResponse.json({ error: "This presentation is too large." }, { status: 413 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.presentationTooLarge") }, { status: 413 });
     if (body.byteLength === 0)
-        return NextResponse.json({ error: "No presentation was sent." }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.noPresentation") }, { status: 400 });
 
     try {
         const deck = await renderPptxDeck(body, width);
@@ -78,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
         // reader nothing they can act on. The screen says the presentation could
         // not be read.
         return NextResponse.json(
-            { error: "This presentation could not be read." },
+            { error: (await readerWords("api"))("errors.presentationUnreadable") },
             { status: 422 }
         );
     }

@@ -16,6 +16,7 @@
 import { subscribeTaskChanges } from "@/lib/tasks/live";
 import { backgroundUser, sessionCan } from "@/lib/session";
 import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,9 +43,9 @@ export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few seconds
     // against a session that is gone.
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (!(await sessionCan(session, "tasks.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const actor: TaskActor = { id: session.id, isAdmin: session.isAdmin };

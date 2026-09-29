@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 
 import { readCallPorts } from "@/lib/chat/call-reach";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function GET(request: Request): Promise<Response> {
         return NextResponse.json(await readCallPorts(probe));
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read the call ports" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.callPortsFailed") },
             { status: 400 }
         );
     }

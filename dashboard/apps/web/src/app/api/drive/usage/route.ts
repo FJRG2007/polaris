@@ -8,6 +8,7 @@
 import { sessionCan } from "@/lib/session";
 import { apiUser } from "@/lib/api-session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,18 +17,18 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const connectionId = new URL(request.url).searchParams.get("c");
-    if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
+    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
 
     let driver;
     try {
         driver = await requireDriveDriver(user.id, connectionId, "", "read", { skipLock: true });
     } catch (caught) {
-        if (caught instanceof DriveLockedError) return Response.json({ error: "Locked" }, { status: 423 });
-        if (caught instanceof DriveAccessError) return Response.json({ error: "Forbidden" }, { status: 403 });
+        if (caught instanceof DriveLockedError) return Response.json({ error: (await readerWords("api"))("errors.locked") }, { status: 423 });
+        if (caught instanceof DriveAccessError) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
         throw caught;
     }
     try {

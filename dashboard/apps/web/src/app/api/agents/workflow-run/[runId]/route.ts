@@ -71,6 +71,7 @@ export async function PATCH(
     const { runId } = await params;
 
     const caller = await authenticateRun(request.headers);
+    // i18n-ignore read by a machine, not shown to a person
     if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
 
     // Either identifier is accepted, and both have to be about the caller. A
@@ -80,8 +81,10 @@ export async function PATCH(
         where: { id: caller.runId },
         select: { githubRunId: true }
     });
+    // i18n-ignore read by a machine, not shown to a person
     if (!row) return Response.json({ error: "not that run" }, { status: 404 });
     if (runId !== caller.runId && runId !== row.githubRunId) {
+        // i18n-ignore read by a machine, not shown to a person
         return Response.json({ error: "not that run" }, { status: 404 });
     }
 

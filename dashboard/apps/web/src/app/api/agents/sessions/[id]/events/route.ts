@@ -19,6 +19,7 @@
 
 import { hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
 import { recordSessionEvents, sessionForToken } from "@/lib/agents/session-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function POST(
     // The token names a session; the URL names one too. They have to be the same
     // one, or a token would be a way to write into any session on the instance.
     if (!session || session.id !== id)
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
+        return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
 
     const body = await request.text();
     if (body.length > MAX_BODY) return acknowledged();

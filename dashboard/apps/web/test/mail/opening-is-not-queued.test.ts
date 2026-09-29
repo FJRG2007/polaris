@@ -22,6 +22,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { translatorFor } from "@/lib/i18n/translate";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -41,7 +42,10 @@ describe("the way a message is asked for", () => {
     it("answers for somebody else's message exactly as for one that is gone", async () => {
         const route = await readFile(`${SRC}app/api/mail/message/[messageId]/route.ts`, "utf8");
         const refused = route.slice(route.indexOf("caught instanceof MailAccessError"));
-        expect(refused).toContain("That message is no longer here.");
+        // The same sentence as a message that is gone, in the reader's language.
+        expect(refused).toContain('("errors.messageGone")');
+        expect(route.split('("errors.messageGone")').length - 1).toBe(2);
+        expect(translatorFor("en-US", "api")("errors.messageGone")).toBe("That message is no longer here.");
         expect(refused).toContain("status: 404");
     });
 

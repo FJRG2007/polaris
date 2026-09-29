@@ -2,6 +2,7 @@ import { apiPermission } from "@/lib/api-session";
 import { getVolumeOwner } from "@/lib/deploy-service";
 import { metricTickStream, subjectKey } from "@/lib/metrics-live";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +14,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (user instanceof Response) return user;
     const { id } = await params;
     const owner = await getVolumeOwner(id);
-    if (!owner) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!owner) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     if (owner.applicationId) {
         const access = await requireApplicationAccess(owner.applicationId, user.id, "project.read").catch(() => null);
-        if (!access) return Response.json({ error: "Not found" }, { status: 404 });
+        if (!access) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     } else if (owner.ownerId !== user.id) {
-        return Response.json({ error: "Not found" }, { status: 404 });
+        return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     }
     return metricTickStream(request, [subjectKey("volume", id)]);
 }

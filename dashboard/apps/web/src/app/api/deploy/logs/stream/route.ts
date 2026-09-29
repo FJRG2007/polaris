@@ -20,6 +20,7 @@
 import { z } from "zod";
 import { apiPermission } from "@/lib/api-session";
 import { followRuntimeLogs, readableServices } from "@/lib/deploy/runtime-logs";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,10 +47,10 @@ export async function GET(request: Request): Promise<Response> {
         services: url.searchParams.get("services") ?? "",
         tail: url.searchParams.get("tail") ?? undefined
     });
-    if (!parsed.success) return Response.json({ error: "Name the services to follow." }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: (await readerWords("api"))("errors.nameServices") }, { status: 400 });
 
     const services = await readableServices(user.id, parsed.data.services);
-    if (services.length === 0) return Response.json({ error: "Service not found" }, { status: 404 });
+    if (services.length === 0) return Response.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
 
     const encoder = new TextEncoder();
     const abort = new AbortController();

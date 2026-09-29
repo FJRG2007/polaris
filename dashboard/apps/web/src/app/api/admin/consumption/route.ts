@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { backgroundUser } from "@/lib/session";
 import { readConsumption } from "@/lib/consumption-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
     const user = await backgroundUser();
     if (!user?.isAdmin) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     try {
@@ -35,7 +36,7 @@ export async function GET(): Promise<Response> {
                 error:
                     caught instanceof Error
                         ? caught.message
-                        : "Could not read what the machine is using"
+                        : (await readerWords("api"))("errors.consumptionFailed")
             },
             { status: 502 }
         );

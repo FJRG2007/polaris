@@ -3,6 +3,7 @@ import { apiPermission } from "@/lib/api-session";
 import { readDeployment } from "@/lib/deploy-service";
 import { deploySteps } from "@/lib/deploy/deploy-steps";
 import { requireDeploymentAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,9 +23,9 @@ export async function GET(
     if (user instanceof Response) return user;
     const { id } = await params;
     const access = await requireDeploymentAccess(id, user.id, "logs.read").catch(() => null);
-    if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!access) return NextResponse.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     const result = await readDeployment(id, access.ownerId);
-    if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!result) return NextResponse.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     if (new URL(request.url).searchParams.get("view") === "steps") {
         return NextResponse.json({
             status: result.status,

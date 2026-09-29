@@ -180,6 +180,7 @@ export async function POST(request: Request): Promise<Response> {
     // A 401 here rather than a JSON-RPC error: the call never reached the
     // protocol, and an MCP client that sees a 401 knows to fix its credential
     // rather than reporting a tool failure to the model.
+    // i18n-ignore read by a machine, not shown to a person
     if (!caller) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const tooLarge = () => jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
@@ -233,6 +234,7 @@ export async function POST(request: Request): Promise<Response> {
 export async function GET(): Promise<Response> {
     return Response.json(
         {
+            // i18n-ignore read by a machine, not shown to a person
             error: "This MCP server answers requests, and has no stream to open. POST your JSON-RPC here."
         },
         { status: 405, headers: { Allow: "POST", "MCP-Protocol-Version": MCP_PROTOCOL_VERSION } }

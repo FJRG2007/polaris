@@ -15,6 +15,7 @@ import { sessionCan } from "@/lib/session";
 import { apiUser } from "@/lib/api-session";
 import { serverStatuses } from "@/lib/server-status";
 import { LOCAL_SERVER_ID } from "@/lib/local-server";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET(): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!user.isAdmin && !(await sessionCan(user, "deploy.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     // Only what can be off: the local box is the machine answering this request.

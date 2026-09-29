@@ -25,10 +25,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     try {
         body = await request.json();
     } catch {
+        // i18n-ignore read by a machine, not shown to a person
         return Response.json({ ok: false, error: "Malformed report" }, { status: 400 });
     }
 
     const parsed = refuseEnrollmentSchema.safeParse(body);
+    // i18n-ignore read by a machine, not shown to a person
     if (!parsed.success) return Response.json({ ok: false, error: "Unknown reason" }, { status: 400 });
 
     await refuseEnrollment(token, parsed.data.reason, await clientIp());

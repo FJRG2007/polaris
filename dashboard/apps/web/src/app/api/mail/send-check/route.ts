@@ -12,6 +12,7 @@ import { z } from "zod";
 import { apiPermission } from "@/lib/api-session";
 import { readSendCheck, startSendCheck } from "@/lib/mailbox/selftest";
 import { answer, jsonBody, refusal } from "@/lib/mailbox/outbox-answer";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function GET(request: Request): Promise<Response> {
     const parsed = askSchema.safeParse({
         accountId: new URL(request.url).searchParams.get("accountId") ?? ""
     });
-    if (!parsed.success) return answer({ error: "That mailbox is not one of yours." }, 400);
+    if (!parsed.success) return answer({ error: (await readerWords("api"))("errors.notYourMailbox") }, 400);
     try {
         return answer(await readSendCheck(user.id, parsed.data.accountId));
     } catch (caught) {
@@ -40,7 +41,7 @@ export async function POST(request: Request): Promise<Response> {
     if (user instanceof Response) return user;
 
     const parsed = askSchema.safeParse(await jsonBody(request));
-    if (!parsed.success) return answer({ error: "That mailbox is not one of yours." }, 400);
+    if (!parsed.success) return answer({ error: (await readerWords("api"))("errors.notYourMailbox") }, 400);
     try {
         return answer(await startSendCheck(user.id, parsed.data.accountId));
     } catch (caught) {

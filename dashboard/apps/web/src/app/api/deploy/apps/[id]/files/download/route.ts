@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { readContainerFile } from "@/lib/container-files-service";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(
     if (user instanceof Response) return user;
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path");
-    if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });
+    if (!path) return NextResponse.json({ error: (await readerWords("api"))("errors.pathRequired") }, { status: 400 });
     try {
         const access = await requireApplicationAccess(id, user.id, "files.read");
         const stream = await readContainerFile(id, access.ownerId, path);
@@ -34,7 +35,7 @@ export async function GET(
         });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read the file" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.readFileFailed") },
             { status: 400 }
         );
     }

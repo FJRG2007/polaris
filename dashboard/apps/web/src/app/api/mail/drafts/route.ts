@@ -11,6 +11,7 @@ import * as core from "@polaris/core";
 import { saveDraft } from "@/lib/mailbox/compose";
 import { apiPermission } from "@/lib/api-session";
 import { answer, jsonBody, refusal } from "@/lib/mailbox/outbox-answer";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function POST(request: Request): Promise<Response> {
     if (user instanceof Response) return user;
 
     const parsed = core.mailDraftSchema.safeParse(await jsonBody(request));
-    if (!parsed.success) return answer({ error: "That draft could not be saved." }, 400);
+    if (!parsed.success) return answer({ error: (await readerWords("api"))("errors.draftNotSaved") }, 400);
     try {
         const draftId = await saveDraft(user.id, {
             accountId: parsed.data.accountId,

@@ -3,6 +3,7 @@ import { apiPermission } from "@/lib/api-session";
 
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { listContainerFiles, writeContainerFile } from "@/lib/container-files-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET(
         return NextResponse.json({ path, entries });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not list files" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.listFilesFailed") },
             { status: 400 }
         );
     }
@@ -37,7 +38,7 @@ export async function PUT(
     if (user instanceof Response) return user;
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path");
-    if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });
+    if (!path) return NextResponse.json({ error: (await readerWords("api"))("errors.pathRequired") }, { status: 400 });
     try {
         const access = await requireApplicationAccess(id, user.id, "files.write");
         const content = Buffer.from(await request.arrayBuffer());
@@ -45,7 +46,7 @@ export async function PUT(
         return NextResponse.json({ ok: true });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not write the file" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.writeFileFailed") },
             { status: 400 }
         );
     }

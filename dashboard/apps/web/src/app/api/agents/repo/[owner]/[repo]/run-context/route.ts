@@ -36,11 +36,13 @@ export async function GET(
     const repoFullName = `${owner}/${repo}`;
 
     const caller = await authenticateRun(request.headers);
+    // i18n-ignore read by a machine, not shown to a person
     if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
 
     // A run may only be told about the repository it belongs to. The path is the
     // caller's claim; the run row is the fact.
     if (caller.repoFullName.toLowerCase() !== repoFullName.toLowerCase()) {
+        // i18n-ignore read by a machine, not shown to a person
         return Response.json({ error: "this run is not for that repository" }, { status: 404 });
     }
 
@@ -60,6 +62,7 @@ export async function GET(
         }
     });
     if (!row?.enabled) {
+        // i18n-ignore read by a machine, not shown to a person
         return Response.json({ reason: "commercial", error: "agent runs are not enabled for this repository" }, { status: 402 });
     }
 

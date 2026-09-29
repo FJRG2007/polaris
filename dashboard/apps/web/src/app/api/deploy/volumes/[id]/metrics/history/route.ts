@@ -4,6 +4,7 @@ import { apiPermission } from "@/lib/api-session";
 import { getVolumeOwner } from "@/lib/deploy-service";
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,15 +23,15 @@ export async function GET(
     // The series belongs to the project, not to the reader: resolve who owns the
     // volume, check the reader's standing on that project, then read as the owner.
     const owner = await getVolumeOwner(id);
-    if (!owner) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!owner) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     if (owner.applicationId) {
         try {
             await requireApplicationAccess(owner.applicationId, user.id, "project.read");
         } catch {
-            return Response.json({ error: "Not found" }, { status: 404 });
+            return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
         }
     } else if (owner.ownerId !== user.id) {
-        return Response.json({ error: "Not found" }, { status: 404 });
+        return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     }
 
     const url = new URL(request.url);
@@ -46,6 +47,6 @@ export async function GET(
         from,
         to
     });
-    if (points === null) return Response.json({ error: "Not found" }, { status: 404 });
+    if (points === null) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     return Response.json({ points });
 }

@@ -7,6 +7,7 @@
 
 import { containerLogs } from "@/lib/container-service";
 import { authorizeConnection, logsQuerySchema, parseQuery } from "../query";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,14 +17,14 @@ export async function GET(request: Request): Promise<Response> {
     if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 
     const caller = await authorizeConnection(parsed.data.c);
-    if (!caller) return Response.json({ error: "Forbidden" }, { status: 403 });
+    if (!caller) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
 
     try {
         const text = await containerLogs(parsed.data.c, caller.userId, parsed.data.id, parsed.data.tail);
         return Response.json({ logs: text });
     } catch (caught) {
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Could not read this container's logs" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.containerLogsFailed") },
             { status: 502 }
         );
     }

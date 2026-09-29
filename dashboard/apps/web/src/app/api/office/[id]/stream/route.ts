@@ -24,6 +24,7 @@
 import { officeReader } from "@/lib/office/reader";
 import { subscribeOfficeChanges } from "@/lib/office/live";
 import { backgroundUser, sessionCan } from "@/lib/session";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function GET(
     // When there is one it still has to hold the app's own permission.
     const session = await backgroundUser();
     if (session && !(await sessionCan(session, "office.use"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const { id } = await params;
@@ -51,7 +52,7 @@ export async function GET(
     const reader = await officeReader(id, session?.id ?? null);
     if (!reader) {
         return Response.json(
-            { error: session ? "Forbidden" : "Unauthorized" },
+            { error: session ? (await readerWords("api"))("errors.forbidden") : (await readerWords("api"))("errors.unauthorized") },
             {
                 status: session ? 403 : 401
             }

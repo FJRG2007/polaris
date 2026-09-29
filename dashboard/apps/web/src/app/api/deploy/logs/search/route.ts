@@ -8,9 +8,13 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiPermission } from "@/lib/api-session";
 import { readableServices, searchRuntimeLogs } from "@/lib/deploy/runtime-logs";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The one refusal of the query a person can cause from the screen. */
+const RANGE_BACKWARDS = "The start of the range is after its end.";
 
 const QuerySchema = z
     .object({
@@ -29,7 +33,8 @@ const QuerySchema = z
         limit: z.coerce.number().int().min(1).max(500).default(200)
     })
     .refine((query) => !query.from || !query.to || new Date(query.from) <= new Date(query.to), {
-        message: "The start of the range is after its end."
+        // i18n-ignore said in the reader's words where the refusal is answered
+        message: RANGE_BACKWARDS
     });
 
 export async function GET(request: Request): Promise<Response> {
@@ -46,11 +51,16 @@ export async function GET(request: Request): Promise<Response> {
         limit: params.get("limit") ?? undefined
     });
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid search" }, { status: 400 });
+        const t = await readerWords("api");
+        const message = parsed.error.issues[0]?.message;
+        return NextResponse.json(
+            { error: message === RANGE_BACKWARDS ? t("errors.rangeBackwards") : (message ?? t("errors.invalidSearch")) },
+            { status: 400 }
+        );
     }
 
     const services = await readableServices(user.id, parsed.data.services);
-    if (services.length === 0) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    if (services.length === 0) return NextResponse.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
 
     const page = await searchRuntimeLogs({
         serviceIds: services.map((service) => service.id),

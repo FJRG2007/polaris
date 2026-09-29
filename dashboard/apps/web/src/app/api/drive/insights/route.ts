@@ -22,6 +22,7 @@ import { isProbableArchive, probeArchiveEncryption } from "@/lib/drive-archive-e
 import { createSizeBudget, getCachedFolderSizes, measureFolder } from "@/lib/drive-folder-size";
 import { listLocks } from "@/lib/access-lock-service";
 import { isReservedRootPath } from "@/lib/system-paths";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,18 +38,18 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
+        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
+    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
 
     let path: string;
     try {
         path = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: "Invalid path" }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
     }
 
     try {
@@ -56,7 +57,7 @@ export async function GET(request: Request): Promise<Response> {
     } catch (caught) {
         if (caught instanceof DriveLockedError) return Response.json({ locked: true });
         if (caught instanceof DriveAccessError)
-            return Response.json({ error: "Forbidden" }, { status: 403 });
+            return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
         throw caught;
     }
 
@@ -66,7 +67,7 @@ export async function GET(request: Request): Promise<Response> {
     } catch (caught) {
         if (caught instanceof SmbShareRequiredError) return Response.json({ needsSmbShare: true });
         console.error("drive: insights connect failed", caught);
-        return Response.json({ error: "Could not connect to this location" }, { status: 502 });
+        return Response.json({ error: (await readerWords("api"))("errors.locationConnectFailed") }, { status: 502 });
     }
 
     try {
@@ -131,7 +132,7 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ sizes, archives, pending });
     } catch (caught) {
         console.error("drive: insights failed", caught);
-        return Response.json({ error: "Could not inspect this location" }, { status: 502 });
+        return Response.json({ error: (await readerWords("api"))("errors.locationInspectFailed") }, { status: 502 });
     } finally {
         await driver.dispose();
     }

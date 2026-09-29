@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 import { readEvidence } from "@/lib/compliance/evidence-readings";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,6 @@ export async function GET(): Promise<Response> {
         return NextResponse.json(await readEvidence(), { headers: { "cache-control": "private, no-store" } });
     } catch (caught) {
         console.error("polaris: the compliance evidence could not be read:", caught);
-        return NextResponse.json({ error: "The evidence could not be read just now. Try again in a minute." }, { status: 500 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.evidenceReadFailed") }, { status: 500 });
     }
 }

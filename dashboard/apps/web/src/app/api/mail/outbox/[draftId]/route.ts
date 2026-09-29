@@ -10,6 +10,7 @@ import * as core from "@polaris/core";
 import { apiPermission } from "@/lib/api-session";
 import { cancelSend, sendNow } from "@/lib/mailbox/compose";
 import { answer, refusal } from "@/lib/mailbox/outbox-answer";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
     const user = await apiPermission("mail.use");
     if (user instanceof Response) return user;
     const draftId = await draftIdOf(params);
-    if (!draftId) return answer({ error: "That message is not in the queue." }, 404);
+    if (!draftId) return answer({ error: (await readerWords("api"))("errors.notQueued") }, 404);
     try {
         return answer({ sent: await sendNow(user.id, draftId) });
     } catch (caught) {
@@ -38,7 +39,7 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Res
     const user = await apiPermission("mail.use");
     if (user instanceof Response) return user;
     const draftId = await draftIdOf(params);
-    if (!draftId) return answer({ error: "That message is not in the queue." }, 404);
+    if (!draftId) return answer({ error: (await readerWords("api"))("errors.notQueued") }, 404);
     try {
         return answer({ undone: await cancelSend(user.id, draftId) });
     } catch (caught) {

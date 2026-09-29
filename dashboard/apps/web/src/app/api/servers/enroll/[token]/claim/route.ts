@@ -27,12 +27,14 @@ export async function POST(
     try {
         body = await request.json();
     } catch {
+        // i18n-ignore read by a machine, not shown to a person
         return Response.json({ ok: false, error: "Malformed report" }, { status: 400 });
     }
 
     const parsed = claimEnrollmentSchema.safeParse(body);
     if (!parsed.success) {
         return Response.json(
+            // i18n-ignore read by a machine, not shown to a person
             { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid report" },
             { status: 400 }
         );

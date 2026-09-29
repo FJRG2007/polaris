@@ -3,6 +3,7 @@ import { apiPermission } from "@/lib/api-session";
 
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,14 +26,14 @@ export async function GET(
         // them, where the owner-only lookup gave them nothing.
         ownerId = (await requireApplicationAccess(id, user.id, "logs.read")).ownerId;
     } catch {
-        return NextResponse.json({ error: "Service not found" }, { status: 404 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.serviceNotFound") }, { status: 404 });
     }
     try {
         const log = await readAppRuntimeLog(id, ownerId, limit);
         return NextResponse.json({ log });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read runtime logs" },
+            { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.runtimeLogsFailed") },
             { status: 400 }
         );
     }

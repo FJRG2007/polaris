@@ -19,6 +19,7 @@ import { gameOfServer } from "@/lib/apps/games-catalog";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
 import { gameTabLabel, GAME_TABS, visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,9 +33,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const access =
         (await resourceAccess(user, installRef(id), "deploy.read")) ??
         (await resourceAccess(user, installRef(id), "games.read"));
-    if (!access) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!access) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     const app = await getInstalledApp(access.ownerId, id);
-    if (!app) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!app) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
 
     // Only a game server has screens of its own. Everything else is its shell.
     // Asked of the catalog rather than of the id's spelling: every game after the

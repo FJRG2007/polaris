@@ -24,6 +24,7 @@ import {
     removeUpload,
     storeUpload
 } from "@/lib/mailbox/uploads";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,14 +61,14 @@ export async function POST(request: Request): Promise<Response> {
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: "That upload did not arrive." }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.uploadMissing") }, { status: 400 });
     }
     const file = form.get("file");
     if (!(file instanceof File))
-        return Response.json({ error: "No file was sent." }, { status: 400 });
+        return Response.json({ error: (await readerWords("api"))("errors.noFileSentDot") }, { status: 400 });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (bytes.length === 0) return Response.json({ error: "That file is empty." }, { status: 400 });
+    if (bytes.length === 0) return Response.json({ error: (await readerWords("api"))("errors.fileEmpty") }, { status: 400 });
     if (bytes.length > ceiling.max) {
         return Response.json({ error: ceiling.refusal }, { status: 413 });
     }
@@ -88,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ upload: stored });
     } catch (caught) {
         console.error("polaris: a mail attachment could not be stored:", caught);
-        return Response.json({ error: "That file could not be attached." }, { status: 500 });
+        return Response.json({ error: (await readerWords("api"))("errors.attachFailed") }, { status: 500 });
     }
 }
 
@@ -97,7 +98,7 @@ export async function DELETE(request: Request): Promise<Response> {
     const user = await apiPermission("mail.use");
     if (user instanceof Response) return user;
     const uploadId = new URL(request.url).searchParams.get("id") ?? "";
-    if (!uploadId) return Response.json({ error: "Nothing was named." }, { status: 400 });
+    if (!uploadId) return Response.json({ error: (await readerWords("api"))("errors.nothingNamed") }, { status: 400 });
     await removeUpload(user.id, uploadId);
     return Response.json({});
 }

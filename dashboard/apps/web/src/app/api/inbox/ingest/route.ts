@@ -29,11 +29,13 @@ export async function POST(request: Request): Promise<Response> {
     const expected = await expectedIngestKey();
     const presented = request.headers.get("x-internal-key");
     if (!expected || !sameKey(presented ?? "", expected)) {
+        // i18n-ignore read by a machine, not shown to a person
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const parsed = inboundEventSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
         return NextResponse.json(
+            // i18n-ignore read by a machine, not shown to a person
             { error: parsed.error?.issues[0]?.message ?? "Invalid event" },
             { status: 400 }
         );
@@ -43,6 +45,7 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ ok: true });
     } catch (caught) {
         return NextResponse.json(
+            // i18n-ignore read by a machine, not shown to a person
             { error: caught instanceof Error ? caught.message : "Ingest failed" },
             { status: 500 }
         );

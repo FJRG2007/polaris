@@ -7,6 +7,7 @@ import { resolveDockerTransport } from "@/lib/docker-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { userHasManage } from "@/lib/session";
 import { canOpenHostShell, mintTerminalTicket } from "@/lib/terminal-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
         if (!(await canOpenHostShell(user.id, body.hostId, asRoot))) {
             // One answer for "no such server" and "that server never granted root",
             // since the caller has no business telling the two apart.
-            return NextResponse.json({ error: "server not found" }, { status: 404 });
+            return NextResponse.json({ error: (await readerWords("api"))("errors.serverNotFound") }, { status: 404 });
         }
         const token = await mintTerminalTicket(user.id, {
             targetId: body.hostId,
@@ -66,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     return NextResponse.json(
-        { error: "applicationId, hostId or connectionId is required" },
+        { error: (await readerWords("api"))("errors.terminalTargetRequired") },
         { status: 400 }
     );
 }
@@ -97,17 +98,17 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
         },
         select: { containerId: true, place: true, state: true }
     });
-    if (!session) return NextResponse.json({ error: "session not found" }, { status: 404 });
+    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.sessionNotFound") }, { status: 404 });
     if (session.place !== "local" || !session.containerId) {
         return NextResponse.json(
             {
-                error: "That session runs on one of your servers. Open a shell on the server instead."
+                error: (await readerWords("api"))("errors.sessionOnServer")
             },
             { status: 409 }
         );
     }
     if (session.state === "stopped" || session.state === "failed") {
-        return NextResponse.json({ error: "That session has ended." }, { status: 409 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.sessionEnded") }, { status: 409 });
     }
     const token = await mintTerminalTicket(user.id, {
         targetId: sessionId,
@@ -142,7 +143,7 @@ async function mintServiceTicket(
             mode === "logs" ? "logs.read" : "console.use"
         );
     } catch {
-        return NextResponse.json({ error: "service not found" }, { status: 404 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.serviceMissing") }, { status: 404 });
     }
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -154,7 +155,7 @@ async function mintServiceTicket(
             environment: { select: { project: { select: { slug: true } } } }
         }
     });
-    if (!app) return NextResponse.json({ error: "service not found" }, { status: 404 });
+    if (!app) return NextResponse.json({ error: (await readerWords("api"))("errors.serviceMissing") }, { status: 404 });
     const serving = await currentReleaseRef(app);
     const token = await mintTerminalTicket(userId, {
         targetId: app.targetId,
@@ -178,14 +179,14 @@ async function mintContainersTicket(connectionId: string, containerRef: string):
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
     if (!containerRef || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(containerRef)) {
-        return NextResponse.json({ error: "a container is required" }, { status: 400 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.containerRequired") }, { status: 400 });
     }
     if (accessFor(connectionId) !== "hostd") {
         try {
             await resolveDockerTransport(connectionId, user.id);
         } catch (caught) {
             return NextResponse.json(
-                { error: caught instanceof Error ? caught.message : "connection not found" },
+                { error: caught instanceof Error ? caught.message : (await readerWords("api"))("errors.connectionNotFound") },
                 { status: 404 }
             );
         }

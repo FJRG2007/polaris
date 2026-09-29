@@ -22,6 +22,7 @@ import { apiAdmin } from "@/lib/api-session";
 import { recordAudit } from "@/lib/audit-service";
 import { evidenceExport } from "@/lib/compliance/evidence-export";
 import { readEvidence } from "@/lib/compliance/evidence-readings";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,6 @@ export async function POST(): Promise<Response> {
         return NextResponse.json(answer, { headers: { "cache-control": "private, no-store" } });
     } catch (caught) {
         console.error("polaris: the compliance evidence could not be exported:", caught);
-        return NextResponse.json({ error: "The evidence could not be exported just now. Try again in a minute." }, { status: 500 });
+        return NextResponse.json({ error: (await readerWords("api"))("errors.evidenceExportFailed") }, { status: 500 });
     }
 }

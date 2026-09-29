@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminWaiting, NOTHING_WAITING } from "@/lib/admin-waiting";
 import { backgroundUser } from "@/lib/session";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(): Promise<Response> {
     const session = await backgroundUser();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json(NOTHING_WAITING);
     return NextResponse.json(await adminWaiting(session.id));
 }

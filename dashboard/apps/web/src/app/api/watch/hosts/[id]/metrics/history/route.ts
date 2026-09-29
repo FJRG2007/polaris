@@ -2,6 +2,7 @@
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { apiPermission } from "@/lib/api-session";
 import { hostSubject, resolveRange } from "@/lib/metrics-shared";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,6 @@ export async function GET(
         from,
         to
     });
-    if (points === null) return Response.json({ error: "Not found" }, { status: 404 });
+    if (points === null) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
     return Response.json({ points });
 }

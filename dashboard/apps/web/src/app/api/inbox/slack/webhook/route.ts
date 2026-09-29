@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
         try {
             body = JSON.parse(raw) as SlackEventBody;
         } catch {
+            // i18n-ignore read by a machine, not shown to a person
             return NextResponse.json({ error: "Malformed payload" }, { status: 400 });
         }
         // The setup handshake is not signed.
@@ -57,6 +58,7 @@ export async function POST(request: Request): Promise<Response> {
             return new Response(String(body.challenge ?? ""), { status: 200, headers: { "content-type": "text/plain" } });
         }
         if (!verify(raw, timestamp, signature)) {
+            // i18n-ignore read by a machine, not shown to a person
             return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
         }
         const event = body.event;
@@ -78,6 +80,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (!verify(raw, timestamp, signature)) {
+        // i18n-ignore read by a machine, not shown to a person
         return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
     const payloadRaw = new URLSearchParams(raw).get("payload");

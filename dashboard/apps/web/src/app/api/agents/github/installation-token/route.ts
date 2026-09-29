@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
     const caller = await authenticateRun(request.headers);
+    // i18n-ignore read by a machine, not shown to a person
     if (!caller) return Response.json({ error: "not a recognized run" }, { status: 401 });
 
     const owner = caller.repoFullName.split("/")[0] ?? "";
@@ -27,6 +28,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!token) {
         return Response.json(
             {
+                // i18n-ignore read by a machine, not shown to a person
                 error: `Polaris has no GitHub App installation it can use for ${owner}. An administrator connects one under Integrations.`
             },
             { status: 403 }
