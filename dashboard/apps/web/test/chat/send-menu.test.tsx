@@ -9,6 +9,7 @@
  * that opens onto nothing is never drawn.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { DEFAULT_CHAT_RULES } from "@polaris/core";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "@/app/(app)/chat/composer";
@@ -59,7 +60,7 @@ function chatBox(extra: Partial<React.ComponentProps<typeof Composer>> = {}) {
             onSend={() => undefined}
             onSchedule={async () => ({})}
             {...extra}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 
@@ -157,7 +158,7 @@ describe("a box with nowhere to send later or keep a draft", () => {
                 disabled={false}
                 placeholder="Comment"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         expect(screen.getByRole("button", { name: "Send" })).toBeDefined();
         expect(screen.queryByRole("button", { name: "More ways to send" })).toBeNull();
@@ -174,7 +175,7 @@ describe("a box with nowhere to send later or keep a draft", () => {
                 disabled={false}
                 placeholder="Reply"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         await waitFor(async () => expect(await boxText(container)).toContain("in the thread"));
         await user.click(screen.getByRole("button", { name: "More ways to send" }));

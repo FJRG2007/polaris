@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
@@ -108,6 +109,7 @@ export function ChannelHeader({
      *  the roster is the two people already named at the top. */
     onMembers?: () => void;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const baseUrl = useAppUrl();
     const { may, callsOff } = useChat();
@@ -159,7 +161,7 @@ export function ChannelHeader({
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
                 <Link
                     href="/chat"
-                    aria-label="Back to conversations"
+                    aria-label={t("channelHeader.backToConversations")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
                 >
                     <ArrowLeft className="size-4" />
@@ -240,8 +242,8 @@ export function ChannelHeader({
                             // A conversation between two people has no roster:
                             // the panel is the other person, and the control
                             // says so rather than offering to list two names.
-                            aria-label={channel.kind === "dm" ? "Profile" : "Who is in here"}
-                            title={channel.kind === "dm" ? "Profile" : "Who is in here"}
+                            aria-label={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
+                            title={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             {channel.kind === "dm" ? (
@@ -255,8 +257,8 @@ export function ChannelHeader({
                         <button
                             type="button"
                             onClick={onSearch}
-                            aria-label="Search messages"
-                            title="Search messages"
+                            aria-label={t("channelHeader.searchMessages")}
+                            title={t("channelHeader.searchMessages")}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <Search className="size-4" />
@@ -274,7 +276,7 @@ export function ChannelHeader({
                         <button
                             type="button"
                             disabled
-                            aria-label="Calls are unavailable"
+                            aria-label={t("channelHeader.callsAreUnavailable")}
                             title={callsOff}
                             className="cursor-not-allowed rounded p-1.5 text-foreground-subtle"
                         >
@@ -294,8 +296,8 @@ export function ChannelHeader({
                         <button
                             type="button"
                             onClick={() => onStartCall(false)}
-                            aria-label="Join the call"
-                            title="Join the call"
+                            aria-label={t("channelHeader.joinTheCall")}
+                            title={t("channelHeader.joinTheCall")}
                             className="flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/25"
                         >
                             <Phone className="size-4" />
@@ -306,8 +308,8 @@ export function ChannelHeader({
                             <button
                                 type="button"
                                 onClick={() => onStartCall(false)}
-                                aria-label="Start a call"
-                                title="Start a call"
+                                aria-label={t("channelHeader.startACall")}
+                                title={t("channelHeader.startACall")}
                                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Phone className="size-4" />
@@ -315,8 +317,8 @@ export function ChannelHeader({
                             <button
                                 type="button"
                                 onClick={() => onStartCall(true)}
-                                aria-label="Start a video call"
-                                title="Start a video call"
+                                aria-label={t("channelHeader.startAVideoCall")}
+                                title={t("channelHeader.startAVideoCall")}
                                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Video className="size-4" />
@@ -326,8 +328,8 @@ export function ChannelHeader({
                     {channel.mayInvite && (
                         <button
                             type="button"
-                            aria-label="Add people"
-                            title="Add people"
+                            aria-label={t("channelHeader.addPeople")}
+                            title={t("channelHeader.addPeople")}
                             onClick={() => setAdding(true)}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
@@ -338,7 +340,7 @@ export function ChannelHeader({
                         <DropdownMenuTrigger asChild>
                             <button
                                 type="button"
-                                aria-label="More for this conversation"
+                                aria-label={t("channelHeader.moreForThisConversation")}
                                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <MoreHorizontal className="size-4" />
@@ -352,7 +354,7 @@ export function ChannelHeader({
                                 onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                             >
                                 <Link2 className="size-3.5" />
-                                Copy link
+                                {t("channelHeader.copyLink")}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <MuteOptions
@@ -385,7 +387,7 @@ export function ChannelHeader({
                             {!named && !group && channel.others.length === 1 && (
                                 <DropdownMenuItem onSelect={() => setNaming(true)}>
                                     <Pencil className="size-3.5" />
-                                    Nickname
+                                    {t("channelHeader.nickname")}
                                 </DropdownMenuItem>
                             )}
                             {group && (
@@ -398,13 +400,13 @@ export function ChannelHeader({
                                     {channel.mayPicture && (
                                         <DropdownMenuItem onSelect={() => setRenaming(true)}>
                                             <Pencil className="size-3.5" />
-                                            Name this group
+                                            {t("channelHeader.nameThisGroup")}
                                         </DropdownMenuItem>
                                     )}
                                     {channel.mayPicture && (
                                         <DropdownMenuItem onSelect={() => setPicturing(true)}>
                                             <ImageIcon className="size-3.5" />
-                                            Group picture
+                                            {t("channelHeader.groupPicture")}
                                         </DropdownMenuItem>
                                     )}
                                     {/* Only the owner's. Offering a switch the
@@ -413,7 +415,7 @@ export function ChannelHeader({
                                     {channel.ownerId === viewerId && (
                                         <DropdownMenuItem onSelect={() => setSettings(true)}>
                                             <Settings2 className="size-3.5" />
-                                            Group settings
+                                            {t("channelHeader.groupSettings")}
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuSeparator />
@@ -422,7 +424,7 @@ export function ChannelHeader({
                                         onSelect={() => setLeaving(true)}
                                     >
                                         <LogOut className="size-3.5" />
-                                        Leave this group
+                                        {t("channelHeader.leaveThisGroup")}
                                     </DropdownMenuItem>
                                 </>
                             )}
@@ -438,7 +440,7 @@ export function ChannelHeader({
                                             )
                                         }
                                     >
-                                        {channel.archived ? "Reopen channel" : "Archive channel"}
+                                        {channel.archived ? t("channelHeader.reopenChannel") : t("channelHeader.archiveChannel")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
@@ -446,7 +448,7 @@ export function ChannelHeader({
                                         onSelect={() => setConfirmDelete(true)}
                                     >
                                         <Trash2 className="size-3.5" />
-                                        Delete channel
+                                        {t("channelHeader.deleteChannel")}
                                     </DropdownMenuItem>
                                 </>
                             )}
@@ -529,14 +531,14 @@ export function ChannelHeader({
             <Dialog open={renaming} onOpenChange={setRenaming}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Name this group</DialogTitle>
+                        <DialogTitle>{t("channelHeader.nameThisGroup")}</DialogTitle>
                     </DialogHeader>
                     <Input
                         value={name}
                         autoFocus
                         maxLength={core.MAX_CHAT_CHANNEL_NAME}
-                        placeholder="Leave it empty to go back to the names"
-                        aria-label="What this group is called"
+                        placeholder={t("channelHeader.leaveItEmptyToGo")}
+                        aria-label={t("channelHeader.whatThisGroupIsCalled")}
                         onChange={(event) => setName(event.target.value)}
                     />
                     {/* Inside the dialog, not only in the banner behind it: the
@@ -545,7 +547,7 @@ export function ChannelHeader({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <DialogFooter>
                         <Button variant="ghost" size="sm" onClick={() => setRenaming(false)}>
-                            Cancel
+                            {t("channelHeader.cancel")}
                         </Button>
                         <Button
                             size="sm"
@@ -562,7 +564,7 @@ export function ChannelHeader({
                                 if (done) setRenaming(false);
                             }}
                         >
-                            Save
+                            {t("channelHeader.save")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -573,8 +575,9 @@ export function ChannelHeader({
                 onOpenChange={setConfirmDelete}
                 name={channel.name}
                 kind="channel"
-                description="Every message in it goes with it. Archiving keeps them readable instead."
-                confirmLabel="Delete channel"
+                title={t("channelHeader.deleteChannel")}
+                description={t("channelHeader.everyMessageInItGoes")}
+                confirmLabel={t("channelHeader.deleteChannel")}
                 onConfirm={async () => {
                     await runAction(() => actions.deleteChannelAction(channel.id), setError);
                     setConfirmDelete(false);

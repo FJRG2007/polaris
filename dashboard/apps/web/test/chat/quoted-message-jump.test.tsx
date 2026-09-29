@@ -17,6 +17,7 @@
  * the browser for a tab.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { MessageList } from "@/app/(app)/chat/message-list";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,7 +127,7 @@ function list(
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

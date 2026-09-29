@@ -22,6 +22,8 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { spokenWait } from "@/lib/chat/durations";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
@@ -201,6 +203,7 @@ export function ChannelView({
      *  always does and then walks back to it. */
     messageId?: string | null;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const params = useSearchParams();
     const { viewerId, viewerName, channels, loaded, refresh, rulesFor, may, callsOff } = useChat();
@@ -1342,7 +1345,7 @@ export function ChannelView({
                 );
                 if (!sent.ok) {
                     await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
-                    return { error: refusal(sent.body) ?? `${file.name} could not be sent` };
+                    return { error: refusal(sent.body) ?? t("channelView.fileNotSent", { name: file.name }) };
                 }
                 const staged: unknown = JSON.parse(sent.body || "{}");
                 uploaded.push(String((staged as { id?: unknown }).id ?? ""));
@@ -1744,9 +1747,9 @@ export function ChannelView({
             <div className="flex flex-1 items-center justify-center p-6">
                 <EmptyState
                     icon={<MessageCircle />}
-                    title="This conversation is not yours to open."
+                    title={t("channelView.thisConversationIsNotYours")}
                     description={
-                        error || "It may have been deleted, or you may have been removed from it."
+                        error || t("channelView.itMayHaveBeenDeleted")
                     }
                 />
             </div>
@@ -1810,7 +1813,7 @@ export function ChannelView({
                     // further back, and is what somebody sees for the
                     // moment it takes.
                     <p className="py-2 text-center text-xs text-muted-foreground">
-                        {loadingOlder ? "Loading earlier messages" : "Earlier messages"}
+                        {loadingOlder ? t("channelView.loadingEarlierMessages") : t("channelView.earlierMessages")}
                     </p>
                 )}
 
@@ -1823,8 +1826,8 @@ export function ChannelView({
                 ) : shown.length === 0 ? (
                     <div className="flex h-full items-center justify-center p-6">
                         <EmptyState
-                            title="Nothing here yet."
-                            description="Say something. Everybody in this conversation will see it."
+                            title={t("channelView.nothingHereYet")}
+                            description={t("channelView.saySomethingEverybodyInThis")}
                         />
                     </div>
                 ) : (
@@ -1903,13 +1906,11 @@ export function ChannelView({
                         >
                             <span className="truncate text-muted-foreground">
                                 {unseen === 0
-                                    ? "You're viewing older messages"
-                                    : unseen === 1
-                                      ? "1 new message"
-                                      : `${unseen} new messages`}
+                                    ? t("channelView.youReViewingOlderMessages")
+                                    : t("channelView.newMessages", { count: unseen })}
                             </span>
                             <span className="flex shrink-0 items-center gap-1 font-medium">
-                                Jump to present
+                                {t("channelView.jumpToPresent")}
                                 <ArrowDown className="size-3.5" />
                             </span>
                         </button>
@@ -1942,7 +1943,7 @@ export function ChannelView({
             {openingName && (
                 <p className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
                     <Loader2 className="size-3 shrink-0 animate-spin" />
-                    Opening your conversation with {openingName}
+                    {t("channelView.opening", { name: openingName })}
                 </p>
             )}
 
@@ -1959,8 +1960,7 @@ export function ChannelView({
                    this one is a decision rather than a wait. */
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
                     <p className="text-xs text-muted-foreground">
-                        You blocked {channel.name}. They cannot reach you, and you cannot write to
-                        them.
+                        {t("channelView.youBlocked", { name: channel.name })}
                     </p>
                     <Button
                         size="sm"
@@ -1968,7 +1968,7 @@ export function ChannelView({
                         disabled={unblocking}
                         onClick={() => void letThemThrough()}
                     >
-                        Unblock
+                        {t("channelView.unblock")}
                     </Button>
                 </div>
             ) : (
@@ -2013,8 +2013,8 @@ export function ChannelView({
                         attachable={may.attach}
                         placeholder={
                             canPost
-                                ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
-                                : "This conversation is archived."
+                                ? t("channelView.messagePlaceholder", { name: channel.kind === "text" ? `#${channel.name}` : channel.name })
+                                : t("channelView.thisConversationIsArchived")
                         }
                         editing={editing}
                         replyingTo={replyingTo ?? carried?.message ?? null}
@@ -2170,10 +2170,10 @@ export function ChannelView({
                             // who turned the warning on; see `voice-settings`.
                             if (session && voice.switchWarning) {
                                 const sure = await confirm({
-                                    title: `Leave your call and join ${channel.name}?`,
+                                    title: t("channelView.leaveAndJoin", { name: channel.name }),
                                     description:
-                                        "You are in a call now, and Polaris holds one at a time - joining this room hangs that one up.",
-                                    confirmLabel: "Join this room"
+                                        t("channelView.youAreInACall"),
+                                    confirmLabel: t("channelView.joinThisRoom")
                                 });
                                 if (!sure) return;
                             }
@@ -2270,7 +2270,7 @@ export function ChannelView({
                         onChange={resizeBand}
                         onReset={resetBand}
                         onResetAll={resetPaneLayout}
-                        label="Call height"
+                        label={t("channelView.callHeight")}
                     />
                 )}
 
@@ -2290,7 +2290,7 @@ export function ChannelView({
                     pane="call-chat"
                     bounds={CALL_CHAT_PANE}
                     beside="lg"
-                    label="Voice channel chat width"
+                    label={t("channelView.voiceChannelChatWidth")}
                     className="border-t border-border lg:border-l lg:border-t-0"
                 >
                     {conversation}
@@ -2364,12 +2364,21 @@ export function ChannelView({
                 name={deleting ? plainExcerpt(deleting.body, 40) : ""}
                 kind="message"
                 requireTyping={false}
+                title={t("channelView.deleteMessage")}
+                question={t.rich("channelView.deleteQuestion", {
+                    name: deleting ? plainExcerpt(deleting.body, 40) : "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
                 description={
                     rules.deleteLeavesTrace || (deleting?.replyCount ?? 0) > 0
-                        ? "It leaves a line saying it was deleted, so any replies under it still make sense."
-                        : "It goes without trace, along with anything attached to it. Nobody is told it was there."
+                        ? t("channelView.itLeavesALineSaying")
+                        : t("channelView.itGoesWithoutTraceAlong")
                 }
-                confirmLabel="Delete message"
+                confirmLabel={t("channelView.deleteMessage")}
                 onConfirm={async () => {
                     if (deleting) {
                         const result = await runAction(
@@ -2452,17 +2461,14 @@ function VoiceStrip({
      *  press twice. */
     busy?: boolean;
 }) {
+    const t = useTranslations("chat");
     return (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
             <Volume2 className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-sm">
                 <span className="font-medium">{name}</span>
                 <span className="text-muted-foreground">
-                    {count === 0
-                        ? " - nobody is in here"
-                        : count === 1
-                          ? " - one person is in here"
-                          : ` - ${count} people are in here`}
+                    {t("channelView.roomCount", { count })}
                 </span>
             </span>
             {off ? (
@@ -2470,17 +2476,17 @@ function VoiceStrip({
             ) : busy ? (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                    Going in
+                    {t("channelView.goingIn")}
                 </span>
             ) : (
                 <>
                     <Button size="xs" onClick={() => void onJoin(false)}>
                         <Mic className="size-3.5" />
-                        Join
+                        {t("channelView.join")}
                     </Button>
                     <Button size="xs" variant="secondary" onClick={() => void onJoin(true)}>
                         <Video className="size-3.5" />
-                        With video
+                        {t("channelView.withVideo")}
                     </Button>
                 </>
             )}
@@ -2489,7 +2495,7 @@ function VoiceStrip({
                 // so it is the row the rest of Polaris uses - see
                 // `CallRosterList`.
                 <div className="basis-full max-h-40 overflow-y-auto overscroll-contain">
-                    <CallRosterList people={people} label={`In ${name}`} />
+                    <CallRosterList people={people} label={t("channelView.inRoom", { name })} />
                 </div>
             )}
         </div>
@@ -2510,6 +2516,7 @@ function VoiceStrip({
  * moment anyway.
  */
 function SlowmodeLine({ seconds, lastSentAt }: { seconds: number; lastSentAt: string | null }) {
+    const t = useTranslations("chat");
     const [left, setLeft] = useState(0);
 
     useEffect(() => {
@@ -2526,9 +2533,10 @@ function SlowmodeLine({ seconds, lastSentAt }: { seconds: number; lastSentAt: st
     }, [lastSentAt, seconds]);
 
     if (left <= 0) return null;
+    const wait = spokenWait(left);
     return (
         <p className="px-4 pb-1 text-xs text-muted-foreground">
-            Slow mode is on here. You can send again in {core.slowmodeSpoken(left)}.
+            {t("channelView.slowMode", { wait: t(wait.key, wait.params) })}
         </p>
     );
 }

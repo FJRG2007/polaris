@@ -7,6 +7,7 @@
  * the band's own divider goes with it, since there is nothing left to divide.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -143,7 +144,7 @@ afterEach(cleanup);
 
 describe("expanding a call in a group", () => {
     it("puts the conversation away behind the call, and brings it back", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         const messages = await screen.findByText("Nothing here yet.");
         expect(messages.closest(".hidden")).toBeNull();
         expect(screen.getByRole("separator", { name: "Call height" })).toBeTruthy();
@@ -163,7 +164,7 @@ describe("expanding a call in a group", () => {
         // they are trying to read, and that happens in a channel's call as much as
         // in a group's. Without this the size above the cap was the whole display.
         state.kind = "text";
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         const messages = await screen.findByText("Nothing here yet.");
         fireEvent.click(screen.getByRole("button", { name: "Expand the call" }));
         expect(messages.isConnected).toBe(true);
@@ -172,7 +173,7 @@ describe("expanding a call in a group", () => {
 
     it("is not offered in a voice room, which is the column already", async () => {
         state.kind = "voice";
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("Nothing here yet.");
         expect(screen.queryByRole("button", { name: "Expand the call" })).toBeNull();
     });

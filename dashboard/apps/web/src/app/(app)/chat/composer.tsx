@@ -22,6 +22,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { EmojiPicker } from "./emoji-picker";
 import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
@@ -261,6 +262,7 @@ export function Composer({
     onSaveEdit?: (messageId: string, body: string) => void | Promise<void>;
     onCancelEdit?: () => void;
 }) {
+    const t = useTranslations("chat");
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
     /** Picks that are staying where they are. Held apart from `files` because
@@ -775,9 +777,9 @@ export function Composer({
             {replyingTo && !editing && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="shrink-0 text-muted-foreground">Replying to</span>
+                    <span className="shrink-0 text-muted-foreground">{t("composer.replyingTo")}</span>
                     <span className="shrink-0 font-medium">
-                        {replyingTo.authorName ?? "somebody who has left"}
+                        {replyingTo.authorName ?? t("composer.somebodyWhoHasLeft")}
                     </span>
                     {replyingFrom && (
                         <span className="shrink-0 text-muted-foreground">
@@ -794,7 +796,7 @@ export function Composer({
                     </span>
                     <button
                         type="button"
-                        aria-label="Stop replying"
+                        aria-label={t("composer.stopReplying")}
                         onClick={onCancelReply}
                         className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
@@ -806,14 +808,14 @@ export function Composer({
             {editing && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <span className="text-muted-foreground">
-                        Editing a message
+                        {t("composer.editingAMessage")}
                         <span className="hidden text-foreground-subtle sm:inline">
-                            {" - escape to cancel"}
+                            {t("composer.escapeToCancel")}
                         </span>
                     </span>
                     <button
                         type="button"
-                        aria-label="Stop editing"
+                        aria-label={t("composer.stopEditing")}
                         onClick={onCancelEdit}
                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
@@ -895,8 +897,7 @@ export function Composer({
                     {voice.silent && (
                         <p role="status" className="flex items-center gap-1.5 text-xs text-danger">
                             <MicOff className="size-3.5 shrink-0" />
-                            Polaris is not hearing anything. Check your microphone, or that it is
-                            the one your browser is using.
+                            {t("composer.polarisIsNotHearingAnything")}
                         </p>
                     )}
                     <div className="flex items-center gap-2">
@@ -937,8 +938,8 @@ export function Composer({
                         <button
                             type="button"
                             onClick={voice.cancel}
-                            aria-label="Throw this recording away"
-                            title="Throw it away"
+                            aria-label={t("composer.throwThisRecordingAway")}
+                            title={t("composer.throwItAway")}
                             className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                         >
                             <Trash2 className="size-4" />
@@ -946,8 +947,8 @@ export function Composer({
                         <button
                             type="button"
                             onClick={voice.stop}
-                            aria-label="Send this recording"
-                            title="Send it"
+                            aria-label={t("composer.sendThisRecording")}
+                            title={t("composer.sendIt")}
                             className="shrink-0 rounded p-1.5 text-primary transition-colors hover:bg-muted"
                         >
                             <SendHorizontal className="size-4" />
@@ -1014,8 +1015,8 @@ export function Composer({
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onClick={() => setPicking(true)}
-                                    aria-label="Attach a file"
-                                    title="Attach a file"
+                                    aria-label={t("composer.attachAFile")}
+                                    title={t("composer.attachAFile")}
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <Paperclip className="size-4" />
@@ -1031,8 +1032,8 @@ export function Composer({
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onClick={() => gallery.current?.click()}
-                                    aria-label="Send a photo or video"
-                                    title="Photo or video"
+                                    aria-label={t("composer.sendAPhotoOrVideo")}
+                                    title={t("composer.photoOrVideo")}
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <ImageIcon className="size-4" />
@@ -1046,8 +1047,8 @@ export function Composer({
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onClick={() => camera.current?.click()}
-                                    aria-label="Take a photo or video"
-                                    title="Camera"
+                                    aria-label={t("composer.takeAPhotoOrVideo")}
+                                    title={t("composer.camera")}
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <Camera className="size-4" />
@@ -1074,8 +1075,8 @@ export function Composer({
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onClick={() => setClipping(true)}
-                                    aria-label="Record a video clip"
-                                    title="Record a clip"
+                                    aria-label={t("composer.recordAVideoClip")}
+                                    title={t("composer.recordAClip")}
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <Video className="size-4" />
@@ -1094,8 +1095,8 @@ export function Composer({
                                         setPollError("");
                                         setPolling(true);
                                     }}
-                                    aria-label="Create a poll"
-                                    title="Create a poll"
+                                    aria-label={t("composer.createAPoll")}
+                                    title={t("composer.createAPoll")}
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <BarChart3 className="size-4" />
@@ -1136,14 +1137,14 @@ export function Composer({
                         {editing ? (
                             <>
                                 <Button size="xs" variant="ghost" onClick={onCancelEdit}>
-                                    Cancel
+                                    {t("composer.cancel")}
                                 </Button>
                                 <Button
                                     size="xs"
                                     disabled={tooLong || (blank && files.length === 0)}
                                     onClick={() => void submit(body)}
                                 >
-                                    Save
+                                    {t("composer.save")}
                                 </Button>
                             </>
                         ) : (
@@ -1219,7 +1220,7 @@ export function Composer({
 
             {picking && (
                 <FilePickerDialog
-                    title="Attach to this message"
+                    title={t("composer.attachToThisMessage")}
                     onClose={() => setPicking(false)}
                     onPick={(picked) => void takePicked(picked)}
                 />
@@ -1268,6 +1269,7 @@ export function Composer({
  * see `MicSettings`.
  */
 function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => void }) {
+    const t = useTranslations("chat");
     const many = true;
 
     return (
@@ -1276,8 +1278,8 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                 type="button"
                 disabled={disabled}
                 onClick={onStart}
-                aria-label="Record a voice message"
-                title="Record a voice message"
+                aria-label={t("composer.recordAVoiceMessage")}
+                title={t("composer.recordAVoiceMessage")}
                 className={cn(
                     "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
                     many && "rounded-r-none pr-1"
@@ -1291,8 +1293,8 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                         <button
                             type="button"
                             disabled={disabled}
-                            aria-label="Microphone settings"
-                            title="Microphone settings"
+                            aria-label={t("composer.microphoneSettings")}
+                            title={t("composer.microphoneSettings")}
                             className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                         >
                             <ChevronDown className="size-3" />
@@ -1339,6 +1341,7 @@ function StagedFile({
     onCover: () => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("chat");
     const [preview, setPreview] = useState<string | null>(null);
     /**
      * Whether this one is open in the viewer.
@@ -1369,8 +1372,8 @@ function StagedFile({
     const remove = (
         <button
             type="button"
-            aria-label={`Remove ${file.name}`}
-            title="Remove"
+            aria-label={t("composer.removeNamed", { name: file.name })}
+            title={t("composer.remove")}
             onClick={onRemove}
             className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
         >
@@ -1389,8 +1392,8 @@ function StagedFile({
         <button
             type="button"
             aria-pressed={covered}
-            aria-label={covered ? `Send ${file.name} uncovered` : `Send ${file.name} as a spoiler`}
-            title={covered ? "Sent as a spoiler" : "Send as a spoiler"}
+            aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: file.name })}
+            title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
             onClick={onCover}
             className={cn(
                 "rounded p-0.5 transition-colors",
@@ -1440,7 +1443,7 @@ function StagedFile({
                 <button
                     type="button"
                     onClick={() => setOpen(true)}
-                    aria-label={`Open ${file.name}`}
+                    aria-label={t("composer.openNamed", { name: file.name })}
                     className="border-border block size-20 cursor-zoom-in overflow-hidden rounded-md border"
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
@@ -1500,10 +1503,11 @@ function StagedFromDrive({
     onCover: () => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("chat");
     return (
         <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
             <HardDrive className="size-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[12rem] truncate" title={`${kept.name} - in your Drive`}>
+            <span className="max-w-[12rem] truncate" title={t("composer.inYourDrive", { name: kept.name })}>
                 {kept.name}
             </span>
             <span className="text-muted-foreground">{readableSize(kept.size)}</span>
@@ -1511,9 +1515,9 @@ function StagedFromDrive({
                 type="button"
                 aria-pressed={covered}
                 aria-label={
-                    covered ? `Send ${kept.name} uncovered` : `Send ${kept.name} as a spoiler`
+                    t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: kept.name })
                 }
-                title={covered ? "Sent as a spoiler" : "Send as a spoiler"}
+                title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
                 onClick={onCover}
                 className={cn(
                     "rounded p-0.5 transition-colors",
@@ -1524,8 +1528,8 @@ function StagedFromDrive({
             </button>
             <button
                 type="button"
-                aria-label={`Remove ${kept.name}`}
-                title="Remove"
+                aria-label={t("composer.removeNamed", { name: kept.name })}
+                title={t("composer.remove")}
                 onClick={onRemove}
                 className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
             >

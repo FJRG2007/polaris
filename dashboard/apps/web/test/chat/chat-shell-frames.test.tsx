@@ -9,6 +9,7 @@
  * else catching up asks for nothing.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,7 +58,7 @@ beforeEach(() => {
     render(
         <ChatShell viewerId="ada" viewerName="Ada" orgId={null} orgName={null} may={may}>
             {null}
-        </ChatShell>
+        </ChatShell>, { wrapper: MessagesWrapper }
     );
 });
 

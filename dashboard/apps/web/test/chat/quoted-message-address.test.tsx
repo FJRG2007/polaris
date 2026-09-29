@@ -15,6 +15,7 @@
  * which is the part that used to redraw everything.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -197,7 +198,7 @@ afterEach(() => {
 describe("a message quoted from this same conversation", () => {
     it("puts the message in the address without asking the router for the route", async () => {
         const user = userEvent.setup();
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m1");
         await user.click(screen.getByRole("button", { name: "quote of m1" }));
         expect(replaced).toEqual(["/chat/c/c1/m1"]);
@@ -206,7 +207,7 @@ describe("a message quoted from this same conversation", () => {
 
     it("scrolls to the line, which is what the navigation was for", async () => {
         const user = userEvent.setup();
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m1");
         scrolledTo = [];
         await user.click(screen.getByRole("button", { name: "quote of m1" }));
@@ -223,7 +224,7 @@ describe("a jump to the newest message", () => {
         // the list stopped following the bottom, and a picture or a preview that
         // loaded under it afterwards left the reader scrolled up past it.
         const user = userEvent.setup();
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m2");
         scrolledTo = [];
         await user.click(screen.getByRole("button", { name: "quote of m2" }));

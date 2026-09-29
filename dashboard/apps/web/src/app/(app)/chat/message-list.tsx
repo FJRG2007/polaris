@@ -19,6 +19,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
@@ -77,6 +78,7 @@ function SentFile({
     at: string;
     onOpen: (file: ViewedFile) => void;
 }) {
+    const t = useTranslations("chat");
     const readable = previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-left text-xs transition-colors hover:bg-card-hover";
@@ -107,7 +109,7 @@ function SentFile({
             <button
                 type="button"
                 className={chip}
-                title={`Open ${file.name}`}
+                title={t("messageList.openNamed", { name: file.name })}
                 onClick={() =>
                     onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
                 }
@@ -124,8 +126,8 @@ function SentFile({
             <a
                 href={`/api/chat/attachments/${file.id}?download=1`}
                 download={file.name}
-                aria-label={`Download ${file.name}`}
-                title="Download"
+                aria-label={t("messageList.downloadNamed", { name: file.name })}
+                title={t("messageList.download")}
                 className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
             >
                 <Download className="size-3.5 shrink-0" />
@@ -706,6 +708,7 @@ function Message({
      *  shows the same ones and they all change together. */
     quick: readonly string[];
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
     const baseUrl = useAppUrl();
     const [showingHistory, setShowingHistory] = useState(false);
@@ -753,13 +756,13 @@ function Message({
     if (message.blocked && !revealed) {
         return (
             <p className="flex items-baseline gap-2 py-1 pl-14 pr-4 text-xs text-muted-foreground">
-                <span>Blocked message</span>
+                <span>{t("messageList.blockedMessage")}</span>
                 <button
                     type="button"
                     onClick={() => setRevealed(true)}
                     className="rounded underline-offset-2 hover:underline focus-visible:underline"
                 >
-                    Show
+                    {t("messageList.show")}
                 </button>
                 <MessageTime iso={message.createdAt} />
             </p>
@@ -823,7 +826,7 @@ function Message({
                                 // card's own face.
                                 <button
                                     type="button"
-                                    aria-label={`View ${author}'s profile`}
+                                    aria-label={t("messageList.viewProfile", { name: author })}
                                     title={author}
                                     onClick={(event) =>
                                         press(
@@ -873,7 +876,7 @@ function Message({
                                         sees what they look like to everybody else. */}
                                     <button
                                         type="button"
-                                        title={`View ${author}'s profile`}
+                                        title={t("messageList.viewProfile", { name: author })}
                                         onClick={(event) =>
                                             press(
                                                 { id: message.authorId!, name: author },
@@ -902,7 +905,7 @@ function Message({
                                     <button
                                         type="button"
                                         disabled={direct.busy}
-                                        title={`Message ${author}`}
+                                        title={t("messageList.messageNamed", { name: author })}
                                         onClick={() => void direct.open(writer)}
                                         className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
                                     >
@@ -931,7 +934,7 @@ function Message({
 
                     {message.deleted ? (
                         <p className="text-sm italic text-foreground-subtle">
-                            This message was deleted.
+                            {t("messageList.thisMessageWasDeleted")}
                         </p>
                     ) : (
                         <div className="text-sm">
@@ -955,7 +958,7 @@ function Message({
                                 <button
                                     type="button"
                                     onClick={() => setShowingHistory(true)}
-                                    title="See what it said before"
+                                    title={t("messageList.seeWhatItSaidBefore")}
                                     className="ml-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                                 >
                                     (edited)
@@ -1096,7 +1099,7 @@ function Message({
                             className="mt-1 flex items-center gap-1.5 rounded px-1 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-muted"
                         >
                             <MessageSquare className="size-3" />
-                            {message.replyCount === 1 ? "1 reply" : `${message.replyCount} replies`}
+                            {t("messageList.replies", { count: message.replyCount })}
                             {message.lastReplyAt && (
                                 <span className="font-normal text-muted-foreground">
                                     <RelativeTime iso={message.lastReplyAt} />
@@ -1112,8 +1115,8 @@ function Message({
                             <button
                                 key={emoji}
                                 type="button"
-                                aria-label={`React with ${emoji}`}
-                                title={`React with ${emoji}`}
+                                aria-label={t("messageList.reactWith", { emoji })}
+                                title={t("messageList.reactWith", { emoji })}
                                 onClick={() => onReact(message.id, emoji)}
                                 className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
                             >
@@ -1127,8 +1130,8 @@ function Message({
                         <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
                         <button
                             type="button"
-                            aria-label={message.starred ? "Remove from saved" : "Save this message"}
-                            title={message.starred ? "Remove from saved" : "Save"}
+                            aria-label={message.starred ? t("messageList.removeFromSaved") : t("messageList.saveThisMessage")}
+                            title={message.starred ? t("messageList.removeFromSaved") : t("messageList.save")}
                             onClick={() => onStar(message)}
                             className={cn(
                                 "rounded p-1 transition-colors hover:bg-muted",
@@ -1142,8 +1145,8 @@ function Message({
                         {onReply && (
                             <button
                                 type="button"
-                                aria-label="Reply"
-                                title="Reply - or press R"
+                                aria-label={t("messageList.reply")}
+                                title={t("messageList.replyOrPressR")}
                                 onClick={() => onReply(message)}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -1153,8 +1156,8 @@ function Message({
                         {onOpenThread && (
                             <button
                                 type="button"
-                                aria-label="Reply in a thread"
-                                title="Reply in a thread"
+                                aria-label={t("messageList.replyInAThread")}
+                                title={t("messageList.replyInAThread")}
                                 onClick={() => onOpenThread(message)}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -1166,7 +1169,7 @@ function Message({
                                 <DropdownMenuTrigger asChild>
                                     <button
                                         type="button"
-                                        aria-label="More for this message"
+                                        aria-label={t("messageList.moreForThisMessage")}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <SmilePlus className="size-3.5 rotate-90" />
@@ -1179,7 +1182,7 @@ function Message({
                                     {mine && rewrite && (
                                         <DropdownMenuItem onSelect={() => rewrite(message)}>
                                             <Pencil className="size-3.5" />
-                                            Edit
+                                            {t("messageList.edit")}
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuItem
@@ -1187,7 +1190,7 @@ function Message({
                                         onSelect={() => onDelete(message)}
                                     >
                                         <Trash2 className="size-3.5" />
-                                        Delete
+                                        {t("messageList.delete")}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -1231,6 +1234,7 @@ function KeepableImage({
      *  thumbnail, whose whole job is the link under it. */
     onOpen?: () => void;
 }) {
+    const t = useTranslations("chat");
     const [kept, setKept] = useState<boolean | null>(null);
     const [busy, setBusy] = useState(false);
 
@@ -1252,7 +1256,7 @@ function KeepableImage({
             <button
                 type="button"
                 onClick={onOpen}
-                aria-label={`Open ${name}`}
+                aria-label={t("messageList.openNamed", { name })}
                 className="block cursor-zoom-in"
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted */}
@@ -1266,8 +1270,8 @@ function KeepableImage({
                 type="button"
                 disabled={busy}
                 aria-pressed={kept === true}
-                aria-label={kept ? "Stop keeping this picture" : "Keep this picture"}
-                title={kept ? "Kept. It is in your picker." : "Keep this"}
+                aria-label={kept ? t("messageList.stopKeepingThisPicture") : t("messageList.keepThisPicture")}
+                title={kept ? t("messageList.keptItIsInYour") : t("messageList.keepThis")}
                 onClick={() => void toggle()}
                 className={cn(
                     "absolute right-1 top-1 rounded-md border border-border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/pic:opacity-100",
@@ -1349,17 +1353,14 @@ function Ticks({
     receipt: NonNullable<ChatMessageView["receipt"]>;
     onOpen: () => void;
 }) {
-    const label = {
-        sent: "Sent",
-        delivered: "Delivered",
-        read: "Read"
-    }[receipt];
+    const t = useTranslations("chat");
+    const label = t(`messageList.receipt.${receipt}`);
 
     return (
         <button
             type="button"
-            title={`${label}. Press for when.`}
-            aria-label={`${label}. Open message information`}
+            title={t("messageList.stateHint", { label })}
+            aria-label={t("messageList.stateInfo", { label })}
             onClick={onOpen}
             className={cn(
                 "ml-1 inline-flex rounded align-middle transition-colors hover:text-foreground",
@@ -1442,6 +1443,7 @@ function VoiceCard({
     reference: ChatReferenceView;
     inRoom: readonly VoicePresence[];
 }) {
+    const t = useTranslations("chat");
     // The nullable one: a card can be drawn on the guest page, which has no
     // dashboard around it and so no hold above it.
     const held = useHeldCall();
@@ -1456,7 +1458,7 @@ function VoiceCard({
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {inRoom.length === 0
-                        ? "Nobody in here"
+                        ? t("messageList.nobodyInHere")
                         : inRoom.map((person) => person.name).join(", ")}
                 </span>
             </span>
@@ -1465,14 +1467,14 @@ function VoiceCard({
                     aria-disabled="true"
                     className="pointer-events-none shrink-0 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
                 >
-                    Joined
+                    {t("messageList.joined")}
                 </span>
             ) : (
                 <Link
                     href={`/chat/c/${reference.id}?join=1`}
                     className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground no-underline hover:bg-primary/90"
                 >
-                    Join
+                    {t("messageList.join")}
                 </Link>
             )}
         </div>
@@ -1547,15 +1549,16 @@ function QuoteLine({
     here: string;
     onJumpTo?: (messageId: string) => void;
 }) {
+    const t = useTranslations("chat");
     const body = (
         <>
             <CornerUpLeft className="size-3 shrink-0" />
-            {quote.forwarded && <span className="shrink-0 font-medium">Forwarded from</span>}
+            {quote.forwarded && <span className="shrink-0 font-medium">{t("messageList.forwardedFrom")}</span>}
             <span className="shrink-0 font-medium text-foreground">
-                {quote.authorName ?? "somebody who has left"}
+                {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}
             </span>
             <span className="min-w-0 truncate" title={quote.excerpt}>
-                {quote.deleted ? "message deleted" : quote.excerpt || "attachment"}
+                {quote.deleted ? t("messageList.messageDeleted") : quote.excerpt || "attachment"}
             </span>
         </>
     );
@@ -1568,7 +1571,7 @@ function QuoteLine({
             channelId={quote.channelId}
             here={here}
             onJumpTo={onJumpTo}
-            title="Go to the original message"
+            title={t("messageList.goToTheOriginalMessage")}
             className={cn(
                 shape,
                 "w-fit max-w-full rounded no-underline transition-colors hover:text-foreground focus-visible:text-foreground"
@@ -1637,6 +1640,7 @@ function QuotedMessageCard({
     /** Scroll to it rather than navigating - see `MessageListProps`. */
     onJumpTo?: (messageId: string) => void;
 }) {
+    const t = useTranslations("chat");
     const from = whereFrom(reference, here);
 
     return (
@@ -1654,7 +1658,7 @@ function QuotedMessageCard({
             )}
             <span className="flex items-baseline gap-2">
                 <span className="truncate text-xs font-medium">
-                    {reference.authorName || "Somebody who has left"}
+                    {reference.authorName || t("messageList.somebodyWhoHasLeft2")}
                 </span>
                 {reference.at && (
                     <span className="shrink-0 text-[0.6875rem] text-foreground-subtle">
@@ -1769,12 +1773,13 @@ function withinWindow(left: string, right: string): boolean {
  * download that fails.
  */
 function DriveMark() {
+    const t = useTranslations("chat");
     return (
         <span
             className="shrink-0 text-muted-foreground"
-            title="This file lives in the sender's Drive. They can change it or remove it."
+            title={t("messageList.thisFileLivesInThe")}
         >
-            in Drive
+            {t("messageList.inDrive")}
         </span>
     );
 }

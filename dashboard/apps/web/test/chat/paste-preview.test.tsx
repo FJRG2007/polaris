@@ -10,6 +10,7 @@
  * nothing lost from the composer's own limits.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { DEFAULT_CHAT_RULES } from "@polaris/core";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "@/app/(app)/chat/composer";
@@ -72,7 +73,7 @@ describe("pasting a screenshot into the composer", () => {
                 disabled={false}
                 placeholder="Message"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const editable = await editableSurface(container);
@@ -96,7 +97,7 @@ describe("pasting a screenshot into the composer", () => {
                 disabled={false}
                 placeholder="Message"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const editable = await editableSurface(container);
@@ -122,7 +123,7 @@ describe("pasting a screenshot into the composer", () => {
                 disabled={false}
                 placeholder="Message"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const editable = await editableSurface(container);
@@ -142,7 +143,7 @@ describe("pasting a screenshot into the composer", () => {
                 attachable={false}
                 placeholder="Message"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const editable = await editableSurface(container);
@@ -187,7 +188,7 @@ describe("focusing the composer for a reply", () => {
                 disabled={false}
                 placeholder="Message"
                 onSend={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const editable = await editableSurface(container);

@@ -16,6 +16,7 @@
  * conversation being had. The guard is what `session` is for.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { render } from "@testing-library/react";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -147,7 +148,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 describe("pressing a voice channel", () => {
     it("walks in when this browser holds no call", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         await vi.waitFor(() =>
             expect(entered).toEqual([
@@ -158,14 +159,14 @@ describe("pressing a voice channel", () => {
     });
 
     it("takes the press out of the address, so a reload does not repeat it", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         await vi.waitFor(() => expect(replaced).toEqual(["/chat/c/c1"]));
     });
 
     it("does not touch a call already held somewhere else", async () => {
         session = { channelId: "elsewhere", meetingId: "m-elsewhere" };
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         await settle();
         expect(started).toEqual([]);
@@ -179,7 +180,7 @@ describe("arriving at a voice channel without pressing it", () => {
         // the room on screen, and nothing in the address saying anybody asked to
         // be in it.
         params = new URLSearchParams();
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         await settle();
         expect(started).toEqual([]);

@@ -11,6 +11,7 @@
  * twice until the next reload.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -168,7 +169,7 @@ afterEach(() => {
 
 describe("the reader's own message", () => {
     it("is drawn once when its frame's catch-up answers after the send's reload", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m1");
         await waitFor(() => expect(onSend).not.toBeNull());
 

@@ -13,6 +13,7 @@
  * at yourself, and there is no conversation to open with you.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { MessageList } from "@/app/(app)/chat/message-list";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -102,7 +103,7 @@ function list() {
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

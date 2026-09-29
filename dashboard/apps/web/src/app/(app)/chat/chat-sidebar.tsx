@@ -304,14 +304,14 @@ export function ChatSidebar() {
         <div className="flex h-full min-h-0 flex-col">
             <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
                 <span className="min-w-0 truncate text-sm font-semibold" title={space?.name}>
-                    {space?.name ?? "Direct messages"}
+                    {space?.name ?? t("sidebar.directMessages")}
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5">
                     {space === null ? (
                         <button
                             type="button"
-                            aria-label="Start a direct message"
-                            title="Start a direct message"
+                            aria-label={t("sidebar.startADirectMessage")}
+                            title={t("sidebar.startADirectMessage")}
                             onClick={() => setNewDirect(true)}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
@@ -323,8 +323,8 @@ export function ChatSidebar() {
                                 <DropdownMenuTrigger asChild>
                                     <button
                                         type="button"
-                                        aria-label={`Add to ${space.name}`}
-                                        title="Add a channel or a category"
+                                        aria-label={t("sidebar.addTo", { name: space.name })}
+                                        title={t("sidebar.addAChannelOrA")}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <Plus className="size-4" />
@@ -337,12 +337,12 @@ export function ChatSidebar() {
                                         }
                                     >
                                         <Hash className="size-3.5" />
-                                        New channel
+                                        {t("sidebar.newChannel")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onSelect={() => setNewCategory(true)}>
                                         <FolderPlus className="size-3.5" />
-                                        New category
+                                        {t("sidebar.newCategory")}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -358,12 +358,12 @@ export function ChatSidebar() {
                 <button
                     type="button"
                     onClick={() => openSearch("chat")}
-                    aria-label="Find or start a conversation"
+                    aria-label={t("sidebar.findOrStartAConversation")}
                     aria-keyshortcuts="Control+K Meta+K"
                     className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-field px-2 text-left text-sm text-foreground-subtle transition-colors hover:border-border-strong hover:text-muted-foreground"
                 >
                     <Search className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate">Find or start a conversation</span>
+                    <span className="min-w-0 flex-1 truncate">{t("sidebar.findOrStartAConversation")}</span>
                 </button>
             </div>
 
@@ -380,7 +380,7 @@ export function ChatSidebar() {
                     )}
                 >
                     <Star className="size-3.5 shrink-0" />
-                    <span>Saved messages</span>
+                    <span>{t("sidebar.savedMessages")}</span>
                 </Link>
 
                 {/* In every rail for the same reason, and drawn for everybody:
@@ -395,7 +395,7 @@ export function ChatSidebar() {
                     )}
                 >
                     <Video className="size-3.5 shrink-0" />
-                    <span>Meetings</span>
+                    <span>{t("sidebar.meetings")}</span>
                 </Link>
 
                 {error && (
@@ -408,12 +408,12 @@ export function ChatSidebar() {
                     <SidebarSkeleton />
                 ) : space === null ? (
                     <Section
-                        label="Direct messages"
+                        label={t("sidebar.directMessages")}
                         folded={folded.includes("dm")}
                         onToggle={() => toggle("dm")}
                     >
                         {directs.length === 0 ? (
-                            <p className="px-2 py-1 text-xs text-foreground-subtle">Nobody yet.</p>
+                            <p className="px-2 py-1 text-xs text-foreground-subtle">{t("sidebar.nobodyYet")}</p>
                         ) : (
                             directs.map((channel) => (
                                 <Row
@@ -613,7 +613,7 @@ export function ChatSidebar() {
                                                 <DropdownMenuTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        aria-label={`More for ${category.name}`}
+                                                        aria-label={t("sidebar.moreFor", { name: category.name })}
                                                         className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                                                     >
                                                         <Plus className="size-3.5" />
@@ -629,7 +629,7 @@ export function ChatSidebar() {
                                                         }
                                                     >
                                                         <Hash className="size-3.5" />
-                                                        New channel here
+                                                        {t("sidebar.newChannelHere")}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem
@@ -643,7 +643,7 @@ export function ChatSidebar() {
                                                         }}
                                                     >
                                                         <Trash2 className="size-3.5" />
-                                                        Delete category
+                                                        {t("sidebar.deleteCategory")}
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -667,7 +667,7 @@ export function ChatSidebar() {
 
                         {inSpace.length === 0 && (
                             <p className="px-2 py-3 text-xs text-muted-foreground">
-                                No channels yet.
+                                {t("sidebar.noChannelsYet")}
                             </p>
                         )}
                     </>
@@ -753,18 +753,18 @@ export function ChatSidebar() {
             <Dialog open={newCategory} onOpenChange={setNewCategory}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>New category</DialogTitle>
+                        <DialogTitle>{t("sidebar.newCategory")}</DialogTitle>
                     </DialogHeader>
                     <Input
                         value={categoryName}
                         autoFocus
-                        placeholder="What the channels under it have in common"
-                        aria-label="What the category is called"
+                        placeholder={t("sidebar.whatTheChannelsUnderIt")}
+                        aria-label={t("sidebar.whatTheCategoryIsCalled")}
                         onChange={(event) => setCategoryName(event.target.value)}
                     />
                     <DialogFooter>
                         <Button variant="ghost" size="sm" onClick={() => setNewCategory(false)}>
-                            Cancel
+                            {t("sidebar.cancel")}
                         </Button>
                         <Button
                             size="sm"
@@ -781,7 +781,7 @@ export function ChatSidebar() {
                                 setNewCategory(false);
                             }}
                         >
-                            Create
+                            {t("sidebar.create")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1129,6 +1129,7 @@ function Row({
      */
     roomy?: boolean;
 }) {
+    const t = useTranslations("chat");
     // A muted conversation still counts its messages - it just does not shout
     // about them, which is the difference between muting and leaving.
     const shout = unread > 0 && !muted;
@@ -1203,13 +1204,13 @@ function Row({
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
             {channel?.pinned && (
-                <Pin className="size-3 shrink-0 text-foreground-subtle" aria-label="Pinned" />
+                <Pin className="size-3 shrink-0 text-foreground-subtle" aria-label={t("sidebar.pinned")} />
             )}
             {occupancy && (
                 <span
                     className="shrink-0 rounded bg-muted px-1 text-[0.625rem] font-medium tabular-nums leading-4 text-muted-foreground"
-                    aria-label={`${occupancy.replace("/", " of ")} places taken`}
-                    title={`${occupancy.replace("/", " of ")} places taken`}
+                    aria-label={t("sidebar.placesTaken", { places: occupancy.replace("/", t("sidebar.of")) })}
+                    title={t("sidebar.placesTaken", { places: occupancy.replace("/", t("sidebar.of")) })}
                 >
                     {occupancy}
                 </span>
@@ -1306,7 +1307,7 @@ function RowMenu({
                         <>
                             <ContextMenuItem onSelect={() => router.push("/chat")}>
                                 <X className="size-3.5" />
-                                Close chat
+                                {t("sidebar.closeChat")}
                             </ContextMenuItem>
                             <ContextMenuSeparator />
                         </>
@@ -1324,7 +1325,7 @@ function RowMenu({
                         ) : (
                             <Pin className="size-3.5" />
                         )}
-                        {channel.pinned ? "Unpin" : "Pin to the top"}
+                        {channel.pinned ? t("sidebar.unpin") : t("sidebar.pinToTheTop")}
                     </ContextMenuItem>
                     {/* Only where there is something to put back. A conversation
                     already carrying a badge has nothing to mark, and an item
@@ -1337,7 +1338,7 @@ function RowMenu({
                             }}
                         >
                             <Mail className="size-3.5" />
-                            Mark as unread
+                            {t("sidebar.markAsUnread")}
                         </ContextMenuItem>
                     ) : (
                         <ContextMenuItem
@@ -1363,7 +1364,7 @@ function RowMenu({
                         onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                     >
                         <Link2 className="size-3.5" />
-                        Copy link
+                        {t("sidebar.copyLink")}
                     </ContextMenuItem>
                     {/* What a bot, an integration or an API call names it by. */}
                     <ContextMenuItem onSelect={() => void copyText(channel.id)}>
@@ -1403,7 +1404,7 @@ function RowMenu({
                             onSelect={() => router.push(`/chat/c/${channel.id}?answer=1`)}
                         >
                             <Phone className="size-3.5" />
-                            Start a call
+                            {t("sidebar.startACall")}
                         </ContextMenuItem>
                     )}
 
@@ -1414,7 +1415,7 @@ function RowMenu({
                     {person && (
                         <ContextMenuItem onSelect={() => setNaming(true)}>
                             <Pencil className="size-3.5" />
-                            Nickname
+                            {t("sidebar.nickname")}
                         </ContextMenuItem>
                     )}
 
@@ -1444,7 +1445,7 @@ function RowMenu({
                                 ) : (
                                     <Ban className="size-3.5" />
                                 )}
-                                {blocked.has(person.id) ? "Unblock" : "Block"}
+                                {blocked.has(person.id) ? t("sidebar.unblock") : t("sidebar.block")}
                             </ContextMenuItem>
                         </>
                     )}
@@ -1460,7 +1461,7 @@ function RowMenu({
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={() => setLeaving(true)}>
                                 <LogOut className="size-3.5" />
-                                Leave this group
+                                {t("sidebar.leaveThisGroup")}
                             </ContextMenuItem>
                         </>
                     )}
@@ -1473,7 +1474,7 @@ function RowMenu({
                             <ContextMenuSeparator />
                             <ContextMenuItem onSelect={() => onManage(channel, "edit")}>
                                 <Settings2 className="size-3.5" />
-                                Edit channel
+                                {t("sidebar.editChannel")}
                             </ContextMenuItem>
                             {/* The settings, people and access rules, under a
                                 new name. Never the messages. */}

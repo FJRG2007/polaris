@@ -13,6 +13,7 @@
  * mention stays the label it always was rather than a button that goes nowhere.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { RichText } from "@/components/rich-text/rich-text";
 import { MessageList } from "@/app/(app)/chat/message-list";
@@ -170,7 +171,7 @@ function conversation(body?: string) {
                 onStar={() => undefined}
                 onDelete={() => undefined}
             />
-        </PersonCardProvider>
+        </PersonCardProvider>, { wrapper: MessagesWrapper }
     );
 }
 
@@ -269,7 +270,7 @@ describe("a mention", () => {
     });
 
     it("stays a label where nothing opens a card, as under a task", () => {
-        render(<RichText value={`ask [@Grace Hopper](polaris:user/${GRACE}) about it`} />);
+        render(<RichText value={`ask [@Grace Hopper](polaris:user/${GRACE}) about it`} />, { wrapper: MessagesWrapper });
         expect(screen.queryByRole("button", { name: "@Grace Hopper" })).toBeNull();
         expect(screen.getByText("@Grace Hopper")).toBeDefined();
     });
@@ -284,7 +285,7 @@ describe("the roster", () => {
                 open
                 onOpenChange={() => undefined}
                 onMention={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         await user.click(await screen.findByRole("button", { name: /Grace Hopper/ }));
         const card = await openCard();

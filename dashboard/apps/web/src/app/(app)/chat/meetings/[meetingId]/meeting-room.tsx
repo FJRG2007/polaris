@@ -20,6 +20,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useAppUrl } from "@/components/app-url";
 import { copyText } from "@/app/(app)/chat/links";
 import { CallRoom } from "@/app/(app)/chat/call-room";
@@ -59,6 +60,7 @@ import {
 } from "@/app/(app)/chat/meeting-actions";
 
 export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewerId: string }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const params = useSearchParams();
     const baseUrl = useAppUrl();
@@ -123,7 +125,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 // A meeting has no conversation. The bar reads this to know it
                 // is already on screen, and the address below to lead back here.
                 channelId: "",
-                title: about?.title || "Meeting",
+                title: about?.title || t("meetingRoom.meeting"),
                 href: `/chat/meetings/${meetingId}`
             },
             false
@@ -171,8 +173,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     if (gone) {
         return (
             <Empty
-                title="This meeting is not here"
-                message="It ended, or it was never yours to open."
+                title={t("meetingRoom.thisMeetingIsNotHere")}
+                message={t("meetingRoom.itEndedOrItWas")}
             />
         );
     }
@@ -187,12 +189,12 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             roster moves, so a host renaming the meeting mid-call
                             reaches everybody in it rather than only themselves. */}
                         <span className="font-medium">
-                            {call.meeting?.title || about?.title || "Meeting"}
+                            {call.meeting?.title || about?.title || t("meetingRoom.meeting")}
                         </span>
                         {about && (
                             <span className="text-muted-foreground">
                                 {" - "}
-                                {about.mine ? "you are hosting" : `${about.hostName} is hosting`}
+                                {about.mine ? t("meetingRoom.youAreHosting") : t("meetingRoom.hostedBy", { name: about.hostName })}
                                 {about.scheduledAt ? `, ${format.dateTime(about.scheduledAt)}` : ""}
                             </span>
                         )}
@@ -202,7 +204,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         <Button
                             size="xs"
                             variant="secondary"
-                            title="Copy the link to send"
+                            title={t("meetingRoom.copyTheLinkToSend")}
                             onClick={async () => {
                                 await copyText(`${baseUrl}/m/${about.guestToken}`);
                                 setCopied(true);
@@ -210,14 +212,14 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             }}
                         >
                             <Link2 className="size-3.5" />
-                            {copied ? "Copied" : "Copy link"}
+                            {copied ? t("meetingRoom.copied") : t("meetingRoom.copyLink")}
                         </Button>
                     )}
                     {host && (
                         <>
                             <Button size="xs" variant="secondary" onClick={() => setInviting(true)}>
                                 <UserPlus className="size-3.5" />
-                                Invite
+                                {t("meetingRoom.invite")}
                             </Button>
                             {/* The name and the hour, which used to be settable
                                 once and never again: a meeting that moved could
@@ -226,15 +228,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             <Button
                                 size="icon-xs"
                                 variant="secondary"
-                                title="Rename or reschedule"
-                                aria-label="Rename or reschedule this meeting"
+                                title={t("meetingRoom.renameOrReschedule")}
+                                aria-label={t("meetingRoom.renameOrRescheduleThisMeeting")}
                                 onClick={() => setEditing(true)}
                             >
                                 <Pencil className="size-3.5" />
                             </Button>
                             <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
                                 <LogOut className="size-3.5" />
-                                End
+                                {t("meetingRoom.end")}
                             </Button>
                         </>
                     )}
@@ -268,17 +270,17 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
                         <p className="text-sm text-muted-foreground">
                             {waiting
-                                ? "Waiting for the host to let you in."
+                                ? t("meetingRoom.waitingForTheHostTo")
                                 : about?.present
-                                  ? `${about.present} in the room.`
-                                  : "Nobody is in here yet."}
+                                  ? t("meetingRoom.present", { count: about.present })
+                                  : t("meetingRoom.nobodyIsInHereYet")}
                         </p>
                         {!waiting && about && about.people.length > 0 && (
                             <CallRoster people={about.people} />
                         )}
                         <Button disabled={joining || waiting} onClick={() => void join()}>
                             {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
-                            {waiting ? "Waiting to be let in" : "Join"}
+                            {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
                         </Button>
                     </div>
                 )}
@@ -307,7 +309,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     pane="call-chat"
                     bounds={CALL_CHAT_PANE}
                     beside="lg"
-                    label="Meeting chat width"
+                    label={t("meetingRoom.meetingChatWidth")}
                     className="border-t border-border lg:border-l lg:border-t-0"
                 >
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
@@ -335,12 +337,20 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
             <ConfirmDeleteDialog
                 open={ending}
                 onOpenChange={(next) => !next && setEnding(false)}
-                name={about?.title ?? "this meeting"}
+                name={about?.title ?? t("meetingRoom.thisMeeting")}
                 kind="meeting"
                 requireTyping={false}
-                title="End this meeting?"
-                description="Everybody in it is dropped, and the link stops opening anything."
-                confirmLabel="End meeting"
+                title={t("meetingRoom.endThisMeeting")}
+                question={t.rich("meetingRoom.endQuestion", {
+                    name: about?.title ?? t("meetingRoom.thisMeeting"),
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("meetingRoom.everybodyInItIsDropped")}
+                confirmLabel={t("meetingRoom.endMeeting")}
                 onConfirm={async () => {
                     setEnding(false);
                     const result = await runAction(() => endMeetingAction(meetingId), setError);
@@ -380,6 +390,7 @@ function HostPanel({
     onChanged: () => void | Promise<void>;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
     const set = async (options: { approveGuests?: boolean; requireAccount?: boolean }) => {
@@ -392,31 +403,31 @@ function HostPanel({
 
     return (
         <section className="shrink-0 border-t border-border px-4 py-3">
-            <h2 className="text-xs font-medium text-muted-foreground">Hosting</h2>
+            <h2 className="text-xs font-medium text-muted-foreground">{t("meetingRoom.hosting")}</h2>
 
             <div className="mt-2 flex flex-col gap-2">
                 <label className="flex items-center justify-between gap-4">
                     <span className="text-xs">
-                        Let people in yourself
+                        {t("meetingRoom.letPeopleInYourself")}
                         <span className="block text-[0.6875rem] text-muted-foreground">
-                            Anybody on the link waits until you admit them.
+                            {t("meetingRoom.anybodyOnTheLinkWaits")}
                         </span>
                     </span>
                     <Switch
-                        aria-label="Let people in yourself"
+                        aria-label={t("meetingRoom.letPeopleInYourself")}
                         checked={about?.approveGuests ?? true}
                         onChange={(next) => void set({ approveGuests: next })}
                     />
                 </label>
                 <label className="flex items-center justify-between gap-4">
                     <span className="text-xs">
-                        Polaris accounts only
+                        {t("meetingRoom.polarisAccountsOnly")}
                         <span className="block text-[0.6875rem] text-muted-foreground">
-                            The link names the meeting but only opens for somebody signed in.
+                            {t("meetingRoom.theLinkNamesTheMeeting")}
                         </span>
                     </span>
                     <Switch
-                        aria-label="Polaris accounts only"
+                        aria-label={t("meetingRoom.polarisAccountsOnly")}
                         checked={about?.requireAccount ?? false}
                         onChange={(next) => void set({ requireAccount: next })}
                     />
@@ -430,7 +441,7 @@ function HostPanel({
                             <span className="min-w-0 flex-1 truncate text-xs">
                                 {person.name}
                                 {person.guest && (
-                                    <span className="text-muted-foreground"> - guest</span>
+                                    <span className="text-muted-foreground">{t("meetingRoom.guestSuffix")}</span>
                                 )}
                             </span>
                             {!person.self && (
@@ -444,10 +455,10 @@ function HostPanel({
                                         variant="ghost"
                                         title={
                                             person.guest
-                                                ? "Only somebody with a Polaris account can host"
-                                                : `Make ${person.name} the host`
+                                                ? t("meetingRoom.onlySomebodyWithAPolaris")
+                                                : t("meetingRoom.makeHost", { name: person.name })
                                         }
-                                        aria-label={`Make ${person.name} the host`}
+                                        aria-label={t("meetingRoom.makeHost", { name: person.name })}
                                         disabled={person.guest}
                                         onClick={async () => {
                                             const result = await runAction(
@@ -462,8 +473,8 @@ function HostPanel({
                                     <Button
                                         size="icon-xs"
                                         variant="ghost"
-                                        title={`Remove ${person.name}`}
-                                        aria-label={`Remove ${person.name}`}
+                                        title={t("meetingRoom.removeNamed", { name: person.name })}
+                                        aria-label={t("meetingRoom.removeNamed", { name: person.name })}
                                         onClick={() =>
                                             setRemoving({ id: person.id, name: person.name })
                                         }
@@ -483,9 +494,17 @@ function HostPanel({
                 name={removing?.name ?? ""}
                 kind="person"
                 requireTyping={false}
-                title={removing ? `Remove ${removing.name}?` : "Remove them?"}
-                description="They are dropped from the meeting. Somebody with an account cannot come back in; a guest on the link comes back to the door."
-                confirmLabel="Remove"
+                title={removing ? t("meetingRoom.removeQuestion", { name: removing.name }) : t("meetingRoom.removeThem")}
+                question={t.rich("meetingRoom.removeConfirm", {
+                    name: removing?.name ?? "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("meetingRoom.theyAreDroppedFromThe")}
+                confirmLabel={t("meetingRoom.remove")}
                 onConfirm={async () => {
                     const person = removing;
                     setRemoving(null);
@@ -517,6 +536,7 @@ function InviteDialog({
     onInvited: () => void | Promise<void>;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
 
@@ -528,12 +548,11 @@ function InviteDialog({
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Invite people</DialogTitle>
+                    <DialogTitle>{t("meetingRoom.invitePeople")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
                     <p className="text-xs text-muted-foreground">
-                        They get an alert with the meeting on it and walk straight in when it
-                        starts. For anybody without an account, send the link instead.
+                        {t("meetingRoom.theyGetAnAlertWith")}
                     </p>
                     <PeoplePicker
                         picked={picked}
@@ -543,7 +562,7 @@ function InviteDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="secondary" size="sm" onClick={onClose}>
-                        Cancel
+                        {t("meetingRoom.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -566,7 +585,7 @@ function InviteDialog({
                         }}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Invite
+                        {t("meetingRoom.invite")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

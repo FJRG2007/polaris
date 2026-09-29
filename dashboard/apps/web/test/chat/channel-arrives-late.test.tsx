@@ -15,6 +15,7 @@
  * test for it is simply that the second render happens.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -161,7 +162,7 @@ afterEach(() => {
 
 describe("a conversation whose channel has not arrived yet", () => {
     it("draws it once it does, rather than throwing on the render that has it", async () => {
-        const { rerender } = render(<ChannelView channelId="c1" />);
+        const { rerender } = render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         // Nothing to draw yet, which is the render that decides how many hooks
         // this component has for the rest of its life.
         expect(screen.queryByText("m1")).toBeNull();

@@ -35,6 +35,7 @@
  */
 
 import type { CallState } from "./use-call";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./meeting-actions";
 import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
@@ -199,6 +200,7 @@ export function CallRoom({
     viewerId?: string;
     mayInvite?: boolean;
 }) {
+    const t = useTranslations("chat");
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
 
@@ -557,9 +559,9 @@ export function CallRoom({
     if (call.ended) {
         return (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8">
-                <p className="text-sm text-muted-foreground">The call has ended.</p>
+                <p className="text-sm text-muted-foreground">{t("callRoom.theCallHasEnded")}</p>
                 <Button size="sm" onClick={onLeave}>
-                    Close
+                    {t("callRoom.close")}
                 </Button>
             </div>
         );
@@ -585,11 +587,11 @@ export function CallRoom({
                             type="button"
                             onClick={() => onExpand(!expanded)}
                             aria-pressed={expanded}
-                            aria-label={expanded ? "Shrink the call" : "Expand the call"}
+                            aria-label={expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")}
                             title={
                                 expanded
-                                    ? "Shrink the call - the conversation comes back"
-                                    : "Expand the call to the whole column"
+                                    ? t("callRoom.shrinkTheCallTheConversation")
+                                    : t("callRoom.expandTheCallToThe")
                             }
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
@@ -607,11 +609,11 @@ export function CallRoom({
                                 call.recording ? held?.recording.stop() : setAsking(true)
                             }
                             aria-pressed={call.recording}
-                            aria-label={call.recording ? "Stop recording" : "Record this call"}
+                            aria-label={call.recording ? t("callRoom.stopRecording") : t("callRoom.recordThisCall")}
                             title={
                                 call.recording
-                                    ? `Stop recording (${clock(held?.recording.seconds ?? 0)})`
-                                    : "Write this call to a video file in this browser"
+                                    ? t("callRoom.stopRecordingAt", { time: clock(held?.recording.seconds ?? 0) })
+                                    : t("callRoom.writeThisCallToA")
                             }
                             className={cn(
                                 "rounded p-1.5 transition-colors hover:bg-muted",
@@ -631,8 +633,8 @@ export function CallRoom({
                         <button
                             type="button"
                             onClick={() => setInviting(true)}
-                            aria-label={mayInvite ? "Add people" : "Share a link to this call"}
-                            title={mayInvite ? "Add people" : "Share a link to this call"}
+                            aria-label={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
+                            title={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <UserPlus className="size-4" />
@@ -668,10 +670,7 @@ export function CallRoom({
                         role="status"
                         className="shrink-0 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
                     >
-                        What you are sharing has stopped sending new pictures, so everybody sees the
-                        last one. If it is a minimised window - a game in full screen minimises when
-                        you switch away - bring it back, run the game in a window, or share your
-                        whole screen.
+                        {t("callRoom.whatYouAreSharingHas")}
                     </p>
                 )}
 
@@ -697,8 +696,8 @@ export function CallRoom({
                         <Circle className="size-3 shrink-0 fill-current" />
                         <span className="min-w-0 flex-1">
                             {call.recording
-                                ? "You are recording this call. Everybody in it can see that."
-                                : `${recordedBy} is recording this call.`}
+                                ? t("callRoom.youAreRecordingThisCall")
+                                : t("callRoom.recordedBy", { name: recordedBy })}
                         </span>
                     </p>
                 )}
@@ -719,12 +718,23 @@ export function CallRoom({
                             className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
                         >
                             <span className="min-w-0 flex-1 truncate">
-                                <span className="font-medium">{person.name}</span>
-                                <span className="text-muted-foreground"> wants to join</span>
+                                {t.rich("callRoom.wantsToJoin", {
+                                    name: person.name,
+                                    who: (chunks) => (
+                                        <span key="who" className="font-medium">
+                                            {chunks}
+                                        </span>
+                                    ),
+                                    rest: (chunks) => (
+                                        <span key="rest" className="text-muted-foreground">
+                                            {chunks}
+                                        </span>
+                                    )
+                                })}
                             </span>
                             <button
                                 type="button"
-                                aria-label={`Let ${person.name} in`}
+                                aria-label={t("callRoom.letIn", { name: person.name })}
                                 onClick={async () => {
                                     await actions.admitAction(meetingId, person.id, true);
                                     call.refresh();
@@ -735,7 +745,7 @@ export function CallRoom({
                             </button>
                             <button
                                 type="button"
-                                aria-label={`Turn ${person.name} away`}
+                                aria-label={t("callRoom.turnAway", { name: person.name })}
                                 onClick={async () => {
                                     await actions.admitAction(meetingId, person.id, false);
                                     call.refresh();
@@ -779,8 +789,8 @@ export function CallRoom({
                             <button
                                 type="button"
                                 onClick={() => setAway((was) => [...was, stage.key])}
-                                aria-label={`Stop watching ${stage.name}`}
-                                title={`Stop watching ${stage.name} - it keeps going, and the conversation comes back`}
+                                aria-label={t("callRoom.stopWatching", { name: stage.name })}
+                                title={t("callRoom.stopWatchingHint", { name: stage.name })}
                                 className="flex max-w-52 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground transition-colors"
                             >
                                 <Eye className="size-3.5 shrink-0" />
@@ -839,7 +849,7 @@ export function CallRoom({
                                             {stage.name}
                                         </span>
                                         <span className="text-xs text-muted-foreground">
-                                            Still sharing. You are not watching.
+                                            {t("callRoom.stillSharingYouAreNot")}
                                         </span>
                                     </span>
                                     <button
@@ -849,7 +859,7 @@ export function CallRoom({
                                         }
                                         className="ml-auto shrink-0 rounded-md border border-border-strong bg-muted px-3 py-1.5 text-xs font-medium text-foreground hover:bg-card-hover"
                                     >
-                                        Watch
+                                        {t("callRoom.watch")}
                                     </button>
                                 </li>
                             </MaybeStreamMenu>
@@ -1061,12 +1071,12 @@ export function CallRoom({
                 needed to leave the call ended up half off the panel. */}
             <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
                 <Split
-                    label={call.micOn ? "Mute" : "Unmute"}
+                    label={call.micOn ? t("callRoom.mute") : t("callRoom.unmute")}
                     // Only a moderator lifts their own mute, so the button says
                     // who has it rather than offering to undo it.
                     title={
                         call.moderation.serverMuted || call.moderation.serverDeafened
-                            ? "A moderator muted you"
+                            ? t("callRoom.aModeratorMutedYou")
                             : undefined
                     }
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
@@ -1075,7 +1085,7 @@ export function CallRoom({
                     onClick={call.toggleMic}
                     devices={call.microphones}
                     chosenId={call.microphoneId}
-                    devicesLabel="Microphone"
+                    devicesLabel={t("callRoom.devices.microphone")}
                     onChoose={call.chooseMicrophone}
                     cleanMic={call.cleanMic}
                     onCleanMic={call.setCleanMic}
@@ -1087,7 +1097,7 @@ export function CallRoom({
                 />
 
                 <Split
-                    label={call.cameraOn ? "Stop video" : "Start video"}
+                    label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
                     icon={
                         call.cameraOn ? (
                             <Video className="size-4" />
@@ -1100,7 +1110,7 @@ export function CallRoom({
                     onClick={call.toggleCamera}
                     devices={call.cameras}
                     chosenId={call.cameraId}
-                    devicesLabel="Camera"
+                    devicesLabel={t("callRoom.devices.camera")}
                     onChoose={call.chooseCamera}
                     ladder={CAMERA_LADDER}
                     quality={call.cameraQuality}
@@ -1119,7 +1129,7 @@ export function CallRoom({
                 />
 
                 <Split
-                    label={call.sharing ? "Stop sharing" : "Share screen"}
+                    label={call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")}
                     icon={
                         call.sharing ? (
                             <MonitorX className="size-4" />
@@ -1135,7 +1145,7 @@ export function CallRoom({
                     // allowed to.
                     devices={[]}
                     chosenId={null}
-                    devicesLabel="Screen"
+                    devicesLabel={t("callRoom.devices.screen")}
                     onChoose={() => undefined}
                     ladder={SCREEN_LADDER}
                     quality={call.screenQuality}
@@ -1149,13 +1159,13 @@ export function CallRoom({
                     room with other people in it, meant leaving the call and
                     changing it in the operating system. */}
                 <Split
-                    label={call.deafened ? "Undeafen" : "Deafen"}
+                    label={call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")}
                     title={
                         call.moderation.serverDeafened
-                            ? "A moderator deafened you"
+                            ? t("callRoom.aModeratorDeafenedYou")
                             : call.deafened
-                              ? "You cannot hear anybody, and nobody can hear you (F10)"
-                              : "Silence everybody, and yourself with them (F10)"
+                              ? t("callRoom.youCannotHearAnybodyAnd")
+                              : t("callRoom.silenceEverybodyAndYourselfWith")
                     }
                     icon={
                         call.deafened ? (
@@ -1169,7 +1179,7 @@ export function CallRoom({
                     onClick={call.toggleDeafen}
                     devices={speakers.devices}
                     chosenId={speakers.chosenId}
-                    devicesLabel="Output"
+                    devicesLabel={t("callRoom.devices.output")}
                     onChoose={speakers.choose}
                 />
 
@@ -1181,11 +1191,13 @@ export function CallRoom({
                     size="icon"
                     variant={call.handRaised ? "primary" : "secondary"}
                     aria-pressed={call.handRaised}
-                    aria-label={call.handRaised ? "Lower your hand" : "Raise your hand"}
+                    aria-label={call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")}
                     title={
                         call.hands.length > 0
-                            ? `${call.hands.length} ${call.hands.length === 1 ? "hand is" : "hands are"} up. ${call.handRaised ? "Lower yours" : "Raise yours"}`
-                            : "Raise your hand"
+                            ? t(call.handRaised ? "callRoom.handsUpLower" : "callRoom.handsUpRaise", {
+                                  count: call.hands.length
+                              })
+                            : t("callRoom.raiseYourHand")
                     }
                     onClick={() => call.setHandRaised(!call.handRaised)}
                     className="relative"
@@ -1210,8 +1222,8 @@ export function CallRoom({
                 <Button
                     size="icon"
                     variant="danger"
-                    aria-label="Leave the call"
-                    title="Leave the call"
+                    aria-label={t("callRoom.leaveTheCall")}
+                    title={t("callRoom.leaveTheCall")}
                     onClick={() => {
                         playCallSound("hangUp");
                         onLeave();
@@ -1254,17 +1266,14 @@ export function CallRoom({
             <Dialog open={asking} onOpenChange={setAsking}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Record this call?</DialogTitle>
+                        <DialogTitle>{t("callRoom.recordThisCall2")}</DialogTitle>
                         <DialogDescription>
-                            The recording is made in this browser, from what it can see and hear,
-                            and it stops if you leave the call or close the tab. Everybody in the
-                            call is told while it runs. When you stop, you choose whether it goes
-                            into the conversation or stays on this machine.
+                            {t("callRoom.theRecordingIsMadeIn")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setAsking(false)}>
-                            Cancel
+                            {t("callRoom.cancel")}
                         </Button>
                         <Button
                             onClick={() => {
@@ -1273,7 +1282,7 @@ export function CallRoom({
                             }}
                         >
                             <Circle className="size-4" />
-                            Start recording
+                            {t("callRoom.startRecording")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1373,6 +1382,7 @@ function Split({
     backgroundRunning?: CameraBackground | null;
     backgroundProblem?: string | null;
 }) {
+    const t = useTranslations("chat");
     // The picker lives outside the menu on purpose: a menu that has closed has
     // unmounted its contents, and a file input that is chosen from after that is
     // an input nothing is listening to.
@@ -1416,8 +1426,8 @@ function Split({
                         <Button
                             size="icon"
                             variant={variant}
-                            aria-label={`${devicesLabel} settings`}
-                            title={`${devicesLabel} settings`}
+                            aria-label={t("callRoom.deviceSettings", { device: devicesLabel })}
+                            title={t("callRoom.deviceSettings", { device: devicesLabel })}
                             className="w-6 rounded-l-none border-l border-border-strong"
                         >
                             <ChevronUp className="size-3.5" />
@@ -1434,10 +1444,9 @@ function Split({
                                         )}
                                     />
                                     <span className="flex min-w-0 flex-col">
-                                        <span>Mirror my picture</span>
+                                        <span>{t("callRoom.mirrorMyPicture")}</span>
                                         <span className="text-xs text-muted-foreground">
-                                            Only how you see yourself. Everybody else sees you the
-                                            way round your camera does.
+                                            {t("callRoom.onlyHowYouSeeYourself")}
                                         </span>
                                     </span>
                                 </DropdownMenuItem>
@@ -1456,10 +1465,9 @@ function Split({
                                         )}
                                     />
                                     <span className="flex min-w-0 flex-col">
-                                        <span>Automatic</span>
+                                        <span>{t("callRoom.automatic")}</span>
                                         <span className="text-xs text-muted-foreground">
-                                            Drops when the connection struggles and comes back when
-                                            it recovers.
+                                            {t("callRoom.dropsWhenTheConnectionStruggles")}
                                         </span>
                                     </span>
                                 </DropdownMenuItem>
@@ -1497,15 +1505,15 @@ function Split({
                                         className="w-full accent-primary"
                                     />
                                     <span className="flex items-center justify-between text-[0.6875rem] text-foreground-subtle">
-                                        <span>Least data</span>
-                                        <span>Best picture</span>
+                                        <span>{t("callRoom.leastData")}</span>
+                                        <span>{t("callRoom.bestPicture")}</span>
                                     </span>
                                 </DropdownMenuItem>
                             </>
                         )}
                         {onBackground && background && (
                             <>
-                                <DropdownMenuLabel>Background</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t("callRoom.background")}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 {BACKGROUNDS.map((choice) => (
                                     <DropdownMenuItem
@@ -1585,8 +1593,8 @@ function Split({
                                             ))}
                                             <button
                                                 type="button"
-                                                title="Use a picture of your own"
-                                                aria-label="Use a picture of your own"
+                                                title={t("callRoom.useAPictureOfYour")}
+                                                aria-label={t("callRoom.useAPictureOfYour")}
                                                 aria-pressed={ownPicture}
                                                 onClick={() => picker.current?.click()}
                                                 className={cn(
@@ -1618,12 +1626,12 @@ function Split({
                                     !backgroundProblem &&
                                     backgroundRunning !== background && (
                                         <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                            Starting. The model downloads once.
+                                            {t("callRoom.startingTheModelDownloadsOnce")}
                                         </p>
                                     )}
                                 {backgroundProblem && (
                                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                        No background is running. {backgroundProblem}
+                                        {t("callRoom.noBackground", { problem: backgroundProblem })}
                                     </p>
                                 )}
                                 {pickProblem && (
@@ -1633,7 +1641,7 @@ function Split({
                         )}
                         {onCleanMic && (
                             <>
-                                <DropdownMenuLabel>Background noise</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t("callRoom.backgroundNoise")}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 {NOISE_LEVELS.filter(
                                     (level) => level.value !== "licensed" || licensedOffered
@@ -1663,13 +1671,12 @@ function Split({
                                     chose is the thing running is noise. */}
                                 {cleanMic === "enhanced" && filterRunning === "light" && (
                                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                        This machine is running the lighter model.
+                                        {t("callRoom.thisMachineIsRunningThe")}
                                     </p>
                                 )}
                                 {cleanMic === "licensed" && filterRunning !== "licensed" && (
                                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                        The licensed filter did not start. Running the free one
-                                        instead.
+                                        {t("callRoom.theLicensedFilterDidNot")}
                                     </p>
                                 )}
                             </>
@@ -1697,7 +1704,7 @@ function Split({
                         {meter !== undefined && (
                             <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuLabel>Input level</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t("callRoom.inputLevel")}</DropdownMenuLabel>
                                 <div className="px-2 pb-2">
                                     <MicLevelMeter track={meter} />
                                 </div>
@@ -1775,11 +1782,12 @@ function StreamCard({
     onWatch: () => void;
     menu?: StreamMenuFor;
 }) {
+    const t = useTranslations("chat");
     const card = (
         <button
             type="button"
             onClick={onWatch}
-            title={`Watch ${name}`}
+            title={t("callRoom.watchNamed", { name })}
             className={cn(
                 "flex flex-col items-center justify-center gap-1.5 rounded-md border border-border bg-muted/40 px-3 text-center transition-colors hover:border-border-strong hover:bg-card-hover",
                 className
@@ -1787,7 +1795,7 @@ function StreamCard({
         >
             <MonitorUp className="size-5 shrink-0 text-muted-foreground" aria-hidden />
             <span className="w-full truncate text-xs font-medium">{name}</span>
-            <span className="text-xs text-muted-foreground">Watch</span>
+            <span className="text-xs text-muted-foreground">{t("callRoom.watch")}</span>
         </button>
     );
     return <MaybeStreamMenu menu={menu}>{card}</MaybeStreamMenu>;
@@ -1852,6 +1860,7 @@ function Face({
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
 }) {
+    const t = useTranslations("chat");
     const [volume] = useCallVolume(volumeKey ?? "");
 
     const face = (
@@ -1869,7 +1878,7 @@ function Face({
                 {hand && (
                     <span
                         className="call-hand-up pointer-events-none absolute -left-1 -top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
-                        aria-label={handPlace ? `Hand up, ${handPlace} in the queue` : "Hand up"}
+                        aria-label={handPlace ? t("callRoom.handUpPlace", { place: handPlace }) : t("callRoom.handUp")}
                     >
                         <Hand className="size-3.5 shrink-0" />
                         {handPlace !== null && <span>{handPlace}</span>}
@@ -1900,13 +1909,13 @@ function Face({
                 {volumeKey && volume === 0 && (
                     <VolumeX
                         className="size-3 shrink-0 text-danger"
-                        aria-label="Silenced for you"
+                        aria-label={t("callRoom.silencedForYou")}
                     />
                 )}
                 {sameRoom && (
                     <Users
                         className="size-3 shrink-0 text-primary"
-                        aria-label="Sharing a room's microphone"
+                        aria-label={t("callRoom.sharingARoomSMicrophone")}
                     />
                 )}
             </span>
@@ -2034,6 +2043,7 @@ function Tile({
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
 }) {
+    const t = useTranslations("chat");
     const video = useRef<HTMLVideoElement>(null);
     const frame = useRef<HTMLDivElement | null>(null);
     /** Pushing into the picture. Held for every tile and used by the ones that
@@ -2268,7 +2278,7 @@ function Tile({
                 // tile the big one.
                 <span
                     className="call-hand-up pointer-events-none absolute left-1 top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
-                    aria-label={handPlace ? `Hand up, ${handPlace} in the queue` : "Hand up"}
+                    aria-label={handPlace ? t("callRoom.handUpPlace", { place: handPlace }) : t("callRoom.handUp")}
                 >
                     <Hand className="size-3.5 shrink-0" />
                     {handPlace !== null && <span>{handPlace}</span>}
@@ -2285,23 +2295,23 @@ function Tile({
                     talking louder, and their microphone being off follows from
                     it anyway. */}
                 {blank ? null : deafened ? (
-                    <HeadphoneOff className="size-3 text-danger" aria-label="Not listening" />
+                    <HeadphoneOff className="size-3 text-danger" aria-label={t("callRoom.notListening")} />
                 ) : muted ? (
-                    <MicOff className="size-3 text-danger" aria-label="Microphone off" />
+                    <MicOff className="size-3 text-danger" aria-label={t("callRoom.microphoneOff")} />
                 ) : null}
                 {volumeKey && volume === 0 && (
-                    <VolumeX className="size-3 text-danger" aria-label="Silenced for you" />
+                    <VolumeX className="size-3 text-danger" aria-label={t("callRoom.silencedForYou")} />
                 )}
                 {sameRoom && (
                     <Users
                         className="size-3 text-primary"
-                        aria-label="Sharing a room's microphone"
+                        aria-label={t("callRoom.sharingARoomSMicrophone")}
                     />
                 )}
                 {recording && (
                     <Circle
                         className="size-3 fill-current text-danger"
-                        aria-label="Recording this call"
+                        aria-label={t("callRoom.recordingThisCall")}
                     />
                 )}
             </span>
@@ -2320,8 +2330,8 @@ function Tile({
                         <button
                             type="button"
                             onClick={onFocus}
-                            aria-label={focused ? backLabel : "Make this bigger"}
-                            title={focused ? backLabel : "Make this bigger"}
+                            aria-label={focused ? backLabel : t("callRoom.makeThisBigger")}
+                            title={focused ? backLabel : t("callRoom.makeThisBigger")}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                             {focused ? (
@@ -2336,11 +2346,11 @@ function Tile({
                             type="button"
                             onClick={onGrow}
                             aria-pressed={grown}
-                            aria-label={grown ? "Bring the conversation back" : "Fill the column"}
+                            aria-label={grown ? t("callRoom.bringTheConversationBack") : t("callRoom.fillTheColumn")}
                             title={
                                 grown
-                                    ? "Shrink the call - the conversation comes back"
-                                    : "Fill the column - the conversation goes behind the call"
+                                    ? t("callRoom.shrinkTheCallTheConversation")
+                                    : t("callRoom.fillTheColumnTheConversation")
                             }
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
@@ -2358,8 +2368,8 @@ function Tile({
                         <button
                             type="button"
                             onClick={look.reset}
-                            aria-label="Fit the picture again"
-                            title="Fit the picture again"
+                            aria-label={t("callRoom.fitThePictureAgain")}
+                            title={t("callRoom.fitThePictureAgain")}
                             className="rounded bg-background/80 px-1.5 py-1 text-[0.625rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
                         >
                             {look.zoom.scale.toFixed(1)}x
@@ -2368,8 +2378,8 @@ function Tile({
                     <button
                         type="button"
                         onClick={toggleFull}
-                        aria-label={full ? "Leave full screen" : "Full screen"}
-                        title={full ? "Leave full screen" : "Full screen"}
+                        aria-label={full ? t("callRoom.leaveFullScreen") : t("callRoom.fullScreen")}
+                        title={full ? t("callRoom.leaveFullScreen") : t("callRoom.fullScreen")}
                         className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                     >
                         {full ? (
@@ -2440,6 +2450,7 @@ function InviteToCallDialog({
     onShared: () => void;
     onDone: (movedTo: { meetingId: string; channelId: string } | null) => void;
 }) {
+    const t = useTranslations("chat");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -2505,11 +2516,11 @@ function InviteToCallDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{mayInvite ? "Add people" : "Anybody with a link"}</DialogTitle>
+                    <DialogTitle>{mayInvite ? t("callRoom.addPeople") : t("callRoom.anybodyWithALink")}</DialogTitle>
                     <DialogDescription>
                         {mayInvite
-                            ? "Their telephone rings. Bringing somebody into a one-to-one call makes it a group with the three of you in it."
-                            : "Only the owner of this group adds people to it. A link still lets somebody with no account ask to join this call."}
+                            ? t("callRoom.theirTelephoneRingsBringingSomebody")
+                            : t("callRoom.onlyTheOwnerOfThis")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -2529,7 +2540,7 @@ function InviteToCallDialog({
                 {canShare && (
                     <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-medium">Anybody with a link</span>
+                            <span className="text-sm font-medium">{t("callRoom.anybodyWithALink")}</span>
                             <Button
                                 size="sm"
                                 variant="secondary"
@@ -2537,13 +2548,13 @@ function InviteToCallDialog({
                                 onClick={() => void share()}
                             >
                                 <Link2 className="size-4" />
-                                {link ? (copied ? "Copied" : "Copy link") : "Create a link"}
+                                {link ? (copied ? t("callRoom.copied") : t("callRoom.copyLink")) : t("callRoom.createALink")}
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
                             {link
-                                ? "Anybody with it can ask to join, and waits until somebody here lets them in. It stops working when the call ends."
-                                : "For somebody with no account here. They ask to join, and wait until somebody here lets them in."}
+                                ? t("callRoom.anybodyWithItCanAsk")
+                                : t("callRoom.forSomebodyWithNoAccount")}
                         </p>
                     </div>
                 )}
@@ -2556,12 +2567,12 @@ function InviteToCallDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        Close
+                        {t("callRoom.close")}
                     </Button>
                     {mayInvite && (
                         <Button disabled={busy || picked.length === 0} onClick={() => void bring()}>
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Add
+                            {t("callRoom.add")}
                         </Button>
                     )}
                 </DialogFooter>
@@ -2598,10 +2609,11 @@ function gridColumns(people: number): string {
  * everybody else's picture.
  */
 function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
+    const t = useTranslations("chat");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="secondary" aria-label="React" title="React">
+                <Button size="icon" variant="secondary" aria-label={t("callRoom.react")} title={t("callRoom.react")}>
                     <Smile className="size-4" />
                 </Button>
             </DropdownMenuTrigger>

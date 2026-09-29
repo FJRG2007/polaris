@@ -14,6 +14,7 @@
  * hovering it.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { MessageList } from "@/app/(app)/chat/message-list";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -107,7 +108,7 @@ describe("the R shortcut", () => {
                 onForward={() => undefined}
                 onEdit={() => undefined}
                 onDelete={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         // The star button is always drawn, so it is a reliable way to land focus
@@ -133,7 +134,7 @@ describe("the R shortcut", () => {
                 onForward={() => undefined}
                 onEdit={() => undefined}
                 onDelete={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         await user.tab();
@@ -159,7 +160,7 @@ describe("the R shortcut", () => {
                     onEdit={() => undefined}
                     onDelete={() => undefined}
                 />
-            </>
+            </>, { wrapper: MessagesWrapper }
         );
 
         const field = screen.getByLabelText("Somewhere else entirely");

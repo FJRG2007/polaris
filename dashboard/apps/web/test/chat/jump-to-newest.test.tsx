@@ -14,6 +14,7 @@
  * identical before and after, and the read still has to happen.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -211,7 +212,7 @@ function readingUpwards(container: HTMLElement): HTMLElement {
 describe("the way back to the newest message", () => {
     it("marks the conversation read, even though the list did not change", async () => {
         const user = userEvent.setup();
-        const { container } = render(<ChannelView channelId="c1" />);
+        const { container } = render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         // Waited for rather than read straight after the line appears: the read
         // is announced from an effect, and an effect runs after the frame that
         // drew the line. On a loaded machine the two are far enough apart that
@@ -244,7 +245,7 @@ describe("the way back to the newest message", () => {
 describe("reading older messages", () => {
     it("offers the way back to the present once the reader is well up the history", async () => {
         const user = userEvent.setup();
-        const { container } = render(<ChannelView channelId="c1" />);
+        const { container } = render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m2");
         expect(screen.queryByText("You're viewing older messages")).toBeNull();
 
@@ -268,7 +269,7 @@ describe("reading older messages", () => {
 describe("a conversation nobody is looking at", () => {
     it("is not read when it was opened in a background tab, and is once the tab is shown", async () => {
         setAttention("hidden", false);
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await screen.findByText("m2");
         // Long enough for the mark to have gone out if it were going to.
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -281,7 +282,7 @@ describe("a conversation nobody is looking at", () => {
 
     it("leaves what arrives behind another window unread until the reader comes back", async () => {
         setAttention("visible", true);
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m2" }]));
 
         // Another program comes to the front; the page is still "visible".

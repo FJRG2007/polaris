@@ -13,6 +13,7 @@
  * chips.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
@@ -160,7 +161,7 @@ afterEach(cleanup);
 
 describe("a call running in a group somebody is only reading", () => {
     it("draws the people in it, with the way in", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         const panel = await screen.findByRole("region", { name: "Call in progress" });
         expect(within(panel).getByText("2 people in the call")).toBeTruthy();
@@ -174,7 +175,7 @@ describe("a call running in a group somebody is only reading", () => {
     });
 
     it("says who is sharing a screen, without a way to watch it from outside", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         const panel = await screen.findByRole("region", { name: "Call in progress" });
         const live = within(panel).getAllByRole("img", { name: "Sharing a screen" });
@@ -184,7 +185,7 @@ describe("a call running in a group somebody is only reading", () => {
     });
 
     it("can be put away, and brought back", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         const panel = await screen.findByRole("region", { name: "Call in progress" });
         fireEvent.click(within(panel).getByRole("button", { name: "Hide the call" }));
@@ -199,7 +200,7 @@ describe("a call running in a group somebody is only reading", () => {
     });
 
     it("stays put away when the conversation is opened again", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         const panel = await screen.findByRole("region", { name: "Call in progress" });
         fireEvent.click(within(panel).getByRole("button", { name: "Hide the call" }));
 
@@ -207,20 +208,20 @@ describe("a call running in a group somebody is only reading", () => {
         // this screen from nothing, which is where a decision held in component
         // state was lost.
         cleanup();
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         expect(await screen.findByText("2 people in the call")).toBeTruthy();
         expect(screen.queryByRole("region", { name: "Call in progress" })).toBeNull();
     });
 
     it("shows the next call, which nobody put away", async () => {
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
         const panel = await screen.findByRole("region", { name: "Call in progress" });
         fireEvent.click(within(panel).getByRole("button", { name: "Hide the call" }));
 
         cleanup();
         state.live!.meetingId = "m2";
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         expect(await screen.findByRole("region", { name: "Call in progress" })).toBeTruthy();
     });
@@ -229,7 +230,7 @@ describe("a call running in a group somebody is only reading", () => {
 describe("a voice room somebody has not walked into", () => {
     it("lists the people in it as rows, the way members are listed elsewhere", async () => {
         state.kind = "voice";
-        render(<ChannelView channelId="c1" />);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         const list = await screen.findByRole("list", { name: "In Deploys" });
         const rows = within(list).getAllByRole("listitem");
