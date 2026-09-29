@@ -118,11 +118,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function parseRecoveryKey(text: string): { id: string; key: Buffer } | { error: string } {
     const parts = text.trim().split(":");
     if (parts.length !== 3 || parts[0] !== RECOVERY_PREFIX) {
+        // i18n-ignore these three are said in the reader's words by lib/backups/refusal-text
         return { error: `A recovery key starts with ${RECOVERY_PREFIX}: and has three parts` };
     }
     const [, id = "", encoded = ""] = parts;
+    // i18n-ignore
     if (!UUID.test(id)) return { error: "The key's id is not one Polaris writes" };
     const key = Buffer.from(encoded, "base64url");
+    // i18n-ignore
     if (key.length !== 32 || key.toString("base64url") !== encoded) return { error: "The key itself is not 32 bytes" };
     return { id: id.toLowerCase(), key };
 }

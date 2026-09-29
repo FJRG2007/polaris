@@ -15,15 +15,26 @@ import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
 import { Badge, Card, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
-const VERB: Record<string, string> = {
-    backup: "Backed up",
-    restore: "Restored",
-    prune: "Pruned",
-    replicate: "Replicated"
-};
+type Words = NamespaceTranslator<"backups">;
+
+/** The job types and statuses the service writes, each said as `activity.verbs.<type>`
+ *  and `activity.statuses.<status>`; one a newer service adds shows as it came. */
+const VERBS = new Set(["backup", "restore", "prune", "replicate"]);
+const STATUSES = new Set(["succeeded", "failed", "running", "pending"]);
+
+function verb(t: Words, type: string): string {
+    return VERBS.has(type) ? t(`activity.verbs.${type}` as NamespaceKey<"backups">) : type;
+}
+
+function statusWord(t: Words, status: string): string {
+    return STATUSES.has(status) ? t(`activity.statuses.${status}` as NamespaceKey<"backups">) : status;
+}
 
 export function ActivityPanel() {
+    const t = useTranslations("backups");
     const format = useDisplayFormat();
     const [jobs, setJobs] = useState<JobRow[] | null>(null);
 
@@ -52,7 +63,7 @@ export function ActivityPanel() {
     if (jobs.length === 0) {
         return (
             <Card>
-                <p className="py-10 text-center text-sm text-muted-foreground">Nothing has run yet.</p>
+                <p className="py-10 text-center text-sm text-muted-foreground">{t("activity.none")}</p>
             </Card>
         );
     }
@@ -63,18 +74,18 @@ export function ActivityPanel() {
                 <table className="w-full text-sm">
                     <thead className="border-b border-border text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">What</th>
-                            <th className="px-3 py-2 font-medium">Started</th>
-                            <th className="px-3 py-2 font-medium">Took</th>
-                            <th className="px-3 py-2 text-right font-medium">Size</th>
-                            <th className="px-3 py-2 font-medium">Result</th>
+                            <th className="px-3 py-2 font-medium">{t("activity.columns.what")}</th>
+                            <th className="px-3 py-2 font-medium">{t("activity.columns.started")}</th>
+                            <th className="px-3 py-2 font-medium">{t("activity.columns.took")}</th>
+                            <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                            <th className="px-3 py-2 font-medium">{t("activity.columns.result")}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {jobs.map((job) => (
                             <tr key={job.id} className="border-b border-border last:border-0">
                                 <td className="px-3 py-2.5">
-                                    <span className="text-muted-foreground">{VERB[job.type] ?? job.type} </span>
+                                    <span className="text-muted-foreground">{verb(t, job.type)} </span>
                                     {job.resourceId && job.resourceName ? (
                                         <Link
                                             href={`/apps/backups/${job.resourceId}`}
@@ -83,16 +94,16 @@ export function ActivityPanel() {
                                             {job.resourceName}
                                         </Link>
                                     ) : (
-                                        <span className="font-medium">{job.resourceName ?? "something removed"}</span>
+                                        <span className="font-medium">{job.resourceName ?? t("activity.removed")}</span>
                                     )}
                                     <span className="ml-2 text-xs text-muted-foreground">
                                         {job.trigger === "scheduled"
-                                            ? "on a schedule"
+                                            ? t("activity.triggers.scheduled")
                                             : job.trigger === "pre-restore"
-                                              ? "before a restore"
+                                              ? t("activity.triggers.preRestore")
                                               : job.trigger === "pre-upgrade"
-                                                ? "before an upgrade"
-                                                : "by hand"}
+                                                ? t("activity.triggers.preUpgrade")
+                                                : t("activity.triggers.manual")}
                                     </span>
                                     {job.error ? <p className="text-xs text-danger">{job.error}</p> : null}
                                 </td>
@@ -101,8 +112,8 @@ export function ActivityPanel() {
                                 </td>
                                 <td className="px-3 py-2.5 text-muted-foreground">
                                     {job.finishedAt
-                                        ? formatElapsed(job.startedAt, job.finishedAt)
-                                        : "still running"}
+                                        ? formatElapsed(job.startedAt, job.finishedAt, t)
+                                        : t("activity.stillRunning")}
                                 </td>
                                 <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                                     {job.bytes ? formatBytes(BigInt(job.bytes)) : "-"}
@@ -117,7 +128,7 @@ export function ActivityPanel() {
                                                   : "success"
                                         }
                                     >
-                                        {job.status}
+                                        {statusWord(t, job.status)}
                                     </Badge>
                                 </td>
                             </tr>
@@ -130,9 +141,9 @@ export function ActivityPanel() {
 }
 
 /** How long it took, in the coarsest unit that still says something. */
-function formatElapsed(from: string, to: string): string {
+function formatElapsed(from: string, to: string, t: Words): string {
     const ms = new Date(to).getTime() - new Date(from).getTime();
-    if (ms < 1000) return "under a second";
+    if (ms < 1000) return t("activity.underSecond");
     const seconds = Math.round(ms / 1000);
     if (seconds < 90) return `${seconds}s`;
     const minutes = Math.round(seconds / 60);

@@ -17,6 +17,9 @@ import { readJson } from "@/lib/read-json";
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import type { DestinationSummary, DiscoveredCandidate, PlanSummary } from "./types";
+import { kindLabel, kindSummary } from "@/lib/backups/words";
+import { readReasonText } from "@/lib/read-json";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -40,6 +43,9 @@ export function ProtectDialog({
     onClose: () => void;
     onProtected: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
     const [candidates, setCandidates] = useState<DiscoveredCandidate[] | null>(null);
     const [chosen, setChosen] = useState<string[]>([]);
     const [planId, setPlanId] = useState<string>("");
@@ -54,13 +60,13 @@ export function ProtectDialog({
                 // "Everything is already protected" is a claim, and a read that failed
                 // cannot make it - so the reason goes where the list would have been.
                 setCandidates(data.ok ? data.value.candidates : []);
-                if (!data.ok) setError(data.reason);
+                if (!data.ok) setError(readReasonText(tc, data.reason));
             }
         );
         return () => {
             live = false;
         };
-    }, []);
+    }, [tc]);
 
     async function onSave() {
         setPending(true);
@@ -75,7 +81,7 @@ export function ProtectDialog({
                 planId: planId || null
             });
             if (result.error) {
-                setError(`${candidate.name}: ${result.error}`);
+                setError(t("destinations.testFailed", { name: candidate.name, reason: result.error }));
                 setPending(false);
                 return;
             }
@@ -91,18 +97,15 @@ export function ProtectDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ShieldCheck className="size-5 text-primary" />
-                        Add resource
+                        {t("table.add")}
                     </DialogTitle>
-                    <DialogDescription>
-                        Everything here that is not being backed up yet. Pick what matters and give
-                        it a plan, or leave it on demand and back it up by hand.
-                    </DialogDescription>
+                    <DialogDescription>{t("protect.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     {destinations.length === 0 ? (
                         <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
-                            There is nowhere to put a backup yet. Add a destination first.
+                            {t("protect.noDestination")}
                         </p>
                     ) : null}
 
@@ -115,7 +118,7 @@ export function ProtectDialog({
                             </div>
                         ) : candidates.length === 0 ? (
                             <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                Everything Polaris can find is already protected.
+                                {t("protect.allProtected")}
                             </p>
                         ) : (
                             <ul className="divide-y divide-border">
@@ -141,11 +144,11 @@ export function ProtectDialog({
                                                 <span className="flex items-center gap-2 text-sm font-medium">
                                                     {candidate.name}
                                                     <span className="text-xs font-normal text-muted-foreground">
-                                                        {candidate.kindLabel}
+                                                        {kindLabel(t, candidate.kind, candidate.kindLabel)}
                                                     </span>
                                                 </span>
                                                 <span className="block truncate text-xs text-muted-foreground">
-                                                    {candidate.context ?? candidate.summary}
+                                                    {candidate.context ?? kindSummary(t, candidate.kind, candidate.summary)}
                                                 </span>
                                             </span>
                                         </label>
@@ -156,19 +159,18 @@ export function ProtectDialog({
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Plan</span>
+                        <span className="font-medium">{t("table.columns.plan")}</span>
                         <Select
                             value={planId}
                             onValueChange={setPlanId}
-                            aria-label="Plan"
+                            aria-label={t("table.columns.plan")}
                             options={[
-                                { value: "", label: "On demand only" },
+                                { value: "", label: t("table.onDemandOnly") },
                                 ...plans.map((plan) => ({ value: plan.id, label: plan.name }))
                             ]}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A plan decides how often a copy is taken, how many are kept, and where
-                            they go. Without one, copies are only taken when you ask.
+                            {t("protect.planHint")}
                         </span>
                     </label>
 
@@ -176,14 +178,14 @@ export function ProtectDialog({
 
                     <div className="flex justify-end gap-2">
                         <DialogClose asChild>
-                            <Button variant="ghost">Cancel</Button>
+                            <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                         </DialogClose>
                         <Button
                             onClick={() => void onSave()}
                             disabled={pending || chosen.length === 0}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {chosen.length > 1 ? `Protect ${chosen.length} things` : "Protect"}
+                            {chosen.length > 1 ? t("protect.many", { count: chosen.length }) : t("protect.one")}
                         </Button>
                     </div>
                 </div>

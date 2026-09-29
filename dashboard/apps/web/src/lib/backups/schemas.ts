@@ -35,7 +35,9 @@ export const subPathSchema = z
             .replace(/\/{2,}/g, "/")
             .replace(/^\/+|\/+$/g, "")
     )
+    // i18n-ignore the schema's sentences are said in the reader's words by the actions
     .refine((value) => !value.split("/").includes(".."), { message: "That path cannot contain '..'" })
+    // i18n-ignore
     .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), { message: "That path contains control characters" });
 
 /**
@@ -140,7 +142,7 @@ export const destinationSchema = z.discriminatedUnion("kind", [
         // An absolute path on the machine, which is what somebody means when they
         // say where on a server the copies should go.
         basePath: z.string().trim().min(1).max(1024).refine((value) => !value.includes(".."), {
-            message: "That path cannot contain '..'"
+            message: "That path cannot contain '..'" // i18n-ignore said by the actions
         })
     })
 ]);

@@ -11,6 +11,7 @@
 
 import { listResources } from "@/lib/backups/manage";
 import { apiAdmin } from "@/lib/api-session";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { listResourcesSchema } from "@/lib/backups/schemas";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(request: Request): Promise<Response> {
         direction: params.get("direction") || undefined
     });
     if (!parsed.success) {
-        return Response.json({ error: "Those filters are not valid." }, { status: 400 });
+        return Response.json({ error: (await readerWords("backups"))("errors.filters") }, { status: 400 });
     }
     return Response.json(await listResources(user.id, parsed.data));
 }

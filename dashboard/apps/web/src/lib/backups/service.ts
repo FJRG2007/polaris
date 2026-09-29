@@ -21,6 +21,7 @@ import { createReadStream } from "node:fs";
 import { sealArtifact } from "./sealed-copies";
 import { sourceFor, allSources } from "./sources/registry";
 import { createNotification } from "@/lib/notification-service";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { SourceUnavailableError, type SourceResource, type StagedArtifact } from "./sources/types";
 import { DestinationUnavailableError, isSourceLocal, openDestination, type DestinationRow } from "./destination";
 import { DEFAULT_LOCAL_DESTINATION, DEFAULT_SOURCE_LOCAL_DESTINATION, isResourceKind, type ResourceKind } from "./kinds";
@@ -357,14 +358,15 @@ async function notifyFailure(
 ): Promise<void> {
     const policy = await policyFor(row.planId);
     if (!policy.notifyOnFailure) return;
+    const t = await wordsFor(row.ownerId, "backups");
     await createNotification({
         userId: row.ownerId,
         type: "backup.failed",
         title:
             outcome.status === "failed"
-                ? `Backup of ${row.name} failed`
-                : `Backup of ${row.name} only partly landed`,
-        body: summarize(outcome.failures) || "No destination accepted the copy.",
+                ? t("notices.failed", { name: row.name })
+                : t("notices.partial", { name: row.name }),
+        body: summarize(outcome.failures) || t("notices.noneAccepted"),
         href: "/apps/backups",
         // A backup that did not land is worth acting on; one that landed
         // everywhere but a bucket is worth knowing about.

@@ -18,19 +18,45 @@ import * as keyring from "@/lib/backups/keyring";
 import { recordAudit } from "@/lib/audit-service";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
+import { backupRefusalText } from "@/lib/backups/refusal-text";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** What every action answers with: a sentence to show, or what it produced. */
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
-/** Turn a thrown failure into the sentence the dialog shows. */
-function failed(error: unknown): { error: string } {
-    return { error: error instanceof Error ? error.message : "That did not work" };
+type BackupsKey = NamespaceKey<"backups">;
+
+/** A reply in the reader's language. */
+async function say(key: BackupsKey): Promise<string> {
+    return (await getTranslations("backups"))(key);
+}
+
+/** Turn a thrown failure into the sentence the dialog shows, in the reader's words. */
+async function failed(error: unknown): Promise<{ error: string }> {
+    const t = await getTranslations("backups");
+    return { error: error instanceof Error ? backupRefusalText(t, error.message) : t("errors.failed") };
+}
+
+/** The schemas' own sentences, keyed by their English. */
+const SCHEMA_WORDS: Readonly<Record<string, BackupsKey>> = {
+    "That path cannot contain '..'": "errors.schema.dotDot",
+    "That path contains control characters": "errors.schema.controlCharacters",
+    "That is not a backup key": "errors.notAKey",
+    "Paste the recovery key": "errors.pasteKey",
+    "A recovery key is shorter than that": "errors.keyTooLong"
+};
+
+/** The first thing a schema refused, in the reader's words. A sentence this has
+ *  no words for is Zod's own English, so `fallback` stands in for it. */
+async function schemaSay(message: string | undefined, fallback: BackupsKey): Promise<string> {
+    return say((message && SCHEMA_WORDS[message]) || fallback);
 }
 
 export async function protectAction(input: unknown): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = protectSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those details are not valid" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalid") };
     try {
         const created = await manage.protectResource(user.id, parsed.data);
         await recordAudit({
@@ -128,7 +154,7 @@ export async function deletePointAction(pointId: string): Promise<Result> {
 export async function restoreAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     const parsed = restoreSchema.safeParse(input);
-    if (!parsed.success) return { error: "Confirm the restore before it can run" };
+    if (!parsed.success) return { error: await say("errors.confirmRestore") };
     try {
         await manage.restoreCopy(user.id, parsed.data.copyId, user.id);
         await recordAudit({
@@ -146,7 +172,7 @@ export async function restoreAction(input: unknown): Promise<Result> {
 export async function savePlanAction(input: unknown, planId?: string): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = planSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those plan details are not valid" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidPlan") };
     try {
         const saved = await manage.savePlan(user.id, parsed.data, planId);
         await recordAudit({
@@ -186,7 +212,7 @@ export async function createDestinationAction(input: unknown): Promise<Result<{ 
     const user = await requireAdmin();
     const parsed = destinationSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those destination details are not valid" };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDestination") };
     }
     try {
         const created = await manage.createDestination(user.id, parsed.data);
@@ -226,7 +252,9 @@ export async function testDestinationAction(
 ): Promise<{ ok: boolean; error?: string; usedBytes?: number; freeBytes?: number }> {
     const user = await requireAdmin();
     try {
-        return await manage.testDestination(user.id, destinationId);
+        const result = await manage.testDestination(user.id, destinationId);
+        if (!result.error) return result;
+        return { ...result, error: backupRefusalText(await getTranslations("backups"), result.error) };
     } catch (error) {
         // Every other action here catches, and this one has to for a reason the
         // others do not: an error thrown out of a Server Action is rethrown in the
@@ -234,7 +262,7 @@ export async function testDestinationAction(
         // report "it did not answer" - it took the whole console down with "This
         // page stopped working", from the one button whose entire job is to find
         // out whether something is reachable.
-        return { ok: false, ...failed(error) };
+        return { ok: false, ...(await failed(error)) };
     }
 }
 
@@ -276,7 +304,7 @@ export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
 export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ recoveryKey: string }>> {
     const user = await requireAdmin();
     const parsed = keyIdSchema.safeParse(keyId);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a backup key" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.notAKey") };
     try {
         const recoveryKey = await keyring.recoveryKey(user.id, parsed.data);
         await recordAudit({ actorId: user.id, action: "backup.key.reveal", targetType: "backup-key", targetId: parsed.data });
@@ -290,7 +318,7 @@ export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ r
 export async function addRecoveryKeyAction(text: string): Promise<Result<{ added: boolean }>> {
     const user = await requireAdmin();
     const parsed = recoveryKeySchema.safeParse(text);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Paste the recovery key" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.pasteKey") };
     try {
         const outcome = await keyring.addRecoveryKey(user.id, parsed.data);
         await recordAudit({ actorId: user.id, action: "backup.key.add", targetType: "backup-key" });
@@ -303,7 +331,7 @@ export async function addRecoveryKeyAction(text: string): Promise<Result<{ added
 /** Store a password for a source that needs one of its own. */
 export async function sealSecretAction(resourceId: string, password: string): Promise<Result> {
     await requireAdmin();
-    if (!password.trim()) return { error: "Enter the password first" };
+    if (!password.trim()) return { error: await say("errors.passwordFirst") };
     try {
         await manage.sealResourceSecret(resourceId, { password });
         return {};

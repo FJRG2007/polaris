@@ -64,12 +64,12 @@ const MS: Record<Exclude<BackupEvery, "off">, number> = {
 };
 
 export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; readonly label: string }[] = [
-    { value: "off", label: "Never - only when I ask" },
-    { value: "hourly", label: "Every hour" },
-    { value: "six-hourly", label: "Every six hours" },
-    { value: "daily", label: "Every day" },
-    { value: "weekly", label: "Every week" },
-    { value: "monthly", label: "Every 30 days" }
+    { value: "off", label: "Never - only when I ask" }, // i18n-ignore said by lib/backups/words
+    { value: "hourly", label: "Every hour" }, // i18n-ignore said by lib/backups/words
+    { value: "six-hourly", label: "Every six hours" }, // i18n-ignore said by lib/backups/words
+    { value: "daily", label: "Every day" }, // i18n-ignore said by lib/backups/words
+    { value: "weekly", label: "Every week" }, // i18n-ignore said by lib/backups/words
+    { value: "monthly", label: "Every 30 days" } // i18n-ignore said by lib/backups/words
 ];
 
 export function isBackupEvery(value: unknown): value is BackupEvery {

@@ -577,5 +577,13 @@
     },
     "messageTime": {
         "yesterdayAt": "Ayer a las {time}"
+    },
+    "readJson": {
+        "unreachable": "No se pudo contactar con Polaris. Revisa la conexión e inténtalo de nuevo.",
+        "expired": "Tu sesión ha caducado. Vuelve a iniciar sesión para ver esto.",
+        "unreadable": "No se pudo leer la respuesta.",
+        "failed": "No ha funcionado",
+        "forbidden": "No tienes acceso a esto. Solo un administrador lo tiene.",
+        "status": "El servidor respondió {status}."
     }
 }

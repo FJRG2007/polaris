@@ -10,7 +10,9 @@
  */
 
 import { useState } from "react";
-import { reasonFor } from "@/lib/read-json";
+import { readReasonText, reasonFor } from "@/lib/read-json";
+import { everyLabel } from "@/lib/backups/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { deletePlanAction, savePlanAction } from "./actions";
@@ -45,6 +47,8 @@ export function PlansPanel({
     loading: boolean;
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
     const [editing, setEditing] = useState<PlanSummary | "new" | null>(null);
     const [removing, setRemoving] = useState<PlanSummary | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -60,7 +64,7 @@ export function PlansPanel({
             const result = await deletePlanAction(target.id);
             if (result.error) setError(result.error);
         } catch (caught) {
-            setError(reasonFor(caught));
+            setError(readReasonText(tc, reasonFor(caught)));
         }
         await onChanged();
     }
@@ -69,11 +73,11 @@ export function PlansPanel({
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                    A plan can be shared: put ten databases on one nightly plan and change the schedule once.
+                    {t("plans.intro")}
                 </p>
                 <Button size="sm" onClick={() => setEditing("new")} disabled={destinations.length === 0}>
                     <Plus className="size-4" />
-                    New plan
+                    {t("plans.new")}
                 </Button>
             </div>
 
@@ -88,7 +92,7 @@ export function PlansPanel({
             ) : plans.length === 0 ? (
                 <Card>
                     <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                        No plans yet. Without one, things are backed up only when you ask.
+                        {t("plans.none")}
                     </CardBody>
                 </Card>
             ) : (
@@ -100,19 +104,18 @@ export function PlansPanel({
                                     <div className="min-w-0">
                                         <p className="truncate font-medium" title={plan.name}>{plan.name}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {BACKUP_EVERY_OPTIONS.find((option) => option.value === plan.every)
-                                                ?.label ?? plan.every}
+                                            {everyLabel(t, plan.every)}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <Button size="sm" variant="ghost" onClick={() => setEditing(plan)}>
-                                            Edit
+                                            {t("plans.edit")}
                                         </Button>
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            aria-label={`Delete ${plan.name}`}
-                                            title="Delete this plan"
+                                            aria-label={t("plans.deleteNamed", { name: plan.name })}
+                                            title={t("plans.delete")}
                                             onClick={() => setRemoving(plan)}
                                         >
                                             <Trash2 className="size-4" />
@@ -120,10 +123,12 @@ export function PlansPanel({
                                     </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Keeps {plan.keepLast > 0 ? `${plan.keepLast} copies` : "any number of copies"}
-                                    {plan.keepDays > 0 ? `, for ${plan.keepDays} days` : ""}
-                                    {plan.maxBytes > 0 ? `, under ${formatBytes(BigInt(plan.maxBytes))}` : ""} in each
-                                    destination.
+                                    {t("plans.keeps", {
+                                        copies: plan.keepLast,
+                                        days: plan.keepDays,
+                                        capped: plan.maxBytes > 0 ? "yes" : "no",
+                                        size: plan.maxBytes > 0 ? formatBytes(BigInt(plan.maxBytes)) : ""
+                                    })}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-1">
                                     {plan.destinationNames.map((name) => (
@@ -132,11 +137,7 @@ export function PlansPanel({
                                         </Badge>
                                     ))}
                                     <span className="ml-auto text-xs text-muted-foreground">
-                                        {plan.usedBy === 0
-                                            ? "Nothing uses it"
-                                            : plan.usedBy === 1
-                                              ? "1 thing uses it"
-                                              : `${plan.usedBy} things use it`}
+                                        {t("plans.usedBy", { count: plan.usedBy })}
                                     </span>
                                 </div>
                             </CardBody>
@@ -159,14 +160,14 @@ export function PlansPanel({
                     open
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.name}
-                    kind="plan"
+                    kind={t("plans.kind")}
                     requireTyping={removing.usedBy > 0}
                     description={
                         removing.usedBy > 0
-                            ? `${removing.usedBy === 1 ? "One thing is" : `${removing.usedBy} things are`} on this plan. They stay protected and become on-demand - no copies are deleted.`
-                            : "Nothing is on this plan."
+                            ? t("plans.deleteBody", { count: removing.usedBy })
+                            : t("plans.deleteEmpty")
                     }
-                    confirmLabel="Delete plan"
+                    confirmLabel={t("plans.deleteConfirm")}
                     onConfirm={() => void onDelete()}
                 />
             ) : null}
@@ -190,6 +191,9 @@ function PlanDialog({
     onClose: () => void;
     onSaved: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
     const [name, setName] = useState(plan?.name ?? "");
     const [every, setEvery] = useState(plan?.every ?? "daily");
     const [keepLast, setKeepLast] = useState(String(plan?.keepLast ?? 7));
@@ -203,12 +207,12 @@ function PlanDialog({
     // Live, against the same rules the server enforces: a plan that writes
     // nowhere is a schedule that silently does nothing.
     const problems: string[] = [];
-    if (!name.trim()) problems.push("Give the plan a name");
-    if (chosen.length === 0) problems.push("Pick at least one destination");
-    if (Number(keepLast) < 0 || Number(keepLast) > MAX_KEEP_LAST) problems.push("That many copies is not a number");
-    if (Number(keepDays) < 0 || Number(keepDays) > MAX_KEEP_DAYS) problems.push("That many days is not a number");
+    if (!name.trim()) problems.push(t("plans.problems.name"));
+    if (chosen.length === 0) problems.push(t("plans.problems.destination"));
+    if (Number(keepLast) < 0 || Number(keepLast) > MAX_KEEP_LAST) problems.push(t("plans.problems.copies"));
+    if (Number(keepDays) < 0 || Number(keepDays) > MAX_KEEP_DAYS) problems.push(t("plans.problems.days"));
     if (every !== "off" && Number(keepLast) === 0 && Number(keepDays) === 0 && !maxGb) {
-        problems.push("Set at least one limit, or the copies pile up until the disk is full");
+        problems.push(t("plans.problems.limit"));
     }
 
     async function onSave() {
@@ -234,7 +238,7 @@ function PlanDialog({
             await onSaved();
             onClose();
         } catch (caught) {
-            setError(reasonFor(caught));
+            setError(readReasonText(tc, reasonFor(caught)));
         } finally {
             setPending(false);
         }
@@ -244,58 +248,56 @@ function PlanDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{plan ? `Edit ${plan.name}` : "New plan"}</DialogTitle>
-                    <DialogDescription>
-                        How often a copy is taken, how many are kept in each destination, and where they go.
-                    </DialogDescription>
+                    <DialogTitle>{plan ? t("plans.editNamed", { name: plan.name }) : t("plans.new")}</DialogTitle>
+                    <DialogDescription>{t("plans.dialogIntro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("table.columns.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Nightly"
+                            placeholder={t("plans.namePlaceholder")}
                         />
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Take a copy</span>
+                        <span className="font-medium">{t("plans.take")}</span>
                         <Select
                             value={every}
                             onValueChange={setEvery}
-                            aria-label="How often"
+                            aria-label={t("plans.howOften")}
                             options={BACKUP_EVERY_OPTIONS.map((option) => ({
                                 value: option.value,
-                                label: option.label
+                                label: everyLabel(t, option.value)
                             }))}
                         />
                     </label>
 
                     <div className="grid gap-3 sm:grid-cols-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Keep</span>
+                            <span className="font-medium">{t("plans.keep")}</span>
                             <Input
                                 type="number"
                                 min={0}
                                 value={keepLast}
                                 onChange={(event) => setKeepLast(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">copies, 0 for no limit</span>
+                            <span className="text-xs text-muted-foreground">{t("plans.keepHint")}</span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">For</span>
+                            <span className="font-medium">{t("plans.for")}</span>
                             <Input
                                 type="number"
                                 min={0}
                                 value={keepDays}
                                 onChange={(event) => setKeepDays(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">days, 0 for no limit</span>
+                            <span className="text-xs text-muted-foreground">{t("plans.forHint")}</span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Under</span>
+                            <span className="font-medium">{t("plans.under")}</span>
                             <Input
                                 type="number"
                                 min={0}
@@ -303,16 +305,13 @@ function PlanDialog({
                                 value={maxGb}
                                 onChange={(event) => setMaxGb(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">GB, blank for no limit</span>
+                            <span className="text-xs text-muted-foreground">{t("plans.underHint")}</span>
                         </label>
                     </div>
 
                     <fieldset className="flex flex-col gap-1.5 text-sm">
-                        <legend className="font-medium">Copies go to</legend>
-                        <p className="text-xs text-muted-foreground">
-                            Every destination gets its own copy, written in this order. The first is the one the
-                            rest are replicated from.
-                        </p>
+                        <legend className="font-medium">{t("plans.goTo")}</legend>
+                        <p className="text-xs text-muted-foreground">{t("plans.goToHint")}</p>
                         {destinations.map((destination) => (
                             <label key={destination.id} className="flex items-center gap-2">
                                 <input
@@ -328,15 +327,15 @@ function PlanDialog({
                                 />
                                 <span>{destination.name}</span>
                                 {destination.status === "unreachable" ? (
-                                    <Badge variant="danger">Not answering</Badge>
+                                    <Badge variant="danger">{t("plans.notAnswering")}</Badge>
                                 ) : null}
                             </label>
                         ))}
                     </fieldset>
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>Tell me when one fails</span>
-                        <Switch checked={notify} onChange={setNotify} aria-label="Notify on failure" />
+                        <span>{t("plans.notify")}</span>
+                        <Switch checked={notify} onChange={setNotify} aria-label={t("plans.notifyLabel")} />
                     </div>
 
                     {problems.length > 0 ? (
@@ -346,11 +345,11 @@ function PlanDialog({
 
                     <div className="flex justify-end gap-2">
                         <DialogClose asChild>
-                            <Button variant="ghost">Cancel</Button>
+                            <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                         </DialogClose>
                         <Button onClick={() => void onSave()} disabled={pending || problems.length > 0}>
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {plan ? "Save changes" : "Create plan"}
+                            {plan ? t("plans.saveChanges") : t("plans.create")}
                         </Button>
                     </div>
                 </div>

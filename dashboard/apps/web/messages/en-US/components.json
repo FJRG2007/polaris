@@ -577,5 +577,13 @@
     },
     "messageTime": {
         "yesterdayAt": "Yesterday at {time}"
+    },
+    "readJson": {
+        "unreachable": "Polaris could not be reached. Check the connection and try again.",
+        "expired": "Your session has expired. Sign in again to see this.",
+        "unreadable": "The answer could not be read.",
+        "failed": "That did not work",
+        "forbidden": "You do not have access to this. Only an administrator does.",
+        "status": "The server answered {status}."
     }
 }

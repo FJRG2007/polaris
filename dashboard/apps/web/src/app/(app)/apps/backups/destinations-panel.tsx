@@ -13,7 +13,9 @@
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import type { DestinationSummary } from "./types";
-import { readJson, reasonFor } from "@/lib/read-json";
+import { readJson, readReasonText, reasonFor } from "@/lib/read-json";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { createDestinationAction, deleteDestinationAction, testDestinationAction } from "./actions";
 import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Plus, Server, Trash2 } from "lucide-react";
@@ -35,12 +37,13 @@ import {
 } from "@polaris/ui";
 
 /** What each kind survives, in one line. */
-const KIND_NOTE: Record<string, string> = {
-    local: "On this machine's data dir. Survives a mistake, not a dead disk.",
-    "source-local": "Beside the thing itself. Instant, and lost with the disk it protects.",
-    connection: "On a storage connection - a NAS, a bucket, a linked drive.",
-    host: "On another server you have connected, over SSH."
-};
+/** The kinds of destination, and what each one survives: `destinations.notes.<kind>`. */
+const DESTINATION_KINDS = new Set(["local", "source-local", "connection", "host"]);
+
+function kindNote(t: NamespaceTranslator<"backups">, kind: string): string {
+    if (!DESTINATION_KINDS.has(kind)) return kind;
+    return t(`destinations.notes.${kind === "source-local" ? "sourceLocal" : kind}` as NamespaceKey<"backups">);
+}
 
 export function DestinationsPanel({
     destinations,
@@ -51,6 +54,8 @@ export function DestinationsPanel({
     loading: boolean;
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
     const format = useDisplayFormat();
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<DestinationSummary | null>(null);
@@ -66,9 +71,16 @@ export function DestinationsPanel({
         setError(null);
         try {
             const result = await testDestinationAction(destination.id);
-            if (!result.ok) setError(`${destination.name}: ${result.error ?? "it did not answer"}`);
+            if (!result.ok) {
+                setError(
+                    t("destinations.testFailed", {
+                        name: destination.name,
+                        reason: result.error ?? t("destinations.noAnswer")
+                    })
+                );
+            }
         } catch (caught) {
-            setError(`${destination.name}: ${reasonFor(caught)}`);
+            setError(t("destinations.testFailed", { name: destination.name, reason: readReasonText(tc, reasonFor(caught)) }));
         } finally {
             setTesting(null);
         }
@@ -83,7 +95,7 @@ export function DestinationsPanel({
             const result = await deleteDestinationAction(target.id);
             if (result.error) setError(result.error);
         } catch (caught) {
-            setError(reasonFor(caught));
+            setError(readReasonText(tc, reasonFor(caught)));
         }
         await onChanged();
     }
@@ -92,11 +104,11 @@ export function DestinationsPanel({
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                    A plan can write to several. That is what makes a backup survive the machine it was taken on.
+                    {t("destinations.intro")}
                 </p>
                 <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
-                    Add destination
+                    {t("destinations.add")}
                 </Button>
             </div>
 
@@ -122,10 +134,10 @@ export function DestinationsPanel({
                                                 <HardDrive className="size-4 text-muted-foreground" />
                                             )}
                                             {destination.name}
-                                            {destination.isDefault ? <Badge variant="neutral">Default</Badge> : null}
+                                            {destination.isDefault ? <Badge variant="neutral">{t("table.default")}</Badge> : null}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {KIND_NOTE[destination.kind] ?? destination.kind}
+                                            {kindNote(t, destination.kind)}
                                             {destination.via ? ` - ${destination.via}` : ""}
                                         </p>
                                     </div>
@@ -139,13 +151,13 @@ export function DestinationsPanel({
                                             {testing === destination.id ? (
                                                 <Loader2 className="size-4 animate-spin" />
                                             ) : null}
-                                            Test
+                                            {t("destinations.test")}
                                         </Button>
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            aria-label={`Delete ${destination.name}`}
-                                            title="Delete this destination"
+                                            aria-label={t("plans.deleteNamed", { name: destination.name })}
+                                            title={t("destinations.delete")}
                                             onClick={() => setRemoving(destination)}
                                         >
                                             <Trash2 className="size-4" />
@@ -155,19 +167,19 @@ export function DestinationsPanel({
 
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                     <span>
-                                        {destination.copyCount} {destination.copyCount === 1 ? "copy" : "copies"}
+                                        {t("destinations.copies", { count: destination.copyCount })}
                                     </span>
                                     <span>-</span>
                                     <span>{formatBytes(BigInt(destination.storedBytes))}</span>
                                     {destination.status === "unreachable" ? (
                                         <span className="flex items-center gap-1 text-danger">
                                             <AlertTriangle className="size-3.5" />
-                                            {destination.lastError ?? "Not answering"}
+                                            {destination.lastError ?? t("plans.notAnswering")}
                                         </span>
                                     ) : destination.lastCheckedAt ? (
                                         <span className="flex items-center gap-1 text-success">
                                             <CheckCircle2 className="size-3.5" />
-                                            Answered {format.dateTime(destination.lastCheckedAt)}
+                                            {t("destinations.answered", { when: format.dateTime(destination.lastCheckedAt) })}
                                         </span>
                                     ) : null}
                                 </div>
@@ -186,14 +198,14 @@ export function DestinationsPanel({
                     open
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.name}
-                    kind="destination"
+                    kind={t("destinations.kind")}
                     requireTyping={removing.copyCount > 0}
                     description={
                         removing.copyCount > 0
-                            ? `It still holds ${removing.copyCount} ${removing.copyCount === 1 ? "copy" : "copies"}. Polaris will refuse until they are gone, so they never become bytes nothing points at.`
-                            : "It holds nothing, so nothing is lost."
+                            ? t("destinations.deleteBody", { count: removing.copyCount })
+                            : t("destinations.deleteEmpty")
                     }
-                    confirmLabel="Delete destination"
+                    confirmLabel={t("destinations.deleteConfirm")}
                     onConfirm={() => void onDelete()}
                 />
             ) : null}
@@ -207,6 +219,9 @@ interface ConnectionOption {
 }
 
 function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
     const [kind, setKind] = useState("connection");
     const [name, setName] = useState("");
     const [basePath, setBasePath] = useState("polaris-backups");
@@ -229,12 +244,12 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
             setHosts(answer.hosts);
             setConnectionId(answer.connections[0]?.id ?? "");
             setHostId(answer.hosts[0]?.id ?? "");
-            if (!data.ok) setError(data.reason);
+            if (!data.ok) setError(readReasonText(tc, data.reason));
         });
         return () => {
             live = false;
         };
-    }, []);
+    }, [tc]);
 
     const needsConnection = kind === "connection";
     const needsHost = kind === "host";
@@ -249,7 +264,7 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
         try {
             await create();
         } catch (caught) {
-            setError(reasonFor(caught));
+            setError(readReasonText(tc, reasonFor(caught)));
         } finally {
             setPending(false);
         }
@@ -277,50 +292,50 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Add a destination</DialogTitle>
-                    <DialogDescription>Somewhere copies are written.</DialogDescription>
+                    <DialogTitle>{t("destinations.title")}</DialogTitle>
+                    <DialogDescription>{t("destinations.dialogIntro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Kind</span>
+                        <span className="font-medium">{t("destinations.kindLabel")}</span>
                         <Select
                             value={kind}
                             onValueChange={setKind}
-                            aria-label="Kind"
+                            aria-label={t("destinations.kindLabel")}
                             options={[
-                                { value: "connection", label: "Storage connection (NAS, bucket, linked drive)" },
-                                { value: "host", label: "A server you have connected" },
-                                { value: "local", label: "This machine's data dir" },
-                                { value: "source-local", label: "Beside the thing itself" }
+                                { value: "connection", label: t("destinations.kinds.connection") },
+                                { value: "host", label: t("destinations.kinds.host") },
+                                { value: "local", label: t("destinations.kinds.local") },
+                                { value: "source-local", label: t("destinations.kinds.sourceLocal") }
                             ]}
                         />
-                        <span className="text-xs text-muted-foreground">{KIND_NOTE[kind]}</span>
+                        <span className="text-xs text-muted-foreground">{kindNote(t, kind)}</span>
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("table.columns.name")}</span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Backblaze bucket"
+                            placeholder={t("destinations.namePlaceholder")}
                         />
                     </label>
 
                     {needsConnection ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Connection</span>
+                            <span className="font-medium">{t("destinations.connection")}</span>
                             {connections === null ? (
                                 <Skeleton className="h-9 w-full" />
                             ) : connections.length === 0 ? (
                                 <span className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                                    No storage connections yet. Add one in Drive first.
+                                    {t("destinations.noConnections")}
                                 </span>
                             ) : (
                                 <Select
                                     value={connectionId}
                                     onValueChange={setConnectionId}
-                                    aria-label="Connection"
+                                    aria-label={t("destinations.connection")}
                                     options={connections.map((entry) => ({ value: entry.id, label: entry.name }))}
                                 />
                             )}
@@ -329,18 +344,18 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
 
                     {needsHost ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Server</span>
+                            <span className="font-medium">{t("destinations.server")}</span>
                             {hosts === null ? (
                                 <Skeleton className="h-9 w-full" />
                             ) : hosts.length === 0 ? (
                                 <span className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                                    No servers connected yet.
+                                    {t("destinations.noServers")}
                                 </span>
                             ) : (
                                 <Select
                                     value={hostId}
                                     onValueChange={setHostId}
-                                    aria-label="Server"
+                                    aria-label={t("destinations.server")}
                                     options={hosts.map((entry) => ({ value: entry.id, label: entry.name }))}
                                 />
                             )}
@@ -349,14 +364,14 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
 
                     {kind !== "source-local" ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Folder</span>
+                            <span className="font-medium">{t("destinations.folder")}</span>
                             <Input
                                 value={basePath}
                                 onChange={(event) => setBasePath(event.target.value)}
                                 placeholder={kind === "host" ? "/var/backups/polaris" : "polaris-backups"}
                             />
                             <span className="text-xs text-muted-foreground">
-                                Everything is written under this, so backups never share a folder with anything else.
+                                {t("destinations.folderHint")}
                             </span>
                         </label>
                     ) : null}
@@ -365,11 +380,11 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
 
                     <div className="flex justify-end gap-2">
                         <DialogClose asChild>
-                            <Button variant="ghost">Cancel</Button>
+                            <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                         </DialogClose>
                         <Button onClick={() => void onSave()} disabled={pending || !ready}>
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            Add
+                            {t("destinations.addShort")}
                         </Button>
                     </div>
                 </div>

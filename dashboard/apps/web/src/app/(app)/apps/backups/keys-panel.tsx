@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { BackupKeyView } from "@/lib/backups/keyring";
 import { KeyRound, Loader2, RefreshCw } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     addRecoveryKeyAction,
     listBackupKeysAction,
@@ -38,6 +39,7 @@ import {
 const RECOVERY_SHAPE = /^polaris-backup-key:[0-9a-f-]{36}:[A-Za-z0-9_-]{43}$/;
 
 export function KeysPanel() {
+    const t = useTranslations("backups");
     const format = useDisplayFormat();
     const [keys, setKeys] = useState<BackupKeyView[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export function KeysPanel() {
             return;
         }
         setRotating(false);
-        setNote("New copies are sealed under the new key. Keep its recovery key too.");
+        setNote(t("keys.rotated"));
         await load();
     }
 
@@ -95,12 +97,12 @@ export function KeysPanel() {
             return;
         }
         setPasted("");
-        setNote(result.added ? "Added. Copies sealed with it now open here." : "That key was already here.");
+        setNote(result.added ? t("keys.added") : t("keys.already"));
         await load();
     }
 
     const trimmed = pasted.trim();
-    const pastedProblem = trimmed && !RECOVERY_SHAPE.test(trimmed) ? "That does not look like a recovery key" : null;
+    const pastedProblem = trimmed && !RECOVERY_SHAPE.test(trimmed) ? t("keys.notAKey") : null;
 
     return (
         <div className="flex flex-col gap-3">
@@ -108,12 +110,10 @@ export function KeysPanel() {
                 <CardBody className="flex flex-col gap-3 text-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="max-w-prose text-muted-foreground">
-                            Copies are encrypted before they leave, with this account&apos;s backup key. Keep each
-                            key&apos;s recovery key somewhere other than this Polaris: without it, the copies cannot
-                            be opened once this Polaris is gone.
+                            {t("keys.intro")}
                         </p>
                         <Button size="sm" variant="secondary" onClick={() => setRotating(true)} disabled={keys === null}>
-                            <RefreshCw className="size-4" /> New key
+                            <RefreshCw className="size-4" /> {t("keys.new")}
                         </Button>
                     </div>
                     {keys === null ? (
@@ -122,7 +122,7 @@ export function KeysPanel() {
                             <Skeleton className="h-10 w-full" />
                         </div>
                     ) : keys.length === 0 ? (
-                        <p className="text-muted-foreground">No key yet. One is made with the first backup.</p>
+                        <p className="text-muted-foreground">{t("keys.none")}</p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {keys.map((key) => (
@@ -130,13 +130,12 @@ export function KeysPanel() {
                                     <KeyRound className="size-4 text-muted-foreground" />
                                     <code className="text-xs">{key.id.slice(0, 8)}</code>
                                     {key.retiredAt ? (
-                                        <Badge variant="neutral">Opens old copies</Badge>
+                                        <Badge variant="neutral">{t("keys.retired")}</Badge>
                                     ) : (
-                                        <Badge variant="success">Sealing new copies</Badge>
+                                        <Badge variant="success">{t("keys.current")}</Badge>
                                     )}
                                     <span className="text-xs text-muted-foreground">
-                                        Made {format.date(key.createdAt)} - {key.copies}{" "}
-                                        {key.copies === 1 ? "copy" : "copies"}
+                                        {t("keys.made", { when: format.date(key.createdAt), count: key.copies })}
                                     </span>
                                     <Button
                                         size="sm"
@@ -145,8 +144,8 @@ export function KeysPanel() {
                                         disabled={revealing !== null}
                                         onClick={() => void reveal(key.id)}
                                     >
-                                        {revealing === key.id && <Loader2 className="size-4 animate-spin" />} Recovery
-                                        key
+                                        {revealing === key.id && <Loader2 className="size-4 animate-spin" />}{" "}
+                                        {t("keys.recovery")}
                                     </Button>
                                 </li>
                             ))}
@@ -158,15 +157,13 @@ export function KeysPanel() {
             <Card>
                 <CardBody className="flex flex-col gap-2 text-sm">
                     <label className="flex flex-col gap-1">
-                        <span className="font-medium">Add a recovery key</span>
-                        <span className="text-xs text-muted-foreground">
-                            From another Polaris, to open the copies it sealed.
-                        </span>
+                        <span className="font-medium">{t("keys.addTitle")}</span>
+                        <span className="text-xs text-muted-foreground">{t("keys.addHint")}</span>
                         <div className="flex flex-wrap gap-2">
                             <Input
                                 value={pasted}
                                 onChange={(event) => setPasted(event.target.value)}
-                                placeholder="polaris-backup-key:..."
+                                placeholder="polaris-backup-key:..." // i18n-ignore the key's own format
                                 autoComplete="off"
                                 spellCheck={false}
                                 className="min-w-0 flex-1 font-mono text-xs"
@@ -176,7 +173,7 @@ export function KeysPanel() {
                                 onClick={() => void add()}
                                 disabled={adding || !trimmed || pastedProblem !== null}
                             >
-                                {adding && <Loader2 className="size-4 animate-spin" />} Add
+                                {adding && <Loader2 className="size-4 animate-spin" />} {t("destinations.addShort")}
                             </Button>
                         </div>
                     </label>
@@ -190,12 +187,12 @@ export function KeysPanel() {
             <ConfirmDeleteDialog
                 open={rotating}
                 onOpenChange={setRotating}
-                name="backup key"
-                kind="key"
+                name={t("keys.name")}
+                kind={t("keys.kind")}
                 requireTyping={false}
-                title="Start a new backup key?"
-                question="New copies are sealed under a new key. Copies already taken keep opening with the key they were sealed under."
-                confirmLabel="New key"
+                title={t("keys.rotateTitle")}
+                question={t("keys.rotateBody")}
+                confirmLabel={t("keys.new")}
                 pending={rotatePending}
                 onConfirm={() => void rotate()}
             />
@@ -203,15 +200,13 @@ export function KeysPanel() {
             <Dialog open={revealed !== null} onOpenChange={(open) => !open && setRevealed(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Recovery key</DialogTitle>
-                        <DialogDescription>
-                            Opens every copy this key sealed. Keep it in a password manager, not on this machine.
-                        </DialogDescription>
+                        <DialogTitle>{t("keys.recoveryTitle")}</DialogTitle>
+                        <DialogDescription>{t("keys.recoveryBody")}</DialogDescription>
                     </DialogHeader>
                     {revealed && (
                         <div className="flex items-center gap-2 rounded-md border border-border p-2">
                             <code className="min-w-0 flex-1 break-all text-xs">{revealed.recoveryKey}</code>
-                            <CopyButton value={revealed.recoveryKey} label="Copy the recovery key" />
+                            <CopyButton value={revealed.recoveryKey} label={t("keys.theRecoveryKey")} />
                         </div>
                     )}
                 </DialogContent>

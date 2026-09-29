@@ -25,7 +25,10 @@ import { ProtectDialog } from "./protect-dialog";
 import { ActivityPanel } from "./activity-panel";
 import { DestinationsPanel } from "./destinations-panel";
 import { useDisplayFormat } from "@/components/display-format";
-import { RESOURCE_KINDS, RESOURCE_KINDS_INFO } from "@/lib/backups/kinds";
+import { RESOURCE_KINDS } from "@/lib/backups/kinds";
+import { kindLabel } from "@/lib/backups/words";
+import { readReasonText } from "@/lib/read-json";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { BackupOverview, DestinationSummary, PlanSummary, ResourceRow } from "./types";
 import { backUpNowAction, setPausedAction, setPlanAction, unprotectAction } from "./actions";
@@ -66,15 +69,12 @@ const CACHE_MS = 30_000;
 
 type Tab = "protected" | "plans" | "destinations" | "keys" | "activity";
 
-const TABS: readonly { readonly id: Tab; readonly label: string }[] = [
-    { id: "protected", label: "Protected" },
-    { id: "plans", label: "Plans" },
-    { id: "destinations", label: "Destinations" },
-    { id: "keys", label: "Encryption" },
-    { id: "activity", label: "Activity" }
-];
+/** The tabs, in order; each one's name is `tabs.<id>` in the catalog. */
+const TABS: readonly Tab[] = ["protected", "plans", "destinations", "keys", "activity"];
 
 export function BackupsView() {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
     const [tab, setTab] = useState<Tab>("protected");
     const [overview, setOverview] = useState<BackupOverview | null>(null);
     // Why the console has nothing to draw, when that is the answer. Held apart
@@ -89,9 +89,9 @@ export function BackupsView() {
             setOverview(next.value);
             setUnread(null);
         } else {
-            setUnread(next.reason);
+            setUnread(readReasonText(tc, next.reason));
         }
-    }, []);
+    }, [tc]);
 
     useEffect(() => {
         void loadOverview();
@@ -112,17 +112,17 @@ export function BackupsView() {
             <div className="flex flex-wrap items-center gap-1 border-b border-border">
                 {TABS.map((entry) => (
                     <button
-                        key={entry.id}
+                        key={entry}
                         type="button"
-                        onClick={() => setTab(entry.id)}
+                        onClick={() => setTab(entry)}
                         className={cn(
                             "-mb-px border-b-2 px-3 py-2 text-sm transition-colors",
-                            tab === entry.id
+                            tab === entry
                                 ? "border-primary font-medium text-foreground"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {entry.label}
+                        {t(`tabs.${entry}`)}
                     </button>
                 ))}
             </div>
@@ -162,17 +162,18 @@ export function BackupsView() {
  * and showing it before the answer is known is showing something false.
  */
 function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; failed: boolean }) {
+    const t = useTranslations("backups");
     const summary = overview?.summary;
     // A dash once the read has failed, not a skeleton: a skeleton says the answer
     // is on its way, and it is not.
     const missing = failed ? "-" : null;
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Protected" value={summary ? String(summary.protectedCount) : missing} />
-            <Stat label="Copies" value={summary ? String(summary.copyCount) : missing} />
-            <Stat label="Stored" value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing} />
+            <Stat label={t("summary.protected")} value={summary ? String(summary.protectedCount) : missing} />
+            <Stat label={t("summary.copies")} value={summary ? String(summary.copyCount) : missing} />
+            <Stat label={t("summary.stored")} value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing} />
             <Stat
-                label="Failed in 24h"
+                label={t("summary.failed")}
                 value={summary ? String(summary.failedRecently) : missing}
                 bad={Boolean(summary && summary.failedRecently > 0)}
             />
@@ -181,10 +182,7 @@ function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; f
                     <CardBody className="flex items-start gap-2 py-3 text-xs text-danger">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                         <span>
-                            {summary.destinationsDown === 1
-                                ? "One destination stopped answering."
-                                : `${summary.destinationsDown} destinations stopped answering.`}{" "}
-                            Copies bound for them are failing - open Destinations to see which.
+                            {t("summary.destinationsDown", { count: summary.destinationsDown })}
                         </span>
                     </CardBody>
                 </Card>
@@ -223,6 +221,8 @@ function ProtectedTable({
     destinations: DestinationSummary[];
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
     const format = useDisplayFormat();
     const [query, setQuery] = useState("");
     const [kind, setKind] = useState("");
@@ -256,7 +256,7 @@ function ProtectedTable({
             }
             const next = await readJson<Page>(`/api/backups/resources?${params}`);
             if (!next.ok) {
-                setError(next.reason);
+                setError(readReasonText(tc, next.reason));
                 // An empty page rather than nothing: the table draws its "nothing
                 // here" row instead of skeletons that never resolve, and the
                 // sentence above it says why it is empty.
@@ -270,7 +270,7 @@ function ProtectedTable({
             );
             if (!cursor) cache.current.set(key, { at: Date.now(), page: answer });
         },
-        [key, kind, query]
+        [key, kind, query, tc]
     );
 
     useEffect(() => {
@@ -297,7 +297,7 @@ function ProtectedTable({
         if (result.error !== undefined) {
             setError(result.error);
         } else if (result.status === "partial") {
-            setError(`${row.name}: the copy landed in some destinations but not all. Open it to see which.`);
+            setError(t("table.partial", { name: row.name }));
         }
         await refresh();
     }
@@ -331,27 +331,27 @@ function ProtectedTable({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search what is protected"
+                        placeholder={t("table.search")}
                         className="pl-8"
-                        aria-label="Search what is protected"
+                        aria-label={t("table.search")}
                     />
                 </div>
                 <Select
                     value={kind}
                     onValueChange={setKind}
-                    aria-label="Filter by type"
+                    aria-label={t("table.filterType")}
                     className="w-44"
                     options={[
-                        { value: "", label: "Every type" },
+                        { value: "", label: t("table.everyType") },
                         ...RESOURCE_KINDS.map((entry) => ({
                             value: entry,
-                            label: RESOURCE_KINDS_INFO[entry].label
+                            label: kindLabel(t, entry)
                         }))
                     ]}
                 />
                 <Button onClick={() => setProtecting(true)}>
                     <Plus className="size-4" />
-                    Add resource
+                    {t("table.add")}
                 </Button>
             </div>
 
@@ -362,14 +362,14 @@ function ProtectedTable({
                     <table className="w-full text-sm">
                         <thead className="border-b border-border text-left text-xs text-muted-foreground">
                             <tr>
-                                <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="px-3 py-2 font-medium">Type</th>
-                                <th className="px-3 py-2 font-medium">Plan</th>
-                                <th className="px-3 py-2 font-medium">Last copy</th>
-                                <th className="px-3 py-2 font-medium">Next</th>
-                                <th className="px-3 py-2 text-right font-medium">Copies</th>
-                                <th className="px-3 py-2 text-right font-medium">Size</th>
-                                <th className="px-3 py-2 font-medium">Destinations</th>
+                                <th className="px-3 py-2 font-medium">{t("table.columns.name")}</th>
+                                <th className="px-3 py-2 font-medium">{t("table.columns.type")}</th>
+                                <th className="px-3 py-2 font-medium">{t("table.columns.plan")}</th>
+                                <th className="px-3 py-2 font-medium">{t("table.columns.lastCopy")}</th>
+                                <th className="px-3 py-2 font-medium">{t("table.columns.next")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{t("summary.copies")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                                <th className="px-3 py-2 font-medium">{t("tabs.destinations")}</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -385,9 +385,7 @@ function ProtectedTable({
                             ) : rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
-                                        {query || kind
-                                            ? "Nothing matches that."
-                                            : "Nothing is being backed up yet. Add a resource to start."}
+                                        {query || kind ? t("table.noMatch") : t("table.empty")}
                                     </td>
                                 </tr>
                             ) : (
@@ -423,7 +421,7 @@ function ProtectedTable({
                     }}
                 >
                     {loadingMore ? <Loader2 className="size-4 animate-spin" /> : null}
-                    Show more
+                    {t("table.more")}
                 </Button>
             ) : null}
 
@@ -441,14 +439,14 @@ function ProtectedTable({
                     open
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.name}
-                    kind="protected item"
+                    kind={t("table.kind")}
                     requireTyping={false}
                     description={
                         removing.copyCount > 0
-                            ? `Its ${removing.copyCount} ${removing.copyCount === 1 ? "copy stays" : "copies stay"} where they are and can still be restored. Delete them separately if you want them gone.`
-                            : "It has no copies yet, so nothing is lost."
+                            ? t("table.removeKeeps", { count: removing.copyCount })
+                            : t("table.removeNoCopies")
                     }
-                    confirmLabel="Stop backing up"
+                    confirmLabel={t("table.stop")}
                     onConfirm={() => void onRemove(false)}
                 />
             ) : null}
@@ -476,6 +474,7 @@ function ResourceLine({
     onRemove: () => void;
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
     const paused = row.status === "paused";
     return (
         <ContextMenu>
@@ -487,24 +486,24 @@ function ResourceLine({
                         </Link>
                         {row.lastStatus === "failed" || row.lastStatus === "partial" ? (
                             <p className="truncate text-xs text-danger" title={row.lastError ?? undefined}>
-                                {row.lastError ?? "The last copy did not land."}
+                                {row.lastError ?? t("table.lastFailed")}
                             </p>
                         ) : null}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{row.kindLabel}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{kindLabel(t, row.kind, row.kindLabel)}</td>
                     <td className="px-3 py-2.5">
                         {row.planName ? (
                             <span className="text-muted-foreground">{row.planName}</span>
                         ) : (
-                            <span className="text-xs text-muted-foreground">On demand</span>
+                            <span className="text-xs text-muted-foreground">{t("table.onDemand")}</span>
                         )}
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground">
-                        {row.lastBackupAt ? format.dateTime(row.lastBackupAt) : "Never"}
+                        {row.lastBackupAt ? format.dateTime(row.lastBackupAt) : t("table.never")}
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground">
                         {paused ? (
-                            <Badge variant="neutral">Paused</Badge>
+                            <Badge variant="neutral">{t("table.paused")}</Badge>
                         ) : row.nextDueAt ? (
                             <span className="flex items-center gap-1 text-xs">
                                 <Clock className="size-3.5" />
@@ -519,15 +518,15 @@ function ResourceLine({
                         {formatBytes(BigInt(row.sizeBytes))}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                        {row.destinations.length > 0 ? row.destinations.join(", ") : "Default"}
+                        {row.destinations.length > 0 ? row.destinations.join(", ") : t("table.default")}
                     </td>
                     <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1">
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={`Back up ${row.name} now`}
-                                title="Back up now"
+                                aria-label={t("table.backUpNamed", { name: row.name })}
+                                title={t("table.backUp")}
                                 disabled={busy}
                                 onClick={onBackUp}
                             >
@@ -540,8 +539,12 @@ function ResourceLine({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={paused ? `Resume ${row.name}` : `Pause ${row.name}`}
-                                title={paused ? "Resume the schedule" : "Pause the schedule"}
+                                aria-label={
+                                    paused
+                                        ? t("table.resumeNamed", { name: row.name })
+                                        : t("table.pauseNamed", { name: row.name })
+                                }
+                                title={paused ? t("table.resume") : t("table.pause")}
                                 disabled={busy}
                                 onClick={onTogglePause}
                             >
@@ -554,15 +557,15 @@ function ResourceLine({
             <ContextMenuContent>
                 <ContextMenuLabel>{row.name}</ContextMenuLabel>
                 <ContextMenuItem asChild>
-                    <Link href={`/apps/backups/${row.id}`}>Open</Link>
+                    <Link href={`/apps/backups/${row.id}`}>{t("table.open")}</Link>
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={onBackUp}>Back up now</ContextMenuItem>
+                <ContextMenuItem onSelect={onBackUp}>{t("table.backUp")}</ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuLabel>Plan</ContextMenuLabel>
+                <ContextMenuLabel>{t("table.columns.plan")}</ContextMenuLabel>
                 <PlanChoices row={row} plans={plans} onChanged={onChanged} />
                 <ContextMenuSeparator />
                 <ContextMenuItem variant="danger" onSelect={onRemove}>
-                    Stop backing up
+                    {t("table.stop")}
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
@@ -579,6 +582,7 @@ function PlanChoices({
     plans: PlanSummary[];
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("backups");
     return (
         <>
             <ContextMenuItem
@@ -587,7 +591,8 @@ function PlanChoices({
                     await onChanged();
                 }}
             >
-                {row.planId === null ? "- " : ""}On demand only
+                {row.planId === null ? "- " : ""}
+                {t("table.onDemandOnly")}
             </ContextMenuItem>
             {plans.map((plan) => (
                 <ContextMenuItem
@@ -602,7 +607,7 @@ function PlanChoices({
                 </ContextMenuItem>
             ))}
             {plans.length === 0 ? (
-                <ContextMenuItem disabled>No plans yet - make one under Plans</ContextMenuItem>
+                <ContextMenuItem disabled>{t("table.noPlans")}</ContextMenuItem>
             ) : null}
         </>
     );

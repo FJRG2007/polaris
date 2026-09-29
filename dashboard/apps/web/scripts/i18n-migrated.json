@@ -1012,6 +1012,20 @@
         "web/src/app/(app)/apps/databases/workbench.tsx",
         "web/src/lib/data/connection-schema.ts",
         "web/src/lib/data/connections.ts",
-        "web/src/lib/data/words.ts"
+        "web/src/lib/data/words.ts",
+        "web/src/app/(app)/apps/backups/[resourceId]/resource-detail.tsx",
+        "web/src/app/(app)/apps/backups/actions.ts",
+        "web/src/app/(app)/apps/backups/activity-panel.tsx",
+        "web/src/app/(app)/apps/backups/backups-view.tsx",
+        "web/src/app/(app)/apps/backups/destinations-panel.tsx",
+        "web/src/app/(app)/apps/backups/keys-panel.tsx",
+        "web/src/app/(app)/apps/backups/page.tsx",
+        "web/src/app/(app)/apps/backups/plans-panel.tsx",
+        "web/src/app/(app)/apps/backups/protect-dialog.tsx",
+        "web/src/app/api/backups/resources/[id]/route.ts",
+        "web/src/app/api/backups/resources/route.ts",
+        "web/src/lib/backups/refusal-text.ts",
+        "web/src/lib/backups/words.ts",
+        "web/src/lib/backups/service.ts"
     ]
 }

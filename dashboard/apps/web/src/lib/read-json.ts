@@ -23,6 +23,8 @@
  * for an expired session to be handled differently.
  */
 
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+
 /** A read that worked, or why it did not. `status` is the server's, absent when
  *  the request never got an answer at all. */
 export type ReadResult<T> =
@@ -78,4 +80,27 @@ async function failureReason(response: Response, isJson: boolean): Promise<strin
         if (said) return said;
     }
     return `The server answered ${response.status}.`;
+}
+
+/** The reasons above, by their English, in the `components` catalog. */
+const REASONS: Readonly<Record<string, NamespaceKey<"components">>> = {
+    "Polaris could not be reached. Check the connection and try again.": "readJson.unreachable",
+    "Your session has expired. Sign in again to see this.": "readJson.expired",
+    "The answer could not be read.": "readJson.unreadable",
+    "That did not work": "readJson.failed",
+    "You do not have access to this. Only an administrator does.": "readJson.forbidden"
+};
+
+/**
+ * A reason this module gave, in the reader's words.
+ *
+ * The reasons are written here in English because this runs without a reader to
+ * ask; a screen hands them through this on the way to the page. A sentence the
+ * server wrote itself passes through as it came.
+ */
+export function readReasonText(t: NamespaceTranslator<"components">, reason: string): string {
+    const key = REASONS[reason];
+    if (key) return t(key);
+    const status = /^The server answered (\d+)\.$/.exec(reason);
+    return status ? t("readJson.status", { status: Number(status[1]) }) : reason;
 }

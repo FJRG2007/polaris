@@ -938,6 +938,7 @@ export async function testDestination(
             basePath: true
         }
     });
+    // i18n-ignore said in the reader's words by lib/backups/refusal-text
     if (!row) return { ok: false, error: "That destination does not exist" };
     if (isSourceLocal(row)) {
         // There is nothing to open: it is wherever the source is.

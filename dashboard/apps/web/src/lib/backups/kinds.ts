@@ -50,7 +50,7 @@ export interface ResourceKindInfo {
 export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo>> = {
     "polaris-database": {
         kind: "polaris-database",
-        label: "Polaris database",
+        label: "Polaris database", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "Everything Polaris itself knows: accounts, apps, settings, history.",
         // Deliberately not restorable from here. Polaris is running on this
         // database: rewriting it underneath the request doing the rewriting
@@ -64,7 +64,7 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     },
     "managed-database": {
         kind: "managed-database",
-        label: "Database",
+        label: "Database", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "A database Polaris runs for one of your services.",
         canRestore: true,
         supportsSourceLocal: false,
@@ -72,7 +72,7 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     },
     "minecraft-world": {
         kind: "minecraft-world",
-        label: "Game world",
+        label: "Game world", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "A Minecraft world, archived with saving paused so it is not caught mid-write.",
         canRestore: true,
         supportsSourceLocal: true,
@@ -80,7 +80,7 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     },
     "deploy-volume": {
         kind: "deploy-volume",
-        label: "Service data",
+        label: "Service data", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "A volume one of your services keeps its data in.",
         canRestore: true,
         supportsSourceLocal: false,
@@ -88,7 +88,7 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     },
     "mail-server": {
         kind: "mail-server",
-        label: "Mail server",
+        label: "Mail server", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "A mail server's mailboxes, queue and keys, exported with the engine stopped so the copy is whole.",
         canRestore: true,
         supportsSourceLocal: false,
@@ -96,7 +96,7 @@ export const RESOURCE_KINDS_INFO: Readonly<Record<ResourceKind, ResourceKindInfo
     },
     "nas-path": {
         kind: "nas-path",
-        label: "Files",
+        label: "Files", // i18n-ignore said in the reader's words by lib/backups/words
         summary: "A folder on a storage connection.",
         canRestore: false,
         supportsSourceLocal: false,

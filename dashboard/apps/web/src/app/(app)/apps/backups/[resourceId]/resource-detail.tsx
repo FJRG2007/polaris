@@ -14,7 +14,13 @@
 
 import { saveFile } from "@/components/transfers/move-file";
 import Link from "next/link";
-import { readJson } from "@/lib/read-json";
+import { readJson, readReasonText } from "@/lib/read-json";
+import { kindLabel } from "@/lib/backups/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** A copy's own status, said as `detail.copyStatuses.<status>`. */
+const COPY_STATUSES = new Set(["available", "failed", "pending", "creating", "deleted", "missing"]);
 import { formatBytes } from "@polaris/core";
 import { useCallback, useEffect, useState } from "react";
 import type { PointRow, ResourceDetail } from "../types";
@@ -37,6 +43,9 @@ import {
 } from "@polaris/ui";
 
 export function ResourceDetailView({ resourceId }: { resourceId: string }) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
     const format = useDisplayFormat();
     const [detail, setDetail] = useState<ResourceDetail | null>(null);
     const [missing, setMissing] = useState(false);
@@ -57,8 +66,8 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
         }
         // A row somebody deleted in another tab is gone, not broken.
         if (result.status === 404) setMissing(true);
-        else setError(result.reason);
-    }, [resourceId]);
+        else setError(readReasonText(tc, result.reason));
+    }, [resourceId, tc]);
 
     useEffect(() => {
         void load();
@@ -100,11 +109,11 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
         return (
             <Card>
                 <CardBody className="flex flex-col items-start gap-3 py-10">
-                    <p className="text-sm text-muted-foreground">That protected item does not exist any more.</p>
+                    <p className="text-sm text-muted-foreground">{t("detail.gone")}</p>
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/apps/backups">
                             <ArrowLeft className="size-4" />
-                            Back to backups
+                            {t("detail.backToList")}
                         </Link>
                     </Button>
                 </CardBody>
@@ -122,9 +131,9 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                         <>
                             <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={resource.name}>{resource.name}</h1>
                             <p className="text-xs text-muted-foreground">
-                                {resource.kindLabel}
-                                {resource.planName ? ` - ${resource.planName}` : " - on demand"}
-                                {resource.nextDueAt ? ` - next ${format.dateTime(resource.nextDueAt)}` : ""}
+                                {kindLabel(t, resource.kind, resource.kindLabel)}
+                                {resource.planName ? ` - ${resource.planName}` : ` - ${t("detail.onDemand")}`}
+                                {resource.nextDueAt ? ` - ${t("detail.next", { when: format.dateTime(resource.nextDueAt) })}` : ""}
                             </p>
                         </>
                     ) : (
@@ -135,7 +144,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/apps/backups">
                             <ArrowLeft className="size-4" />
-                            Back
+                            {t("detail.back")}
                         </Link>
                     </Button>
                     <Button size="sm" onClick={() => void onBackUpNow()} disabled={busy || !resource}>
@@ -144,7 +153,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                         ) : (
                             <HardDriveDownload className="size-4" />
                         )}
-                        Back up now
+                        {t("table.backUp")}
                     </Button>
                 </div>
             </div>
@@ -152,7 +161,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {resource?.lastStatus === "partial" ? (
                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
-                    The last copy landed in some destinations but not all. What did land is still restorable.
+                    {t("detail.partial")}
                 </p>
             ) : null}
 
@@ -161,10 +170,10 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                     <table className="w-full text-sm">
                         <thead className="border-b border-border text-left text-xs text-muted-foreground">
                             <tr>
-                                <th className="px-3 py-2 font-medium">Taken</th>
-                                <th className="px-3 py-2 text-right font-medium">Size</th>
-                                <th className="px-3 py-2 font-medium">Where it is</th>
-                                <th className="px-3 py-2 font-medium">Expires</th>
+                                <th className="px-3 py-2 font-medium">{t("detail.columns.taken")}</th>
+                                <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                                <th className="px-3 py-2 font-medium">{t("detail.columns.where")}</th>
+                                <th className="px-3 py-2 font-medium">{t("detail.columns.expires")}</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -180,7 +189,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                             ) : detail.points.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-3 py-10 text-center text-sm text-muted-foreground">
-                                        No copies yet. Back it up now, or give it a plan.
+                                        {t("detail.none")}
                                     </td>
                                 </tr>
                             ) : (
@@ -190,7 +199,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                             {format.dateTime(point.takenAt)}
                                             {point.status === "partial" ? (
                                                 <Badge variant="warning" className="ml-2">
-                                                    Partial
+                                                    {t("detail.partialBadge")}
                                                 </Badge>
                                             ) : null}
                                             {point.error ? (
@@ -217,22 +226,24 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                             copy.sealed ? (
                                                                 <Lock
                                                                     className="size-3.5 text-muted-foreground"
-                                                                    aria-label="Encrypted"
+                                                                    aria-label={t("detail.encrypted")}
                                                                 >
-                                                                    <title>Encrypted with this account's backup key</title>
+                                                                    <title>{t("detail.encryptedHint")}</title>
                                                                 </Lock>
                                                             ) : (
                                                                 <LockOpen
                                                                     className="size-3.5 text-muted-foreground"
-                                                                    aria-label="Not encrypted"
+                                                                    aria-label={t("detail.plain")}
                                                                 >
-                                                                    <title>Not encrypted: kept on the disk it copies, or taken before backups were encrypted</title>
+                                                                    <title>{t("detail.plainHint")}</title>
                                                                 </LockOpen>
                                                             )
                                                         ) : null}
                                                         {copy.status !== "available" ? (
                                                             <span className="text-danger" title={copy.error ?? ""}>
-                                                                {copy.status}
+                                                                {COPY_STATUSES.has(copy.status)
+                                                                    ? t(`detail.copyStatuses.${copy.status}` as NamespaceKey<"backups">)
+                                                                    : copy.status}
                                                             </span>
                                                         ) : null}
                                                         {copy.downloadable ? (
@@ -247,7 +258,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                                 }}
                                                                 download
                                                                 className="text-primary hover:underline"
-                                                                aria-label={`Download the copy in ${copy.destinationName}`}
+                                                                aria-label={t("detail.download", { where: copy.destinationName })}
                                                             >
                                                                 <Download className="size-3.5" />
                                                             </a>
@@ -256,8 +267,8 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                             <button
                                                                 type="button"
                                                                 className="text-primary hover:underline"
-                                                                aria-label={`Restore from ${copy.destinationName}`}
-                                                                title="Put this copy back"
+                                                                aria-label={t("detail.restoreFrom", { where: copy.destinationName })}
+                                                                title={t("detail.putBack")}
                                                                 onClick={() =>
                                                                     setRestoring({
                                                                         copyId: copy.id,
@@ -273,14 +284,14 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                             </ul>
                                         </td>
                                         <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                                            {point.expiresAt ? format.dateTime(point.expiresAt) : "Kept"}
+                                            {point.expiresAt ? format.dateTime(point.expiresAt) : t("detail.kept")}
                                         </td>
                                         <td className="px-3 py-2.5">
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                aria-label="Delete this backup"
-                                                title="Delete this backup everywhere"
+                                                aria-label={t("detail.delete")}
+                                                title={t("detail.deleteEverywhere")}
                                                 onClick={() => setDeleting(point)}
                                             >
                                                 <Trash2 className="size-4" />
@@ -296,9 +307,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
 
             {resource && !resource.canRestore ? (
                 <p className="text-xs text-muted-foreground">
-                    {resource.kind === "polaris-database"
-                        ? "Polaris is running on this database, so it cannot be rewritten from here. Download the copy and load it with Polaris stopped."
-                        : "This kind cannot be put back automatically - download the copy and restore it yourself."}
+                    {resource.kind === "polaris-database" ? t("detail.noRestorePolaris") : t("detail.noRestore")}
                 </p>
             ) : null}
 
@@ -306,22 +315,22 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                 <Dialog open onOpenChange={(open) => !open && setRestoring(null)}>
                     <DialogContent className="max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Put this copy back?</DialogTitle>
+                            <DialogTitle>{t("detail.restoreTitle")}</DialogTitle>
                             <DialogDescription>
-                                The copy in {restoring.where} will be written over what is there now.{" "}
+                                {t("detail.restoreBody", { where: restoring.where })}{" "}
                                 {resource?.kind === "minecraft-world"
-                                    ? "It lands as a new level beside the one being played, so nothing is lost until you switch to it."
+                                    ? t("detail.restoreWorld")
                                     : resource?.kind === "managed-database"
-                                      ? "A copy of the database as it is now is taken first and kept in this history; if that copy fails, nothing is restored."
-                                      : "The current data is replaced."}
+                                      ? t("detail.restoreDatabase")
+                                      : t("detail.restoreReplace")}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex justify-end gap-2">
                             <DialogClose asChild>
-                                <Button variant="ghost">Cancel</Button>
+                                <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                             </DialogClose>
                             <Button variant="danger" onClick={() => void onRestore()}>
-                                Restore
+                                {t("detail.restore")}
                             </Button>
                         </div>
                     </DialogContent>
@@ -333,10 +342,14 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
                     name={format.dateTime(deleting.takenAt)}
-                    kind="backup"
+                    kind={t("detail.kind")}
                     requireTyping={false}
-                    description={`Every copy of it goes - ${deleting.copies.length === 1 ? `the one in ${deleting.copies[0]?.destinationName}` : `all ${deleting.copies.length} of them`}. This cannot be undone.`}
-                    confirmLabel="Delete everywhere"
+                    description={
+                        deleting.copies.length === 1
+                            ? t("detail.deleteOne", { where: deleting.copies[0]?.destinationName ?? "" })
+                            : t("detail.deleteAll", { count: deleting.copies.length })
+                    }
+                    confirmLabel={t("detail.deleteConfirm")}
                     onConfirm={() => void onDeletePoint()}
                 />
             ) : null}

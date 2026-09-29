@@ -12,17 +12,19 @@
  */
 
 import { PageHeader } from "@polaris/ui";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireAdmin } from "@/lib/session";
 import { BackupsView } from "./backups-view";
 
 export default async function BackupsPage() {
     await requireAdmin();
+    const t = await getTranslations("backups");
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col">
             <PageHeader
-                title="Backups"
-                description="What is protected, how often it is copied, and where those copies live."
+                title={t("page.title")}
+                description={t("page.description")}
             />
             <BackupsView />
         </div>
