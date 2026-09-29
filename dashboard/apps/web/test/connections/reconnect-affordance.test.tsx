@@ -15,6 +15,7 @@
  * way to start it.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -60,7 +61,7 @@ function card(overrides: Partial<Card> = {}, account: Record<string, unknown> = 
 }
 
 function markup(entry: Card): string {
-    return renderToStaticMarkup(<ConnectionsView providers={[entry]} />);
+    return renderToStaticMarkup(withMessages(<ConnectionsView providers={[entry]} />));
 }
 
 describe("a linked account that needs approving", () => {

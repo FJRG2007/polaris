@@ -12,6 +12,8 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "../security/action-messages";
 import { minecraftNameSchema } from "@polaris/core";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
@@ -30,7 +32,14 @@ import {
 const CONNECTIONS_PATH = "/account/connections";
 
 const connectionIdSchema = z.string().uuid();
-const tokenSchema = z.string().trim().min(1, "Paste the token first").max(500);
+const tokenSchema = z.string().trim().min(1, "connections.errors.pasteToken").max(500);
+
+/** A schema here names its complaint by catalog key; this says it in the reader's words. */
+async function issue(message: string | undefined, fallback: string): Promise<{ error: string }> {
+    const t = await getTranslations("account");
+    const key = message ?? fallback;
+    return { error: t.has(key) ? t(key) : key };
+}
 
 /**
  * Who a pasted token turns out to belong to, per service.
@@ -59,6 +68,7 @@ const TOKEN_ACCOUNTS: Readonly<
         const account = await vercelUser(token);
         return {
             accountId: account.id,
+            // i18n-ignore: a service's own name
             label: account.username || account.name || account.email || "Vercel",
             email: account.email || null
         };
@@ -67,6 +77,7 @@ const TOKEN_ACCOUNTS: Readonly<
         const account = await railwayAccount(token);
         return {
             accountId: account.id,
+            // i18n-ignore: a service's own name
             label: account.name || account.email || "Railway",
             email: account.email || null
         };
@@ -87,13 +98,13 @@ export async function connectTokenAction(
 ): Promise<{ error?: string; login?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const readAccount = TOKEN_ACCOUNTS[provider];
-    if (!readAccount) return { error: "That service cannot be connected with a token" };
+    if (!readAccount) return { error: (await getTranslations("account"))("connections.errors.noToken") };
 
     const parsed = tokenSchema.safeParse(rawToken);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Paste the token first" };
+    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.pasteToken");
 
     try {
         const account = await readAccount(parsed.data);
@@ -112,21 +123,23 @@ export async function connectTokenAction(
         if (caught instanceof ConnectionClaimedError || caught instanceof ConnectionLimitError) {
             return { error: caught.message };
         }
-        return { error: caught instanceof Error ? caught.message : "Could not connect the account" };
+        return {
+            error: caught instanceof Error ? caught.message : (await getTranslations("account"))("connections.errors.connectFailed")
+        };
     }
 }
 
 /** An AWS key pair and the region it was linked for. The region is asked for
  *  because a key is not regional and everything it reaches is. */
 const awsSchema = z.object({
-    accessKeyId: z.string().trim().min(16, "That does not look like an access key").max(128),
-    secretAccessKey: z.string().trim().min(16, "That does not look like a secret key").max(256),
+    accessKeyId: z.string().trim().min(16, "connections.errors.notAccessKey").max(128),
+    secretAccessKey: z.string().trim().min(16, "connections.errors.notSecretKey").max(256),
     region: z
         .string()
         .trim()
-        .min(1, "Name the region your services are in")
+        .min(1, "connections.errors.nameRegion")
         .max(32)
-        .regex(/^[a-z0-9-]+$/, "A region looks like eu-west-1")
+        .regex(/^[a-z0-9-]+$/, "connections.errors.regionFormat")
 });
 
 /**
@@ -145,10 +158,10 @@ const awsSchema = z.object({
 export async function connectAwsAction(input: unknown): Promise<{ error?: string; login?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = awsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.checkDetails");
 
     try {
         const identity = await awsIdentity(parsed.data);
@@ -171,7 +184,9 @@ export async function connectAwsAction(input: unknown): Promise<{ error?: string
         if (caught instanceof ConnectionClaimedError || caught instanceof ConnectionLimitError) {
             return { error: caught.message };
         }
-        return { error: caught instanceof Error ? caught.message : "Could not connect the account" };
+        return {
+            error: caught instanceof Error ? caught.message : (await getTranslations("account"))("connections.errors.connectFailed")
+        };
     }
 }
 
@@ -187,10 +202,10 @@ export async function connectAwsAction(input: unknown): Promise<{ error?: string
 export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error?: string; name?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = minecraftNameSchema.safeParse(rawName);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the username and try again" };
+    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.checkUsername");
 
     try {
         const saved = await saveTypedConnection(user.id, "minecraft", parsed.data);
@@ -201,7 +216,7 @@ export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error
             return { error: caught.message };
         }
         console.error("typed Minecraft name not saved:", caught);
-        return { error: "Could not save the username. Try again." };
+        return { error: (await getTranslations("account"))("connections.errors.usernameNotSaved") };
     }
 }
 
@@ -209,13 +224,13 @@ export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error
 export async function disconnectAccountAction(connectionId: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = connectionIdSchema.safeParse(connectionId);
-    if (!parsed.success) return { error: "Unknown account" };
+    if (!parsed.success) return { error: (await getTranslations("account"))("connections.errors.unknownAccount") };
 
     const removed = await deleteConnection(user.id, parsed.data);
-    if (!removed) return { error: "That account is not linked to your profile" };
+    if (!removed) return { error: (await getTranslations("account"))("connections.errors.notLinked") };
     revalidatePath(CONNECTIONS_PATH);
     return {};
 }

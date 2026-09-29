@@ -40,12 +40,13 @@ import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ApiKeyView } from "@polaris/auth";
 import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
 import { Ban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     API_KEY_ENVIRONMENTS,
-    API_KEY_ENVIRONMENT_LABELS,
     describeDevice,
     type ApiKeyEnvironment
 } from "@polaris/core";
@@ -66,27 +67,53 @@ import {
 /** The one line that says a key is narrower than it looks, or nothing when it is
  *  not. A key restricted to an address or a client and showing no sign of it is a
  *  key somebody will spend an afternoon debugging. */
-function describeLimits(key: ApiKeyView): string | null {
-    const parts: string[] = [];
+function describeLimits(key: ApiKeyView, t: Translate): string | null {
     const addresses =
         key.allowedCidrs.length + key.allowedCountries.length + key.allowedContinents.length;
-    if (addresses > 0) parts.push(`${addresses} address rule${addresses === 1 ? "" : "s"}`);
+    const parts: string[] = [];
+    if (addresses > 0) parts.push(t("apiKeys.list.limits.addresses", { count: addresses }));
     if (key.allowedUserAgents.length > 0) {
-        parts.push(
-            `${key.allowedUserAgents.length} allowed client${key.allowedUserAgents.length === 1 ? "" : "s"}`
-        );
+        parts.push(t("apiKeys.list.limits.allowed", { count: key.allowedUserAgents.length }));
     }
     if (key.deniedUserAgents.length > 0) {
-        parts.push(
-            `${key.deniedUserAgents.length} blocked client${key.deniedUserAgents.length === 1 ? "" : "s"}`
-        );
+        parts.push(t("apiKeys.list.limits.blocked", { count: key.deniedUserAgents.length }));
     }
-    return parts.length > 0 ? `Limited to ${parts.join(", ")}` : null;
+    // A list of counts, one per kind of rule, in the order they are set.
+    return parts.length > 0 ? parts.join(", ") : null;
+}
+
+type Translate = NamespaceTranslator<"account">;
+
+/** Each environment's name on screen. */
+const ENVIRONMENT_KEYS: Readonly<Record<ApiKeyEnvironment, NamespaceKey<"account">>> = {
+    production: "apiKeys.environments.production",
+    development: "apiKeys.environments.development"
+};
+
+/** The list's sort and expiry choices, named. */
+const SORT_KEYS: Readonly<Record<list.KeySort, NamespaceKey<"account">>> = {
+    "created-desc": "apiKeys.list.sorts.createdDesc",
+    "created-asc": "apiKeys.list.sorts.createdAsc",
+    "used-desc": "apiKeys.list.sorts.usedDesc",
+    "usage-desc": "apiKeys.list.sorts.usageDesc",
+    "name-asc": "apiKeys.list.sorts.nameAsc"
+};
+
+function expiryLabel(value: list.ExpiryFilter, t: Translate): string {
+    if (value === "soon") return t("apiKeys.list.expiry.soon", { days: list.EXPIRING_SOON_DAYS });
+    return t(`apiKeys.list.expiry.${value}` as const);
+}
+
+/** An environment's name, or the stored value when it is one this version does not know. */
+function environmentLabel(environment: string, t: Translate): string {
+    const key = ENVIRONMENT_KEYS[environment as ApiKeyEnvironment];
+    return key ? t(key) : environment;
 }
 
 export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
     const router = useRouter();
     const format = useDisplayFormat();
+    const t = useTranslations("account");
     const [confirm, confirmElement] = useConfirm();
     const [filters, setFilters] = useState<list.KeyFilters>(list.NO_FILTERS);
     const [error, setError] = useState<string | null>(null);
@@ -101,9 +128,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
 
     async function revoke(key: ApiKeyView) {
         const ok = await confirm({
-            title: `Revoke "${key.name}"?`,
-            description: "Anything using this key stops working immediately.",
-            confirmLabel: "Revoke",
+            title: t("apiKeys.list.revokeTitle", { name: key.name }),
+            description: t("apiKeys.list.revokeDescription"),
+            confirmLabel: t("apiKeys.list.revoke"),
             danger: true
         });
         if (!ok) return;
@@ -114,9 +141,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
 
     async function remove(key: ApiKeyView) {
         const ok = await confirm({
-            title: `Delete "${key.name}"?`,
-            description: "The key disappears from this list. It cannot be undone.",
-            confirmLabel: "Delete",
+            title: t("apiKeys.list.deleteTitle", { name: key.name }),
+            description: t("apiKeys.list.deleteDescription"),
+            confirmLabel: t("apiKeys.list.delete"),
             danger: true
         });
         if (!ok) return;
@@ -132,25 +159,25 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
             <div className="flex flex-wrap items-end justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
                     <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Search</span>
+                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.search")}</span>
                         <Input
                             value={filters.search}
-                            placeholder="Name or key"
+                            placeholder={t("apiKeys.list.searchPlaceholder")}
                             autoComplete="off"
                             onChange={(event) => change("search", event.target.value)}
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Environment</span>
+                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.environment")}</span>
                         <Select
                             value={filters.environment}
                             onValueChange={(value) => change("environment", value)}
                             className="w-40"
                             options={[
-                                { value: "all", label: "All environments" },
+                                { value: "all", label: t("apiKeys.list.allEnvironments") },
                                 ...API_KEY_ENVIRONMENTS.map((value) => ({
                                     value,
-                                    label: API_KEY_ENVIRONMENT_LABELS[value]
+                                    label: environmentLabel(value, t)
                                 }))
                             ]}
                         />
@@ -160,14 +187,14 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         not need a picker whose every option is "all". */}
                     {apps.length > 0 && (
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">App</span>
+                            <span className="text-xs text-muted-foreground">{t("apiKeys.list.app")}</span>
                             <Select
                                 value={filters.app}
                                 onValueChange={(value) => change("app", value)}
                                 className="w-40"
                                 options={[
-                                    { value: "all", label: "All apps" },
-                                    { value: "none", label: "No app" },
+                                    { value: "all", label: t("apiKeys.list.allApps") },
+                                    { value: "none", label: t("apiKeys.list.noApp") },
                                     ...apps.map((app) => ({
                                         value: app.id,
                                         label: app.name
@@ -177,26 +204,26 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         </label>
                     )}
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Expiry</span>
+                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.expiryLabel")}</span>
                         <Select
                             value={filters.expiry}
                             onValueChange={(value) => change("expiry", value as list.ExpiryFilter)}
                             className="w-44"
                             options={list.EXPIRY_FILTERS.map((value) => ({
                                 value,
-                                label: list.EXPIRY_FILTER_LABELS[value]
+                                label: expiryLabel(value, t)
                             }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Sort by</span>
+                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.sortBy")}</span>
                         <Select
                             value={filters.sort}
                             onValueChange={(value) => change("sort", value as list.KeySort)}
                             className="w-44"
                             options={list.KEY_SORTS.map((value) => ({
                                 value,
-                                label: list.KEY_SORT_LABELS[value]
+                                label: t(SORT_KEYS[value])
                             }))}
                         />
                     </label>
@@ -204,24 +231,21 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                 <Button size="sm" asChild>
                     <Link href="/account/api-keys/new" className="no-underline">
                         <Plus className="size-4" />
-                        New key
+                        {t("apiKeys.list.newKey")}
                     </Link>
                 </Button>
             </div>
 
             <p className="text-xs text-muted-foreground">
                 {keys.length === 0
-                    ? "No keys yet."
+                    ? t("apiKeys.list.none")
                     : narrowed
-                      ? `Showing ${shown.length} of ${keys.length} keys`
-                      : `${keys.length} key${keys.length === 1 ? "" : "s"}`}
+                      ? t("apiKeys.list.showing", { shown: shown.length, total: keys.length })
+                      : t("apiKeys.list.count", { count: keys.length })}
             </p>
 
             {keys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    A key lets a script act as you, with a subset of your own permissions and only
-                    from where you allow.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("apiKeys.list.emptyHint")}</p>
             ) : (
                 // Scrolls sideways rather than shrinking: nine columns on a phone
                 // would be nine unreadable ones. The same table every list in
@@ -231,34 +255,34 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                             <tr>
                                 <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
-                                    Name
+                                    {t("apiKeys.list.columns.name")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Key
+                                    {t("apiKeys.list.columns.key")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Environment
+                                    {t("apiKeys.list.environment")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    App
+                                    {t("apiKeys.list.app")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Expires
+                                    {t("apiKeys.list.columns.expires")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Created
+                                    {t("apiKeys.list.columns.created")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Last used
+                                    {t("apiKeys.list.columns.lastUsed")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 text-right font-medium">
-                                    Calls today
+                                    {t("apiKeys.list.columns.callsToday")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 font-medium">
-                                    Compromised
+                                    {t("apiKeys.list.columns.compromised")}
                                 </th>
                                 <th scope="col" className="px-3 py-2">
-                                    <span className="sr-only">Actions</span>
+                                    <span className="sr-only">{t("apiKeys.list.columns.actions")}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -279,13 +303,13 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                                         className="px-3 py-10 text-center text-sm text-muted-foreground"
                                     >
                                         <span className="flex flex-col items-center gap-2">
-                                            No key matches those filters.
+                                            {t("apiKeys.list.noMatch")}
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() => setFilters(list.NO_FILTERS)}
                                             >
-                                                Clear filters
+                                                {t("apiKeys.list.clearFilters")}
                                             </Button>
                                         </span>
                                     </td>
@@ -312,10 +336,11 @@ function KeyRow({
     onRevoke: () => void;
     onDelete: () => void;
 }) {
+    const t = useTranslations("account");
     const href = `/account/api-keys/${entry.id}`;
     const state = list.lifecycleOf(entry);
     const soon = list.expiringSoon(entry);
-    const limits = describeLimits(entry);
+    const limits = describeLimits(entry, t);
 
     return (
         <tr className="border-t border-border hover:bg-card-hover">
@@ -324,7 +349,7 @@ function KeyRow({
                     <Link
                         href={href}
                         className="min-w-0 truncate text-left font-medium no-underline hover:underline"
-                        title={`Edit ${entry.name}`}
+                        title={t("apiKeys.list.editNamed", { name: entry.name })}
                     >
                         {entry.name}
                     </Link>
@@ -332,9 +357,9 @@ function KeyRow({
                         says "Active" on every line says nothing on any of
                         them. */}
                     {state === "revoked" ? (
-                        <Badge variant="danger">Revoked</Badge>
+                        <Badge variant="danger">{t("apiKeys.list.revoked")}</Badge>
                     ) : state === "expired" ? (
-                        <Badge variant="neutral">Expired</Badge>
+                        <Badge variant="neutral">{t("apiKeys.list.expiry.expired")}</Badge>
                     ) : null}
                 </span>
                 {entry.description ? (
@@ -343,16 +368,21 @@ function KeyRow({
                     </p>
                 ) : null}
                 <p className="truncate text-xs text-muted-foreground">
-                    {entry.scopes.length} scope{entry.scopes.length === 1 ? "" : "s"}
-                    {limits ? ` - ${limits.toLowerCase()}` : null}
+                    {limits
+                        ? t("apiKeys.list.scopesLimited", { count: entry.scopes.length, limits })
+                        : t("apiKeys.list.scopes", { count: entry.scopes.length })}
                 </p>
                 {entry.lastUsedUserAgent ? (
                     <p
                         className="truncate text-xs text-muted-foreground"
                         title={entry.lastUsedUserAgent}
                     >
-                        {describeDevice(entry.lastUsedUserAgent)}
-                        {entry.lastUsedIp ? ` from ${entry.lastUsedIp}` : null}
+                        {entry.lastUsedIp
+                            ? t("apiKeys.list.deviceFrom", {
+                                  device: describeDevice(entry.lastUsedUserAgent),
+                                  ip: entry.lastUsedIp
+                              })
+                            : describeDevice(entry.lastUsedUserAgent)}
                     </p>
                 ) : null}
             </td>
@@ -361,12 +391,11 @@ function KeyRow({
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top">
                 <Badge variant={entry.environment === "production" ? "primary" : "neutral"}>
-                    {API_KEY_ENVIRONMENT_LABELS[entry.environment as ApiKeyEnvironment] ??
-                        entry.environment}
+                    {environmentLabel(entry.environment, t)}
                 </Badge>
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
-                {entry.projectName ?? "None"}
+                {entry.projectName ?? t("apiKeys.list.noneApp")}
             </td>
             {/* The same tone as the two date columns beside it. A date that is
                 merely a date has nothing to say, and reading brighter than
@@ -385,18 +414,18 @@ function KeyRow({
                 {entry.expiresAt ? (
                     <span title={date(entry.expiresAt)}>{date(entry.expiresAt)}</span>
                 ) : (
-                    "Never"
+                    t("apiKeys.list.never")
                 )}
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
                 {date(entry.createdAt)}
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
-                {entry.lastUsedAt ? <RelativeTime iso={entry.lastUsedAt} /> : "Never"}
+                {entry.lastUsedAt ? <RelativeTime iso={entry.lastUsedAt} /> : t("apiKeys.list.never")}
             </td>
             <td
                 className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums"
-                title={`${entry.usedRecently} calls in the last 30 days`}
+                title={t("apiKeys.list.callsRecently", { count: entry.usedRecently })}
             >
                 {entry.usedToday === 0 ? (
                     <span className="text-muted-foreground">0</span>
@@ -405,7 +434,7 @@ function KeyRow({
                 )}
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-muted-foreground">
-                Coming soon
+                {t("apiKeys.list.comingSoon")}
             </td>
             <td className="px-3 py-2 align-top">
                 <DropdownMenu>
@@ -413,8 +442,8 @@ function KeyRow({
                         <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`What to do with ${entry.name}`}
-                            title="More"
+                            aria-label={t("apiKeys.list.menuFor", { name: entry.name })}
+                            title={t("apiKeys.list.more")}
                         >
                             <MoreHorizontal className="size-4" />
                         </Button>
@@ -423,19 +452,19 @@ function KeyRow({
                         <DropdownMenuItem asChild>
                             <Link href={href} className="no-underline">
                                 <Pencil className="size-3.5" />
-                                Edit
+                                {t("apiKeys.list.edit")}
                             </Link>
                         </DropdownMenuItem>
                         {state === "revoked" ? null : (
                             <DropdownMenuItem onSelect={onRevoke}>
                                 <Ban className="size-3.5" />
-                                Revoke
+                                {t("apiKeys.list.revoke")}
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={onDelete} variant="danger">
                             <Trash2 className="size-3.5" />
-                            Delete
+                            {t("apiKeys.list.delete")}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

@@ -22,6 +22,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ScopePicker } from "./scope-picker";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
@@ -35,7 +37,6 @@ import {
 import {
     API_KEY_DESCRIPTION_MAX,
     API_KEY_ENVIRONMENTS,
-    API_KEY_ENVIRONMENT_LABELS,
     API_KEY_EXPIRY_CHOICES,
     expandPermissions,
     type ApiKeyEnvironment,
@@ -51,8 +52,8 @@ const CUSTOM_EXPIRY = "custom";
  *  quietly move its expiry to whatever the form happened to show. */
 const KEEP_EXPIRY = "keep";
 
-function expiryLabel(days: number): string {
-    return days === 0 ? "Never expires" : `${days} days`;
+function expiryLabel(days: number, t: NamespaceTranslator<"account">): string {
+    return days === 0 ? t("apiKeys.form.neverExpires") : t("apiKeys.form.days", { count: days });
 }
 
 /** A picked day expires at the end of it, local time - the day itself still works. */
@@ -105,6 +106,8 @@ export function KeyForm({
     editing: ApiKeyView | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [name, setName] = useState(editing?.name ?? "");
     const [description, setDescription] = useState(editing?.description ?? "");
     const [environment, setEnvironment] = useState<ApiKeyEnvironment>(
@@ -200,7 +203,7 @@ export function KeyForm({
         });
         setBusy(false);
         if (result.error || !result.secret) {
-            setError(result.error ?? "Could not create the key.");
+            setError(result.error ?? t("apiKeys.form.createFailed"));
             return;
         }
         setIssued(result.secret);
@@ -211,10 +214,7 @@ export function KeyForm({
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Copy it now. Polaris stores only a hash of it and cannot show it again -
-                        losing it means making another key.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("apiKeys.form.copyNow")}</p>
                 </div>
                 <Card>
                     <CardBody className="flex flex-col gap-3">
@@ -232,7 +232,7 @@ export function KeyForm({
                                 }}
                             >
                                 <Copy className="size-4" />
-                                {copied ? "Copied" : "Copy"}
+                                {copied ? t("apiKeys.form.copied") : t("apiKeys.form.copy")}
                             </Button>
                             <Button
                                 onClick={() => {
@@ -240,7 +240,7 @@ export function KeyForm({
                                     router.refresh();
                                 }}
                             >
-                                Done
+                                {t("apiKeys.form.done")}
                             </Button>
                         </div>
                     </CardBody>
@@ -257,80 +257,73 @@ export function KeyForm({
                     className="flex w-fit items-center gap-1 text-xs text-muted-foreground no-underline transition-colors hover:text-foreground"
                 >
                     <ArrowLeft className="size-3.5" />
-                    API keys
+                    {t("apiKeys.page.title")}
                 </Link>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    {editing ? editing.name : "New API key"}
+                    {editing ? editing.name : t("apiKeys.form.newTitle")}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                    {editing
-                        ? "Everything except the secret itself. Whatever is using this key keeps working."
-                        : "A key acts as you, with a subset of your own permissions and only from where you allow."}
+                    {editing ? t("apiKeys.form.editIntro") : t("apiKeys.form.newIntro")}
                 </p>
             </div>
 
-            <Section title="What it is" hint="How you will recognise this key in a year.">
+            <Section title={t("apiKeys.form.what.title")} hint={t("apiKeys.form.what.hint")}>
                 <div className="flex flex-col gap-4 sm:flex-row">
                     <label className="flex flex-1 flex-col gap-1 text-sm">
-                        Name
+                        {t("apiKeys.list.columns.name")}
                         <Input
                             value={name}
-                            placeholder="Backup script"
+                            placeholder={t("apiKeys.form.namePlaceholder")}
                             autoComplete="off"
                             onChange={(event) => setName(event.target.value)}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm sm:w-48">
-                        Environment
+                        {t("apiKeys.list.environment")}
                         <Select
                             value={environment}
                             onValueChange={(value) => setEnvironment(value as ApiKeyEnvironment)}
                             options={API_KEY_ENVIRONMENTS.map((value) => ({
                                 value,
-                                label: API_KEY_ENVIRONMENT_LABELS[value]
+                                label: t(`apiKeys.environments.${value}` as const)
                             }))}
                         />
                     </label>
                 </div>
                 <label className="flex flex-col gap-1 text-sm">
-                    Description
+                    {t("apiKeys.form.description")}
                     <Textarea
                         value={description}
                         rows={2}
                         maxLength={API_KEY_DESCRIPTION_MAX}
-                        placeholder="What this key is for, and what would break without it."
+                        placeholder={t("apiKeys.form.descriptionPlaceholder")}
                         onChange={(event) => setDescription(event.target.value)}
                     />
                 </label>
-                <p className="text-xs text-muted-foreground">
-                    The environment is a label for sorting your own keys. Both reach the same
-                    Polaris.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("apiKeys.form.environmentHint")}</p>
             </Section>
 
             <Section
-                title="Expiry"
-                hint="A key that never expires is a key nobody ever reviews."
+                title={t("apiKeys.list.expiryLabel")}
+                hint={t("apiKeys.form.expiryHint")}
             >
                 <div className="flex flex-col gap-2 sm:max-w-sm">
                     <Select
                         value={expiry}
                         onValueChange={setExpiry}
-                        aria-label="Expiry"
+                        aria-label={t("apiKeys.list.expiryLabel")}
                         options={[
-                            ...(editing ? [{ value: KEEP_EXPIRY, label: "Leave as it is" }] : []),
+                            ...(editing ? [{ value: KEEP_EXPIRY, label: t("apiKeys.form.keepExpiry") }] : []),
                             ...API_KEY_EXPIRY_CHOICES.map((days) => ({
                                 value: String(days),
-                                label: expiryLabel(days)
+                                label: expiryLabel(days, t)
                             })),
-                            { value: CUSTOM_EXPIRY, label: "Custom date" }
+                            { value: CUSTOM_EXPIRY, label: t("apiKeys.form.customDate") }
                         ]}
                     />
                     {custom ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">
-                                Works through the end of the chosen day.
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("apiKeys.form.endOfDay")}</span>
                             <Input
                                 type="date"
                                 value={expiryDate}
@@ -343,22 +336,22 @@ export function KeyForm({
             </Section>
 
             <Section
-                title="Permissions"
-                hint="A key can never do more than you can, whatever is ticked here."
+                title={t("apiKeys.form.permissions.title")}
+                hint={t("apiKeys.form.permissions.hint")}
             >
                 <ScopePicker available={availableScopes} selected={scopes} onChange={setScopes} />
             </Section>
 
             <Section
-                title="Where it may be used"
-                hint="Addresses and places the key is answered from. Left empty, it works from anywhere you do."
+                title={t("apiKeys.form.where.title")}
+                hint={t("apiKeys.form.where.hint")}
             >
                 <AccessRulesEditor value={rules} groups={groups} onChange={setRules} />
             </Section>
 
             <Section
-                title="What may use it"
-                hint="The clients allowed to present it. A blocked one is refused whatever the allow list says."
+                title={t("apiKeys.form.clients.title")}
+                hint={t("apiKeys.form.clients.hint")}
             >
                 <ClientRulesEditor value={clients} onChange={setClients} />
             </Section>
@@ -371,7 +364,7 @@ export function KeyForm({
 
             <div className="flex flex-wrap justify-end gap-2 pb-2">
                 <Button variant="ghost" onClick={() => router.push("/account/api-keys")}>
-                    Cancel
+                    {tc("actions.cancel")}
                 </Button>
                 <Button
                     onClick={() => void submit()}
@@ -380,11 +373,11 @@ export function KeyForm({
                     <KeyRound className="size-4" />
                     {busy
                         ? editing
-                            ? "Saving..."
-                            : "Creating..."
+                            ? tc("actions.saving")
+                            : t("apiKeys.form.creating")
                         : editing
-                          ? "Save changes"
-                          : "Create key"}
+                          ? t("apiKeys.form.saveChanges")
+                          : t("apiKeys.form.create")}
                 </Button>
             </div>
         </div>

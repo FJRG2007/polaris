@@ -9,6 +9,7 @@
  * a linked name is.
  */
 
+import { withMessages } from "../setup/i18n";
 import { minecraftNameSchema } from "@polaris/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -119,7 +120,7 @@ function account(method: "oauth" | "manual", label: string): Card["accounts"][nu
     };
 }
 
-const markup = (card: Card): string => renderToStaticMarkup(<ConnectionsView providers={[card]} />);
+const markup = (card: Card): string => renderToStaticMarkup(withMessages(<ConnectionsView providers={[card]} />));
 
 describe("the Minecraft card", () => {
     it("offers a typed name where the Microsoft application is not connected", () => {

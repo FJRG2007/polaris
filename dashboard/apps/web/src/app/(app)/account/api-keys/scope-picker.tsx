@@ -29,6 +29,7 @@ import { ChevronRight, Search, X } from "lucide-react";
 import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
 import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS } from "@/lib/api-key-scopes";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -53,6 +54,7 @@ export function ScopePicker({
     selected: readonly Permission[];
     onChange: (scopes: Permission[]) => void;
 }) {
+    const t = useTranslations("account");
     const [search, setSearch] = useState("");
     /** Which areas the reader has opened. Closed is the default: the point of
      *  the sections is that a hundred permissions are not on screen at once. */
@@ -66,8 +68,8 @@ export function ScopePicker({
         })).filter((group) => group.scopes.length > 0);
         const listed = new Set(named.flatMap((group) => group.scopes));
         const rest = available.filter((scope) => !listed.has(scope));
-        return rest.length > 0 ? [...named, { title: "Other", scopes: rest }] : named;
-    }, [available, offered]);
+        return rest.length > 0 ? [...named, { title: t("apiKeys.scopes.other"), scopes: rest }] : named;
+    }, [available, offered, t]);
 
     const needle = search.trim().toLowerCase();
     const effective = useMemo(() => new Set(expandPermissions(selected)), [selected]);
@@ -78,9 +80,7 @@ export function ScopePicker({
 
     if (available.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">
-                You hold no permissions a key could carry.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noneHeld")}</p>
         );
     }
 
@@ -92,14 +92,14 @@ export function ScopePicker({
                     <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Filter permissions"
-                        aria-label="Filter permissions"
+                        placeholder={t("apiKeys.scopes.filter")}
+                        aria-label={t("apiKeys.scopes.filter")}
                         autoComplete="off"
                         className="pl-8"
                     />
                 </span>
                 <span className="text-xs text-muted-foreground">
-                    {effective.size} of {available.length} selected
+                    {t("apiKeys.scopes.selected", { count: effective.size, total: available.length })}
                 </span>
             </div>
 
@@ -113,7 +113,7 @@ export function ScopePicker({
                     {[...effective].map((scope) => {
                         const source = includedBy(scope, selected);
                         return source ? (
-                            <Badge key={scope} variant="neutral" title={`Included with ${SCOPE_LABELS[source]}`}>
+                            <Badge key={scope} variant="neutral" title={t("apiKeys.scopes.includedWith", { scope: SCOPE_LABELS[source] })}>
                                 {SCOPE_LABELS[scope]}
                             </Badge>
                         ) : (
@@ -121,8 +121,8 @@ export function ScopePicker({
                                 key={scope}
                                 type="button"
                                 onClick={() => toggle(scope, false)}
-                                aria-label={`Remove ${SCOPE_LABELS[scope]}`}
-                                title={`Remove ${SCOPE_LABELS[scope]}`}
+                                aria-label={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
+                                title={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
                                 className="inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px text-[0.6875rem] font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25"
                             >
                                 {SCOPE_LABELS[scope]}
@@ -172,7 +172,7 @@ export function ScopePicker({
                                         chosen > 0 ? "text-primary" : "text-muted-foreground"
                                     )}
                                 >
-                                    {chosen > 0 ? `${chosen} of ${group.scopes.length}` : "None"}
+                                    {chosen > 0 ? t("apiKeys.scopes.ofGroup", { count: chosen, total: group.scopes.length }) : t("apiKeys.scopes.none")}
                                 </span>
                             </button>
 
@@ -204,7 +204,7 @@ export function ScopePicker({
                                                         </code>
                                                         {source ? (
                                                             <span className="text-xs text-muted-foreground">
-                                                                Included with {SCOPE_LABELS[source]}
+                                                                {t("apiKeys.scopes.includedWith", { scope: SCOPE_LABELS[source] })}
                                                             </span>
                                                         ) : null}
                                                     </span>
@@ -222,11 +222,9 @@ export function ScopePicker({
                 })}
                 {groups.every((group) => group.scopes.every((scope) => !matches(scope, needle))) && (
                     <div className="flex items-center justify-between gap-2 px-3 py-3">
-                        <p className="text-sm text-muted-foreground">
-                            No permission matches that.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noMatch")}</p>
                         <Button size="sm" variant="ghost" onClick={() => setSearch("")}>
-                            Clear
+                            {t("apiKeys.scopes.clear")}
                         </Button>
                     </div>
                 )}

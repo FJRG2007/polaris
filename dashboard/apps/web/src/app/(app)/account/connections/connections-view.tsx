@@ -15,6 +15,8 @@ import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { connectionSections, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, KeyRound, Loader2, Pencil, Plus, RefreshCw, Unlink } from "lucide-react";
 import {
@@ -84,26 +86,21 @@ export interface ConnectionProviderCard {
 }
 
 /** What the round trip to a provider came back with, as the callback flagged it. */
-const OUTCOMES: Record<string, { text: string; bad: boolean }> = {
-    linked: { text: "Account connected.", bad: false },
-    cancelled: { text: "The authorization was cancelled.", bad: true },
-    state_error: { text: "That request did not come from this page. Start it again.", bad: true },
-    taken: { text: "That account is already linked to another Polaris account.", bad: true },
-    limit: {
-        text: "You have already linked as many accounts of that service as you are allowed.",
-        bad: true
-    },
-    unavailable: { text: "This Polaris cannot connect that service yet.", bad: true },
+const OUTCOMES: Record<string, { key: "linked" | "cancelled" | "stateError" | "taken" | "limit" | "unavailable" | "error"; bad: boolean }> = {
+    linked: { key: "linked", bad: false },
+    cancelled: { key: "cancelled", bad: true },
+    state_error: { key: "stateError", bad: true },
+    taken: { key: "taken", bad: true },
+    limit: { key: "limit", bad: true },
+    unavailable: { key: "unavailable", bad: true },
     // Nothing here is this person's to fix, and the reason lives in a console
     // they cannot open - so the one useful thing to tell them is that the people
     // who can open it now know.
-    error: {
-        text: "The service did not complete the authorization. Nothing was wrong on your side: this Polaris has told its administrators.",
-        bad: true
-    }
+    error: { key: "error", bad: true }
 };
 
 export function ConnectionsView({ providers }: { providers: ConnectionProviderCard[] }) {
+    const t = useTranslations("account");
     const [notice, setNotice] = useState<{ provider: string; text: string; bad: boolean } | null>(
         null
     );
@@ -116,7 +113,7 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         const provider = params.get("provider");
         if (!outcome || !provider) return;
         const known = OUTCOMES[outcome];
-        if (known) setNotice({ provider, ...known });
+        if (known) setNotice({ provider, text: t(`connections.outcomes.${known.key}` as const), bad: known.bad });
         const url = new URL(window.location.href);
         url.searchParams.delete("connection");
         url.searchParams.delete("provider");
@@ -162,6 +159,7 @@ function ProviderCard({
     notice: { text: string; bad: boolean } | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("account");
     const [pending, startTransition] = useTransition();
     const [removed, setRemoved] = useState<string[]>([]);
     const [confirming, setConfirming] = useState<LinkedAccount | null>(null);
@@ -216,7 +214,7 @@ function ProviderCard({
                             <h3 className="truncate text-sm font-medium">{provider.name}</h3>
                             {provider.limit > 1 ? (
                                 <Badge variant="neutral">
-                                    {accounts.length} of {provider.limit}
+                                    {t("connections.ofLimit", { count: accounts.length, limit: provider.limit })}
                                 </Badge>
                             ) : null}
                         </div>
@@ -252,40 +250,40 @@ function ProviderCard({
                                         variant="warning"
                                         title={
                                             account.missingScopes?.length
-                                                ? `Not granted: ${account.missingScopes.join(", ")}. Connect again to approve.`
-                                                : "Connect again to approve what Polaris now asks for."
+                                                ? t("connections.badges.notGranted", { scopes: account.missingScopes.join(", ") })
+                                                : t("connections.badges.connectAgain")
                                         }
                                     >
-                                        Needs approving
+                                        {t("connections.badges.needsApproving")}
                                     </Badge>
                                 ) : null}
                                 {account.signsIn ? (
-                                    <Badge variant="neutral" title="This account can sign you in">
-                                        Signs you in
+                                    <Badge variant="neutral" title={t("connections.badges.signsInTitle")}>
+                                        {t("connections.badges.signsIn")}
                                     </Badge>
                                 ) : null}
                                 {account.method === "token" ? (
                                     <Badge
                                         variant="neutral"
-                                        title="Connected with a personal access token"
+                                        title={t("connections.badges.tokenTitle")}
                                     >
-                                        Token
+                                        {t("connections.badges.token")}
                                     </Badge>
                                 ) : null}
                                 {provider.acceptsTypedName ? (
                                     account.method === "manual" ? (
                                         <Badge
                                             variant="warning"
-                                            title="You typed this name. Nothing has confirmed the account is yours."
+                                            title={t("connections.badges.notVerifiedTitle")}
                                         >
-                                            Not verified
+                                            {t("connections.badges.notVerified")}
                                         </Badge>
                                     ) : (
                                         <Badge
                                             variant="success"
-                                            title={`Confirmed by signing in to ${provider.name}`}
+                                            title={t("connections.badges.verifiedTitle", { provider: provider.name })}
                                         >
-                                            Verified
+                                            {t("connections.badges.verified")}
                                         </Badge>
                                     )
                                 ) : null}
@@ -316,13 +314,13 @@ function ProviderCard({
                                         }
                                         aria-label={
                                             account.needsReauthorization
-                                                ? `Reconnect ${account.label} to approve what Polaris now asks for`
-                                                : `Reconnect ${account.label}`
+                                                ? t("connections.reconnectToApprove", { account: account.label })
+                                                : t("connections.reconnect", { account: account.label })
                                         }
                                         title={
                                             account.needsReauthorization
-                                                ? `Reconnect ${account.label} to approve what Polaris now asks for`
-                                                : `Reconnect ${account.label}`
+                                                ? t("connections.reconnectToApprove", { account: account.label })
+                                                : t("connections.reconnect", { account: account.label })
                                         }
                                         disabled={pending}
                                         onClick={() =>
@@ -336,8 +334,8 @@ function ProviderCard({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Change ${account.label}`}
-                                        title={`Change ${account.label}`}
+                                        aria-label={t("connections.change", { account: account.label })}
+                                        title={t("connections.change", { account: account.label })}
                                         disabled={pending}
                                         onClick={() => setTyping(true)}
                                     >
@@ -347,8 +345,8 @@ function ProviderCard({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={`Disconnect ${account.label}`}
-                                    title={`Disconnect ${account.label}`}
+                                    aria-label={t("connections.disconnect", { account: account.label })}
+                                    title={t("connections.disconnect", { account: account.label })}
                                     disabled={pending}
                                     onClick={() => setConfirming(account)}
                                 >
@@ -359,7 +357,7 @@ function ProviderCard({
                     </ul>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No {provider.name} account connected.
+                        {t("connections.none", { provider: provider.name })}
                     </p>
                 )}
 
@@ -368,14 +366,17 @@ function ProviderCard({
                     {provider.canSignIn ? (
                         <>
                             {" "}
-                            An account you connect can also sign you in - choose which under{" "}
-                            <Link
-                                href="/account/security"
-                                className="underline underline-offset-2 hover:text-foreground"
-                            >
-                                Security
-                            </Link>
-                            .
+                            {t.rich("connections.canSignIn", {
+                                link: (chunks) => (
+                                    <Link
+                                        key="link"
+                                        href="/account/security"
+                                        className="underline underline-offset-2 hover:text-foreground"
+                                    >
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
                         </>
                     ) : null}
                 </p>
@@ -392,7 +393,7 @@ function ProviderCard({
                                 }
                             >
                                 <Plus className="size-4" />
-                                Connect {provider.name}
+                                {t("connections.connectProvider", { provider: provider.name })}
                             </Button>
                         ) : null}
                         {provider.acceptsToken ? (
@@ -403,7 +404,7 @@ function ProviderCard({
                                 onClick={() => setTokenOpen(true)}
                             >
                                 <KeyRound className="size-4" />
-                                Use a token
+                                {t("connections.useToken")}
                             </Button>
                         ) : null}
                         {/* Once a name is typed, changing it is the pencil on its row. */}
@@ -415,7 +416,7 @@ function ProviderCard({
                                 onClick={() => setTyping(true)}
                             >
                                 <Pencil className="size-4" />
-                                Type your username
+                                {t("connections.typeUsername")}
                             </Button>
                         ) : null}
                         {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
@@ -426,8 +427,8 @@ function ProviderCard({
                                       // what is wanted is the one already listed, authorized
                                       // again. Pointing at the wrong action is what made people
                                       // unlink a working account to grant a permission.
-                                      "To approve what Polaris now asks for, use the reconnect button beside the account above."
-                                    : "Disconnect one to connect another account."}
+                                      t("connections.useReconnect")
+                                    : t("connections.disconnectOne")}
                             </span>
                         ) : null}
                     </div>
@@ -435,8 +436,7 @@ function ProviderCard({
 
                 {!provider.canAuthorize && !provider.acceptsToken && !canType ? (
                     <p className="text-sm text-muted-foreground">
-                        Available once whoever administers this Polaris connects {provider.requires}{" "}
-                        under Integrations.
+                        {t("connections.availableOnce", { requires: provider.requires })}
                     </p>
                 ) : null}
 
@@ -484,7 +484,7 @@ function ProviderCard({
                 <TokenDialog
                     provider={provider.slug}
                     providerName={provider.name}
-                    label={provider.tokenLabel ?? "Access token"}
+                    label={provider.tokenLabel ?? t("connections.token.accessToken")}
                     help={provider.tokenHelp}
                     tokenUrl={provider.tokenUrl}
                     onClose={() => setTokenOpen(false)}
@@ -504,14 +504,12 @@ function ProviderCard({
  * One sentence served every service and spoke of repositories and runner pools
  * - true of GitHub and nonsense on a Minecraft name somebody typed.
  */
-function disconnectSays(account: LinkedAccount, providerName: string): string {
-    if (account.method === "manual") {
-        return "Servers stop being able to add you by this name until you type it again or connect your account.";
-    }
-    if (account.provider === "github") {
-        return `Polaris stops reaching anything in this ${providerName} account. Services that build from its repositories stop deploying, and any runner pool serving you stops serving them.`;
-    }
-    return `Polaris stops reaching anything in this ${providerName} account.${account.signsIn ? " It also stops being a way to sign in to Polaris." : ""}`;
+function disconnectSays(account: LinkedAccount, providerName: string, t: NamespaceTranslator<"account">): string {
+    if (account.method === "manual") return t("connections.disconnectDialog.manual");
+    if (account.provider === "github") return t("connections.disconnectDialog.github", { provider: providerName });
+    return account.signsIn
+        ? t("connections.disconnectDialog.signsIn", { provider: providerName })
+        : t("connections.disconnectDialog.other", { provider: providerName });
 }
 
 function DisconnectDialog({
@@ -525,22 +523,24 @@ function DisconnectDialog({
     onCancel: () => void;
     onConfirm: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     return (
         <Dialog open onOpenChange={(open) => (open ? undefined : onCancel())}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
                         {account.method === "manual"
-                            ? `Remove ${account.label}?`
-                            : `Disconnect ${account.label}?`}
+                            ? t("connections.disconnectDialog.removeTitle", { account: account.label })
+                            : t("connections.disconnectDialog.title", { account: account.label })}
                     </DialogTitle>
-                    <DialogDescription>{disconnectSays(account, providerName)}</DialogDescription>
+                    <DialogDescription>{disconnectSays(account, providerName, t)}</DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
-                    <Button onClick={onConfirm}>Disconnect</Button>
+                    <Button onClick={onConfirm}>{t("connections.disconnectDialog.confirm")}</Button>
                 </div>
             </DialogContent>
         </Dialog>
@@ -557,6 +557,8 @@ function DisconnectDialog({
  * somebody would spend an afternoon on.
  */
 function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [accessKeyId, setAccessKeyId] = useState("");
     const [secretAccessKey, setSecretAccessKey] = useState("");
     const [region, setRegion] = useState("");
@@ -590,25 +592,22 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Connect AWS with an access key</DialogTitle>
-                    <DialogDescription>
-                        Polaris asks AWS who the key belongs to and connects that account. It reads
-                        your ECS services and Amplify branches in this region, and can ask for
-                        another release.
-                    </DialogDescription>
+                    <DialogTitle>{t("connections.aws.title")}</DialogTitle>
+                    <DialogDescription>{t("connections.aws.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Access key ID</span>
+                        <span className="text-sm font-medium">{t("connections.aws.accessKeyId")}</span>
                         <Input
                             autoComplete="off"
                             value={accessKeyId}
+                            // i18n-ignore: the shape of an AWS key
                             placeholder="AKIA..."
                             onChange={(event) => setAccessKeyId(event.target.value)}
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Secret access key</span>
+                        <span className="text-sm font-medium">{t("connections.aws.secretAccessKey")}</span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -617,27 +616,24 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Region</span>
+                        <span className="text-sm font-medium">{t("connections.aws.region")}</span>
                         <Input
                             autoComplete="off"
                             value={region}
                             placeholder="eu-west-1"
                             onChange={(event) => setRegion(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            The one your services are in. A key reaches every region; what it can
-                            see is decided here, and the wrong one simply lists nothing.
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("connections.aws.regionHint")}</span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button onClick={submit} disabled={pending || !ready}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Connect
+                        {t("connections.connect")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -663,6 +659,8 @@ function MinecraftNameDialog({
     onClose: () => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [name, setName] = useState(current ?? "");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -696,14 +694,9 @@ function MinecraftNameDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {current
-                            ? "Change your Minecraft username"
-                            : "Type your Minecraft username"}
+                        {current ? t("connections.minecraft.changeTitle") : t("connections.minecraft.typeTitle")}
                     </DialogTitle>
-                    <DialogDescription>
-                        Exactly as it appears in the game, with the same upper and lower case. A
-                        typed name is shown as not verified.
-                    </DialogDescription>
+                    <DialogDescription>{t("connections.minecraft.description")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-2"
@@ -713,7 +706,7 @@ function MinecraftNameDialog({
                     }}
                 >
                     <label className="text-sm font-medium" htmlFor="minecraft-name">
-                        Username
+                        {t("connections.minecraft.username")}
                     </label>
                     <Input
                         id="minecraft-name"
@@ -722,6 +715,7 @@ function MinecraftNameDialog({
                         spellCheck={false}
                         maxLength={32}
                         value={name}
+                        // i18n-ignore: an example player name
                         placeholder="Steve"
                         aria-invalid={problem ? true : undefined}
                         aria-describedby="minecraft-name-hint"
@@ -731,17 +725,17 @@ function MinecraftNameDialog({
                         id="minecraft-name-hint"
                         className={`text-xs ${problem ? "text-danger" : "text-muted-foreground"}`}
                     >
-                        {problem ?? "Java Edition: 3 to 16 letters, numbers or underscores."}
+                        {problem ?? t("connections.minecraft.hint")}
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </form>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button onClick={submit} disabled={pending || !checked.success || unchanged}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Save
+                        {tc("actions.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -768,6 +762,8 @@ function TokenDialog({
     onClose: () => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [token, setToken] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -792,11 +788,8 @@ function TokenDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Connect {providerName} with a token</DialogTitle>
-                    <DialogDescription>
-                        Polaris checks the token with {providerName} and connects whichever account
-                        it belongs to.
-                    </DialogDescription>
+                    <DialogTitle>{t("connections.token.title", { provider: providerName })}</DialogTitle>
+                    <DialogDescription>{t("connections.token.description", { provider: providerName })}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium" htmlFor="connection-token">
@@ -818,7 +811,7 @@ function TokenDialog({
                             rel="noreferrer noopener"
                             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                         >
-                            Create one
+                            {t("connections.token.createOne")}
                             <ExternalLink className="size-3" />
                         </a>
                     ) : null}
@@ -826,11 +819,11 @@ function TokenDialog({
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button onClick={submit} disabled={pending || token.trim().length === 0}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Connect
+                        {t("connections.connect")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

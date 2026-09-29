@@ -144,12 +144,212 @@
         "page": {
             "title": "API keys",
             "intro": "Credentials for scripts and integrations acting as you. Keep them somewhere safe: anyone holding one can do what it allows, as you."
+        },
+        "environments": {
+            "production": "Production",
+            "development": "Development"
+        },
+        "list": {
+            "limits": {
+                "addresses": "{count, plural, one {# address rule} other {# address rules}}",
+                "allowed": "{count, plural, one {# allowed client} other {# allowed clients}}",
+                "blocked": "{count, plural, one {# blocked client} other {# blocked clients}}"
+            },
+            "scopes": "{count, plural, one {# scope} other {# scopes}}",
+            "scopesLimited": "{count, plural, one {# scope} other {# scopes}} - limited to {limits}",
+            "sorts": {
+                "createdDesc": "Created (newest)",
+                "createdAsc": "Created (oldest)",
+                "usedDesc": "Last used",
+                "usageDesc": "Calls today",
+                "nameAsc": "Name"
+            },
+            "expiry": {
+                "all": "All",
+                "never": "Never expires",
+                "soon": "Expiring in {days} days",
+                "expired": "Expired"
+            },
+            "revokeTitle": "Revoke \"{name}\"?",
+            "revokeDescription": "Anything using this key stops working immediately.",
+            "revoke": "Revoke",
+            "deleteTitle": "Delete \"{name}\"?",
+            "deleteDescription": "The key disappears from this list. It cannot be undone.",
+            "delete": "Delete",
+            "search": "Search",
+            "searchPlaceholder": "Name or key",
+            "environment": "Environment",
+            "allEnvironments": "All environments",
+            "app": "App",
+            "allApps": "All apps",
+            "noApp": "No app",
+            "expiryLabel": "Expiry",
+            "sortBy": "Sort by",
+            "newKey": "New key",
+            "none": "No keys yet.",
+            "showing": "Showing {shown} of {total} keys",
+            "count": "{count, plural, one {# key} other {# keys}}",
+            "emptyHint": "A key lets a script act as you, with a subset of your own permissions and only from where you allow.",
+            "columns": {
+                "name": "Name",
+                "key": "Key",
+                "expires": "Expires",
+                "created": "Created",
+                "lastUsed": "Last used",
+                "callsToday": "Calls today",
+                "compromised": "Compromised",
+                "actions": "Actions"
+            },
+            "noMatch": "No key matches those filters.",
+            "clearFilters": "Clear filters",
+            "editNamed": "Edit {name}",
+            "revoked": "Revoked",
+            "deviceFrom": "{device} from {ip}",
+            "noneApp": "None",
+            "never": "Never",
+            "callsRecently": "{count} calls in the last 30 days",
+            "comingSoon": "Coming soon",
+            "menuFor": "What to do with {name}",
+            "more": "More",
+            "edit": "Edit"
+        },
+        "form": {
+            "neverExpires": "Never expires",
+            "days": "{count} days",
+            "createFailed": "Could not create the key.",
+            "copyNow": "Copy it now. Polaris stores only a hash of it and cannot show it again - losing it means making another key.",
+            "copied": "Copied",
+            "copy": "Copy",
+            "done": "Done",
+            "newTitle": "New API key",
+            "editIntro": "Everything except the secret itself. Whatever is using this key keeps working.",
+            "newIntro": "A key acts as you, with a subset of your own permissions and only from where you allow.",
+            "what": {
+                "title": "What it is",
+                "hint": "How you will recognise this key in a year."
+            },
+            "namePlaceholder": "Backup script",
+            "description": "Description",
+            "descriptionPlaceholder": "What this key is for, and what would break without it.",
+            "environmentHint": "The environment is a label for sorting your own keys. Both reach the same Polaris.",
+            "expiryHint": "A key that never expires is a key nobody ever reviews.",
+            "keepExpiry": "Leave as it is",
+            "customDate": "Custom date",
+            "endOfDay": "Works through the end of the chosen day.",
+            "permissions": {
+                "title": "Permissions",
+                "hint": "A key can never do more than you can, whatever is ticked here."
+            },
+            "where": {
+                "title": "Where it may be used",
+                "hint": "Addresses and places the key is answered from. Left empty, it works from anywhere you do."
+            },
+            "clients": {
+                "title": "What may use it",
+                "hint": "The clients allowed to present it. A blocked one is refused whatever the allow list says."
+            },
+            "creating": "Creating...",
+            "saveChanges": "Save changes",
+            "create": "Create key",
+            "noneHeld": "You do not hold any of the permissions you picked."
+        },
+        "scopes": {
+            "other": "Other",
+            "noneHeld": "You hold no permissions a key could carry.",
+            "filter": "Filter permissions",
+            "selected": "{count} of {total} selected",
+            "includedWith": "Included with {scope}",
+            "remove": "Remove {scope}",
+            "ofGroup": "{count} of {total}",
+            "none": "None",
+            "noMatch": "No permission matches that.",
+            "clear": "Clear"
         }
     },
     "connections": {
         "page": {
             "title": "Connected accounts",
             "intro": "The outside accounts Polaris acts with on your behalf. Only yours, and only what you link."
+        },
+        "outcomes": {
+            "linked": "Account connected.",
+            "cancelled": "The authorization was cancelled.",
+            "stateError": "That request did not come from this page. Start it again.",
+            "taken": "That account is already linked to another Polaris account.",
+            "limit": "You have already linked as many accounts of that service as you are allowed.",
+            "unavailable": "This Polaris cannot connect that service yet.",
+            "error": "The service did not complete the authorization. Nothing was wrong on your side: this Polaris has told its administrators."
+        },
+        "ofLimit": "{count} of {limit}",
+        "badges": {
+            "notGranted": "Not granted: {scopes}. Connect again to approve.",
+            "connectAgain": "Connect again to approve what Polaris now asks for.",
+            "needsApproving": "Needs approving",
+            "signsInTitle": "This account can sign you in",
+            "signsIn": "Signs you in",
+            "tokenTitle": "Connected with a personal access token",
+            "token": "Token",
+            "notVerifiedTitle": "You typed this name. Nothing has confirmed the account is yours.",
+            "notVerified": "Not verified",
+            "verifiedTitle": "Confirmed by signing in to {provider}",
+            "verified": "Verified"
+        },
+        "reconnectToApprove": "Reconnect {account} to approve what Polaris now asks for",
+        "reconnect": "Reconnect {account}",
+        "change": "Change {account}",
+        "disconnect": "Disconnect {account}",
+        "none": "No {provider} account connected.",
+        "canSignIn": "An account you connect can also sign you in - choose which under <link>Security</link>.",
+        "connectProvider": "Connect {provider}",
+        "useToken": "Use a token",
+        "typeUsername": "Type your username",
+        "useReconnect": "To approve what Polaris now asks for, use the reconnect button beside the account above.",
+        "disconnectOne": "Disconnect one to connect another account.",
+        "availableOnce": "Available once whoever administers this Polaris connects {requires} under Integrations.",
+        "connect": "Connect",
+        "disconnectDialog": {
+            "manual": "Servers stop being able to add you by this name until you type it again or connect your account.",
+            "github": "Polaris stops reaching anything in this {provider} account. Services that build from its repositories stop deploying, and any runner pool serving you stops serving them.",
+            "signsIn": "Polaris stops reaching anything in this {provider} account. It also stops being a way to sign in to Polaris.",
+            "other": "Polaris stops reaching anything in this {provider} account.",
+            "removeTitle": "Remove {account}?",
+            "title": "Disconnect {account}?",
+            "confirm": "Disconnect"
+        },
+        "aws": {
+            "title": "Connect AWS with an access key",
+            "description": "Polaris asks AWS who the key belongs to and connects that account. It reads your ECS services and Amplify branches in this region, and can ask for another release.",
+            "accessKeyId": "Access key ID",
+            "secretAccessKey": "Secret access key",
+            "region": "Region",
+            "regionHint": "The one your services are in. A key reaches every region; what it can see is decided here, and the wrong one simply lists nothing."
+        },
+        "minecraft": {
+            "changeTitle": "Change your Minecraft username",
+            "typeTitle": "Type your Minecraft username",
+            "description": "Exactly as it appears in the game, with the same upper and lower case. A typed name is shown as not verified.",
+            "username": "Username",
+            "hint": "Java Edition: 3 to 16 letters, numbers or underscores."
+        },
+        "token": {
+            "accessToken": "Access token",
+            "title": "Connect {provider} with a token",
+            "description": "Polaris checks the token with {provider} and connects whichever account it belongs to.",
+            "createOne": "Create one"
+        },
+        "errors": {
+            "noToken": "That service cannot be connected with a token",
+            "pasteToken": "Paste the token first",
+            "connectFailed": "Could not connect the account",
+            "notAccessKey": "That does not look like an access key",
+            "notSecretKey": "That does not look like a secret key",
+            "nameRegion": "Name the region your services are in",
+            "regionFormat": "A region looks like eu-west-1",
+            "checkDetails": "Check the details and try again",
+            "checkUsername": "Check the username and try again",
+            "usernameNotSaved": "Could not save the username. Try again.",
+            "unknownAccount": "Unknown account",
+            "notLinked": "That account is not linked to your profile"
         }
     },
     "details": {

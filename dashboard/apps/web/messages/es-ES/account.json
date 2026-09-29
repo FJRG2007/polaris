@@ -144,12 +144,212 @@
         "page": {
             "title": "Claves de API",
             "intro": "Credenciales para scripts e integraciones que actúan como tú. Guárdalas en un lugar seguro: quien tenga una puede hacer lo que permita, como tú."
+        },
+        "environments": {
+            "production": "Producción",
+            "development": "Desarrollo"
+        },
+        "list": {
+            "limits": {
+                "addresses": "{count, plural, one {# regla de dirección} other {# reglas de dirección}}",
+                "allowed": "{count, plural, one {# cliente permitido} other {# clientes permitidos}}",
+                "blocked": "{count, plural, one {# cliente bloqueado} other {# clientes bloqueados}}"
+            },
+            "scopes": "{count, plural, one {# permiso} other {# permisos}}",
+            "scopesLimited": "{count, plural, one {# permiso} other {# permisos}} - limitada a {limits}",
+            "sorts": {
+                "createdDesc": "Creación (más reciente)",
+                "createdAsc": "Creación (más antigua)",
+                "usedDesc": "Último uso",
+                "usageDesc": "Llamadas de hoy",
+                "nameAsc": "Nombre"
+            },
+            "expiry": {
+                "all": "Todas",
+                "never": "No caduca",
+                "soon": "Caduca en {days} días",
+                "expired": "Caducada"
+            },
+            "revokeTitle": "¿Revocar «{name}»?",
+            "revokeDescription": "Todo lo que use esta clave deja de funcionar al momento.",
+            "revoke": "Revocar",
+            "deleteTitle": "¿Eliminar «{name}»?",
+            "deleteDescription": "La clave desaparece de esta lista. No se puede deshacer.",
+            "delete": "Eliminar",
+            "search": "Buscar",
+            "searchPlaceholder": "Nombre o clave",
+            "environment": "Entorno",
+            "allEnvironments": "Todos los entornos",
+            "app": "App",
+            "allApps": "Todas las apps",
+            "noApp": "Sin app",
+            "expiryLabel": "Caducidad",
+            "sortBy": "Ordenar por",
+            "newKey": "Nueva clave",
+            "none": "Todavía no hay claves.",
+            "showing": "Se muestran {shown} de {total} claves",
+            "count": "{count, plural, one {# clave} other {# claves}}",
+            "emptyHint": "Una clave permite que un script actúe como tú, con parte de tus permisos y solo desde donde tú permitas.",
+            "columns": {
+                "name": "Nombre",
+                "key": "Clave",
+                "expires": "Caduca",
+                "created": "Creada",
+                "lastUsed": "Último uso",
+                "callsToday": "Llamadas hoy",
+                "compromised": "Comprometida",
+                "actions": "Acciones"
+            },
+            "noMatch": "Ninguna clave coincide con esos filtros.",
+            "clearFilters": "Quitar filtros",
+            "editNamed": "Editar {name}",
+            "revoked": "Revocada",
+            "deviceFrom": "{device} desde {ip}",
+            "noneApp": "Ninguna",
+            "never": "Nunca",
+            "callsRecently": "{count} llamadas en los últimos 30 días",
+            "comingSoon": "Próximamente",
+            "menuFor": "Qué hacer con {name}",
+            "more": "Más",
+            "edit": "Editar"
+        },
+        "form": {
+            "neverExpires": "No caduca",
+            "days": "{count} días",
+            "createFailed": "No se ha podido crear la clave.",
+            "copyNow": "Cópiala ahora. Polaris solo guarda un hash y no puede volver a mostrarla: si la pierdes, tendrás que crear otra.",
+            "copied": "Copiada",
+            "copy": "Copiar",
+            "done": "Hecho",
+            "newTitle": "Nueva clave de API",
+            "editIntro": "Todo menos el secreto en sí. Lo que use esta clave sigue funcionando.",
+            "newIntro": "Una clave actúa como tú, con parte de tus permisos y solo desde donde tú permitas.",
+            "what": {
+                "title": "Qué es",
+                "hint": "Cómo reconocerás esta clave dentro de un año."
+            },
+            "namePlaceholder": "Script de copias de seguridad",
+            "description": "Descripción",
+            "descriptionPlaceholder": "Para qué es esta clave y qué se rompería sin ella.",
+            "environmentHint": "El entorno es una etiqueta para ordenar tus propias claves. Las dos llegan al mismo Polaris.",
+            "expiryHint": "Una clave que no caduca es una clave que nadie revisa nunca.",
+            "keepExpiry": "Dejarla como está",
+            "customDate": "Fecha personalizada",
+            "endOfDay": "Funciona hasta el final del día elegido.",
+            "permissions": {
+                "title": "Permisos",
+                "hint": "Una clave nunca puede hacer más que tú, marques lo que marques aquí."
+            },
+            "where": {
+                "title": "Dónde se puede usar",
+                "hint": "Direcciones y lugares desde los que se acepta la clave. Si lo dejas vacío, funciona desde cualquier sitio desde el que funciones tú."
+            },
+            "clients": {
+                "title": "Qué puede usarla",
+                "hint": "Los clientes que pueden presentarla. Uno bloqueado se rechaza diga lo que diga la lista de permitidos."
+            },
+            "creating": "Creando...",
+            "saveChanges": "Guardar cambios",
+            "create": "Crear clave",
+            "noneHeld": "No tienes ninguno de los permisos que has elegido."
+        },
+        "scopes": {
+            "other": "Otros",
+            "noneHeld": "No tienes ningún permiso que pueda llevar una clave.",
+            "filter": "Filtrar permisos",
+            "selected": "{count} de {total} seleccionados",
+            "includedWith": "Incluido con {scope}",
+            "remove": "Quitar {scope}",
+            "ofGroup": "{count} de {total}",
+            "none": "Ninguno",
+            "noMatch": "Ningún permiso coincide.",
+            "clear": "Borrar"
         }
     },
     "connections": {
         "page": {
             "title": "Cuentas conectadas",
             "intro": "Las cuentas externas con las que Polaris actúa en tu nombre. Solo las tuyas, y solo lo que vincules."
+        },
+        "outcomes": {
+            "linked": "Cuenta conectada.",
+            "cancelled": "Se ha cancelado la autorización.",
+            "stateError": "Esa solicitud no venía de esta página. Vuelve a empezar.",
+            "taken": "Esa cuenta ya está vinculada a otra cuenta de Polaris.",
+            "limit": "Ya has vinculado tantas cuentas de ese servicio como se te permite.",
+            "unavailable": "Este Polaris todavía no puede conectar ese servicio.",
+            "error": "El servicio no ha completado la autorización. No has hecho nada mal: este Polaris ya ha avisado a sus administradores."
+        },
+        "ofLimit": "{count} de {limit}",
+        "badges": {
+            "notGranted": "Sin conceder: {scopes}. Vuelve a conectar para aprobarlo.",
+            "connectAgain": "Vuelve a conectar para aprobar lo que ahora pide Polaris.",
+            "needsApproving": "Pendiente de aprobar",
+            "signsInTitle": "Esta cuenta puede iniciar tu sesión",
+            "signsIn": "Inicia tu sesión",
+            "tokenTitle": "Conectada con un token de acceso personal",
+            "token": "Token",
+            "notVerifiedTitle": "Has escrito este nombre tú. Nada ha confirmado que la cuenta sea tuya.",
+            "notVerified": "Sin verificar",
+            "verifiedTitle": "Confirmada al iniciar sesión en {provider}",
+            "verified": "Verificada"
+        },
+        "reconnectToApprove": "Volver a conectar {account} para aprobar lo que ahora pide Polaris",
+        "reconnect": "Volver a conectar {account}",
+        "change": "Cambiar {account}",
+        "disconnect": "Desconectar {account}",
+        "none": "No hay ninguna cuenta de {provider} conectada.",
+        "canSignIn": "Una cuenta que conectes también puede iniciar tu sesión: elige cuáles en <link>Seguridad</link>.",
+        "connectProvider": "Conectar {provider}",
+        "useToken": "Usar un token",
+        "typeUsername": "Escribir tu nombre de usuario",
+        "useReconnect": "Para aprobar lo que ahora pide Polaris, usa el botón de volver a conectar junto a la cuenta de arriba.",
+        "disconnectOne": "Desconecta una para conectar otra cuenta.",
+        "availableOnce": "Disponible cuando quien administra este Polaris conecte {requires} en Integraciones.",
+        "connect": "Conectar",
+        "disconnectDialog": {
+            "manual": "Los servidores dejan de poder añadirte con este nombre hasta que lo vuelvas a escribir o conectes tu cuenta.",
+            "github": "Polaris deja de llegar a nada de esta cuenta de {provider}. Los servicios que se compilan desde sus repositorios dejan de desplegarse, y cualquier grupo de runners que te sirva deja de servirles.",
+            "signsIn": "Polaris deja de llegar a nada de esta cuenta de {provider}. También deja de ser una forma de iniciar sesión en Polaris.",
+            "other": "Polaris deja de llegar a nada de esta cuenta de {provider}.",
+            "removeTitle": "¿Quitar {account}?",
+            "title": "¿Desconectar {account}?",
+            "confirm": "Desconectar"
+        },
+        "aws": {
+            "title": "Conectar AWS con una clave de acceso",
+            "description": "Polaris pregunta a AWS de quién es la clave y conecta esa cuenta. Lee tus servicios de ECS y tus ramas de Amplify en esta región, y puede pedir otra publicación.",
+            "accessKeyId": "ID de la clave de acceso",
+            "secretAccessKey": "Clave de acceso secreta",
+            "region": "Región",
+            "regionHint": "La región en la que están tus servicios. Una clave llega a todas las regiones; lo que ve se decide aquí, y con la equivocada simplemente no aparece nada."
+        },
+        "minecraft": {
+            "changeTitle": "Cambiar tu nombre de usuario de Minecraft",
+            "typeTitle": "Escribir tu nombre de usuario de Minecraft",
+            "description": "Exactamente como aparece en el juego, con las mismas mayúsculas y minúsculas. Un nombre escrito a mano aparece como sin verificar.",
+            "username": "Nombre de usuario",
+            "hint": "Java Edition: de 3 a 16 letras, números o guiones bajos."
+        },
+        "token": {
+            "accessToken": "Token de acceso",
+            "title": "Conectar {provider} con un token",
+            "description": "Polaris comprueba el token con {provider} y conecta la cuenta a la que pertenezca.",
+            "createOne": "Crear uno"
+        },
+        "errors": {
+            "noToken": "Ese servicio no se puede conectar con un token",
+            "pasteToken": "Primero pega el token",
+            "connectFailed": "No se ha podido conectar la cuenta",
+            "notAccessKey": "Eso no parece una clave de acceso",
+            "notSecretKey": "Eso no parece una clave secreta",
+            "nameRegion": "Indica la región en la que están tus servicios",
+            "regionFormat": "Una región tiene un formato como eu-west-1",
+            "checkDetails": "Revisa los datos y vuelve a intentarlo",
+            "checkUsername": "Revisa el nombre de usuario y vuelve a intentarlo",
+            "usernameNotSaved": "No se ha podido guardar el nombre de usuario. Vuelve a intentarlo.",
+            "unknownAccount": "Cuenta desconocida",
+            "notLinked": "Esa cuenta no está vinculada a tu perfil"
         }
     },
     "details": {

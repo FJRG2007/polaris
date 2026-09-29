@@ -8,6 +8,7 @@
  * draws what the split returns.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CONNECTION_PROVIDERS, connectionSections } from "@polaris/core";
@@ -89,7 +90,7 @@ describe("which section a service is listed under", () => {
 
 describe("the screen", () => {
     it("shows the general accounts above the Developers heading", () => {
-        const html = renderToStaticMarkup(<ConnectionsView providers={cards()} />);
+        const html = renderToStaticMarkup(withMessages(<ConnectionsView providers={cards()} />));
         const general = html.indexOf(">General</h2>");
         const developers = html.indexOf(">Developers</h2>");
         expect(general).toBeGreaterThan(-1);
@@ -101,7 +102,7 @@ describe("the screen", () => {
 
     it("draws the AWS card with the AWS mark rather than the generic block", () => {
         const aws = cards().filter((card) => card.slug === "aws");
-        const html = renderToStaticMarkup(<ConnectionsView providers={aws} />);
+        const html = renderToStaticMarkup(withMessages(<ConnectionsView providers={aws} />));
         // The smile, in AWS's own orange.
         expect(html).toContain("#FF9900");
     });

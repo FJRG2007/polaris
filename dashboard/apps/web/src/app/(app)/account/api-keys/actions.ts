@@ -15,6 +15,8 @@ import { createApiKey, deleteApiKey, revokeApiKey, scopesAvailableTo, updateApiK
 import { createApiKeySchema, updateApiKeySchema } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { firstIssue, localized } from "../security/action-messages";
 import { newDeviceRefusal } from "@/lib/device-grace";
 
 export async function createApiKeyAction(
@@ -22,13 +24,13 @@ export async function createApiKeyAction(
 ): Promise<{ secret?: string; prefix?: string; error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = createApiKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const allowed = new Set(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = parsed.data.scopes.filter((scope) => allowed.has(scope));
-    if (scopes.length === 0) return { error: "You do not hold any of the permissions you picked." };
+    if (scopes.length === 0) return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
 
     const created = await createApiKey(user.id, { ...parsed.data, scopes });
     await recordAudit({
@@ -52,13 +54,13 @@ export async function createApiKeyAction(
 export async function updateApiKeyAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = updateApiKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
 
     const allowed = new Set(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = parsed.data.scopes.filter((scope) => allowed.has(scope));
-    if (scopes.length === 0) return { error: "You do not hold any of the permissions you picked." };
+    if (scopes.length === 0) return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
 
     await updateApiKey(user.id, { ...parsed.data, scopes });
     await recordAudit({
@@ -75,7 +77,7 @@ export async function updateApiKeyAction(input: unknown): Promise<{ error?: stri
 export async function revokeApiKeyAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     await revokeApiKey(user.id, String(id));
     await recordAudit({
         actorId: user.id,
@@ -90,7 +92,7 @@ export async function revokeApiKeyAction(id: string): Promise<{ error?: string }
 export async function deleteApiKeyAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     await deleteApiKey(user.id, String(id));
     await recordAudit({
         actorId: user.id,
