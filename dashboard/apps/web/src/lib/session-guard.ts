@@ -34,6 +34,7 @@ import {
 import { notify } from "@/lib/notifications/dispatch";
 import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
@@ -603,7 +604,7 @@ async function createSessionState(input: {
         await notify({
             userId: input.userId,
             event: "account.signin",
-            title: "A new sign-in is waiting for your approval",
+            title: (await wordsFor(input.userId, "notices"))("session.awaitingApproval"),
             body: describeOrigin(
                 input.ip,
                 input.country,

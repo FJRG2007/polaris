@@ -1287,6 +1287,12 @@
         "web/src/app/api/servers/status/route.ts",
         "web/src/app/api/tasks/stream/route.ts",
         "web/src/app/api/watch/hosts/[id]/metrics/history/route.ts",
-        "web/src/app/api/watch/hosts/[id]/metrics/stream/route.ts"
+        "web/src/app/api/watch/hosts/[id]/metrics/stream/route.ts",
+        "web/src/lib/notifications/operators.ts",
+        "web/src/lib/account-recovery-service.ts",
+        "web/src/lib/session-guard.ts",
+        "web/src/lib/account-lifecycle.ts",
+        "web/src/lib/safety-queue.ts",
+        "web/src/lib/orgs/invitation-service.ts"
     ]
 }

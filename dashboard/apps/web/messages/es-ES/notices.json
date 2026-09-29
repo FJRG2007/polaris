@@ -1,7 +1,8 @@
 {
     "session": {
         "opened": "Se ha iniciado sesión en tu cuenta",
-        "closed": "{count, plural, one {Se ha cerrado una sesión} other {Se han cerrado # sesiones}}"
+        "closed": "{count, plural, one {Se ha cerrado una sesión} other {Se han cerrado # sesiones}}",
+        "awaitingApproval": "Un nuevo inicio de sesión espera tu aprobación"
     },
     "breach": {
         "signedOut": "{reason} Se ha cerrado su sesión.",
@@ -94,5 +95,39 @@
     },
     "dropPoint": {
         "received": "Ha llegado un archivo a «{title}»"
+    },
+    "account": {
+        "lockedDownTitle": "Tu cuenta está bloqueada",
+        "lockedDownBody": "No se puede cambiar nada de cómo está protegida y ningún inicio de sesión nuevo funciona. Los dispositivos que ya tienen la sesión iniciada siguen funcionando, y se ha avisado a un administrador.",
+        "deletingTitle": "Tu cuenta se eliminará",
+        "deletingBody": "No se borra nada durante {days} días. Inicia sesión antes y se cancela: no hay nada más que hacer ni nadie a quien pedírselo.",
+        "disabledTitle": "Tu cuenta se ha desactivado",
+        "disabledBody": "Vuelve a iniciar sesión cuando quieras y se reactivará al momento.",
+        "notDeletingTitle": "Tu cuenta no se eliminará",
+        "backTitle": "Tu cuenta ha vuelto",
+        "backBody": "Al iniciar sesión se ha recuperado. No se ha perdido nada.",
+        "recoveryTitle": "Alguien no puede entrar en su cuenta",
+        "recoveryVerified": "Respondió a sus preguntas de recuperación. Apruébalo en Personas para que pueda poner una contraseña nueva.",
+        "recoveryUnverified": "No pudo responder a ninguna pregunta de recuperación. Comprueba quién es antes de aprobarlo en Personas."
+    },
+    "safety": {
+        "lockedDownTitle": "Se ha bloqueado una cuenta",
+        "lockedDownNoDetail": "No dio detalles. La cuenta no admite ningún cambio ni inicios de sesión nuevos hasta que se levante.",
+        "reportedTitle": "Se ha denunciado una cuenta",
+        "reportedReason": "{reason}.",
+        "reportedDetail": "{reason}. {note}",
+        "settledTitle": "Un administrador ha revisado tu cuenta bloqueada",
+        "settledBody": "Ha terminado de revisarla. Levantar el bloqueo sigue siendo cosa tuya, en Seguridad.",
+        "subject": "{name} ({email})",
+        "anAccount": "Una cuenta",
+        "subjectSaid": "{who}: {detail}"
+    },
+    "orgs": {
+        "somebody": "Alguien",
+        "invitedTitle": "{from} te ha invitado a {org}",
+        "invitedBody": "Acéptala para unirte o recházala. No pasa nada hasta que lo hagas.",
+        "joined": "{who} se ha unido a {org}",
+        "couldNotJoinTitle": "Alguien a quien invitaste a {org} creó una cuenta pero no pudo unirse",
+        "inviteAgain": "Vuelve a invitarle desde Personas."
     }
 }

@@ -34,6 +34,9 @@ import { rateLimit } from "./rate-limit-service";
 import { passwordIsBreached } from "./pwned-passwords";
 import { revokeUserSessions } from "./user-admin-service";
 import { notifyOperators } from "./notifications/operators";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { listSecurityQuestions, resetUserPassword, verifySecurityAnswers } from "@polaris/auth";
 import {
@@ -173,13 +176,16 @@ export async function requestAccountRecovery(input: {
         targetId: userId,
         metadata: { verified, ip: input.ip, userAgent: input.userAgent }
     });
+    // Each operator reads it in their own language; the default is the fallback.
+    const say = (t: NamespaceTranslator<"notices">) => ({
+        title: t("account.recoveryTitle"),
+        body: verified ? t("account.recoveryVerified") : t("account.recoveryUnverified")
+    });
     await notifyOperators({
         permission: "users.manage",
         event: "account.recovery",
-        title: "Someone is locked out of their account",
-        body: verified
-            ? "They answered their recovery questions. Approve it in People to let them set a new password."
-            : "They could not answer any recovery questions. Check who they are before approving it in People.",
+        ...say(translatorFor(DEFAULT_LOCALE, "notices")),
+        say,
         href: "/admin/users",
         level: "warning",
         actionRequired: true

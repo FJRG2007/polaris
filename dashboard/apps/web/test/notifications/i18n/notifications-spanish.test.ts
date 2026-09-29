@@ -55,4 +55,14 @@ describe("in Spanish", () => {
         expect(many.title).toBe("4 dominios vuelven a responder");
         expect(many.body).toBe("shop.example.com, blog.example.com, api.example.com y 1 más.");
     });
+
+    it("tells an account and its administrators about it in their language", () => {
+        expect(english("account.deletingBody", { days: 30 })).toBe(
+            "Nothing is removed for 30 days. Sign in before then and it is called off - there is nothing else to do and nobody to ask."
+        );
+        expect(spanish("orgs.invitedTitle", { from: "Ana", org: "Acme" })).toBe("Ana te ha invitado a Acme");
+        expect(spanish("safety.subjectSaid", { who: spanish("safety.anAccount"), detail: "Spam." })).toBe(
+            "Una cuenta: Spam."
+        );
+    });
 });

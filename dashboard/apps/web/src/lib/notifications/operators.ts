@@ -9,6 +9,8 @@
 
 import { usersWithPermission } from "@polaris/auth";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { NotificationLevel, Permission } from "@polaris/core";
 
 export interface OperatorAlert {
@@ -22,23 +24,28 @@ export interface OperatorAlert {
     href: string;
     level?: NotificationLevel;
     actionRequired?: boolean;
+    /** The same words in one recipient's language, when the caller has them in
+     *  the notices catalog. Each recipient reads their own; `title` and `body`
+     *  are what is said if that cannot be worked out. */
+    say?: (t: NamespaceTranslator<"notices">) => { title: string; body: string };
 }
 
 /** Raise one alert with every recipient, never failing its caller. */
 export async function notifyOperators(alert: OperatorAlert): Promise<void> {
     const recipients = await usersWithPermission(alert.permission);
     await Promise.allSettled(
-        recipients.map((userId) =>
-            notify({
+        recipients.map(async (userId) => {
+            const words = alert.say ? alert.say(await wordsFor(userId, "notices")) : null;
+            return notify({
                 userId,
                 event: alert.event,
-                title: alert.title,
-                body: alert.body,
+                title: words?.title ?? alert.title,
+                body: words?.body ?? alert.body,
                 href: alert.href,
                 level: alert.level,
                 audience: "admins",
                 actionRequired: alert.actionRequired
-            })
-        )
+            });
+        })
     );
 }

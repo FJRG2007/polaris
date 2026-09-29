@@ -25,6 +25,7 @@ import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { ensureSystemRoles, roleIsRestricted } from "./role-service";
 
 /**
@@ -177,14 +178,15 @@ export async function inviteToOrg(
         where: { id: invitedById },
         select: { name: true, username: true }
     });
-    const from = inviter?.name || (inviter?.username ? `@${inviter.username}` : "Somebody");
+    const t = await wordsFor(user.id, "notices");
+    const from = inviter?.name || (inviter?.username ? `@${inviter.username}` : t("orgs.somebody"));
     // Never fails the invitation: the row is the thing, and the alert is how
     // they find out it is there.
     await notify({
         userId: user.id,
         event: "account.orgInvite",
-        title: `${from} invited you to ${org.name}`,
-        body: "Accept it to join, or turn it down. Nothing happens until you do.",
+        title: t("orgs.invitedTitle", { from, org: org.name }),
+        body: t("orgs.invitedBody"),
         href: "/account/organizations",
         actionRequired: true
     }).catch(() => undefined);
@@ -411,10 +413,14 @@ export async function joinOrgFromInvite(input: {
             where: { id: input.userId },
             select: { name: true, username: true }
         });
+        const t = await wordsFor(input.invitedById, "notices");
         await notify({
             userId: input.invitedById,
             event: "account.orgInvite",
-            title: `${joined?.name || (joined?.username ? `@${joined.username}` : "Somebody")} joined ${org.name}`,
+            title: t("orgs.joined", {
+                who: joined?.name || (joined?.username ? `@${joined.username}` : t("orgs.somebody")),
+                org: org.name
+            }),
             href: `/account/organizations/${org.slug}/people`
         }).catch(() => undefined);
         return true;
@@ -424,11 +430,12 @@ export async function joinOrgFromInvite(input: {
             .findUnique({ where: { id: input.orgId }, select: { name: true, slug: true } })
             .catch(() => null);
         if (org) {
+            const t = await wordsFor(input.invitedById, "notices");
             await notify({
                 userId: input.invitedById,
                 event: "account.orgInvite",
-                title: `Somebody you invited to ${org.name} made an account but could not join`,
-                body: caught instanceof OrgError ? caught.message : "Invite them again from People.",
+                title: t("orgs.couldNotJoinTitle", { org: org.name }),
+                body: caught instanceof OrgError ? caught.message : t("orgs.inviteAgain"),
                 href: `/account/organizations/${org.slug}/people`
             }).catch(() => undefined);
         }
@@ -661,10 +668,14 @@ export async function respondToInvitation(
         where: { id: userId },
         select: { name: true, username: true }
     });
+    const t = await wordsFor(invitation.invitedById, "notices");
     await notify({
         userId: invitation.invitedById,
         event: "account.orgInvite",
-        title: `${joined?.name || (joined?.username ? `@${joined.username}` : "Somebody")} joined ${org.name}`,
+        title: t("orgs.joined", {
+            who: joined?.name || (joined?.username ? `@${joined.username}` : t("orgs.somebody")),
+            org: org.name
+        }),
         href: `/account/organizations/${org.slug}/people`
     }).catch(() => undefined);
 

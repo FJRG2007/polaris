@@ -1,7 +1,8 @@
 {
     "session": {
         "opened": "Your account was signed in to",
-        "closed": "{count, plural, one {A session was signed out} other {# sessions were signed out}}"
+        "closed": "{count, plural, one {A session was signed out} other {# sessions were signed out}}",
+        "awaitingApproval": "A new sign-in is waiting for your approval"
     },
     "breach": {
         "signedOut": "{reason} It has been signed out.",
@@ -94,5 +95,39 @@
     },
     "dropPoint": {
         "received": "A file arrived at \"{title}\""
+    },
+    "account": {
+        "lockedDownTitle": "Your account is locked down",
+        "lockedDownBody": "Nothing about how it is protected can be changed and no new sign-in works. The devices already signed in keep working, and an administrator has been told.",
+        "deletingTitle": "Your account will be deleted",
+        "deletingBody": "Nothing is removed for {days} days. Sign in before then and it is called off - there is nothing else to do and nobody to ask.",
+        "disabledTitle": "Your account has been switched off",
+        "disabledBody": "Sign in again whenever you like and it comes straight back.",
+        "notDeletingTitle": "Your account will not be deleted",
+        "backTitle": "Your account is back",
+        "backBody": "Signing in brought it back. Nothing was lost.",
+        "recoveryTitle": "Someone is locked out of their account",
+        "recoveryVerified": "They answered their recovery questions. Approve it in People to let them set a new password.",
+        "recoveryUnverified": "They could not answer any recovery questions. Check who they are before approving it in People."
+    },
+    "safety": {
+        "lockedDownTitle": "An account has been locked down",
+        "lockedDownNoDetail": "They gave no detail. The account is shut to every change and to new sign-ins until it is lifted.",
+        "reportedTitle": "An account was reported",
+        "reportedReason": "{reason}.",
+        "reportedDetail": "{reason}. {note}",
+        "settledTitle": "An administrator has looked at your locked-down account",
+        "settledBody": "They have finished looking. Lifting the lockdown is still yours to do, under Security.",
+        "subject": "{name} ({email})",
+        "anAccount": "An account",
+        "subjectSaid": "{who}: {detail}"
+    },
+    "orgs": {
+        "somebody": "Somebody",
+        "invitedTitle": "{from} invited you to {org}",
+        "invitedBody": "Accept it to join, or turn it down. Nothing happens until you do.",
+        "joined": "{who} joined {org}",
+        "couldNotJoinTitle": "Somebody you invited to {org} made an account but could not join",
+        "inviteAgain": "Invite them again from People."
     }
 }

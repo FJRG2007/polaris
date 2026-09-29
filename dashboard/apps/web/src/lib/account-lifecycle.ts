@@ -28,6 +28,7 @@ import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { openLockdownCase } from "@/lib/safety-queue";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { revokeStepUpGrants } from "@/lib/step-up-grant";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 
@@ -105,11 +106,12 @@ export async function raiseLockdown(userId: string, note: string): Promise<void>
     await revokeStepUpGrants(userId);
     await recordAudit({ actorId: userId, action: "account.lockdown.raised" });
     await openLockdownCase(userId, note);
+    const t = await wordsFor(userId, "notices");
     await notify({
         userId,
         event: "account.security",
-        title: "Your account is locked down",
-        body: "Nothing about how it is protected can be changed and no new sign-in works. The devices already signed in keep working, and an administrator has been told.",
+        title: t("account.lockedDownTitle"),
+        body: t("account.lockedDownBody"),
         href: SECURITY_HREF,
         actionRequired: true
     }).catch(() => undefined);
@@ -157,17 +159,15 @@ export async function closeAccount(
         actorId: userId,
         action: closure === "deleting" ? "account.deletion.requested" : "account.disabled"
     });
+    const t = await wordsFor(userId, "notices");
     await notify({
         userId,
         event: "account.security",
-        title:
-            closure === "deleting"
-                ? "Your account will be deleted"
-                : "Your account has been switched off",
+        title: closure === "deleting" ? t("account.deletingTitle") : t("account.disabledTitle"),
         body:
             closure === "deleting"
-                ? `Nothing is removed for ${core.DELETION_GRACE_DAYS} days. Sign in before then and it is called off - there is nothing else to do and nobody to ask.`
-                : "Sign in again whenever you like and it comes straight back.",
+                ? t("account.deletingBody", { days: core.DELETION_GRACE_DAYS })
+                : t("account.disabledBody"),
         href: SECURITY_HREF
     }).catch(() => undefined);
 }
@@ -197,14 +197,12 @@ export async function restoreAccount(userId: string): Promise<core.AccountClosur
         actorId: userId,
         action: undone === "deleting" ? "account.deletion.cancelled" : "account.enabled"
     });
+    const t = await wordsFor(userId, "notices");
     await notify({
         userId,
         event: "account.security",
-        title:
-            undone === "deleting"
-                ? "Your account will not be deleted"
-                : "Your account is back",
-        body: "Signing in brought it back. Nothing was lost.",
+        title: undone === "deleting" ? t("account.notDeletingTitle") : t("account.backTitle"),
+        body: t("account.backBody"),
         href: SECURITY_HREF
     }).catch(() => undefined);
     return undone;

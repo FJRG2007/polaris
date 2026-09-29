@@ -18,6 +18,9 @@ import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { alertAdmins } from "@/lib/notifications/admins";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 /** One case, as the queue draws it. */
 export interface SafetyCaseView {
@@ -128,15 +131,16 @@ export async function openLockdownCase(userId: string, note: string): Promise<vo
             data: { kind: "lockdown", subjectId: userId, reason: "lockdown", note }
         });
     }
-    await alertAdmins({
-        title: "An account has been locked down",
-        body: await describeSubject(
-            userId,
-            note ||
-                "They gave no detail. The account is shut to every change and to new sign-ins until it is lifted."
-        ),
-        actionRequired: true
-    });
+    const who = await subjectName(userId);
+    // Each administrator reads it in their own language.
+    const said = (locale: core.Locale) => {
+        const t = translatorFor(locale, "notices");
+        return {
+            title: t("safety.lockedDownTitle"),
+            body: describeSubject(t, who, note || t("safety.lockedDownNoDetail"))
+        };
+    };
+    await alertAdmins({ ...said(core.DEFAULT_LOCALE), say: said, actionRequired: true });
 }
 
 /** Somebody reported a person. */
@@ -183,14 +187,20 @@ export async function reportUser(
         targetId: input.subjectId,
         metadata: { reason: input.reason }
     });
-    await alertAdmins({
-        title: "An account was reported",
-        body: await describeSubject(
-            input.subjectId,
-            `${core.USER_REPORT_REASON_LABELS[input.reason]}. ${input.note}`.trim()
-        ),
-        actionRequired: false
-    });
+    const who = await subjectName(input.subjectId);
+    const said = (locale: core.Locale) => {
+        const t = translatorFor(locale, "notices");
+        const reason = translatorFor(locale, "components")(`report.reasons.${input.reason}`);
+        return {
+            title: t("safety.reportedTitle"),
+            body: describeSubject(
+                t,
+                who,
+                input.note.trim() ? t("safety.reportedDetail", { reason, note: input.note.trim() }) : t("safety.reportedReason", { reason })
+            )
+        };
+    };
+    await alertAdmins({ ...said(core.DEFAULT_LOCALE), say: said, actionRequired: false });
     return {};
 }
 
@@ -226,13 +236,12 @@ export async function settleSafetyCase(
     // somebody who reported a person is not owed a verdict on that person, and
     // telling them would be handing over a decision about somebody else.
     if (settled?.kind === "lockdown") {
+        const t = await wordsFor(settled.subjectId, "notices");
         await notify({
             userId: settled.subjectId,
             event: "account.security",
-            title: "An administrator has looked at your locked-down account",
-            body:
-                input.outcome ||
-                "They have finished looking. Lifting the lockdown is still yours to do, under Security.",
+            title: t("safety.settledTitle"),
+            body: input.outcome || t("safety.settledBody"),
             href: "/account/security"
         }).catch(() => undefined);
     }
@@ -240,11 +249,19 @@ export async function settleSafetyCase(
 }
 
 /** What the alert says about whose account it is. */
-async function describeSubject(userId: string, detail: string): Promise<string> {
-    const user = await prisma.user.findUnique({
+async function subjectName(userId: string): Promise<{ name: string; email: string } | null> {
+    return prisma.user.findUnique({
         where: { id: userId },
         select: { name: true, email: true }
     });
-    const who = user ? `${user.name} (${user.email})` : "An account";
-    return detail ? `${who}: ${detail}` : who;
+}
+
+/** Who it is about and what was said, in one administrator's words. */
+function describeSubject(
+    t: NamespaceTranslator<"notices">,
+    who: { name: string; email: string } | null,
+    detail: string
+): string {
+    const named = who ? t("safety.subject", { name: who.name, email: who.email }) : t("safety.anAccount");
+    return detail ? t("safety.subjectSaid", { who: named, detail }) : named;
 }
