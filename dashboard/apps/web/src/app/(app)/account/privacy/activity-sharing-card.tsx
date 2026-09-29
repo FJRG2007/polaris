@@ -20,6 +20,7 @@ import { Plus, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
 
@@ -27,18 +28,7 @@ import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
 export type SpotifyReadiness = "linked" | "unlinked" | "unavailable";
 
 /** A source's row: what it is and what it needs to work. */
-const SOURCES: readonly { id: "games" | "minecraft"; label: string; hint: string }[] = [
-    {
-        id: "games",
-        label: "Games on your computer",
-        hint: "Seen by the Polaris desktop app on Windows, macOS and Linux. A browser cannot see what else is running, so this only works while the desktop app is open."
-    },
-    {
-        id: "minecraft",
-        label: "Minecraft servers here",
-        hint: "When you play on one of this Polaris's Minecraft servers as a player linked to your account."
-    }
-];
+const SOURCES = ["games", "minecraft"] as const;
 
 /** One flip of a switch, applied to whatever state it lands on. */
 type Change = (state: core.ActivitySettings) => core.ActivitySettings;
@@ -58,6 +48,7 @@ export function ActivitySharingCard({
     /** Whether this account has a Spotify linked, or could link one here. */
     spotify: SpotifyReadiness;
 }) {
+    const t = useTranslations("accountPrivacy");
     const [saved, setSaved] = useState(settings);
     const [pending, setPending] = useState<readonly { id: number; change: Change }[]>([]);
     const [error, setError] = useState("");
@@ -105,72 +96,70 @@ export function ActivitySharingCard({
         <Card>
             <CardBody className="flex flex-col gap-3 p-3">
                 <div>
-                    <h2 className="text-sm font-medium">Activity</h2>
-                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                        What you are playing or listening to, shown beside your name. Only people who can see that
-                        you are here see it, and nobody sees it while you appear offline.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("activity.title")}</h2>
+                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">{t("activity.description")}</p>
                 </div>
 
                 <label className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
                     <span className="min-w-0 flex-1">
-                        <span className="block text-[0.8125rem]">Share my activity</span>
+                        <span className="block text-[0.8125rem]">{t("activity.share")}</span>
                         <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                            Off hides all of it, from everybody.
+                            {t("activity.shareHint")}
                         </span>
                     </span>
                     <Switch
                         checked={draft.share}
                         onChange={(share) => commit((state) => ({ ...state, share }))}
-                        aria-label="Share my activity"
+                        aria-label={t("activity.share")}
                     />
                 </label>
 
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                     <li className="flex items-center gap-3 px-3 py-2">
                         <span className="min-w-0 flex-1">
+                            {/* i18n-ignore: a service's own name */}
                             <span className="block text-[0.8125rem]">Spotify</span>
                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                {spotify === "linked" ? (
-                                    "The song your linked Spotify is playing, while you are here. People who see it can listen along."
-                                ) : spotify === "unlinked" ? (
-                                    <>
-                                        Link your Spotify under{" "}
-                                        <Link
-                                            href="/account/connections"
-                                            className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                                        >
-                                            Connected accounts
-                                        </Link>{" "}
-                                        and the song you are playing shows here.
-                                    </>
-                                ) : (
-                                    "Not available yet: whoever runs this Polaris has not connected Spotify to it."
-                                )}
+                                {spotify === "linked"
+                                    ? t("activity.spotify.linked")
+                                    : spotify === "unlinked"
+                                      ? t.rich("activity.spotify.unlinked", {
+                                            link: (chunks) => (
+                                                <Link
+                                                    key="link"
+                                                    href="/account/connections"
+                                                    className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                                >
+                                                    {chunks}
+                                                </Link>
+                                            )
+                                        })
+                                      : t("activity.spotify.unavailable")}
                             </span>
                         </span>
                         <Switch
                             checked={!off && draft.spotify}
                             disabled={off}
                             onChange={(on) => commit((state) => ({ ...state, spotify: on }))}
+                            // i18n-ignore: a service's own name
                             aria-label="Spotify"
                         />
                     </li>
                     {SOURCES.map((source) => (
-                        <li key={source.id} className="flex items-center gap-3 px-3 py-2">
+                        <li key={source} className="flex items-center gap-3 px-3 py-2">
                             <span className="min-w-0 flex-1">
-                                <span className="block text-[0.8125rem]">{source.label}</span>
+                                <span className="block text-[0.8125rem]">{t(`activity.sources.${source}.label` as const)}</span>
                                 <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                    {source.hint}
+                                    {t(`activity.sources.${source}.hint` as const)}
                                 </span>
                             </span>
                             <Switch
-                                checked={!off && draft[source.id]}
+                                checked={!off && draft[source]}
                                 disabled={off}
                                 onChange={(on) =>
-                                    commit((state) => ({ ...state, [source.id]: on }))
+                                    commit((state) => ({ ...state, [source]: on }))
                                 }
-                                aria-label={source.label}
+                                aria-label={t(`activity.sources.${source}.label` as const)}
                             />
                         </li>
                     ))}
@@ -178,12 +167,11 @@ export function ActivitySharingCard({
 
                 <section className="flex flex-col gap-1.5">
                     <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                        Games
+                        {t("activity.games")}
                     </h3>
                     {games.size === 0 ? (
                         <p className="rounded-md border border-dashed border-border px-3 py-3 text-[0.6875rem] text-muted-foreground">
-                            None yet. A game shows up here the first time the desktop app sees it
-                            running, and you can hide it from then on.
+                            {t("activity.noGames")}
                         </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
@@ -202,7 +190,7 @@ export function ActivitySharingCard({
                                                 className="block truncate text-[0.6875rem] text-foreground-subtle"
                                                 title={key}
                                             >
-                                                {hidden ? "Never shown" : key}
+                                                {hidden ? t("activity.neverShown") : key}
                                             </span>
                                         </span>
                                         <Switch
@@ -220,7 +208,7 @@ export function ActivitySharingCard({
                                                           : [...state.hiddenGames, key]
                                                 }))
                                             }
-                                            aria-label={`Show ${name}`}
+                                            aria-label={t("activity.showGame", { name })}
                                         />
                                     </li>
                                 );
@@ -288,6 +276,7 @@ function OwnGames({
     onAdd: (game: core.CustomGame) => void;
     onRemove: (executable: string) => void;
 }) {
+    const t = useTranslations("accountPrivacy");
     const [program, setProgram] = useState("");
     const [name, setName] = useState("");
     const [running, setRunning] = useState<readonly string[] | null>(null);
@@ -299,13 +288,13 @@ function OwnGames({
         candidate.success && games.some((game) => game.executable === candidate.data.executable);
     const full = games.length >= core.MOST_CUSTOM_GAMES;
     const problem = full
-        ? `The list is full at ${core.MOST_CUSTOM_GAMES}. Remove one to add another.`
+        ? t("ownGames.full", { count: core.MOST_CUSTOM_GAMES })
         : program.trim() && name.trim()
           ? taken
-              ? "That program is already on the list."
+              ? t("ownGames.taken")
               : candidate.success
                 ? ""
-                : (candidate.error.issues[0]?.message ?? "Check the program and the name.")
+                : (candidate.error.issues[0]?.message ?? t("ownGames.check"))
           : "";
     const ready = candidate.success && !taken && !full;
 
@@ -321,12 +310,9 @@ function OwnGames({
     return (
         <section className="flex flex-col gap-1.5">
             <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                Your own games
+                {t("ownGames.title")}
             </h3>
-            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                A game the desktop app does not know yet: the program that runs it, and what to call
-                it.
-            </p>
+            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">{t("ownGames.description")}</p>
             {games.length > 0 && (
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                     {games.map((game) => (
@@ -345,8 +331,8 @@ function OwnGames({
                             <button
                                 type="button"
                                 disabled={disabled}
-                                aria-label={`Remove ${game.name}`}
-                                title={`Remove ${game.name}`}
+                                aria-label={t("ownGames.remove", { name: game.name })}
+                                title={t("ownGames.remove", { name: game.name })}
                                 onClick={() => onRemove(game.executable)}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                             >
@@ -358,7 +344,7 @@ function OwnGames({
             )}
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
-                    Program
+                    {t("ownGames.program")}
                     <Input
                         value={program}
                         onChange={(event) => setProgram(event.target.value)}
@@ -368,18 +354,18 @@ function OwnGames({
                     />
                 </label>
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
-                    Name
+                    {t("ownGames.name")}
                     <Input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="My game"
+                        placeholder={t("ownGames.namePlaceholder")}
                         disabled={disabled}
                         className="h-8 text-xs"
                     />
                 </label>
                 <Button size="sm" onClick={add} disabled={disabled || !ready}>
                     <Plus className="size-4 shrink-0" />
-                    Add
+                    {t("ownGames.add")}
                 </Button>
             </div>
             {problem ? <p className="text-[0.6875rem] text-danger">{problem}</p> : null}
@@ -388,7 +374,7 @@ function OwnGames({
                     <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                         {running.length === 0 ? (
                             <span className="text-[0.6875rem] text-muted-foreground">
-                                Nothing could be listed.
+                                {t("ownGames.nothingListed")}
                             </span>
                         ) : (
                             running.map((entry) => (
@@ -415,7 +401,7 @@ function OwnGames({
                         }
                         className="self-start rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:opacity-50"
                     >
-                        Choose from what is running on this computer
+                        {t("ownGames.chooseRunning")}
                     </button>
                 )
             ) : null}

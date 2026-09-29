@@ -3,6 +3,219 @@
         "page": {
             "title": "Horario de estado",
             "intro": "Horas en las que estás ausente, ocupado o no se te muestra, repetidas cada semana. Un horario toma el control cuando empieza, y lo que elijas mientras está en marcha es tuyo hasta que termine."
+        },
+        "summary": "Horas en las que estás ausente, ocupado o no se te muestra, repetidas cada semana.",
+        "open": "Abrir",
+        "notSaved": "No se ha podido guardar ese horario",
+        "deleteTitle": "¿Eliminar este horario?",
+        "deleteDescription": "{schedule}. No se puede deshacer: para guardarlo para más adelante, desactívalo en su lugar.",
+        "zone": {
+            "assumed": "Funcionan con el reloj de la máquina en la que esté Polaris. Elige una zona horaria en Preferencias para asegurarte de que usan el tuyo.",
+            "pinned": "Las horas se leen en tu propio reloj ({zone}).",
+            "browser": "Las horas se leen en el reloj de este navegador ({zone}). Elige una zona horaria en Preferencias para fijarlas a una."
+        },
+        "new": "Nuevo horario",
+        "emptyTitle": "Todavía no hay horarios",
+        "emptyDescription": "Indica las horas en las que duermes, estás concentrado o libras el fin de semana, y deja de cambiarlo a mano dos veces al día.",
+        "row": "{presence}, de {start} a {end}",
+        "rowOvernight": "{presence}, de {start} a {end} del día siguiente",
+        "runningNow": "En marcha ahora",
+        "use": "Usar este horario ({schedule})",
+        "editTitle": "Editar el horario",
+        "dialogDescription": "Cómo apareces y las horas en las que se aplica.",
+        "appearAs": "Aparecer como",
+        "appearAsLabel": "Cómo aparecer",
+        "from": "Desde",
+        "until": "Hasta",
+        "onDays": "Estos días",
+        "days": {
+            "every": "Todos los días",
+            "weekdays": "Entre semana",
+            "weekends": "Fines de semana",
+            "none": "Ningún día"
+        },
+        "add": "Añadir horario",
+        "summaryLine": "{presence} durante {span}. {days}.",
+        "summaryOvernight": "{presence} durante {span}, hasta el día siguiente. {days}.",
+        "describe": "{presence} - de {start} a {end} - {days}"
+    },
+    "page": {
+        "title": "Privacidad",
+        "intro": "Quién puede encontrarte, quién ve tus datos y quién ve lo que estás haciendo. Todo aquí se puede responder con todo el mundo, nadie o un grupo de personas que tú elijas."
+    },
+    "somebody": "Alguien",
+    "saved": "Guardado.",
+    "addSomebody": "Añadir a alguien",
+    "adminNote": "Quién cuenta como amigo está en tu <link>página de amigos</link>. Quien administra este Polaris puede verlo todo elijas lo que elijas aquí. Puede leer la base de datos, así que un ajuste que dijera lo contrario no sería cierto.",
+    "sections": {
+        "finding": "Que te encuentren",
+        "details": "Tus datos",
+        "reaching": "Contactar contigo",
+        "presence": "Presencia",
+        "messages": "Mensajes"
+    },
+    "audiences": {
+        "everyone": "Todo el mundo",
+        "everyoneExcept": "Todo el mundo excepto",
+        "friends": "Amigos",
+        "friendsExcept": "Amigos excepto",
+        "friendsOfFriends": "Amigos de mis amigos",
+        "following": "Gente a la que sigo",
+        "followers": "Gente que me sigue",
+        "only": "Solo",
+        "nobody": "Nadie"
+    },
+    "fields": {
+        "discoverable": {
+            "label": "Si la gente puede encontrarte",
+            "note": "Quién encuentra tu cuenta cuando busca a alguien. Quien no pueda tendrá que saber tu nombre de usuario exacto para pedirte que le añadas, y nunca se le dice si existe."
+        },
+        "lastSeen": {
+            "label": "Cuándo estuviste aquí por última vez",
+            "note": "Si otras personas pueden ver que estás aquí ahora, o cuándo estuviste por última vez."
+        },
+        "activity": {
+            "label": "A qué juegas o qué escuchas",
+            "note": "El juego o la canción que aparece junto a tu nombre. Solo lo ve quien también puede ver que estás aquí, y nunca mientras apareces desconectado."
+        },
+        "readReceipts": {
+            "label": "Que has leído un mensaje",
+            "note": "Los ticks bajo un mensaje en una conversación directa. Si lo restringes, tampoco verás los de los demás, y «solo» es la forma de dejarlos activados para una persona."
+        },
+        "avatar": {
+            "label": "Tu foto",
+            "note": "Quién ve tu foto. Quien no pueda verá tus iniciales en su lugar."
+        },
+        "photoFullSize": {
+            "label": "Abrir tu foto",
+            "note": "Quién puede abrir tu foto y verla a tamaño completo. Quien no pueda la sigue viendo junto a tu nombre: es una regla sobre el clic, no una segunda copia de la imagen."
+        },
+        "fullName": {
+            "label": "Tu nombre completo",
+            "note": "Quién ve el nombre de tu cuenta en lugar del nombre que muestras. Quien no pueda ve tu nombre visible, que es lo que muestran todas las pantallas de todas formas."
+        },
+        "email": {
+            "label": "Tu correo",
+            "note": "Quién ve la dirección con la que inicias sesión. Quien no pueda ve tu nombre y tu nombre de usuario, que basta para escribirte aquí."
+        },
+        "phone": {
+            "label": "Tu número de teléfono",
+            "note": "El número que se guarda para los códigos de inicio de sesión. No se muestra a nadie salvo que tú lo digas."
+        },
+        "companies": {
+            "label": "Dónde trabajas",
+            "note": "La empresa de tu perfil y las organizaciones de aquí que has elegido mostrar. Cuáles son esas organizaciones se elige una a una en tu perfil; esto decide quién ve las que elegiste."
+        },
+        "followers": {
+            "label": "Los nombres tras tus contadores de seguidores",
+            "note": "Quién puede abrir las dos listas de nombres de tu perfil. Los contadores siempre se muestran (cuánta gente te sigue es un dato sobre ti, y está en tu página igual que el día en que te uniste), así que esto va de las otras personas de las listas, que nunca eligieron estar en tu página. Tu administrador decide con qué empieza una cuenta nueva; esto es tuyo."
+        },
+        "friendRequests": {
+            "label": "Quién puede pedirte amistad",
+            "note": "Quién puede pedírtela. A quien se lo impidas aquí no se le dice: simplemente no se le ofrece el botón, y nunca se impide a nadie que te siga, porque eso no te pide nada. Si eliges nadie, solo se pueden responder las solicitudes que ya están esperando."
+        },
+        "fileTransfers": {
+            "label": "Quién puede enviarte archivos",
+            "note": "Quién puede ofrecerte un archivo o una carpeta. Nunca llega nada sin que lo aceptes, así que esto va de quién puede preguntar: a quien no pueda simplemente no se le ofrece el botón. Las personas con las que compartes una organización cuentan aquí como amigos; si eliges nadie, no puede nadie, tampoco ellas."
+        },
+        "calls": {
+            "label": "Quién puede llamarte",
+            "note": "Quién puede llamarte. Una llamada ocupa la pantalla de lo que estuvieras haciendo y hace ruido en la habitación en la que estás, por eso empieza en tus amigos y no en todo el mundo. Entrar en un canal de voz no es esto: es una sala en la que alguien entra, y quién puede estar en ella lo decide la propia sala. A quien no pueda llamarte simplemente no se le ofrece el botón."
+        },
+        "forwarding": {
+            "label": "Reenviar tus mensajes",
+            "note": "Quién puede reenviar algo que escribiste a otra conversación. A quien no pueda no se le ofrece, y aun así puede copiar el texto: es una regla sobre el botón, no un candado para tus palabras."
         }
+    },
+    "who": {
+        "emptyList": "Esa lista está vacía, así que no incluye a nadie.",
+        "nobody": "Todavía no has elegido a nadie, así que esto no hace nada.",
+        "listName": "{name}:",
+        "more": "y {count} más",
+        "choose": "Elegir"
+    },
+    "dialog": {
+        "title": "{audience, select, everyoneExcept {Todo el mundo excepto estas personas} friendsExcept {Amigos excepto estas personas} only {Solo estas personas} other {Estas personas}}",
+        "description": "{field}. A nadie se le dice que está en una lista tuya.",
+        "whoToUse": "A quién usar",
+        "pickedHere": "Las personas que elija aquí",
+        "everybodyOnList": "Todas las personas de esta lista.",
+        "emptyList": "Esta lista todavía no tiene a nadie.",
+        "changeUnderLists": "Cambia quién está en ella en Listas, debajo de los ajustes.",
+        "done": "Hecho"
+    },
+    "lists": {
+        "title": "Listas",
+        "new": "Nueva lista",
+        "empty": "Una lista es un grupo de personas al que puedes aplicar más de un ajuste: las personas a las que ocultas tu número, las que ven cuándo estuviste por última vez. Los ajustes también pueden nombrar personas en su propia fila sin una lista.",
+        "nobodyOnIt": "No hay nadie",
+        "usedBy": "La usan: {fields}",
+        "edit": "Editar",
+        "editNamed": "Editar {name}",
+        "inUse": "La usa un ajuste",
+        "deleteThis": "Eliminar esta lista",
+        "deleteNamed": "Eliminar {name}",
+        "deleteTitle": "¿Eliminar {name}?",
+        "deleteDescription": "No se avisa a las personas que están en ella, y no cambia nada más.",
+        "delete": "Eliminar",
+        "editTitle": "Editar la lista",
+        "dialogDescription": "Ponle el nombre de para qué sirve. A nadie de la lista se le dice nunca que está en ella.",
+        "name": "Nombre",
+        "namePlaceholder": "Trabajo"
+    },
+    "blocked": {
+        "title": "Bloqueados",
+        "description": "No pueden escribirte, llamarte ni mencionarte, y lo que escriben donde estáis los dos aparece plegado. No se les avisa.",
+        "empty": "Nadie. Puedes bloquear a alguien desde el menú de su nombre.",
+        "unblockNamed": "Desbloquear a {name}",
+        "unblock": "Desbloquear"
+    },
+    "errors": {
+        "notSaved": "No se han podido guardar esos ajustes",
+        "checkList": "Revisa la lista",
+        "cannotBlock": "Esa no es una persona que se pueda bloquear",
+        "cannotUnblock": "Esa no es una persona que se pueda desbloquear"
+    },
+    "friends": {
+        "asked": "Si esa cuenta existe, ya se le ha preguntado."
+    },
+    "activity": {
+        "title": "Actividad",
+        "description": "A qué juegas o qué escuchas, junto a tu nombre. Solo lo ve quien puede ver que estás aquí, y nadie lo ve mientras apareces desconectado.",
+        "share": "Compartir mi actividad",
+        "shareHint": "Desactivado, se oculta todo a todo el mundo.",
+        "spotify": {
+            "linked": "La canción que está sonando en tu Spotify vinculado, mientras estás aquí. Quien la vea puede escucharla contigo.",
+            "unlinked": "Vincula tu Spotify en <link>Cuentas conectadas</link> y la canción que estás escuchando aparecerá aquí.",
+            "unavailable": "Todavía no está disponible: quien gestiona este Polaris no le ha conectado Spotify."
+        },
+        "sources": {
+            "games": {
+                "label": "Juegos de tu ordenador",
+                "hint": "Los ve la app de escritorio de Polaris en Windows, macOS y Linux. Un navegador no puede ver qué más se está ejecutando, así que esto solo funciona mientras la app de escritorio está abierta."
+            },
+            "minecraft": {
+                "label": "Servidores de Minecraft de aquí",
+                "hint": "Cuando juegas en uno de los servidores de Minecraft de este Polaris como un jugador vinculado a tu cuenta."
+            }
+        },
+        "games": "Juegos",
+        "noGames": "Todavía ninguno. Un juego aparece aquí la primera vez que la app de escritorio lo ve en marcha, y desde entonces puedes ocultarlo.",
+        "neverShown": "No se muestra nunca",
+        "showGame": "Mostrar {name}"
+    },
+    "ownGames": {
+        "full": "La lista está llena con {count}. Quita uno para añadir otro.",
+        "taken": "Ese programa ya está en la lista.",
+        "check": "Revisa el programa y el nombre.",
+        "title": "Tus propios juegos",
+        "description": "Un juego que la app de escritorio todavía no conoce: el programa que lo ejecuta y cómo llamarlo.",
+        "remove": "Quitar {name}",
+        "program": "Programa",
+        "name": "Nombre",
+        "namePlaceholder": "Mi juego",
+        "add": "Añadir",
+        "nothingListed": "No se ha podido listar nada.",
+        "chooseRunning": "Elegir entre lo que se está ejecutando en este ordenador"
     }
 }

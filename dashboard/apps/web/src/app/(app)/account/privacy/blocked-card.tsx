@@ -22,12 +22,14 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
 import { unblockPersonAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { BlockedPerson } from "@/lib/blocks";
 import { PersonName, PersonRow, RealNames } from "@/components/person-name";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
     const router = useRouter();
+    const t = useTranslations("accountPrivacy");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState("");
 
@@ -42,7 +44,7 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Blocked</CardTitle>
+                <CardTitle>{t("blocked.title")}</CardTitle>
             </CardHeader>
             {/* Everybody here is named by the account the block was placed on,
                 not by whatever this reader calls them. The row was contradicting
@@ -53,14 +55,11 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                 this way. See `contact-names` for where a nickname does belong. */}
             <RealNames>
                 <CardBody className="flex flex-col gap-3 p-3">
-                    <p className="text-xs text-muted-foreground">
-                        They cannot message, call or mention you, and what they write where you both
-                        are is folded away. They are not told.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("blocked.description")}</p>
 
                     {people.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            Nobody. You can block somebody from the menu on their name.
+                            {t("blocked.empty")}
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-1">
@@ -82,8 +81,8 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                                         size="xs"
                                         variant="ghost"
                                         disabled={busy === person.id}
-                                        aria-label={`Unblock ${person.name}`}
-                                        title="Unblock"
+                                        aria-label={t("blocked.unblockNamed", { name: person.name })}
+                                        title={t("blocked.unblock")}
                                         onClick={() => void letThrough(person)}
                                     >
                                         <ShieldBan className="size-3.5" />

@@ -21,6 +21,7 @@
 import { useState } from "react";
 import * as core from "@polaris/core";
 import { ListsCard } from "./lists-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Users } from "lucide-react";
 import { savePrivacyAction } from "./actions";
@@ -44,6 +45,8 @@ export function PrivacyView({
     /** Names for everybody the rules already name, so the rows can draw them. */
     people: readonly NamedPerson[];
 }) {
+    const t = useTranslations("accountPrivacy");
+    const tc = useTranslations("common");
     const [draft, setDraft] = useState(settings);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -61,7 +64,7 @@ export function PrivacyView({
         setSaving(false);
     };
 
-    const nameOf = (id: string) => named.find((person) => person.id === id)?.name ?? "Somebody";
+    const nameOf = (id: string) => named.find((person) => person.id === id)?.name ?? t("somebody");
 
     return (
         <div className="flex flex-col gap-4">
@@ -70,7 +73,7 @@ export function PrivacyView({
                     {core.PRIVACY_SECTIONS.map((section) => (
                         <section key={section.id} className="flex flex-col gap-1.5">
                             <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                {section.label}
+                                {t(`sections.${section.id}` as const)}
                             </h3>
                             <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                                 {section.fields.map((field) => (
@@ -80,19 +83,19 @@ export function PrivacyView({
                                     >
                                         <span className="min-w-[12rem] flex-1">
                                             <span className="block text-[0.8125rem]">
-                                                {core.PRIVACY_FIELD_LABELS[field]}
+                                                {t(`fields.${field}.label` as const)}
                                             </span>
                                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                                {core.PRIVACY_FIELD_NOTES[field]}
+                                                {t(`fields.${field}.note` as const)}
                                             </span>
                                         </span>
                                         <Select
                                             className="h-8 w-40 shrink-0 text-xs"
-                                            aria-label={core.PRIVACY_FIELD_LABELS[field]}
+                                            aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
                                             options={core.PRIVACY_AUDIENCES.map((audience) => ({
                                                 value: audience,
-                                                label: core.PRIVACY_AUDIENCE_LABELS[audience]
+                                                label: t(`audiences.${audience}` as const)
                                             }))}
                                             onValueChange={(value) =>
                                                 setDraft((current) => ({
@@ -119,16 +122,17 @@ export function PrivacyView({
                     ))}
 
                     <p className="text-[0.6875rem] leading-snug text-muted-foreground">
-                        Who counts as a friend is on your{" "}
-                        <a
-                            href="/account/friends"
-                            className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                        >
-                            friends page
-                        </a>
-                        . Whoever administers this Polaris can see all of it whatever you choose
-                        here. They can read the database, so a setting that claimed otherwise would
-                        not be true.
+                        {t.rich("adminNote", {
+                            link: (chunks) => (
+                                <a
+                                    key="link"
+                                    href="/account/friends"
+                                    className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
                     </p>
 
                     {error && (
@@ -140,9 +144,9 @@ export function PrivacyView({
                     <div className="flex items-center gap-3">
                         <Button size="sm" onClick={() => void save()} disabled={!dirty || saving}>
                             {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                            Save
+                            {tc("actions.save")}
                         </Button>
-                        {!dirty && <span className="text-xs text-muted-foreground">Saved.</span>}
+                        {!dirty && <span className="text-xs text-muted-foreground">{t("saved")}</span>}
                     </div>
                 </CardBody>
             </Card>
@@ -188,6 +192,7 @@ function Who({
     nameOf: (id: string) => string;
     onEdit: () => void;
 }) {
+    const t = useTranslations("accountPrivacy");
     const list = rule.listId ? lists.find((entry) => entry.id === rule.listId) : null;
     // Kept as people rather than names: two colleagues share a first name often
     // enough, and everybody whose name has not been resolved yet is "Somebody".
@@ -200,14 +205,12 @@ function Who({
             <Users className="size-3.5 shrink-0 text-foreground-subtle" />
             {shown.length === 0 ? (
                 <span className="text-[0.6875rem] text-warning">
-                    {list
-                        ? "That list is empty, so this names nobody."
-                        : "Nobody named yet, so this does nothing."}
+                    {list ? t("who.emptyList") : t("who.nobody")}
                 </span>
             ) : (
                 <>
                     {list && (
-                        <span className="text-[0.6875rem] text-muted-foreground">{list.name}:</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">{t("who.listName", { name: list.name })}</span>
                     )}
                     {first.map((person) => (
                         <span
@@ -218,7 +221,7 @@ function Who({
                         </span>
                     ))}
                     {rest > 0 && (
-                        <span className="text-[0.6875rem] text-muted-foreground">and {rest} more</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">{t("who.more", { count: rest })}</span>
                     )}
                 </>
             )}
@@ -227,7 +230,7 @@ function Who({
                 onClick={onEdit}
                 className="rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
             >
-                Choose
+                {t("who.choose")}
             </button>
         </div>
     );

@@ -16,6 +16,7 @@
 import { useState } from "react";
 import * as core from "@polaris/core";
 import { searchPeopleAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamedPerson } from "./privacy-view";
 import type { PrivacyListView } from "@/lib/privacy-service";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
@@ -51,10 +52,11 @@ export function AudienceDialog({
     onChange: (rule: core.PrivacyRule) => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("accountPrivacy");
     const [source, setSource] = useState(rule.listId ?? PICKED_HERE);
     const picked: PickedPerson[] = rule.people.map((id) => ({
         id,
-        name: named.find((person) => person.id === id)?.name ?? "Somebody"
+        name: named.find((person) => person.id === id)?.name ?? t("somebody")
     }));
     const list = lists.find((entry) => entry.id === source);
 
@@ -76,25 +78,22 @@ export function AudienceDialog({
                     {/* The audience said back in full - "friends except these
                         people" is a different rule from "everybody except these
                         people", and the dialog is where that has to be plain. */}
-                    <DialogTitle>
-                        {core.PRIVACY_AUDIENCE_LABELS[rule.audience]} these people
-                    </DialogTitle>
+                    <DialogTitle>{t("dialog.title", { audience: rule.audience })}</DialogTitle>
                     <DialogDescription>
-                        {core.PRIVACY_FIELD_LABELS[field]}. Nobody is told they are on a list of
-                        yours.
+                        {t("dialog.description", { field: t(`fields.${field}.label` as const) })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     {lists.length > 0 && (
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Who to use
+                            {t("dialog.whoToUse")}
                             <Select
-                                aria-label="Who to use"
+                                aria-label={t("dialog.whoToUse")}
                                 value={source}
                                 onValueChange={use}
                                 options={[
-                                    { value: PICKED_HERE, label: "People I choose here" },
+                                    { value: PICKED_HERE, label: t("dialog.pickedHere") },
                                     ...lists.map((entry) => ({
                                         value: entry.id,
                                         label: `${entry.name} (${entry.members.length})`
@@ -106,7 +105,7 @@ export function AudienceDialog({
 
                     {source === PICKED_HERE ? (
                         <PeoplePicker
-                            label="Add somebody"
+                            label={t("addSomebody")}
                             picked={picked}
                             search={searchPeopleAction}
                             onChange={(next) => {
@@ -121,9 +120,7 @@ export function AudienceDialog({
                     ) : (
                         <div className="flex flex-col gap-1 rounded-md border border-border p-2">
                             <p className="text-xs text-muted-foreground">
-                                {list?.members.length
-                                    ? "Everybody on this list."
-                                    : "This list has nobody on it yet."}
+                                {list?.members.length ? t("dialog.everybodyOnList") : t("dialog.emptyList")}
                             </p>
                             <ul className="flex flex-wrap gap-1">
                                 {list?.members.map((member) => (
@@ -136,7 +133,7 @@ export function AudienceDialog({
                                 ))}
                             </ul>
                             <p className="text-[0.6875rem] text-foreground-subtle">
-                                Change who is on it under Lists, below the settings.
+                                {t("dialog.changeUnderLists")}
                             </p>
                         </div>
                     )}
@@ -144,7 +141,7 @@ export function AudienceDialog({
 
                 <div className="flex justify-end">
                     <Button size="sm" onClick={onClose}>
-                        Done
+                        {t("dialog.done")}
                     </Button>
                 </div>
             </DialogContent>

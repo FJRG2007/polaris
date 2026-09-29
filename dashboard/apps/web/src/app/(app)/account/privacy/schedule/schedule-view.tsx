@@ -21,6 +21,8 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import { CalendarClock, Pencil, Plus, Trash2 } from "lucide-react";
 import type { PresenceScheduleView } from "@/lib/presence-schedule-service";
@@ -72,6 +74,8 @@ export function ScheduleView({
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
+    const words = useScheduleWords();
+    const t = useTranslations("accountPrivacy");
     const [confirm, confirmElement] = useConfirm();
     const [editing, setEditing] = useState<{ id: string | null; draft: core.PresenceScheduleInput } | null>(null);
     const [error, setError] = useState("");
@@ -125,9 +129,9 @@ export function ScheduleView({
 
     const remove = async (rule: PresenceScheduleView) => {
         const ok = await confirm({
-            title: "Delete this schedule?",
-            description: `${core.describeSchedule(rule, weekOrder)}. This cannot be undone - to keep it for later, switch it off instead.`,
-            confirmLabel: "Delete",
+            title: t("schedule.deleteTitle"),
+            description: t("schedule.deleteDescription", { schedule: words.describe(rule, weekOrder) }),
+            confirmLabel: t("lists.delete"),
             danger: true
         });
         if (!ok) return;
@@ -142,22 +146,14 @@ export function ScheduleView({
                 <CardBody className="flex flex-col gap-3 p-3">
                     <div className="flex items-center justify-between gap-3">
                         <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                            {core.scheduleZoneIsAssumed(timeZone) ? (
-                                <>
-                                    These run on the clock of whichever machine Polaris is on. Pick
-                                    a timezone in Preferences to be sure they run on yours.
-                                </>
-                            ) : pinned ? (
-                                <>Times are read on your own clock ({timeZone}).</>
-                            ) : (
-                                // Worth saying, because it is the one thing that moves these
-                                // hours without anybody editing them: a zone taken from the
-                                // browser follows the browser abroad.
-                                <>
-                                    Times are read on this browser&apos;s clock ({timeZone}). Pick a
-                                    timezone in Preferences to keep them on one.
-                                </>
-                            )}
+                            {core.scheduleZoneIsAssumed(timeZone)
+                                ? t("schedule.zone.assumed")
+                                : pinned
+                                  ? t("schedule.zone.pinned", { zone: timeZone })
+                                  : // Worth saying, because it is the one thing that moves these
+                                    // hours without anybody editing them: a zone taken from the
+                                    // browser follows the browser abroad.
+                                    t("schedule.zone.browser", { zone: timeZone })}
                         </p>
                         <Button
                             size="sm"
@@ -165,15 +161,15 @@ export function ScheduleView({
                             onClick={() => setEditing({ id: null, draft: BLANK })}
                         >
                             <Plus className="size-4" />
-                            New schedule
+                            {t("schedule.new")}
                         </Button>
                     </div>
 
                     {schedules.length === 0 ? (
                         <EmptyState
                             icon={<CalendarClock className="size-5" />}
-                            title="No schedules yet"
-                            description="Set the hours you are asleep, heads down, or off for the weekend, and stop setting them by hand twice a day."
+                            title={t("schedule.emptyTitle")}
+                            description={t("schedule.emptyDescription")}
                         />
                     ) : (
                         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
@@ -194,27 +190,29 @@ export function ScheduleView({
                                         />
                                         <span className={cn("min-w-[12rem] flex-1", !enabled && "opacity-60")}>
                                             <span className="block text-[0.8125rem]">
-                                                {core.PRESENCE_LABELS[rule.presence]}, {core.clockTime(rule.startMinute)} to{" "}
-                                                {core.clockTime(rule.endMinute)}
-                                                {rule.endMinute <= rule.startMinute ? " the next day" : ""}
+                                                {t(rule.endMinute <= rule.startMinute ? "schedule.rowOvernight" : "schedule.row", {
+                                                    presence: words.presence(rule.presence),
+                                                    start: core.clockTime(rule.startMinute),
+                                                    end: core.clockTime(rule.endMinute)
+                                                })}
                                             </span>
                                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                                {core.nameDays(rule.days, weekOrder)}
+                                                {words.days(rule.days, weekOrder)}
                                             </span>
                                         </span>
                                         {openId === rule.id && enabled ? (
-                                            <Badge variant="success">Running now</Badge>
+                                            <Badge variant="success">{t("schedule.runningNow")}</Badge>
                                         ) : null}
                                         <Switch
                                             checked={enabled}
-                                            aria-label={`Use this schedule (${core.describeSchedule(rule, weekOrder)})`}
+                                            aria-label={t("schedule.use", { schedule: words.describe(rule, weekOrder) })}
                                             onChange={(next) => void toggle(rule, next)}
                                         />
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            title="Edit"
-                                            aria-label={`Edit ${core.describeSchedule(rule, weekOrder)}`}
+                                            title={t("lists.edit")}
+                                            aria-label={t("lists.editNamed", { name: words.describe(rule, weekOrder) })}
                                             onClick={() => setEditing({ id: rule.id, draft: rule })}
                                         >
                                             <Pencil className="size-4" />
@@ -222,8 +220,8 @@ export function ScheduleView({
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            title="Delete"
-                                            aria-label={`Delete ${core.describeSchedule(rule, weekOrder)}`}
+                                            title={t("lists.delete")}
+                                            aria-label={t("lists.deleteNamed", { name: words.describe(rule, weekOrder) })}
                                             onClick={() => void remove(rule)}
                                         >
                                             <Trash2 className="size-4" />
@@ -277,6 +275,9 @@ function ScheduleDialog({
 }) {
     const [draft, setDraft] = useState(initial);
     const [saving, setSaving] = useState(false);
+    const t = useTranslations("accountPrivacy");
+    const tc = useTranslations("common");
+    const words = useScheduleWords();
 
     const change = (patch: Partial<core.PresenceScheduleInput>) =>
         setDraft((current) => ({ ...current, ...patch }));
@@ -298,20 +299,18 @@ function ScheduleDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{editing ? "Edit schedule" : "New schedule"}</DialogTitle>
-                    <DialogDescription>
-                        What you appear as, and the hours it runs.
-                    </DialogDescription>
+                    <DialogTitle>{editing ? t("schedule.editTitle") : t("schedule.new")}</DialogTitle>
+                    <DialogDescription>{t("schedule.dialogDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Appear as</span>
+                        <span className="text-xs text-muted-foreground">{t("schedule.appearAs")}</span>
                         <Select
                             value={draft.presence}
-                            aria-label="What to appear as"
+                            aria-label={t("schedule.appearAsLabel")}
                             options={core.SCHEDULED_PRESENCES.map((presence) => ({
                                 value: presence,
-                                label: core.PRESENCE_LABELS[presence]
+                                label: words.presence(presence)
                             }))}
                             onValueChange={(value) =>
                                 change({ presence: value as core.ScheduledPresence })
@@ -321,7 +320,7 @@ function ScheduleDialog({
 
                     <div className="flex gap-2">
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">From</span>
+                            <span className="text-xs text-muted-foreground">{t("schedule.from")}</span>
                             <Input
                                 type="time"
                                 value={core.clockTime(draft.startMinute)}
@@ -332,7 +331,7 @@ function ScheduleDialog({
                             />
                         </label>
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Until</span>
+                            <span className="text-xs text-muted-foreground">{t("schedule.until")}</span>
                             <Input
                                 type="time"
                                 value={core.clockTime(draft.endMinute)}
@@ -346,7 +345,7 @@ function ScheduleDialog({
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            On these days <span aria-hidden="true">*</span>
+                            {t("schedule.onDays")} <span aria-hidden="true">*</span>
                         </span>
                         <div className="flex flex-wrap gap-1">
                             {weekOrder.map((day) => {
@@ -364,16 +363,16 @@ function ScheduleDialog({
                                                 : "border-border text-muted-foreground hover:bg-muted"
                                         )}
                                     >
-                                        {core.DAY_SHORT_NAMES[day]}
+                                        {words.shortDay(day)}
                                     </button>
                                 );
                             })}
                         </div>
                         <div className="flex gap-1">
                             {[
-                                { label: "Every day", days: core.EVERY_DAY },
-                                { label: "Weekdays", days: core.WEEKDAYS },
-                                { label: "Weekends", days: core.WEEKEND }
+                                { label: t("schedule.days.every"), days: core.EVERY_DAY },
+                                { label: t("schedule.days.weekdays"), days: core.WEEKDAYS },
+                                { label: t("schedule.days.weekends"), days: core.WEEKEND }
                             ].map((preset) => (
                                 <Button
                                     key={preset.label}
@@ -389,19 +388,19 @@ function ScheduleDialog({
                     </div>
 
                     <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                        {problem || summarize(draft, weekOrder)}
+                        {problem || summarize(draft, weekOrder, t, words)}
                     </p>
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" disabled={saving} onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         disabled={saving}
                         aria-disabled={!checked.success || !changed}
                         onClick={() => void submit()}
                     >
-                        {editing ? "Save" : "Add schedule"}
+                        {editing ? tc("actions.save") : t("schedule.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -412,11 +411,69 @@ function ScheduleDialog({
 /** The window as a sentence, including the hours it lasts - which is the number
  *  somebody is checking when they wonder whether they wrote it the right way
  *  round. */
-function summarize(draft: core.PresenceScheduleInput, weekOrder: readonly number[]): string {
+function summarize(
+    draft: core.PresenceScheduleInput,
+    weekOrder: readonly number[],
+    t: NamespaceTranslator<"accountPrivacy">,
+    words: ScheduleWords
+): string {
     const length = core.windowLength(draft.startMinute, draft.endMinute);
     const hours = Math.floor(length / 60);
     const minutes = length % 60;
     const spans = [hours ? `${hours}h` : "", minutes ? `${minutes}m` : ""].filter(Boolean).join(" ");
-    const overnight = draft.endMinute <= draft.startMinute ? ", into the next day" : "";
-    return `${core.PRESENCE_LABELS[draft.presence]} for ${spans}${overnight}. ${core.nameDays(draft.days, weekOrder)}.`;
+    return t(draft.endMinute <= draft.startMinute ? "schedule.summaryOvernight" : "schedule.summaryLine", {
+        presence: words.presence(draft.presence),
+        span: spans,
+        days: words.days(draft.days, weekOrder)
+    });
+}
+
+/** The names a schedule is described with, in the reader's language. */
+interface ScheduleWords {
+    presence: (presence: core.PresenceScheduleInput["presence"]) => string;
+    shortDay: (day: number) => string;
+    days: (days: number, weekOrder: readonly number[]) => string;
+    describe: (
+        rule: Pick<core.PresenceScheduleInput, "presence" | "days" | "startMinute" | "endMinute">,
+        weekOrder: readonly number[]
+    ) => string;
+}
+
+/**
+ * `nameDays` and `describeSchedule` from @polaris/core, said in the reader's
+ * language: the presets by name, anything else as the short day names in the
+ * order this account's week runs.
+ */
+function useScheduleWords(): ScheduleWords {
+    const t = useTranslations("accountPrivacy");
+    const nav = useTranslations("nav");
+    const locale = useLocale();
+    return useMemo(() => {
+        const short = core.weekdayNames(locale, "short");
+        const presence = (value: core.PresenceScheduleInput["presence"]) =>
+            nav(`account.presence.${value}` as const);
+        const days = (mask: number, weekOrder: readonly number[]) => {
+            const set = mask & core.EVERY_DAY;
+            if (set === core.EVERY_DAY) return t("schedule.days.every");
+            if (set === core.WEEKDAYS) return t("schedule.days.weekdays");
+            if (set === core.WEEKEND) return t("schedule.days.weekends");
+            if (set === 0) return t("schedule.days.none");
+            return weekOrder
+                .filter((day) => core.runsOnDay(set, day))
+                .map((day) => short[day])
+                .join(", ");
+        };
+        return {
+            presence,
+            shortDay: (day) => short[day] ?? "",
+            days,
+            describe: (rule, weekOrder) =>
+                t("schedule.describe", {
+                    presence: presence(rule.presence),
+                    start: core.clockTime(rule.startMinute),
+                    end: core.clockTime(rule.endMinute),
+                    days: days(rule.days, weekOrder)
+                })
+        };
+    }, [t, nav, locale]);
 }

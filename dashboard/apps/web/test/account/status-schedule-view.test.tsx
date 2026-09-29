@@ -8,6 +8,7 @@
  * enough to leave switched on.
  */
 
+import { withMessages } from "../setup/i18n";
 import * as core from "@polaris/core";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -30,7 +31,7 @@ function draw(
     pinned = true
 ): string {
     return renderToStaticMarkup(
-        <ScheduleView schedules={schedules} timeZone={timeZone} pinned={pinned} />
+        withMessages(<ScheduleView schedules={schedules} timeZone={timeZone} pinned={pinned} />)
     );
 }
 

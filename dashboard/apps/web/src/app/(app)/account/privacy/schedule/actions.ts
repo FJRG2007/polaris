@@ -10,6 +10,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
 import { presenceScheduleSchema } from "@polaris/core";
 import {
@@ -25,7 +26,9 @@ export async function createScheduleAction(input: unknown): Promise<{ error?: st
     const user = await requireUser();
     const parsed = presenceScheduleSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That schedule could not be saved" };
+        return {
+            error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("schedule.notSaved")
+        };
     }
     const result = await createSchedule(user.id, parsed.data);
     if (!result.error) revalidatePath(PAGE);
@@ -39,7 +42,9 @@ export async function updateScheduleAction(
     const user = await requireUser();
     const parsed = presenceScheduleSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That schedule could not be saved" };
+        return {
+            error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("schedule.notSaved")
+        };
     }
     const result = await updateSchedule(user.id, String(id), parsed.data);
     if (!result.error) revalidatePath(PAGE);

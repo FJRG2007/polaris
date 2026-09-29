@@ -3,6 +3,219 @@
         "page": {
             "title": "Status schedule",
             "intro": "Hours you are away, busy, or not shown at all, repeated every week. A schedule takes over when it starts, and anything you pick while one is running is yours until it ends."
+        },
+        "summary": "Hours you are away, busy, or not shown at all, repeated every week.",
+        "open": "Open",
+        "notSaved": "That schedule could not be saved",
+        "deleteTitle": "Delete this schedule?",
+        "deleteDescription": "{schedule}. This cannot be undone - to keep it for later, switch it off instead.",
+        "zone": {
+            "assumed": "These run on the clock of whichever machine Polaris is on. Pick a timezone in Preferences to be sure they run on yours.",
+            "pinned": "Times are read on your own clock ({zone}).",
+            "browser": "Times are read on this browser's clock ({zone}). Pick a timezone in Preferences to keep them on one."
+        },
+        "new": "New schedule",
+        "emptyTitle": "No schedules yet",
+        "emptyDescription": "Set the hours you are asleep, heads down, or off for the weekend, and stop setting them by hand twice a day.",
+        "row": "{presence}, {start} to {end}",
+        "rowOvernight": "{presence}, {start} to {end} the next day",
+        "runningNow": "Running now",
+        "use": "Use this schedule ({schedule})",
+        "editTitle": "Edit schedule",
+        "dialogDescription": "What you appear as, and the hours it runs.",
+        "appearAs": "Appear as",
+        "appearAsLabel": "What to appear as",
+        "from": "From",
+        "until": "Until",
+        "onDays": "On these days",
+        "days": {
+            "every": "Every day",
+            "weekdays": "Weekdays",
+            "weekends": "Weekends",
+            "none": "No days"
+        },
+        "add": "Add schedule",
+        "summaryLine": "{presence} for {span}. {days}.",
+        "summaryOvernight": "{presence} for {span}, into the next day. {days}.",
+        "describe": "{presence} - {start} to {end} - {days}"
+    },
+    "page": {
+        "title": "Privacy",
+        "intro": "Who can find you, who sees your details, and who sees what you are doing. Everything here can be answered with everybody, nobody, or a set of people you name."
+    },
+    "somebody": "Somebody",
+    "saved": "Saved.",
+    "addSomebody": "Add somebody",
+    "adminNote": "Who counts as a friend is on your <link>friends page</link>. Whoever administers this Polaris can see all of it whatever you choose here. They can read the database, so a setting that claimed otherwise would not be true.",
+    "sections": {
+        "finding": "Being found",
+        "details": "Your details",
+        "reaching": "Reaching you",
+        "presence": "Presence",
+        "messages": "Messages"
+    },
+    "audiences": {
+        "everyone": "Everybody",
+        "everyoneExcept": "Everybody except",
+        "friends": "Friends",
+        "friendsExcept": "Friends except",
+        "friendsOfFriends": "Friends of my friends",
+        "following": "People I follow",
+        "followers": "People who follow me",
+        "only": "Only",
+        "nobody": "Nobody"
+    },
+    "fields": {
+        "discoverable": {
+            "label": "Whether people can find you",
+            "note": "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists."
+        },
+        "lastSeen": {
+            "label": "When you were last here",
+            "note": "Whether other people can see that you are here now, or when you last were."
+        },
+        "activity": {
+            "label": "What you are playing or listening to",
+            "note": "The game or song shown beside your name. Only ever shown to people who can also see that you are here, and never while you appear offline."
+        },
+        "readReceipts": {
+            "label": "That you have read a message",
+            "note": "The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else's, and \"only\" is how you leave them on for one person."
+        },
+        "avatar": {
+            "label": "Your photo",
+            "note": "Who sees your photo. Anybody who cannot gets your initials instead."
+        },
+        "photoFullSize": {
+            "label": "Opening your photo",
+            "note": "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture."
+        },
+        "fullName": {
+            "label": "Your full name",
+            "note": "Who sees the name on your account rather than the name you show. Anybody who cannot sees your display name, which is what every screen draws anyway."
+        },
+        "email": {
+            "label": "Your email address",
+            "note": "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here."
+        },
+        "phone": {
+            "label": "Your phone number",
+            "note": "The number kept for sign-in codes. Nobody is shown it unless you say so."
+        },
+        "companies": {
+            "label": "Where you work",
+            "note": "The company on your profile, and the organizations here you have chosen to show. Which organizations those are is picked one at a time on your profile; this decides who sees the ones you picked."
+        },
+        "followers": {
+            "label": "The names behind your follower counts",
+            "note": "Who can open the two lists of names on your profile. The counts are always shown - how many follow you is a fact about you, and it is on your page the way the day you joined is - so this is about the several other people in the lists, who never chose to be on your page. Your administrator sets what a new account starts on; this is yours."
+        },
+        "friendRequests": {
+            "label": "Who can ask to be your friend",
+            "note": "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered."
+        },
+        "fileTransfers": {
+            "label": "Who can send you files",
+            "note": "Who may offer you a file or a folder. Nothing ever lands without you accepting it, so this is about who may ask - anybody who cannot is simply not offered the button. People you share an organization with count as friends here; set to nobody, nobody can, including them."
+        },
+        "calls": {
+            "label": "Who can call you",
+            "note": "Who may ring you. A call takes over the screen of whatever you were doing and makes a noise in the room you are in, which is why this starts at your friends rather than at everybody. Joining a voice channel is not this: that is a room somebody walked into, and who may be in it is the room's own question. Anybody who cannot call you is simply not offered the button."
+        },
+        "forwarding": {
+            "label": "Passing your messages on",
+            "note": "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
         }
+    },
+    "who": {
+        "emptyList": "That list is empty, so this names nobody.",
+        "nobody": "Nobody named yet, so this does nothing.",
+        "listName": "{name}:",
+        "more": "and {count} more",
+        "choose": "Choose"
+    },
+    "dialog": {
+        "title": "{audience, select, everyoneExcept {Everybody except these people} friendsExcept {Friends except these people} only {Only these people} other {These people}}",
+        "description": "{field}. Nobody is told they are on a list of yours.",
+        "whoToUse": "Who to use",
+        "pickedHere": "People I choose here",
+        "everybodyOnList": "Everybody on this list.",
+        "emptyList": "This list has nobody on it yet.",
+        "changeUnderLists": "Change who is on it under Lists, below the settings.",
+        "done": "Done"
+    },
+    "lists": {
+        "title": "Lists",
+        "new": "New list",
+        "empty": "A list is a set of people you can point more than one setting at - the people you hide your number from, the ones who see when you were last here. Settings can also name people on their own row without one.",
+        "nobodyOnIt": "Nobody on it",
+        "usedBy": "Used by: {fields}",
+        "edit": "Edit",
+        "editNamed": "Edit {name}",
+        "inUse": "In use by a setting",
+        "deleteThis": "Delete this list",
+        "deleteNamed": "Delete {name}",
+        "deleteTitle": "Delete {name}?",
+        "deleteDescription": "The people on it are not told, and nothing else changes.",
+        "delete": "Delete",
+        "editTitle": "Edit list",
+        "dialogDescription": "Name it for what it is for. Nobody on it is ever told they are.",
+        "name": "Name",
+        "namePlaceholder": "Work"
+    },
+    "blocked": {
+        "title": "Blocked",
+        "description": "They cannot message, call or mention you, and what they write where you both are is folded away. They are not told.",
+        "empty": "Nobody. You can block somebody from the menu on their name.",
+        "unblockNamed": "Unblock {name}",
+        "unblock": "Unblock"
+    },
+    "errors": {
+        "notSaved": "Those settings could not be saved",
+        "checkList": "Check the list",
+        "cannotBlock": "That is not somebody this can block",
+        "cannotUnblock": "That is not somebody this can unblock"
+    },
+    "friends": {
+        "asked": "If that account exists, it has been asked."
+    },
+    "activity": {
+        "title": "Activity",
+        "description": "What you are playing or listening to, shown beside your name. Only people who can see that you are here see it, and nobody sees it while you appear offline.",
+        "share": "Share my activity",
+        "shareHint": "Off hides all of it, from everybody.",
+        "spotify": {
+            "linked": "The song your linked Spotify is playing, while you are here. People who see it can listen along.",
+            "unlinked": "Link your Spotify under <link>Connected accounts</link> and the song you are playing shows here.",
+            "unavailable": "Not available yet: whoever runs this Polaris has not connected Spotify to it."
+        },
+        "sources": {
+            "games": {
+                "label": "Games on your computer",
+                "hint": "Seen by the Polaris desktop app on Windows, macOS and Linux. A browser cannot see what else is running, so this only works while the desktop app is open."
+            },
+            "minecraft": {
+                "label": "Minecraft servers here",
+                "hint": "When you play on one of this Polaris's Minecraft servers as a player linked to your account."
+            }
+        },
+        "games": "Games",
+        "noGames": "None yet. A game shows up here the first time the desktop app sees it running, and you can hide it from then on.",
+        "neverShown": "Never shown",
+        "showGame": "Show {name}"
+    },
+    "ownGames": {
+        "full": "The list is full at {count}. Remove one to add another.",
+        "taken": "That program is already on the list.",
+        "check": "Check the program and the name.",
+        "title": "Your own games",
+        "description": "A game the desktop app does not know yet: the program that runs it, and what to call it.",
+        "remove": "Remove {name}",
+        "program": "Program",
+        "name": "Name",
+        "namePlaceholder": "My game",
+        "add": "Add",
+        "nothingListed": "Nothing could be listed.",
+        "chooseRunning": "Choose from what is running on this computer"
     }
 }

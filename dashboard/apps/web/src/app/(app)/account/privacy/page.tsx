@@ -8,6 +8,7 @@ import { CalendarClock } from "lucide-react";
 import { listBlocked } from "@/lib/blocks";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { PrivacyView } from "./privacy-view";
 import { BlockedCard } from "./blocked-card";
 import { listConnections } from "@/lib/connections/store";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PrivacyPage() {
     const session = await requireUser();
+    const t = await getTranslations("accountPrivacy");
     const [settings, lists, blocked, activity, spotifyLinks, spotifyOffered] = await Promise.all([
         privacyFor(session.id),
         listsFor(session.id),
@@ -35,12 +37,8 @@ export default async function PrivacyPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Privacy</h1>
-                <p className="text-sm text-muted-foreground">
-                    Who can find you, who sees your details, and who sees what you are doing.
-                    Everything here can be answered with everybody, nobody, or a set of people you
-                    name.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
             <PrivacyView settings={settings} lists={lists} people={people} />
             {/* What is shared, beside the audience row above that decides who
@@ -59,13 +57,13 @@ export default async function PrivacyPage() {
                 <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
                     <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-[14rem] flex-1">
-                        <span className="block text-[0.8125rem]">Status schedule</span>
+                        <span className="block text-[0.8125rem]">{t("schedule.page.title")}</span>
                         <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                            Hours you are away, busy, or not shown at all, repeated every week.
+                            {t("schedule.summary")}
                         </span>
                     </span>
                     <Button size="sm" variant="secondary" asChild>
-                        <Link href="/account/privacy/schedule">Open</Link>
+                        <Link href="/account/privacy/schedule">{t("schedule.open")}</Link>
                     </Button>
                 </CardBody>
             </Card>

@@ -22,6 +22,7 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { findPeople } from "@/lib/people-search";
 import { publishChatChange } from "@/lib/chat/live";
 import { announceActivity } from "@/lib/presence-activity/live";
@@ -69,7 +70,7 @@ async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
 export async function savePrivacyAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.privacySettingsSchema.safeParse(input);
-    if (!parsed.success) return { error: "Those settings could not be saved" };
+    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
 
     return guard(() => setPrivacy(user.id, parsed.data));
 }
@@ -81,7 +82,9 @@ export async function savePrivacyAction(input: unknown): Promise<{ error?: strin
 export async function createPrivacyListAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.privacyListSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.checkList") };
+    }
 
     return guard(async () => {
         await createList(user.id, parsed.data);
@@ -94,7 +97,9 @@ export async function updatePrivacyListAction(
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.privacyListSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.checkList") };
+    }
 
     return guard(() => updateList(user.id, String(listId), parsed.data));
 }
@@ -141,7 +146,7 @@ export async function requestFriendByUsernameAction(
     const user = await requireUser();
     const result = await guard(() => requestFriendByUsername(user.id, String(username ?? "")));
     if (result.error) return { said: "", error: result.error };
-    return { said: "If that account exists, it has been asked." };
+    return { said: (await getTranslations("accountPrivacy"))("friends.asked") };
 }
 
 export async function respondToRequestAction(
@@ -211,7 +216,7 @@ function blockMoved(userId: string): void {
 export async function blockPersonAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.blockSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not somebody this can block" };
+    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.cannotBlock") };
 
     const result = await guard(() => block(user.id, parsed.data.userId));
     if (!result.error) blockMoved(user.id);
@@ -222,7 +227,7 @@ export async function blockPersonAction(input: unknown): Promise<{ error?: strin
 export async function unblockPersonAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.blockSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not somebody this can unblock" };
+    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.cannotUnblock") };
 
     const result = await guard(() => unblock(user.id, parsed.data.userId));
     if (!result.error) blockMoved(user.id);
@@ -252,7 +257,7 @@ export async function saveActivitySettingsAction(input: unknown): Promise<{ erro
     const user = await requireUser();
     const parsed = core.activitySettingsSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those settings could not be saved" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.notSaved") };
     }
     await saveActivitySettings(user.id, parsed.data);
     await announceActivity([user.id]);

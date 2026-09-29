@@ -17,6 +17,7 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { searchPeopleAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { PrivacyListView } from "@/lib/privacy-service";
 import { ListPlus, Loader2, Pencil, Trash2, Users } from "lucide-react";
@@ -49,6 +50,7 @@ interface Editing {
 
 export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
     const router = useRouter();
+    const t = useTranslations("accountPrivacy");
     const [confirm, confirmElement] = useConfirm();
     const [editing, setEditing] = useState<Editing | null>(null);
     const [error, setError] = useState("");
@@ -68,23 +70,19 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
-                    <Users className="size-4 shrink-0" /> Lists
+                    <Users className="size-4 shrink-0" /> {t("lists.title")}
                 </CardTitle>
                 <Button
                     size="xs"
                     variant="secondary"
                     onClick={() => setEditing({ id: null, name: "", members: [] })}
                 >
-                    <ListPlus className="size-3.5 shrink-0" /> New list
+                    <ListPlus className="size-3.5 shrink-0" /> {t("lists.new")}
                 </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
                 {lists.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        A list is a set of people you can point more than one setting at - the
-                        people you hide your number from, the ones who see when you were last here.
-                        Settings can also name people on their own row without one.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("lists.empty")}</p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                         {lists.map((list) => (
@@ -98,24 +96,25 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                     </span>
                                     <span className="block text-[0.6875rem] text-foreground-subtle">
                                         {list.members.length === 0
-                                            ? "Nobody on it"
+                                            ? t("lists.nobodyOnIt")
                                             : list.members.map((member) => member.name).join(", ")}
                                     </span>
                                     {list.usedBy.length > 0 && (
                                         <span className="block text-[0.6875rem] text-muted-foreground">
-                                            Used by:{" "}
-                                            {list.usedBy
-                                                .map((field) =>
-                                                    core.PRIVACY_FIELD_LABELS[field].toLowerCase()
-                                                )
-                                                .join(", ")}
+                                            {t("lists.usedBy", {
+                                                fields: list.usedBy
+                                                    .map((field) =>
+                                                        t(`fields.${field}.label` as const).toLocaleLowerCase(t.locale)
+                                                    )
+                                                    .join(", ")
+                                            })}
                                         </span>
                                     )}
                                 </span>
                                 <button
                                     type="button"
-                                    title="Edit"
-                                    aria-label={`Edit ${list.name}`}
+                                    title={t("lists.edit")}
+                                    aria-label={t("lists.editNamed", { name: list.name })}
                                     disabled={busy}
                                     onClick={() =>
                                         setEditing({
@@ -131,18 +130,15 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                 <button
                                     type="button"
                                     title={
-                                        list.usedBy.length > 0
-                                            ? "In use by a setting"
-                                            : "Delete this list"
+                                        list.usedBy.length > 0 ? t("lists.inUse") : t("lists.deleteThis")
                                     }
-                                    aria-label={`Delete ${list.name}`}
+                                    aria-label={t("lists.deleteNamed", { name: list.name })}
                                     disabled={busy || list.usedBy.length > 0}
                                     onClick={async () => {
                                         const ok = await confirm({
-                                            title: `Delete ${list.name}?`,
-                                            description:
-                                                "The people on it are not told, and nothing else changes.",
-                                            confirmLabel: "Delete",
+                                            title: t("lists.deleteTitle", { name: list.name }),
+                                            description: t("lists.deleteDescription"),
+                                            confirmLabel: t("lists.delete"),
                                             danger: true
                                         });
                                         if (ok) await act(() => deletePrivacyListAction(list.id));
@@ -201,31 +197,31 @@ function ListDialog({
     onClose: () => void;
     onSave: (editing: Editing) => void | Promise<void>;
 }) {
+    const t = useTranslations("accountPrivacy");
+    const tc = useTranslations("common");
     const named = core.privacyListSchema.shape.name.safeParse(editing.name).success;
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{editing.id ? "Edit list" : "New list"}</DialogTitle>
-                    <DialogDescription>
-                        Name it for what it is for. Nobody on it is ever told they are.
-                    </DialogDescription>
+                    <DialogTitle>{editing.id ? t("lists.editTitle") : t("lists.new")}</DialogTitle>
+                    <DialogDescription>{t("lists.dialogDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        Name
+                        {t("lists.name")}
                         <Input
                             autoFocus
                             value={editing.name}
-                            placeholder="Work"
+                            placeholder={t("lists.namePlaceholder")}
                             onChange={(event) => onChange({ ...editing, name: event.target.value })}
                         />
                     </label>
 
                     <PeoplePicker
-                        label="Add somebody"
+                        label={t("addSomebody")}
                         picked={editing.members}
                         search={searchPeopleAction}
                         onChange={(members) => onChange({ ...editing, members })}
@@ -234,7 +230,7 @@ function ListDialog({
 
                 <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -242,7 +238,7 @@ function ListDialog({
                         onClick={() => void onSave(editing)}
                     >
                         {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                        Save
+                        {tc("actions.save")}
                     </Button>
                 </div>
             </DialogContent>
