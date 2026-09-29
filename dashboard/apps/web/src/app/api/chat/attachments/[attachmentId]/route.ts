@@ -18,6 +18,7 @@
  */
 
 import { apiPermission } from "@/lib/api-session";
+import { getTranslations } from "@/lib/i18n/request";
 
 import { channelAccess } from "@/lib/chat/access";
 import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
@@ -125,7 +126,7 @@ export async function GET(
         console.error(`chat: attachment ${attachmentId} is gone - ${detail || "(not diagnosed)"}`);
         return Response.json(
             {
-                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
+                error: (await getTranslations("chat"))("errors.attachmentGone"),
                 detail
             },
             { status: 410 }

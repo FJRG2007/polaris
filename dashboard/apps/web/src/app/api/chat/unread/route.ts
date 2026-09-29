@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(): Promise<Response> {
     const session = await backgroundUser();
+    // i18n-ignore: a status body the badge poll never shows
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!(await sessionCan(session, "chat.use"))) return NextResponse.json(NO_CHAT_WAITING);
     return NextResponse.json(await chatWaitingOnShelf(session.id));

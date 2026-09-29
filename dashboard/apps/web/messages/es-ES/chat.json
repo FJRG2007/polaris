@@ -155,7 +155,25 @@
         "notCreated": "No se pudo crear",
         "pickToInvite": "Elige a quién invitar",
         "notAsked": "No se pudo preguntar",
-        "callUnreachable": "No se pudo llegar a la llamada. Vuelve a intentarlo."
+        "callUnreachable": "No se pudo llegar a la llamada. Vuelve a intentarlo.",
+        "notRead": "No se pudo leer",
+        "writeOrAttach": "Escribe algo o adjunta un archivo",
+        "noFilesAllowed": "Aquí no puedes enviar archivos",
+        "noFilesHere": "Aquí no se envían archivos",
+        "tooManyFiles": "Son más de {max} archivos",
+        "fileTooBig": "{name} pesa más de {max} MB",
+        "uploadFirst": "{name} tiene que subirse antes que el mensaje al que va",
+        "notSentDetail": "No se pudo enviar: {detail}",
+        "notScheduledDetail": "No se pudo programar: {detail}",
+        "fileNotStoredDetail": "No se pudo guardar el archivo: {detail}",
+        "notAMessage": "Eso no es un mensaje",
+        "fileNoName": "Ese archivo no tiene nombre",
+        "fileEmpty": "Ese archivo estaba vacío",
+        "fileNotStored": "No se pudo guardar el archivo",
+        "stillWaiting": "Todavía esperas a que te dejen pasar",
+        "notInThatCall": "Fuera de la llamada",
+        "fileGone": "Ese archivo ya no está",
+        "attachmentGone": "Este archivo no está en el almacenamiento donde Polaris guarda las subidas. Se escribió y ya no está."
     },
     "media": {
         "refused": {
@@ -1234,8 +1252,8 @@
         "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas."
     },
     "gameLink": {
-        "server": "el servidor de {game} {name}",
-        "linkedTo": "Vinculado a {servers}",
+        "server": "servidor de {game} {name}",
+        "linkedTo": "Vinculado al {servers}",
         "and": " y ",
         "open": "{label}. Abrir su página."
     },
@@ -1256,5 +1274,22 @@
         "microphoneN": "Micrófono {n}",
         "systemDefault": "Predeterminado",
         "outputN": "Salida {n}"
+    },
+    "notices": {
+        "justYou": "Solo tú",
+        "call": "Llamada",
+        "missedCall": "Llamada perdida de {name}",
+        "somebody": "alguien",
+        "somebodyCapital": "Alguien",
+        "nobodyPicked": "Nadie la cogió.",
+        "nobodyPickedIn": "En {name}. Nadie la cogió.",
+        "nobodyPickedGroup": "En un grupo de {count}. Nadie la cogió.",
+        "roomMention": "{name} usó {mention} en {where}"
+    },
+    "callRepair": {
+        "notShipped": "Este despliegue no ejecuta el servidor de llamadas, así que aquí no hay nada que reiniciar.",
+        "noEngine": "Polaris no llega a un motor de contenedores desde aquí, así que no puede reiniciar el servidor de llamadas.",
+        "notRestarted": "El servidor de llamadas no se reinició. Los ajustes del chat dicen qué está haciendo.",
+        "restarting": "El servidor de llamadas se está reiniciando y volverá a pedir la dirección de esta red. Podrás llamar en unos segundos."
     }
 }

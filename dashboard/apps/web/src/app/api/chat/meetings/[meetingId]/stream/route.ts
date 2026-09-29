@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { getTranslations } from "@/lib/i18n/request";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
 import { subscribeMeetingEvents } from "@/lib/chat/meeting-events";
 
@@ -32,7 +33,7 @@ export async function GET(
     const seat = await resolveSeat(meetingId);
     // A non-200 makes EventSource give up rather than reconnect forever against
     // a call it is not in.
-    if (!seat) return Response.json({ error: "Not in that call" }, { status: 403 });
+    if (!seat) return Response.json({ error: (await getTranslations("chat"))("errors.notInThatCall") }, { status: 403 });
 
     /** Settled by the request that proved the seat, and what everything below
      *  is about. Held on its own so the long-lived callbacks below do not each

@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import * as core from "@polaris/core";
 import { markRead } from "@/lib/chat/messages";
 import { apiPermission } from "@/lib/api-session";
@@ -27,6 +28,7 @@ export async function POST(
     // JSON only: a form posted from another site cannot be one, so a page
     // elsewhere cannot mark somebody's conversations read for them.
     if (!request.headers.get("content-type")?.startsWith("application/json")) {
+        // i18n-ignore: a protocol answer to a request no screen sends; nobody reads it
         return Response.json({ error: "Send JSON" }, { status: 415 });
     }
     const { channelId } = await params;
@@ -34,13 +36,13 @@ export async function POST(
     try {
         body = await request.json();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
     }
     const parsed = core.chatMarkReadSchema.safeParse({
         channelId,
         messageId: bodySchema.safeParse(body).data?.messageId
     });
-    if (!parsed.success) return Response.json({ error: "That is not a message" }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: (await getTranslations("chat"))("errors.notAMessage") }, { status: 400 });
     try {
         await markRead({ id: user.id }, parsed.data);
     } catch (caught) {

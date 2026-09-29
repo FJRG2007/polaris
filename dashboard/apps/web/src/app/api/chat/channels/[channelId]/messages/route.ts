@@ -22,6 +22,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -188,7 +189,7 @@ export async function POST(
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
     }
 
     // What the browser measured while recording, one entry per file in the same
@@ -202,7 +203,7 @@ export async function POST(
         parentId: form.get("parentId") ? String(form.get("parentId")) : null,
         replyToId: form.get("replyToId") ? String(form.get("replyToId")) : null
     });
-    if (!fields.success) return Response.json({ error: "That could not be sent" }, { status: 400 });
+    if (!fields.success) return Response.json({ error: (await getTranslations("chat"))("errors.notSent") }, { status: 400 });
 
     const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
     // One still per file, in the same order, with an empty one standing in for
@@ -237,7 +238,7 @@ export async function POST(
      *  covered list, the stills and the sounds are all indexed over this. */
     const carrying = uploads.length + files.length + borrowed.length;
     if (carrying === 0 && !fields.data.body) {
-        return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.writeOrAttach") }, { status: 400 });
     }
     // Whether this account may put files in a conversation at all, which is a
     // grant rather than a rule: the rules below are the instance's ceiling for
@@ -245,7 +246,7 @@ export async function POST(
     // read off the request.
     if (carrying > 0 && !(await can(user.id, "chat.attach"))) {
         return Response.json(
-            { error: "You are not allowed to send files here" },
+            { error: (await getTranslations("chat"))("errors.noFilesAllowed") },
             { status: 403 }
         );
     }
@@ -254,11 +255,11 @@ export async function POST(
     // a channel and nothing at all in a direct message.
     const rules = await rulesForChannel(channelId);
     if (carrying > 0 && rules.maxAttachments === 0) {
-        return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesHere") }, { status: 400 });
     }
     if (carrying > rules.maxAttachments) {
         return Response.json(
-            { error: `That is more than ${rules.maxAttachments} files` },
+            { error: (await getTranslations("chat"))("errors.tooManyFiles", { max: rules.maxAttachments }) },
             { status: 400 }
         );
     }
@@ -270,7 +271,7 @@ export async function POST(
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
-                { error: `${file.name} is bigger than ${rules.maxAttachmentMib} MB` },
+                { error: (await getTranslations("chat"))("errors.fileTooBig", { name: file.name, max: rules.maxAttachmentMib }) },
                 { status: 400 }
             );
         }
@@ -280,7 +281,7 @@ export async function POST(
             // gets told which way a file this big goes in.
             return Response.json(
                 {
-                    error: `${file.name} has to be uploaded before the message it goes on`
+                    error: (await getTranslations("chat"))("errors.uploadFirst", { name: file.name })
                 },
                 { status: 413 }
             );
@@ -379,7 +380,7 @@ export async function POST(
         if (caught instanceof UploadRefused) {
             return Response.json({ error: caught.message }, { status: 409 });
         }
-        // Said as what it is. "That could not be sent" for a storage that took
+        // Said as what it is. (await getTranslations("chat"))("errors.notSent") for a storage that took
         // the file and lost it sends whoever reads it looking at the browser, at
         // the network and at the message - anywhere but at the disk.
         if (caught instanceof AttachmentStorageError) {
@@ -387,13 +388,13 @@ export async function POST(
             return Response.json({ error: caught.message }, { status: 502 });
         }
         console.error(caught);
-        // To an administrator, what actually threw. "That could not be sent" is
+        // To an administrator, what actually threw. (await getTranslations("chat"))("errors.notSent") is
         // the right thing to tell somebody who cannot act on it and the wrong
         // thing to tell the one person who can - it is their instance, and the
         // sentence they need is in a log they should not have to go and find.
         const detail = caught instanceof Error ? caught.message : String(caught);
         return Response.json(
-            { error: user.isAdmin ? `That could not be sent: ${detail}` : "That could not be sent" },
+            { error: user.isAdmin ? (await getTranslations("chat"))("errors.notSentDetail", { detail }) : (await getTranslations("chat"))("errors.notSent") },
             { status: 500 }
         );
     }

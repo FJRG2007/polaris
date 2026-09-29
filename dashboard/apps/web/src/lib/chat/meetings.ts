@@ -33,6 +33,9 @@ import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
+import { translatorFor } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ChatAccessError, channelAccess, requireChannel, type ChatActor, type ChatErrorText } from "./access";
 
 /** How many browsers one call holds.
@@ -568,19 +571,21 @@ export async function callElsewhere(userId: string): Promise<CallElsewhere | nul
     const channel = seat?.meeting.channel;
     if (!seat?.meeting.channelId || !channel) return null;
 
+    // Read by the person sitting in the call, in their own language.
+    const words = translatorFor(await getUserLocale(userId), "chat");
     const named = channel.spaceId
         ? channel.kind === "text"
             ? `#${channel.name}`
             : channel.name
         : channel.name ||
           channel.members.map((member) => member.user.name).join(", ") ||
-          "Just you";
+          words("notices.justYou");
 
     return {
         meetingId: seat.meetingId,
         channelId: seat.meeting.channelId,
         participantId: seat.id,
-        title: named || "Call"
+        title: named || words("notices.call")
     };
 }
 
@@ -1463,16 +1468,18 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
         const channelId = meeting.channelId;
         const shelf = meeting.channel ? await chatAlertShelf(meeting.channel) : undefined;
         await Promise.all(
-            missed.map((userId) =>
-                notify({
+            missed.map(async (userId) => {
+                // Written for whoever missed it, who reads it later, in their language.
+                const words = translatorFor(await getUserLocale(userId), "chat");
+                return notify({
                     userId,
                     event: "chat.callMissed",
-                    title: `Missed call from ${caller?.name || "somebody"}`,
-                    body: missedCallBody(meeting.channel),
+                    title: words("notices.missedCall", { name: caller?.name || words("notices.somebody") }),
+                    body: missedCallBody(meeting.channel, words),
                     href: `/chat/c/${channelId}`,
                     shelf
-                }).catch(() => undefined)
-            )
+                }).catch(() => undefined);
+            })
         );
     } catch (error) {
         console.error("polaris: could not record a missed call:", error);
@@ -1862,11 +1869,12 @@ async function requireHost(
 /** What the missed-call alert says under its title: which group, for a group,
  *  since "missed call from Ana" alone does not say where to call back. */
 function missedCallBody(
-    channel: { kind: string; name: string | null; members: readonly unknown[] } | null | undefined
+    channel: { kind: string; name: string | null; members: readonly unknown[] } | null | undefined,
+    words: NamespaceTranslator<"chat">
 ): string {
-    if (channel?.kind !== "group") return "Nobody picked it up.";
+    if (channel?.kind !== "group") return words("notices.nobodyPicked");
     const name = channel.name?.trim();
     return name
-        ? `In ${name}. Nobody picked it up.`
-        : `In a group of ${channel.members.length}. Nobody picked it up.`;
+        ? words("notices.nobodyPickedIn", { name })
+        : words("notices.nobodyPickedGroup", { count: channel.members.length });
 }

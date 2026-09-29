@@ -40,8 +40,10 @@ export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
+    // i18n-ignore: EventSource status body; never shown
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
     if (!(await sessionCan(session, "chat.use"))) {
+        // i18n-ignore: EventSource status body; never shown
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 

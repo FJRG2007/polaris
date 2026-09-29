@@ -40,6 +40,8 @@ import { createNotification } from "@/lib/notification-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
 import { chatAlertShelf } from "./isolation";
+import { translatorFor } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
 import { recipientShelf } from "@/lib/workspace-scope";
 import {
     ChatAccessError,
@@ -139,7 +141,7 @@ export async function announceRoomMention(
         where: { id: authorId },
         select: { name: true }
     });
-    const authorName = author?.name ?? "Somebody";
+    const authorName = author?.name ?? null;
     const about = await chatAlertShelf(channel);
 
     await Promise.all(
@@ -149,17 +151,23 @@ export async function announceRoomMention(
             .filter((userId) => !silenced.has(userId))
             .filter((userId) => !shut.has(userId))
             .filter((userId) => online === null || online.has(userId))
-            .map(async (userId) =>
-                createNotification({
+            .map(async (userId) => {
+                // Written for whoever is told, in their own language.
+                const words = translatorFor(await getUserLocale(userId), "chat");
+                return createNotification({
                     userId,
                     type: "chat.mention",
-                    title: `${authorName} used ${label} in ${where}`,
+                    title: words("notices.roomMention", {
+                        name: authorName ?? words("notices.somebodyCapital"),
+                        mention: label,
+                        where
+                    }),
                     body: plainExcerpt(body, 140),
                     href: `/chat/c/${channelId}/${messageId}`,
                     level: "info",
                     shelf: await recipientShelf(userId, about).catch(() => null)
-                })
-            )
+                });
+            })
     );
 }
 

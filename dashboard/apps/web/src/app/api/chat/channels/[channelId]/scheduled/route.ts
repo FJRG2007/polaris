@@ -20,6 +20,7 @@
  */
 
 import { z } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -124,7 +125,7 @@ export async function POST(
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: "That could not be read" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.notRead") }, { status: 400 });
     }
 
     const sounds = soundsSchema.safeParse(readSounds(form.get("sounds")));
@@ -135,7 +136,7 @@ export async function POST(
         sendAt: String(form.get("sendAt") ?? "")
     });
     if (!fields.success) {
-        return Response.json({ error: "That could not be scheduled" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.notScheduled") }, { status: 400 });
     }
     // The window, before a byte is read: a moment in the past is a message that
     // goes the second it is written, and one in the far future never goes at all.
@@ -153,18 +154,18 @@ export async function POST(
     const uploads = readUploads(form.get("uploads"));
     const carrying = uploads.length + files.length;
     if (carrying === 0 && !fields.data.body) {
-        return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.writeOrAttach") }, { status: 400 });
     }
     if (carrying > 0 && !(await can(user.id, "chat.attach"))) {
-        return Response.json({ error: "You are not allowed to send files here" }, { status: 403 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesAllowed") }, { status: 403 });
     }
 
     const rules = await rulesForChannel(channelId);
     if (carrying > 0 && rules.maxAttachments === 0) {
-        return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesHere") }, { status: 400 });
     }
     if (carrying > rules.maxAttachments) {
-        return Response.json({ error: `That is more than ${rules.maxAttachments} files` }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.tooManyFiles", { max: rules.maxAttachments }) }, { status: 400 });
     }
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
     // A file that came in this request is held in memory to be read out of the
@@ -173,13 +174,13 @@ export async function POST(
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
-                { error: `${file.name} is bigger than ${rules.maxAttachmentMib} MB` },
+                { error: (await getTranslations("chat"))("errors.fileTooBig", { name: file.name, max: rules.maxAttachmentMib }) },
                 { status: 400 }
             );
         }
         if (file.size > inTheForm) {
             return Response.json(
-                { error: `${file.name} has to be uploaded before the message it goes on` },
+                { error: (await getTranslations("chat"))("errors.uploadFirst", { name: file.name }) },
                 { status: 413 }
             );
         }
@@ -248,8 +249,8 @@ export async function POST(
         return Response.json(
             {
                 error: user.isAdmin
-                    ? `That could not be scheduled: ${detail}`
-                    : "That could not be scheduled"
+                    ? (await getTranslations("chat"))("errors.notScheduledDetail", { detail })
+                    : (await getTranslations("chat"))("errors.notScheduled")
             },
             { status: 500 }
         );

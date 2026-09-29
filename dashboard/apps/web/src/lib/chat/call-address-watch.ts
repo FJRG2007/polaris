@@ -36,6 +36,7 @@
  */
 
 import { notify } from "@/lib/notifications/dispatch";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { callServer } from "@/lib/chat/call-server";
 import { detectPublicIp } from "@/lib/network-service";
@@ -156,27 +157,25 @@ export async function watchCallAddress(): Promise<CallAddressState> {
  * theory out.
  */
 export async function repairCallAddress(): Promise<{ ok: boolean; message: string }> {
+    const t = await readerWords("chat");
     const endpoint = await callServer().catch(() => null);
     if (!endpoint?.shipped) {
-        return {
-            ok: false,
-            message: "This deployment does not run the call server, so there is nothing here to restart."
-        };
+        return { ok: false, message: t("callRepair.notShipped") };
     }
     const container = await callContainer();
     if (!container) {
         return {
             ok: false,
-            message: "Polaris cannot reach a container engine from here, so it cannot restart the call server itself."
+            message: t("callRepair.noEngine")
         };
     }
     if (!(await restart(container.id))) {
-        return { ok: false, message: "The call server did not restart. Chat settings says what it is doing." };
+        return { ok: false, message: t("callRepair.notRestarted") };
     }
     await setSetting(CHANGED_AT, null);
     return {
         ok: true,
-        message: "The call server is restarting and will ask for this network's address again. Calls can be made in a few seconds."
+        message: t("callRepair.restarting")
     };
 }
 

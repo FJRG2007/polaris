@@ -19,6 +19,7 @@
  */
 
 import { can } from "@polaris/auth";
+import { getTranslations } from "@/lib/i18n/request";
 import { apiPermission } from "@/lib/api-session";
 import { rulesForChannel } from "@/lib/chat/rules";
 import { StorageRefused } from "@/lib/storage-target";
@@ -49,17 +50,17 @@ export async function PUT(
     // This account's standing, then the instance's rules for this kind of
     // conversation. Both before the body is touched.
     if (!(await can(user.id, "chat.attach"))) {
-        return Response.json({ error: "You are not allowed to send files here" }, { status: 403 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesAllowed") }, { status: 403 });
     }
     const rules = await rulesForChannel(channelId);
     if (rules.maxAttachments === 0) {
-        return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
+        return Response.json({ error: (await getTranslations("chat"))("errors.noFilesHere") }, { status: 400 });
     }
 
     const url = new URL(request.url);
     const name = url.searchParams.get("name");
-    if (!name) return Response.json({ error: "That file has no name" }, { status: 400 });
-    if (!request.body) return Response.json({ error: "That file was empty" }, { status: 400 });
+    if (!name) return Response.json({ error: (await getTranslations("chat"))("errors.fileNoName") }, { status: 400 });
+    if (!request.body) return Response.json({ error: (await getTranslations("chat"))("errors.fileEmpty") }, { status: 400 });
 
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
     // What the browser says it weighs. Refused here when it is already over the
@@ -100,8 +101,8 @@ export async function PUT(
         return Response.json(
             {
                 error: user.isAdmin
-                    ? `That file could not be stored: ${detail}`
-                    : "That file could not be stored"
+                    ? (await getTranslations("chat"))("errors.fileNotStoredDetail", { detail })
+                    : (await getTranslations("chat"))("errors.fileNotStored")
             },
             { status: 500 }
         );

@@ -155,7 +155,25 @@
         "notCreated": "That could not be created",
         "pickToInvite": "Pick somebody to invite",
         "notAsked": "That could not be asked",
-        "callUnreachable": "The call could not be reached. Try again."
+        "callUnreachable": "The call could not be reached. Try again.",
+        "notRead": "That could not be read",
+        "writeOrAttach": "Write something, or attach a file",
+        "noFilesAllowed": "You are not allowed to send files here",
+        "noFilesHere": "Files cannot be sent here",
+        "tooManyFiles": "That is more than {max} files",
+        "fileTooBig": "{name} is bigger than {max} MB",
+        "uploadFirst": "{name} has to be uploaded before the message it goes on",
+        "notSentDetail": "That could not be sent: {detail}",
+        "notScheduledDetail": "That could not be scheduled: {detail}",
+        "fileNotStoredDetail": "That file could not be stored: {detail}",
+        "notAMessage": "That is not a message",
+        "fileNoName": "That file has no name",
+        "fileEmpty": "That file was empty",
+        "fileNotStored": "That file could not be stored",
+        "stillWaiting": "You are still waiting to be let in",
+        "notInThatCall": "Not in that call",
+        "fileGone": "That file is no longer there",
+        "attachmentGone": "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there."
     },
     "media": {
         "refused": {
@@ -1256,5 +1274,22 @@
         "microphoneN": "Microphone {n}",
         "systemDefault": "System default",
         "outputN": "Output {n}"
+    },
+    "notices": {
+        "justYou": "Just you",
+        "call": "Call",
+        "missedCall": "Missed call from {name}",
+        "somebody": "somebody",
+        "somebodyCapital": "Somebody",
+        "nobodyPicked": "Nobody picked it up.",
+        "nobodyPickedIn": "In {name}. Nobody picked it up.",
+        "nobodyPickedGroup": "In a group of {count}. Nobody picked it up.",
+        "roomMention": "{name} used {mention} in {where}"
+    },
+    "callRepair": {
+        "notShipped": "This deployment does not run the call server, so there is nothing here to restart.",
+        "noEngine": "Polaris cannot reach a container engine from here, so it cannot restart the call server itself.",
+        "notRestarted": "The call server did not restart. Chat settings says what it is doing.",
+        "restarting": "The call server is restarting and will ask for this network's address again. Calls can be made in a few seconds."
     }
 }
