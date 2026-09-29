@@ -22,6 +22,8 @@ import { serverMetricsAction } from "./actions";
 import { useLiveRead } from "@/components/use-live-resource";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import type { ServerConsumer, ServerMetrics } from "@/lib/server-probe";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** The cadence the probe itself is cached at on the server, so a poll is one SSH
  *  session per interval rather than one per tick that answers with the same
@@ -44,11 +46,12 @@ export function ServerUsage({
     // A machine that cannot be read has to throw rather than resolve empty: the
     // difference between "unreachable" and "nothing running" is the whole point
     // of the panel, and it decides whether the last reading stays on screen.
+    const t = useTranslations("servers");
     const load = useCallback(async (): Promise<ServerMetrics> => {
         const result = await serverMetricsAction(hostId);
-        if (!result) throw new Error("It may be off or unreachable.");
+        if (!result) throw new Error(t("usage.offMaybe"));
         return result;
-    }, [hostId]);
+    }, [hostId, t]);
 
     const {
         data: metrics,
@@ -67,7 +70,7 @@ export function ServerUsage({
     if (error) {
         return (
             <p className="text-xs text-muted-foreground">
-                Polaris could not read this server just now. {error}
+                {t("usage.unread", { reason: error })}
             </p>
         );
     }
@@ -77,31 +80,31 @@ export function ServerUsage({
     return (
         <div className="flex flex-col gap-3">
             <div className="grid grid-cols-3 gap-2">
-                <Meter label="CPU" value={cpuLoad(metrics)} caption={cpuCaption(metrics)} />
+                <Meter label={t("usage.cpu")} value={cpuLoad(metrics)} caption={cpuCaption(metrics, t)} />
                 <Meter
-                    label="Memory"
+                    label={t("usage.memory")}
                     value={ratio(metrics?.memoryUsedBytes, metrics?.memoryTotalBytes)}
-                    caption={sizeCaption(metrics?.memoryUsedBytes, metrics?.memoryTotalBytes)}
+                    caption={sizeCaption(metrics?.memoryUsedBytes, metrics?.memoryTotalBytes, t)}
                 />
                 <Meter
-                    label="Disk"
+                    label={t("usage.disk")}
                     value={ratio(metrics?.diskUsedBytes, metrics?.diskTotalBytes)}
-                    caption={sizeCaption(metrics?.diskUsedBytes, metrics?.diskTotalBytes)}
+                    caption={sizeCaption(metrics?.diskUsedBytes, metrics?.diskTotalBytes, t)}
                 />
             </div>
 
             <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-xs font-medium text-muted-foreground">
-                        Heaviest on the machine
+                        {t("usage.heaviest")}
                     </span>
                     {/* A refresh that failed over figures still on screen, or a
                         reading old enough that it is no longer this instant's. */}
                     {stale ? (
-                        <span className="text-xs text-warning">Not answering. {stale}</span>
+                        <span className="text-xs text-warning">{t("usage.stale", { reason: stale })}</span>
                     ) : age !== null && age > STALE_AFTER_MS ? (
                         <span className="text-xs text-muted-foreground">
-                            read {formatAge(age)} ago
+                            {t("usage.readAgo", { age: formatAge(age) })}
                         </span>
                     ) : null}
                 </div>
@@ -112,7 +115,7 @@ export function ServerUsage({
                         ))
                     ) : (
                         <span className="text-xs text-muted-foreground">
-                            Nothing worth reporting is running on this server.
+                            {t("usage.nothing")}
                         </span>
                     )
                 ) : (
@@ -131,6 +134,7 @@ export function ServerUsage({
 }
 
 function ConsumerRow({ consumer }: { consumer: ServerConsumer }) {
+    const t = useTranslations("servers");
     return (
         <div className="flex items-center gap-2 text-xs">
             {consumer.kind === "container" ? (
@@ -141,7 +145,7 @@ function ConsumerRow({ consumer }: { consumer: ServerConsumer }) {
             <span className="w-full max-w-0 flex-1 truncate" title={consumer.name}>
                 {consumer.name}
             </span>
-            {consumer.kind === "container" ? <Badge variant="neutral">Container</Badge> : null}
+            {consumer.kind === "container" ? <Badge variant="neutral">{t("storage.columns.container")}</Badge> : null}
             <span className="tabular-nums text-muted-foreground">
                 {consumer.cpuPercent === null ? "-" : `${consumer.cpuPercent.toFixed(1)}%`}
             </span>
@@ -178,11 +182,11 @@ function cpuLoad(metrics: ServerMetrics | null): number | null {
     return metrics.loadAverage / metrics.cpuCount;
 }
 
-function cpuCaption(metrics: ServerMetrics | null): string | null {
+function cpuCaption(metrics: ServerMetrics | null, t: NamespaceTranslator<"servers">): string | null {
     if (!metrics) return null;
-    if (metrics.loadAverage === null) return "unknown";
-    const cores = metrics.cpuCount ? ` of ${metrics.cpuCount}` : "";
-    return `${metrics.loadAverage.toFixed(2)} load${cores}`;
+    if (metrics.loadAverage === null) return t("storage.unknown");
+    const load = metrics.loadAverage.toFixed(2);
+    return metrics.cpuCount ? t("usage.loadOf", { load, cores: metrics.cpuCount }) : t("usage.load", { load });
 }
 
 function ratio(used: number | null | undefined, total: number | null | undefined): number | null {
@@ -190,10 +194,14 @@ function ratio(used: number | null | undefined, total: number | null | undefined
     return used / total;
 }
 
-function sizeCaption(used: number | null | undefined, total: number | null | undefined): string | null {
+function sizeCaption(
+    used: number | null | undefined,
+    total: number | null | undefined,
+    t: NamespaceTranslator<"servers">
+): string | null {
     if (used === undefined || total === undefined) return null;
-    if (used === null || total === null) return "unknown";
-    return `${size(used)} of ${size(total)}`;
+    if (used === null || total === null) return t("storage.unknown");
+    return t("usage.of", { used: size(used), total: size(total) });
 }
 
 const SCALE = ["B", "KB", "MB", "GB", "TB"];

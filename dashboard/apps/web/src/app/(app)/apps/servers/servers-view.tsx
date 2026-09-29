@@ -24,7 +24,8 @@ import { renameServerAction } from "./actions";
 import { useEffect, useRef, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
 import { ServerGroups } from "./server-groups";
-import { ENVIRONMENT_META } from "./environment-meta";
+import { ENVIRONMENT_META, environmentWords } from "./environment-meta";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TerminalPanel } from "../deploy/terminal-panel";
 import { RemoveServerDialog } from "./remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -78,6 +79,7 @@ export function ServersView({
      *  reports something else. */
     machineName: string;
 }) {
+    const t = useTranslations("servers");
     const router = useRouter();
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
     const [outcome, setOutcome] = useState<RemoveServerResult | null>(null);
@@ -185,7 +187,7 @@ export function ServersView({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-medium text-muted-foreground">Servers</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">{t("list.heading")}</h2>
                 <HostDialog />
             </div>
 
@@ -200,15 +202,17 @@ export function ServersView({
             {unset.length > 0 ? (
                 <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-muted-foreground">
                     <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                    Set where{" "}
-                    {unset.length === 1 ? (
-                        <b className="font-medium text-foreground">{unset[0]!.name}</b>
-                    ) : (
-                        `${unset.length} servers`
-                    )}{" "}
-                    {unset.length === 1 ? "lives" : "live"}: a home server behind a router and a
-                    data-center box are exposed in different ways, so Polaris needs the answer
-                    before it can tell you how to point a domain.
+                    <span>
+                        {t.rich("list.unset", {
+                            count: unset.length,
+                            name: unset[0]!.name,
+                            b: (chunks) => (
+                                <b key="name" className="font-medium text-foreground">
+                                    {chunks}
+                                </b>
+                            )
+                        })}
+                    </span>
                 </p>
             ) : null}
 
@@ -224,11 +228,11 @@ export function ServersView({
                 <table className="w-full min-w-[46rem] text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">Server</th>
-                            <th className="px-3 py-2 font-medium">Address</th>
-                            <th className="px-3 py-2 font-medium">Answering</th>
-                            <th className="px-3 py-2 font-medium">Location</th>
-                            <th className="px-3 py-2 font-medium">Auth</th>
+                            <th className="px-3 py-2 font-medium">{t("list.columns.server")}</th>
+                            <th className="px-3 py-2 font-medium">{t("list.columns.address")}</th>
+                            <th className="px-3 py-2 font-medium">{t("list.columns.answering")}</th>
+                            <th className="px-3 py-2 font-medium">{t("list.columns.location")}</th>
+                            <th className="px-3 py-2 font-medium">{t("list.columns.auth")}</th>
                             <th className="px-3 py-2" />
                         </tr>
                     </thead>
@@ -284,15 +288,15 @@ export function ServersView({
                                                 ) : (
                                                     <Link
                                                         href={`/apps/servers/${server.id}`}
-                                                        aria-label={`Open ${name}`}
-                                                        title="Right-click for more, F2 to rename"
+                                                        aria-label={t("list.open", { name })}
+                                                        title={t("list.rowHint")}
                                                         className="flex items-center gap-2 font-medium hover:underline"
                                                     >
                                                         <Server className="size-4 text-muted-foreground" />
                                                         {name}
                                                         {server.kind === "local" ? (
                                                             <Badge variant="primary">
-                                                                This machine
+                                                                {t("list.thisMachine")}
                                                             </Badge>
                                                         ) : null}
                                                     </Link>
@@ -339,14 +343,14 @@ export function ServersView({
                                                         </Badge>
                                                     ) : (
                                                         <span className="text-xs text-muted-foreground">
-                                                            Local
+                                                            {t("list.local")}
                                                         </span>
                                                     )}
                                                     {/* Root is worth its own badge: it is the widest thing a
                                                 server can have granted, and a server that has it should
                                                 never be one anybody has to go and check. */}
                                                     {server.sudo ? (
-                                                        <Badge variant="warning">Root</Badge>
+                                                        <Badge variant="warning">{t("list.root")}</Badge>
                                                     ) : null}
                                                 </div>
                                             </td>
@@ -363,12 +367,8 @@ export function ServersView({
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 disabled={down}
-                                                                aria-label={`Open a shell on ${server.name}`}
-                                                                title={
-                                                                    down
-                                                                        ? "Not answering over SSH"
-                                                                        : "Open a shell"
-                                                                }
+                                                                aria-label={t("list.shellOn", { name: server.name })}
+                                                                title={down ? t("list.notAnsweringSsh") : t("list.shell")}
                                                                 onClick={() => setShell(server)}
                                                             >
                                                                 <SquareTerminal className="size-4" />
@@ -378,8 +378,8 @@ export function ServersView({
                                                                     size="icon"
                                                                     variant="ghost"
                                                                     disabled
-                                                                    aria-label={`Browse the files on ${server.name}`}
-                                                                    title="Not answering over SSH"
+                                                                    aria-label={t("list.filesOn", { name: server.name })}
+                                                                    title={t("list.notAnsweringSsh")}
                                                                 >
                                                                     <FolderOpen className="size-4" />
                                                                 </Button>
@@ -391,8 +391,8 @@ export function ServersView({
                                                                 >
                                                                     <Link
                                                                         href={`/drive?c=host:${server.hostId}`}
-                                                                        aria-label={`Browse the files on ${server.name}`}
-                                                                        title="Browse its files"
+                                                                        aria-label={t("list.filesOn", { name: server.name })}
+                                                                        title={t("list.files")}
                                                                     >
                                                                         <FolderOpen className="size-4" />
                                                                     </Link>
@@ -409,14 +409,14 @@ export function ServersView({
                                                             onClick={() => setEnrollLocal(true)}
                                                         >
                                                             <SquareTerminal className="size-3.5" />{" "}
-                                                            Enable shell and files
+                                                            {t("list.enable")}
                                                         </Button>
                                                     ) : null}
                                                     <Button size="icon" variant="ghost" asChild>
                                                         <Link
                                                             href={`/apps/servers/${server.id}`}
-                                                            aria-label={`Open ${server.name}`}
-                                                            title="Usage, load and connection details"
+                                                            aria-label={t("list.open", { name: server.name })}
+                                                            title={t("list.detailsHint")}
                                                         >
                                                             <Settings2 className="size-4" />
                                                         </Link>
@@ -431,13 +431,13 @@ export function ServersView({
                                                             variant="ghost"
                                                             aria-label={
                                                                 server.kind === "local"
-                                                                    ? `Stop reaching ${server.name} over SSH`
-                                                                    : `Remove ${server.name}`
+                                                                    ? t("list.stopReaching", { name: server.name })
+                                                                    : t("list.removeNamed", { name: server.name })
                                                             }
                                                             title={
                                                                 server.kind === "local"
-                                                                    ? "Give up the login"
-                                                                    : "Remove"
+                                                                    ? t("list.giveUpLogin")
+                                                                    : t("list.remove")
                                                             }
                                                             onClick={() =>
                                                                 setRemoving({
@@ -460,7 +460,7 @@ export function ServersView({
                                         <ContextMenuSeparator />
                                         <ContextMenuItem asChild>
                                             <Link href={`/apps/servers/${server.id}`}>
-                                                <Settings2 className="size-4" /> Open
+                                                <Settings2 className="size-4" /> {t("list.openItem")}
                                             </Link>
                                         </ContextMenuItem>
                                         {server.hostId ? (
@@ -469,11 +469,10 @@ export function ServersView({
                                                     disabled={down}
                                                     onSelect={() => setShell(server)}
                                                 >
-                                                    <SquareTerminal className="size-4" /> Open a
-                                                    shell
+                                                    <SquareTerminal className="size-4" /> {t("list.shell")}
                                                     {down ? (
                                                         <span className="ml-auto pl-3 text-xs">
-                                                            Not answering
+                                                            {t("list.notAnswering")}
                                                         </span>
                                                     ) : null}
                                                 </ContextMenuItem>
@@ -481,10 +480,9 @@ export function ServersView({
                                                     // A disabled item takes no pointer
                                                     // events, so it says why itself.
                                                     <ContextMenuItem disabled>
-                                                        <FolderOpen className="size-4" /> Browse its
-                                                        files
+                                                        <FolderOpen className="size-4" /> {t("list.files")}
                                                         <span className="ml-auto pl-3 text-xs">
-                                                            Not answering
+                                                            {t("list.notAnswering")}
                                                         </span>
                                                     </ContextMenuItem>
                                                 ) : (
@@ -492,16 +490,14 @@ export function ServersView({
                                                         <Link
                                                             href={`/drive?c=host:${server.hostId}`}
                                                         >
-                                                            <FolderOpen className="size-4" /> Browse
-                                                            its files
+                                                            <FolderOpen className="size-4" /> {t("list.files")}
                                                         </Link>
                                                     </ContextMenuItem>
                                                 )}
                                             </>
                                         ) : server.kind === "local" ? (
                                             <ContextMenuItem onSelect={() => setEnrollLocal(true)}>
-                                                <SquareTerminal className="size-4" /> Enable shell
-                                                and files
+                                                <SquareTerminal className="size-4" /> {t("list.enable")}
                                             </ContextMenuItem>
                                         ) : null}
                                         <ContextMenuSeparator />
@@ -511,18 +507,18 @@ export function ServersView({
                                                 setRenaming(server.id);
                                             }}
                                         >
-                                            <Pencil className="size-4" /> Rename
-                                            <MenuShortcut>F2</MenuShortcut>
+                                            <Pencil className="size-4" /> {t("list.rename")}
+                                            <MenuShortcut>F2</MenuShortcut>{/* i18n-ignore key name */}
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() =>
                                                 void navigator.clipboard?.writeText(address)
                                             }
                                         >
-                                            <Copy className="size-4" /> Copy address
+                                            <Copy className="size-4" /> {t("list.copyAddress")}
                                         </ContextMenuItem>
                                         <ContextMenuItem onSelect={() => askEnvironment(server)}>
-                                            <MapPin className="size-4" /> Where it lives
+                                            <MapPin className="size-4" /> {t("list.whereItLives")}
                                         </ContextMenuItem>
                                         {server.hostId ? (
                                             <>
@@ -537,10 +533,8 @@ export function ServersView({
                                                     }
                                                 >
                                                     <Trash2 className="size-4" />
-                                                    {server.kind === "local"
-                                                        ? "Give up the login"
-                                                        : "Remove"}
-                                                    <MenuShortcut>Del</MenuShortcut>
+                                                    {server.kind === "local" ? t("list.giveUpLogin") : t("list.remove")}
+                                                    <MenuShortcut>{t("list.deleteKey")}</MenuShortcut>
                                                 </ContextMenuItem>
                                             </>
                                         ) : null}
@@ -554,8 +548,7 @@ export function ServersView({
 
             {remotes.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Add a server to reach it from Containers (Docker), Drive (SFTP) and a shell
-                    here.
+                    {t("list.empty")}
                 </p>
             ) : null}
 
@@ -572,11 +565,8 @@ export function ServersView({
             <Dialog open={enrollLocal} onOpenChange={setEnrollLocal}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Reach this machine</DialogTitle>
-                        <DialogDescription>
-                            Run this on the machine Polaris runs on to give it a shell, its files,
-                            and a login to run jobs under.
-                        </DialogDescription>
+                        <DialogTitle>{t("list.reachTitle")}</DialogTitle>
+                        <DialogDescription>{t("list.reachBody")}</DialogDescription>
                     </DialogHeader>
                     <QuickEnroll kind="local" onDone={() => setEnrollLocal(false)} />
                 </DialogContent>
@@ -599,6 +589,7 @@ function RemovalOutcome({
     result: RemoveServerResult;
     onDismiss: () => void;
 }) {
+    const t = useTranslations("servers");
     const moved = result.moved ?? [];
     const warnings = result.warnings ?? [];
     if (moved.length === 0 && warnings.length === 0) return null;
@@ -613,11 +604,11 @@ function RemovalOutcome({
             <div className="flex items-start justify-between gap-2">
                 <p className="text-muted-foreground">
                     {moved.length > 0
-                        ? `Moved to the new server: ${moved.join(", ")}.`
-                        : "The server was removed."}
+                        ? t("list.moved", { names: moved.join(", ") })
+                        : t("list.removed")}
                 </p>
                 <Button size="sm" variant="ghost" onClick={onDismiss}>
-                    Dismiss
+                    {t("list.dismiss")}
                 </Button>
             </div>
             {warnings.map((warning) => (
@@ -645,6 +636,7 @@ function RenameField({
     /** The value to save, or null to leave the name as it was. */
     onDone: (value: string | null) => void;
 }) {
+    const t = useTranslations("servers");
     const [value, setValue] = useState(name);
     // Deferred rather than `autoFocus`: opened from the context menu, the menu is
     // still holding focus when this mounts and would take it straight back.
@@ -660,7 +652,7 @@ function RenameField({
             ref={field}
             value={value}
             placeholder={placeholder}
-            aria-label="Server name"
+            aria-label={t("list.nameLabel")}
             maxLength={120}
             autoCapitalize="none"
             autoCorrect="off"
@@ -687,18 +679,19 @@ function RenameField({
 /** Reachability, or the fact that it has not been checked yet. The local box is
  *  the machine answering the request, so it is stated rather than probed. */
 function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerStatus | null }) {
-    if (kind === "local") return <Badge variant="success">Up</Badge>;
-    if (!status) return <span className="text-xs text-muted-foreground">Checking...</span>;
+    const t = useTranslations("servers");
+    if (kind === "local") return <Badge variant="success">{t("status.up")}</Badge>;
+    if (!status) return <span className="text-xs text-muted-foreground">{t("status.checking")}</span>;
     if (status.state === "down") {
         return (
             <Badge variant="danger" title={status.detail ?? undefined}>
-                No answer
+                {t("status.noAnswer")}
             </Badge>
         );
     }
     return (
         <Badge variant="success">
-            {status.latencyMs === null ? "Up" : `${status.latencyMs} ms`}
+            {status.latencyMs === null ? t("status.up") : t("status.latency", { ms: status.latencyMs })}
         </Badge>
     );
 }
@@ -712,6 +705,7 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
  * two it is, so there is never a terminal whose prompt disagrees with its label.
  */
 function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: () => void }) {
+    const t = useTranslations("servers");
     const [asRoot, setAsRoot] = useState(false);
 
     // A different server may not offer root at all; starting each one as the login
@@ -731,8 +725,8 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                     <DialogDescription>
                         {server
                             ? asRoot
-                                ? `Signed in as ${server.detail} over SSH, elevated with sudo.`
-                                : `Signed in as ${server.detail} over SSH.`
+                                ? t("shell.asRoot", { login: server.detail })
+                                : t("shell.asLogin", { login: server.detail })
                             : null}
                     </DialogDescription>
                 </DialogHeader>
@@ -744,7 +738,7 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                             variant="ghost"
                             onClick={() => setAsRoot((current) => !current)}
                         >
-                            {asRoot ? `Back to ${server.detail}` : "Open as root"}
+                            {asRoot ? t("shell.backTo", { login: server.detail }) : t("shell.openAsRoot")}
                         </Button>
                     </DialogFooter>
                 ) : null}
@@ -763,12 +757,14 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
 
 /** The location cell: a clickable badge, or a call to action when it is unset. */
 function EnvironmentCell({ server, onPick }: { server: ServerRow; onPick: () => void }) {
+    const t = useTranslations("servers");
+    const tc = useTranslations("components");
     const meta = ENVIRONMENT_META[server.environment];
 
     if (server.environment === "unknown") {
         return (
             <Button size="sm" variant="secondary" onClick={onPick}>
-                <MapPin className="size-3.5" /> Set location
+                <MapPin className="size-3.5" /> {t("list.setLocation")}
             </Button>
         );
     }
@@ -777,13 +773,13 @@ function EnvironmentCell({ server, onPick }: { server: ServerRow; onPick: () => 
         <button
             type="button"
             onClick={onPick}
-            aria-label={`Change where ${server.name} lives`}
+            aria-label={t("list.changeLocation", { name: server.name })}
             className="flex items-center gap-2"
         >
-            <Badge variant={meta.tone}>{meta.label}</Badge>
+            <Badge variant={meta.tone}>{environmentWords(tc, server.environment).label}</Badge>
             {/* Detected but never confirmed: say so rather than pass a guess off as settled. */}
             {server.confirmed ? null : (
-                <span className="text-xs text-muted-foreground">detected</span>
+                <span className="text-xs text-muted-foreground">{t("list.detected")}</span>
             )}
         </button>
     );

@@ -20,6 +20,7 @@ import { Badge, Button, Skeleton, cn } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge, STALE_AFTER_MS } from "@/app/(app)/apps/containers/freshness";
 import type { ContainerRow, HostSnapshot } from "@/app/(app)/apps/containers/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** The same cadence the Containers table polls at: this is the same data, and a
  *  server's page is no less live than the list it was opened from. */
@@ -30,6 +31,7 @@ const REFRESH_MS = 5000;
 const SHOWN = 8;
 
 export function ServerWorkload({ connectionId }: { connectionId: string }) {
+    const t = useTranslations("servers");
     const { data, loading, error, stale } = useLiveResource<HostSnapshot>({
         url: `/api/containers?c=${encodeURIComponent(connectionId)}`,
         // The key the Containers table writes, so opening a server after visiting
@@ -47,10 +49,10 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
         <section className="flex flex-col gap-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-medium">
-                    Using the most
+                    {t("workload.title")}
                     {data ? (
                         <span className="ml-1.5 text-muted-foreground">
-                            {running.length} of {containers.length} running
+                            {t("workload.running", { running: running.length, total: containers.length })}
                         </span>
                     ) : null}
                 </h2>
@@ -60,7 +62,9 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
                 {stale ? (
                     <span className="text-xs text-warning">{stale}</span>
                 ) : age !== null && age > STALE_AFTER_MS ? (
-                    <span className="text-xs text-muted-foreground">sampled {formatAge(age)} ago</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("workload.sampled", { age: formatAge(age) })}
+                    </span>
                 ) : null}
             </div>
 
@@ -72,10 +76,10 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
                 </div>
             ) : error ? (
                 <p className="text-xs text-muted-foreground">
-                    Polaris could not reach the container engine on this server: {error}
+                    {t("workload.unreachable", { reason: error })}
                 </p>
             ) : containers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No containers on this server.</p>
+                <p className="text-xs text-muted-foreground">{t("workload.none")}</p>
             ) : (
                 <>
                     <ul className="flex flex-col divide-y divide-border/60 overflow-hidden rounded-md border border-border">
@@ -91,14 +95,14 @@ export function ServerWorkload({ connectionId }: { connectionId: string }) {
                     <div className="flex items-center justify-between gap-2">
                         {containers.length > SHOWN ? (
                             <span className="text-xs text-muted-foreground">
-                                and {containers.length - SHOWN} more
+                                {t("workload.more", { count: containers.length - SHOWN })}
                             </span>
                         ) : (
                             <span />
                         )}
                         <Button asChild variant="ghost" size="sm">
                             <Link href={`/apps/containers?c=${encodeURIComponent(connectionId)}`}>
-                                Open in Containers
+                                {t("workload.open")}
                             </Link>
                         </Button>
                     </div>

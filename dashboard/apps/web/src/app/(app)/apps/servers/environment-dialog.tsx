@@ -12,7 +12,8 @@ import { Check } from "lucide-react";
 import type { ServerEnvironment } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
+import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export interface EnvironmentTarget {
     /** Null for the box Polaris runs on, which has no Host row. */
@@ -33,6 +34,9 @@ export function EnvironmentDialog({
     target: EnvironmentTarget | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("servers");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
     const router = useRouter();
     const [pending, setPending] = useState<ServerEnvironment | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -56,7 +60,7 @@ export function EnvironmentDialog({
     // Only worth showing while unanswered: once confirmed, the marked option says it all.
     const suggestion =
         target && !target.confirmed && target.suggested !== "unknown"
-            ? ENVIRONMENT_META[target.suggested].label
+            ? environmentWords(tc, target.suggested).label
             : null;
 
     return (
@@ -73,21 +77,24 @@ export function EnvironmentDialog({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Where does {target?.name} live?</DialogTitle>
-                    <DialogDescription>
-                        This decides how a domain can be pointed at it, and whether it can serve public traffic
-                        directly. Registered servers can also take a wildcard domain of their own below.
-                    </DialogDescription>
+                    <DialogTitle>{t("environment.title", { name: target?.name ?? "" })}</DialogTitle>
+                    <DialogDescription>{t("environment.intro")}</DialogDescription>
                 </DialogHeader>
                 {suggestion ? (
                     <p className="mb-3 text-xs text-muted-foreground">
-                        Polaris detected <b className="font-medium text-foreground">{suggestion}</b> from its address.
-                        Confirm it or pick another.
+                        {t.rich("environment.detected", {
+                            name: suggestion,
+                            b: (chunks) => (
+                                <b key="name" className="font-medium text-foreground">
+                                    {chunks}
+                                </b>
+                            )
+                        })}
                     </p>
                 ) : null}
                 <div className="flex flex-col gap-2">
                     {ENVIRONMENT_CHOICES.map((environment) => {
-                        const meta = ENVIRONMENT_META[environment];
+                        const meta = environmentWords(tc, environment);
                         const selected = target?.current === environment;
                         return (
                             <button
@@ -105,7 +112,9 @@ export function EnvironmentDialog({
                                     {meta.label}
                                     {selected ? <Check className="size-3.5 text-primary" /> : null}
                                     {pending === environment ? (
-                                        <span className="text-xs font-normal text-muted-foreground">Saving...</span>
+                                        <span className="text-xs font-normal text-muted-foreground">
+                                            {tcommon("actions.saving")}
+                                        </span>
                                     ) : null}
                                 </span>
                                 <span className="text-xs text-muted-foreground">{meta.summary}</span>
@@ -128,6 +137,8 @@ export function EnvironmentDialog({
  * at all.
  */
 function ServerWildcard({ hostId, current }: { hostId: string; current: string }) {
+    const t = useTranslations("servers");
+    const tcommon = useTranslations("common");
     const router = useRouter();
     const [value, setValue] = useState(current);
     const [saving, setSaving] = useState(false);
@@ -151,7 +162,7 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
     return (
         <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
             <label className="flex flex-col gap-1 text-sm">
-                Wildcard domain for this server
+                {t("environment.wildcard")}
                 <div className="flex items-center gap-2">
                     <Input
                         value={value}
@@ -159,19 +170,21 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                             setValue(event.target.value);
                             setSaved(false);
                         }}
-                        placeholder="apps.example.com"
+                        placeholder="apps.example.com" // i18n-ignore example domain
                         autoComplete="off"
                     />
                     <Button size="sm" variant="secondary" onClick={save} disabled={saving || value === current}>
-                        {saving ? "Saving..." : "Save"}
+                        {saving ? tcommon("actions.saving") : tcommon("actions.save")}
                     </Button>
                 </div>
             </label>
             <p className="text-xs text-muted-foreground">
-                Point <code>*.{value.trim() || "apps.example.com"}</code> at this server, and its services get a real
-                domain with a Let&apos;s Encrypt certificate. Leave empty to use free IP-based subdomains.
+                {t.rich("environment.wildcardHint", {
+                    domain: value.trim() || "apps.example.com", // i18n-ignore example domain
+                    code: (chunks) => <code key="domain">{chunks}</code>
+                })}
             </p>
-            {saved ? <p className="text-xs text-success">Saved.</p> : null}
+            {saved ? <p className="text-xs text-success">{t("environment.saved")}</p> : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
     );

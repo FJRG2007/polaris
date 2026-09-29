@@ -8,22 +8,23 @@
  */
 
 import type { ActivityLine } from "@/lib/activity/activity";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
-/** One line of a server's history, as a sentence. */
-export function describeServerEvent(line: ActivityLine): string {
+/** One line of a server's history, as a sentence in the reader's words. */
+export function describeServerEvent(line: ActivityLine, t: NamespaceTranslator<"servers">): string {
     const who = line.authorName ?? "Polaris";
     switch (line.action) {
         case "renamed":
-            return line.toValue ? `${who} renamed it to ${line.toValue}` : `${who} renamed it`;
+            return line.toValue ? t("history.renamedTo", { who, name: line.toValue }) : t("history.renamed", { who });
         case "environment":
-            return `${who} set where it lives to ${line.toValue ?? "somewhere else"}`;
+            return t("history.environment", { who, where: line.toValue ?? t("history.elsewhere") });
         case "edge-ready":
-            return `${who} set it up to serve its own domains`;
+            return t("history.edgeReady", { who });
         case "edge-failed":
             return line.toValue
-                ? `${who} could not set it up to serve its own domains: ${line.toValue}`
-                : `${who} could not set it up to serve its own domains`;
+                ? t("history.edgeFailedWhy", { who, reason: line.toValue })
+                : t("history.edgeFailed", { who });
         default:
-            return `${who} changed it`;
+            return t("history.changed", { who });
     }
 }

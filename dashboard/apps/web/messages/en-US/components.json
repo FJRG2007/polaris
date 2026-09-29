@@ -488,5 +488,32 @@
         "note": "What this is for",
         "notePlaceholder": "Cleaner, Tuesdays",
         "share": "Share"
+    },
+    "environments": {
+        "homeNat": {
+            "label": "Home or office LAN",
+            "summary": "Private IP behind a router you control.",
+            "routing": "A domain needs ports 80 and 443 forwarded to this server, or a tunnel. Use DuckDNS or another updater if the ISP IP changes."
+        },
+        "homeCgnat": {
+            "label": "Home behind carrier NAT",
+            "summary": "The ISP shares one public IP across customers - common on mobile, fibre resellers and Starlink.",
+            "routing": "Port forwarding cannot work here. A domain only reaches this server through a tunnel."
+        },
+        "vps": {
+            "label": "VPS or dedicated server",
+            "summary": "Holds its own public IP.",
+            "routing": "Point the domain's A record straight at this server; its own edge issues the certificate."
+        },
+        "cloud": {
+            "label": "Cloud VM",
+            "summary": "AWS, GCP, Azure or similar - public IP behind a firewall you configure.",
+            "routing": "Point the A record at the instance and allow 80/443 in its security group. Use a reserved IP so the record keeps working."
+        },
+        "unknown": {
+            "label": "Not set",
+            "summary": "Polaris could not tell where this server lives.",
+            "routing": "Set where it lives to get the right way to point a domain at it."
+        }
     }
 }

@@ -5,7 +5,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { ActivityLine } from "../../src/lib/activity/activity";
-import { describeServerEvent } from "../../src/app/(app)/apps/servers/server-history";
+import { translatorFor } from "../../src/lib/i18n/translate";
+import { describeServerEvent as describeIn } from "../../src/app/(app)/apps/servers/server-history";
+
+const english = translatorFor("en-US", "servers");
+const describeServerEvent = (entry: ActivityLine) => describeIn(entry, english);
 
 function line(overrides: Partial<ActivityLine> = {}): ActivityLine {
     return {
@@ -63,6 +67,17 @@ describe("setting a server up on its own", () => {
             )
         ).toBe(
             "Polaris could not set it up to serve its own domains: Error: port 80 is already allocated"
+        );
+    });
+});
+
+describe("in Spanish", () => {
+    const spanish = translatorFor("es-ES", "servers");
+
+    it("reads a rename and a failed set-up in Spanish", () => {
+        expect(describeIn(line({ toValue: "lirio-0" }), spanish)).toBe("Ana lo ha renombrado a lirio-0");
+        expect(describeIn(line({ action: "edge-failed", authorName: null }), spanish)).toBe(
+            "Polaris no ha podido prepararlo para servir sus propios dominios"
         );
     });
 });

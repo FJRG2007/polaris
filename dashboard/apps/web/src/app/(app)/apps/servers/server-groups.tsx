@@ -21,6 +21,7 @@ import {
     renameHostGroupAction,
     setHostGroupMembersAction
 } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface Group {
     id: string;
@@ -29,6 +30,8 @@ interface Group {
 }
 
 export function ServerGroups({ servers }: { servers: readonly { id: string; name: string; kind: string }[] }) {
+    const t = useTranslations("servers");
+    const tcommon = useTranslations("common");
     const [groups, setGroups] = useState<Group[] | null>(null);
     const [creating, setCreating] = useState(false);
     const [draftName, setDraftName] = useState("");
@@ -86,18 +89,17 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                     <Layers className="size-4 text-muted-foreground" />
-                    Server groups
+                    {t("groups.title")}
                 </CardTitle>
                 {!creating ? (
                     <Button type="button" variant="secondary" size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New group
+                        <Plus className="size-4" /> {t("groups.new")}
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Write a firewall rule once for a set of machines. Adding a server to a group brings it under the
-                    group&apos;s rules straight away.
+                    {t("groups.intro")}
                 </p>
 
                 {creating ? (
@@ -105,7 +107,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                         <Input
                             autoFocus
                             value={draftName}
-                            placeholder="e.g. Data center"
+                            placeholder={t("groups.placeholder")}
                             onChange={(event) => setDraftName(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") {
@@ -116,13 +118,13 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                             }}
                         />
                         <Button type="button" onClick={create} disabled={draftName.trim() === ""}>
-                            Create
+                            {t("groups.create")}
                         </Button>
                         <Button
                             type="button"
                             variant="secondary"
-                            aria-label="Cancel"
-                            title="Cancel"
+                            aria-label={tcommon("actions.cancel")}
+                            title={tcommon("actions.cancel")}
                             onClick={() => setCreating(false)}
                         >
                             <X className="size-4" />
@@ -131,10 +133,10 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                 ) : null}
 
                 {groups === null ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">Loading groups...</p>
+                    <p className="py-4 text-center text-sm text-muted-foreground">{t("groups.loading")}</p>
                 ) : groups.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                        No groups yet.
+                        {t("groups.none")}
                     </p>
                 ) : (
                     groups.map((group) => (
@@ -165,8 +167,8 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                                 <div className="flex items-center gap-1">
                                     <button
                                         type="button"
-                                        aria-label={`Rename ${group.name}`}
-                                        title="Rename"
+                                        aria-label={t("groups.renameNamed", { name: group.name })}
+                                        title={t("list.rename")}
                                         onClick={() => setRenaming(group.id)}
                                         className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
@@ -174,8 +176,8 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label={`Delete ${group.name}`}
-                                        title="Delete"
+                                        aria-label={t("storage.deleteNamed", { name: group.name })}
+                                        title={t("storage.delete")}
                                         onClick={() => setConfirmDelete(group)}
                                         className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                                     >
@@ -184,7 +186,7 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                                 </div>
                             </div>
                             {eligible.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">Enroll a server to put one in here.</p>
+                                <p className="text-xs text-muted-foreground">{t("groups.enrollFirst")}</p>
                             ) : (
                                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                                     {eligible.map((server) => (
@@ -211,8 +213,8 @@ export function ServerGroups({ servers }: { servers: readonly { id: string; name
                 open={confirmDelete !== null}
                 onOpenChange={(open) => !open && setConfirmDelete(null)}
                 name={confirmDelete?.name ?? ""}
-                kind="server group"
-                description="The servers themselves stay. Any firewall rules written for this group are deleted with it."
+                kind={t("groups.kind")}
+                description={t("groups.deleteBody")}
                 onConfirm={() => {
                     const group = confirmDelete;
                     setConfirmDelete(null);

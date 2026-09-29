@@ -9,6 +9,9 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { enrollmentRefusalText } from "./enrollment-refusal-text";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as notes from "@/lib/server-notes-service";
@@ -75,6 +78,34 @@ import {
 
 const SERVERS_PATH = "/apps/servers";
 
+type ServersKey = NamespaceKey<"servers">;
+
+/** A reply in the reader's language. */
+async function say(key: ServersKey): Promise<string> {
+    return (await getTranslations("servers"))(key);
+}
+
+/** What went wrong, for the reader: a service's own sentence passes through, and
+ *  anything that is not an Error reads as `fallback`. */
+async function failure(caught: unknown, fallback: ServersKey): Promise<string> {
+    return caught instanceof Error ? caught.message : say(fallback);
+}
+
+/** The shared schemas' own sentences, keyed by their English. */
+const SCHEMA_WORDS: Record<string, ServersKey> = {
+    "Choose a server": "errors.schema.chooseServer",
+    "Choose where the services should move to": "errors.schema.chooseDestination",
+    "Not a hostname": "errors.schema.notHostname",
+    "Write something first": "errors.schema.writeSomething"
+};
+
+/** The first thing a schema refused, in the reader's words, or `fallback` when it
+ *  said nothing this screen has words for. */
+async function schemaSay(message: string | undefined, fallback: ServersKey): Promise<string> {
+    const key = message ? SCHEMA_WORDS[message] : undefined;
+    return say(key ?? fallback);
+}
+
 /** What has happened to this server. */
 export async function serverHistoryAction(hostId: string): Promise<ActivityLine[]> {
     const user = await requirePermission("system.manage");
@@ -102,12 +133,12 @@ export async function postServerNoteAction(input: {
     const user = await requirePermission("system.manage");
     const parsed = subjectCommentSchema.safeParse({ subjectId: input.hostId, body: input.body });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.noteRefused") };
     try {
         await notes.postServerNote(parsed.data.subjectId, user.id, parsed.data.body);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not post the note" };
+        return { error: await failure(caught, "errors.notePost") };
     }
 }
 
@@ -120,7 +151,7 @@ export async function deleteServerNoteAction(input: {
         await notes.deleteServerNote(input.hostId, user.id, input.commentId);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the note" };
+        return { error: await failure(caught, "errors.noteDelete") };
     }
 }
 
@@ -143,14 +174,14 @@ export async function setServerFollowAction(input: {
         await notes.setFollowingServer(input.hostId, user.id, input.following);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+        return { error: await failure(caught, "errors.change") };
     }
 }
 
 export async function createHostAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createHostSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid host" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidHost") };
     try {
         const created = await createHost(user.id, parsed.data);
         await recordAudit({
@@ -162,7 +193,7 @@ export async function createHostAction(input: unknown): Promise<{ error?: string
         });
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not connect to the host"
+            error: await failure(caught, "errors.connect")
         };
     }
     revalidatePath(SERVERS_PATH);
@@ -177,11 +208,11 @@ export async function createHostAction(input: unknown): Promise<{ error?: string
 export async function setServerEnvironmentAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = setServerEnvironmentSchema.safeParse(input);
-    if (!parsed.success) return { error: "Invalid server environment" };
+    if (!parsed.success) return { error: await say("errors.invalidEnvironment") };
     const { hostId, environment } = parsed.data;
     if (hostId) {
         if (!(await setHostEnvironment(user.id, hostId, environment)))
-            return { error: "Server not found" };
+            return { error: await say("errors.notFound") };
     } else {
         await setLocalEnvironment(environment);
     }
@@ -210,13 +241,13 @@ export async function findLocalPathAction(
 ): Promise<{ error?: string; path?: LocalPath }> {
     const user = await requirePermission("system.manage");
     const parsed = z.string().uuid().safeParse(hostId);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: await say("errors.notFound") };
     try {
         return { path: await findLocalPath(parsed.data, user.id) };
     } catch {
         // The reason is for the log; what a reader can do about it is the same
         // either way, and the message would name internals.
-        return { error: "Could not ask this server about its network" };
+        return { error: await say("errors.askNetwork") };
     }
 }
 
@@ -238,13 +269,13 @@ export async function recoverServerAddressAction(
 ): Promise<{ error?: string; found?: string; path?: LocalPath }> {
     const user = await requirePermission("system.manage");
     const parsed = z.string().uuid().safeParse(hostId);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: await say("errors.notFound") };
 
     let path: LocalPath;
     try {
         path = await findLocalPath(parsed.data, user.id);
     } catch {
-        return { error: "Could not look for this server on the network" };
+        return { error: await say("errors.lookNetwork") };
     }
     if (path.kind !== "found" || !path.moved) return { path };
 
@@ -268,7 +299,7 @@ export async function useLocalPathAction(input: unknown): Promise<{ error?: stri
     const parsed = z
         .object({ hostId: z.string().uuid(), address: z.string().trim().min(1).max(253) })
         .safeParse(input);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: await say("errors.notFound") };
 
     const result = await useLocalPath(parsed.data.hostId, user.id, parsed.data.address);
     if (result.error) return result;
@@ -294,11 +325,11 @@ export async function useLocalPathAction(input: unknown): Promise<{ error?: stri
 export async function renameServerAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = renameServerSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidName") };
     const { hostId, name } = parsed.data;
     if (hostId) {
-        if (!name) return { error: "Name this server" };
-        if (!(await renameHost(user.id, hostId, name))) return { error: "Server not found" };
+        if (!name) return { error: await say("errors.nameIt") };
+        if (!(await renameHost(user.id, hostId, name))) return { error: await say("errors.notFound") };
     } else {
         await setLocalServerName(name);
     }
@@ -329,15 +360,15 @@ const serverWildcardSchema = z.object({
 export async function setServerWildcardAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = serverWildcardSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid domain" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDomain") };
     try {
         if (
             !(await setHostWildcardDomain(user.id, parsed.data.hostId, parsed.data.wildcardDomain))
         ) {
-            return { error: "Server not found" };
+            return { error: await say("errors.notFound") };
         }
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the domain" };
+        return { error: await failure(caught, "errors.saveDomain") };
     }
     await recordAudit({
         actorId: user.id,
@@ -359,12 +390,12 @@ export async function openEnrollmentAction(
 ): Promise<{ enrollment?: OpenedEnrollment; error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createEnrollmentSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid enrollment" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidEnrollment") };
     try {
         return { enrollment: await openEnrollment(user.id, parsed.data) };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not start the enrollment"
+            error: await failure(caught, "errors.startEnrollment")
         };
     }
 }
@@ -375,7 +406,8 @@ export async function enrollmentStatusAction(id: string): Promise<EnrollmentStat
     const status = await getEnrollmentStatus(id, user.id);
     // A finished enrollment added a row the list does not know about yet.
     if (status?.state === "claimed") revalidatePath(SERVERS_PATH);
-    return status;
+    if (!status?.error) return status;
+    return { ...status, error: enrollmentRefusalText(await getTranslations("servers"), status.error) };
 }
 
 /** Kill a command that was generated and should not be used after all. */
@@ -417,7 +449,7 @@ export async function removeServerAction(
 ): Promise<RemoveServerResult> {
     const user = await requirePermission("system.manage");
     const parsed = removeServerSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid removal" };
+    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidRemoval") };
 
     const result = await removeServer(user.id, hostId, user.id, parsed.data);
     if (result.error) return result;
@@ -458,7 +490,7 @@ export async function createHostGroupAction(
         revalidatePath(SERVERS_PATH);
         return { id: group.id };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the group" };
+        return { error: await failure(caught, "errors.groupCreate") };
     }
 }
 
@@ -467,20 +499,20 @@ export async function renameHostGroupAction(
     name: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
+    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
     try {
         await renameHostGroup(user.id, groupId, name);
         revalidatePath(SERVERS_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not rename the group" };
+        return { error: await failure(caught, "errors.groupRename") };
     }
 }
 
 /** Delete a group. Its firewall rules go with it - see deleteHostGroup. */
 export async function deleteHostGroupAction(groupId: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
+    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
     try {
         await deleteHostGroup(user.id, groupId);
         await recordAudit({
@@ -492,7 +524,7 @@ export async function deleteHostGroupAction(groupId: string): Promise<{ error?: 
         revalidatePath(SERVERS_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the group" };
+        return { error: await failure(caught, "errors.groupDelete") };
     }
 }
 
@@ -501,15 +533,15 @@ export async function setHostGroupMembersAction(
     hostIds: string[]
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
+    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
     const members = z.array(z.string().uuid()).max(1000).safeParse(hostIds);
-    if (!members.success) return { error: "Pick servers from the list" };
+    if (!members.success) return { error: await say("errors.pickServers") };
     try {
         await setHostGroupMembers(user.id, groupId, members.data);
         revalidatePath(SERVERS_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the group" };
+        return { error: await failure(caught, "errors.groupSave") };
     }
 }
 
@@ -531,8 +563,6 @@ export async function hostSpaceAction(): Promise<HostSpace | null> {
 
 /** A prune refused because a deploy is fetching or building on the machine. */
 const BUSY = "busy" as const;
-const BUSY_MESSAGE =
-    "A deploy is downloading or building an image on this machine. Nothing was removed - try again once it finishes.";
 
 /**
  * Hand back the room that holds nothing anybody wrote.
@@ -546,9 +576,9 @@ export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?
     const freed = await reclaimHostSpace({ whenIdle: true }).catch((error: unknown) =>
         error instanceof ImageStoreBusy ? BUSY : null
     );
-    if (freed === BUSY) return { error: BUSY_MESSAGE };
+    if (freed === BUSY) return { error: await say("errors.busy") };
     if (freed === null) {
-        return { error: "This machine would not say. Nothing was removed." };
+        return { error: await say("errors.wouldNotSay") };
     }
     await recordAudit({
         actorId: user.id,
@@ -570,9 +600,9 @@ export async function reclaimBuildCacheAction(): Promise<{ freed?: number; error
     const freed = await reclaimBuildCache({ whenIdle: true }).catch((error: unknown) =>
         error instanceof ImageStoreBusy ? BUSY : null
     );
-    if (freed === BUSY) return { error: BUSY_MESSAGE };
+    if (freed === BUSY) return { error: await say("errors.busy") };
     if (freed === null) {
-        return { error: "This machine would not say. Nothing was removed." };
+        return { error: await say("errors.wouldNotSay") };
     }
     await recordAudit({
         actorId: user.id,
@@ -610,7 +640,7 @@ export async function removeHostVolumeAction(name: string): Promise<{ error?: st
     const before = volumes?.find((volume) => volume.name === name) ?? null;
 
     const result = await removeHostVolume(name).catch(() => null);
-    if (!result) return { error: "This machine would not answer. Nothing was removed." };
+    if (!result) return { error: await say("errors.wouldNotAnswer") };
     if (!result.ok) return { error: result.reason };
 
     await recordAudit({
@@ -633,7 +663,7 @@ export async function leftoverAutoRemoveAction(): Promise<boolean> {
 /** Switch it. Audited: it decides whether data is deleted without anybody pressing. */
 export async function setLeftoverAutoRemoveAction(on: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (typeof on !== "boolean") return { error: "That is not a setting." };
+    if (typeof on !== "boolean") return { error: await say("errors.notASetting") };
     await setAutoRemove(on);
     await recordAudit({
         actorId: user.id,
@@ -666,7 +696,7 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
     const before = strays?.find((entry) => entry.id === id) ?? null;
 
     const result = await removeStrayContainer(id).catch(() => null);
-    if (!result) return { error: "This machine would not answer. Nothing was removed." };
+    if (!result) return { error: await say("errors.wouldNotAnswer") };
     if (!result.ok) return { error: result.reason };
 
     await recordAudit({
@@ -712,7 +742,7 @@ export async function prepareServerEdgeAction(
 ): Promise<{ error?: string; log?: string }> {
     const user = await requirePermission("system.manage");
     const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
-    if (!host) return { error: "That server is not one of yours" };
+    if (!host) return { error: await say("errors.notYours") };
     try {
         // The same target the deploy pipeline uses, so the proxy network the edge
         // joins is the one deployed containers are already on. Two networks is an
@@ -734,7 +764,7 @@ export async function prepareServerEdgeAction(
         return { log: log.slice(-4000) };
     } catch (error) {
         return {
-            error: error instanceof Error ? error.message : "That server refused to set itself up"
+            error: await failure(error, "errors.edgeRefused")
         };
     }
 }

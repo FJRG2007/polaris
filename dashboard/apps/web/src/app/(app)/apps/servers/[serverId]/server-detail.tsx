@@ -20,7 +20,8 @@ import { EdgePanel } from "../edge-panel";
 import { ServerUsage } from "../server-usage";
 import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
-import { ENVIRONMENT_META } from "../environment-meta";
+import { environmentWords } from "../environment-meta";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { ServerNotesPanel } from "../server-notes-panel";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -48,15 +49,15 @@ import {
 const STATUS_POLL_MS = 30_000;
 
 const TABS = [
-    { id: "overview", label: "Overview" },
+    { id: "overview" },
     // What the Storage figure on the overview is actually made of. Only for the
     // machine Polaris runs on: it is the one it can reach through its own daemon
     // to say what is on the disk, let alone take anything off it.
-    { id: "storage", label: "Storage", needsLocal: true },
-    { id: "connection", label: "Connection" },
+    { id: "storage", needsLocal: true },
+    { id: "connection" },
     // Only a registered server has an id to hang a history on: the box Polaris
     // runs on has no Host row until it is enrolled.
-    { id: "notes", label: "Notes", needsHost: true }
+    { id: "notes", needsHost: true }
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -89,6 +90,8 @@ export function ServerDetail({
     /** The reading the server already had of this machine, for the first paint. */
     initialUsage?: { at: number; value: ServerMetrics };
 }) {
+    const t = useTranslations("servers");
+    const tc = useTranslations("components");
     const router = useRouter();
     const query = useSearchParams();
     const [tab, setTab] = useState<TabId>(() => tabFromQuery(query.get("tab")) ?? "overview");
@@ -108,12 +111,12 @@ export function ServerDetail({
     // Only a machine that answered with a refusal or a timeout is treated as down;
     // one that has not been probed yet keeps its actions.
     const down = status?.state === "down";
-    const meta = ENVIRONMENT_META[server.environment];
+    const meta = environmentWords(tc, server.environment);
     // How to reach it, said once: the paragraph under the name draws it, and the
     // same string is what the tooltip hands back when that paragraph clips.
     const reach =
         server.kind === "local"
-            ? `The machine Polaris runs on, ${live?.machineName ?? machineName}`
+            ? t("detail.localReach", { name: live?.machineName ?? machineName })
             : `${server.detail}@${server.address}${server.port ? `:${server.port}` : ""}`;
 
     return (
@@ -124,7 +127,7 @@ export function ServerDetail({
                         href="/apps/servers"
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
-                        <ArrowLeft className="size-3" /> Servers
+                        <ArrowLeft className="size-3" /> {t("list.heading")}
                     </Link>
                     <h1
                         title={server.name}
@@ -132,9 +135,9 @@ export function ServerDetail({
                     >
                         {server.name}
                         {server.kind === "local" ? (
-                            <Badge variant="primary">This machine</Badge>
+                            <Badge variant="primary">{t("list.thisMachine")}</Badge>
                         ) : null}
-                        {server.sudo ? <Badge variant="warning">Root</Badge> : null}
+                        {server.sudo ? <Badge variant="warning">{t("list.root")}</Badge> : null}
                     </h1>
                     <p
                         title={server.os ? `${reach} - ${server.os}` : reach}
@@ -152,7 +155,7 @@ export function ServerDetail({
                 <div className="flex flex-wrap items-center gap-1">
                     <Button asChild variant="ghost" size="sm">
                         <Link href={`/apps/containers?c=${encodeURIComponent(connectionId)}`}>
-                            <Boxes className="size-4" /> Containers
+                            <Boxes className="size-4" /> {t("detail.containers")}
                         </Link>
                     </Button>
                     {server.hostId ? (
@@ -161,14 +164,14 @@ export function ServerDetail({
                                 variant="ghost"
                                 size="sm"
                                 disabled={down}
-                                title={down ? "Not answering over SSH" : "Open a shell"}
+                                title={down ? t("list.notAnsweringSsh") : t("list.shell")}
                                 onClick={() => setShellOpen(true)}
                             >
-                                <SquareTerminal className="size-4" /> Shell
+                                <SquareTerminal className="size-4" /> {t("detail.shell")}
                             </Button>
                             <Button asChild variant="ghost" size="sm" disabled={down}>
                                 <Link href={`/drive?c=host:${server.hostId}`}>
-                                    <FolderOpen className="size-4" /> Files
+                                    <FolderOpen className="size-4" /> {t("storage.files")}
                                 </Link>
                             </Button>
                         </>
@@ -194,7 +197,7 @@ export function ServerDetail({
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {entry.label}
+                        {t(`detail.tabs.${entry.id}`)}
                     </button>
                 ))}
             </div>
@@ -235,14 +238,14 @@ export function ServerDetail({
                     <ServerWorkload connectionId={connectionId} />
 
                     <section className="flex flex-col gap-1">
-                        <h2 className="text-sm font-medium">Load</h2>
+                        <h2 className="text-sm font-medium">{t("detail.load")}</h2>
                         <MetricsHistory
                             endpoint={`/api/watch/hosts/${encodeURIComponent(metricsId)}/metrics/history`}
                             live={`/api/watch/hosts/${encodeURIComponent(metricsId)}/metrics/stream`}
                             metrics={CONSUMPTION_METRICS}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Read from the machine itself, not only from what Polaris runs on it.{" "}
+                            {t("detail.loadHint")}{" "}
                             {/* The Storage figure is the one people arrive at with a
                                 question the chart cannot answer: 89 GB of what. */}
                             {server.kind === "local" ? (
@@ -251,7 +254,7 @@ export function ServerDetail({
                                     onClick={() => setTab("storage")}
                                     className="text-primary hover:underline"
                                 >
-                                    See what is taking up the disk
+                                    {t("detail.seeDisk")}
                                 </button>
                             ) : null}
                         </p>
@@ -262,7 +265,7 @@ export function ServerDetail({
                     <RenameForm server={server} onRenamed={() => router.refresh()} />
 
                     <section className="flex flex-col gap-2">
-                        <h2 className="text-sm font-medium">Location</h2>
+                        <h2 className="text-sm font-medium">{t("list.columns.location")}</h2>
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="secondary"
@@ -279,20 +282,19 @@ export function ServerDetail({
                                 }
                             >
                                 <MapPin className="size-3.5" />
-                                {server.environment === "unknown" ? "Set location" : meta.label}
+                                {server.environment === "unknown" ? t("list.setLocation") : meta.label}
                             </Button>
                             {server.environment !== "unknown" && !server.confirmed ? (
-                                <span className="text-xs text-muted-foreground">detected</span>
+                                <span className="text-xs text-muted-foreground">{t("list.detected")}</span>
                             ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            A home server behind a router and a data-center box are exposed in
-                            different ways, so this decides how a domain is pointed at it.
+                            {t("detail.locationHint")}
                         </p>
                     </section>
 
                     <section className="flex flex-col gap-2">
-                        <h2 className="text-sm font-medium">Reach it yourself</h2>
+                        <h2 className="text-sm font-medium">{t("detail.reachYourself")}</h2>
                         {server.kind === "local" && !server.hostId ? (
                             <LocalNote />
                         ) : (
@@ -303,14 +305,12 @@ export function ServerDetail({
                     {server.hostId ? (
                         <section className="flex flex-col gap-2">
                             <h2 className="text-sm font-medium">
-                                {server.kind === "local"
-                                    ? "Give up the login"
-                                    : "Remove this server"}
+                                {server.kind === "local" ? t("list.giveUpLogin") : t("detail.removeTitle")}
                             </h2>
                             <p className="text-xs text-muted-foreground">
                                 {server.kind === "local"
-                                    ? "The machine Polaris runs on stays listed. Only the SSH login it was enrolled with is given back, so the shell and its files stop being offered here."
-                                    : "What this would take with it is worked out first, and anything deployed here can be moved to another server rather than lost."}
+                                    ? t("detail.giveUpHint")
+                                    : t("detail.removeHint")}
                             </p>
                             <div>
                                 <Button
@@ -321,7 +321,7 @@ export function ServerDetail({
                                     }
                                 >
                                     <Trash2 className="size-3.5" />
-                                    {server.kind === "local" ? "Give up the login" : "Remove"}
+                                    {server.kind === "local" ? t("list.giveUpLogin") : t("list.remove")}
                                 </Button>
                             </div>
                         </section>
@@ -353,7 +353,7 @@ export function ServerDetail({
                                 variant="ghost"
                                 onClick={() => setAsRoot((current) => !current)}
                             >
-                                {asRoot ? `Back to ${server.detail}` : "Open as root"}
+                                {asRoot ? t("shell.backTo", { login: server.detail }) : t("shell.openAsRoot")}
                             </Button>
                         </DialogFooter>
                     ) : null}

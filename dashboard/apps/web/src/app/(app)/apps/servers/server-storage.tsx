@@ -38,6 +38,8 @@ import type { StrayContainer } from "@/lib/deploy/host-containers";
 import { useLiveRead } from "@/components/use-live-resource";
 import { Badge, Button, EmptyState, Switch } from "@polaris/ui";
 import { Boxes, HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     hostVolumesAction,
     leftoverAutoRemoveAction,
@@ -50,23 +52,31 @@ import {
 /** A disk does not change between two glances at it. */
 const REFRESH_MS = 60_000;
 
-function size(bytes: number | null): string {
-    if (bytes === null) return "not measured";
+type Words = NamespaceTranslator<"servers">;
+
+function size(bytes: number | null, t: Words): string {
+    if (bytes === null) return t("storage.notMeasured");
     if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
     if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / (1024 * 1024))} MB`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-/** How long it has been sitting there, in the words somebody would use. */
-function age(iso: string | null): string | null {
+/** Whole days since then, or null when there is no sensible answer. */
+function daysSince(iso: string | null): number | null {
     if (!iso) return null;
     const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-    if (!Number.isFinite(days) || days < 0) return null;
-    if (days === 0) return "today";
-    if (days === 1) return "yesterday";
-    if (days < 30) return `${days} days ago`;
+    return !Number.isFinite(days) || days < 0 ? null : days;
+}
+
+/** How long it has been sitting there, in the words somebody would use. */
+function age(iso: string | null, t: Words): string | null {
+    const days = daysSince(iso);
+    if (days === null) return null;
+    if (days === 0) return t("storage.age.today");
+    if (days === 1) return t("storage.age.yesterday");
+    if (days < 30) return t("storage.age.days", { days });
     const months = Math.round(days / 30);
-    return months <= 1 ? "a month ago" : `${months} months ago`;
+    return months <= 1 ? t("storage.age.month") : t("storage.age.months", { months });
 }
 
 /**
@@ -74,17 +84,19 @@ function age(iso: string | null): string | null {
  * use. Counted from its last use, or - never seen in use since Polaris began
  * keeping notes - from when the notes began, which is said so.
  */
-function unusedFor(volume: HostVolume): string | null {
+function unusedFor(volume: HostVolume, t: Words): string | null {
     if (volume.inUse) return null;
     const since = volume.lastUsedAt ?? volume.notedSince;
-    const when = age(since);
+    const when = age(since, t);
     if (!when) return null;
-    if (volume.lastUsedAt) return `Last used ${when}`;
+    if (volume.lastUsedAt) return t("storage.lastUsed", { when });
     // "Since 3 days ago" read as a use 3 days ago; it is when watching began.
-    return when === "today" ? "Not seen in use yet" : `Never seen in use (watched since ${when})`;
+    return daysSince(since) === 0 ? t("storage.notSeenYet") : t("storage.neverSeen", { when });
 }
 
 export function ServerStorage() {
+    const t = useTranslations("servers");
+    const tcommon = useTranslations("common");
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -110,7 +122,7 @@ export function ServerStorage() {
         setAutoRemoveShown(on);
         setError(null);
         const result = await setLeftoverAutoRemoveAction(on).catch(() => ({
-            error: "Could not change it. Try again."
+            error: t("storage.switchFailed")
         }));
         if (result.error) {
             setAutoRemoveShown(before);
@@ -135,11 +147,13 @@ export function ServerStorage() {
 
     const remove = async (volume: HostVolume) => {
         const ok = await confirm({
-            title: `Delete "${volume.name}"?`,
-            description: `${size(volume.bytes)} of whatever was written in it, gone for good. Nothing on this machine references it${
-                age(volume.createdAt) ? `, and it was created ${age(volume.createdAt)}` : ""
-            }. A volume does not come back the way a rebuilt image does.`,
-            confirmLabel: "Delete it",
+            title: t("storage.deleteTitle", { name: volume.name }),
+            description: t("storage.deleteBody", {
+                size: size(volume.bytes, t),
+                dated: age(volume.createdAt, t) ? "yes" : "no",
+                created: age(volume.createdAt, t) ?? ""
+            }),
+            confirmLabel: t("storage.deleteIt"),
             danger: true
         });
         if (!ok) return;
@@ -169,11 +183,10 @@ export function ServerStorage() {
                     <div>
                         <h2 className="flex items-center gap-1.5 text-sm font-medium">
                             <HardDrive className="size-4 shrink-0 text-muted-foreground" />
-                            Volumes
+                            {t("storage.volumes")}
                         </h2>
                         <p className="text-muted-foreground text-xs">
-                            Largest first. A volume is where an app keeps what it wrote - a
-                            database, a world, an upload.
+                            {t("storage.volumesIntro")}
                         </p>
                     </div>
                     <label className="flex max-w-sm items-start gap-2 text-xs">
@@ -181,27 +194,24 @@ export function ServerStorage() {
                             checked={autoRemove ?? false}
                             disabled={autoRemove === null}
                             onChange={(on) => void switchAutoRemove(on)}
-                            aria-label="Remove leftovers automatically"
+                            aria-label={t("storage.autoRemove")}
                         />
                         <span>
-                            <span className="block font-medium">
-                                Remove leftovers automatically
-                            </span>
+                            <span className="block font-medium">{t("storage.autoRemove")}</span>
                             {autoRemoveUnread ? (
                                 <span className="text-danger">
-                                    Could not read whether this is on.{" "}
+                                    {t("storage.autoRemoveUnread")}{" "}
                                     <button
                                         type="button"
                                         className="underline underline-offset-2"
                                         onClick={readAutoRemove}
                                     >
-                                        Try again
+                                        {tcommon("pages.error.tryAgain")}
                                     </button>
                                 </span>
                             ) : (
                                 <span className="text-muted-foreground">
-                                    The data of an app deleted over a week ago that nothing has used
-                                    since. You are told what went.
+                                    {t("storage.autoRemoveHint")}
                                 </span>
                             )}
                         </span>
@@ -211,25 +221,27 @@ export function ServerStorage() {
                 {volumes === null ? (
                     <p className="text-muted-foreground flex items-center gap-2 px-3 py-6 text-sm">
                         <Loader2 className="size-4 shrink-0 animate-spin" />
-                        Reading what this machine is holding
+                        {t("storage.reading")}
                     </p>
                 ) : used.length === 0 && spare.length === 0 ? (
                     <EmptyState
                         icon={<HardDrive />}
-                        title="No volumes"
-                        description="Nothing on this machine has stored anything in a volume yet."
+                        title={t("storage.noVolumes")}
+                        description={t("storage.noVolumesBody")}
                     />
                 ) : (
                     <div className="overflow-x-auto rounded-lg border border-border">
                         <table className="w-full text-sm">
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="w-full max-w-0 px-3 py-2 font-medium">Volume</th>
+                                    <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                        {t("storage.columns.volume")}
+                                    </th>
                                     <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                        Size
+                                        {t("storage.columns.size")}
                                     </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
-                                        Created
+                                        {t("storage.columns.created")}
                                     </th>
                                     <th className="px-3 py-2" />
                                 </tr>
@@ -254,7 +266,7 @@ export function ServerStorage() {
                                                         className="shrink-0"
                                                         title={volume.reason}
                                                     >
-                                                        Safe to delete
+                                                        {t("storage.safe")}
                                                     </Badge>
                                                 ) : volume.spare ? (
                                                     <Badge
@@ -262,7 +274,7 @@ export function ServerStorage() {
                                                         className="shrink-0"
                                                         title={volume.reason}
                                                     >
-                                                        Check first
+                                                        {t("storage.checkFirst")}
                                                     </Badge>
                                                 ) : volume.inUse ? null : (
                                                     <Badge
@@ -270,22 +282,22 @@ export function ServerStorage() {
                                                         className="shrink-0"
                                                         title={volume.reason}
                                                     >
-                                                        Idle
+                                                        {t("storage.idle")}
                                                     </Badge>
                                                 )}
                                             </span>
                                             <span className="text-muted-foreground block truncate text-xs">
                                                 {volume.owner
-                                                    ? `Belongs to ${volume.owner}`
+                                                    ? t("storage.belongsTo", { owner: volume.owner })
                                                     : volume.description
-                                                      ? `${volume.description} - no longer exists`
+                                                      ? t("storage.gone", { what: volume.description })
                                                       : volume.project
-                                                        ? `Created by ${volume.project}`
-                                                        : "Polaris has no record of this one"}
+                                                        ? t("storage.createdBy", { project: volume.project })
+                                                        : t("storage.noRecord")}
                                                 {volume.heldBy.length > 0
-                                                    ? ` - ${holders(volume)}`
+                                                    ? ` - ${holders(volume, t)}`
                                                     : ""}
-                                                {unusedFor(volume) ? ` - ${unusedFor(volume)}` : ""}
+                                                {unusedFor(volume, t) ? ` - ${unusedFor(volume, t)}` : ""}
                                             </span>
                                             {!volume.inUse && !volume.owner ? (
                                                 <span className="text-muted-foreground block text-xs">
@@ -294,10 +306,10 @@ export function ServerStorage() {
                                             ) : null}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">
-                                            {size(volume.bytes)}
+                                            {size(volume.bytes, t)}
                                         </td>
                                         <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
-                                            {age(volume.createdAt) ?? "unknown"}
+                                            {age(volume.createdAt, t) ?? t("storage.unknown")}
                                         </td>
                                         <td className="px-3 py-2 text-right">
                                             <span className="flex items-center justify-end gap-0.5">
@@ -312,8 +324,8 @@ export function ServerStorage() {
                                                         asChild
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label={`Open ${volume.name} in Drive`}
-                                                        title="See what is inside"
+                                                        aria-label={t("storage.openInDrive", { name: volume.name })}
+                                                        title={t("storage.seeInside")}
                                                     >
                                                         <Link href={volume.browseHref}>
                                                             <FolderOpen className="size-4 shrink-0" />
@@ -326,8 +338,8 @@ export function ServerStorage() {
                                                         size="icon"
                                                         disabled={removing !== null}
                                                         onClick={() => void remove(volume)}
-                                                        aria-label={`Delete ${volume.name}`}
-                                                        title="Delete"
+                                                        aria-label={t("storage.deleteNamed", { name: volume.name })}
+                                                        title={t("storage.delete")}
                                                     >
                                                         {removing === volume.name ? (
                                                             <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -347,16 +359,15 @@ export function ServerStorage() {
 
                 {spare.length > 0 ? (
                     <p className="text-muted-foreground text-xs">
-                        {spare.length === 1 ? "One volume is" : `${spare.length} volumes are`}{" "}
-                        holding {size(spareBytes)} that nothing on this machine references, that
-                        Polaris has no record of, and that has been sitting there for more than a
-                        day. Delete them one at a time, when you know what they were.
+                        {t("storage.spare", { count: spare.length, size: size(spareBytes, t) })}
                     </p>
                 ) : null}
 
                 {freed ? (
                     <p className="text-success text-xs">
-                        {freed.name} removed{freed.bytes ? `, ${size(freed.bytes)} back` : ""}.
+                        {freed.bytes
+                            ? t("storage.freedBack", { name: freed.name, size: size(freed.bytes, t) })
+                            : t("storage.freed", { name: freed.name })}
                     </p>
                 ) : null}
                 {error ? <p className="text-danger text-xs">{error}</p> : null}
@@ -368,16 +379,14 @@ export function ServerStorage() {
                 <div>
                     <h2 className="flex items-center gap-1.5 text-sm font-medium">
                         <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                        Files
+                        {t("storage.files")}
                     </h2>
                     <p className="text-muted-foreground text-xs">
-                        What the containers on this machine are holding is above. The files people
-                        put here are Drive&apos;s side of the same disk, and it weighs its own
-                        folders.
+                        {t("storage.filesIntro")}
                     </p>
                 </div>
                 <Link href="/drive/insights" className="text-primary w-fit text-sm hover:underline">
-                    What is taking up room in Drive
+                    {t("storage.driveRoom")}
                 </Link>
             </section>
 
@@ -389,13 +398,12 @@ export function ServerStorage() {
 /** What has a volume open, in a sentence rather than a count: "held by
  *  minecraft-a1b2" is the answer somebody looking at a large row is after, and a
  *  number is not. */
-function holders(volume: HostVolume): string {
-    const names = volume.heldBy.map(
-        (holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`
+function holders(volume: HostVolume, t: Words): string {
+    const names = volume.heldBy.map((holder) =>
+        holder.running ? holder.name : t("storage.stopped", { name: holder.name })
     );
-    if (names.length === 1) return `held by ${names[0]}`;
-    const rest = names.length - 2;
-    return `held by ${names.slice(0, 2).join(", ")}${rest > 0 ? ` and ${rest} more` : ""}`;
+    if (names.length === 1) return t("storage.heldBy", { names: names[0]!, rest: 0 });
+    return t("storage.heldBy", { names: names.slice(0, 2).join(", "), rest: names.length - 2 });
 }
 
 /**
@@ -412,6 +420,7 @@ function holders(volume: HostVolume): string {
  * have one.
  */
 function StrayContainers() {
+    const t = useTranslations("servers");
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -433,11 +442,9 @@ function StrayContainers() {
 
     const remove = async (stray: StrayContainer) => {
         const ok = await confirm({
-            title: `Remove "${stray.name}"?`,
-            description: `Polaris deployed this and no longer has a record of it${
-                stray.running ? ", and it is still running" : ""
-            }. Removing it frees its image layer and its ports. Anything it wrote to a volume stays where it is - those are listed above, with their sizes.`,
-            confirmLabel: "Remove it",
+            title: t("storage.removeTitle", { name: stray.name }),
+            description: t("storage.removeBody", { running: stray.running ? "yes" : "no" }),
+            confirmLabel: t("storage.removeIt"),
             danger: true
         });
         if (!ok) return;
@@ -459,14 +466,10 @@ function StrayContainers() {
             <div>
                 <h2 className="flex items-center gap-1.5 text-sm font-medium">
                     <Boxes className="size-4 shrink-0 text-muted-foreground" />
-                    Left behind
+                    {t("storage.leftBehind")}
                 </h2>
                 <p className="text-muted-foreground text-xs">
-                    Polaris put{" "}
-                    {strays.length === 1 ? "this container" : `these ${strays.length} containers`}{" "}
-                    on this machine and has no record of {strays.length === 1 ? "it" : "them"} any
-                    more - a service removed, or a stack recreated under another name. Nothing else
-                    on the machine is touched.
+                    {t("storage.leftBehindIntro", { count: strays.length })}
                 </p>
             </div>
 
@@ -474,9 +477,11 @@ function StrayContainers() {
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="w-full max-w-0 px-3 py-2 font-medium">Container</th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                {t("storage.columns.container")}
+                            </th>
                             <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
-                                Created
+                                {t("storage.columns.created")}
                             </th>
                             <th className="px-3 py-2" />
                         </tr>
@@ -494,7 +499,7 @@ function StrayContainers() {
                                         </span>
                                         {stray.running ? (
                                             <Badge variant="warning" className="shrink-0">
-                                                Still running
+                                                {t("storage.stillRunning")}
                                             </Badge>
                                         ) : null}
                                     </span>
@@ -504,7 +509,7 @@ function StrayContainers() {
                                     </span>
                                 </td>
                                 <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
-                                    {age(stray.createdAt) ?? "unknown"}
+                                    {age(stray.createdAt, t) ?? t("storage.unknown")}
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                     <Button
@@ -512,8 +517,8 @@ function StrayContainers() {
                                         size="icon"
                                         disabled={removing !== null}
                                         onClick={() => void remove(stray)}
-                                        aria-label={`Remove ${stray.name}`}
-                                        title="Remove"
+                                        aria-label={t("list.removeNamed", { name: stray.name })}
+                                        title={t("list.remove")}
                                     >
                                         {removing === stray.id ? (
                                             <Loader2 className="size-4 shrink-0 animate-spin" />

@@ -17,37 +17,11 @@ import { ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Loader2, Server, TriangleAlert } from "lucide-react";
 import { removeServerAction, serverRemovalPlanAction } from "./actions";
 import type { RemoveServerResult, ServerRemovalMode, ServerRemovalPlan } from "@/lib/server-removal-service";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
-interface Choice {
-    readonly mode: ServerRemovalMode;
-    readonly label: string;
-    readonly summary: string;
-    readonly confirmLabel: string;
-}
-
-const CHOICES: readonly Choice[] = [
-    {
-        mode: "disconnect",
-        label: "Disconnect it",
-        summary:
-            "Polaris forgets the server and stops managing it. Whatever is running there keeps running, and its login stays authorized.",
-        confirmLabel: "Disconnect server"
-    },
-    {
-        mode: "clean",
-        label: "Disconnect it and clean up",
-        summary:
-            "Stop the services Polaris deployed there and take its login back off the machine first, so nothing is left running unmanaged.",
-        confirmLabel: "Clean up and disconnect"
-    },
-    {
-        mode: "move",
-        label: "Move its services first, then clean up",
-        summary:
-            "Each service comes up on the new server before the old one is stopped, so it is not off while it moves. Then the machine is cleaned up and forgotten.",
-        confirmLabel: "Move and disconnect"
-    }
-];
+/** The ways to remove a server, in the order they are offered; each one's words
+ *  are `remove.modes.<mode>` in the `servers` catalog. */
+const MODES: readonly ServerRemovalMode[] = ["disconnect", "clean", "move"];
 
 export function RemoveServerDialog({
     server,
@@ -58,6 +32,7 @@ export function RemoveServerDialog({
     onClose: () => void;
     onRemoved: (result: RemoveServerResult) => void;
 }) {
+    const t = useTranslations("servers");
     const [plan, setPlan] = useState<ServerRemovalPlan | null>(null);
     const [mode, setMode] = useState<ServerRemovalMode>("clean");
     const [destination, setDestination] = useState("");
@@ -94,7 +69,7 @@ export function RemoveServerDialog({
             if (result.error) {
                 setError(
                     result.moved && result.moved.length > 0
-                        ? `${result.error}. Moved first: ${result.moved.join(", ")}. The server is still connected.`
+                        ? t("remove.partlyMoved", { reason: result.error, names: result.moved.join(", ") })
                         : result.error
                 );
                 return;
@@ -107,16 +82,20 @@ export function RemoveServerDialog({
     const services = plan?.services ?? [];
     const running = services.filter((service) => service.deployed).length;
     const canMove = (plan?.destinations.length ?? 0) > 0;
-    const choices = CHOICES.filter((choice) => choice.mode !== "move" || canMove);
+    const choices = MODES.filter((one) => one !== "move" || canMove).map((one) => ({
+        mode: one,
+        label: t(`remove.modes.${one}.label`),
+        summary: t(`remove.modes.${one}.summary`)
+    }));
 
     return (
         <ConfirmDeleteDialog
             open={server !== null}
             onOpenChange={(open) => !open && !pending && onClose()}
             name={server?.name ?? ""}
-            kind="server"
-            confirmLabel={CHOICES.find((choice) => choice.mode === mode)?.confirmLabel}
-            description="Polaris stops reaching this machine. What happens to what it is running is up to you."
+            kind={t("remove.kind")}
+            confirmLabel={t(`remove.modes.${mode}.confirm`)}
+            description={t("remove.intro")}
             error={error}
             pending={pending}
             onConfirm={remove}
@@ -152,7 +131,7 @@ export function RemoveServerDialog({
 
                 {mode === "move" && plan ? (
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">Move the services to</span>
+                        <span className="text-xs text-muted-foreground">{t("remove.moveTo")}</span>
                         <Select
                             value={destination}
                             onValueChange={setDestination}
@@ -161,9 +140,7 @@ export function RemoveServerDialog({
                         />
                         {plan.localVolumes > 0 ? (
                             <span className="text-xs text-warning">
-                                {plan.localVolumes === 1 ? "One volume" : `${plan.localVolumes} volumes`} on this
-                                machine {plan.localVolumes === 1 ? "is" : "are"} re-created empty on the new server.
-                                Copy anything you need off it first.
+                                {t("remove.volumes", { count: plan.localVolumes })}
                             </span>
                         ) : null}
                     </label>
@@ -172,7 +149,7 @@ export function RemoveServerDialog({
                 {pending && mode === "move" ? (
                     <p className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="size-3.5 animate-spin" />
-                        Moving the services. Each one is a full deploy, so this takes a few minutes - leave this open.
+                        {t("remove.moving")}
                     </p>
                 ) : null}
             </div>
@@ -190,11 +167,12 @@ function Inventory({
     services: number;
     running: number;
 }) {
+    const t = useTranslations("servers");
     if (services === 0 && plan.runnerPools === 0) {
         return (
             <p className="flex items-start gap-2 rounded-md border border-border bg-surface/60 px-3 py-2 text-xs text-muted-foreground">
                 <Server className="mt-0.5 size-3.5 shrink-0" />
-                Nothing is deployed on this server.
+                {t("remove.nothing")}
             </p>
         );
     }
@@ -203,18 +181,8 @@ function Inventory({
             <p className="flex items-start gap-2">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 <span>
-                    {services > 0 ? (
-                        <>
-                            {services} {services === 1 ? "service" : "services"} live here
-                            {running > 0 ? `, ${running} running right now` : ""}.
-                        </>
-                    ) : null}{" "}
-                    {plan.runnerPools > 0 ? (
-                        <>
-                            {plan.runnerPools} {plan.runnerPools === 1 ? "runner pool" : "runner pools"} lose the
-                            machine they run on.
-                        </>
-                    ) : null}
+                    {services > 0 ? t("remove.services", { count: services, running }) : null}{" "}
+                    {plan.runnerPools > 0 ? t("remove.pools", { count: plan.runnerPools }) : null}
                 </span>
             </p>
             {plan.services.length > 0 ? (
@@ -223,7 +191,7 @@ function Inventory({
                         .slice(0, 6)
                         .map((service) => `${service.project}/${service.name}`)
                         .join(", ")}
-                    {plan.services.length > 6 ? ` and ${plan.services.length - 6} more` : ""}
+                    {plan.services.length > 6 ? t("remove.andMore", { count: plan.services.length - 6 }) : ""}
                 </p>
             ) : null}
         </div>

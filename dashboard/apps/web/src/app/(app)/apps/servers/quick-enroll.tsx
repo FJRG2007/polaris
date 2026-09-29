@@ -20,17 +20,13 @@ import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
 import { Check, Copy, Terminal, TriangleAlert } from "lucide-react";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
+import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { cancelEnrollmentAction, enrollmentStatusAction, openEnrollmentAction } from "./actions";
 
 /** How often the page asks whether the machine has called home. Frequent enough
  *  to feel immediate, slow enough that a forgotten open dialog is not a load. */
 const POLL_MS = 2000;
-
-const ENVIRONMENT_OPTIONS = [
-    ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: ENVIRONMENT_META[value].label })),
-    { value: "unknown", label: "Not sure yet" }
-];
 
 interface Opened {
     id: string;
@@ -42,6 +38,12 @@ interface Opened {
 }
 
 export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
+    const t = useTranslations("servers");
+    const tc = useTranslations("components");
+    const environmentOptions = [
+        ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: environmentWords(tc, value).label })),
+        { value: "unknown", label: t("host.notSure") }
+    ];
     const router = useRouter();
     const isLocal = kind === "local";
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
@@ -81,7 +83,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 return;
             }
             if (status.state === "failed") {
-                setWaitError(status.error ?? "The machine could not be registered");
+                setWaitError(status.error ?? t("enroll.notRegistered"));
                 setStillUsable(status.retryable);
                 // Only a spent command is the end of the road. While the token is
                 // still good the poll stays alive, so the operator who fixes the
@@ -99,8 +101,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 // the refusal was reported to avoid, one lifetime later.
                 setWaitError(
                     status.error
-                        ? `${status.error} This command has since expired, so generate a new one.`
-                        : "This command expired before the machine ran it"
+                        ? t("enroll.expiredAfter", { reason: status.error })
+                        : t("enroll.expired")
                 );
                 return;
             }
@@ -113,21 +115,21 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             live = false;
             clearInterval(timer);
         };
-    }, [opened, onDone, router]);
+    }, [opened, onDone, router, t]);
 
     async function generate() {
         setPending(true);
         setError(null);
         const result = await openEnrollmentAction({
             kind,
-            name: name.trim() || (isLocal ? "This server" : "New server"),
+            name: name.trim() || (isLocal ? t("enroll.thisServer") : t("enroll.newServer")),
             // This machine's location is already settled elsewhere (it is where
             // Polaris runs), so enrolling it never re-asks.
             environment: isLocal ? "unknown" : environment
         });
         setPending(false);
         if (result.error || !result.enrollment) {
-            setError(result.error ?? "Could not start the enrollment");
+            setError(result.error ?? t("enroll.notStarted"));
             return;
         }
         setOpened(result.enrollment);
@@ -146,8 +148,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
         return (
             <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    Run this on the server. It works once and expires{" "}
-                    <RelativeExpiry at={opened.expiresAt} />.
+                    <RelativeExpiry at={opened.expiresAt} />
                 </p>
 
                 <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3">
@@ -158,8 +159,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                     <Button
                         size="icon"
                         variant="ghost"
-                        aria-label="Copy the command"
-                        title="Copy the command"
+                        aria-label={t("enroll.copy")}
+                        title={t("enroll.copy")}
                         onClick={() => {
                             void navigator.clipboard.writeText(showing.command);
                             setCopied(true);
@@ -173,7 +174,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                     <label className="flex items-start gap-2 text-sm">
                         <Checkbox
                             checked={overLan}
-                            aria-label="Point the command at the local address"
+                            aria-label={t("enroll.lanLabel")}
                             onChange={(event) => {
                                 setOverLan(event.target.checked);
                                 setCopied(false);
@@ -181,9 +182,14 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                             className="mt-0.5"
                         />
                         <span className="text-muted-foreground">
-                            This server cannot reach the internet. Point the command at{" "}
-                            <code className="font-mono text-xs">{local.base}</code> instead, which only
-                            works from the same network.
+                            {t.rich("enroll.lan", {
+                                base: local.base,
+                                code: (chunks) => (
+                                    <code key="base" className="font-mono text-xs">
+                                        {chunks}
+                                    </code>
+                                )
+                            })}
                         </span>
                     </label>
                 ) : null}
@@ -191,8 +197,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 {showing.insecureTransport ? (
                     <Notice>
                         {overLan && local
-                            ? "The local address has no certificate, so this command pipes an unencrypted download into a root shell. It stays on your own network, which is the trade being made."
-                            : "Polaris is only reachable over plain HTTP here, so this command pipes an unencrypted download into a root shell. Set a domain with HTTPS under Admin > Domains before running it on anything you do not fully trust the network of."}
+                            ? t("enroll.insecureLan")
+                            : t("enroll.insecure")}
                     </Notice>
                 ) : null}
 
@@ -201,18 +207,17 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                         <p className="text-sm text-danger">{waitError}</p>
                         {stillUsable ? (
                             <p className="text-sm text-muted-foreground">
-                                It was not used, so the command above still works. Fix that and run it
-                                again before it expires - this picks it up on its own.
+                                {t("enroll.stillUsable")}
                             </p>
                         ) : null}
                     </div>
                 ) : (
-                    <p className="text-sm text-muted-foreground">Waiting for the server to check in...</p>
+                    <p className="text-sm text-muted-foreground">{t("enroll.waiting")}</p>
                 )}
 
                 <div className="mt-1 flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => void discard()}>
-                        {waitError && !stillUsable ? "Start over" : "Cancel this command"}
+                        {waitError && !stillUsable ? t("enroll.startOver") : t("enroll.cancel")}
                     </Button>
                 </div>
             </div>
@@ -223,60 +228,56 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
                 {isLocal ? (
-                    <>
-                        Polaris runs in a container, so it reaches this machine through its container
-                        engine and nothing else - which is why it has no shell here. Run this command on
-                        the machine itself and it joins like any other server: a dedicated{" "}
-                        <code className="font-mono text-xs">polaris</code> login with no password,
-                        authorized for one key Polaris keeps.
-                    </>
+                    t.rich("enroll.introLocal", { code: loginCode })
                 ) : (
-                    <>
-                        Polaris generates a command you run on the server. It creates a dedicated{" "}
-                        <code className="font-mono text-xs">polaris</code> login with no password,
-                        authorizes one key Polaris keeps, and registers the machine. No credential of
-                        yours is typed anywhere.
-                    </>
+                    t.rich("enroll.intro", { code: loginCode })
                 )}
             </p>
 
             {isLocal ? null : (
                 <label className="flex flex-col gap-1 text-sm">
-                    Name (optional)
+                    {t("enroll.name")}
                     <Input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="Its hostname is used when you leave this empty"
+                        placeholder={t("enroll.namePlaceholder")}
                     />
                 </label>
             )}
 
             {isLocal ? null : (
                 <label className="flex flex-col gap-1 text-sm">
-                    Where it lives
+                    {t("host.where")}
                     <Select
                         value={environment}
                         onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
-                        options={ENVIRONMENT_OPTIONS}
+                        options={environmentOptions}
                     />
-                    <span className="text-xs text-muted-foreground">{ENVIRONMENT_META[environment].routing}</span>
+                    <span className="text-xs text-muted-foreground">{environmentWords(tc, environment).routing}</span>
                 </label>
             )}
 
             <p className="text-xs text-muted-foreground">
-                The command adds a dedicated login, lets it manage containers and gives it
-                password-less sudo, which is what deploying, CI jobs and the file browser need. Undo
-                it later by deleting the login and /etc/sudoers.d/polaris.
+                {t("enroll.grants")}
             </p>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             <div className="mt-1 flex justify-end">
                 <Button onClick={() => void generate()} disabled={pending}>
-                    {pending ? "Generating..." : "Generate the command"}
+                    {pending ? t("enroll.generating") : t("enroll.generate")}
                 </Button>
             </div>
         </div>
+    );
+}
+
+/** The `polaris` login, set in code wherever the intro names it. */
+function loginCode(chunks: React.ReactNode) {
+    return (
+        <code key="login" className="font-mono text-xs">
+            {chunks}
+        </code>
     );
 }
 
@@ -292,11 +293,12 @@ function Notice({ children }: { children: React.ReactNode }) {
 /** Minutes left on the command, recomputed as it counts down so a dialog left
  *  open does not keep claiming the command is still good. */
 function RelativeExpiry({ at }: { at: string }) {
+    const t = useTranslations("servers");
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 30_000);
         return () => clearInterval(timer);
     }, []);
     const minutes = Math.max(0, Math.round((new Date(at).getTime() - now) / 60_000));
-    return <span>{minutes === 0 ? "in under a minute" : `in ${minutes} min`}</span>;
+    return <span>{t("enroll.runOnce", { minutes })}</span>;
 }

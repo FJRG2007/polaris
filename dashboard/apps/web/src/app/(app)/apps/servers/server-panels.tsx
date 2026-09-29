@@ -19,10 +19,13 @@ import type { LocalPath } from "@/lib/server-local-path";
 import { findLocalPathAction, renameServerAction, useLocalPathAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Name the server. Save stays disabled until the value actually differs, so a
  *  field touched and put back cannot write the name it already had. */
 export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed: () => void }) {
+    const t = useTranslations("servers");
+    const tcommon = useTranslations("common");
     const [name, setName] = useState(server.name);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -45,18 +48,18 @@ export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed
 
     return (
         <label className="flex flex-col gap-1 text-sm">
-            Name
+            {t("host.name")}
             <span className="flex gap-2">
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder={local ? "This server" : undefined}
+                    placeholder={local ? t("enroll.thisServer") : undefined}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
                 />
                 <Button variant="secondary" disabled={!changed || pending} onClick={() => void save()}>
-                    {pending ? "Saving..." : "Save"}
+                    {pending ? tcommon("actions.saving") : tcommon("actions.save")}
                 </Button>
             </span>
             {error ? <span className="text-xs text-danger">{error}</span> : null}
@@ -67,29 +70,35 @@ export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed
 /** Whether it answered, and how long it took. The local box is never probed - it
  *  is the machine serving this page. */
 export function Reachability({ server, status }: { server: ServerRow; status: ServerStatus | null }) {
+    const t = useTranslations("servers");
     if (server.kind === "local") {
-        return <p className="text-sm text-muted-foreground">Running Polaris, so it is up by definition.</p>;
+        return <p className="text-sm text-muted-foreground">{t("reach.local")}</p>;
     }
-    if (!status) return <p className="text-sm text-muted-foreground">Checking whether it answers...</p>;
+    if (!status) return <p className="text-sm text-muted-foreground">{t("reach.checking")}</p>;
     if (status.state === "up") {
         return (
             <p className="text-sm text-success">
-                Answering on port {server.port ?? 22}
-                {status.latencyMs === null ? "" : ` in ${status.latencyMs} ms`}.
+                {status.latencyMs === null
+                    ? t("reach.up", { port: server.port ?? 22 })
+                    : t("reach.upIn", { port: server.port ?? 22, ms: status.latencyMs })}
             </p>
         );
     }
-    return <p className="text-sm text-danger">Not answering: {status.detail ?? "no reason given"}.</p>;
+    return (
+        <p className="text-sm text-danger">
+            {t("reach.down", { reason: status.detail ?? t("reach.noReason") })}
+        </p>
+    );
 }
 
 /** The Polaris box has no SSH login of its own to hand out - nothing enrolled it,
  *  so there is no account and no key. Say what to do instead of leaving an empty
  *  section where the commands are for every other server. */
 export function LocalNote() {
+    const t = useTranslations("servers");
     return (
         <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            Polaris has no login of its own on this machine, so there is nothing to copy here. Sign in the way you
-            already do, or add it with Add server to get a shell and its files in Polaris too.
+            {t("connect.localNote")}
         </p>
     );
 }
@@ -113,6 +122,7 @@ export function LocalNote() {
  * again before it is written down.
  */
 export function LocalPathPanel({ server }: { server: ServerRow }) {
+    const t = useTranslations("servers");
     const [path, setPath] = useState<LocalPath | null>(null);
     const [busy, setBusy] = useState(false);
     const [moved, setMoved] = useState("");
@@ -153,59 +163,59 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-col">
-                    <span className="text-sm font-medium">On this network</span>
+                    <span className="text-sm font-medium">{t("lan.title")}</span>
                     <span className="text-xs text-muted-foreground">
-                        Polaris reaches this server at {server.address}. A direct address on this
-                        network is faster and keeps working when the internet does not - and if the
-                        machine has moved, this is what finds it again.
+                        {t("lan.intro", { address: server.address })}
                     </span>
                 </div>
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => void check()}>
-                    {busy ? "Checking..." : "Check"}
+                    {busy ? t("status.checking") : t("lan.check")}
                 </Button>
             </div>
 
             {moved ? (
-                <p className="text-sm text-success">Now reached at {moved}.</p>
+                <p className="text-sm text-success">{t("lan.moved", { address: moved })}</p>
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
             {path?.kind === "found" ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm">
-                        {path.moved
-                            ? // Found by looking rather than by asking, which
-                              // means the address on record had stopped reaching
-                              // it - almost always a DHCP lease that moved.
-                              "It is not where Polaris had it recorded any more."
-                            : "It answers directly at"}{" "}
-                        <span className="font-mono">{path.address}</span>
-                        {path.moved ? " is this same server - its host key proves it." : "."}
+                        {/* Found by looking rather than by asking, which means the
+                            address on record had stopped reaching it - almost always
+                            a DHCP lease that moved. */}
+                        {t.rich(path.moved ? "lan.foundMoved" : "lan.found", {
+                            address: path.address,
+                            mono: (chunks) => (
+                                <span key="address" className="font-mono">
+                                    {chunks}
+                                </span>
+                            )
+                        })}
                     </p>
                     <Button size="sm" disabled={busy} onClick={() => void move(path.address)}>
-                        Use it
+                        {t("lan.use")}
                     </Button>
                 </div>
             ) : null}
             {path?.kind === "already" ? (
                 <p className="text-sm text-muted-foreground">
-                    Already reached directly, at {path.address}.
+                    {t("lan.already", { address: path.address })}
                 </p>
             ) : null}
             {path?.kind === "none" ? (
                 <p className="text-sm text-muted-foreground">
-                    It has no address on this network, so it really is somewhere else.
+                    {t("lan.none")}
                 </p>
             ) : null}
             {path?.kind === "unreachable" ? (
                 <p className="text-sm text-muted-foreground">
-                    It is not answering where Polaris knows it, and nothing on this network answers
-                    with its host key. It is switched off, or somewhere else.
+                    {t("lan.unreachable")}
                 </p>
             ) : null}
             {path?.kind === "unknown" ? (
                 <p className="text-sm text-muted-foreground">
-                    Polaris does not know its own address on this network, so it cannot tell what is near it.
+                    {t("lan.unknown")}
                 </p>
             ) : null}
         </div>
@@ -214,6 +224,7 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
 
 /** Everything an operator needs to reach the machine with their own tools. */
 export function Connect({ server }: { server: ServerRow }) {
+    const t = useTranslations("servers");
     const port = server.port ?? 22;
     const account = `${server.detail}@${server.address}`;
     const ssh = port === 22 ? `ssh ${account}` : `ssh -p ${port} ${account}`;
@@ -221,36 +232,40 @@ export function Connect({ server }: { server: ServerRow }) {
 
     return (
         <div className="flex flex-col gap-3">
-            <Command label="a shell" value={ssh} />
-            <Command label="a file transfer" value={sftp} />
+            <Command label={t("connect.forShell")} value={ssh} />
+            <Command label={t("connect.forTransfer")} value={sftp} />
 
             <div className="flex flex-col gap-1">
-                <span className="text-sm">Or in a file manager</span>
+                <span className="text-sm">{t("connect.fileManager")}</span>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md border border-border p-3 text-xs">
-                    <Field label="Protocol" value="SFTP (SSH)" />
-                    <Field label="Host" value={server.address} copyable />
-                    <Field label="Port" value={String(port)} />
-                    <Field label="Username" value={server.detail} copyable />
-                    <Field label="Sign in with" value={server.authMethod === "key" ? "Private key" : "Password"} />
+                    <Field label={t("connect.protocol")} value="SFTP (SSH)" />
+                    <Field label={t("connect.host")} value={server.address} copyable />
+                    <Field label={t("host.port")} value={String(port)} />
+                    <Field label={t("host.username")} value={server.detail} copyable />
+                    <Field
+                        label={t("connect.signInWith")}
+                        value={server.authMethod === "key" ? t("host.privateKey") : t("host.password")}
+                    />
                 </dl>
             </div>
 
             <p className="text-xs text-muted-foreground">
                 {server.authMethod === "key"
-                    ? "The key Polaris uses stays in Polaris, so these connect with your own credentials for that account."
-                    : "Use the password this server was registered with."}
+                    ? t("connect.keyNote")
+                    : t("connect.passwordNote")}
             </p>
         </div>
     );
 }
 
 function Command({ label, value }: { label: string; value: string }) {
+    const t = useTranslations("servers");
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-sm">For {label}</span>
+            <span className="text-sm">{label}</span>
             <span className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
                 <code className="flex-1 break-all font-mono text-xs">{value}</code>
-                <CopyButton value={value} label="the command" />
+                <CopyButton value={value} label={t("connect.theCommand")} />
             </span>
         </div>
     );

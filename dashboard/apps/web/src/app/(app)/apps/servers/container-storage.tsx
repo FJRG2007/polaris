@@ -26,6 +26,7 @@ import type { HostSpace } from "@/lib/deploy/host-space";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useLiveRead } from "@/components/use-live-resource";
 import { hostSpaceAction, reclaimBuildCacheAction, reclaimHostSpaceAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Slow: this is a picture of a disk, and a disk does not change between two
  *  glances at it. Re-read straight after a reclaim, which is when it does. */
@@ -41,6 +42,7 @@ function size(bytes: number): string {
 }
 
 export function ContainerStorage() {
+    const t = useTranslations("servers");
     const [freeing, setFreeing] = useState(false);
     const [freed, setFreed] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -64,10 +66,10 @@ export function ContainerStorage() {
     if (!space) return null;
 
     const rows = [
-        { label: "Images", value: space.images },
-        { label: "Volumes", value: space.volumes },
-        { label: "Build cache", value: space.buildCache },
-        { label: "Containers", value: space.containers }
+        { id: "images", label: t("space.images"), value: space.images },
+        { id: "volumes", label: t("storage.volumes"), value: space.volumes },
+        { id: "buildCache", label: t("space.buildCache"), value: space.buildCache },
+        { id: "containers", label: t("detail.containers"), value: space.containers }
     ];
     const worth = space.reclaimable >= WORTH_RECLAIMING;
 
@@ -89,13 +91,13 @@ export function ContainerStorage() {
         <section className="flex flex-col gap-2">
             <h2 className="flex items-center gap-1.5 text-sm font-medium">
                 <HardDrive className="size-4 shrink-0 text-muted-foreground" />
-                Container storage
+                {t("space.title")}
             </h2>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {rows.map((row) => (
                     <div
-                        key={row.label}
+                        key={row.id}
                         className="flex items-start justify-between gap-1 rounded-lg border border-border bg-surface px-3 py-2"
                     >
                         <div className="min-w-0">
@@ -105,19 +107,18 @@ export function ContainerStorage() {
                         {/* The build cache on its own, for somebody who looked at
                             the number and wants exactly that gone. Nothing in it is
                             data: the next build makes it again, more slowly. */}
-                        {row.label === "Build cache" && row.value > 0 ? (
+                        {row.id === "buildCache" && row.value > 0 ? (
                             <button
                                 type="button"
                                 disabled={freeing}
-                                aria-label="Delete the build cache"
-                                title="Delete the build cache"
+                                aria-label={t("space.deleteCache")}
+                                title={t("space.deleteCache")}
                                 className="-mr-1 -mt-0.5 shrink-0 rounded p-1 text-foreground-subtle hover:text-danger disabled:opacity-50"
                                 onClick={() =>
                                     void confirm({
-                                        title: `Delete ${size(row.value)} of build cache?`,
-                                        description:
-                                            "It is only what past builds left to speed up the next ones. Nothing running is affected; the next build of each app takes longer while it is made again.",
-                                        confirmLabel: "Delete build cache",
+                                        title: t("space.deleteCacheTitle", { size: size(row.value) }),
+                                        description: t("space.deleteCacheBody"),
+                                        confirmLabel: t("space.deleteCacheConfirm"),
                                         danger: true
                                     }).then((agreed) => {
                                         if (agreed) void free("build-cache");
@@ -134,13 +135,13 @@ export function ContainerStorage() {
             <div className="flex flex-wrap items-center gap-2">
                 <p className={cn("text-xs", worth ? "text-foreground" : "text-muted-foreground")}>
                     {worth
-                        ? `About ${size(space.reclaimable)} of that is build cache and images nothing is running. Freeing it costs nothing but the time to build or pull them again - an app that is stopped keeps its data and fetches its image on the next start. Your volumes are not touched, and a release kept for a rollback is not either.`
-                        : "There is nothing worth reclaiming here. Volumes are never touched by this."}
+                        ? t("space.reclaimable", { size: size(space.reclaimable) })
+                        : t("space.nothingWorth")}
                 </p>
                 {worth ? (
                     <Button variant="secondary" size="sm" disabled={freeing} onClick={() => void free()}>
                         {freeing ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        {freeing ? "Freeing" : "Free up space"}
+                        {freeing ? t("space.freeing") : t("space.free")}
                     </Button>
                 ) : null}
             </div>
@@ -149,7 +150,7 @@ export function ContainerStorage() {
                 the daemon decides when it runs, and it reports exactly. */}
             {freed !== null ? (
                 <p className="text-xs text-success">
-                    {freed > 0 ? `${size(freed)} given back.` : "Nothing was left to remove."}
+                    {freed > 0 ? t("space.freed", { size: size(freed) }) : t("space.nothingLeft")}
                 </p>
             ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}

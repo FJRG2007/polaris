@@ -27,7 +27,7 @@ import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-li
 import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
 import { Badge, Button, Checkbox, DnsRecordTable, Input, Select, Skeleton } from "@polaris/ui";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
+import { ENVIRONMENT_CHOICES, environmentWords } from "@/app/(app)/apps/servers/environment-meta";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
 import {
     approachesFor,
@@ -458,6 +458,7 @@ function EnvironmentStep({
     onSelect: (next: ServerEnvironment) => void;
 }) {
     const t = useTranslations("admin");
+    const tc = useTranslations("components");
     return (
         <div className="flex flex-col gap-3">
             <StepTitle
@@ -470,7 +471,7 @@ function EnvironmentStep({
             />
             <div className="grid gap-2 sm:grid-cols-2">
                 {ENVIRONMENT_CHOICES.map((option) => {
-                    const meta = ENVIRONMENT_META[option];
+                    const meta = environmentWords(tc, option);
                     return (
                         <button
                             key={option}
@@ -490,7 +491,7 @@ function EnvironmentStep({
                 })}
             </div>
             <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                {ENVIRONMENT_META[selected].routing}
+                {environmentWords(tc, selected).routing}
             </p>
         </div>
     );

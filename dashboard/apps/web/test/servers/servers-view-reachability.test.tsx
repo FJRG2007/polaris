@@ -18,6 +18,7 @@ import type {
     ServerStatus,
     ServerStatusPayload
 } from "../../src/app/(app)/apps/servers/types";
+import { withMessages } from "../setup/i18n";
 
 let statuses: ServerStatus[] = [];
 
@@ -71,7 +72,7 @@ function server(overrides: Partial<ServerRow> = {}): ServerRow {
 
 function render(row: ServerRow, status: ServerStatus): string {
     statuses = [status];
-    return renderToStaticMarkup(<ServersView servers={[row]} />);
+    return renderToStaticMarkup(withMessages(<ServersView servers={[row]} />));
 }
 
 describe("the Servers table on an unreachable machine", () => {
@@ -102,7 +103,7 @@ describe("the Servers table on an unreachable machine", () => {
     it("keeps both while the probe has not answered yet", () => {
         const row = server();
         statuses = [];
-        const markup = renderToStaticMarkup(<ServersView servers={[row]} />);
+        const markup = renderToStaticMarkup(withMessages(<ServersView servers={[row]} />));
 
         expect(markup).toContain("Checking...");
         expect(markup).toContain(`/drive?c=host:${row.hostId}`);

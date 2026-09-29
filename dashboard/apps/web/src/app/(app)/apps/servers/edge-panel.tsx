@@ -26,8 +26,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { ServerEdgeState } from "@/lib/deploy/server-edge";
 import { prepareServerEdgeAction, serverEdgeAction } from "./actions";
 import { CircleAlert, CircleCheck, Loader2, RefreshCw } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function EdgePanel({ hostId }: { hostId: string }) {
+    const t = useTranslations("servers");
     const [state, setState] = useState<ServerEdgeState | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -70,39 +72,39 @@ export function EdgePanel({ hostId }: { hostId: string }) {
 
     return (
         <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">Serving its own domains</h2>
+            <h2 className="text-sm font-medium">{t("edge.title")}</h2>
 
             {elsewhere && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                    Polaris is setting this server up now. This can take a few minutes.
+                    {t("edge.elsewhere")}
                 </p>
             )}
 
             {state === null ? (
                 <p className="text-sm text-muted-foreground">
-                    Asking this server what it is running...
+                    {t("edge.asking")}
                 </p>
             ) : state.error ? (
                 <p className="text-sm text-muted-foreground">
-                    Polaris could not ask it: {state.error}
+                    {t("edge.askFailed", { reason: state.error })}
                 </p>
             ) : (
                 <div className="flex flex-col gap-1.5 rounded-md border border-border p-3">
                     <Line
                         good={state.traefik}
-                        yes="It answers on 80 and 443 itself, so a domain pointed here keeps working while Polaris is off."
-                        no="Nothing here is answering on 80 and 443, so a domain pointed at this server reaches nothing."
+                        yes={t("edge.traefikYes")}
+                        no={t("edge.traefikNo")}
                     />
                     <Line
                         good={state.guard}
-                        yes="The firewall's decision-maker is running beside it."
-                        no="No firewall decision-maker: an address allowlist still applies, a denylist, a rule pack or a sign-in rule cannot."
+                        yes={t("edge.guardYes")}
+                        no={t("edge.guardNo")}
                     />
                     <Line
                         good={state.pushable}
-                        yes="It takes routes and firewall changes from Polaris as they happen."
-                        no="It only reads what a deployed container tells it, so a new domain or an edited firewall rule waits for that service to be built again, and a deploy replaces the running version with a short gap."
+                        yes={t("edge.pushYes")}
+                        no={t("edge.pushNo")}
                     />
                 </div>
             )}
@@ -134,16 +136,10 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                     ) : (
                         <RefreshCw className="size-4 shrink-0" />
                     )}
-                    {busy || elsewhere
-                        ? "Setting it up"
-                        : ready
-                          ? "Set it up again"
-                          : "Set this server up"}
+                    {busy || elsewhere ? t("edge.settingUp") : ready ? t("edge.again") : t("edge.setUp")}
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                    Installs Docker if it is missing, and starts this server&apos;s own edge. It
-                    replaces the running one, so anything this server is serving stops for a second
-                    or two.
+                    {t("edge.hint")}
                 </span>
             </div>
         </section>

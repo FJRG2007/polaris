@@ -27,6 +27,7 @@ import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper, withMessages } from "../setup/i18n";
 
 /** sessionStorage as the cache expects it; jsdom is not loaded for these tests. */
 class MemoryStorage {
@@ -61,7 +62,7 @@ const { ServerUsage } = await import("../../src/app/(app)/apps/servers/server-us
 
 /** What the browser shows first. */
 function paint(element: ReactElement): string {
-    return render(element).container.innerHTML;
+    return render(element, { wrapper: MessagesWrapper }).container.innerHTML;
 }
 
 const metrics: ServerMetrics = {
@@ -116,7 +117,7 @@ describe("A server's usage panel", () => {
     it("leaves the kept reading out of the server's markup, which hydration has to match", () => {
         writeSnapshot("personal:servers.usage.host-a", metrics);
 
-        const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
+        const markup = renderToStaticMarkup(withMessages(<ServerUsage hostId="host-a" />));
 
         expect(markup).not.toContain("polaris-web-110");
         expect(markup).toContain("animate-pulse");

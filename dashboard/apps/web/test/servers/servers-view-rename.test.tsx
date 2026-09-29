@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import type { ServerRow } from "../../src/app/(app)/apps/servers/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 let renames: unknown[] = [];
 let renameAnswer: { error?: string } = {};
@@ -91,7 +92,7 @@ beforeEach(() => {
     renames = [];
     renameAnswer = {};
     removing = null;
-    render(<ServersView servers={[server()]} machineName="lirio-0" />);
+    render(<ServersView servers={[server()]} machineName="lirio-0" />, { wrapper: MessagesWrapper });
 });
 
 afterEach(cleanup);

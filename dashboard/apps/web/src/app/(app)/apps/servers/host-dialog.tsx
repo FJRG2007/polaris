@@ -15,7 +15,8 @@ import { useRouter } from "next/navigation";
 import { QuickEnroll } from "./quick-enroll";
 import { createHostAction } from "./actions";
 import { useState, type FormEvent } from "react";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
+import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     environmentFromAddress,
     SSH_AUTH_METHODS,
@@ -36,21 +37,19 @@ import {
     DialogDescription
 } from "@polaris/ui";
 
-const AUTH_LABELS: Record<SshAuthMethod, string> = {
-    password: "Password",
-    key: "Private key"
-};
-
-const ENVIRONMENT_OPTIONS = [
-    ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: ENVIRONMENT_META[value].label })),
-    { value: "unknown", label: "Not sure yet" }
-];
 
 /** Which way the operator is adding this one. Quick leads, because it is the one
  *  that does not ask anybody to paste a private key into a browser. */
 type AddMode = "quick" | "manual";
 
 export function HostDialog() {
+    const t = useTranslations("servers");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
+    const environmentOptions = [
+        ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: environmentWords(tc, value).label })),
+        { value: "unknown", label: t("host.notSure") }
+    ];
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [mode, setMode] = useState<AddMode>("quick");
@@ -110,23 +109,21 @@ export function HostDialog() {
             <DialogTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <Plus className="size-4" />
-                    Add server
+                    {t("host.add")}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a server</DialogTitle>
-                    <DialogDescription>
-                        An SSH host, reusable in Containers (Docker) and Drive (SFTP).
-                    </DialogDescription>
+                    <DialogTitle>{t("host.title")}</DialogTitle>
+                    <DialogDescription>{t("host.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="mb-1 flex gap-1 rounded-md bg-muted/40 p-1">
                     <ModeTab active={mode === "quick"} onClick={() => setMode("quick")}>
-                        Run a command
+                        {t("host.quick")}
                     </ModeTab>
                     <ModeTab active={mode === "manual"} onClick={() => setMode("manual")}>
-                        Enter SSH details
+                        {t("host.manual")}
                     </ModeTab>
                 </div>
 
@@ -135,11 +132,11 @@ export function HostDialog() {
                 {mode !== "manual" ? null : (
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("host.name")}
                         <Input name="name" required placeholder="nas-01" />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Address
+                        {t("host.address")}
                         <Input
                             name="address"
                             required
@@ -152,49 +149,49 @@ export function HostDialog() {
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            Port
+                            {t("host.port")}
                             <Input name="port" type="number" defaultValue="22" />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Username
+                            {t("host.username")}
                             <Input name="username" required />
                         </label>
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
-                        Where it lives
+                        {t("host.where")}
                         <Select
                             value={environment}
                             onValueChange={(value) => {
                                 setEnvironment(value as ServerEnvironment);
                                 setEnvironmentPicked(true);
                             }}
-                            options={ENVIRONMENT_OPTIONS}
+                            options={environmentOptions}
                         />
                         <span className="text-xs text-muted-foreground">
-                            {ENVIRONMENT_META[environment].routing}
+                            {environmentWords(tc, environment).routing}
                         </span>
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Authentication
+                        {t("host.auth")}
                         <Select
                             value={authMethod}
                             onValueChange={(value) => setAuthMethod(value as SshAuthMethod)}
                             options={SSH_AUTH_METHODS.map((value) => ({
                                 value,
-                                label: AUTH_LABELS[value]
+                                label: value === "password" ? t("host.password") : t("host.privateKey")
                             }))}
                         />
                     </label>
 
                     {authMethod === "password" ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            Password
+                            {t("host.password")}
                             <Input name="password" type="password" required />
                         </label>
                     ) : (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Private key (PEM)
+                                {t("host.pem")}
                                 <Textarea
                                     name="privateKey"
                                     required
@@ -203,7 +200,7 @@ export function HostDialog() {
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Key passphrase (optional)
+                                {t("host.passphrase")}
                                 <Input name="passphrase" type="password" />
                             </label>
                         </>
@@ -213,11 +210,11 @@ export function HostDialog() {
                     <div className="mt-2 flex justify-end gap-2">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">
-                                Cancel
+                                {tcommon("actions.cancel")}
                             </Button>
                         </DialogClose>
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Connecting..." : "Add server"}
+                            {pending ? t("host.connecting") : t("host.add")}
                         </Button>
                     </div>
                 </form>

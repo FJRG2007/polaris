@@ -3,6 +3,7 @@ import { ServersView } from "./servers-view";
 import { listServerRows } from "./server-rows";
 import { requirePermission } from "@/lib/session";
 import { localMachineNameNow } from "@/lib/local-server";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +21,13 @@ export const dynamic = "force-dynamic";
 export default async function ServersPage() {
     const user = await requirePermission("system.manage");
     const servers = await listServerRows(user.id);
+    const t = await getTranslations("servers");
 
     return (
         <>
             <PageHeader
-                title="Servers"
-                description="The box Polaris runs on and every SSH host it manages, reused across Containers (Docker) and Drive (SFTP)."
+                title={t("list.heading")}
+                description={t("page.description")}
             />
             <ServersView servers={servers} machineName={localMachineNameNow()} />
         </>

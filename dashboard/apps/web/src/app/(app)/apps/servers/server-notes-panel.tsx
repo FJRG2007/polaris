@@ -23,8 +23,10 @@ import { describeServerEvent } from "./server-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ServerNotesPanel({ hostId }: { hostId: string }) {
+    const t = useTranslations("servers");
     const [notes, setNotes] = useState<CommentView[] | null>(null);
     const [history, setHistory] = useState<ActivityLine[] | null>(null);
     const [error, setError] = useState("");
@@ -40,7 +42,7 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium">Notes</h2>
+                    <h2 className="text-sm font-medium">{t("detail.tabs.notes")}</h2>
                     <FollowToggle hostId={hostId} />
                 </div>
                 {error ? <p className="text-[0.8125rem] text-danger">{error}</p> : null}
@@ -48,7 +50,7 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
                     comments={notes}
                     canModerate
                     busy={busy}
-                    placeholder="Leave a note about this server"
+                    placeholder={t("notes.placeholder")}
                     onPost={async (body) => {
                         setBusy(true);
                         setError("");
@@ -68,8 +70,8 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
 
             {history && history.length > 0 ? (
                 <section className="flex flex-col gap-2">
-                    <h2 className="text-sm font-medium">History</h2>
-                    <ActivityFeed lines={history} describe={describeServerEvent} />
+                    <h2 className="text-sm font-medium">{t("notes.history")}</h2>
+                    <ActivityFeed lines={history} describe={(line) => describeServerEvent(line, t)} />
                 </section>
             ) : null}
         </div>
@@ -79,6 +81,7 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
 /** Hear about this server, or stop. Optimistic, and rolled back if the server
  *  disagrees - the answer is a boolean it cannot half-apply. */
 function FollowToggle({ hostId }: { hostId: string }) {
+    const t = useTranslations("servers");
     const [following, setFollowing] = useState<boolean | null>(null);
 
     useEffect(() => {
@@ -88,7 +91,7 @@ function FollowToggle({ hostId }: { hostId: string }) {
 
     if (following === null) return null;
 
-    const label = following ? "Stop hearing about this server" : "Hear about this server";
+    const label = following ? t("notes.unfollowHint") : t("notes.followHint");
     return (
         <Button
             variant="ghost"
@@ -104,7 +107,7 @@ function FollowToggle({ hostId }: { hostId: string }) {
             className={cn(following && "text-primary")}
         >
             {following ? <Bell /> : <BellOff />}
-            {following ? "Following" : "Follow"}
+            {following ? t("notes.following") : t("notes.follow")}
         </Button>
     );
 }

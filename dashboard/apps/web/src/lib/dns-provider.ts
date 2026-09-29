@@ -40,7 +40,7 @@ export interface DnsProvider {
 const DNS_PROVIDERS: DnsProvider[] = [
     {
         id: "cloudflare",
-        label: "Cloudflare",
+        label: "Cloudflare", // i18n-ignore brand name
         // Customer zones get `<name>.ns.cloudflare.com`, but not every Cloudflare zone
         // does (`ns3.cloudflare.com` and friends serve some), and any nameserver under
         // the domain is theirs either way. Foundation DNS is the same company under a
@@ -53,116 +53,116 @@ const DNS_PROVIDERS: DnsProvider[] = [
     },
     {
         id: "route53",
-        label: "AWS Route 53",
+        label: "AWS Route 53", // i18n-ignore brand name
         match: [".awsdns-"],
         url: () => "https://console.aws.amazon.com/route53/v2/hostedzones"
     },
     {
         id: "godaddy",
-        label: "GoDaddy",
+        label: "GoDaddy", // i18n-ignore brand name
         match: [".domaincontrol.com", ".godaddy.com"],
         url: () => "https://dcc.godaddy.com/domains"
     },
     {
         id: "namecheap",
-        label: "Namecheap",
+        label: "Namecheap", // i18n-ignore brand name
         match: [".registrar-servers.com"],
         url: (zone) => `https://ap.www.namecheap.com/Domains/DomainControlPanel/${zone}/advancedns`
     },
     {
         id: "hostinger",
-        label: "Hostinger",
+        label: "Hostinger", // i18n-ignore brand name
         match: [".dns-parking.com"],
         url: () => "https://hpanel.hostinger.com/domains"
     },
     {
         id: "vercel",
-        label: "Vercel",
+        label: "Vercel", // i18n-ignore brand name
         match: [".vercel-dns.com"],
         url: () => "https://vercel.com/dashboard/domains"
     },
-    { id: "ns1", label: "NS1 / Netlify", match: [".nsone.net"] },
+    { id: "ns1", label: "NS1 / Netlify", match: [".nsone.net"] }, // i18n-ignore brand name
     {
         id: "digitalocean",
-        label: "DigitalOcean",
+        label: "DigitalOcean", // i18n-ignore brand name
         match: [".digitalocean.com"],
         url: () => "https://cloud.digitalocean.com/networking/domains"
     },
     {
         id: "google",
-        label: "Google Cloud DNS",
+        label: "Google Cloud DNS", // i18n-ignore brand name
         match: [".googledomains.com"],
         url: () => "https://console.cloud.google.com/net-services/dns/zones"
     },
     {
         id: "squarespace",
-        label: "Squarespace",
+        label: "Squarespace", // i18n-ignore brand name
         match: [".squarespacedns.com"],
         url: () => "https://account.squarespace.com/domains"
     },
     {
         id: "azure",
-        label: "Azure DNS",
+        label: "Azure DNS", // i18n-ignore brand name
         match: [".azure-dns."],
         url: () => "https://portal.azure.com"
     },
     {
         id: "ovh",
-        label: "OVH",
+        label: "OVH", // i18n-ignore brand name
         match: [".ovh.net"],
         url: () => "https://www.ovh.com/manager/#/web/domain"
     },
-    { id: "ionos", label: "IONOS", match: [".ui-dns."], url: () => "https://my.ionos.com/domains" },
+    { id: "ionos", label: "IONOS", match: [".ui-dns."], url: () => "https://my.ionos.com/domains" }, // i18n-ignore brand name
     {
         id: "gandi",
-        label: "Gandi",
+        label: "Gandi", // i18n-ignore brand name
         match: [".gandi.net"],
         url: () => "https://admin.gandi.net/domain"
     },
     {
         id: "hetzner",
-        label: "Hetzner",
+        label: "Hetzner", // i18n-ignore brand name
         match: [".hetzner.com", ".hetzner.de", ".your-server.de"],
         url: () => "https://dns.hetzner.com"
     },
     {
         id: "porkbun",
-        label: "Porkbun",
+        label: "Porkbun", // i18n-ignore brand name
         match: [".porkbun.com"],
         url: () => "https://porkbun.com/account/domainsSpeedy"
     },
     {
         id: "dnsimple",
-        label: "DNSimple",
+        label: "DNSimple", // i18n-ignore brand name
         match: [".dnsimple.com"],
         url: () => "https://dnsimple.com/domains"
     },
     {
         id: "name-com",
-        label: "Name.com",
+        label: "Name.com", // i18n-ignore brand name
         match: [".name.com"],
         url: () => "https://www.name.com/account/domain"
     },
     {
         id: "linode",
-        label: "Akamai / Linode",
+        label: "Akamai / Linode", // i18n-ignore brand name
         match: [".linode.com"],
         url: () => "https://cloud.linode.com/domains"
     },
-    { id: "bunny", label: "Bunny DNS", match: [".bunny.net"], url: () => "https://dash.bunny.net" },
+    { id: "bunny", label: "Bunny DNS", match: [".bunny.net"], url: () => "https://dash.bunny.net" }, // i18n-ignore brand name
     {
         id: "duckdns",
-        label: "DuckDNS",
+        label: "DuckDNS", // i18n-ignore brand name
         match: [".duckdns.org"],
         url: () => "https://www.duckdns.org/domains"
     },
     {
         id: "dondominio",
-        label: "DonDominio",
+        label: "DonDominio", // i18n-ignore brand name
         match: [".dondominio.com"],
         url: () => "https://www.dondominio.com/panel/"
     },
-    { id: "cdmon", label: "cdmon", match: [".cdmon.net", ".cdmon.com"] }
+    { id: "cdmon", label: "cdmon", match: [".cdmon.net", ".cdmon.com"] } // i18n-ignore brand name
 ];
 
 /** What the wizard renders from - plain data, so it crosses the server-action boundary. */
