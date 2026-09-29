@@ -429,6 +429,9 @@ async function returnOne(
     items: stage.Flavour["items"],
     language: catalog.Language
 ): Promise<boolean> {
+    // Sent back by an end that was stopped before it wrote so: not moved again.
+    const say = (line: string) => server.say([line]);
+    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return true;
     if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
     await server.sayAll(
         stage.afterReturnLines(

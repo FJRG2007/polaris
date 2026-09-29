@@ -1717,9 +1717,9 @@ describe("what an arena sends", () => {
     it("brings a player in protected, in adventure mode, and tagged", () => {
         expect(stage.admitLines("Ana", { x: 10.5, y: 101, z: -3.5, yaw: -90 })).toEqual([
             "effect give Ana minecraft:resistance 10 4 true",
+            "tag Ana add pe_in",
             "execute in minecraft:overworld run tp Ana 10.500 101.000 -3.500 -90.0 0.0",
-            "gamemode adventure Ana",
-            "tag Ana add pe_in"
+            "gamemode adventure Ana"
         ]);
     });
 

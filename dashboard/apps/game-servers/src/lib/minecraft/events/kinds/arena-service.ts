@@ -352,7 +352,8 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 pitch: turned.pitch,
                 gamemode,
                 side: duelling ? index % 2 : index,
-                away: true
+                away: true,
+                tagged: true
             });
         }
         if (run.entrants.length + fresh.length < catalog.joinersNeeded(run.preset)) {
@@ -713,11 +714,15 @@ export async function closeArena(
         for (; index < left.entrants.length; index += 1) {
             const one = left.entrants[index]!;
             if (!one.away || !arena.commandable(one)) continue;
+            // Sent back by an end that was stopped before it wrote so: not moved again.
+            const say = (line: string) => server.say([line]);
+            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) continue;
             await server.sayAll(arena.homeward(one, left.marker, left.kit));
             if (!arena.wentHome(await server.say([arena.sendHome(one)]))) {
                 remaining.push(one);
                 continue;
             }
+            await server.say([arena.leftArena(one.name)]);
             const thrown = box ? arena.sendThrown(box, one) : null;
             if (thrown) await server.say([thrown]);
             if (language) {

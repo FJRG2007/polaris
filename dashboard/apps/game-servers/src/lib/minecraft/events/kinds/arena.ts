@@ -256,13 +256,23 @@ export interface Spot {
     readonly pitch?: number;
 }
 
+/** The tag everybody an arena took in carries until they are sent back. */
+export const IN_ARENA = "pe_arena";
+
 /** Into the arena, standing on its floor, in adventure mode: nothing can be
- *  placed or broken there but what the kit allows. */
+ *  placed or broken there but what the kit allows. Tagged before they are
+ *  moved, so nobody is ever in it untagged and taken for back already. */
 export function enter(name: string, spot: Spot): string[] {
     return [
+        `tag ${name} add ${IN_ARENA}`,
         `${IN_OVERWORLD} tp ${name} ${spot.x + 0.5} ${spot.y} ${spot.z + 0.5} ${spot.yaw} ${spot.pitch ?? 0}`,
         `gamemode adventure ${name}`
     ];
+}
+
+/** Back, and so no longer in: the tag taken off. */
+export function leftArena(name: string): string {
+    return `tag ${name} remove ${IN_ARENA}`;
 }
 
 /** Moved within it, the game mode as it is. */

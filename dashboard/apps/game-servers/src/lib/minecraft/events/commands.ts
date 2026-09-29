@@ -479,6 +479,23 @@ export function readTest(output: string): "passed" | "failed" | "unloaded" | "un
     return "unknown";
 }
 
+/**
+ * Whether somebody an event moved is back already: on, and no longer carrying
+ * the tag it gave them for as long as they were in. An end that sent everybody
+ * back and was stopped before it could write so leaves them listed as still
+ * owed the trip - and a player who has since walked off must not be moved
+ * again. Offline, or an answer it cannot read, is never "back".
+ */
+export async function alreadyBack(
+    say: (line: string) => Promise<string>,
+    name: string,
+    tag: string
+): Promise<boolean> {
+    if (readTest(await say(`execute if entity @a[name=${name},tag=${tag}]`)) !== "failed")
+        return false;
+    return readTest(await say(`execute if entity @a[name=${name}]`)) === "passed";
+}
+
 // ------------------------------------------------------------------ what the server understands
 
 /**

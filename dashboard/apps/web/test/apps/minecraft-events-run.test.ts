@@ -338,11 +338,27 @@ function answer(sent: string): string {
         world.at[name] = [Number(moved[3]), Number(moved[4]), Number(moved[5])];
         return `Teleported ${name} to ${moved[3]}, ${moved[4]}, ${moved[5]}`;
     }
-    const tagged = /^tag (\w+) (add|remove) pe_in$/.exec(line);
-    if (tagged) {
-        if (tagged[2] === "add") world.inside.add(tagged[1] as string);
-        else world.inside.delete(tagged[1] as string);
+    const arenaTag = /^tag (\w+) (add|remove) pe_in$/.exec(line);
+    if (arenaTag) {
+        if (arenaTag[2] === "add") world.inside.add(arenaTag[1] as string);
+        else world.inside.delete(arenaTag[1] as string);
         return "";
+    }
+    // One player's own tag, as the game answers it; offline, nobody is found.
+    const tagOne = /^tag (\w+) (add|remove) (pe_\w+)$/.exec(line);
+    if (tagOne) {
+        const [, name, how, tag] = tagOne as unknown as [string, string, string, string];
+        if (!world.online.includes(name)) return "No entity was found";
+        if (how === "add") tagged(tag).add(name);
+        else tagged(tag).delete(name);
+        return how === "add" ? `Added tag '${tag}' to ${name}` : `Removed tag '${tag}' from ${name}`;
+    }
+    // Whether somebody is on, and whether they carry a tag.
+    const isThere = /^execute if entity @a\[name=(\w+)(?:,tag=(pe_\w+))?\]$/.exec(line);
+    if (isThere) {
+        const [, name, tag] = isThere as unknown as [string, string, string | undefined];
+        const carries = !tag || (tag === "pe_in" ? world.inside.has(name) : tagged(tag).has(name));
+        return world.online.includes(name) && carries ? "Test passed, count: 1" : "Test failed";
     }
     if (line === "execute as @a run data get entity @s playerGameType") {
         return world.online
@@ -3526,7 +3542,9 @@ describe("spleef", () => {
         const after = state();
         expect(after.history[0]).toMatchObject({ outcome: "cancelled" });
         expect(world.sent.some((line) => / tp Ben /.test(line))).toBe(false);
-        expect(world.sent).toContain("gamemode survival Ana");
+        // Written down, never moved: nothing of hers is touched on the way out.
+        expect(world.sent.some((line) => / tp Ana /.test(line))).toBe(false);
+        expect(world.sent.some((line) => /^gamemode \w+ Ana$/.test(line))).toBe(false);
         keptTheRules();
         expect(after.stageLeftovers).toEqual([]);
     });
@@ -3593,6 +3611,61 @@ describe("spleef", () => {
         expect(world.sent).toContain(
             "execute in minecraft:overworld run forceload remove 293 -7 307 7"
         );
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("never moves again somebody an end stopped by a restart had already sent back", async () => {
+        const preset = floor();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const boxes = spleef.arena(preset.options, site, site.y).boxes;
+        const saved = (name: string, x: number) => ({
+            name,
+            dimension: "minecraft:overworld",
+            x,
+            y: 64,
+            z: 5,
+            yaw: 0,
+            pitch: 0,
+            mode: "survival"
+        });
+        // Ben was sent back - and his tag taken - before the end was stopped;
+        // Ana is still up on the floor.
+        world.inside = new Set(["Ana"]);
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "interrupted",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 120_000,
+                startsAt: now - 90_000,
+                endsAt: now + 60_000,
+                participants: ["Ana", "Ben"],
+                finishing: true,
+                stage: {
+                    origin: site,
+                    area: { x1: 293, z1: -7, x2: 307, z2: 7 },
+                    boxes,
+                    built: true,
+                    saved: [saved("Ana", 10.5), saved("Ben", 20.5)],
+                    racers: [
+                        { name: "Ana", since: now - 90_000 },
+                        { name: "Ben", since: now - 90_000 }
+                    ]
+                }
+            }
+        };
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 10.500 64.000 5.000 0.0 0.0"
+        );
+        expect(world.sent.some((line) => / tp Ben /.test(line))).toBe(false);
+        expect(world.sent).not.toContain("gamemode survival Ben");
+        expect(world.inside.size).toBe(0);
         expect(state().stageLeftovers).toEqual([]);
     });
 
@@ -4231,6 +4304,52 @@ describe("an arena after a restart", () => {
         );
         expect(world.sent).toContain("gamerule keepInventory false");
         onlyOurBlocks();
+    });
+
+    it("never moves again somebody an end stopped by a restart had already sent back", async () => {
+        stored({
+            finishing: true,
+            endsAt: Date.now() - 1_000,
+            entrants: [
+                { ...entrant("Ana", 0), tagged: true },
+                { ...entrant("Ben", 1), tagged: true }
+            ]
+        });
+        // Ana was sent back, and her tag taken, before the end was stopped.
+        world.tags = { pe_arena: new Set(["Ben"]) };
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(world.sent.some((line) => / tp Ana /.test(line))).toBe(false);
+        expect(world.sent).not.toContain("gamemode creative Ana");
+        expect(world.sent).toContain(
+            "execute in minecraft:the_nether run tp Ben 13.500 70.000 -4.250 45.0 0.0"
+        );
+        expect(world.sent).toContain("tag Ben remove pe_arena");
+        expect(world.tags.pe_arena?.size).toBe(0);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("still owes the trip to a tagged player who is offline, and sends them once they are on", async () => {
+        stored({
+            finishing: true,
+            endsAt: Date.now() - 1_000,
+            entrants: [
+                { ...entrant("Ana", 0), tagged: true },
+                { ...entrant("Ben", 1), tagged: true }
+            ]
+        });
+        world.tags = { pe_arena: new Set(["Ana", "Ben"]) };
+        world.online = ["Ana"];
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(state().arenaLeftovers[0]?.entrants.map((one) => one.name)).toEqual(["Ben"]);
+        world.online = ["Ana", "Ben"];
+        await events.sweepEvents();
+        expect(world.sent).toContain(
+            "execute in minecraft:the_nether run tp Ben 13.500 70.000 -4.250 45.0 0.0"
+        );
+        expect(state().arenaLeftovers).toEqual([]);
     });
 
     it("whose end had begun, is never played again but still undone by the sweep", async () => {

@@ -74,7 +74,10 @@ export const entrantSchema = z.object({
     /** Their team in a duel (0 or 1), their plot in a build battle. */
     side: z.number().int(),
     /** Moved by the event and not yet put back. */
-    away: z.boolean().default(true)
+    away: z.boolean().default(true),
+    /** Carries the arena's tag while in: one who is on without it has been put
+     *  back already. False for anybody taken in before the tag was given. */
+    tagged: z.boolean().default(false)
 });
 export type Entrant = z.infer<typeof entrantSchema>;
 

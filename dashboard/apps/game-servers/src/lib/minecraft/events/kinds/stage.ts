@@ -400,13 +400,15 @@ export interface Spot {
     readonly yaw: number;
 }
 
-/** Into the arena, protected first: moved, in adventure mode, tagged as inside. */
+/** Into the arena, protected first: tagged as inside before they are moved -
+ *  so nobody is ever in it untagged, and taken for back already - then in
+ *  adventure mode. */
 export function admitLines(name: string, spot: Spot): string[] {
     return [
         protect(name),
+        `tag ${name} add ${IN_ARENA}`,
         `${WORLD} tp ${name} ${coordinate(spot.x)} ${coordinate(spot.y)} ${coordinate(spot.z)} ${spot.yaw.toFixed(1)} 0.0`,
-        `gamemode adventure ${name}`,
-        `tag ${name} add ${IN_ARENA}`
+        `gamemode adventure ${name}`
     ];
 }
 
