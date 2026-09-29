@@ -174,9 +174,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * "dark" at 16px for anything with no session and no database, which is what
  * keeps a build that prerenders a page from needing one.
  *
- * The language is the reader's (see `getLocale`), and the `common` namespace is
- * handed to every client component from here; a screen that needs more asks for
- * it with `<Messages>`.
+ * The language is the reader's (see `getLocale`), and the `common` and
+ * `components` namespaces are handed to every client component from here -
+ * `components` because the shared components are drawn on every screen, signed
+ * in or not; a screen that needs more asks for it with `<Messages>`.
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
@@ -196,7 +197,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             suppressHydrationWarning
         >
             <body>
-                <I18nProvider locale={locale} messages={pickMessages(locale, ["common"])}>
+                <I18nProvider locale={locale} messages={pickMessages(locale, ["common", "components"])}>
                     <LocaleSync locale={locale} signedIn={session !== null} />
                     <DropGuard />
                     {children}
