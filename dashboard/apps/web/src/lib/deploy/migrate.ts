@@ -53,6 +53,7 @@ import {
     providerDriver,
     type ExternalServiceView
 } from "@/lib/deploy/external-services";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /* -------------------------------------------------------------------------- */
 /* Out of Polaris                                                             */
@@ -351,9 +352,9 @@ export async function moveHomePlan(projectId: string, serviceId: string): Promis
         driver
             .variables(token, row.externalId, row.ref)
             .then((values) => ({ values: carriable(values), error: null as string | null }))
-            .catch((caught: unknown) => ({
+            .catch(async (caught: unknown) => ({
                 values: {} as Record<string, string>,
-                error: caught instanceof Error ? caught.message : "Those could not be read"
+                error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.deploy.variablesUnreadable")
             }))
     ]);
 

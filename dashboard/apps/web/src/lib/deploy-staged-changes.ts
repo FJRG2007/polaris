@@ -29,6 +29,7 @@ import {
     type StagedChangeKind,
     type StagedChangePayload
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** A staged change as the changeset panel renders it. */
 export interface StagedChangeView {
@@ -192,7 +193,7 @@ export async function applyStagedChanges(environmentId: string, ownerId: string)
         } catch (caught) {
             failures.push({
                 targetName: change.targetName,
-                error: caught instanceof Error ? caught.message : "Could not apply the change"
+                error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.deploy.changeFailed")
             });
         }
     }

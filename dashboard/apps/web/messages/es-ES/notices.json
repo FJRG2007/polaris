@@ -210,5 +210,17 @@
         "waitingBody": "{logins} no ha concedido {permissions}. {open} pulsa Review request y luego Accept new permissions. Hasta entonces, se rechazan los grupos de runners y las ejecuciones de agentes en esa cuenta. Solo quien es propietario de la cuenta puede aceptarlo, así que esto Polaris no puede hacerlo por ti.",
         "openUrl": "Abre {url} y",
         "openInstallation": "Abre la instalación en GitHub y"
+    },
+    "deployTest": {
+        "title": "Prueba de Polaris",
+        "body": "Así se verá un aviso de despliegue de este proyecto."
+    },
+    "domainAddress": {
+        "pointsTitle": "{domain} ahora apunta a {to}",
+        "changedBody": "La dirección pública de este servidor cambió de {from} a {to}, así que se {count, plural, one {redirigió # registro} other {redirigieron # registros}} DNS. No se tocó nada más.",
+        "setBody": "La dirección pública de este servidor es {to}, así que se {count, plural, one {redirigió # registro} other {redirigieron # registros}} DNS.",
+        "staleTitle": "{domain} no apunta a este servidor",
+        "notUpdated": "Este servidor responde ahora en {current}, pero no se pudieron actualizar los registros: {detail}",
+        "conflict": "Este servidor responde ahora en {current}, pero {names} apunta a {contents}. Polaris no redirige un registro que no escribió: cámbialo tú si debe apuntar a este servidor."
     }
 }

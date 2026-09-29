@@ -43,6 +43,7 @@ import { getHostConnection } from "@/lib/host-service";
 import { probeTcp } from "@/lib/server-status";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { alreadyLocal, localCandidates } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** What the machine is asked. Both spellings in one command so it costs one
  *  round trip on Linux and on macOS, and neither complains when the other's tool
@@ -202,7 +203,7 @@ export async function useLocalPath(
 ): Promise<{ error?: string }> {
     const connection = await getHostConnection(hostId, ownerId);
     if (!(await answersAsSameMachine(address, connection))) {
-        return { error: "That address did not answer as this server" };
+        return { error: (await readerWords("api"))("refusals.servers.notThisServer") };
     }
 
     await prisma.host.update({ where: { id: hostId }, data: { address } });

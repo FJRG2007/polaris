@@ -1393,6 +1393,19 @@
         "web/src/lib/step-up.ts",
         "web/src/lib/two-factor-delivery.ts",
         "web/src/lib/user-admin-service.ts",
-        "web/src/lib/view-as-service.ts"
+        "web/src/lib/view-as-service.ts",
+        "web/src/lib/agents/model-catalog.ts",
+        "web/src/lib/agents/model-key-actions.ts",
+        "web/src/lib/apps/install-sharing.ts",
+        "web/src/lib/connection-removal-service.ts",
+        "web/src/lib/deploy-project-service.ts",
+        "web/src/lib/deploy-staged-changes.ts",
+        "web/src/lib/deploy/migrate.ts",
+        "web/src/lib/deploy/server-edge.ts",
+        "web/src/lib/domain-address-sync.ts",
+        "web/src/lib/integrations/virustotal.ts",
+        "web/src/lib/mail-service.ts",
+        "web/src/lib/server-local-path.ts",
+        "web/src/lib/server-removal-service.ts"
     ]
 }

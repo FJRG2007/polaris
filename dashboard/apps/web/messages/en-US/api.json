@@ -151,6 +151,63 @@
             "alreadyYou": "That is already your account.",
             "cannotOpen": "This session cannot open another account.",
             "cannotPreview": "This session cannot preview a role."
+        },
+        "aiKeys": {
+            "catalogUnreachable": "The catalog could not be reached.",
+            "catalogEmpty": "The catalog listed no usable models.",
+            "checkKey": "Check the key",
+            "notAProvider": "That is not a model provider.",
+            "keyGone": "That key is gone.",
+            "pickKey": "Pick a key",
+            "orderUnreadable": "Could not read the new order.",
+            "catalogAnswered": "The catalog answered {status}."
+        },
+        "sharing": {
+            "enterWho": "Enter an email address or a username",
+            "chooseOne": "Choose at least one thing they may do",
+            "tooMany": "That is a lot of invites at once. Try again in a little while.",
+            "alreadyOwner": "They already own this server",
+            "noMatch": "No account matches that. Invite them by email address.",
+            "enterEmail": "Enter their email address"
+        },
+        "connections": {
+            "notFound": "Connection not found",
+            "chooseDestination": "Choose where the content should go",
+            "sameConnection": "That is the connection being removed",
+            "destinationMissing": "The connection to copy to was not found",
+            "stillMounted": "{names} still {count, plural, one {mounts} other {mount}} this connection. Move its content to another connection first, or remove those volumes."
+        },
+        "deploy": {
+            "unreachable": "It could not be reached",
+            "webhookNotFound": "Webhook not found",
+            "webhookUrlUnreadable": "The stored URL could not be read. Remove the webhook and add it again.",
+            "changeFailed": "Could not apply the change",
+            "variablesUnreadable": "Those could not be read"
+        },
+        "virusTotal": {
+            "invalidKey": "Invalid API key",
+            "unreachable": "Could not reach VirusTotal",
+            "unavailable": "VirusTotal is unavailable ({status})"
+        },
+        "mailChannels": {
+            "enterSecret": "Enter the key or password for this provider.",
+            "nameIt": "Give the channel a name.",
+            "storeFailed": "Could not store the channel.",
+            "noStoredKey": "This channel has no stored key. Enter one to save it.",
+            "notConfigured": "That email channel is not configured."
+        },
+        "servers": {
+            "notThisServer": "That address did not answer as this server",
+            "sameServer": "That is the server being removed",
+            "destinationMissing": "The server to move to was not found",
+            "redeployFailed": "{name} could not be deployed on the new server: {failure}"
+        },
+        "domains": {
+            "recordsFailed": "The records could not be written"
         }
+    },
+    "words": {
+        "theOwner": "The owner",
+        "mintedToken": "Minted from this app's settings."
     }
 }

@@ -8,6 +8,8 @@
  * rather than rejecting legitimate files because the scanner was unavailable.
  */
 
+import { readerWords } from "@/lib/i18n/reader-words";
+
 const BASE = "https://www.virustotal.com/api/v3";
 /** Public API file-upload ceiling. Larger files can only be looked up by hash. */
 export const VT_MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
@@ -58,14 +60,14 @@ export async function verifyKey(apiKey: string): Promise<{ ok: boolean; error?: 
             signal: AbortSignal.timeout(15000)
         });
         if (response.status === 401 || response.status === 403)
-            return { ok: false, error: "Invalid API key" };
+            return { ok: false, error: (await readerWords("api"))("refusals.virusTotal.invalidKey") };
         if (response.status >= 500)
-            return { ok: false, error: `VirusTotal is unavailable (${response.status})` };
+            return { ok: false, error: (await readerWords("api"))("refusals.virusTotal.unavailable", { status: response.status }) };
         return { ok: true };
     } catch (caught) {
         return {
             ok: false,
-            error: caught instanceof Error ? caught.message : "Could not reach VirusTotal"
+            error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.virusTotal.unreachable")
         };
     }
 }

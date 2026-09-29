@@ -28,6 +28,7 @@ import {
     updateModelKey,
     type KeyOwner
 } from "@/lib/agents/model-keys";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** What a write reports back. `warning` is the case that is neither: the key was
  *  stored, and the provider could not be asked whether it is any good. */
@@ -67,8 +68,8 @@ const SECRET_TAKEN = "That key was already added for this provider.";
 
 export async function addKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = createModelKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the key" };
-    if (!isStorableProvider(parsed.data.provider)) return { error: "That is not a model provider." };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("refusals.aiKeys.checkKey") };
+    if (!isStorableProvider(parsed.data.provider)) return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name)) return { error: NAME_TAKEN };
 
@@ -128,7 +129,7 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
 
 export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = updateModelKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the key" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("refusals.aiKeys.checkKey") };
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name, parsed.data.id)) return { error: NAME_TAKEN };
 
@@ -137,7 +138,7 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
     let warning: string | undefined;
     if (parsed.data.secret !== undefined) {
         const provider = await providerOfModelKey(scope.owner, parsed.data.id);
-        if (!provider) return { error: "That key is gone." };
+        if (!provider) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
         // Excluding this row: retyping the same key it already holds is a
         // no-op, not somebody's second copy of it.
         if (
@@ -166,7 +167,7 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
         if (clash) return { error: clash === "secret" ? SECRET_TAKEN : NAME_TAKEN };
         throw caught;
     }
-    if (!changed) return { error: "That key is gone." };
+    if (!changed) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
 
     await recordAudit({
         actorId: scope.actorId,
@@ -181,9 +182,9 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
 
 export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a key" };
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
 
-    if (!(await deleteModelKey(scope.owner, parsed.data.id))) return { error: "That key is gone." };
+    if (!(await deleteModelKey(scope.owner, parsed.data.id))) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
     await recordAudit({
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,
@@ -197,7 +198,7 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
 /** The order to try them in, as the table now reads top to bottom. */
 export async function reorderKeys(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = reorderModelKeysSchema.safeParse(input);
-    if (!parsed.success) return { error: "Could not read the new order." };
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.orderUnreadable") };
 
     await reorderModelKeys(scope.owner, parsed.data.ids);
     revalidatePath(scope.path);

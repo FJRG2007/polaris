@@ -34,6 +34,7 @@ import {
     requireGameServer,
     sharingRightsFor
 } from "@/lib/apps/install-access";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How many people one account may bring in per hour, per server. */
 const SHARE_LIMIT = 10;
@@ -126,7 +127,7 @@ export async function listInstallAccess(installedAppId: string): Promise<Install
                 ? owner.username
                     ? `${owner.name} (@${owner.username})`
                     : owner.name
-                : "The owner",
+                : (await readerWords("api"))("words.theOwner"),
             actions: ["games.read", "games.moderate", "games.manage"],
             canShare: true,
             expiresAt: null,
@@ -176,7 +177,7 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
     const { user, access } = await requireGameServer("games.read", input.installedAppId);
     const ref = installRef(input.installedAppId);
     const identifier = input.identifier.trim().toLowerCase();
-    if (!identifier) return { error: "Enter an email address or a username" };
+    if (!identifier) return { error: (await readerWords("api"))("refusals.sharing.enterWho") };
 
     const [held, rights, policy] = await Promise.all([
         gamePermissionsFor(user, input.installedAppId),
@@ -197,7 +198,7 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
             input.actions.filter((action) => held.includes(action))
         )
     );
-    if (actions.length === 0) return { error: "Choose at least one thing they may do" };
+    if (actions.length === 0) return { error: (await readerWords("api"))("refusals.sharing.chooseOne") };
     // Passing it on is only ever passed on by somebody who holds it.
     const canShare = input.canShare && (user.isAdmin || access.isOwner || rights.mayPassOn);
 
@@ -214,12 +215,12 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
 
     const attempt = await rateLimit(`share:install:${user.id}`, SHARE_LIMIT, SHARE_WINDOW_MS);
     if (!attempt.ok)
-        return { error: "That is a lot of invites at once. Try again in a little while." };
+        return { error: (await readerWords("api"))("refusals.sharing.tooMany") };
 
     const expiresAt = clampExpiry(input.expiresInDays, rights.until);
 
     if (target) {
-        if (target.id === access.ownerId) return { error: "They already own this server" };
+        if (target.id === access.ownerId) return { error: (await readerWords("api"))("refusals.sharing.alreadyOwner") };
         await setResourceGrant({
             principalType: "user",
             principalId: target.id,
@@ -248,7 +249,7 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
     // Nobody by that name, so this is an invite. It carries what was promised, and
     // the claim narrows it again to whatever the inviter still holds by then.
     if (!identifier.includes("@"))
-        return { error: "No account matches that. Invite them by email address." };
+        return { error: (await readerWords("api"))("refusals.sharing.noMatch") };
     const created = await createInvite(user.id, {
         email: identifier,
         role: policy.inviteRole,
@@ -314,7 +315,7 @@ export interface InvitePlayerResult {
 export async function invitePlayer(input: InvitePlayerInput): Promise<InvitePlayerResult> {
     const { user, access } = await requireGameServer("games.manage", input.installedAppId);
     const email = input.email.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter their email address" };
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: (await readerWords("api"))("refusals.sharing.enterEmail") };
 
     const existing = await prisma.user.findFirst({ where: { email }, select: { id: true } });
     if (existing) return { userId: existing.id };
@@ -332,7 +333,7 @@ export async function invitePlayer(input: InvitePlayerInput): Promise<InvitePlay
 
     const attempt = await rateLimit(`share:install:${user.id}`, SHARE_LIMIT, SHARE_WINDOW_MS);
     if (!attempt.ok)
-        return { error: "That is a lot of invites at once. Try again in a little while." };
+        return { error: (await readerWords("api"))("refusals.sharing.tooMany") };
 
     const created = await createInvite(user.id, {
         email,

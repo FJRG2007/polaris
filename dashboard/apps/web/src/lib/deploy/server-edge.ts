@@ -44,6 +44,7 @@ import { getHostConnection } from "@/lib/host-service";
 import { recordServerEvent } from "@/lib/server-notes-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { execCommand, openSshClient } from "@polaris/ssh";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
  * How the script is started on the server.
@@ -213,7 +214,7 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
         return {
             ...UNREACHABLE,
             settingUp: isSettingUp(hostId),
-            error: error instanceof Error ? error.message : "It could not be reached"
+            error: error instanceof Error ? error.message : (await readerWords("api"))("refusals.deploy.unreachable")
         };
     }
 }

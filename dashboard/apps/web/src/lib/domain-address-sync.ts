@@ -34,6 +34,8 @@ import { getDomainZones } from "@/lib/domain-zones";
 import { createNotification } from "@/lib/notification-service";
 import { checkZoneDns, provisionZoneDns } from "@/lib/domain-dns";
 import { detectPublicIp, networkPublicIp } from "@/lib/network-service";
+import { readerWords } from "@/lib/i18n/reader-words";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 /** How often the address is re-checked. The same cadence the DuckDNS sync runs
  *  at, and for the same reason: it is one outbound request, and the window it
@@ -147,8 +149,10 @@ export async function syncZoneAddress(): Promise<ZoneAddressSync> {
         };
     }
 
-    const written = await provisionZoneDns({ overwrite: true }).catch((caught: unknown) => {
-        return { error: caught instanceof Error ? caught.message : "The records could not be written" };
+    const written = await provisionZoneDns({ overwrite: true }).catch(async (caught: unknown) => {
+        return {
+            error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.domains.recordsFailed")
+        };
     });
     if ("error" in written) {
         await warn(config.baseDomain, current, [], written.error);
@@ -180,13 +184,14 @@ async function administrators(): Promise<string[]> {
  *  happened rather than a mystery somebody half-noticed. */
 async function announce(domain: string, from: string | null, to: string, records: number): Promise<void> {
     for (const userId of await administrators()) {
+        const t = await wordsFor(userId, "notices");
         await createNotification({
             userId,
             type: "domain.address-changed",
-            title: `${domain} now points at ${to}`,
+            title: t("domainAddress.pointsTitle", { domain, to }),
             body: from
-                ? `This server's public address changed from ${from} to ${to}, so ${records} DNS ${records === 1 ? "record was" : "records were"} repointed. Nothing else was touched.`
-                : `This server's public address is ${to}, so ${records} DNS ${records === 1 ? "record was" : "records were"} repointed.`,
+                ? t("domainAddress.changedBody", { from, to, count: records })
+                : t("domainAddress.setBody", { to, count: records }),
             href: "/admin/domains",
             level: "info"
         });
@@ -200,15 +205,19 @@ async function warn(
     conflicts: readonly { name: string; content: string }[],
     detail?: string
 ): Promise<void> {
-    const body = detail
-        ? `This server now answers on ${current}, but the records could not be updated: ${detail}`
-        : `This server now answers on ${current}, but ${conflicts.map((entry) => entry.name).join(", ")} points at ${conflicts.map((entry) => entry.content).join(", ")}. Polaris does not repoint a record it did not write - change it yourself if it should name this server.`;
     for (const userId of await administrators()) {
+        const t = await wordsFor(userId, "notices");
         await createNotification({
             userId,
             type: "domain.address-stale",
-            title: `${domain} does not point at this server`,
-            body,
+            title: t("domainAddress.staleTitle", { domain }),
+            body: detail
+                ? t("domainAddress.notUpdated", { current, detail })
+                : t("domainAddress.conflict", {
+                      current,
+                      names: conflicts.map((entry) => entry.name).join(", "),
+                      contents: conflicts.map((entry) => entry.content).join(", ")
+                  }),
             href: "/admin/domains",
             level: "warning",
             actionRequired: true

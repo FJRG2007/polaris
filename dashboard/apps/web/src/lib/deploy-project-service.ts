@@ -42,6 +42,7 @@ import {
     type ProjectWebhookInput,
     type WebhookFormat
 } from "@polaris/core";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 // ---------------------------------------------------------------------------
 // General
@@ -556,7 +557,8 @@ export async function createProjectToken(
     const days = TOKEN_LIFETIME_DAYS[input.lifetime];
     const key = await createApiKey(input.minterId, {
         name: input.name,
-        description: "Minted from this app's settings.",
+        // Said in the minter's language: they are the one who reads the key list.
+        description: (await readerWords("api"))("words.mintedToken"),
         // A deploy token is wired into something that runs on its own, which is
         // what "production" means on the key list whatever it is deploying to.
         environment: "production",
@@ -725,15 +727,16 @@ export async function testProjectWebhook(
         where: { id, projectId },
         select: { id: true }
     });
-    if (!owned) return { error: "Webhook not found" };
+    if (!owned) return { error: (await readerWords("api"))("refusals.deploy.webhookNotFound") };
     const resolved = await webhookUrl(id);
     if (!resolved)
-        return { error: "The stored URL could not be read. Remove the webhook and add it again." };
+        return { error: (await readerWords("api"))("refusals.deploy.webhookUrlUnreadable") };
+    const t = await readerWords("notices");
     const result = await sendWebhook(resolved.url, resolved.format, {
         event: "deploy.succeeded",
         level: "info",
-        title: "Polaris test event",
-        body: "This is what a deploy notification from this project will look like.",
+        title: t("deployTest.title"),
+        body: t("deployTest.body"),
         url: null,
         at: new Date().toISOString()
     });

@@ -26,6 +26,7 @@ import { PERSONAL_KIND } from "@polaris/core";
 import { deployAndWait } from "@/lib/deploy-service";
 import type { StorageDriver } from "@polaris/storage";
 import { deleteConnection, getDriver } from "@/lib/storage-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export type ConnectionRemovalMode = "forget" | "move";
 
@@ -106,27 +107,30 @@ export async function removeConnection(
     input: RemoveConnectionInput
 ): Promise<RemoveConnectionResult> {
     const plan = await getConnectionRemovalPlan(ownerId, connectionId);
-    if (!plan) return { error: "Connection not found" };
+    if (!plan) return { error: (await readerWords("api"))("refusals.connections.notFound") };
 
     if (input.mode === "forget") {
         if (plan.services.length > 0) {
             const names = plan.services.map((service) => service.name).join(", ");
             return {
-                error: `${names} still ${plan.services.length === 1 ? "mounts" : "mount"} this connection. Move its content to another connection first, or remove those volumes.`
+                error: (await readerWords("api"))("refusals.connections.stillMounted", {
+                    names,
+                    count: plan.services.length
+                })
             };
         }
         await deleteConnection(ownerId, connectionId);
         return {};
     }
 
-    if (!input.destinationId) return { error: "Choose where the content should go" };
+    if (!input.destinationId) return { error: (await readerWords("api"))("refusals.connections.chooseDestination") };
     if (input.destinationId === connectionId)
-        return { error: "That is the connection being removed" };
+        return { error: (await readerWords("api"))("refusals.connections.sameConnection") };
     const destination = await prisma.storageConnection.findFirst({
         where: { id: input.destinationId, ownerId, kind: { not: PERSONAL_KIND } },
         select: { id: true }
     });
-    if (!destination) return { error: "The connection to copy to was not found" };
+    if (!destination) return { error: (await readerWords("api"))("refusals.connections.destinationMissing") };
 
     const copied = await copyEverything(ownerId, connectionId, destination.id);
     if (copied) return { error: copied };

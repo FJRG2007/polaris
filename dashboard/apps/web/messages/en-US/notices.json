@@ -210,5 +210,17 @@
         "waitingBody": "{logins} has not granted {permissions}. {open} press Review request, then Accept new permissions. Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.",
         "openUrl": "Open {url} and",
         "openInstallation": "Open the installation on GitHub and"
+    },
+    "deployTest": {
+        "title": "Polaris test event",
+        "body": "This is what a deploy notification from this project will look like."
+    },
+    "domainAddress": {
+        "pointsTitle": "{domain} now points at {to}",
+        "changedBody": "This server's public address changed from {from} to {to}, so {count} DNS {count, plural, one {record was} other {records were}} repointed. Nothing else was touched.",
+        "setBody": "This server's public address is {to}, so {count} DNS {count, plural, one {record was} other {records were}} repointed.",
+        "staleTitle": "{domain} does not point at this server",
+        "notUpdated": "This server now answers on {current}, but the records could not be updated: {detail}",
+        "conflict": "This server now answers on {current}, but {names} points at {contents}. Polaris does not repoint a record it did not write - change it yourself if it should name this server."
     }
 }

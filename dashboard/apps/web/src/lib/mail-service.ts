@@ -26,6 +26,7 @@ import {
 import { sendEmail } from "./mail/send";
 import { verifyMailAccount } from "./mail/verify";
 import type { EmailMessage, MailAccount } from "./mail/types";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** An email channel as the UI sees it. Never carries the secret. */
 export interface EmailChannelView {
@@ -147,9 +148,9 @@ export async function createEmailChannel(
     const parsed = parseMailConfig(input.provider, input.settings);
     if (!parsed.ok) return { error: parsed.error };
     const secret = input.secret?.trim();
-    if (!secret) return { error: "Enter the key or password for this provider." };
+    if (!secret) return { error: (await readerWords("api"))("refusals.mailChannels.enterSecret") };
     const name = input.name.trim();
-    if (!name) return { error: "Give the channel a name." };
+    if (!name) return { error: (await readerWords("api"))("refusals.mailChannels.nameIt") };
 
     const blob = encryptSecret(secret, loadEnv().POLARIS_MASTER_KEY);
     const failure = await checkAccount({ config: parsed.value, secret });
@@ -168,7 +169,7 @@ export async function createEmailChannel(
         }
     });
     const view = toView(row);
-    return view ? { channel: view } : { error: "Could not store the channel." };
+    return view ? { channel: view } : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
 }
 
 /** Verify credentials, returning the reason they failed or null when they work. */
@@ -193,16 +194,16 @@ export async function updateEmailChannel(
     const existing = await prisma.channel.findFirst({
         where: { id: channelId, platform: EMAIL_PLATFORM }
     });
-    if (!existing) return { error: "That channel no longer exists." };
+    if (!existing) return { error: (await readerWords("admin"))("inboxChannels.errors.gone") };
     const parsed = parseMailConfig(input.provider, input.settings);
     if (!parsed.ok) return { error: parsed.error };
     const name = input.name.trim();
-    if (!name) return { error: "Give the channel a name." };
+    if (!name) return { error: (await readerWords("api"))("refusals.mailChannels.nameIt") };
 
     const replacement = input.secret?.trim();
     const blob = replacement ? encryptSecret(replacement, loadEnv().POLARIS_MASTER_KEY) : null;
     const secret = replacement ?? (await loadAccount(channelId))?.secret;
-    if (!secret) return { error: "This channel has no stored key. Enter one to save it." };
+    if (!secret) return { error: (await readerWords("api"))("refusals.mailChannels.noStoredKey") };
 
     const failure = await checkAccount({ config: parsed.value, secret });
     const row = await prisma.channel.update({
@@ -219,7 +220,7 @@ export async function updateEmailChannel(
         }
     });
     const view = toView(row);
-    return view ? { channel: view } : { error: "Could not store the channel." };
+    return view ? { channel: view } : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
 }
 
 /** Remove an email channel. */
@@ -240,7 +241,7 @@ export async function sendThroughChannel(
     const account = await loadAccount(channelId);
     if (!account) {
         await recordOutcome(channelId, "The channel is not configured.");
-        return { error: "That email channel is not configured." };
+        return { error: (await readerWords("api"))("refusals.mailChannels.notConfigured") };
     }
     try {
         await sendEmail(account, message);
@@ -256,7 +257,7 @@ export async function sendThroughChannel(
 /** Re-check a channel's credentials and update its status. */
 export async function recheckEmailChannel(channelId: string): Promise<{ error?: string }> {
     const account = await loadAccount(channelId);
-    if (!account) return { error: "That email channel is not configured." };
+    if (!account) return { error: (await readerWords("api"))("refusals.mailChannels.notConfigured") };
     const failure = await checkAccount(account);
     await recordOutcome(channelId, failure);
     return failure ? { error: failure } : {};

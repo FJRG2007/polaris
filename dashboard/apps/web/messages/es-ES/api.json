@@ -151,6 +151,63 @@
             "alreadyYou": "Esa ya es tu cuenta.",
             "cannotOpen": "Esta sesión no puede abrir otra cuenta.",
             "cannotPreview": "Esta sesión no puede previsualizar un rol."
+        },
+        "aiKeys": {
+            "catalogUnreachable": "No se pudo contactar con el catálogo.",
+            "catalogEmpty": "El catálogo no incluía ningún modelo utilizable.",
+            "checkKey": "Revisa la clave",
+            "notAProvider": "Eso no es un proveedor de modelos.",
+            "keyGone": "Esa clave ya no existe.",
+            "pickKey": "Elige una clave",
+            "orderUnreadable": "No se pudo leer el nuevo orden.",
+            "catalogAnswered": "El catálogo respondió {status}."
+        },
+        "sharing": {
+            "enterWho": "Escribe una dirección de correo o un nombre de usuario",
+            "chooseOne": "Elige al menos una cosa que pueda hacer",
+            "tooMany": "Son muchas invitaciones a la vez. Vuelve a intentarlo dentro de un rato.",
+            "alreadyOwner": "Ya es propietario de este servidor",
+            "noMatch": "Ninguna cuenta coincide. Invítale por dirección de correo.",
+            "enterEmail": "Escribe su dirección de correo"
+        },
+        "connections": {
+            "notFound": "Conexión no encontrada",
+            "chooseDestination": "Elige adónde debe ir el contenido",
+            "sameConnection": "Esa es la conexión que se está eliminando",
+            "destinationMissing": "No se encontró la conexión de destino",
+            "stillMounted": "{names} aún {count, plural, one {monta} other {montan}} esta conexión. Mueve su contenido a otra conexión primero, o elimina esos volúmenes."
+        },
+        "deploy": {
+            "unreachable": "No se pudo contactar",
+            "webhookNotFound": "Webhook no encontrado",
+            "webhookUrlUnreadable": "No se pudo leer la URL guardada. Elimina el webhook y vuelve a añadirlo.",
+            "changeFailed": "No se pudo aplicar el cambio",
+            "variablesUnreadable": "No se pudieron leer"
+        },
+        "virusTotal": {
+            "invalidKey": "Clave de API no válida",
+            "unreachable": "VirusTotal no responde",
+            "unavailable": "VirusTotal no está disponible ({status})"
+        },
+        "mailChannels": {
+            "enterSecret": "Escribe la clave o la contraseña de este proveedor.",
+            "nameIt": "Ponle un nombre al canal.",
+            "storeFailed": "No se pudo guardar el canal.",
+            "noStoredKey": "Este canal no tiene ninguna clave guardada. Escribe una para guardarlo.",
+            "notConfigured": "Ese canal de correo no está configurado."
+        },
+        "servers": {
+            "notThisServer": "Esa dirección no respondió como este servidor",
+            "sameServer": "Es el servidor que se elimina",
+            "destinationMissing": "No se encontró el servidor de destino",
+            "redeployFailed": "No se pudo desplegar {name} en el servidor nuevo: {failure}"
+        },
+        "domains": {
+            "recordsFailed": "No se pudieron escribir los registros"
         }
+    },
+    "words": {
+        "theOwner": "El propietario",
+        "mintedToken": "Creado desde los ajustes de esta app."
     }
 }

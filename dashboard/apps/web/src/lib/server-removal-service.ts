@@ -29,6 +29,7 @@ import { execCommand, openSshClient } from "@polaris/ssh";
 import { deleteHost, getHostConnection } from "@/lib/host-service";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { deployAndWait, stopApplicationOnTarget, syncAppRoutes } from "@/lib/deploy-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How a server is taken out. Each one includes everything the one before it does. */
 export type ServerRemovalMode = "disconnect" | "clean" | "move";
@@ -132,14 +133,14 @@ export async function removeServer(
     input: RemoveServerInput
 ): Promise<RemoveServerResult> {
     const host = await prisma.host.findFirst({ where: { id: hostId, ownerId } });
-    if (!host) return { error: "Server not found" };
+    if (!host) return { error: (await readerWords("servers"))("errors.notFound") };
 
     const warnings: string[] = [];
     let moved: string[] = [];
 
     if (input.mode === "move") {
-        if (!input.destinationId) return { error: "Choose where the services should move to" };
-        if (input.destinationId === hostId) return { error: "That is the server being removed" };
+        if (!input.destinationId) return { error: (await readerWords("servers"))("errors.schema.chooseDestination") };
+        if (input.destinationId === hostId) return { error: (await readerWords("api"))("refusals.servers.sameServer") };
         const result = await moveServices(ownerId, hostId, userId, input.destinationId);
         moved = result.moved;
         if (result.error) return { error: result.error, moved };
@@ -179,7 +180,7 @@ async function moveServices(
         destinationId === "local"
             ? await getOrCreateLocalTarget(ownerId)
             : await destinationHostTarget(ownerId, destinationId);
-    if (!destination) return { moved: [], error: "The server to move to was not found" };
+    if (!destination) return { moved: [], error: (await readerWords("api"))("refusals.servers.destinationMissing") };
 
     const apps = await prisma.application.findMany({
         where: { target: { hostId, ownerId } },
@@ -211,7 +212,10 @@ async function moveServices(
                 prisma.application.update({ where: { id: app.id }, data: { targetId: from } }),
                 prisma.volume.updateMany({ where: { applicationId: app.id, targetId: destination.id }, data: { targetId: from } })
             ]);
-            return { moved, error: `${app.name} could not be deployed on the new server: ${failure}` };
+            return {
+                moved,
+                error: (await readerWords("api"))("refusals.servers.redeployFailed", { name: app.name, failure })
+            };
         }
         // Up and serving on the far side; the old containers are now the only thing
         // still holding the machine, so they come down.
