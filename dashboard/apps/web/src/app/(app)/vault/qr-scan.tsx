@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Camera, ImageUp, Loader2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 
@@ -43,6 +44,7 @@ export function QrScanDialog({
     onFound: (value: string) => void;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("vault");
     const video = useRef<HTMLVideoElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const [scanning, setScanning] = useState(false);
@@ -71,7 +73,7 @@ export function QrScanDialog({
                 if (!live) return;
                 setScanning(false);
                 setError(
-                    "The camera is not available here. Browsers only allow it over a secure (https) address - upload a screenshot of the code instead."
+                    t("qr.noCamera")
                 );
                 return;
             }
@@ -141,13 +143,13 @@ export function QrScanDialog({
                 inversionAttempts: "attemptBoth"
             });
             if (!found?.data) {
-                setError("No code was found in that picture. A tighter crop usually does it.");
+                setError(t("qr.notFound"));
                 return;
             }
             onFound(found.data);
             onOpenChange(false);
         } catch {
-            setError("That file could not be read as a picture.");
+            setError(t("qr.notPicture"));
         } finally {
             setReading(false);
         }
@@ -195,13 +197,11 @@ export function QrScanDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Scan the code</DialogTitle>
+                    <DialogTitle>{t("qr.title")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Point the camera at the square the site is showing, paste a
-                        screenshot with Ctrl+V, or choose the picture. None of it leaves this
-                        browser.
+                        {t("qr.intro")}
                     </p>
 
                     {scanning ? (
@@ -222,7 +222,7 @@ export function QrScanDialog({
                             onClick={() => setScanning((was) => !was)}
                         >
                             <Camera className="size-4 shrink-0" />
-                            {scanning ? "Stop the camera" : "Use the camera"}
+                            {scanning ? t("qr.stop") : t("qr.start")}
                         </Button>
                         <Button
                             type="button"
@@ -235,7 +235,7 @@ export function QrScanDialog({
                             ) : (
                                 <ImageUp className="size-4 shrink-0" />
                             )}
-                            Upload a screenshot
+                            {t("qr.upload")}
                         </Button>
                     </div>
 

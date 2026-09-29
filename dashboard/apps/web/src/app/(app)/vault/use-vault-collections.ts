@@ -12,6 +12,7 @@
 
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "./vault-session";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState } from "react";
 import { vaultCollectionsAction } from "./share-actions";
 
@@ -27,6 +28,7 @@ export function useVaultCollections(vaultId: string | null): {
     reload: () => Promise<void>;
 } {
     const { vaultKeys } = useVaultSession();
+    const t = useTranslations("vault");
     const [collections, setCollections] = useState<VaultCollection[]>([]);
     const [error, setError] = useState<string | null>(null);
     const key = vaultId ? (vaultKeys.get(vaultId) ?? null) : null;
@@ -47,11 +49,11 @@ export function useVaultCollections(vaultId: string | null): {
         for (const raw of result.collections ?? []) {
             opened.push({
                 id: String(raw.id ?? ""),
-                name: (await vaultCrypto.decrypt(String(raw.name ?? ""), key)) ?? "Untitled"
+                name: (await vaultCrypto.decrypt(String(raw.name ?? ""), key)) ?? t("sends.untitled")
             });
         }
         setCollections(opened.sort((left, right) => left.name.localeCompare(right.name)));
-    }, [vaultId, key]);
+    }, [vaultId, key, t]);
 
     useEffect(() => {
         void reload();

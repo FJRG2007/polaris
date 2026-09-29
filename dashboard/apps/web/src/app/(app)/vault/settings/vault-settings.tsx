@@ -18,6 +18,9 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
 import { usePasswordSafety } from "@/lib/use-password-safety";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
+import { unlockTimeoutLabel } from "../vault-labels";
 import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import {
     Button,
@@ -38,11 +41,6 @@ import {
 
 const MIN_LENGTH = 12;
 
-/** The KDFs somebody can move to, and what each is for. */
-const KDF_OPTIONS = [
-    { value: String(core.KDF_PBKDF2), label: "PBKDF2 - works everywhere" },
-    { value: String(core.KDF_ARGON2ID), label: "Argon2id - harder to attack, slower to unlock" }
-];
 
 /** Where this browser's choice about site icons is kept. The same key the list
  *  reads - see `vault-app`. */
@@ -50,6 +48,13 @@ const FAVICON_KEY = "polaris.vault.favicons";
 
 export function VaultSettings() {
     const { state, name, key: vaultKey, lock, unlockTimeout } = useVaultSession();
+    const t = useTranslations("vault");
+    const tv = useTranslations("validation");
+    /** The KDFs somebody can move to, and what each is for. */
+    const kdfOptions = [
+        { value: String(core.KDF_PBKDF2), label: t("settings.pbkdf2") },
+        { value: String(core.KDF_ARGON2ID), label: t("settings.argon2") }
+    ];
     const { email, kdf } = state;
     const protectedKey = state.protectedKey ?? "";
     const [lockAfter, setLockAfter] = useState(String(unlockTimeout));
@@ -75,7 +80,8 @@ export function VaultSettings() {
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
-    const unsafe = usePasswordSafety(next, [email, name, email.split("@")[0]]);
+    const unsafeMessage = usePasswordSafety(next, [email, name, email.split("@")[0]]);
+    const unsafe = unsafeMessage ? validationMessage(tv, unsafeMessage) : null;
 
     /** The settings a change would move to. */
     function targetKdf(): core.KdfSettings {
@@ -95,11 +101,11 @@ export function VaultSettings() {
         setError(null);
         setDone(null);
         if (next.length < MIN_LENGTH) {
-            setError(`Use at least ${MIN_LENGTH} characters.`);
+            setError(t("settings.tooShort", { count: MIN_LENGTH }));
             return;
         }
         if (next !== confirmValue) {
-            setError("Those do not match.");
+            setError(t("settings.mismatch"));
             return;
         }
         if (unsafe) {
@@ -111,9 +117,7 @@ export function VaultSettings() {
         // two secrets that are one secret protect nothing twice: whoever learns
         // the Polaris password would have the vault with it.
         if (core.passwordsTooAlike(next, accountPassword)) {
-            setError(
-                "That is your Polaris password. If they are the same, whoever learns one has the vault as well."
-            );
+            setError(t("settings.samePassword"));
             return;
         }
 
@@ -123,7 +127,7 @@ export function VaultSettings() {
             // nothing inside has to be re-encrypted.
             const currentKey = await crypto.unlockVaultKey(current, email, kdf, protectedKey);
             if (!currentKey) {
-                setError("That is not your current master password.");
+                setError(t("settings.wrongCurrent"));
                 return;
             }
             const settings = targetKdf();
@@ -152,7 +156,7 @@ export function VaultSettings() {
             setNext("");
             setConfirmValue("");
             setAccountPassword("");
-            setDone("Your master password has changed. Every app will ask for it again.");
+            setDone(t("settings.changed"));
         } finally {
             setPending(null);
         }
@@ -160,10 +164,9 @@ export function VaultSettings() {
 
     async function onDelete() {
         const confirmed = await confirm({
-            title: "Delete your vault?",
-            description:
-                "Every item in it goes with it, and nobody - not an administrator - can bring it back. Export first if you want to keep anything.",
-            confirmLabel: "Delete it",
+            title: t("settings.deleteTitle"),
+            description: t("settings.deleteBody"),
+            confirmLabel: t("settings.deleteIt"),
             danger: true
         });
         if (!confirmed) return;
@@ -187,20 +190,20 @@ export function VaultSettings() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Vault settings</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("settings.title")}</h1>
                 <p className="text-sm text-muted-foreground">
-                    Everything here needs your master password, and does its work in this browser.
+                    {t("settings.intro")}
                 </p>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Master password</CardTitle>
+                    <CardTitle>{t("settings.master")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onChangePassword} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Current master password
+                            {t("settings.currentMaster")}
                             <Input
                                 type="password"
                                 autoComplete="current-password"
@@ -209,7 +212,7 @@ export function VaultSettings() {
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            New master password
+                            {t("settings.newMaster")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 Both run here, in usePasswordSafety. Neither can run
                                 again on the server: it never sees this password, only
@@ -223,7 +226,7 @@ export function VaultSettings() {
                         </label>
                         {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
                         <label className="flex flex-col gap-1 text-sm">
-                            Type it again
+                            {t("settings.again")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 A confirmation of the field above, not a second secret. */}
                             <Input
@@ -234,7 +237,7 @@ export function VaultSettings() {
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Your Polaris password
+                            {t("settings.polarisPassword")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 The existing account password, typed to prove who this
                                 is. Both checks ran when it was chosen; re-running them
@@ -247,19 +250,19 @@ export function VaultSettings() {
                                 onChange={(event) => setAccountPassword(event.target.value)}
                             />
                             <span className="text-xs text-muted-foreground">
-                                Checked so the two passwords cannot end up being the same one.
+                                {t("settings.polarisPasswordHint")}
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            How it is derived
+                            {t("settings.kdf")}
                             <Select
                                 value={nextKdf}
                                 onValueChange={setNextKdf}
-                                options={KDF_OPTIONS}
-                                aria-label="How the key is derived"
+                                options={kdfOptions}
+                                aria-label={t("settings.kdfLabel")}
                             />
                             <span className="text-xs text-muted-foreground">
-                                Changing this re-derives your key, so it happens with the password.
+                                {t("settings.kdfHint")}
                             </span>
                         </label>
                         {done ? <p className="text-sm text-success">{done}</p> : null}
@@ -272,7 +275,7 @@ export function VaultSettings() {
                                 {pending === "password" ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : null}
-                                Change it
+                                {t("settings.changeIt")}
                             </Button>
                         </div>
                     </form>
@@ -281,17 +284,11 @@ export function VaultSettings() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Site icons</CardTitle>
+                    <CardTitle>{t("settings.icons")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Items can show the icon of the website they belong to. Off by default,
-                        because it is not only a preference: the icon is fetched from that
-                        website, by this browser, so a site that receives the request learns
-                        somebody with a Polaris vault has an account there. It never goes
-                        through Polaris and never through an icon service - either of those
-                        would hand over every domain in a vault nobody is supposed to be able
-                        to read.
+                        {t("settings.iconsBody")}
                     </p>
                     <label className="flex items-center gap-3 text-sm">
                         <Switch
@@ -305,30 +302,29 @@ export function VaultSettings() {
                                     // remember, which is the right thing to lose.
                                 }
                             }}
-                            aria-label="Fetch website icons"
+                            aria-label={t("settings.iconsLabel")}
                         />
-                        Fetch website icons in this browser
+                        {t("settings.iconsSwitch")}
                     </label>
                 </CardBody>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Signed-in apps</CardTitle>
+                    <CardTitle>{t("settings.apps")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-muted-foreground">
-                        End every app&apos;s session without changing your password. They will each
-                        ask for it again.
+                        {t("settings.appsBody")}
                     </p>
                     <Button
                         variant="secondary"
                         onClick={async () => {
                             await deauthorizeVaultAction();
-                            setDone("Every app has been signed out.");
+                            setDone(t("settings.appsSignedOut"));
                         }}
                     >
-                        Sign them all out
+                        {t("settings.signOutAll")}
                     </Button>
                 </CardBody>
             </Card>
@@ -337,13 +333,12 @@ export function VaultSettings() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Clock className="size-4" />
-                        How long it stays open
+                        {t("settings.timeout")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Your key is held by this browser, never by the server. This is how long it
-                        may keep it while you are not using the vault.
+                        {t("settings.timeoutBody")}
                     </p>
                     <Select
                         value={lockAfter}
@@ -361,18 +356,16 @@ export function VaultSettings() {
                             // one rather than applying it at some unclear moment.
                             // The reason travels with the lock, because this screen
                             // unmounts the moment the key goes.
-                            lock("Saved. Your vault was locked so the new setting applies.");
+                            lock(t("settings.timeoutSaved"));
                         }}
-                        aria-label="How long the vault stays open"
+                        aria-label={t("settings.timeoutLabel")}
                         options={core.VAULT_UNLOCK_TIMEOUTS.map((minutes) => ({
                             value: String(minutes),
-                            label: core.VAULT_UNLOCK_TIMEOUT_LABEL[minutes] ?? String(minutes)
+                            label: unlockTimeoutLabel(t, minutes)
                         }))}
                     />
                     <p className="text-xs text-muted-foreground">
-                        Anything but the first choice keeps the key in this tab&apos;s own storage,
-                        which is cleared when the tab closes. It is never written to disk and never
-                        sent anywhere.
+                        {t("settings.timeoutNote")}
                     </p>
                 </CardBody>
             </Card>
@@ -384,12 +377,12 @@ export function VaultSettings() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-danger">
                         <ShieldAlert className="size-4" />
-                        Delete this vault
+                        {t("settings.deleteVault")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
                     <p className="max-w-md text-sm text-muted-foreground">
-                        Everything in it goes. Your Polaris account stays as it is.
+                        {t("settings.deleteHint")}
                     </p>
                     <Button variant="secondary" onClick={onDelete} disabled={pending !== null}>
                         {pending === "delete" ? (
@@ -397,7 +390,7 @@ export function VaultSettings() {
                         ) : (
                             <Trash2 className="size-4" />
                         )}
-                        Delete it
+                        {t("settings.deleteIt")}
                     </Button>
                 </CardBody>
             </Card>

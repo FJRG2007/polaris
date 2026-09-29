@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "../vault-session";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { vaultContentsAction } from "../vault-actions";
 import { decryptFolders, decryptItem, type VaultItem } from "../vault-model";
 import { Button, Card, CardBody, CardHeader, CardTitle, Select } from "@polaris/ui";
@@ -35,6 +36,7 @@ export function VaultExport({
     }) => Promise<boolean>;
 }) {
     const { keyFor } = useVaultSession();
+    const t = useTranslations("vault");
     const [format, setFormat] = useState<ExportFormat>("json");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -42,14 +44,13 @@ export function VaultExport({
 
     async function onExport(): Promise<void> {
         if (!vaultKey) {
-            setError("Your vault is locked.");
+            setError(t("port.locked"));
             return;
         }
         const confirmed = await confirm({
-            title: "Export everything, unencrypted?",
-            description:
-                "The file will hold every password in plain text. Put it somewhere you would put the passwords themselves, and delete it when you are done.",
-            confirmLabel: "Export",
+            title: t("port.exportTitle"),
+            description: t("port.exportBody"),
+            confirmLabel: t("port.export"),
             danger: true
         });
         if (!confirmed) return;
@@ -92,9 +93,7 @@ export function VaultExport({
             // same tick cancels the download.
             window.setTimeout(() => URL.revokeObjectURL(url), 0);
             if (skipped > 0) {
-                setNotice(
-                    `${skipped} shared ${skipped === 1 ? "item was" : "items were"} left out: you do not hold the key for ${skipped === 1 ? "it" : "them"} yet.`
-                );
+                setNotice(t("port.skipped", { count: skipped }));
             }
         } finally {
             setPending(false);
@@ -104,12 +103,11 @@ export function VaultExport({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Export</CardTitle>
+                <CardTitle>{t("port.export")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    Every item, in the clear. That is what makes it portable, and what makes it
-                    worth deleting once whatever you are moving to has read it.
+                    {t("port.exportIntro")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                     <Select
@@ -117,9 +115,9 @@ export function VaultExport({
                         onValueChange={(value) => setFormat(value as ExportFormat)}
                         options={EXPORT_FORMATS.map((entry) => ({
                             value: entry.value,
-                            label: entry.label
+                            label: t(`port.formats.${entry.value}`)
                         }))}
-                        aria-label="Export format"
+                        aria-label={t("port.format")}
                         className="min-w-0 flex-1"
                     />
                     <Button variant="secondary" onClick={onExport} disabled={pending}>
@@ -128,7 +126,7 @@ export function VaultExport({
                         ) : (
                             <Download className="size-4" />
                         )}
-                        Export
+                        {t("port.export")}
                     </Button>
                 </div>
                 {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}

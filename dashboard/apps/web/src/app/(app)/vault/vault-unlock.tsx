@@ -18,6 +18,7 @@ import { useState, type FormEvent } from "react";
 import type { KdfSettings } from "@polaris/core";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { unlockVaultKey, type SymmetricKey } from "@/lib/vault/crypto";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function VaultUnlock({
     email,
@@ -33,6 +34,7 @@ export function VaultUnlock({
     notice?: string | null;
     onUnlocked: (key: SymmetricKey) => void;
 }) {
+    const t = useTranslations("vault");
     const [password, setPassword] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,12 +46,12 @@ export function VaultUnlock({
         try {
             const key = await unlockVaultKey(password, email, kdf, protectedKey);
             if (!key) {
-                setError("That is not your master password.");
+                setError(t("errors.wrongMaster"));
                 return;
             }
             onUnlocked(key);
         } catch {
-            setError("Your browser could not derive the key. It needs a secure connection.");
+            setError(t("unlock.noCrypto"));
         } finally {
             setPending(false);
         }
@@ -63,7 +65,7 @@ export function VaultUnlock({
                         <div className="flex flex-col items-center gap-2 pb-2 text-center">
                             <Lock className="size-5 text-muted-foreground" />
                             <div>
-                                <p className="text-sm font-medium">Your vault is locked</p>
+                                <p className="text-sm font-medium">{t("unlock.title")}</p>
                                 <p className="text-xs text-muted-foreground">{email}</p>
                             </div>
                         </div>
@@ -75,8 +77,8 @@ export function VaultUnlock({
                             autoFocus
                             required
                             autoComplete="current-password"
-                            placeholder="Master password"
-                            aria-label="Master password"
+                            placeholder={t("settings.master")}
+                            aria-label={t("settings.master")}
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                         />
@@ -85,8 +87,7 @@ export function VaultUnlock({
                             broken page. */}
                         {password.length > 0 && !core.couldBeMasterPassword(password) ? (
                             <p className="text-xs text-muted-foreground">
-                                A master password here is at least {core.MASTER_PASSWORD_MIN}{" "}
-                                characters, so this cannot be it yet.
+                                {t("unlock.tooShort", { count: core.MASTER_PASSWORD_MIN })}
                             </p>
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -103,7 +104,7 @@ export function VaultUnlock({
                             disabled={pending || !core.couldBeMasterPassword(password)}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {pending ? "Deriving your key..." : "Unlock"}
+                            {pending ? t("unlock.deriving") : t("unlock.unlock")}
                         </Button>
                     </form>
                 </CardBody>

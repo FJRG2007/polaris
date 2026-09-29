@@ -370,12 +370,9 @@ export function readImportFile(fileName: string, text: string): ImportedVault {
     return readCsv(text);
 }
 
-/** The export formats offered, and what each is for. */
-export const EXPORT_FORMATS = [
-    { value: "json", label: "Bitwarden JSON - everything, and what its clients read" },
-    { value: "csv", label: "CSV - what most managers and browsers read" },
-    { value: "keepass", label: "KeePass XML - for KeePass and KeePassXC" }
-] as const;
+/** The export formats offered. What each is for is in the `vault` catalog, under
+ *  `port.formats`. */
+export const EXPORT_FORMATS = [{ value: "json" }, { value: "csv" }, { value: "keepass" }] as const;
 
 export type ExportFormat = (typeof EXPORT_FORMATS)[number]["value"];
 

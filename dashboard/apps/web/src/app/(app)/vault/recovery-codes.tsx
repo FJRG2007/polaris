@@ -30,6 +30,7 @@
 
 import * as core from "@polaris/core";
 import { useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Copy, Eye, EyeOff, FileUp, RotateCcw } from "lucide-react";
 import {
     Button,
@@ -82,6 +83,8 @@ export function RecoveryCodes({
     readOnly?: boolean;
 }) {
     const file = useRef<HTMLInputElement>(null);
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     const [pasting, setPasting] = useState("");
     const [copied, setCopied] = useState<number | null>(null);
     /** Covered until asked for, exactly like the password above it. */
@@ -140,21 +143,21 @@ export function RecoveryCodes({
                 <>
                     <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span>
-                            {left} of {lines.length} still unused
+                            {t("recovery.left", { left, total: lines.length })}
                         </span>
                         <span className="flex items-center gap-2">
                             {!readOnly && left === 0 ? (
                                 // The sentence that matters: a set with nothing
                                 // left is a lockout waiting for the day the
                                 // phone breaks.
-                                <span className="text-warning">Ask the site for a new set.</span>
+                                <span className="text-warning">{t("recovery.askNew")}</span>
                             ) : null}
                             <Button
                                 type="button"
                                 size="icon-sm"
                                 variant="ghost"
-                                title={revealed ? "Hide the codes" : "Show the codes"}
-                                aria-label={revealed ? "Hide the codes" : "Show the codes"}
+                                title={revealed ? t("recovery.hide") : t("recovery.show")}
+                                aria-label={revealed ? t("recovery.hide") : t("recovery.show")}
                                 onClick={() => setRevealed((prev) => !prev)}
                             >
                                 {revealed ? (
@@ -176,7 +179,7 @@ export function RecoveryCodes({
                                         codeUsed(line) && "text-muted-foreground line-through"
                                     )}
                                     title={
-                                        codeUsed(line) ? "Used - copy it anyway" : "Copy and mark used"
+                                        codeUsed(line) ? t("recovery.usedCopy") : t("recovery.copyMark")
                                     }
                                 >
                                     {revealed ? codeText(line) : masked(codeText(line))}
@@ -191,8 +194,8 @@ export function RecoveryCodes({
                                         type="button"
                                         size="icon-sm"
                                         variant="ghost"
-                                        aria-label={codeUsed(line) ? "Mark as unused" : "Mark as used"}
-                                        title={codeUsed(line) ? "Mark as unused" : "Mark as used"}
+                                        aria-label={codeUsed(line) ? t("recovery.markUnused") : t("recovery.markUsed")}
+                                        title={codeUsed(line) ? t("recovery.markUnused") : t("recovery.markUsed")}
                                         onClick={() =>
                                             onChange(
                                                 lines
@@ -224,7 +227,7 @@ export function RecoveryCodes({
                         value={pasting}
                         onChange={(event) => setPasting(event.target.value)}
                         onBlur={() => take(core.readRecoveryCodes(pasting))}
-                        placeholder="Paste the codes here - however the site printed them"
+                        placeholder={t("recovery.paste")}
                         rows={2}
                         className="w-full rounded-md border border-border bg-surface px-2 py-1 font-mono text-xs outline-none focus-visible:border-border-strong"
                     />
@@ -236,7 +239,7 @@ export function RecoveryCodes({
                             disabled={core.readRecoveryCodes(pasting).length === 0}
                             onClick={() => take(core.readRecoveryCodes(pasting))}
                         >
-                            Add {core.readRecoveryCodes(pasting).length || ""} codes
+                            {t("recovery.add", { count: core.readRecoveryCodes(pasting).length })}
                         </Button>
                         <Button
                             type="button"
@@ -245,7 +248,7 @@ export function RecoveryCodes({
                             onClick={() => file.current?.click()}
                         >
                             <FileUp className="size-4 shrink-0" />
-                            From a file
+                            {t("recovery.fromFile")}
                         </Button>
                         <input
                             ref={file}
@@ -269,26 +272,24 @@ export function RecoveryCodes({
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
                         <DialogTitle>
-                            Replace the {lines.length} codes you already have?
+                            {t("recovery.replaceTitle", { count: lines.length })}
                         </DialogTitle>
                         <DialogDescription>
-                            Most sites cancel the old codes when they hand out a new set, so the
-                            ones here would no longer work. Polaris cannot tell which way this site
-                            went.
+                            {t("recovery.replaceBody")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" onClick={() => setArriving(null)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button
                             variant="secondary"
                             onClick={() => commit(arriving ?? [], false)}
                         >
-                            Keep both sets
+                            {t("recovery.keepBoth")}
                         </Button>
                         <Button variant="danger" onClick={() => commit(arriving ?? [], true)}>
-                            Replace them
+                            {t("recovery.replace")}
                         </Button>
                     </div>
                 </DialogContent>

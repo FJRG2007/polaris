@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { moveItemAction } from "./share-actions";
 import { Loader2, MoveRight } from "lucide-react";
 import { useVaultSession } from "./vault-session";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { encryptItem, type VaultItem } from "./vault-model";
 import { useVaultCollections } from "./use-vault-collections";
 import {
@@ -44,6 +45,8 @@ export function MoveDialog({
     onMoved: () => Promise<void>;
 }) {
     const { vaults, vaultKeys, key: personalKey } = useVaultSession();
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     // Only vaults whose key this account actually holds: moving into one it has
     // only been invited to would produce ciphertext it cannot read.
     const usable = vaults.filter(
@@ -59,7 +62,7 @@ export function MoveDialog({
 
     // Where it is now is not somewhere to move it to.
     const targets = [
-        ...(item?.organizationId ? [{ value: PERSONAL, label: "My own vault" }] : []),
+        ...(item?.organizationId ? [{ value: PERSONAL, label: t("vaults.ownTitle") }] : []),
         ...usable
             .filter((vault) => vault.vaultId !== item?.organizationId)
             .map((vault) => ({ value: vault.vaultId ?? "", label: vault.name }))
@@ -85,11 +88,11 @@ export function MoveDialog({
         const toPersonal = target === PERSONAL;
         const key = toPersonal ? personalKey : (vaultKeys.get(target) ?? null);
         if (!key) {
-            setError("You do not hold the key for that vault.");
+            setError(t("move.noKey"));
             return;
         }
         if (!toPersonal && !collectionId) {
-            setError("Pick a collection to move it into.");
+            setError(t("errors.pickCollectionMove"));
             return;
         }
         setPending(true);
@@ -112,38 +115,35 @@ export function MoveDialog({
         <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Move &quot;{item?.name}&quot;</DialogTitle>
+                    <DialogTitle>{t("move.title", { name: item?.name ?? "" })}</DialogTitle>
                     <DialogDescription>
-                        It is re-encrypted here under the key of wherever it goes. Everybody in that
-                        vault will be able to read it, and anybody who already synced it keeps the
-                        copy they have.
+                        {t("move.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {targets.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        There is nowhere to move it. Make another vault, or ask somebody to let you
-                        into theirs.
+                        {t("move.nowhere")}
                     </p>
                 ) : (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Vault
+                            {t("vaults.picker")}
                             <Select
                                 value={target}
                                 onValueChange={setTarget}
-                                aria-label="Vault"
+                                aria-label={t("vaults.picker")}
                                 options={targets}
                             />
                         </label>
                         {target === PERSONAL ? null : (
                             <label className="flex flex-col gap-1 text-sm">
-                                Collection
+                                {t("move.collection")}
                                 <Select
                                     value={collectionId}
                                     onValueChange={setCollectionId}
-                                    aria-label="Collection"
-                                    placeholder="No collections here yet"
+                                    aria-label={t("move.collection")}
+                                    placeholder={t("move.noCollections")}
                                     options={collections.map((collection) => ({
                                         value: collection.id,
                                         label: collection.name
@@ -159,7 +159,7 @@ export function MoveDialog({
                 ) : null}
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         type="button"
@@ -175,7 +175,7 @@ export function MoveDialog({
                         ) : (
                             <MoveRight className="size-4" />
                         )}
-                        Move it
+                        {t("move.moveIt")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

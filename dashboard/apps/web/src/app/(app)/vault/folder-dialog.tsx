@@ -18,6 +18,7 @@ import * as vaultCrypto from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import { deleteFolderAction, saveFolderAction } from "./vault-actions";
 import { Check, FolderPlus, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -43,6 +44,8 @@ export function FolderDialog({
     /** Called after any write, so the screen behind can reload its folders. */
     onChanged: () => Promise<void>;
 }) {
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     const [adding, setAdding] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
@@ -73,9 +76,9 @@ export function FolderDialog({
 
     async function remove(folder: VaultFolder): Promise<void> {
         const confirmed = await confirm({
-            title: `Delete "${folder.name || "Untitled"}"?`,
-            description: "What is in it stays in your vault; it just stops being filed here.",
-            confirmLabel: "Delete",
+            title: t("sends.deleteTitle", { name: folder.name || t("sends.untitled") }),
+            description: t("folders.deleteBody"),
+            confirmLabel: t("vaults.delete"),
             danger: true
         });
         if (!confirmed) return;
@@ -95,10 +98,9 @@ export function FolderDialog({
             <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Folders</DialogTitle>
+                        <DialogTitle>{t("app.folders")}</DialogTitle>
                         <DialogDescription>
-                            Yours alone. The names are encrypted with everything else, so nobody
-                            else can read them.
+                            {t("folders.intro")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -113,8 +115,8 @@ export function FolderDialog({
                             <Input
                                 value={adding}
                                 onChange={(event) => setAdding(event.target.value)}
-                                placeholder="New folder"
-                                aria-label="New folder name"
+                                placeholder={t("folders.new")}
+                                aria-label={t("folders.newName")}
                             />
                             <Button type="submit" size="sm" disabled={pending || !adding.trim()}>
                                 {pending ? (
@@ -122,13 +124,13 @@ export function FolderDialog({
                                 ) : (
                                     <FolderPlus className="size-4" />
                                 )}
-                                Add
+                                {t("vaults.add")}
                             </Button>
                         </form>
 
                         {folders.length === 0 ? (
                             <p className="py-4 text-center text-sm text-muted-foreground">
-                                No folders yet.
+                                {t("folders.none")}
                             </p>
                         ) : (
                             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -150,13 +152,13 @@ export function FolderDialog({
                                                         if (event.key === "Escape")
                                                             setEditingId(null);
                                                     }}
-                                                    aria-label={`Rename ${folder.name}`}
+                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
                                                 />
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    title="Save"
-                                                    aria-label="Save the new name"
+                                                    title={tc("actions.save")}
+                                                    aria-label={t("folders.saveName")}
                                                     disabled={pending}
                                                     onClick={() =>
                                                         void save(folder.id, editingName)
@@ -167,8 +169,8 @@ export function FolderDialog({
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    title="Cancel"
-                                                    aria-label="Stop renaming"
+                                                    title={tc("actions.cancel")}
+                                                    aria-label={t("folders.stopRenaming")}
                                                     onClick={() => setEditingId(null)}
                                                 >
                                                     <X className="size-4" />
@@ -177,13 +179,13 @@ export function FolderDialog({
                                         ) : (
                                             <>
                                                 <span className="min-w-0 flex-1 truncate text-sm">
-                                                    {folder.name || "Untitled"}
+                                                    {folder.name || t("sends.untitled")}
                                                 </span>
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    title="Rename"
-                                                    aria-label={`Rename ${folder.name}`}
+                                                    title={t("vaults.rename")}
+                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
                                                     onClick={() => {
                                                         setEditingId(folder.id);
                                                         setEditingName(folder.name);
@@ -194,8 +196,8 @@ export function FolderDialog({
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    title="Delete"
-                                                    aria-label={`Delete ${folder.name}`}
+                                                    title={t("vaults.delete")}
+                                                    aria-label={t("vaults.deleteNamed", { name: folder.name })}
                                                     disabled={pending}
                                                     onClick={() => void remove(folder)}
                                                 >
@@ -212,7 +214,7 @@ export function FolderDialog({
 
                     <DialogFooter>
                         <Button type="button" variant="secondary" onClick={onClose}>
-                            Done
+                            {t("folders.done")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

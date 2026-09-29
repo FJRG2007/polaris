@@ -11,6 +11,7 @@
 import { Button } from "@polaris/ui";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@/lib/vault/totp-browser";
 import { totpCode, totpRemaining } from "@/lib/vault/totp-browser";
 
@@ -29,6 +30,7 @@ import { totpCode, totpRemaining } from "@/lib/vault/totp-browser";
  * that is when the fact changes.
  */
 function CountdownRing({ remaining, of }: { remaining: number; of: number }) {
+    const t = useTranslations("vault");
     const period = Math.max(1, of);
     const left = Math.max(0, Math.min(period, remaining));
     const radius = 9;
@@ -40,7 +42,7 @@ function CountdownRing({ remaining, of }: { remaining: number; of: number }) {
         <span
             className={`relative flex size-7 shrink-0 items-center justify-center ${tone}`}
             role="timer"
-            aria-label={`${left} seconds left`}
+            aria-label={t("totp.secondsLeft", { count: left })}
         >
             <svg viewBox="0 0 24 24" className="absolute inset-0 size-full -rotate-90">
                 <circle
@@ -75,6 +77,7 @@ function CountdownRing({ remaining, of }: { remaining: number; of: number }) {
 export function TotpCode({ value }: { value: string }) {
     const [code, setCode] = useState<string | null>(null);
     const [remaining, setRemaining] = useState(30);
+    const t = useTranslations("vault");
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -96,8 +99,8 @@ export function TotpCode({ value }: { value: string }) {
     if (!code) {
         return (
             <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Authenticator</span>
-                <p className="text-sm text-muted-foreground">That key is not one this can read.</p>
+                <span className="text-xs text-muted-foreground">{t("totp.label")}</span>
+                <p className="text-sm text-muted-foreground">{t("totp.unreadable")}</p>
             </div>
         );
     }
@@ -105,7 +108,7 @@ export function TotpCode({ value }: { value: string }) {
     return (
         <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
-                <span className="text-xs text-muted-foreground">Authenticator</span>
+                <span className="text-xs text-muted-foreground">{t("totp.label")}</span>
                 <p className="font-mono text-sm tracking-widest">
                     {code.slice(0, 3)} {code.slice(3)}
                 </p>
@@ -114,8 +117,8 @@ export function TotpCode({ value }: { value: string }) {
             <Button
                 size="icon"
                 variant="ghost"
-                title="Copy the code"
-                aria-label="Copy the authenticator code"
+                title={t("totp.copy")}
+                aria-label={t("totp.copyLabel")}
                 onClick={async () => {
                     await navigator.clipboard.writeText(code);
                     setCopied(true);

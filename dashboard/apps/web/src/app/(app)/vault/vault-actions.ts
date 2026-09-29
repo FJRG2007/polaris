@@ -16,6 +16,7 @@
 import * as core from "@polaris/core";
 import * as sends from "@/lib/vault/sends";
 import { revalidatePath } from "next/cache";
+import { schemaRefusal, vaultRefusal } from "./vault-refusal";
 import * as account from "@/lib/vault/account";
 import * as ciphers from "@/lib/vault/ciphers";
 import * as folders from "@/lib/vault/folders";
@@ -76,7 +77,7 @@ export async function vaultStateAction(): Promise<VaultState> {
 export async function setUnlockTimeoutAction(minutes: number): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     if (!(await account.setUnlockTimeout(user.id, minutes))) {
-        return { error: "That is not one of the choices." };
+        return { error: await vaultRefusal("errors.notAChoice") };
     }
     revalidatePath("/vault", "layout");
     return {};
@@ -102,10 +103,10 @@ export async function createAccountVaultAction(input: unknown): Promise<{ error?
     const user = await requirePermission("vault.use");
     const parsed = core.vaultSetupSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those keys are not usable." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
-        return { error: "That is not your Polaris password." };
+        return { error: await vaultRefusal("errors.wrongPolarisPassword") };
     }
     const result = await account.createVault(user.id, {
         masterPasswordHash: parsed.data.masterPasswordHash,
@@ -124,10 +125,10 @@ export async function createAccountVaultAction(input: unknown): Promise<{ error?
         return {
             error:
                 result.reason === "exists"
-                    ? "This account already has a vault."
+                    ? await vaultRefusal("errors.accountHasVault")
                     : result.reason === "kdf"
-                      ? "Those settings are out of range."
-                      : "Those keys are not encrypted values."
+                      ? await vaultRefusal("errors.kdfOutOfRange")
+                      : await vaultRefusal("errors.keysNotEncrypted")
         };
     }
     revalidatePath("/vault");
@@ -139,13 +140,13 @@ export async function changeMasterPasswordAction(input: unknown): Promise<{ erro
     const user = await requirePermission("vault.use");
     const parsed = core.vaultPasswordChangeSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.invalidRequest") };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
-        return { error: "That is not your Polaris password." };
+        return { error: await vaultRefusal("errors.wrongPolarisPassword") };
     }
     const current = await account.getVault(user.id);
-    if (!current) return { error: "This account has no vault." };
+    if (!current) return { error: await vaultRefusal("errors.accountNoVault") };
 
     const result = await account.changeMasterPassword(user.id, {
         currentHash: parsed.data.masterPasswordHash,
@@ -166,10 +167,10 @@ export async function changeMasterPasswordAction(input: unknown): Promise<{ erro
         return {
             error:
                 result.reason === "wrong_password"
-                    ? "That is not your current master password."
+                    ? await vaultRefusal("errors.wrongCurrentMaster")
                     : result.reason === "kdf"
-                      ? "Those settings are out of range."
-                      : "Invalid request"
+                      ? await vaultRefusal("errors.kdfOutOfRange")
+                      : await vaultRefusal("errors.invalidRequest")
         };
     }
     revalidatePath("/vault");
@@ -189,9 +190,9 @@ export async function deauthorizeVaultAction(): Promise<void> {
 export async function deleteAccountVaultAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.vaultVerifySchema.safeParse(input);
-    if (!parsed.success) return { error: "Invalid request" };
+    if (!parsed.success) return { error: await vaultRefusal("errors.invalidRequest") };
     if (!(await account.verifyMasterPassword(user.id, parsed.data.masterPasswordHash))) {
-        return { error: "That is not your master password." };
+        return { error: await vaultRefusal("errors.wrongMaster") };
     }
     await account.deleteVault(user.id);
     revalidatePath("/vault");
@@ -228,14 +229,14 @@ export async function saveItemAction(
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That item is not encrypted." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted") };
     }
     if (!itemId) {
         if (parsed.data.organizationId && collectionIds.length === 0) {
-            return { error: "Pick a collection to put it in." };
+            return { error: await vaultRefusal("errors.pickCollectionPut") };
         }
         const item = await ciphers.createCipher(user.id, parsed.data, collectionIds);
-        if (!item) return { error: "You are not in that vault." };
+        if (!item) return { error: await vaultRefusal("errors.notInVault") };
         revalidatePath("/vault");
         return { item };
     }
@@ -244,8 +245,8 @@ export async function saveItemAction(
         return {
             error:
                 result.reason === "conflict"
-                    ? "Somebody else changed this item. Reload and try again."
-                    : "That item is not yours."
+                    ? await vaultRefusal("errors.itemConflict")
+                    : await vaultRefusal("errors.itemNotYours")
         };
     }
     revalidatePath("/vault");
@@ -263,7 +264,7 @@ export async function setItemFavoriteAction(itemId: string, favorite: boolean): 
 export async function deleteItemAction(itemId: string, soft: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const count = await ciphers.deleteCiphers(user.id, [itemId], soft);
-    if (count === 0) return { error: "That item is not yours." };
+    if (count === 0) return { error: await vaultRefusal("errors.itemNotYours") };
     revalidatePath("/vault");
     return {};
 }
@@ -272,7 +273,7 @@ export async function deleteItemAction(itemId: string, soft: boolean): Promise<{
 export async function restoreItemAction(itemId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     if ((await ciphers.restoreCiphers(user.id, [itemId])) === 0) {
-        return { error: "That item is not yours." };
+        return { error: await vaultRefusal("errors.itemNotYours") };
     }
     revalidatePath("/vault");
     return {};
@@ -284,13 +285,13 @@ export async function saveFolderAction(
     name: string
 ): Promise<{ folder?: Record<string, unknown>; error?: string }> {
     const user = await requirePermission("vault.use");
-    if (!core.isEncString(name)) return { error: "A folder name must be encrypted." };
+    if (!core.isEncString(name)) return { error: await vaultRefusal("errors.folderNameEncrypted") };
     if (!folderId) {
         revalidatePath("/vault");
         return { folder: await folders.createFolder(user.id, name) };
     }
     const folder = await folders.updateFolder(user.id, folderId, name);
-    if (!folder) return { error: "That folder is not yours." };
+    if (!folder) return { error: await vaultRefusal("errors.folderNotYours") };
     revalidatePath("/vault");
     return { folder };
 }
@@ -298,7 +299,7 @@ export async function saveFolderAction(
 export async function deleteFolderAction(folderId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     if (!(await folders.deleteFolder(user.id, folderId)))
-        return { error: "That folder is not yours." };
+        return { error: await vaultRefusal("errors.folderNotYours") };
     revalidatePath("/vault");
     return {};
 }
@@ -355,7 +356,7 @@ export async function createSendAction(
     const user = await requirePermission("vault.use");
     const parsed = core.sendSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That send is not encrypted." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted") };
     }
     const send = await sends.createSend(user.id, parsed.data);
     revalidatePath("/vault/sends");
@@ -378,7 +379,7 @@ export async function createSendAction(
 export async function recordItemUseAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const parsed = core.itemUseSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not something an item can be used for." };
+    if (!parsed.success) return { error: await vaultRefusal("errors.notAUse") };
     await accessLog.recordItemUse(user.id, parsed.data.itemId, parsed.data.use);
     return {};
 }
@@ -390,7 +391,7 @@ export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
 
 export async function deleteSendAction(sendId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    if (!(await sends.deleteSend(user.id, sendId))) return { error: "That send is not yours." };
+    if (!(await sends.deleteSend(user.id, sendId))) return { error: await vaultRefusal("errors.sendNotYours") };
     revalidatePath("/vault/sends");
     return {};
 }

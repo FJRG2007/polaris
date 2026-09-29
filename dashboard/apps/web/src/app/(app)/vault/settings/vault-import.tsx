@@ -17,18 +17,21 @@ import { useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { readImportFile } from "@/lib/vault/portability";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { importRefusalText } from "../vault-labels";
 import { Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { decryptFolders, encryptItem, type VaultItem } from "../vault-model";
 import { saveFolderAction, saveItemAction, vaultContentsAction } from "../vault-actions";
 
 export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey | null }) {
+    const t = useTranslations("vault");
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
 
     async function onFile(file: File): Promise<void> {
         if (!vaultKey) {
-            setError("Your vault is locked.");
+            setError(t("port.locked"));
             return;
         }
         setError(null);
@@ -38,11 +41,11 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
         try {
             read = readImportFile(file.name, await file.text());
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "That file could not be read.");
+            setError(caught instanceof Error ? importRefusalText(t, caught.message) : t("port.unreadable"));
             return;
         }
         if (read.items.length === 0) {
-            setError("There was nothing in that file.");
+            setError(t("port.emptyFile"));
             return;
         }
 
@@ -78,21 +81,19 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
         setProgress(null);
         setDone(
             failed === 0
-                ? `Brought in ${read.items.length} items.`
-                : `Brought in ${read.items.length - failed} items; ${failed} could not be saved.`
+                ? t("port.imported", { count: read.items.length })
+                : t("port.importedSome", { count: read.items.length - failed, failed })
         );
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Import</CardTitle>
+                <CardTitle>{t("port.import")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    A Bitwarden JSON export, a KeePass XML export, or the CSV most managers and
-                    browsers write. The file is read here and every item is encrypted before it is
-                    sent.
+                    {t("port.importIntro")}
                 </p>
                 <Input
                     type="file"
@@ -103,12 +104,12 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
                         if (file) void onFile(file);
                         event.target.value = "";
                     }}
-                    aria-label="The file to import"
+                    aria-label={t("port.file")}
                 />
                 {progress ? (
                     <p className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
-                        {progress.done} of {progress.total}...
+                        {t("port.progress", { done: progress.done, total: progress.total })}
                     </p>
                 ) : null}
                 {done ? (
@@ -119,8 +120,7 @@ export function VaultImport({ vaultKey }: { vaultKey: vaultCrypto.SymmetricKey |
                 ) : null}
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 <p className="text-xs text-muted-foreground">
-                    A KeePass <code>.kdbx</code> is the database itself rather than an export. In
-                    KeePass, use File &gt; Export and pick KeePass XML.
+                    {t.rich("port.kdbxNote", { code: (chunks) => <code>{chunks}</code> })}
                 </p>
             </CardBody>
         </Card>

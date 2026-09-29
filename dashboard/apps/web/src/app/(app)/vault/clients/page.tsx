@@ -9,6 +9,7 @@
  */
 
 import Link from "next/link";
+import { Fragment } from "react";
 import { loadEnv } from "@polaris/config";
 import { getVault } from "@/lib/vault/account";
 import { requirePermission } from "@/lib/session";
@@ -32,6 +33,14 @@ export default async function VaultClientsPage() {
     const base = await sharingBaseUrl();
     const clients = await listVaultClients(user.id);
     const serverUrl = `${base}/vault`;
+    // i18n-ignore: a command, typed as it is
+    const cliCommand = `bw config server ${serverUrl}`;
+    const endpoints = [
+        ["clients.api", "/api"],
+        ["clients.identity", "/identity"],
+        ["clients.icons", "/icons"],
+        ["clients.notifications", "/notifications"]
+    ] as const;
     const insecure =
         !serverUrl.startsWith("https://") && !loadEnv().POLARIS_APP_URL.includes("localhost");
 
@@ -95,10 +104,10 @@ export default async function VaultClientsPage() {
                         <p className="text-muted-foreground">{t("clients.cliHint")}</p>
                         <div className="mt-2 flex items-center gap-2">
                             <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs">
-                                bw config server {serverUrl}
+                                {cliCommand}
                             </code>
                             <CopyButton
-                                value={`bw config server ${serverUrl}`}
+                                value={cliCommand}
                                 label={t("clients.cliCopy")}
                             />
                         </div>
@@ -189,26 +198,14 @@ export default async function VaultClientsPage() {
                         <dd className="truncate" title={serverUrl}>
                             {serverUrl}
                         </dd>
-                        <dt className="text-muted-foreground">{t("clients.api")}</dt>
-                        <dd
-                            className="truncate"
-                            title={`${serverUrl}/api`}
-                        >{`${serverUrl}/api`}</dd>
-                        <dt className="text-muted-foreground">{t("clients.identity")}</dt>
-                        <dd
-                            className="truncate"
-                            title={`${serverUrl}/identity`}
-                        >{`${serverUrl}/identity`}</dd>
-                        <dt className="text-muted-foreground">{t("clients.icons")}</dt>
-                        <dd
-                            className="truncate"
-                            title={`${serverUrl}/icons`}
-                        >{`${serverUrl}/icons`}</dd>
-                        <dt className="text-muted-foreground">{t("clients.notifications")}</dt>
-                        <dd
-                            className="truncate"
-                            title={`${serverUrl}/notifications`}
-                        >{`${serverUrl}/notifications`}</dd>
+                        {endpoints.map(([label, path]) => (
+                            <Fragment key={path}>
+                                <dt className="text-muted-foreground">{t(label)}</dt>
+                                <dd className="truncate" title={serverUrl + path}>
+                                    {serverUrl + path}
+                                </dd>
+                            </Fragment>
+                        ))}
                     </dl>
                 </CardBody>
             </Card>

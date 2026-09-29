@@ -66,6 +66,7 @@ export async function authenticateVault(request: Request): Promise<VaultPrincipa
 
 /** The shape every vault endpoint answers a refusal with. */
 export function vaultUnauthorized(): Response {
+    // i18n-ignore: protocol status text for a Bitwarden client
     return Response.json({ message: "Unauthorized" }, { status: 401 });
 }
 

@@ -145,6 +145,7 @@ export async function dispatchVault(
     }
 
     return Response.json(
+        // i18n-ignore: protocol status text for a Bitwarden client
         { message: pathExists ? "Method not allowed" : "Not found", object: "error" },
         { status: pathExists ? 405 : 404 }
     );

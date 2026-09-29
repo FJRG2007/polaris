@@ -10,7 +10,7 @@
  * The account's own vault is listed first and drawn by a panel of its own. It is
  * a VaultAccount rather than a VaultOrganization - folders instead of
  * collections, nobody to invite - so none of the controls below apply to it, and
- * leaving it off the list made a screen headed "Vaults" look empty to somebody
+ * leaving it off the list made a screen headed t("vaults.title") look empty to somebody
  * whose items are all in one.
  *
  * Three things happen here that cannot happen anywhere else, and all three need
@@ -36,6 +36,8 @@ import { useEffect, useState } from "react";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import type { VaultView } from "../share-actions";
 import { useVaultSession } from "../vault-session";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { vaultSchemaText } from "../vault-labels";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useVaultCollections, type VaultCollection } from "../use-vault-collections";
 import {
@@ -86,6 +88,7 @@ function pickerValue(vault: VaultView): string {
 }
 
 export function VaultsView() {
+    const t = useTranslations("vault");
     const { vaults, vaultKeys, key, privateKey, reloadVaults } = useVaultSession();
     const [selected, setSelected] = useState("");
     const [creating, setCreating] = useState(false);
@@ -101,32 +104,31 @@ export function VaultsView() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Vaults</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("vaults.title")}</h1>
                     <p className="text-sm text-muted-foreground">
-                        Every vault you can open, each with its own key. Yours is the first.
+                        {t("vaults.intro")}
                     </p>
                 </div>
                 <Button size="sm" onClick={() => setCreating(true)}>
                     <Plus className="size-4" />
-                    New vault
+                    {t("vaults.newVault")}
                 </Button>
             </div>
 
             {vaults.length === 0 ? (
                 <Card>
                     <CardBody className="p-6 text-sm text-muted-foreground">
-                        Nothing here yet. Set up your own vault from the Vault app first; then you
-                        can make another to keep something apart, or to share it with somebody.
+                        {t("vaults.empty")}
                     </CardBody>
                 </Card>
             ) : (
                 <Select
                     value={current ? pickerValue(current) : ""}
                     onValueChange={setSelected}
-                    aria-label="Vault"
+                    aria-label={t("vaults.picker")}
                     options={vaults.map((vault) => ({
                         value: pickerValue(vault),
-                        label: vault.organizationId ? `${vault.name} (organization)` : vault.name
+                        label: vault.organizationId ? t("vaults.orgOption", { name: vault.name }) : vault.name
                     }))}
                 />
             )}
@@ -181,6 +183,9 @@ function NewVaultDialog({
     onError: (message: string | null) => void;
 }) {
     const { state } = useVaultSession();
+    const t = useTranslations("vault");
+    const tv = useTranslations("validation");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [pending, setPending] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
@@ -193,12 +198,13 @@ function NewVaultDialog({
     }, [open]);
 
     const parsed = core.vaultNameField.safeParse(name);
-    const nameProblem = name.length > 0 && !parsed.success ? parsed.error.issues[0]?.message : null;
+    const issue = name.length > 0 && !parsed.success ? parsed.error.issues[0]?.message : undefined;
+    const nameProblem = issue ? vaultSchemaText(t, tv, issue) : null;
 
     async function onCreate(): Promise<void> {
         if (!parsed.success) return;
         if (!state.publicKey) {
-            setProblem("Your own vault has to be open first.");
+            setProblem(t("vaults.openOwnFirst"));
             return;
         }
         setPending(true);
@@ -219,10 +225,10 @@ function NewVaultDialog({
                     publicKey: pair.publicKey,
                     encryptedPrivateKey: await vaultCrypto.encryptBytes(pair.privateKey, vaultKey)
                 },
-                collectionName: await vaultCrypto.encrypt("General", vaultKey)
+                collectionName: await vaultCrypto.encrypt(t("vaults.generalCollection"), vaultKey)
             });
             if (result.error || !result.vaultId) {
-                setProblem(result.error ?? "That vault could not be created.");
+                setProblem(result.error ?? t("vaults.notCreated"));
                 return;
             }
             onError(null);
@@ -237,10 +243,9 @@ function NewVaultDialog({
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New vault</DialogTitle>
+                    <DialogTitle>{t("vaults.newVault")}</DialogTitle>
                     <DialogDescription>
-                        Its key is made in this browser and wrapped to you. The name is the one
-                        thing about it the server can read.
+                        {t("vaults.newIntro")}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -253,8 +258,8 @@ function NewVaultDialog({
                     <Input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="Work, family, side project"
-                        aria-label="Vault name"
+                        placeholder={t("vaults.namePlaceholder")}
+                        aria-label={t("vaults.nameLabel")}
                         autoFocus
                         maxLength={core.VAULT_NAME_MAX}
                     />
@@ -262,7 +267,7 @@ function NewVaultDialog({
                     {problem ? <p className="text-sm text-danger">{problem}</p> : null}
                     <DialogFooter>
                         <Button type="button" variant="secondary" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={pending || !parsed.success}>
                             {pending ? (
@@ -270,7 +275,7 @@ function NewVaultDialog({
                             ) : (
                                 <Plus className="size-4" />
                             )}
-                            Create it
+                            {t("vaults.create")}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -290,24 +295,21 @@ function NewVaultDialog({
  * the vault.
  */
 function AccountVaultPanel() {
+    const t = useTranslations("vault");
     return (
         <Card>
             <CardHeader>
-                <CardTitle>My own vault</CardTitle>
+                <CardTitle>{t("vaults.ownTitle")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3 text-[0.8125rem] text-muted-foreground">
                 <p>
-                    Everything you save lands here unless you put it somewhere else. It is yours
-                    alone: nobody can be let in, because the key is wrapped under your master
-                    password and nothing on the server can derive it.
+                    {t("vaults.ownBody")}
                 </p>
                 <p>
-                    To let somebody at one of these items, make a vault below and move the item
-                    into it from the item itself. Moving re-encrypts it under that vault&apos;s key,
-                    which is what sharing actually is here.
+                    {t("vaults.ownShare")}
                 </p>
                 <Button asChild variant="outline" size="sm" className="self-start">
-                    <Link href="/vault">Open it</Link>
+                    <Link href="/vault">{t("vaults.open")}</Link>
                 </Button>
             </CardBody>
         </Card>
@@ -324,14 +326,14 @@ function CreateOrganizationVault({
     onCreated: () => Promise<void>;
 }) {
     const { state } = useVaultSession();
+    const t = useTranslations("vault");
     const [pending, setPending] = useState(false);
 
     if (!vault.mayAdminister) {
         return (
             <Card>
                 <CardBody className="p-6 text-sm text-muted-foreground">
-                    {vault.name} has no vault yet, and setting one up is not something your role
-                    there can do.
+                    {t("vaults.orgNoVault", { name: vault.name })}
                 </CardBody>
             </Card>
         );
@@ -339,7 +341,7 @@ function CreateOrganizationVault({
 
     async function onCreate(): Promise<void> {
         if (!state.publicKey || !vault.organizationId) {
-            onError("Your own vault has to be open first.");
+            onError(t("vaults.openOwnFirst"));
             return;
         }
         setPending(true);
@@ -357,7 +359,7 @@ function CreateOrganizationVault({
                     publicKey: pair.publicKey,
                     encryptedPrivateKey: await vaultCrypto.encryptBytes(pair.privateKey, orgKey)
                 },
-                collectionName: await vaultCrypto.encrypt("Shared", orgKey)
+                collectionName: await vaultCrypto.encrypt(t("vaults.sharedCollection"), orgKey)
             });
             if (result.error) {
                 onError(result.error);
@@ -374,13 +376,12 @@ function CreateOrganizationVault({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Building2 className="size-4" />
-                    Set up a vault for {vault.name}
+                    {t("vaults.setUpFor", { name: vault.name })}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    The keys are made in this browser. You will hold it first, and anybody else who
-                    should read it has to be let in by somebody who already can.
+                    {t("vaults.setUpIntro")}
                 </p>
                 <div className="flex justify-end">
                     <Button onClick={onCreate} disabled={pending}>
@@ -389,7 +390,7 @@ function CreateOrganizationVault({
                         ) : (
                             <Plus className="size-4" />
                         )}
-                        Create it
+                        {t("vaults.create")}
                     </Button>
                 </div>
             </CardBody>
@@ -412,6 +413,8 @@ function VaultPanel({
     onChanged: () => Promise<void>;
 }) {
     const { privateKey } = useVaultSession();
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     const [members, setMembers] = useState<MemberRow[]>([]);
     const [candidates, setCandidates] = useState<
         { userId: string; name: string; email: string; hasVault: boolean }[]
@@ -462,7 +465,7 @@ function VaultPanel({
      */
     async function onLetIn(member: MemberRow, scope: core.VaultScope): Promise<void> {
         if (!vaultKey || !privateKey || !hasPersonalKey) {
-            onError("Your own vault has to be open, and you have to hold this vault's key.");
+            onError(t("vaults.needKeys"));
             return;
         }
         setPending(true);
@@ -470,7 +473,7 @@ function VaultPanel({
         try {
             const theirKey = await share.memberPublicKeyAction(vaultId, member.id);
             if (theirKey.error || !theirKey.publicKey) {
-                onError(theirKey.error ?? "That person has no key to wrap this to.");
+                onError(theirKey.error ?? t("vaults.noKey"));
                 return;
             }
             const wrapped = await vaultCrypto.encryptRsa(
@@ -522,10 +525,9 @@ function VaultPanel({
 
     async function onRemove(member: MemberRow): Promise<void> {
         const confirmed = await confirm({
-            title: `Take ${member.email} out of this vault?`,
-            description:
-                "They keep whatever they already synced - a key cannot be un-given - but they stop receiving anything new. Change what they knew if that matters.",
-            confirmLabel: "Remove",
+            title: t("vaults.removeTitle", { email: member.email }),
+            description: t("vaults.removeBody"),
+            confirmLabel: t("vaults.remove"),
             danger: true
         });
         if (!confirmed) return;
@@ -558,10 +560,9 @@ function VaultPanel({
 
     async function onDeleteCollection(collection: VaultCollection): Promise<void> {
         const confirmed = await confirm({
-            title: `Delete the collection "${collection.name}"?`,
-            description:
-                "What is in it is not deleted. It stops being shared through this collection, which may leave it reachable only by an administrator.",
-            confirmLabel: "Delete",
+            title: t("vaults.deleteCollectionTitle", { name: collection.name }),
+            description: t("vaults.deleteCollectionBody"),
+            confirmLabel: t("vaults.delete"),
             danger: true
         });
         if (!confirmed) return;
@@ -590,10 +591,9 @@ function VaultPanel({
 
     async function onLeave(): Promise<void> {
         const confirmed = await confirm({
-            title: `Leave "${vault.name}"?`,
-            description:
-                "It stops syncing to you and you lose what is in it. Whatever you already synced stays on the devices that have it.",
-            confirmLabel: "Leave",
+            title: t("vaults.leaveTitle", { name: vault.name }),
+            description: t("vaults.leaveBody"),
+            confirmLabel: t("vaults.leaveConfirm"),
             danger: true
         });
         if (!confirmed) return;
@@ -607,10 +607,9 @@ function VaultPanel({
 
     async function onDeleteVault(): Promise<void> {
         const confirmed = await confirm({
-            title: `Delete "${vault.name}"?`,
-            description:
-                "Everything in it goes with it, and its key goes too. Anybody you let in keeps what they already synced. This cannot be undone.",
-            confirmLabel: "Delete the vault",
+            title: t("vaults.deleteVaultTitle", { name: vault.name }),
+            description: t("vaults.deleteVaultBody"),
+            confirmLabel: t("vaults.deleteVault"),
             danger: true
         });
         if (!confirmed) return;
@@ -627,9 +626,7 @@ function VaultPanel({
             {!vaultKey ? (
                 <Card>
                     <CardBody className="p-6 text-sm text-muted-foreground">
-                        You are on this vault&apos;s list but nobody has let you in yet. Until
-                        somebody who holds its key vouches for you, there is nothing here to read -
-                        which is what makes it worth being in.
+                        {t("vaults.waiting")}
                     </CardBody>
                 </Card>
             ) : (
@@ -641,13 +638,12 @@ function VaultPanel({
                             ) : (
                                 <User className="size-4" />
                             )}
-                            Collections
+                            {t("vaults.collections")}
                         </CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">
-                            Where an item in this vault lives. Moving something into one is done
-                            from the item itself.
+                            {t("vaults.collectionsIntro")}
                         </p>
                         {vault.mayAdminister ? (
                             <form
@@ -660,8 +656,8 @@ function VaultPanel({
                                 <Input
                                     value={newCollection}
                                     onChange={(event) => setNewCollection(event.target.value)}
-                                    placeholder="New collection"
-                                    aria-label="New collection name"
+                                    placeholder={t("vaults.newCollection")}
+                                    aria-label={t("vaults.newCollectionName")}
                                 />
                                 <Button
                                     type="submit"
@@ -669,12 +665,12 @@ function VaultPanel({
                                     disabled={pending || !newCollection.trim()}
                                 >
                                     <FolderPlus className="size-4" />
-                                    Add
+                                    {t("vaults.add")}
                                 </Button>
                             </form>
                         ) : null}
                         {collections.length === 0 ? (
-                            <p className="py-2 text-sm text-muted-foreground">No collections yet.</p>
+                            <p className="py-2 text-sm text-muted-foreground">{t("vaults.noCollections")}</p>
                         ) : (
                             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                                 {collections.map((collection) => (
@@ -689,8 +685,8 @@ function VaultPanel({
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Delete"
-                                                aria-label={`Delete ${collection.name}`}
+                                                title={t("vaults.delete")}
+                                                aria-label={t("vaults.deleteNamed", { name: collection.name })}
                                                 onClick={() => void onDeleteCollection(collection)}
                                             >
                                                 <Trash2 className="size-4" />
@@ -707,26 +703,25 @@ function VaultPanel({
             {vault.mayAdminister ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Who is in it</CardTitle>
+                        <CardTitle>{t("vaults.members")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-2">
                         <p className="text-sm text-muted-foreground">
-                            Adding somebody puts them on the list. Letting them in hands over the
-                            key, and only somebody who already holds it can do that.
+                            {t("vaults.membersIntro")}
                         </p>
                         <div className="flex items-center gap-2">
                             {vault.organizationId ? (
                                 <Select
                                     value={invitee}
                                     onValueChange={setInvitee}
-                                    aria-label="Somebody to add"
-                                    placeholder="Everybody on the roster is already here"
+                                    aria-label={t("vaults.addWho")}
+                                    placeholder={t("vaults.everybodyHere")}
                                     className="min-w-0 flex-1"
                                     options={candidates.map((person) => ({
                                         value: person.email,
                                         label: person.hasVault
                                             ? `${person.name} (${person.email})`
-                                            : `${person.name} - no vault of their own yet`,
+                                            : t("vaults.noVaultYet", { name: person.name }),
                                         disabled: !person.hasVault
                                     }))}
                                 />
@@ -735,14 +730,14 @@ function VaultPanel({
                                     type="email"
                                     value={invitee}
                                     onChange={(event) => setInvitee(event.target.value)}
-                                    placeholder="Their email address"
-                                    aria-label="Somebody to add"
+                                    placeholder={t("vaults.theirEmail")}
+                                    aria-label={t("vaults.addWho")}
                                     className="min-w-0 flex-1"
                                 />
                             )}
                             <Button size="sm" onClick={onInvite} disabled={pending || !invitee}>
                                 <Plus className="size-4" />
-                                Add
+                                {t("vaults.add")}
                             </Button>
                         </div>
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -760,15 +755,15 @@ function VaultPanel({
                                         <>
                                             <Badge variant="neutral">
                                                 {member.accessAll
-                                                    ? "Whole vault"
-                                                    : `${member.collections.length} collections`}
+                                                    ? t("vaults.wholeVault")
+                                                    : t("vaults.collectionCount", { count: member.collections.length })}
                                             </Badge>
-                                            <Badge variant="success">Holds the key</Badge>
+                                            <Badge variant="success">{t("vaults.holdsKey")}</Badge>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Change what they reach"
-                                                aria-label={`Change what ${member.email} reaches`}
+                                                title={t("vaults.changeScope")}
+                                                aria-label={t("vaults.changeScopeNamed", { email: member.email })}
                                                 onClick={() => setAccess(member)}
                                             >
                                                 <Pencil className="size-4" />
@@ -776,12 +771,12 @@ function VaultPanel({
                                         </>
                                     ) : (
                                         <>
-                                            <Badge variant="neutral">Not let in yet</Badge>
+                                            <Badge variant="neutral">{t("vaults.notLetIn")}</Badge>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Let them in"
-                                                aria-label={`Let ${member.email} in`}
+                                                title={t("vaults.letIn")}
+                                                aria-label={t("vaults.letInNamed", { email: member.email })}
                                                 disabled={pending || !vaultKey}
                                                 onClick={() => setAccess(member)}
                                             >
@@ -796,8 +791,8 @@ function VaultPanel({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        title="Remove"
-                                        aria-label={`Remove ${member.email}`}
+                                        title={t("vaults.remove")}
+                                        aria-label={t("vaults.removeNamed", { email: member.email })}
                                         onClick={() => void onRemove(member)}
                                     >
                                         <X className="size-4" />
@@ -812,7 +807,7 @@ function VaultPanel({
             {vault.mine ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>This vault</CardTitle>
+                        <CardTitle>{t("vaults.thisVault")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-3">
                         {renaming === null ? (
@@ -821,8 +816,8 @@ function VaultPanel({
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    title="Rename"
-                                    aria-label={`Rename ${vault.name}`}
+                                    title={t("vaults.rename")}
+                                    aria-label={t("vaults.renameNamed", { name: vault.name })}
                                     onClick={() => setRenaming(vault.name)}
                                 >
                                     <Pencil className="size-4" />
@@ -839,12 +834,12 @@ function VaultPanel({
                                 <Input
                                     value={renaming}
                                     onChange={(event) => setRenaming(event.target.value)}
-                                    aria-label="Vault name"
+                                    aria-label={t("vaults.nameLabel")}
                                     maxLength={core.VAULT_NAME_MAX}
                                     autoFocus
                                 />
                                 <Button type="submit" size="sm" disabled={pending}>
-                                    Save
+                                    {tc("actions.save")}
                                 </Button>
                                 <Button
                                     type="button"
@@ -852,17 +847,17 @@ function VaultPanel({
                                     variant="secondary"
                                     onClick={() => setRenaming(null)}
                                 >
-                                    Cancel
+                                    {tc("actions.cancel")}
                                 </Button>
                             </form>
                         )}
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-sm text-muted-foreground">
-                                Deleting it takes everything in it, and its key.
+                                {t("vaults.deleteHint")}
                             </p>
                             <Button size="sm" variant="danger" onClick={() => void onDeleteVault()}>
                                 <Trash2 className="size-4" />
-                                Delete
+                                {t("vaults.delete")}
                             </Button>
                         </div>
                     </CardBody>
@@ -874,12 +869,12 @@ function VaultPanel({
                     <CardBody className="flex flex-wrap items-center justify-between gap-2 p-4">
                         <p className="text-sm text-muted-foreground">
                             {vault.organizationId
-                                ? "You were let into this vault."
-                                : "Somebody let you into this vault."}
+                                ? t("vaults.letInOrg")
+                                : t("vaults.letInPersonal")}
                         </p>
                         <Button size="sm" variant="secondary" onClick={() => void onLeave()}>
                             <LogOut className="size-4" />
-                            Leave it
+                            {t("vaults.leave")}
                         </Button>
                     </CardBody>
                 </Card>
@@ -917,6 +912,8 @@ function AccessDialog({
     onClose: () => void;
     onSave: (member: MemberRow, scope: core.VaultScope) => Promise<void>;
 }) {
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     const [whole, setWhole] = useState(true);
     const [picked, setPicked] = useState<Map<string, { readOnly: boolean }>>(new Map());
     const [pending, setPending] = useState(false);
@@ -974,11 +971,12 @@ function AccessDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {firstTime ? `Let ${member?.email} in` : `What ${member?.email} reaches`}
+                        {firstTime
+                            ? t("vaults.letInNamed", { email: member?.email ?? "" })
+                            : t("vaults.scopeOf", { email: member?.email ?? "" })}
                     </DialogTitle>
                     <DialogDescription>
-                        They are handed this vault&apos;s key either way. What you choose here is
-                        what they are shown and allowed to change.
+                        {t("vaults.scopeIntro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -987,13 +985,13 @@ function AccessDialog({
                         <Checkbox
                             checked={whole}
                             onChange={(event) => setWhole(event.target.checked)}
-                            aria-label="The whole vault"
+                            aria-label={t("vaults.theWholeVault")}
                         />
-                        The whole vault
+                        {t("vaults.theWholeVault")}
                     </label>
                     {whole ? null : collections.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            There are no collections to pick. Make one first.
+                            {t("vaults.nothingToPick")}
                         </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -1022,9 +1020,9 @@ function AccessDialog({
                                                             event.target.checked
                                                         )
                                                     }
-                                                    aria-label={`Read only in ${collection.name}`}
+                                                    aria-label={t("vaults.readOnlyIn", { name: collection.name })}
                                                 />
-                                                Read only
+                                                {t("vaults.readOnly")}
                                             </label>
                                         ) : null}
                                     </li>
@@ -1036,7 +1034,7 @@ function AccessDialog({
 
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button
                         type="button"
@@ -1050,7 +1048,7 @@ function AccessDialog({
                         ) : (
                             <Check className="size-4" />
                         )}
-                        {firstTime ? "Let them in" : "Save"}
+                        {firstTime ? t("vaults.letIn") : tc("actions.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

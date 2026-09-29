@@ -221,7 +221,7 @@ export async function answerVaultAuthorization(
     now = new Date()
 ): Promise<{ error?: AuthorizationRefusal }> {
     if (input.approve && !input.wrappedKey) {
-        return { error: "unlockFirst" };
+        return { error: "unlockFirst" }; // i18n-ignore: a refusal code, worded by the screen
     }
 
     // A request that came from a connected extension belongs to the account that
@@ -237,10 +237,10 @@ export async function answerVaultAuthorization(
             select: { userId: true, revokedAt: true }
         });
         if (!connection || connection.revokedAt) {
-            return { error: "connectionEnded" };
+            return { error: "connectionEnded" }; // i18n-ignore: a refusal code, worded by the screen
         }
         if (connection.userId !== input.userId) {
-            return { error: "otherAccount" };
+            return { error: "otherAccount" }; // i18n-ignore: a refusal code, worded by the screen
         }
     }
     // Only a pending, unexpired row is answerable, and the update says so in its
@@ -254,7 +254,7 @@ export async function answerVaultAuthorization(
         }
     });
     if (answered.count === 0) {
-        return { error: "noLongerWaiting" };
+        return { error: "noLongerWaiting" }; // i18n-ignore: a refusal code, worded by the screen
     }
     return {};
 }

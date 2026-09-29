@@ -25,6 +25,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import { schemaRefusal, vaultRefusal } from "./vault-refusal";
+import { getTranslations } from "@/lib/i18n/request";
 import * as vaultOrgs from "@/lib/vault/orgs";
 import * as ciphers from "@/lib/vault/ciphers";
 import { requirePermission } from "@/lib/session";
@@ -74,6 +76,7 @@ export interface VaultView {
  */
 export async function vaultListAction(): Promise<VaultView[]> {
     const user = await requirePermission("vault.use");
+    const t = await getTranslations("vault");
     // The shelf that is open. A vault belongs to a person or to one company, so
     // the switcher in the header means the same here as it does everywhere else:
     // on a company's shelf this is that company's vault, and on your own it is
@@ -111,7 +114,7 @@ export async function vaultListAction(): Promise<VaultView[]> {
         return {
             vaultId: row.id,
             organizationId: row.organizationId,
-            name: row.organization?.name ?? row.name ?? "Vault",
+            name: row.organization?.name ?? row.name ?? t("names.vault"),
             mine: row.ownerUserId === user.id,
             mayAdminister: row.organizationId
                 ? (mayManage.get(row.organizationId) ?? false)
@@ -148,7 +151,7 @@ export async function vaultListAction(): Promise<VaultView[]> {
         views.unshift({
             vaultId: null,
             organizationId: null,
-            name: "My own vault",
+            name: t("names.ownVault"),
             mine: true,
             mayAdminister: false,
             wrappedKey: null,
@@ -166,14 +169,14 @@ export async function createOrganizationVaultAction(input: unknown): Promise<{ e
     const user = await requirePermission("vault.use");
     const parsed = core.vaultOrganizationSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those keys are not usable." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
     }
     const access = await resolveOrgAccess(
         { id: user.id, isAdmin: user.isAdmin },
         parsed.data.organizationId
     );
     if (!orgCan(access, "vault.manage")) {
-        return { error: "You cannot set up a vault for that organization." };
+        return { error: await vaultRefusal("errors.cannotSetUpOrg") };
     }
     const result = await vaultOrgs.createOrganizationVault({
         organizationId: parsed.data.organizationId,
@@ -188,8 +191,8 @@ export async function createOrganizationVaultAction(input: unknown): Promise<{ e
         return {
             error:
                 result.reason === "exists"
-                    ? "That organization already has a vault."
-                    : "Those keys are not encrypted values."
+                    ? await vaultRefusal("errors.orgHasVault")
+                    : await vaultRefusal("errors.keysNotEncrypted")
         };
     }
     revalidatePath("/vault", "layout");
@@ -203,7 +206,7 @@ export async function createPersonalVaultAction(
     const user = await requirePermission("vault.use");
     const parsed = core.personalVaultSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those keys are not usable." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
     }
     const result = await vaultOrgs.createPersonalVault({
         name: parsed.data.name,
@@ -218,8 +221,8 @@ export async function createPersonalVaultAction(
         return {
             error:
                 result.reason === "too_many"
-                    ? `You can keep ${core.MAX_OWNED_VAULTS} vaults of your own. Delete one first.`
-                    : "Those keys are not encrypted values."
+                    ? await vaultRefusal("errors.tooManyVaults", { count: core.MAX_OWNED_VAULTS })
+                    : await vaultRefusal("errors.keysNotEncrypted")
         };
     }
     revalidatePath("/vault", "layout");
@@ -244,7 +247,7 @@ async function administered(
     vaultId: string
 ): Promise<{ ok: true; vaultId: string; userId: string } | { ok: false; error: string }> {
     const user = await requirePermission("vault.use");
-    const refused = { ok: false, error: "You cannot administer that vault." } as const;
+    const refused = { ok: false, error: await vaultRefusal("errors.cannotAdminister") } as const;
     const vault = await vaultOrgs.vaultById(vaultId);
     if (!vault) return refused;
 
@@ -272,9 +275,9 @@ export async function renameVaultAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     const parsed = core.vaultNameField.safeParse(name);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Give it a name." };
+    if (!parsed.success) return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.giveItName") };
     if (!(await vaultOrgs.renameVault(vaultId, parsed.data))) {
-        return { error: "An organization's vault is named after the organization." };
+        return { error: await vaultRefusal("errors.orgVaultName") };
     }
     revalidatePath("/vault", "layout");
     return {};
@@ -291,7 +294,7 @@ export async function deleteVaultAction(vaultId: string): Promise<{ error?: stri
     const user = await requirePermission("vault.use");
     const vault = await vaultOrgs.vaultById(vaultId);
     if (!vault || vault.ownerUserId !== user.id) {
-        return { error: "That is not a vault of yours to delete." };
+        return { error: await vaultRefusal("errors.notYoursToDelete") };
     }
     await vaultOrgs.deleteVault(vaultId);
     revalidatePath("/vault", "layout");
@@ -309,12 +312,12 @@ export async function deleteVaultAction(vaultId: string): Promise<{ error?: stri
 export async function leaveVaultAction(vaultId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
     const vault = await vaultOrgs.vaultById(vaultId);
-    if (!vault) return { error: "That vault does not exist." };
+    if (!vault) return { error: await vaultRefusal("errors.vaultMissing") };
     if (vault.ownerUserId === user.id) {
-        return { error: "You own this vault. Delete it instead of leaving it." };
+        return { error: await vaultRefusal("errors.ownerCannotLeave") };
     }
     const standing = await vaultOrgs.standingIn(user.id, vaultId);
-    if (!standing) return { error: "You are not in that vault." };
+    if (!standing) return { error: await vaultRefusal("errors.notInVault") };
     await vaultOrgs.removeMember(vaultId, standing.memberId);
     revalidatePath("/vault", "layout");
     return {};
@@ -378,7 +381,7 @@ export async function inviteVaultMemberAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     const parsed = core.emailField.safeParse(email);
-    if (!parsed.success) return { error: "Enter a valid email address." };
+    if (!parsed.success) return { error: await vaultRefusal("errors.invalidEmail") };
     const roles = [
         core.ORG_ROLE_OWNER,
         core.ORG_ROLE_ADMIN,
@@ -390,7 +393,7 @@ export async function inviteVaultMemberAction(
         parsed.data,
         roles.includes(type) ? type : core.ORG_ROLE_USER
     );
-    if (!invited.ok) return { error: "That is the owner of this vault." };
+    if (!invited.ok) return { error: await vaultRefusal("errors.isOwner") };
     revalidatePath("/vault/vaults");
     return {};
 }
@@ -410,7 +413,7 @@ export async function memberPublicKeyAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (!idSchema.safeParse(memberId).success)
-        return { error: "That member is not in this vault." };
+        return { error: await vaultRefusal("errors.memberMissing") };
     const member = await prisma.vaultOrgUser.findFirst({
         where: { id: memberId, orgId: gate.vaultId },
         select: { userId: true }
@@ -423,7 +426,7 @@ export async function memberPublicKeyAction(
         : null;
     if (!account?.publicKey) {
         return {
-            error: "They have not set up a vault of their own yet, so there is no key to wrap this to."
+            error: await vaultRefusal("errors.noKeyToWrap")
         };
     }
     return { publicKey: account.publicKey };
@@ -440,16 +443,16 @@ export async function confirmVaultMemberAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (!idSchema.safeParse(memberId).success)
-        return { error: "That member could not be confirmed." };
+        return { error: await vaultRefusal("errors.memberNotConfirmed") };
     const parsed = core.vaultScopeSchema.safeParse(scope);
-    if (!parsed.success) return { error: "Say what they should reach." };
+    if (!parsed.success) return { error: await vaultRefusal("errors.sayScope") };
     // Handing the key over while granting nothing is strictly worse than not
     // handing it over: they hold it and see an empty vault.
     if (!parsed.data.accessAll && parsed.data.collections.length === 0) {
-        return { error: "Pick the whole vault or at least one collection." };
+        return { error: await vaultRefusal("errors.pickScope") };
     }
     if (!(await vaultOrgs.confirmMember(gate.vaultId, memberId, wrappedKey, parsed.data))) {
-        return { error: "That member could not be confirmed." };
+        return { error: await vaultRefusal("errors.memberNotConfirmed") };
     }
     revalidatePath("/vault/vaults");
     return {};
@@ -464,11 +467,11 @@ export async function setMemberScopeAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (!idSchema.safeParse(memberId).success)
-        return { error: "That member is not in this vault." };
+        return { error: await vaultRefusal("errors.memberMissing") };
     const parsed = core.vaultScopeSchema.safeParse(scope);
-    if (!parsed.success) return { error: "Say what they should reach." };
+    if (!parsed.success) return { error: await vaultRefusal("errors.sayScope") };
     if (!(await vaultOrgs.setMemberScope(gate.vaultId, memberId, parsed.data))) {
-        return { error: "That member is not in this vault." };
+        return { error: await vaultRefusal("errors.memberMissing") };
     }
     revalidatePath("/vault/vaults");
     return {};
@@ -481,9 +484,9 @@ export async function removeVaultMemberAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (!idSchema.safeParse(memberId).success)
-        return { error: "That member is not in this vault." };
+        return { error: await vaultRefusal("errors.memberMissing") };
     if (!(await vaultOrgs.removeMember(gate.vaultId, memberId))) {
-        return { error: "That member is not in this vault." };
+        return { error: await vaultRefusal("errors.memberMissing") };
     }
     revalidatePath("/vault/vaults");
     return {};
@@ -499,7 +502,7 @@ export async function vaultCollectionsAction(
     const standing = await vaultOrgs.standingIn(user.id, vaultId);
     if (!standing?.confirmed) {
         const gate = await administered(vaultId);
-        if (!gate.ok) return { error: "You are not in that vault." };
+        if (!gate.ok) return { error: await vaultRefusal("errors.notInVault") };
     }
     return { collections: await vaultOrgs.listOrgCollections(vaultId) };
 }
@@ -513,13 +516,13 @@ export async function saveVaultCollectionAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (collectionId !== null && !idSchema.safeParse(collectionId).success) {
-        return { error: "That collection is not in this vault." };
+        return { error: await vaultRefusal("errors.collectionMissing") };
     }
-    if (!core.isEncString(name)) return { error: "A collection name must be encrypted." };
+    if (!core.isEncString(name)) return { error: await vaultRefusal("errors.collectionNameEncrypted") };
     const collection = collectionId
         ? await vaultOrgs.updateCollection(gate.vaultId, collectionId, name)
         : await vaultOrgs.createCollection(gate.vaultId, name);
-    if (!collection) return { error: "That collection is not in this vault." };
+    if (!collection) return { error: await vaultRefusal("errors.collectionMissing") };
     revalidatePath("/vault/vaults");
     return { collection };
 }
@@ -531,9 +534,9 @@ export async function deleteVaultCollectionAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     if (!idSchema.safeParse(collectionId).success)
-        return { error: "That collection is not in this vault." };
+        return { error: await vaultRefusal("errors.collectionMissing") };
     if (!(await vaultOrgs.deleteCollection(gate.vaultId, collectionId))) {
-        return { error: "That collection is not in this vault." };
+        return { error: await vaultRefusal("errors.collectionMissing") };
     }
     revalidatePath("/vault/vaults");
     return {};
@@ -556,13 +559,13 @@ export async function moveItemAction(
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That item is not encrypted." };
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted") };
     }
     if (parsed.data.organizationId && collectionIds.length === 0) {
-        return { error: "Pick a collection to move it into." };
+        return { error: await vaultRefusal("errors.pickCollectionMove") };
     }
     const result = await ciphers.moveCipher(user.id, itemId, parsed.data, collectionIds);
-    if (!result.ok) return { error: "That item could not be moved there." };
+    if (!result.ok) return { error: await vaultRefusal("errors.itemNotMoved") };
     revalidatePath("/vault");
     return {};
 }

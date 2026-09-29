@@ -32,6 +32,9 @@ import type { SymmetricKey } from "@/lib/vault/crypto";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
+import { vaultSchemaText } from "./vault-labels";
 
 /** Under this, a master password is not protecting anything. */
 const MIN_LENGTH = core.MASTER_PASSWORD_MIN;
@@ -54,7 +57,10 @@ export function VaultSetup({
     const [understood, setUnderstood] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const unsafe = usePasswordSafety(password, [email, name, email.split("@")[0]]);
+    const t = useTranslations("vault");
+    const tv = useTranslations("validation");
+    const unsafeMessage = usePasswordSafety(password, [email, name, email.split("@")[0]]);
+    const unsafe = unsafeMessage ? validationMessage(tv, unsafeMessage) : null;
 
     const tooShort = password.length > 0 && password.length < MIN_LENGTH;
     const mismatch = confirm.length > 0 && confirm !== password;
@@ -115,7 +121,7 @@ export function VaultSetup({
             }
             onCreated(vaultKey);
         } catch {
-            setError("Your browser could not create the keys. It needs a secure connection.");
+            setError(t("setup.noCrypto"));
         } finally {
             setPending(false);
         }
@@ -124,16 +130,16 @@ export function VaultSetup({
     return (
         <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Set up your vault</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("setup.title")}</h1>
                 <p className="text-sm text-muted-foreground">
-                    Your master password unlocks everything in it, and it never leaves this browser.
+                    {t("setup.intro")}
                 </p>
             </div>
             <Card>
                 <CardBody>
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Master password
+                            {t("settings.master")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 Both checks ARE run, by usePasswordSafety above - the
                                 breach corpus as it is typed and the identity rule
@@ -150,16 +156,16 @@ export function VaultSetup({
                                 required
                             />
                             <span className="text-xs text-muted-foreground">
-                                At least {MIN_LENGTH} characters. Longer is better than stranger.
+                                {t("setup.minLength", { count: MIN_LENGTH })}
                             </span>
                         </label>
                         {tooShort || weak ? (
-                            <p className="text-sm text-danger">{weak}</p>
+                            <p className="text-sm text-danger">{weak ? vaultSchemaText(t, tv, weak) : null}</p>
                         ) : null}
                         {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
 
                         <label className="flex flex-col gap-1 text-sm">
-                            Type it again
+                            {t("settings.again")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 A confirmation field, not a second secret: it is only
                                 ever compared with the one above, which both checks
@@ -173,11 +179,11 @@ export function VaultSetup({
                             />
                         </label>
                         {mismatch ? (
-                            <p className="text-sm text-danger">Those do not match.</p>
+                            <p className="text-sm text-danger">{t("settings.mismatch")}</p>
                         ) : null}
 
                         <label className="flex flex-col gap-1 text-sm">
-                            Your Polaris password
+                            {t("settings.polarisPassword")}
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password
                                 Not a password being chosen - it is the existing
                                 account password, typed to prove who this is. Both
@@ -193,31 +199,29 @@ export function VaultSetup({
                                 required
                             />
                             <span className="text-xs text-muted-foreground">
-                                So Polaris knows it is you, and so it can check the two passwords
-                                are not the same one.
+                                {t("setup.polarisPasswordHint")}
                             </span>
                         </label>
                         {sameAsAccount ? (
                             <p className="text-sm text-danger">
-                                That is your Polaris password. If they are the same, whoever learns
-                                one has the vault as well - which is the one thing the vault is for.
+                                {t("setup.samePassword")}
                             </p>
                         ) : null}
 
                         <label className="flex flex-col gap-1 text-sm">
-                            Hint (optional)
+                            {t("setup.hint")}
                             <Input
                                 value={hint}
                                 onChange={(event) => setHint(event.target.value)}
-                                placeholder="Something only you would understand"
+                                placeholder={t("setup.hintPlaceholder")}
                             />
                             <span className="text-xs text-muted-foreground">
-                                Shown to anybody who asks for it at sign-in, so keep it oblique.
+                                {t("setup.hintNote")}
                             </span>
                         </label>
                         {hintLeaks ? (
                             <p className="text-sm text-danger">
-                                That hint contains the password itself.
+                                {t("setup.hintLeaks")}
                             </p>
                         ) : null}
 
@@ -231,11 +235,9 @@ export function VaultSetup({
                                     onChange={(event) => setUnderstood(event.target.checked)}
                                 />
                                 <span>
-                                    I understand that forgetting this password means losing
-                                    everything in the vault.
+                                    {t("setup.understand")}
                                     <span className="block text-xs text-muted-foreground">
-                                        Not even an administrator can reset it. That is what makes
-                                        it worth using.
+                                        {t("setup.understandNote")}
                                     </span>
                                 </span>
                             </label>
@@ -248,7 +250,7 @@ export function VaultSetup({
                             ) : (
                                 <KeyRound className="size-4" />
                             )}
-                            Create my vault
+                            {t("setup.create")}
                         </Button>
                     </form>
                 </CardBody>

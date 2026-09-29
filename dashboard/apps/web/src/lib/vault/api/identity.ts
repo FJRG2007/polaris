@@ -306,6 +306,7 @@ export async function registerRefusal(): Promise<Response> {
     return Response.json(
         {
             message:
+                // i18n-ignore: said to a Bitwarden client over its own protocol, which names no language
                 "Accounts are created in Polaris, not from a client. Sign in to Polaris and set up your vault there.",
             object: "error"
         },

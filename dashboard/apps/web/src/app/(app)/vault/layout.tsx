@@ -19,7 +19,7 @@ export default async function VaultLayout({ children }: { children: ReactNode })
     const user = await requirePermission("vault.use");
     const state = await vaultStateAction();
     return (
-        <Messages namespaces={["vault"]}>
+        <Messages namespaces={["vault", "validation"]}>
             <VaultSessionProvider state={state} name={user.name}>
                 {children}
             </VaultSessionProvider>
