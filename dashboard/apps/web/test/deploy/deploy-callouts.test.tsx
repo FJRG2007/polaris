@@ -4,6 +4,7 @@
  * where an environment answers and how its last deploy went.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DeploymentSummary } from "@/lib/deploy-service";
@@ -53,14 +54,14 @@ function deployment(overrides: Partial<DeploymentSummary>): DeploymentSummary {
 
 function callouts(items: DeploymentSummary[], canDeploy = true): string {
     return renderToStaticMarkup(
-        <DeployCallouts
+        withMessages(<DeployCallouts
             applicationId="app"
             items={items}
             canDeploy={canDeploy}
             busy={false}
             onDeploy={() => undefined}
             onViewLog={() => undefined}
-        />
+        />)
     );
 }
 
@@ -105,7 +106,7 @@ const GLANCE: EnvironmentGlance = {
 describe("the project summary line", () => {
     const render = (glance: EnvironmentGlance | undefined) =>
         renderToStaticMarkup(
-            <ProjectGlanceBar environmentId="prod" glance={glance} serviceHref={(id) => `/p?service=${id}`} />
+            withMessages(<ProjectGlanceBar environmentId="prod" glance={glance} serviceHref={(id) => `/p?service=${id}`} />)
         );
 
     it("shows the most stable address first and offers the others, never a disabled one", () => {
@@ -142,7 +143,7 @@ describe("the attention dots", () => {
     });
 
     it("is named by its reason, not only its colour", () => {
-        const html = renderToStaticMarkup(<TabAttentionDot label="A scheduled job is failing" />);
+        const html = renderToStaticMarkup(withMessages(<TabAttentionDot label="A scheduled job is failing" />));
         expect(html).toContain('aria-label="A scheduled job is failing"');
         expect(html).toContain("bg-danger-solid");
     });
