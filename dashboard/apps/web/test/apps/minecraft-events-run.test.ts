@@ -106,6 +106,12 @@ interface World {
     refused: string[];
     /** The name over the boss's head, as a player reads it. */
     bossName: string;
+    /** A Bukkit-family server (Paper, Spigot, Purpur), and whether EssentialsX
+     *  is on it - whose commands answer to vanilla's names. */
+    bukkit: boolean;
+    essentials: boolean;
+    /** Lines a plugin answered instead of the game. */
+    pluginGot: string[];
     /** How long the storm lasts, in ticks, as the last `weather thunder` left it. */
     stormTicks: number;
 }
@@ -165,6 +171,9 @@ const world: World = {
     versionIn: "latest",
     refused: [],
     bossName: "",
+    bukkit: false,
+    essentials: false,
+    pluginGot: [],
     stormTicks: 0
 };
 let config: Record<string, unknown> = {};
@@ -210,8 +219,28 @@ function itemReadable(item: string): boolean {
     return components ? !/^[^[]*\{/.test(item) : !item.includes("[");
 }
 
-function answer(line: string): string {
-    world.sent.push(line);
+/** The commands EssentialsX takes over from vanilla, by the names vanilla has. */
+const ESSENTIALS = /(^|^execute .*? run )(kill|give|tp|teleport|gamemode|clear|xp|experience|time|weather|item) /;
+
+function answer(sent: string): string {
+    world.sent.push(sent);
+    let line = sent;
+    if (line === "minecraft:difficulty") {
+        // Only a Bukkit-family server has vanilla's commands under `minecraft:`.
+        return world.bukkit
+            ? `The difficulty is ${world.difficulty}`
+            : "Unknown or incomplete command, see below for error\n...difficulty<--[HERE]";
+    }
+    if (world.bukkit) {
+        const vanilla = line.replace(/(^| run )minecraft:(?=[a-z_]+( |$))/g, "$1");
+        if (vanilla !== line) line = vanilla;
+        else if (world.essentials && ESSENTIALS.test(line)) {
+            world.pluginGot.push(line);
+            return "Error: Player not found.";
+        }
+    } else if (/(^| run )minecraft:[a-z_]+ /.test(line)) {
+        return `Unknown or incomplete command, see below for error\n...${line.slice(0, 20)}<--[HERE]`;
+    }
     // Up to 1.21.4 a name is JSON in a string, and anything else is passed over;
     // from 1.21.5 it is a text component, which a plain string is too.
     const named = /^data merge entity @e\[tag=pe_boss,limit=1\] \{CustomName:(.*)\}$/.exec(line);
@@ -770,6 +799,9 @@ beforeEach(() => {
     world.versionIn = "latest";
     world.refused = [];
     world.bossName = "";
+    world.bukkit = false;
+    world.essentials = false;
+    world.pluginGot = [];
     world.stormTicks = 0;
     events.forgetPlayers();
     held.length = 0;
@@ -3725,6 +3757,66 @@ describe("a server whose version is not in today's log", () => {
                 startedBy: null
             })
         ).rejects.toThrow(/needs Minecraft 1.16/);
+    });
+});
+
+describe("a server with EssentialsX on it", () => {
+    beforeEach(() => {
+        world.bukkit = true;
+        world.essentials = true;
+    });
+
+    it("runs a duel with the game's own commands: kit given and taken back, everybody home", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...catalog.newPreset("team-duel", "duel"), minutes: 3 }]);
+        await joinAndStart("duel");
+        await play(4 * 60_000);
+        expect(world.pluginGot).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("minecraft:give Ana "))).toBe(true);
+        expect(world.sent.some((line) => /^minecraft:clear Ana \S+\[/.test(line))).toBe(true);
+        expect(
+            world.sent.some((line) => /^minecraft:execute in \S+ run minecraft:tp Ana /.test(line))
+        ).toBe(true);
+    });
+
+    it("hands a prize over with the game's own give and xp", async () => {
+        setUp([catalog.newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
+        config[catalog.EVENT_STATE_KEY] = {
+            pending: [
+                {
+                    id: "p1",
+                    player: "Ana",
+                    reward: { items: [{ id: "minecraft:diamond", count: 2 }], levels: 5 },
+                    event: "Fishing contest",
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        await events.sweepEvents();
+        expect(world.pluginGot).toEqual([]);
+        expect(world.sent).toContain("minecraft:give Ana minecraft:diamond 2");
+        expect(world.sent).toContain("minecraft:xp add Ana 5 levels");
+        expect(state().pending).toEqual([]);
+    });
+
+    it("sends vanilla and Fabric servers their lines as they are", async () => {
+        world.bukkit = false;
+        world.essentials = false;
+        setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 3 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4 * 60_000);
+        expect(world.sent.filter((line) => line.startsWith("minecraft:"))).toEqual([
+            "minecraft:difficulty"
+        ]);
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
     });
 });
 

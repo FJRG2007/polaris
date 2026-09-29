@@ -40,14 +40,57 @@ import * as stageService from "./kinds/stage-service";
 import * as arenaService from "./kinds/arena-service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import {
-    editionOf,
-    openServerContainer,
-    withServerContainer,
-    type ServerContainer
-} from "../service";
+import * as service from "../service";
+import { editionOf, type ServerContainer } from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
+
+/** How long what kind of server one is stays known: it changes only with a restart. */
+const KIND_KNOWN_MS = 10 * 60_000;
+const bukkitServers = new Map<string, { at: number; bukkit: boolean }>();
+
+/**
+ * The server an event talks to: every line it is sent named as vanilla's own
+ * command on a Bukkit-family server (`commands.namespaced`), where a plugin's
+ * command of the same name would otherwise answer instead. Which kind it is is
+ * asked once and remembered; a server that does not answer is asked again.
+ */
+function vanillaCommands(server: ServerContainer): ServerContainer {
+    const bukkit = async (): Promise<boolean> => {
+        const known = bukkitServers.get(server.installedAppId);
+        if (known && Date.now() - known.at < KIND_KNOWN_MS) return known.bukkit;
+        if (server.edition !== "java") return false;
+        const said = await server.say([commands.BUKKIT_PROBE]).catch(() => "");
+        if (said.trim().length > 0)
+            bukkitServers.set(server.installedAppId, { at: Date.now(), bukkit: commands.isBukkit(said) });
+        return commands.isBukkit(said);
+    };
+    const named = async (lines: readonly string[]) =>
+        (await bukkit()) ? lines.map(commands.namespaced) : lines;
+    return {
+        ...server,
+        say: async (argv) => server.say(await named([argv.join(" ")])),
+        sayAll: async (lines) => server.sayAll(await named(lines))
+    };
+}
+
+function withServerContainer<T>(
+    ownerId: string,
+    installedAppId: string,
+    work: (server: ServerContainer) => Promise<T>
+): Promise<T> {
+    return service.withServerContainer(ownerId, installedAppId, (server) =>
+        work(vanillaCommands(server))
+    );
+}
+
+async function openServerContainer(
+    ownerId: string,
+    installedAppId: string
+): Promise<{ server: ServerContainer; close: () => Promise<void> }> {
+    const link = await service.openServerContainer(ownerId, installedAppId);
+    return { server: vanillaCommands(link.server), close: link.close };
+}
 
 const TICK_MS = 2_000;
 /** How often the boss bar's clock moves: every second, on its own timer. */
@@ -3277,6 +3320,7 @@ async function deliverPending(
  *  recorded "later" by the test before it. */
 export function forgetPlayers(): void {
     playing.forgetActivity();
+    bukkitServers.clear();
 }
 
 /** For a test: what the loops hold. */

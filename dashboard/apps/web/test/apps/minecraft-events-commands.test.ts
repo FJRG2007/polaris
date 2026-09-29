@@ -575,6 +575,54 @@ describe("letting go of chunks", () => {
     });
 });
 
+describe("vanilla's own commands on a Bukkit-family server", () => {
+    it("names the command, and the one an execute runs, as vanilla's", () => {
+        expect(commands.namespaced("kill @e[tag=pe_mark]")).toBe("minecraft:kill @e[tag=pe_mark]");
+        expect(
+            commands.namespaced(
+                "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
+            )
+        ).toBe("minecraft:execute in minecraft:overworld run minecraft:tp Ana 1.000 64.000 2.000 0.0 0.0");
+        expect(
+            commands.namespaced(
+                'execute as @e[tag=pe_boss,nbt={CustomName:"a run b"}] at @s run execute as @a run give @s minecraft:stone 1'
+            )
+        ).toBe(
+            'minecraft:execute as @e[tag=pe_boss,nbt={CustomName:"a run b"}] at @s run minecraft:execute as @a run minecraft:give @s minecraft:stone 1'
+        );
+        // Text is never touched, nor a line already named.
+        expect(commands.namespaced('tellraw @a {"text":"run kill"}')).toBe(
+            'minecraft:tellraw @a {"text":"run kill"}'
+        );
+        expect(commands.namespaced("minecraft:difficulty")).toBe("minecraft:difficulty");
+    });
+
+    it("keeps every ground check short enough to arrive with the name in front", () => {
+        const far = { x: -29999999, y: -63, z: -29999999 };
+        for (const names of commands.GROUND_NAMES) {
+            for (const line of commands.builtUnder(far, names)) {
+                expect(commands.namespaced(line).startsWith("minecraft:execute ")).toBe(true);
+                expect(commandBytes(commands.namespaced(line))).toBeLessThanOrEqual(
+                    COMMAND_BYTES_MAX
+                );
+            }
+        }
+        // A line with no room left goes as it is rather than not at all.
+        const full = `say ${"x".repeat(COMMAND_BYTES_MAX - 4)}`;
+        expect(commands.namespaced(full)).toBe(full);
+    });
+
+    it("tells a Bukkit-family server by its answer", () => {
+        expect(commands.isBukkit("The difficulty is Normal")).toBe(true);
+        expect(
+            commands.isBukkit(
+                "Unknown or incomplete command, see below for error\n...ft:difficulty<--[HERE]"
+            )
+        ).toBe(false);
+        expect(commands.isBukkit("")).toBe(false);
+    });
+});
+
 describe("what the server understands, when its version is unknown", () => {
     it("reads a probe the game parsed apart from one it refused", () => {
         // 1.20.5 and later, and 1.16 and later: nobody has the tag.

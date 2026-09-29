@@ -510,6 +510,64 @@ export function commandKnown(output: string): boolean {
     return said.length > 0 && !/unknown (or incomplete )?command/i.test(said);
 }
 
+// ------------------------------------------------------------------ Bukkit's plugins
+
+/**
+ * Asked once of a server to tell a Bukkit-family one (Spigot, Paper, Purpur and
+ * the hybrids): only there is every vanilla command also `minecraft:<name>`.
+ * Vanilla, Fabric and the Forge family know no such command.
+ */
+export const BUKKIT_PROBE = "minecraft:difficulty";
+
+/** `The difficulty is Normal` from a Bukkit-family server. */
+export function isBukkit(output: string): boolean {
+    return /difficulty is/i.test(output);
+}
+
+/** Where an `execute`'s `run` is: the first one outside brackets and quotes. */
+function runAt(line: string): number {
+    let depth = 0;
+    let quote: string | null = null;
+    for (let index = 0; index < line.length; index += 1) {
+        const char = line[index] as string;
+        if (quote) {
+            if (char === "\\") index += 1;
+            else if (char === quote) quote = null;
+        } else if (char === '"' || char === "'") quote = char;
+        else if (char === "[" || char === "{") depth += 1;
+        else if (char === "]" || char === "}") depth -= 1;
+        else if (depth === 0 && line.startsWith(" run ", index)) return index;
+    }
+    return -1;
+}
+
+/**
+ * A line with its command - and the one an `execute` runs - named as vanilla's
+ * own. A plugin's command of the same name wins over vanilla's on a Bukkit-family
+ * server: EssentialsX has `kill`, `give`, `tp`, `gamemode`, `clear`, `xp`,
+ * `time`, `weather` and `item`, and answers them its own way - players only for
+ * `kill`, no `xp add`, no item with components to `clear` - so markers and
+ * bosses lived on, kits were never taken back and prizes never arrived.
+ */
+export function namespaced(line: string): string {
+    const named = namespacedAll(line);
+    // Never at the price of a line too long to arrive: as it was, it may still.
+    return commandBytes(named) <= COMMAND_BYTES_MAX ? named : line;
+}
+
+const NAMESPACE = "minecraft:";
+
+function namespacedAll(line: string): string {
+    const verb = /^([a-z_]+)(?= |$)/.exec(line)?.[1];
+    if (!verb) return line;
+    if (verb === "execute") {
+        const at = runAt(line);
+        if (at >= 0)
+            return `${NAMESPACE}${line.slice(0, at)} run ${namespacedAll(line.slice(at + 5))}`;
+    }
+    return `${NAMESPACE}${line}`;
+}
+
 // ------------------------------------------------------------------ finding a place
 
 /**
@@ -759,7 +817,8 @@ const GROUND: Readonly<Record<GroundNames, readonly string[]>> = {
  * Whether what is under a point is somebody's rather than the world's, asked in
  * as many commands as it takes to keep each one short enough to arrive: it is
  * somebody's when every one of them answers `Test passed`, and the world's as
- * soon as one answers `Test failed`.
+ * soon as one answers `Test failed`. Room is left for the `minecraft:` a
+ * Bukkit-family server has put in front (`namespaced`).
  */
 export function builtUnder(
     point: { x: number; y: number; z: number },
@@ -771,7 +830,7 @@ export function builtUnder(
     let line = prefix;
     for (const id of GROUND[names]) {
         const check = ` unless block ${at} ${id.startsWith("#") ? id : `minecraft:${id}`}`;
-        if (line !== prefix && commandBytes(line + check) > COMMAND_BYTES_MAX) {
+        if (line !== prefix && commandBytes(line + check) > COMMAND_BYTES_MAX - NAMESPACE.length) {
             lines.push(line);
             line = prefix;
         }
