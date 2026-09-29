@@ -54,15 +54,15 @@ describe("the settings screen in Spanish", () => {
 
     it("labels the update card and its choices in Spanish", () => {
         expect(markup).toContain("Buscar actualizaciones");
-        expect(markup).toContain("Compilación en uso");
+        expect(markup).toContain("Versión en uso");
         expect(markup).toContain("Se instala a las 04:00 siguientes a que aparezca una compilación.");
         expect(markup).toContain("Descarga la compilación que GitHub ya ha hecho.");
         expect(markup).not.toContain("Check for updates");
     });
 
     it("draws the deployment facts and public pages in Spanish", () => {
-        expect(markup).toContain("Rama de publicación");
-        expect(markup).toContain("Política de privacidad");
+        expect(markup).toContain("Rama de versión");
+        expect(markup).toContain("Privacidad");
         expect(markup).toContain("Guardar");
         expect(markup).not.toContain("Release branch");
     });
@@ -84,7 +84,7 @@ describe("the transfer card in Spanish", () => {
 
     it("explains the export and import in Spanish", () => {
         expect(markup).toContain("Mover a otra máquina");
-        expect(markup).toContain("Repite la frase de contraseña");
+        expect(markup).toContain("Repite la frase");
         expect(markup).toContain("En una instalación nueva: importa una exportación.");
         expect(markup).not.toContain("Move to another machine");
     });

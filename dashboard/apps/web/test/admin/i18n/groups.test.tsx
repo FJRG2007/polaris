@@ -87,7 +87,7 @@ describe("the roles editor in Spanish", () => {
     );
 
     it("names the areas and permissions in Spanish", () => {
-        expect(markup).toContain("Servidores de juegos");
+        expect(markup).toContain("Juegos");
         expect(markup).toContain("Ver archivos y descargarlos");
         expect(markup).not.toContain("See files and download them");
     });

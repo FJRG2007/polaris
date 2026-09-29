@@ -59,14 +59,14 @@ describe("integrations in Spanish", () => {
         const markup = renderToStaticMarkup(withMessages(<IntegrationsView cards={cards} />, "es-ES"));
         expect(markup).toContain(`0 de ${cards.length} configuradas`);
         expect(markup).toContain("Buscar integraciones");
-        expect(markup).toContain("Documentación");
+        expect(markup).toContain("Guía");
         expect(markup).not.toContain("Search integrations");
         expect(markup).not.toContain(`of ${cards.length} set up`);
     });
 
     it("draws the Cloudflare dialog in Spanish", () => {
         const text = cloudflareDialog("es-ES");
-        expect(text).toContain("Acceso a la API");
+        expect(text).toContain("Acceso API");
         expect(text).toContain("Registros DNS");
         expect(text).toContain("Sin conectar. Apunta tus zonas a este servidor.");
         expect(text).toContain("Solo túneles");

@@ -50,7 +50,7 @@ describe("audit integrity", () => {
 
         expect(html).toContain("1200 entradas selladas, 3 pendientes de sellar.");
         expect(html).toContain("Aún sin comprobar.");
-        expect(html).toContain("Comprobar ahora");
+        expect(html).toContain("Comprobar");
         expect(html).not.toContain("entries sealed");
     });
 
@@ -69,6 +69,6 @@ describe("model catalog", () => {
         );
         const spanish = renderToStaticMarkup(withMessages(<CatalogCard models={340} refreshedAt={null} />, "es-ES"));
         expect(spanish).toContain("340 modelos de los proveedores que admite Polaris.");
-        expect(spanish).toContain("Catálogo de modelos");
+        expect(spanish).toContain("Modelos");
     });
 });

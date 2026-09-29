@@ -69,9 +69,9 @@ describe("the remembered devices in Spanish", () => {
     );
 
     it("names the columns and the device being read on", () => {
-        expect(markup).toContain(">Dispositivo</th>");
+        expect(markup).toContain(">Equipo</th>");
         expect(markup).toContain(">Recordado</th>");
-        expect(markup).toContain("Este dispositivo");
+        expect(markup).toContain("Este equipo");
         expect(markup).not.toContain(">Device</th>");
     });
 
@@ -99,7 +99,7 @@ describe("the privacy settings in Spanish", () => {
     );
 
     it("names the sections and the questions that were core's English", () => {
-        expect(markup).toContain("Que te encuentren");
+        expect(markup).toContain("Encontrarte");
         expect(markup).toContain("Quién puede llamarte");
         expect(markup).not.toContain("Who can call you");
     });

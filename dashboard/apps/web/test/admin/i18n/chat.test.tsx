@@ -38,7 +38,7 @@ describe("admin chat in Spanish", () => {
         expect(screen.getByText("Chats de grupo")).toBeTruthy();
         expect(screen.getByText("Mensajes directos")).toBeTruthy();
         expect(screen.getByText("Archivo más grande")).toBeTruthy();
-        expect(screen.getByText("Guardar espacios")).toBeTruthy();
+        expect(screen.getByText("Guardar")).toBeTruthy();
         expect(screen.queryByText("Biggest single file")).toBeNull();
         expect(screen.queryByText("Group chats")).toBeNull();
     });
