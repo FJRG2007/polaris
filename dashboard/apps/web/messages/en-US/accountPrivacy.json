@@ -1,1 +1,8 @@
-{}
+{
+    "schedule": {
+        "page": {
+            "title": "Status schedule",
+            "intro": "Hours you are away, busy, or not shown at all, repeated every week. A schedule takes over when it starts, and anything you pick while one is running is yours until it ends."
+        }
+    }
+}

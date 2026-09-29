@@ -7,6 +7,7 @@
  * it when it deploys something.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { getPublicIp } from "@/lib/domain-service";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountDomainsPage() {
     const user = await requireUser();
+    const t = await getTranslations("account");
     const owner = { kind: "user", id: user.id } as const;
 
     const [domains, allowed, publicIp, reserved] = await Promise.all([
@@ -28,10 +30,8 @@ export default async function AccountDomainsPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Domains</h1>
-                <p className="text-muted-foreground text-sm">
-                    Domains you own, so what you deploy here answers on your own name instead of this Polaris&rsquo;s.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("domains.page.title")}</h1>
+                <p className="text-muted-foreground text-sm">{t("domains.page.intro")}</p>
             </div>
             <OwnerDomainsView
                 owner={{ kind: "user" }}

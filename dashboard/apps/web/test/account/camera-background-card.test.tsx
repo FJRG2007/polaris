@@ -15,6 +15,7 @@
  * answer.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CameraBackground } from "@/app/(app)/chat/camera-background";
@@ -132,7 +133,7 @@ describe("the camera preview", () => {
     it("shows the call's own picture rather than opening a second camera", async () => {
         setCameraBackground("blur");
         call = { session: true, track: fakeTrack("the-call") };
-        render(<DevicesView />);
+        render(<DevicesView />, { wrapper: MessagesWrapper });
 
         await act(async () => void showMe().click());
 
@@ -143,7 +144,7 @@ describe("the camera preview", () => {
 
     it("draws the background it is given, and draws the next one when it changes", async () => {
         setCameraBackground("blur");
-        render(<DevicesView />);
+        render(<DevicesView />, { wrapper: MessagesWrapper });
 
         await act(async () => void showMe().click());
         expect(opened).toHaveLength(1);
@@ -157,7 +158,7 @@ describe("the camera preview", () => {
     });
 
     it("builds nothing at all for a camera nobody asked to change", async () => {
-        render(<DevicesView />);
+        render(<DevicesView />, { wrapper: MessagesWrapper });
         await act(async () => void showMe().click());
         expect(opened).toHaveLength(1);
         expect(asked).toHaveLength(0);

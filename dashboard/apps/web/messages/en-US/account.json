@@ -127,5 +127,164 @@
         "notAPresence": "That is not a status",
         "notAWindow": "That is not a window",
         "statusNotSaved": "That status could not be saved"
+    },
+    "access": {
+        "page": {
+            "title": "Access rules",
+            "intro": "Restrict where your account and your API keys may be used from."
+        }
+    },
+    "activity": {
+        "page": {
+            "title": "Activity",
+            "intro": "What has been done with your account, and which device did it."
+        }
+    },
+    "apiKeys": {
+        "page": {
+            "title": "API keys",
+            "intro": "Credentials for scripts and integrations acting as you. Keep them somewhere safe: anyone holding one can do what it allows, as you."
+        }
+    },
+    "connections": {
+        "page": {
+            "title": "Connected accounts",
+            "intro": "The outside accounts Polaris acts with on your behalf. Only yours, and only what you link."
+        }
+    },
+    "details": {
+        "page": {
+            "title": "Account",
+            "intro": "How you sign in and how Polaris reaches you. None of it is on your profile."
+        }
+    },
+    "devices": {
+        "page": {
+            "title": "Voice & Video",
+            "intro": "Which microphone and camera Polaris uses on this machine, and how you sound through them. Kept in this browser, because a headset is plugged into a machine rather than into an account."
+        },
+        "stop": "Stop",
+        "whichOne": "Which one",
+        "keys": {
+            "space": "Space",
+            "numpad": "Numpad {key}",
+            "arrow": "{direction} arrow"
+        },
+        "mic": {
+            "title": "Microphone",
+            "test": "Test it",
+            "pressTest": "Press Test it to see what is here",
+            "namesHint": "The names only appear once a microphone has been allowed once, which the test does.",
+            "level": "Level",
+            "saySomething": "Say something. The bars should move.",
+            "watchBars": "Talk and watch the bars. If they stay dark, press Test it.",
+            "noise": "Background noise",
+            "unfiltered": "It could not start, so you are going out unfiltered: {problem}",
+            "runningNoModel": "Running, with no model - only the volume above.",
+            "running": "Running: the {model} model started.",
+            "volume": "Volume",
+            "volumeLabel": "Microphone volume",
+            "volumeHint": "How loud you go out. Turn it up if people say you are quiet."
+        },
+        "camera": {
+            "title": "Camera",
+            "show": "Show me",
+            "pressShow": "Press Show me to see what is here",
+            "closed": "Nothing is opened until you press it, and it closes when you leave this screen.",
+            "inCall": "This is the camera your call is sending, background and all.",
+            "background": "Background",
+            "pictures": "Pictures",
+            "changePicture": "Change your picture",
+            "ownPicture": "Use a picture of your own",
+            "pictureStays": "A picture of your own stays in this browser and is sent nowhere.",
+            "pictureFailed": "Polaris could not use that picture.",
+            "starting": "Starting. The first one on a machine downloads the model.",
+            "failed": "It could not start, so there is nothing behind you: {problem}",
+            "running": "Running. This is what a call sends."
+        },
+        "input": {
+            "title": "Input",
+            "when": "When your microphone is sending",
+            "modeLabel": "Input mode",
+            "key": "Key",
+            "pressKey": "Press a key...",
+            "keyHint": "Held down to talk. It stands down while you are typing.",
+            "threshold": "How loud counts as talking",
+            "thresholdLabel": "Voice activity threshold",
+            "thresholdHint": "Test the microphone above while you set this: the mark on the bar is where it opens, and the bar turns green past it.",
+            "release": "Stay open after you stop",
+            "releaseLabel": "Release delay",
+            "releaseHint": "Zero cuts the last syllable off, and everybody hears it."
+        },
+        "advanced": {
+            "title": "Advanced",
+            "intro": "Leave these alone unless something is wrong. Each one is set to what Polaris did before this screen existed.",
+            "autoGain": {
+                "label": "Automatic gain control",
+                "note": "Lets the browser even out how loud you are. Turn it off if your level is pumped up and down between sentences."
+            },
+            "betterDetection": {
+                "label": "Better voice detection",
+                "note": "Decides whether you are talking from the cleaned-up sound rather than the raw microphone, so a keyboard or a fan does not open it. Costs whatever the noise model costs."
+            },
+            "bypass": {
+                "label": "Send the microphone untouched",
+                "note": "Turns off the browser's echo, noise and level handling together, for an interface or a feed that has already done all three. Doing it twice is what ruins that sound."
+            },
+            "noAudio": {
+                "label": "Say when nothing is picked up",
+                "note": "A microphone that opened but hears nothing looks exactly like somebody who is not talking. This is the only thing that would tell you."
+            },
+            "switchWarning": {
+                "label": "Ask before switching rooms mid-call",
+                "note": "Joining another voice room hangs up the call you are in. Off by default, because most of the time that is what pressing it meant."
+            },
+            "attenuate": {
+                "label": "Quieten the call while you talk",
+                "note": "Turns the room down while your microphone is open. It is Polaris's own sound, not the machine's - a page cannot reach your other applications."
+            },
+            "howFar": "How far",
+            "howFarLabel": "How far the call is quietened",
+            "howFarHint": "A hundred is silence while you are speaking.",
+            "stream": "Lower voices while a stream plays",
+            "streamLabel": "How far voices are lowered while a stream plays",
+            "streamHint": "While you watch a stream that has sound. Zero leaves voices alone."
+        }
+    },
+    "domains": {
+        "page": {
+            "title": "Domains",
+            "intro": "Domains you own, so what you deploy here answers on your own name instead of this Polaris’s."
+        }
+    },
+    "extension": {
+        "page": {
+            "title": "Connect the extension",
+            "intro": "Type the code the extension is showing. Nothing is connected until you say so."
+        }
+    },
+    "friends": {
+        "page": {
+            "title": "Friends",
+            "intro": "Who sees what you show your friends. Being friends grants nothing else."
+        }
+    },
+    "scan": {
+        "page": {
+            "title": "Scan a code",
+            "intro": "Let a sign-in through on a device that cannot ask for your password."
+        }
+    },
+    "standing": {
+        "page": {
+            "title": "Account standing",
+            "intro": "Where your account stands here, and anything in force against it."
+        }
+    },
+    "profile": {
+        "page": {
+            "title": "Profile",
+            "intro": "How you appear to everybody else in Polaris."
+        }
     }
 }

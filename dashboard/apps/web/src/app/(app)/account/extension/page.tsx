@@ -10,6 +10,7 @@
  * letting it into one is still the vault's own screen and its own approval.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ExtensionConnectView } from "./extension-connect-view";
 
@@ -17,15 +18,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ExtensionPage() {
     await requireUser();
+    const t = await getTranslations("account");
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    Connect the extension
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                    Type the code the extension is showing. Nothing is connected until you say so.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("extension.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("extension.page.intro")}</p>
             </div>
             <ExtensionConnectView />
         </div>

@@ -8,6 +8,7 @@
  * alone.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ConnectionsPage() {
     const user = await requireUser();
+    const t = await getTranslations("account");
     const linked = await listConnections(user.id);
 
     const providers = await Promise.all(
@@ -64,10 +66,8 @@ export default async function ConnectionsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Connected accounts</h1>
-                <p className="text-sm text-muted-foreground">
-                    The outside accounts Polaris acts with on your behalf. Only yours, and only what you link.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("connections.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
             </div>
             <ConnectionsView providers={providers} />
         </div>

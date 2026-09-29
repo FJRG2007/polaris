@@ -12,6 +12,7 @@
  * a moderator's decision.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { StandingView } from "./standing-view";
 import { PlainNames } from "@/components/person-name";
@@ -21,15 +22,14 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountStandingPage() {
     const session = await requireUser();
+    const t = await getTranslations("account");
     const view = await accountStandingFor(session.id);
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Account standing</h1>
-                <p className="text-sm text-muted-foreground">
-                    Where your account stands here, and anything in force against it.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("standing.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("standing.page.intro")}</p>
             </div>
             {/* A record about this account, so it is drawn as one: the face here
                 wears no ring and the name no gradient. What the page is telling

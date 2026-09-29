@@ -10,6 +10,7 @@
  * a question the client can be trusted to answer.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { ScanView } from "./scan-view";
 import { requireUser } from "@/lib/session";
 import { ScanHistory } from "./scan-history";
@@ -25,6 +26,7 @@ export default async function ScanPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const user = await requireUser();
+    const t = await getTranslations("account");
     const params = await searchParams;
     const raw = typeof params.code === "string" ? params.code : null;
     const parsed = raw ? qrUserCodeField.safeParse(raw) : null;
@@ -37,10 +39,8 @@ export default async function ScanPage({
     return (
         <div className="mx-auto flex max-w-xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Scan a code</h1>
-                <p className="text-sm text-muted-foreground">
-                    Let a sign-in through on a device that cannot ask for your password.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("scan.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("scan.page.intro")}</p>
             </div>
             <ScanView request={request} scanned={raw !== null} hasPin={security.hasPin} />
             {/* Every code this account has answered, under the thing that answers

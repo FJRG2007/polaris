@@ -20,6 +20,7 @@
  * views.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { prisma } from "@polaris/db";
 import { AppearanceCard } from "./appearance-card";
 import { requireUser } from "@/lib/session";
@@ -45,6 +46,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
+    const t = await getTranslations("account");
     const [user, photo, banner, style, organizations, shown] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
@@ -94,10 +96,8 @@ export default async function AccountPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Profile</h1>
-                <p className="text-sm text-muted-foreground">
-                    How you appear to everybody else in Polaris.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("profile.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("profile.page.intro")}</p>
             </div>
             <ProfileView
                 name={user?.name ?? session.name}

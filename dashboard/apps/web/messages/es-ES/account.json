@@ -127,5 +127,164 @@
         "notAPresence": "Ese no es un estado válido",
         "notAWindow": "Ese no es un periodo válido",
         "statusNotSaved": "No se ha podido guardar el estado"
+    },
+    "access": {
+        "page": {
+            "title": "Reglas de acceso",
+            "intro": "Limita desde dónde se pueden usar tu cuenta y tus claves de API."
+        }
+    },
+    "activity": {
+        "page": {
+            "title": "Actividad",
+            "intro": "Lo que se ha hecho con tu cuenta y desde qué dispositivo."
+        }
+    },
+    "apiKeys": {
+        "page": {
+            "title": "Claves de API",
+            "intro": "Credenciales para scripts e integraciones que actúan como tú. Guárdalas en un lugar seguro: quien tenga una puede hacer lo que permita, como tú."
+        }
+    },
+    "connections": {
+        "page": {
+            "title": "Cuentas conectadas",
+            "intro": "Las cuentas externas con las que Polaris actúa en tu nombre. Solo las tuyas, y solo lo que vincules."
+        }
+    },
+    "details": {
+        "page": {
+            "title": "Cuenta",
+            "intro": "Cómo inicias sesión y cómo te contacta Polaris. Nada de esto aparece en tu perfil."
+        }
+    },
+    "devices": {
+        "page": {
+            "title": "Voz y vídeo",
+            "intro": "Qué micrófono y qué cámara usa Polaris en este ordenador, y cómo suenas a través de ellos. Se guarda en este navegador, porque unos auriculares se conectan a un ordenador, no a una cuenta."
+        },
+        "stop": "Parar",
+        "whichOne": "Cuál",
+        "keys": {
+            "space": "Espacio",
+            "numpad": "Teclado numérico {key}",
+            "arrow": "{direction, select, Up {Flecha arriba} Down {Flecha abajo} Left {Flecha izquierda} Right {Flecha derecha} other {Flecha {direction}}}"
+        },
+        "mic": {
+            "title": "Micrófono",
+            "test": "Probarlo",
+            "pressTest": "Pulsa Probarlo para ver qué hay aquí",
+            "namesHint": "Los nombres solo aparecen cuando se ha permitido un micrófono una vez, y la prueba lo hace.",
+            "level": "Nivel",
+            "saySomething": "Di algo. Las barras deberían moverse.",
+            "watchBars": "Habla y mira las barras. Si se quedan apagadas, pulsa Probarlo.",
+            "noise": "Ruido de fondo",
+            "unfiltered": "No se ha podido iniciar, así que se te oye sin filtrar: {problem}",
+            "runningNoModel": "Funcionando, sin modelo: solo el volumen de arriba.",
+            "running": "Funcionando: se ha iniciado el modelo {model}.",
+            "volume": "Volumen",
+            "volumeLabel": "Volumen del micrófono",
+            "volumeHint": "Lo alto que se te oye. Súbelo si te dicen que se te oye bajo."
+        },
+        "camera": {
+            "title": "Cámara",
+            "show": "Enséñamela",
+            "pressShow": "Pulsa Enséñamela para ver qué hay aquí",
+            "closed": "No se abre nada hasta que lo pulses, y se cierra cuando sales de esta pantalla.",
+            "inCall": "Esta es la cámara que está enviando tu llamada, con fondo y todo.",
+            "background": "Fondo",
+            "pictures": "Imágenes",
+            "changePicture": "Cambiar tu imagen",
+            "ownPicture": "Usar una imagen tuya",
+            "pictureStays": "Una imagen tuya se queda en este navegador y no se envía a ningún sitio.",
+            "pictureFailed": "Polaris no ha podido usar esa imagen.",
+            "starting": "Iniciando. La primera vez en un ordenador se descarga el modelo.",
+            "failed": "No se ha podido iniciar, así que no hay nada detrás de ti: {problem}",
+            "running": "Funcionando. Esto es lo que envía una llamada."
+        },
+        "input": {
+            "title": "Entrada",
+            "when": "Cuándo envía tu micrófono",
+            "modeLabel": "Modo de entrada",
+            "key": "Tecla",
+            "pressKey": "Pulsa una tecla...",
+            "keyHint": "Mantenla pulsada para hablar. Se desactiva mientras escribes.",
+            "threshold": "Qué volumen cuenta como hablar",
+            "thresholdLabel": "Umbral de actividad de voz",
+            "thresholdHint": "Prueba el micrófono de arriba mientras lo ajustas: la marca de la barra es donde se abre, y la barra se pone verde al pasarla.",
+            "release": "Seguir abierto al dejar de hablar",
+            "releaseLabel": "Retardo de liberación",
+            "releaseHint": "Con cero se corta la última sílaba, y todos lo oyen."
+        },
+        "advanced": {
+            "title": "Avanzado",
+            "intro": "No toques esto salvo que algo vaya mal. Cada opción está como lo hacía Polaris antes de que existiera esta pantalla.",
+            "autoGain": {
+                "label": "Control automático de ganancia",
+                "note": "Deja que el navegador iguale tu volumen. Desactívalo si tu nivel sube y baja entre frases."
+            },
+            "betterDetection": {
+                "label": "Mejor detección de voz",
+                "note": "Decide si estás hablando a partir del sonido ya limpio en lugar del micrófono en bruto, para que un teclado o un ventilador no lo abran. Cuesta lo mismo que el modelo de ruido."
+            },
+            "bypass": {
+                "label": "Enviar el micrófono sin tocar",
+                "note": "Desactiva a la vez el tratamiento de eco, ruido y nivel del navegador, para una interfaz o una señal que ya ha hecho las tres cosas. Hacerlo dos veces es lo que estropea ese sonido."
+            },
+            "noAudio": {
+                "label": "Avisar cuando no se capta nada",
+                "note": "Un micrófono que se ha abierto pero no oye nada parece exactamente alguien que no está hablando. Esto es lo único que te lo diría."
+            },
+            "switchWarning": {
+                "label": "Preguntar antes de cambiar de sala en plena llamada",
+                "note": "Entrar en otra sala de voz cuelga la llamada en la que estás. Desactivado por defecto, porque casi siempre es lo que querías al pulsarlo."
+            },
+            "attenuate": {
+                "label": "Bajar la llamada mientras hablas",
+                "note": "Baja el volumen de la sala mientras tu micrófono está abierto. Es el sonido de Polaris, no el del ordenador: una página no llega a tus otras aplicaciones."
+            },
+            "howFar": "Cuánto",
+            "howFarLabel": "Cuánto se baja la llamada",
+            "howFarHint": "Cien es silencio mientras hablas.",
+            "stream": "Bajar las voces mientras suena una emisión",
+            "streamLabel": "Cuánto se bajan las voces mientras suena una emisión",
+            "streamHint": "Mientras ves una emisión con sonido. Cero deja las voces como están."
+        }
+    },
+    "domains": {
+        "page": {
+            "title": "Dominios",
+            "intro": "Dominios de tu propiedad, para que lo que despliegues aquí responda en tu propio nombre y no en el de este Polaris."
+        }
+    },
+    "extension": {
+        "page": {
+            "title": "Conectar la extensión",
+            "intro": "Escribe el código que muestra la extensión. No se conecta nada hasta que tú lo digas."
+        }
+    },
+    "friends": {
+        "page": {
+            "title": "Amigos",
+            "intro": "Quién ve lo que muestras a tus amigos. Ser amigos no concede nada más."
+        }
+    },
+    "scan": {
+        "page": {
+            "title": "Escanear un código",
+            "intro": "Deja pasar un inicio de sesión en un dispositivo que no puede pedirte la contraseña."
+        }
+    },
+    "standing": {
+        "page": {
+            "title": "Estado de la cuenta",
+            "intro": "Cómo está tu cuenta aquí y cualquier medida en vigor contra ella."
+        }
+    },
+    "profile": {
+        "page": {
+            "title": "Perfil",
+            "intro": "Cómo te ven todos los demás en Polaris."
+        }
     }
 }

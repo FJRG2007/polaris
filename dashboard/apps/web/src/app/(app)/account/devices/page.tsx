@@ -15,25 +15,27 @@
  * goes wrong.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { DevicesView } from "./devices-view";
+import { Messages } from "@/components/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
 export default async function DevicesPage() {
     await requireUser();
+    const t = await getTranslations("account");
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Voice &amp; Video</h1>
-                <p className="text-sm text-muted-foreground">
-                    Which microphone and camera Polaris uses on this machine, and how you sound through
-                    them. Kept in this browser, because a headset is plugged into a machine rather than
-                    into an account.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("devices.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("devices.page.intro")}</p>
             </div>
-            <DevicesView />
+            {/* The call settings' own words live with the call, in `chat`. */}
+            <Messages namespaces={["chat"]}>
+                <DevicesView />
+            </Messages>
         </div>
     );
 }

@@ -4,6 +4,7 @@
  * offered when scoping an API key, so an allowlist is written once.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { getUserSecurity, listAccessGroups, resolveEnforcedRules } from "@polaris/auth";
 import { clientIp } from "@/lib/request-context";
 import { requireUser } from "@/lib/session";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccessPage() {
     const user = await requireUser();
+    const t = await getTranslations("account");
     const [settings, groups, ip, enforced] = await Promise.all([
         getUserSecurity(user.id),
         listAccessGroups(user.id),
@@ -23,10 +25,8 @@ export default async function AccessPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Access rules</h1>
-                <p className="text-sm text-muted-foreground">
-                    Restrict where your account and your API keys may be used from.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("access.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("access.page.intro")}</p>
             </div>
             <AccessView
                 groups={groups}

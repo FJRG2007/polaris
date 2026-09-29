@@ -1,1 +1,8 @@
-{}
+{
+    "schedule": {
+        "page": {
+            "title": "Horario de estado",
+            "intro": "Horas en las que estás ausente, ocupado o no se te muestra, repetidas cada semana. Un horario toma el control cuando empieza, y lo que elijas mientras está en marcha es tuyo hasta que termine."
+        }
+    }
+}

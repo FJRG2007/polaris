@@ -8,6 +8,7 @@
  * same table, narrowed to the reader's own entries.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ActivityView } from "./activity-view";
 
@@ -15,15 +16,14 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountActivityPage() {
     await requireUser();
+    const t = await getTranslations("account");
 
     // Held to the width of the other security tables so the two read as one place.
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Activity</h1>
-                <p className="text-sm text-muted-foreground">
-                    What has been done with your account, and which device did it.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("activity.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("activity.page.intro")}</p>
             </div>
             <ActivityView />
         </div>

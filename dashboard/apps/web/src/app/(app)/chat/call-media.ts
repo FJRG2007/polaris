@@ -208,17 +208,26 @@ export function isDenial(error: unknown): boolean {
  * act on in a way that "could not reach your microphone" is not.
  */
 export function refused(error: unknown, what: string): string {
+    switch (refusalOf(error)) {
+        case "denied":
+            return `Polaris has not been allowed to use your ${what}. Your browser is blocking it, not Polaris: open the permissions beside the address and allow it, then rejoin.`;
+        case "busy":
+            return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
+        case "missing":
+            return `No ${what} was found on this device.`;
+        default:
+            return `Polaris could not reach your ${what}.`;
+    }
+}
+
+/** Which of those refusals it was, for a screen that words it in the reader's
+ *  language: `chat.media.refused.<kind>` in the catalogs. */
+export function refusalOf(error: unknown): "denied" | "busy" | "missing" | "unreachable" {
     const name = error instanceof Error ? error.name : "";
-    if (name === "NotAllowedError" || name === "SecurityError") {
-        return `Polaris has not been allowed to use your ${what}. Your browser is blocking it, not Polaris: open the permissions beside the address and allow it, then rejoin.`;
-    }
-    if (name === "NotReadableError" || name === "AbortError") {
-        return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;
-    }
-    if (name === "NotFoundError" || name === "OverconstrainedError") {
-        return `No ${what} was found on this device.`;
-    }
-    return `Polaris could not reach your ${what}.`;
+    if (name === "NotAllowedError" || name === "SecurityError") return "denied";
+    if (name === "NotReadableError" || name === "AbortError") return "busy";
+    if (name === "NotFoundError" || name === "OverconstrainedError") return "missing";
+    return "unreachable";
 }
 
 /** What this browser has to offer, named. Labels are only filled in once a

@@ -5,6 +5,7 @@
  * older on demand.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { listDeliveries } from "@/lib/notification-service";
 import { describeNotificationRules } from "@/lib/notifications/preferences";
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
     const user = await requireUser();
+    const t = await getTranslations("accountNotifications");
     const [rules, destinations, senders, deliveries, inGameOffered, inGameReady, account] =
         await Promise.all([
             describeNotificationRules(user.id),
@@ -35,10 +37,8 @@ export default async function NotificationsPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Notifications</h1>
-                <p className="text-sm text-muted-foreground">
-                    Alerts from Polaris and your integrations, and where each one is sent.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("settings.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("settings.page.intro")}</p>
             </div>
             <NotificationsPageView
                 rules={rules}

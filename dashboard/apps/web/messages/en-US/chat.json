@@ -1,5 +1,76 @@
 {
     "errors": {
         "notInConversation": "You are not in that conversation"
+    },
+    "media": {
+        "refused": {
+            "denied": "Polaris has not been allowed to use your {device, select, microphone {microphone} camera {camera} screen {screen} other {microphone or camera}}. Your browser is blocking it, not Polaris: open the permissions beside the address and allow it, then rejoin.",
+            "busy": "Your {device, select, microphone {microphone} camera {camera} screen {screen} other {microphone or camera}} is busy - another application is holding it. Close it, or pick a different device, and rejoin.",
+            "missing": "No {device, select, microphone {microphone} camera {camera} screen {screen} other {microphone or camera}} was found on this device.",
+            "unreachable": "Polaris could not reach your {device, select, microphone {microphone} camera {camera} screen {screen} other {microphone or camera}}."
+        }
+    },
+    "callSettings": {
+        "noise": {
+            "enhanced": {
+                "label": "Remove background noise",
+                "help": "Keeps your voice and takes out the rest - typing, a fan, a dog, somebody talking behind you. Costs a little battery."
+            },
+            "standard": {
+                "label": "Standard",
+                "help": "The browser's own echo and noise handling. Enough for a quiet room."
+            },
+            "licensed": {
+                "label": "Enhanced (licensed)",
+                "help": "The filter your administrator connected."
+            },
+            "off": {
+                "label": "Off",
+                "help": "Send exactly what the microphone hears."
+            }
+        },
+        "backgrounds": {
+            "blur": {
+                "label": "Blur my background",
+                "help": "Everything except you goes out of focus. Costs a little battery."
+            },
+            "strong": {
+                "label": "Blur it heavily",
+                "help": "The same, blurred until nothing behind you can be read."
+            },
+            "image": {
+                "label": "Use a picture",
+                "help": "Replaces the room with an image of yours. It stays on this machine."
+            },
+            "off": {
+                "label": "Off",
+                "help": "Send the room as the camera sees it."
+            }
+        },
+        "scenes": {
+            "meetingRoom": "Meeting room",
+            "desk": "Desk by a window",
+            "warmHallway": "Warm lights",
+            "library": "Library",
+            "shelvesWindow": "Reading room",
+            "shelvesPlants": "Shelves and plants",
+            "gradientDusk": "Dusk",
+            "gradientAmber": "Amber",
+            "gradientWaves": "Waves"
+        },
+        "inputModes": {
+            "open": {
+                "label": "Always on",
+                "note": "Your microphone is live until you mute it. What Polaris does unless you say otherwise."
+            },
+            "activity": {
+                "label": "Voice activity",
+                "note": "Your microphone opens when you speak and closes when you stop."
+            },
+            "ptt": {
+                "label": "Push to talk",
+                "note": "Your microphone is closed except while you hold a key."
+            }
+        }
     }
 }

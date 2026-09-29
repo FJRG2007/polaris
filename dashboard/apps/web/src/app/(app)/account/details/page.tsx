@@ -13,6 +13,7 @@
  * view.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountDetailsPage() {
     const session = await requireUser();
+    const t = await getTranslations("account");
     const [user, emails, mail, phone, whatsappChannel] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
@@ -42,10 +44,8 @@ export default async function AccountDetailsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Account</h1>
-                <p className="text-sm text-muted-foreground">
-                    How you sign in and how Polaris reaches you. None of it is on your profile.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("details.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("details.page.intro")}</p>
             </div>
             <AccountView
                 firstName={user?.firstName ?? ""}

@@ -1,1 +1,8 @@
-{}
+{
+    "settings": {
+        "page": {
+            "title": "Notificaciones",
+            "intro": "Avisos de Polaris y de tus integraciones, y adónde se envía cada uno."
+        }
+    }
+}

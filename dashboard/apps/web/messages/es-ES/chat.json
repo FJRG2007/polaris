@@ -1,5 +1,76 @@
 {
     "errors": {
         "notInConversation": "No estás en esa conversación"
+    },
+    "media": {
+        "refused": {
+            "denied": "Polaris no tiene permiso para usar {device, select, microphone {tu micrófono} camera {tu cámara} screen {tu pantalla} other {tu micrófono o tu cámara}}. Lo está bloqueando tu navegador, no Polaris: abre los permisos junto a la dirección, permítelo y vuelve a entrar.",
+            "busy": "{device, select, microphone {Tu micrófono está ocupado} camera {Tu cámara está ocupada} screen {Tu pantalla está ocupada} other {Tu micrófono o tu cámara están ocupados}}: otra aplicación lo está usando. Ciérrala o elige otro dispositivo, y vuelve a entrar.",
+            "missing": "No se ha encontrado {device, select, microphone {ningún micrófono} camera {ninguna cámara} screen {ninguna pantalla} other {ningún micrófono ni cámara}} en este dispositivo.",
+            "unreachable": "Polaris no ha podido acceder a {device, select, microphone {tu micrófono} camera {tu cámara} screen {tu pantalla} other {tu micrófono o tu cámara}}."
+        }
+    },
+    "callSettings": {
+        "noise": {
+            "enhanced": {
+                "label": "Quitar el ruido de fondo",
+                "help": "Mantiene tu voz y quita el resto: el teclado, un ventilador, un perro, alguien hablando detrás de ti. Gasta un poco de batería."
+            },
+            "standard": {
+                "label": "Estándar",
+                "help": "El tratamiento de eco y ruido del propio navegador. Suficiente para una habitación tranquila."
+            },
+            "licensed": {
+                "label": "Mejorado (con licencia)",
+                "help": "El filtro que ha conectado tu administrador."
+            },
+            "off": {
+                "label": "Desactivado",
+                "help": "Envía exactamente lo que oye el micrófono."
+            }
+        },
+        "backgrounds": {
+            "blur": {
+                "label": "Difuminar mi fondo",
+                "help": "Todo menos tú queda desenfocado. Gasta un poco de batería."
+            },
+            "strong": {
+                "label": "Difuminarlo mucho",
+                "help": "Lo mismo, difuminado hasta que no se pueda leer nada de lo que hay detrás de ti."
+            },
+            "image": {
+                "label": "Usar una imagen",
+                "help": "Sustituye la habitación por una imagen tuya. Se queda en este ordenador."
+            },
+            "off": {
+                "label": "Desactivado",
+                "help": "Envía la habitación tal como la ve la cámara."
+            }
+        },
+        "scenes": {
+            "meetingRoom": "Sala de reuniones",
+            "desk": "Escritorio junto a una ventana",
+            "warmHallway": "Luces cálidas",
+            "library": "Biblioteca",
+            "shelvesWindow": "Sala de lectura",
+            "shelvesPlants": "Estanterías y plantas",
+            "gradientDusk": "Atardecer",
+            "gradientAmber": "Ámbar",
+            "gradientWaves": "Ondas"
+        },
+        "inputModes": {
+            "open": {
+                "label": "Siempre activo",
+                "note": "Tu micrófono está abierto hasta que lo silencies. Es lo que hace Polaris salvo que digas otra cosa."
+            },
+            "activity": {
+                "label": "Actividad de voz",
+                "note": "Tu micrófono se abre cuando hablas y se cierra cuando paras."
+            },
+            "ptt": {
+                "label": "Pulsar para hablar",
+                "note": "Tu micrófono está cerrado salvo mientras mantienes pulsada una tecla."
+            }
+        }
     }
 }
