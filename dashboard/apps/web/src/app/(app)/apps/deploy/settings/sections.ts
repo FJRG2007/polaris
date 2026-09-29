@@ -20,54 +20,57 @@ import {
     Webhook,
     type LucideIcon
 } from "lucide-react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export interface SettingsSection {
     slug: string;
-    label: string;
+    /** Catalog key of the section's name, in the deploySettings namespace. */
+    label: NamespaceKey<"deploySettings">;
     icon: LucideIcon;
-    /** One line under the page title, saying what this section decides. */
-    hint: string;
+    /** One line under the page title, saying what this section decides - a
+     *  catalog key in the deploySettings namespace. */
+    hint: NamespaceKey<"deploySettings">;
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
     {
         slug: "general",
-        label: "General",
+        label: "sections.general.label",
         icon: SlidersHorizontal,
-        hint: "Name, description, and who can see it"
+        hint: "sections.general.hint"
     },
-    { slug: "usage", label: "Usage", icon: Gauge, hint: "What the project is consuming" },
+    { slug: "usage", label: "sections.usage.label", icon: Gauge, hint: "sections.usage.hint" },
     {
         slug: "environments",
-        label: "Environments",
+        label: "sections.environments.label",
         icon: Boxes,
-        hint: "Rename, set the default, remove"
+        hint: "sections.environments.hint"
     },
     {
         slug: "variables",
-        label: "Shared variables",
+        label: "sections.variables.label",
         icon: Variable,
-        hint: "Values every service in an environment gets"
+        hint: "sections.variables.hint"
     },
     {
         slug: "webhooks",
-        label: "Webhooks",
+        label: "sections.webhooks.label",
         icon: Webhook,
-        hint: "Where this project reports its deploys"
+        hint: "sections.webhooks.hint"
     },
-    { slug: "flags", label: "Feature flags", icon: Flag, hint: "How this project behaves" },
+    { slug: "flags", label: "sections.flags.label", icon: Flag, hint: "sections.flags.hint" },
     {
         slug: "members",
-        label: "Access",
+        label: "sections.members.label",
         icon: Users,
-        hint: "Who can reach the project, and to do what"
+        hint: "sections.members.hint"
     },
-    { slug: "tokens", label: "Tokens", icon: KeyRound, hint: "API access scoped to this project" },
+    { slug: "tokens", label: "sections.tokens.label", icon: KeyRound, hint: "sections.tokens.hint" },
     {
         slug: "integrations",
-        label: "Integrations",
+        label: "sections.integrations.label",
         icon: Blocks,
-        hint: "What this project is connected to"
+        hint: "sections.integrations.hint"
     },
-    { slug: "danger", label: "Danger", icon: TriangleAlert, hint: "Irreversible things" }
+    { slug: "danger", label: "sections.danger.label", icon: TriangleAlert, hint: "sections.danger.hint" }
 ];

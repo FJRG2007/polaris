@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { Button, Switch } from "@polaris/ui";
 import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setProjectFlagsAction } from "../project-actions";
 import { PROJECT_FLAGS, type ProjectFlags } from "@polaris/core";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
@@ -25,6 +26,7 @@ export function FeatureFlagsSection({
     canManage: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploySettings");
     const [flags, setFlags] = useState<ProjectFlags>(settings.flags);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -45,8 +47,8 @@ export function FeatureFlagsSection({
 
     return (
         <SettingsCard
-            title="Feature flags"
-            description="These apply to this project only. Changing one affects what happens next, not what already happened."
+            title={t("flags.title")}
+            description={t("flags.description")}
         >
             <div className="flex flex-col gap-2">
                 {PROJECT_FLAGS.map((flag) => (
@@ -73,7 +75,7 @@ export function FeatureFlagsSection({
             {canManage && (
                 <div className="flex justify-end">
                     <Button onClick={save} disabled={pending || !dirty}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} Save flags
+                        {pending && <Loader2 className="size-4 animate-spin" />} {t("flags.save")}
                     </Button>
                 </div>
             )}

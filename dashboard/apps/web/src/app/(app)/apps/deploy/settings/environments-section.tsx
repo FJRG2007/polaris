@@ -17,6 +17,7 @@ import { SettingsCard } from "../project-settings";
 import { NetworkingCard } from "./networking-card";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
 import { NewEnvironmentDialog } from "../new-environment-dialog";
 import { Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
@@ -31,6 +32,7 @@ export function EnvironmentsSection({
     canManage: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploySettings");
     const [renaming, setRenaming] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [deleting, setDeleting] = useState<ProjectEnvironmentView | null>(null);
@@ -91,8 +93,8 @@ export function EnvironmentsSection({
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard
-                title="Environments"
-                description="Each holds its own services and its own shared variables. The default is where a link that names no environment lands."
+                title={t("environments.title")}
+                description={t("environments.description")}
             >
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <div className="overflow-hidden rounded-md border border-border/60">
@@ -119,8 +121,8 @@ export function EnvironmentsSection({
                                             size="icon"
                                             onClick={() => commitRename(environment)}
                                             disabled={pending}
-                                            aria-label="Save name"
-                                            title="Save"
+                                            aria-label={t("environments.saveName")}
+                                            title={t("environments.save")}
                                         >
                                             <Check className="size-4" />
                                         </Button>
@@ -128,8 +130,8 @@ export function EnvironmentsSection({
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => setRenaming(null)}
-                                            aria-label="Cancel rename"
-                                            title="Cancel"
+                                            aria-label={t("environments.cancelRename")}
+                                            title={t("environments.cancel")}
                                         >
                                             <X className="size-4" />
                                         </Button>
@@ -140,7 +142,7 @@ export function EnvironmentsSection({
                                             {environment.name}
                                             {environment.isDefault && (
                                                 <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
-                                                    Default
+                                                    {t("environments.default")}
                                                 </span>
                                             )}
                                             {environment.pullRequest !== null && environment.previewRepo && (
@@ -148,24 +150,26 @@ export function EnvironmentsSection({
                                                     href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    title="Open the pull request this previews"
+                                                    title={t("environments.openPullRequest")}
                                                     className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
                                                 >
-                                                    Preview of #{environment.pullRequest}
+                                                    {t("environments.previewOf", { number: environment.pullRequest })}
                                                 </a>
                                             )}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {environment.serviceCount}{" "}
-                                            {environment.serviceCount === 1 ? "service" : "services"}
-                                            {environment.branch ? (
-                                                <>
-                                                    {" - follows "}
-                                                    <span className="font-mono">{environment.branch}</span>
-                                                </>
-                                            ) : null}
-                                            {" - created "}
-                                            {display.date(environment.createdAt)}
+                                            {t("environments.services", { count: environment.serviceCount })}
+                                            {environment.branch
+                                                ? t.rich("environments.follows", {
+                                                      branch: environment.branch,
+                                                      mono: (chunks) => (
+                                                          <span key="branch" className="font-mono">
+                                                              {chunks}
+                                                          </span>
+                                                      )
+                                                  })
+                                                : null}
+                                            {t("environments.created", { date: display.date(environment.createdAt) })}
                                         </p>
                                     </div>
                                 )}
@@ -177,8 +181,8 @@ export function EnvironmentsSection({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => startRename(environment)}
-                                        aria-label={`Rename ${environment.name}`}
-                                        title="Rename"
+                                        aria-label={t("environments.renameNamed", { name: environment.name })}
+                                        title={t("environments.rename")}
                                     >
                                         <Pencil className="size-4" />
                                     </Button>
@@ -187,8 +191,8 @@ export function EnvironmentsSection({
                                         size="icon"
                                         disabled={environment.isDefault || pending}
                                         onClick={() => makeDefault(environment)}
-                                        aria-label={`Make ${environment.name} the default`}
-                                        title={environment.isDefault ? "Already the default" : "Make default"}
+                                        aria-label={t("environments.makeDefaultNamed", { name: environment.name })}
+                                        title={environment.isDefault ? t("environments.alreadyDefault") : t("environments.makeDefault")}
                                     >
                                         <Star className={`size-4 ${environment.isDefault ? "fill-current" : ""}`} />
                                     </Button>
@@ -197,11 +201,11 @@ export function EnvironmentsSection({
                                         size="icon"
                                         disabled={environment.isDefault}
                                         onClick={() => setDeleting(environment)}
-                                        aria-label={`Delete ${environment.name}`}
+                                        aria-label={t("environments.deleteNamed", { name: environment.name })}
                                         title={
                                             environment.isDefault
-                                                ? "Promote another environment first"
-                                                : "Delete environment"
+                                                ? t("environments.promoteFirst")
+                                                : t("environments.delete")
                                         }
                                     >
                                         <Trash2 className="size-4" />
@@ -215,7 +219,7 @@ export function EnvironmentsSection({
                 {canManage && (
                     <div className="flex justify-end">
                         <Button variant="ghost" onClick={() => setCreating(true)}>
-                            <Plus className="size-4" /> New environment
+                            <Plus className="size-4" /> {t("environments.new")}
                         </Button>
                     </div>
                 )}
@@ -234,11 +238,11 @@ export function EnvironmentsSection({
                 open={deleting !== null}
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting?.name ?? ""}
-                kind="environment"
+                kind={t("environments.kind")}
                 description={
                     deleting && deleting.serviceCount > 0
-                        ? `Every service in it goes too - ${deleting.serviceCount} of them, with their containers, domains and variables.`
-                        : "The environment and its variables are removed."
+                        ? t("environments.deleteWithServices", { count: deleting.serviceCount })
+                        : t("environments.deleteEmpty")
                 }
                 error={error}
                 pending={pending}

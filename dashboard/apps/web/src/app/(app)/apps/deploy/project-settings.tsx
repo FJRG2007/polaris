@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { cn, PageHeader, ScrollRow } from "@polaris/ui";
 import { SETTINGS_SECTIONS } from "./settings/sections";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageSection } from "./settings/usage-section";
 import { TokensSection } from "./settings/tokens-section";
 import { DangerSection } from "./settings/danger-section";
@@ -36,12 +37,13 @@ export function ProjectSettings({
     /** Only the owner may delete or hand over the project itself. */
     isOwner: boolean;
 }) {
+    const t = useTranslations("deploySettings");
     const base = `/apps/deploy/${settings.id}/settings`;
     const current = SETTINGS_SECTIONS.find((entry) => entry.slug === section) ?? SETTINGS_SECTIONS[0]!;
 
     return (
         <div className="flex w-full flex-col gap-4">
-            <PageHeader title="Project settings" description={current.hint} />
+            <PageHeader title={t("sections.title")} description={t(current.hint)} />
 
             <div className="flex flex-col gap-5 md:flex-row md:gap-6">
                 <nav className="md:w-48 md:shrink-0">
@@ -65,7 +67,7 @@ export function ProjectSettings({
                                         )}
                                     >
                                         <Icon className="size-4 shrink-0" />
-                                        {entry.label}
+                                        {t(entry.label)}
                                     </Link>
                                 </li>
                             );

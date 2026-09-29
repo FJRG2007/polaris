@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteProjectAction } from "../actions";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Trash2, TriangleAlert } from "lucide-react";
 import { Button, ConfirmDeleteDialog } from "@polaris/ui";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
@@ -27,6 +28,7 @@ export function DangerSection({
     isOwner: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploySettings");
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -47,23 +49,21 @@ export function DangerSection({
         <div className="flex flex-col gap-4">
             <SettingsCard
                 tone="danger"
-                title="Delete this project"
-                description="Every environment, service, volume record, variable and deploy log in it goes, and whatever it is running is stopped and removed from its server. There is no undo and no export afterwards."
+                title={t("danger.title")}
+                description={t("danger.description")}
             >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">
-                        {settings.environments.length}{" "}
-                        {settings.environments.length === 1 ? "environment" : "environments"} - {settings.serviceCount}{" "}
-                        {settings.serviceCount === 1 ? "service" : "services"}
+                        {t("danger.counts", { environments: settings.environments.length, services: settings.serviceCount })}
                     </p>
                     {isOwner ? (
                         <Button variant="danger" onClick={() => setConfirming(true)} disabled={!canManage}>
-                            <Trash2 className="size-4" /> Delete project
+                            <Trash2 className="size-4" /> {t("danger.delete")}
                         </Button>
                     ) : (
                         <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <TriangleAlert className="size-3.5" />
-                            Only {settings.ownerName}, who owns this project, can delete it.
+                            {t("danger.ownerOnly", { owner: settings.ownerName })}
                         </p>
                     )}
                 </div>
@@ -71,16 +71,15 @@ export function DangerSection({
             </SettingsCard>
 
             <p className="text-xs text-muted-foreground">
-                Removing a single service is done from the service itself, and is staged so it can be reviewed before it
-                takes effect.
+                {t("danger.singleService")}
             </p>
 
             <ConfirmDeleteDialog
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={settings.name}
-                kind="project"
-                description="This is immediate. Unlike removing a service, it is not staged and there is nothing to review afterwards."
+                kind={t("danger.kind")}
+                description={t("danger.confirmDescription")}
                 error={error}
                 pending={pending}
                 onConfirm={remove}

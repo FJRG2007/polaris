@@ -15,28 +15,27 @@ import { Button, Select } from "@polaris/ui";
 import { useState, useTransition } from "react";
 import { Loader2, Network } from "lucide-react";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setEnvironmentNetworkModeAction } from "../project-actions";
 import { ENVIRONMENT_NETWORK_MODES, type EnvironmentNetworkMode } from "@polaris/core";
 import type { ProjectEnvironmentView, ProjectSettingsView } from "@/lib/deploy-project-service";
 
-const MODE_LABELS: Record<EnvironmentNetworkMode, string> = {
-    shared: "Shared network",
-    environment: "Own network",
-    links: "Canvas links only"
-};
+const MODE_LABELS = {
+    shared: "networking.modes.shared",
+    environment: "networking.modes.environment",
+    links: "networking.modes.links"
+} as const satisfies Record<EnvironmentNetworkMode, string>;
 
-const MODE_HINTS: Record<EnvironmentNetworkMode, string> = {
-    shared: "Every service joins the network all deployments share, so services in other projects can reach these by name.",
-    environment: "Services in this environment reach each other by name. Nothing outside it can.",
-    links: "A service reaches only the services it is linked to on the canvas, and a database is reached only through a link."
-};
+const MODE_HINTS = {
+    shared: "networking.hints.shared",
+    environment: "networking.hints.environment",
+    links: "networking.hints.links"
+} as const satisfies Record<EnvironmentNetworkMode, string>;
 
 export function NetworkingCard({ settings, canManage }: { settings: ProjectSettingsView; canManage: boolean }) {
+    const t = useTranslations("deploySettings");
     return (
-        <SettingsCard
-            title="Private networking"
-            description="Which services can reach each other by name. Domains and published ports are not affected."
-        >
+        <SettingsCard title={t("networking.title")} description={t("networking.description")}>
             <div className="overflow-hidden rounded-md border border-border/60">
                 {settings.environments.map((environment) => (
                     <EnvironmentNetworkRow
@@ -61,6 +60,7 @@ function EnvironmentNetworkRow({
     privateNetworksHere: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploySettings");
     const [mode, setMode] = useState<EnvironmentNetworkMode>(environment.networkMode);
     const [error, setError] = useState<string | null>(null);
     const [outcome, setOutcome] = useState<string | null>(null);
@@ -87,11 +87,11 @@ function EnvironmentNetworkRow({
                 const failed = result.failed ?? [];
                 setOutcome(
                     failed.length > 0
-                        ? `Deploying ${result.started ?? 0}. Not started: ${failed.join("; ")}`
-                        : `Deploying ${result.started ?? 0} ${result.started === 1 ? "service" : "services"} onto the new setting.`
+                        ? t("networking.deployingSome", { count: result.started ?? 0, failed: failed.join("; ") })
+                        : t("networking.deploying", { count: result.started ?? 0 })
                 );
             } else {
-                setOutcome("Saved. Each service moves over on its next deploy.");
+                setOutcome(t("networking.saved"));
             }
             router.refresh();
         });
@@ -111,27 +111,25 @@ function EnvironmentNetworkRow({
                         setMode(value as EnvironmentNetworkMode);
                         setOutcome(null);
                     }}
-                    options={ENVIRONMENT_NETWORK_MODES.map((value) => ({ value, label: MODE_LABELS[value] }))}
+                    options={ENVIRONMENT_NETWORK_MODES.map((value) => ({ value, label: t(MODE_LABELS[value]) }))}
                     className="w-full sm:w-52"
-                    aria-label={`How services in ${environment.name} connect`}
+                    aria-label={t("networking.modeLabel", { name: environment.name })}
                 />
             </div>
-            <p className="text-xs text-muted-foreground">{MODE_HINTS[mode]}</p>
+            <p className="text-xs text-muted-foreground">{t(MODE_HINTS[mode])}</p>
             {mode === "links" && environment.linkCount === 0 && (
                 <p className="text-xs text-warning">
-                    This environment&apos;s canvas has no links yet, so no service would reach another. Link them on the
-                    canvas first.
+                    {t("networking.noLinks")}
                 </p>
             )}
             {mode !== "shared" && !privateNetworksHere && (
                 <p className="text-xs text-warning">
-                    Services on this server stay on the shared network until Polaris is updated from Settings.
-                    Services on your other servers get their own network now.
+                    {t("networking.needsUpdate")}
                 </p>
             )}
             {dirty && environment.networkMode === "shared" && (
                 <p className="text-xs text-muted-foreground">
-                    Anything that reaches these services by name from another project stops reaching them.
+                    {t("networking.leavesShared")}
                 </p>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -139,13 +137,13 @@ function EnvironmentNetworkRow({
             {canManage && dirty && (
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="ghost" onClick={() => setMode(environment.networkMode)} disabled={pending}>
-                        Cancel
+                        {t("networking.cancel")}
                     </Button>
                     <Button variant="secondary" onClick={() => save(false)} disabled={pending}>
-                        {pending && !deploying && <Loader2 className="size-4 animate-spin" />} Save
+                        {pending && !deploying && <Loader2 className="size-4 animate-spin" />} {t("networking.save")}
                     </Button>
                     <Button onClick={() => save(true)} disabled={pending || environment.serviceCount === 0}>
-                        {pending && deploying && <Loader2 className="size-4 animate-spin" />} Save and deploy
+                        {pending && deploying && <Loader2 className="size-4 animate-spin" />} {t("networking.saveDeploy")}
                     </Button>
                 </div>
             )}

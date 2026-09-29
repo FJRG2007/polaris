@@ -1,1 +1,276 @@
-{}
+{
+    "members": {
+        "custom": "Personalizado",
+        "expiry": {
+            "never": "Sin caducidad",
+            "days": "{count} días",
+            "year": "1 año"
+        },
+        "permissions": "{count, plural, one {# permiso} other {# permisos}}",
+        "removedEnvironment": "entorno eliminado",
+        "noEnvironment": "ningún entorno",
+        "expiredLower": "caducado",
+        "until": "hasta el {date}",
+        "title": "Acceso",
+        "description": "Todas las personas de aquí llegan a este proyecto por los mismos caminos que su propietario, limitadas a lo que permite su entrada.",
+        "owner": "Propietario",
+        "expired": "Caducado",
+        "changeNamed": "Cambiar lo que puede hacer {name}",
+        "edit": "Editar",
+        "remove": "Quitar",
+        "give": "Dar acceso",
+        "entryKind": "entrada",
+        "removeAccess": "Quitar el acceso",
+        "removeDescription": "Pierden el acceso a este proyecto. Nada de lo que desplegaron se ve afectado.",
+        "change": "Cambiar el acceso",
+        "for": "Para",
+        "forLabel": "Para quién es",
+        "identifier": "Correo o nombre de usuario",
+        "needsAccount": "Tiene que tener ya una cuenta en este Polaris.",
+        "team": "Equipo",
+        "noTeam": "Aún no estás en ningún equipo. Los equipos están dentro de una organización, en Cuenta.",
+        "organization": "Organización",
+        "noOrganization": "Aún no estás en ninguna organización.",
+        "everyone": "Todas las personas con cuenta en este Polaris, las hayan añadido aquí o no.",
+        "theyMay": "Pueden",
+        "whatTheyMay": "Qué pueden hacer",
+        "environments": "Entornos",
+        "everyEnvironment": "Todos los entornos",
+        "expires": "Caduca",
+        "keepDate": "Mantener la fecha actual",
+        "whenEnds": "Cuándo termina este acceso",
+        "cancel": "Cancelar",
+        "save": "Guardar"
+    },
+    "tokens": {
+        "lifetimes": {
+            "days30": "30 días",
+            "days90": "90 días",
+            "year": "1 año",
+            "never": "No caduca"
+        },
+        "revoked": "Revocado",
+        "expired": "Caducado",
+        "active": "Activo",
+        "title": "Tokens del proyecto",
+        "description": "Preséntalo como `Authorization: Bearer ...`. Solo actúa sobre este proyecto, con el acceso de quien lo creó.",
+        "empty": "No hay tokens para este proyecto.",
+        "canChange": " - puede hacer cambios",
+        "readOnly": " - solo lectura",
+        "madeBy": " - creado por {name}",
+        "expires": " - caduca el {date}",
+        "lastUsed": " - usado por última vez el {date}",
+        "neverUsed": " - nunca usado",
+        "revoke": "Revocar",
+        "deleteNamed": "Eliminar {name}",
+        "delete": "Eliminar",
+        "new": "Nuevo token",
+        "kind": "token",
+        "deleteDescription": "Lo que lo use deja de funcionar al momento, y el registro de lo que hizo se va con él. Revócalo en su lugar si quieres conservar el rastro.",
+        "createFailed": "No se pudo crear el token",
+        "createTitle": "Nuevo token del proyecto",
+        "createDescription": "Se muestra una vez al crearlo y nunca más.",
+        "name": "Nombre",
+        "namePlaceholder": "Pipeline de CI",
+        "expiresLabel": "Caduca",
+        "allowChanges": "Permitir cambios",
+        "allowChangesHint": "Sin esto, el token puede leer el proyecto pero no desplegar, editar ni eliminar nada. En cualquier caso, solo puede hacer lo que puedes hacer tú.",
+        "cancel": "Cancelar",
+        "create": "Crear el token",
+        "issuedTitle": "Copia tu token",
+        "issuedDescription": "Es la única vez que se muestra. Polaris guarda un hash, así que no se puede recuperar después.",
+        "copyToken": "Copiar el token",
+        "copy": "Copiar",
+        "done": "Hecho"
+    },
+    "usage": {
+        "loadFailed": "No se pudo cargar el uso",
+        "totals": "Totales",
+        "totalsHint": "Suma de todos los servicios que enviaron una muestra en la última media hora.",
+        "services": "Servicios",
+        "running": "{count} en marcha",
+        "cpu": "CPU",
+        "cpuHint": "Entre los servicios que informan",
+        "memory": "Memoria",
+        "resident": "Residente",
+        "volumes": "Volúmenes",
+        "attached": "{count} conectados",
+        "sampled": "Muestra del {time}",
+        "noSamples": "Aún no hay muestras. El recolector guarda una cada pocos minutos.",
+        "refresh": "Actualizar",
+        "stale": "Se muestran las últimas cifras. {reason}",
+        "byService": "Por servicio",
+        "byServiceHint": "Un servicio sin cifras no está informando - normalmente porque no está en marcha.",
+        "service": "Servicio",
+        "environment": "Entorno",
+        "isRunning": "En marcha",
+        "notRunning": "Detenido",
+        "empty": "Aún no hay servicios en este proyecto.",
+        "monthFailed": "No se pudo calcular el uso de este mes",
+        "monthSoFar": "{month} hasta ahora",
+        "thisMonthSoFar": "Este mes hasta ahora",
+        "monthNoPrices": "Uso desde el día 1 del mes. Este Polaris no tiene precios configurados, así que no hay coste.",
+        "monthWithPrices": "Uso desde el día 1 del mes y su coste con los precios de este Polaris."
+    },
+    "environments": {
+        "title": "Entornos",
+        "description": "Cada uno tiene sus propios servicios y sus propias variables compartidas. El predeterminado es al que llega un enlace que no nombra ningún entorno.",
+        "saveName": "Guardar el nombre",
+        "save": "Guardar",
+        "cancelRename": "Cancelar el cambio de nombre",
+        "cancel": "Cancelar",
+        "default": "Predeterminado",
+        "openPullRequest": "Abrir la pull request que previsualiza",
+        "previewOf": "Vista previa de #{number}",
+        "services": "{count, plural, one {# servicio} other {# servicios}}",
+        "follows": " - sigue <mono>{branch}</mono>",
+        "created": " - creado el {date}",
+        "renameNamed": "Renombrar {name}",
+        "rename": "Renombrar",
+        "makeDefaultNamed": "Hacer que {name} sea el predeterminado",
+        "alreadyDefault": "Ya es el predeterminado",
+        "makeDefault": "Hacer predeterminado",
+        "deleteNamed": "Eliminar {name}",
+        "promoteFirst": "Haz antes predeterminado otro entorno",
+        "delete": "Eliminar el entorno",
+        "new": "Nuevo entorno",
+        "kind": "entorno",
+        "deleteWithServices": "También se van todos sus servicios - {count}, con sus contenedores, dominios y variables.",
+        "deleteEmpty": "Se eliminan el entorno y sus variables."
+    },
+    "sections": {
+        "title": "Ajustes del proyecto",
+        "general": {
+            "label": "General",
+            "hint": "Nombre, descripción y quién puede verlo"
+        },
+        "usage": {
+            "label": "Uso",
+            "hint": "Lo que está consumiendo el proyecto"
+        },
+        "environments": {
+            "label": "Entornos",
+            "hint": "Renombrar, elegir el predeterminado, eliminar"
+        },
+        "variables": {
+            "label": "Variables compartidas",
+            "hint": "Valores que recibe cada servicio de un entorno"
+        },
+        "webhooks": {
+            "label": "Webhooks",
+            "hint": "Adónde informa este proyecto de sus despliegues"
+        },
+        "flags": {
+            "label": "Opciones",
+            "hint": "Cómo se comporta este proyecto"
+        },
+        "members": {
+            "label": "Acceso",
+            "hint": "Quién puede llegar al proyecto y para qué"
+        },
+        "tokens": {
+            "label": "Tokens",
+            "hint": "Acceso por API limitado a este proyecto"
+        },
+        "integrations": {
+            "label": "Integraciones",
+            "hint": "A qué está conectado este proyecto"
+        },
+        "danger": {
+            "label": "Zona de peligro",
+            "hint": "Cosas irreversibles"
+        }
+    },
+    "general": {
+        "visibility": {
+            "title": "Visibilidad",
+            "private": "Privado",
+            "internal": "Interno",
+            "privateHint": "Solo el propietario y las personas añadidas a este proyecto pueden verlo.",
+            "internalHint": "Cualquiera con sesión iniciada en este Polaris que pueda leer Deploy puede verlo. Nadie desde internet."
+        },
+        "info": "Información del proyecto",
+        "infoHint": "Del nombre salen los nombres de los contenedores y de los subdominios gratuitos.",
+        "name": "Nombre",
+        "description": "Descripción",
+        "descriptionPlaceholder": "Para qué es este proyecto",
+        "projectId": "ID del proyecto",
+        "copyId": "Copiar el ID del proyecto",
+        "update": "Actualizar",
+        "template": {
+            "failed": "No se pudo generar la plantilla",
+            "title": "Plantilla",
+            "description": "El proyecto escrito como una descripción portable de sí mismo: entornos, servicios, volúmenes y los nombres de las variables que necesita cada uno.",
+            "safe": "Los valores de las variables se dejan fuera a propósito, así que el archivo se puede pasar a otra persona sin riesgo.",
+            "export": "Exportar la plantilla"
+        }
+    },
+    "networking": {
+        "modes": {
+            "shared": "Red compartida",
+            "environment": "Red propia",
+            "links": "Solo enlaces del lienzo"
+        },
+        "hints": {
+            "shared": "Cada servicio se une a la red que comparten todos los despliegues, así que los servicios de otros proyectos pueden llegar a estos por nombre.",
+            "environment": "Los servicios de este entorno se alcanzan entre sí por nombre. Nada de fuera puede.",
+            "links": "Un servicio solo alcanza los servicios con los que está enlazado en el lienzo, y a una base de datos solo se llega por un enlace."
+        },
+        "title": "Red privada",
+        "description": "Qué servicios pueden alcanzarse por nombre. Los dominios y los puertos publicados no se ven afectados.",
+        "deployingSome": "Desplegando {count}. Sin iniciar: {failed}",
+        "deploying": "Desplegando {count, plural, one {# servicio} other {# servicios}} con el nuevo ajuste.",
+        "saved": "Guardado. Cada servicio se cambia en su próximo despliegue.",
+        "modeLabel": "Cómo se conectan los servicios de {name}",
+        "noLinks": "El lienzo de este entorno aún no tiene enlaces, así que ningún servicio llegaría a otro. Enlázalos antes en el lienzo.",
+        "needsUpdate": "Los servicios de este servidor siguen en la red compartida hasta que Polaris se actualice desde Ajustes. Los servicios de tus otros servidores ya tienen su propia red.",
+        "leavesShared": "Lo que llegue a estos servicios por nombre desde otro proyecto dejará de llegar.",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "saveDeploy": "Guardar y desplegar"
+    },
+    "sharedVariables": {
+        "title": "Variables compartidas",
+        "emptyHint": "Valores que recibe cada servicio de un entorno.",
+        "noEnvironments": "Este proyecto aún no tiene entornos.",
+        "description": "Se definen una vez por entorno y llegan a todos sus servicios. Si un servicio tiene su propia variable con el mismo nombre, gana la suya.",
+        "environment": "Entorno",
+        "redeployTarget": "todos los servicios desplegados de {name}",
+        "thisEnvironment": "este entorno"
+    },
+    "danger": {
+        "title": "Eliminar este proyecto",
+        "description": "Se van todos sus entornos, servicios, registros de volúmenes, variables y registros de despliegue, y lo que esté ejecutando se detiene y se retira de su servidor. No se puede deshacer ni exportar después.",
+        "counts": "{environments, plural, one {# entorno} other {# entornos}} - {services, plural, one {# servicio} other {# servicios}}",
+        "delete": "Eliminar el proyecto",
+        "ownerOnly": "Solo {owner}, que es el propietario del proyecto, puede eliminarlo.",
+        "singleService": "Un servicio suelto se elimina desde el propio servicio, y queda preparado para poder revisarlo antes de que se aplique.",
+        "kind": "proyecto",
+        "confirmDescription": "Es inmediato. A diferencia de eliminar un servicio, no se prepara y no hay nada que revisar después."
+    },
+    "flags": {
+        "title": "Opciones",
+        "description": "Se aplican solo a este proyecto. Cambiar una afecta a lo que pase a partir de ahora, no a lo que ya pasó.",
+        "save": "Guardar las opciones"
+    },
+    "webhooks": {
+        "title": "Webhooks",
+        "description": "Endpoints que reciben los eventos de despliegue de este proyecto. Pertenecen al proyecto, así que siguen informando aunque ya no esté quien los añadió.",
+        "everywhere": "Todos los endpoints de todos los proyectos aparecen juntos en <link>Watch</link>."
+    },
+    "integrations": {
+        "title": "Integraciones",
+        "loadingHint": "A qué puede llegar este proyecto.",
+        "description": "A qué puede llegar este proyecto. GitHub son las cuentas que hayas conectado tú; el resto se configura una vez para toda la instancia.",
+        "connected": "Conectado",
+        "githubConnected": "{login} - {count, plural, one {# repositorio disponible} other {# repositorios disponibles}}",
+        "githubHint": "Despliega desde un repositorio privado y vuelve a desplegar cuando llega un commit.",
+        "dnsReady": " - DNS listo",
+        "dnsNotReady": " - DNS sin preparar",
+        "cloudflareHint": "Da a un servicio un nombre público estable a través de un túnel, con el DNS resuelto por ti.",
+        "registries": "Registros de contenedores",
+        "registriesHint": "Inicia sesión en un registro para que este proyecto pueda descargar imágenes privadas.",
+        "manage": "Gestionar",
+        "connect": "Conectar"
+    }
+}

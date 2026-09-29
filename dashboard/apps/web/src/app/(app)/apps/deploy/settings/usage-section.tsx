@@ -20,6 +20,7 @@ import { COLLECT_TICK_MS } from "@/lib/metrics-shared";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { StatementView } from "@/lib/billing/statement";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectUsage } from "@/lib/deploy-project-service";
 import { Database, Layers, Loader2, RefreshCw } from "lucide-react";
 import { StatementTotals } from "@/components/billing/statement-parts";
@@ -38,13 +39,14 @@ function formatBytes(bytes: number | null): string {
 }
 
 export function UsageSection({ projectId }: { projectId: string }) {
+    const t = useTranslations("deploySettings");
     const display = useDisplayFormat();
 
     const load = useCallback(async (): Promise<ProjectUsage> => {
         const result = await projectUsageAction(projectId);
-        if (result.error || !result.usage) throw new Error(result.error ?? "Could not load the usage");
+        if (result.error || !result.usage) throw new Error(result.error ?? t("usage.loadFailed"));
         return result.usage;
-    }, [projectId]);
+    }, [projectId, t]);
 
     const {
         data: usage,
@@ -64,8 +66,8 @@ export function UsageSection({ projectId }: { projectId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard
-                title="Totals"
-                description="Summed across every service that reported a sample in the last half hour."
+                title={t("usage.totals")}
+                description={t("usage.totalsHint")}
             >
                 {loading ? (
                     <div className="flex justify-center py-6 text-muted-foreground">
@@ -74,28 +76,28 @@ export function UsageSection({ projectId }: { projectId: string }) {
                 ) : (
                     <>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <Stat label="Services" value={String(usage?.totals.services ?? 0)} hint={`${usage?.totals.running ?? 0} running`} />
+                            <Stat label={t("usage.services")} value={String(usage?.totals.services ?? 0)} hint={t("usage.running", { count: usage?.totals.running ?? 0 })} />
                             <Stat
-                                label="CPU"
+                                label={t("usage.cpu")}
                                 value={usage?.totals.cpuPercent == null ? "-" : `${usage.totals.cpuPercent}%`}
-                                hint="Across reporting services"
+                                hint={t("usage.cpuHint")}
                             />
-                            <Stat label="Memory" value={formatBytes(usage?.totals.memUsedBytes ?? null)} hint="Resident" />
+                            <Stat label={t("usage.memory")} value={formatBytes(usage?.totals.memUsedBytes ?? null)} hint={t("usage.resident")} />
                             <Stat
-                                label="Volumes"
+                                label={t("usage.volumes")}
                                 value={formatBytes(usage?.totals.volumeBytes ?? null)}
-                                hint={`${usage?.totals.volumes ?? 0} attached`}
+                                hint={t("usage.attached", { count: usage?.totals.volumes ?? 0 })}
                             />
                         </div>
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
                                 {usage?.sampledAt
-                                    ? `Sampled ${display.dateTime(usage.sampledAt)}`
-                                    : "No samples yet. The collector writes one every few minutes."}
+                                    ? t("usage.sampled", { time: display.dateTime(usage.sampledAt) })
+                                    : t("usage.noSamples")}
                             </p>
                             <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing}>
                                 {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-                                Refresh
+                                {t("usage.refresh")}
                             </Button>
                         </div>
                     </>
@@ -104,21 +106,21 @@ export function UsageSection({ projectId }: { projectId: string }) {
                     failed over figures already on screen only means they stopped
                     moving, which is a warning rather than an error. */}
                 {error && <p className="text-sm text-danger">{error}</p>}
-                {stale && <p className="text-sm text-warning">Showing the last figures. {stale}</p>}
+                {stale && <p className="text-sm text-warning">{t("usage.stale", { reason: stale })}</p>}
             </SettingsCard>
 
             <MonthCard projectId={projectId} />
 
-            <SettingsCard title="By service" description="A service with no figures is not reporting - usually because it is not running.">
+            <SettingsCard title={t("usage.byService")} description={t("usage.byServiceHint")}>
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[32rem] text-sm">
                         <thead>
                             <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
-                                <th className="px-2 py-1.5 font-medium">Service</th>
-                                <th className="px-2 py-1.5 font-medium">Environment</th>
-                                <th className="px-2 py-1.5 text-right font-medium">CPU</th>
-                                <th className="px-2 py-1.5 text-right font-medium">Memory</th>
-                                <th className="px-2 py-1.5 text-right font-medium">Volumes</th>
+                                <th className="px-2 py-1.5 font-medium">{t("usage.service")}</th>
+                                <th className="px-2 py-1.5 font-medium">{t("usage.environment")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.cpu")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.memory")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium">{t("usage.volumes")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -134,7 +136,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                                             <span className="truncate">{service.name}</span>
                                             <span
                                                 className={`size-1.5 shrink-0 rounded-full ${service.running ? "bg-success-solid" : "bg-muted-foreground"}`}
-                                                title={service.running ? "Running" : "Not running"}
+                                                title={service.running ? t("usage.isRunning") : t("usage.notRunning")}
                                             />
                                         </span>
                                     </td>
@@ -153,7 +155,7 @@ export function UsageSection({ projectId }: { projectId: string }) {
                             {(usage?.services.length ?? 0) === 0 && !loading && (
                                 <tr>
                                     <td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">
-                                        No services in this project yet.
+                                        {t("usage.empty")}
                                     </td>
                                 </tr>
                             )}
@@ -175,11 +177,12 @@ const MONTH_POLL_MS = 5 * 60_000;
  * for it, so whoever runs the project does not have to ask what it costs.
  */
 function MonthCard({ projectId }: { projectId: string }) {
+    const t = useTranslations("deploySettings");
     const load = useCallback(async (): Promise<StatementView> => {
         const result = await projectMonthUsageAction(projectId);
-        if (result.error || !result.month) throw new Error(result.error ?? "Could not work out this month's usage");
+        if (result.error || !result.month) throw new Error(result.error ?? t("usage.monthFailed"));
         return result.month;
-    }, [projectId]);
+    }, [projectId, t]);
     const { data, error, stale } = useLiveRead<StatementView>({
         load,
         cacheKey: `deploy.month.${projectId}`,
@@ -188,16 +191,12 @@ function MonthCard({ projectId }: { projectId: string }) {
 
     return (
         <SettingsCard
-            title={data ? `${data.monthLabel} so far` : "This month so far"}
-            description={
-                data && !data.statement.rates
-                    ? "Usage since the first of the month. No prices are set on this Polaris, so there is no cost."
-                    : "Usage since the first of the month, and its cost at this Polaris's prices."
-            }
+            title={data ? t("usage.monthSoFar", { month: data.monthLabel }) : t("usage.thisMonthSoFar")}
+            description={data && !data.statement.rates ? t("usage.monthNoPrices") : t("usage.monthWithPrices")}
         >
             <StatementTotals view={data} />
             {error ? <p className="text-sm text-danger">{error}</p> : null}
-            {stale ? <p className="text-sm text-warning">Showing the last figures. {stale}</p> : null}
+            {stale ? <p className="text-sm text-warning">{t("usage.stale", { reason: stale })}</p> : null}
         </SettingsCard>
     );
 }

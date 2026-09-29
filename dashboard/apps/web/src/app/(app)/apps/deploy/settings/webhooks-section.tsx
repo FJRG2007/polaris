@@ -8,21 +8,22 @@
 
 import Link from "next/link";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ProjectWebhooks } from "@/components/project-webhooks";
 
 export function WebhooksSection({ projectId }: { projectId: string }) {
+    const t = useTranslations("deploySettings");
     return (
-        <SettingsCard
-            title="Webhooks"
-            description="Endpoints that receive this project's deploy events. They belong to the project, so they keep reporting after whoever added them is gone."
-        >
+        <SettingsCard title={t("webhooks.title")} description={t("webhooks.description")}>
             <ProjectWebhooks projectId={projectId} />
             <p className="text-xs text-muted-foreground">
-                Every endpoint across every project is listed together in{" "}
-                <Link href="/watch/webhooks" className="text-primary hover:underline">
-                    Watch
-                </Link>
-                .
+                {t.rich("webhooks.everywhere", {
+                    link: (chunks) => (
+                        <Link key="watch" href="/watch/webhooks" className="text-primary hover:underline">
+                            {chunks}
+                        </Link>
+                    )
+                })}
             </p>
         </SettingsCard>
     );

@@ -16,6 +16,8 @@
 import { SettingsCard } from "../project-settings";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ProjectAccessCandidates, ProjectMemberView } from "@/lib/deploy-project-service";
 import { Building2, Clock, Crown, Globe2, Loader2, Pencil, UserPlus, Users } from "lucide-react";
@@ -55,7 +57,10 @@ import {
 /** The role picker, plus the answer for access a role cannot describe. A role
  *  reaching past what the reader holds themselves is not offered: an entry never
  *  grants more than the person writing it can do, so the server would refuse it. */
-function roleOptions(grantable: readonly ProjectCapability[]): { value: string; label: string }[] {
+function roleOptions(
+    grantable: readonly ProjectCapability[],
+    t: NamespaceTranslator<"deploySettings">
+): { value: string; label: string }[] {
     const held = new Set(grantable);
     return [
         ...PROJECT_ROLES.filter((role) =>
@@ -63,7 +68,7 @@ function roleOptions(grantable: readonly ProjectCapability[]): { value: string; 
                 held.has(capability)
             )
         ).map((value) => ({ value, label: PROJECT_ROLE_LABELS[value] })),
-        { value: "custom", label: "Custom" }
+        { value: "custom", label: t("members.custom") }
     ];
 }
 
@@ -75,12 +80,12 @@ const PRINCIPAL_OPTIONS = PROJECT_PRINCIPALS.map((value) => ({
 /** How long an entry lasts. Offered as durations rather than a date field: the
  *  question people are answering is "for how long", and a date picker makes them
  *  do the arithmetic themselves. */
-const EXPIRY_OPTIONS = [
-    { value: "never", label: "No expiry" },
-    { value: "7", label: "7 days" },
-    { value: "30", label: "30 days" },
-    { value: "90", label: "90 days" },
-    { value: "365", label: "1 year" }
+const expiryOptions = (t: NamespaceTranslator<"deploySettings">) => [
+    { value: "never", label: t("members.expiry.never") },
+    { value: "7", label: t("members.expiry.days", { count: 7 }) },
+    { value: "30", label: t("members.expiry.days", { count: 30 }) },
+    { value: "90", label: t("members.expiry.days", { count: 90 }) },
+    { value: "365", label: t("members.expiry.year") }
 ];
 
 const PRINCIPAL_ICONS: Record<ProjectPrincipalKind, typeof Users> = {
@@ -178,6 +183,7 @@ function expiresAt(choice: string, existing: string | null): string | null {
 }
 
 export function MembersSection({ projectId }: { projectId: string }) {
+    const t = useTranslations("deploySettings");
     const display = useDisplayFormat();
     const [members, setMembers] = useState<ProjectMemberView[] | null>(null);
     const [environments, setEnvironments] = useState<Environment[]>([]);
@@ -267,15 +273,15 @@ export function MembersSection({ projectId }: { projectId: string }) {
         if (entry.isOwner) return parts.join(" - ");
         parts.push(
             entry.role === "custom"
-                ? `${entry.capabilities.length} permissions`
+                ? t("members.permissions", { count: entry.capabilities.length })
                 : PROJECT_ROLE_LABELS[entry.role]
         );
         if (entry.environmentIds) {
-            const names = entry.environmentIds.map((id) => byId.get(id) ?? "removed environment");
-            parts.push(names.length > 0 ? names.join(", ") : "no environment");
+            const names = entry.environmentIds.map((id) => byId.get(id) ?? t("members.removedEnvironment"));
+            parts.push(names.length > 0 ? names.join(", ") : t("members.noEnvironment"));
         }
         if (entry.expiresAt) {
-            parts.push(entry.expired ? "expired" : `until ${display.date(entry.expiresAt)}`);
+            parts.push(entry.expired ? t("members.expiredLower") : t("members.until", { date: display.date(entry.expiresAt) }));
         }
         return parts.join(" - ");
     }
@@ -283,8 +289,8 @@ export function MembersSection({ projectId }: { projectId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard
-                title="Access"
-                description="Everyone here reaches this project through the same paths its owner does, limited to what their entry allows."
+                title={t("members.title")}
+                description={t("members.description")}
             >
                 {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -307,12 +313,12 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                                 {entry.name}
                                                 {entry.isOwner && (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-muted-foreground">
-                                                        <Crown className="size-3" /> Owner
+                                                        <Crown className="size-3" /> {t("members.owner")}
                                                     </span>
                                                 )}
                                                 {entry.expired && (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-warning">
-                                                        <Clock className="size-3" /> Expired
+                                                        <Clock className="size-3" /> {t("members.expired")}
                                                     </span>
                                                 )}
                                             </p>
@@ -326,8 +332,8 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                aria-label={`Change what ${entry.name} may do`}
-                                                title="Edit"
+                                                aria-label={t("members.changeNamed", { name: entry.name })}
+                                                title={t("members.edit")}
                                                 onClick={() => {
                                                     setFormError(null);
                                                     setDraft(draftFrom(entry));
@@ -340,7 +346,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                                 size="sm"
                                                 onClick={() => setRemoving(entry)}
                                             >
-                                                Remove
+                                                {t("members.remove")}
                                             </Button>
                                         </div>
                                     )}
@@ -360,7 +366,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                             }}
                         >
                             <UserPlus className="size-4" />
-                            Give access
+                            {t("members.give")}
                         </Button>
                     </div>
                 )}
@@ -400,9 +406,9 @@ export function MembersSection({ projectId }: { projectId: string }) {
                 open={removing !== null}
                 onOpenChange={(open) => !open && setRemoving(null)}
                 name={removing?.name ?? ""}
-                kind="entry"
-                confirmLabel="Remove access"
-                description="They lose access to this project. Nothing they deployed is affected."
+                kind={t("members.entryKind")}
+                confirmLabel={t("members.removeAccess")}
+                description={t("members.removeDescription")}
                 pending={pending}
                 onConfirm={remove}
             />
@@ -440,6 +446,7 @@ function AccessDialog({
     onClose: () => void;
     onSave: () => void;
 }) {
+    const t = useTranslations("deploySettings");
     const patch = (values: Partial<Draft>): void => onChange({ ...draft, ...values });
 
     /** Picking a role fills the checkboxes in, so switching to Custom starts from
@@ -484,11 +491,11 @@ function AccessDialog({
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
-                <DialogTitle>{draft.entryId ? "Change access" : "Give access"}</DialogTitle>
+                <DialogTitle>{draft.entryId ? t("members.change") : t("members.give")}</DialogTitle>
                 <div className="flex flex-col gap-4 pt-2">
                     {!draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">For</span>
+                            <span className="text-xs font-medium text-muted-foreground">{t("members.for")}</span>
                             <Select
                                 value={draft.principal}
                                 onValueChange={(value) =>
@@ -499,7 +506,7 @@ function AccessDialog({
                                     })
                                 }
                                 options={PRINCIPAL_OPTIONS}
-                                aria-label="Who this is for"
+                                aria-label={t("members.forLabel")}
                             />
                         </label>
                     )}
@@ -507,34 +514,34 @@ function AccessDialog({
                     {draft.principal === "user" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">
-                                Email or username
+                                {t("members.identifier")}
                             </span>
                             <Input
                                 value={draft.identifier}
                                 onChange={(event) => patch({ identifier: event.target.value })}
+                                // i18n-ignore: an example address
                                 placeholder="someone@example.com"
                                 autoComplete="off"
                             />
                             <span className="text-xs text-muted-foreground">
-                                They need an account on this Polaris already.
+                                {t("members.needsAccount")}
                             </span>
                         </label>
                     )}
 
                     {draft.principal === "team" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">Team</span>
+                            <span className="text-xs font-medium text-muted-foreground">{t("members.team")}</span>
                             {teamOptions.length > 0 ? (
                                 <Select
                                     value={draft.principalId}
                                     onValueChange={(value) => patch({ principalId: value })}
                                     options={teamOptions}
-                                    aria-label="Team"
+                                    aria-label={t("members.team")}
                                 />
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    You are not on a team yet. Teams live inside an organization,
-                                    under Account.
+                                    {t("members.noTeam")}
                                 </span>
                             )}
                         </label>
@@ -543,18 +550,18 @@ function AccessDialog({
                     {draft.principal === "org" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">
-                                Organization
+                                {t("members.organization")}
                             </span>
                             {orgOptions.length > 0 ? (
                                 <Select
                                     value={draft.principalId}
                                     onValueChange={(value) => patch({ principalId: value })}
                                     options={orgOptions}
-                                    aria-label="Organization"
+                                    aria-label={t("members.organization")}
                                 />
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    You are not in an organization yet.
+                                    {t("members.noOrganization")}
                                 </span>
                             )}
                         </label>
@@ -562,18 +569,17 @@ function AccessDialog({
 
                     {draft.principal === "everyone" && !draft.entryId && (
                         <p className="text-xs text-muted-foreground">
-                            Everyone with an account on this Polaris, whether or not they were added
-                            here.
+                            {t("members.everyone")}
                         </p>
                     )}
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">They may</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("members.theyMay")}</span>
                         <Select
                             value={draft.role}
                             onValueChange={pickRole}
-                            options={roleOptions(grantable)}
-                            aria-label="What they may do"
+                            options={roleOptions(grantable, t)}
+                            aria-label={t("members.whatTheyMay")}
                         />
                     </label>
 
@@ -622,7 +628,7 @@ function AccessDialog({
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                            Environments
+                            {t("members.environments")}
                         </span>
                         {everyEnvironment && (
                             <label className="flex items-center gap-2 text-xs">
@@ -636,7 +642,7 @@ function AccessDialog({
                                         })
                                     }
                                 />
-                                Every environment
+                                {t("members.everyEnvironment")}
                             </label>
                         )}
                         {(!everyEnvironment || draft.environmentIds.length > 0) &&
@@ -657,19 +663,19 @@ function AccessDialog({
                     </div>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Expires</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("members.expires")}</span>
                         <Select
                             value={draft.expiry}
                             onValueChange={(value) => patch({ expiry: value })}
                             options={
                                 draft.expiry === "keep"
                                     ? [
-                                          { value: "keep", label: "Keep the current date" },
-                                          ...EXPIRY_OPTIONS
+                                          { value: "keep", label: t("members.keepDate") },
+                                          ...expiryOptions(t)
                                       ]
-                                    : EXPIRY_OPTIONS
+                                    : expiryOptions(t)
                             }
-                            aria-label="When this access ends"
+                            aria-label={t("members.whenEnds")}
                         />
                     </label>
 
@@ -677,11 +683,11 @@ function AccessDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {t("members.cancel")}
                         </Button>
                         <Button onClick={onSave} disabled={pending || !ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            {draft.entryId ? "Save" : "Give access"}
+                            {draft.entryId ? t("members.save") : t("members.give")}
                         </Button>
                     </div>
                 </div>

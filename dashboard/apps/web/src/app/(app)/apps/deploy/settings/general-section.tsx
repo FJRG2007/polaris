@@ -14,22 +14,24 @@ import { useState, useTransition } from "react";
 import { SettingsCard } from "../project-settings";
 import { Button, Input, Select } from "@polaris/ui";
 import { Check, Copy, Download, Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 import { PROJECT_VISIBILITIES, type ProjectVisibility } from "@polaris/core";
 import { exportProjectTemplateAction, setProjectVisibilityAction, updateProjectGeneralAction } from "../project-actions";
 
-const VISIBILITY_LABELS: Record<ProjectVisibility, string> = {
-    private: "Private",
-    internal: "Internal"
-};
+const VISIBILITY_LABELS = {
+    private: "general.visibility.private",
+    internal: "general.visibility.internal"
+} as const satisfies Record<ProjectVisibility, string>;
 
-const VISIBILITY_HINTS: Record<ProjectVisibility, string> = {
-    private: "Only the owner and the people added to this project can see it.",
-    internal: "Anyone signed in to this Polaris who can read Deploy can see it. Still nobody from the internet."
-};
+const VISIBILITY_HINTS = {
+    private: "general.visibility.privateHint",
+    internal: "general.visibility.internalHint"
+} as const satisfies Record<ProjectVisibility, string>;
 
 export function GeneralSection({ settings, canManage }: { settings: ProjectSettingsView; canManage: boolean }) {
     const router = useRouter();
+    const t = useTranslations("deploySettings");
     const [name, setName] = useState(settings.name);
     const [description, setDescription] = useState(settings.description);
     const [visibility, setVisibility] = useState<ProjectVisibility>(settings.visibility);
@@ -80,28 +82,29 @@ export function GeneralSection({ settings, canManage }: { settings: ProjectSetti
 
     return (
         <div className="flex flex-col gap-4">
-            <SettingsCard title="Project info" description="The name is what containers and free subdomains are derived from.">
+            <SettingsCard title={t("general.info")} description={t("general.infoHint")}>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Name</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("general.name")}</span>
                         <Input
                             value={name}
                             disabled={!canManage}
                             onChange={(event) => setName(event.target.value)}
+                            // i18n-ignore: an example project name
                             placeholder="my-project"
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Description</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("general.description")}</span>
                         <Input
                             value={description}
                             disabled={!canManage}
                             onChange={(event) => setDescription(event.target.value)}
-                            placeholder="What this project is for"
+                            placeholder={t("general.descriptionPlaceholder")}
                         />
                     </label>
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Project ID</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("general.projectId")}</span>
                         <div className="flex items-center gap-2">
                             <code className="min-w-0 flex-1 truncate rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 font-mono text-xs">
                                 {settings.id}
@@ -110,8 +113,8 @@ export function GeneralSection({ settings, canManage }: { settings: ProjectSetti
                                 variant="ghost"
                                 size="icon"
                                 onClick={copyId}
-                                aria-label="Copy project ID"
-                                title="Copy project ID"
+                                aria-label={t("general.copyId")}
+                                title={t("general.copyId")}
                             >
                                 {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
                             </Button>
@@ -121,21 +124,21 @@ export function GeneralSection({ settings, canManage }: { settings: ProjectSetti
                     {canManage && (
                         <div className="flex justify-end">
                             <Button onClick={save} disabled={pending || !dirty || !name.trim()}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} Update
+                                {pending && <Loader2 className="size-4 animate-spin" />} {t("general.update")}
                             </Button>
                         </div>
                     )}
                 </div>
             </SettingsCard>
 
-            <SettingsCard title="Visibility" description={VISIBILITY_HINTS[visibility]}>
+            <SettingsCard title={t("general.visibility.title")} description={t(VISIBILITY_HINTS[visibility])}>
                 <Select
                     value={visibility}
                     disabled={!canManage}
                     onValueChange={(value) => changeVisibility(value as ProjectVisibility)}
-                    options={PROJECT_VISIBILITIES.map((value) => ({ value, label: VISIBILITY_LABELS[value] }))}
+                    options={PROJECT_VISIBILITIES.map((value) => ({ value, label: t(VISIBILITY_LABELS[value]) }))}
                     className="max-w-xs"
-                    aria-label="Visibility"
+                    aria-label={t("general.visibility.title")}
                 />
             </SettingsCard>
 
@@ -153,6 +156,7 @@ function TemplateCard({
     projectName: string;
     canManage: boolean;
 }) {
+    const t = useTranslations("deploySettings");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -161,7 +165,7 @@ function TemplateCard({
         startTransition(async () => {
             const result = await exportProjectTemplateAction(projectId);
             if (result.error || !result.template) {
-                setError(result.error ?? "Could not build the template");
+                setError(result.error ?? t("general.template.failed"));
                 return;
             }
             const blob = new Blob([result.template], { type: "application/json" });
@@ -176,17 +180,15 @@ function TemplateCard({
 
     return (
         <SettingsCard
-            title="Template"
-            description="The project written out as a portable description of itself: environments, services, volumes, and the names of the variables each one needs."
+            title={t("general.template.title")}
+            description={t("general.template.description")}
         >
-            <p className="text-xs text-muted-foreground">
-                Variable values are left out on purpose, so the file is safe to hand to somebody else.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("general.template.safe")}</p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button variant="secondary" onClick={download} disabled={pending || !canManage}>
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                    Export template
+                    {t("general.template.export")}
                 </Button>
             </div>
         </SettingsCard>

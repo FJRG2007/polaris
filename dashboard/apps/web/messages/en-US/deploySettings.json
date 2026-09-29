@@ -1,1 +1,276 @@
-{}
+{
+    "members": {
+        "custom": "Custom",
+        "expiry": {
+            "never": "No expiry",
+            "days": "{count} days",
+            "year": "1 year"
+        },
+        "permissions": "{count, plural, one {# permissions} other {# permissions}}",
+        "removedEnvironment": "removed environment",
+        "noEnvironment": "no environment",
+        "expiredLower": "expired",
+        "until": "until {date}",
+        "title": "Access",
+        "description": "Everyone here reaches this project through the same paths its owner does, limited to what their entry allows.",
+        "owner": "Owner",
+        "expired": "Expired",
+        "changeNamed": "Change what {name} may do",
+        "edit": "Edit",
+        "remove": "Remove",
+        "give": "Give access",
+        "entryKind": "entry",
+        "removeAccess": "Remove access",
+        "removeDescription": "They lose access to this project. Nothing they deployed is affected.",
+        "change": "Change access",
+        "for": "For",
+        "forLabel": "Who this is for",
+        "identifier": "Email or username",
+        "needsAccount": "They need an account on this Polaris already.",
+        "team": "Team",
+        "noTeam": "You are not on a team yet. Teams live inside an organization, under Account.",
+        "organization": "Organization",
+        "noOrganization": "You are not in an organization yet.",
+        "everyone": "Everyone with an account on this Polaris, whether or not they were added here.",
+        "theyMay": "They may",
+        "whatTheyMay": "What they may do",
+        "environments": "Environments",
+        "everyEnvironment": "Every environment",
+        "expires": "Expires",
+        "keepDate": "Keep the current date",
+        "whenEnds": "When this access ends",
+        "cancel": "Cancel",
+        "save": "Save"
+    },
+    "tokens": {
+        "lifetimes": {
+            "days30": "30 days",
+            "days90": "90 days",
+            "year": "1 year",
+            "never": "Never expires"
+        },
+        "revoked": "Revoked",
+        "expired": "Expired",
+        "active": "Active",
+        "title": "Project tokens",
+        "description": "Present one as `Authorization: Bearer ...`. It acts on this project only, with the access of whoever made it.",
+        "empty": "No tokens for this project.",
+        "canChange": " - can change",
+        "readOnly": " - read only",
+        "madeBy": " - made by {name}",
+        "expires": " - expires {date}",
+        "lastUsed": " - last used {date}",
+        "neverUsed": " - never used",
+        "revoke": "Revoke",
+        "deleteNamed": "Delete {name}",
+        "delete": "Delete",
+        "new": "New token",
+        "kind": "token",
+        "deleteDescription": "Anything using it stops working immediately, and the record of what it did goes with it. Revoke instead if you want to keep the trail.",
+        "createFailed": "Could not create the token",
+        "createTitle": "New project token",
+        "createDescription": "Shown once when it is created, and never again.",
+        "name": "Name",
+        "namePlaceholder": "CI pipeline",
+        "expiresLabel": "Expires",
+        "allowChanges": "Allow changes",
+        "allowChangesHint": "Without this the token can read the project but not deploy, edit, or delete anything in it. Either way it can only do what you can.",
+        "cancel": "Cancel",
+        "create": "Create token",
+        "issuedTitle": "Copy your token",
+        "issuedDescription": "This is the only time it is shown. Polaris stores a hash, so it cannot be recovered later.",
+        "copyToken": "Copy token",
+        "copy": "Copy",
+        "done": "Done"
+    },
+    "usage": {
+        "loadFailed": "Could not load the usage",
+        "totals": "Totals",
+        "totalsHint": "Summed across every service that reported a sample in the last half hour.",
+        "services": "Services",
+        "running": "{count} running",
+        "cpu": "CPU",
+        "cpuHint": "Across reporting services",
+        "memory": "Memory",
+        "resident": "Resident",
+        "volumes": "Volumes",
+        "attached": "{count} attached",
+        "sampled": "Sampled {time}",
+        "noSamples": "No samples yet. The collector writes one every few minutes.",
+        "refresh": "Refresh",
+        "stale": "Showing the last figures. {reason}",
+        "byService": "By service",
+        "byServiceHint": "A service with no figures is not reporting - usually because it is not running.",
+        "service": "Service",
+        "environment": "Environment",
+        "isRunning": "Running",
+        "notRunning": "Not running",
+        "empty": "No services in this project yet.",
+        "monthFailed": "Could not work out this month's usage",
+        "monthSoFar": "{month} so far",
+        "thisMonthSoFar": "This month so far",
+        "monthNoPrices": "Usage since the first of the month. No prices are set on this Polaris, so there is no cost.",
+        "monthWithPrices": "Usage since the first of the month, and its cost at this Polaris's prices."
+    },
+    "environments": {
+        "title": "Environments",
+        "description": "Each holds its own services and its own shared variables. The default is where a link that names no environment lands.",
+        "saveName": "Save name",
+        "save": "Save",
+        "cancelRename": "Cancel rename",
+        "cancel": "Cancel",
+        "default": "Default",
+        "openPullRequest": "Open the pull request this previews",
+        "previewOf": "Preview of #{number}",
+        "services": "{count, plural, one {# service} other {# services}}",
+        "follows": " - follows <mono>{branch}</mono>",
+        "created": " - created {date}",
+        "renameNamed": "Rename {name}",
+        "rename": "Rename",
+        "makeDefaultNamed": "Make {name} the default",
+        "alreadyDefault": "Already the default",
+        "makeDefault": "Make default",
+        "deleteNamed": "Delete {name}",
+        "promoteFirst": "Promote another environment first",
+        "delete": "Delete environment",
+        "new": "New environment",
+        "kind": "environment",
+        "deleteWithServices": "Every service in it goes too - {count} of them, with their containers, domains and variables.",
+        "deleteEmpty": "The environment and its variables are removed."
+    },
+    "sections": {
+        "title": "Project settings",
+        "general": {
+            "label": "General",
+            "hint": "Name, description, and who can see it"
+        },
+        "usage": {
+            "label": "Usage",
+            "hint": "What the project is consuming"
+        },
+        "environments": {
+            "label": "Environments",
+            "hint": "Rename, set the default, remove"
+        },
+        "variables": {
+            "label": "Shared variables",
+            "hint": "Values every service in an environment gets"
+        },
+        "webhooks": {
+            "label": "Webhooks",
+            "hint": "Where this project reports its deploys"
+        },
+        "flags": {
+            "label": "Feature flags",
+            "hint": "How this project behaves"
+        },
+        "members": {
+            "label": "Access",
+            "hint": "Who can reach the project, and to do what"
+        },
+        "tokens": {
+            "label": "Tokens",
+            "hint": "API access scoped to this project"
+        },
+        "integrations": {
+            "label": "Integrations",
+            "hint": "What this project is connected to"
+        },
+        "danger": {
+            "label": "Danger",
+            "hint": "Irreversible things"
+        }
+    },
+    "general": {
+        "visibility": {
+            "title": "Visibility",
+            "private": "Private",
+            "internal": "Internal",
+            "privateHint": "Only the owner and the people added to this project can see it.",
+            "internalHint": "Anyone signed in to this Polaris who can read Deploy can see it. Still nobody from the internet."
+        },
+        "info": "Project info",
+        "infoHint": "The name is what containers and free subdomains are derived from.",
+        "name": "Name",
+        "description": "Description",
+        "descriptionPlaceholder": "What this project is for",
+        "projectId": "Project ID",
+        "copyId": "Copy project ID",
+        "update": "Update",
+        "template": {
+            "failed": "Could not build the template",
+            "title": "Template",
+            "description": "The project written out as a portable description of itself: environments, services, volumes, and the names of the variables each one needs.",
+            "safe": "Variable values are left out on purpose, so the file is safe to hand to somebody else.",
+            "export": "Export template"
+        }
+    },
+    "networking": {
+        "modes": {
+            "shared": "Shared network",
+            "environment": "Own network",
+            "links": "Canvas links only"
+        },
+        "hints": {
+            "shared": "Every service joins the network all deployments share, so services in other projects can reach these by name.",
+            "environment": "Services in this environment reach each other by name. Nothing outside it can.",
+            "links": "A service reaches only the services it is linked to on the canvas, and a database is reached only through a link."
+        },
+        "title": "Private networking",
+        "description": "Which services can reach each other by name. Domains and published ports are not affected.",
+        "deployingSome": "Deploying {count}. Not started: {failed}",
+        "deploying": "Deploying {count, plural, one {# service} other {# services}} onto the new setting.",
+        "saved": "Saved. Each service moves over on its next deploy.",
+        "modeLabel": "How services in {name} connect",
+        "noLinks": "This environment's canvas has no links yet, so no service would reach another. Link them on the canvas first.",
+        "needsUpdate": "Services on this server stay on the shared network until Polaris is updated from Settings. Services on your other servers get their own network now.",
+        "leavesShared": "Anything that reaches these services by name from another project stops reaching them.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saveDeploy": "Save and deploy"
+    },
+    "sharedVariables": {
+        "title": "Shared variables",
+        "emptyHint": "Values every service in an environment receives.",
+        "noEnvironments": "This project has no environments yet.",
+        "description": "Set once per environment and delivered to every service in it. A service's own variable of the same name wins.",
+        "environment": "Environment",
+        "redeployTarget": "every deployed service in {name}",
+        "thisEnvironment": "this environment"
+    },
+    "danger": {
+        "title": "Delete this project",
+        "description": "Every environment, service, volume record, variable and deploy log in it goes, and whatever it is running is stopped and removed from its server. There is no undo and no export afterwards.",
+        "counts": "{environments, plural, one {# environment} other {# environments}} - {services, plural, one {# service} other {# services}}",
+        "delete": "Delete project",
+        "ownerOnly": "Only {owner}, who owns this project, can delete it.",
+        "singleService": "Removing a single service is done from the service itself, and is staged so it can be reviewed before it takes effect.",
+        "kind": "project",
+        "confirmDescription": "This is immediate. Unlike removing a service, it is not staged and there is nothing to review afterwards."
+    },
+    "flags": {
+        "title": "Feature flags",
+        "description": "These apply to this project only. Changing one affects what happens next, not what already happened.",
+        "save": "Save flags"
+    },
+    "webhooks": {
+        "title": "Webhooks",
+        "description": "Endpoints that receive this project's deploy events. They belong to the project, so they keep reporting after whoever added them is gone.",
+        "everywhere": "Every endpoint across every project is listed together in <link>Watch</link>."
+    },
+    "integrations": {
+        "title": "Integrations",
+        "loadingHint": "What this project can reach.",
+        "description": "What this project can reach. GitHub is whichever accounts you have connected; the rest are set once for the whole instance.",
+        "connected": "Connected",
+        "githubConnected": "{login} - {count, plural, one {# repository} other {# repositories}} available",
+        "githubHint": "Deploy from a private repository, and redeploy when a commit lands.",
+        "dnsReady": " - DNS ready",
+        "dnsNotReady": " - DNS not ready",
+        "cloudflareHint": "Give a service a stable public hostname through a tunnel, with DNS handled for you.",
+        "registries": "Container registries",
+        "registriesHint": "Sign in to a registry so this project can pull private images.",
+        "manage": "Manage",
+        "connect": "Connect"
+    }
+}

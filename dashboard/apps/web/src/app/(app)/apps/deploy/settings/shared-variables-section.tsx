@@ -14,6 +14,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button, Select } from "@polaris/ui";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { VariablesEditor } from "../variables-editor";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "../new-environment-dialog";
@@ -25,6 +26,8 @@ export function SharedVariablesSection({
     settings: ProjectSettingsView;
     canManage: boolean;
 }) {
+    const t = useTranslations("deploySettings");
+    const td = useTranslations("deploy");
     const first = settings.environments.find((environment) => environment.isDefault) ?? settings.environments[0];
     const [environmentId, setEnvironmentId] = useState(first?.id ?? "");
     const [creating, setCreating] = useState(false);
@@ -39,12 +42,12 @@ export function SharedVariablesSection({
     if (!first) {
         return (
             <>
-                <SettingsCard title="Shared variables" description="Values every service in an environment receives.">
-                    <p className="text-sm text-muted-foreground">This project has no environments yet.</p>
+                <SettingsCard title={t("sharedVariables.title")} description={t("sharedVariables.emptyHint")}>
+                    <p className="text-sm text-muted-foreground">{t("sharedVariables.noEnvironments")}</p>
                     {canManage && (
                         <div>
                             <Button variant="ghost" onClick={() => setCreating(true)}>
-                                <Plus className="size-4" /> New environment
+                                <Plus className="size-4" /> {td("newEnvironment.option")}
                             </Button>
                         </div>
                     )}
@@ -62,18 +65,18 @@ export function SharedVariablesSection({
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard
-                title="Shared variables"
-                description="Set once per environment and delivered to every service in it. A service's own variable of the same name wins."
+                title={t("sharedVariables.title")}
+                description={t("sharedVariables.description")}
             >
                 <Select
                     value={environmentId}
                     onValueChange={selectEnvironment}
                     options={[
                         ...settings.environments.map((one) => ({ value: one.id, label: one.name })),
-                        ...newEnvironmentOption(canManage)
+                        ...newEnvironmentOption(canManage, td("newEnvironment.option"))
                     ]}
                     className="max-w-xs"
-                    aria-label="Environment"
+                    aria-label={t("sharedVariables.environment")}
                 />
                 {environmentId && (
                     <VariablesEditor
@@ -81,7 +84,7 @@ export function SharedVariablesSection({
                         scopeId={environmentId}
                         canWrite={canManage}
                         canDeploy={canManage}
-                        redeployTarget={`every deployed service in ${environment?.name ?? "this environment"}`}
+                        redeployTarget={t("sharedVariables.redeployTarget", { name: environment?.name ?? t("sharedVariables.thisEnvironment") })}
                     />
                 )}
             </SettingsCard>

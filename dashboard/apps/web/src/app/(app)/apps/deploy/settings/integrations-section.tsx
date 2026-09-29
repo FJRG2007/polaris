@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useCallback } from "react";
 import { SettingsCard } from "../project-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLiveRead } from "@/components/use-live-resource";
 import { CheckCircle2, CircleDashed, ExternalLink, Loader2 } from "lucide-react";
 import { CloudflareMark, DockerMark, GitHubMark } from "@/components/brand-icons";
@@ -29,6 +30,7 @@ interface IntegrationState {
 }
 
 export function IntegrationsSection({ projectId }: { projectId: string }) {
+    const t = useTranslations("deploySettings");
     // Instance-wide state with nothing secret in it - whether each is connected,
     // the account names and the registry logins - so the last answer paints at
     // once and the fresh one replaces only what moved.
@@ -67,7 +69,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
 
     if (!state) {
         return (
-            <SettingsCard title="Integrations" description="What this project can reach.">
+            <SettingsCard title={t("integrations.title")} description={t("integrations.loadingHint")}>
                 <div className="flex justify-center py-6 text-muted-foreground">
                     <Loader2 className="size-5 animate-spin" />
                 </div>
@@ -78,18 +80,22 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <SettingsCard
-                title="Integrations"
-                description="What this project can reach. GitHub is whichever accounts you have connected; the rest are set once for the whole instance."
+                title={t("integrations.title")}
+                description={t("integrations.description")}
             >
                 <div className="flex flex-col gap-2">
                     <IntegrationRow
                         icon={<GitHubMark className="size-5" />}
+                        // i18n-ignore: a brand name
                         name="GitHub"
                         connected={state.github.connected}
                         detail={
                             state.github.connected
-                                ? `${state.github.login ?? "Connected"} - ${state.github.repos} ${state.github.repos === 1 ? "repository" : "repositories"} available`
-                                : "Deploy from a private repository, and redeploy when a commit lands."
+                                ? t("integrations.githubConnected", {
+                                      login: state.github.login ?? t("integrations.connected"),
+                                      count: state.github.repos
+                                  })
+                                : t("integrations.githubHint")
                         }
                         // GitHub is the one here that is not instance-wide: it is
                         // whichever accounts the reader has connected themselves.
@@ -97,25 +103,27 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                     />
                     <IntegrationRow
                         icon={<CloudflareMark className="size-5" />}
+                        // i18n-ignore: a brand name
                         name="Cloudflare"
                         connected={state.cloudflare.connected}
                         detail={
                             state.cloudflare.connected
-                                ? `${state.cloudflare.account ?? "Connected"}${state.cloudflare.dnsReady ? " - DNS ready" : " - DNS not ready"}`
-                                : "Give a service a stable public hostname through a tunnel, with DNS handled for you."
+                                ? (state.cloudflare.account ?? t("integrations.connected")) +
+                                  (state.cloudflare.dnsReady ? t("integrations.dnsReady") : t("integrations.dnsNotReady"))
+                                : t("integrations.cloudflareHint")
                         }
                         href="/admin/integrations"
                     />
                     <IntegrationRow
                         icon={<DockerMark className="size-5" />}
-                        name="Container registries"
+                        name={t("integrations.registries")}
                         connected={state.registries.length > 0}
                         detail={
                             state.registries.length > 0
                                 ? state.registries
                                       .map((entry) => `${entry.registry} (${entry.username})`)
                                       .join(", ")
-                                : "Sign in to a registry so this project can pull private images."
+                                : t("integrations.registriesHint")
                         }
                         href="/apps/deploy"
                     />
@@ -138,6 +146,7 @@ function IntegrationRow({
     connected: boolean;
     href: string;
 }) {
+    const t = useTranslations("deploySettings");
     return (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 p-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -160,7 +169,7 @@ function IntegrationRow({
                 href={href}
                 className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-muted"
             >
-                {connected ? "Manage" : "Connect"} <ExternalLink className="size-3" />
+                {connected ? t("integrations.manage") : t("integrations.connect")} <ExternalLink className="size-3" />
             </Link>
         </div>
     );

@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
@@ -58,14 +59,14 @@ interface ProviderAccount {
     label: string;
 }
 
-const STATUS_WORDS: Readonly<Record<string, string>> = {
-    queued: "Queued",
-    building: "Building",
-    live: "Live",
-    failed: "Failed",
-    cancelled: "Stopped",
-    unknown: "Not known"
-};
+const STATUS_WORDS = {
+    queued: "elsewhere.status.queued",
+    building: "elsewhere.status.building",
+    live: "elsewhere.status.live",
+    failed: "elsewhere.status.failed",
+    cancelled: "elsewhere.status.cancelled",
+    unknown: "elsewhere.status.unknown"
+} as const;
 
 const STATUS_TONES: Readonly<Record<string, string>> = {
     queued: "border-border bg-muted text-muted-foreground",
@@ -100,6 +101,7 @@ export function ElsewhereView({
     canRemove: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploy");
     const format = useDisplayFormat();
     const [services, setServices] = useState(initial);
     const [adding, setAdding] = useState(false);
@@ -168,18 +170,13 @@ export function ElsewhereView({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Elsewhere</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Services in this project that Vercel or Railway builds and serves. Polaris
-                        watches them and can release them again - and a service can be moved either
-                        way: one of these onto a Polaris server, or one of your own services out to
-                        a provider, from its own Settings.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("elsewhere.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("elsewhere.intro")}</p>
                 </div>
                 {canAdd && accounts.length > 0 && (
                     <Button size="sm" onClick={() => setAdding(true)}>
                         <Plus className="size-4 shrink-0" />
-                        Add a service
+                        {t("elsewhere.add")}
                     </Button>
                 )}
             </div>
@@ -192,23 +189,23 @@ export function ElsewhereView({
 
             {accounts.length === 0 ? (
                 <EmptyState
-                    title="No account to watch one through."
-                    description="Connect Vercel or Railway under Connected accounts, then add the projects you run there to this one."
+                    title={t("elsewhere.noAccount")}
+                    description={t("elsewhere.noAccountHint")}
                     action={
                         <Button size="sm" asChild>
-                            <Link href="/account/connections">Connected accounts</Link>
+                            <Link href="/account/connections">{t("elsewhere.connectedAccounts")}</Link>
                         </Button>
                     }
                 />
             ) : services.length === 0 ? (
                 <EmptyState
-                    title="Nothing here yet."
-                    description="A repository is often on a Polaris server for staging and on Vercel or Railway for production. Add the half that runs there and both are on one board."
+                    title={t("elsewhere.empty")}
+                    description={t("elsewhere.emptyHint")}
                     action={
                         canAdd ? (
                             <Button size="sm" onClick={() => setAdding(true)}>
                                 <Plus className="size-4 shrink-0" />
-                                Add a service
+                                {t("elsewhere.add")}
                             </Button>
                         ) : undefined
                     }
@@ -238,7 +235,7 @@ export function ElsewhereView({
                                         {service.status === "building" && (
                                             <Loader2 className="size-3 shrink-0 animate-spin" />
                                         )}
-                                        {STATUS_WORDS[service.status] ?? STATUS_WORDS.unknown}
+                                        {t(STATUS_WORDS[service.status as keyof typeof STATUS_WORDS] ?? STATUS_WORDS.unknown)}
                                     </Badge>
                                 </span>
                                 <span
@@ -264,7 +261,7 @@ export function ElsewhereView({
                                     <Button size="sm" variant="outline" asChild>
                                         <Link href={service.url} target="_blank" rel="noreferrer">
                                             <ExternalLink className="size-4 shrink-0" />
-                                            Open
+                                            {t("elsewhere.open")}
                                         </Link>
                                     </Button>
                                 )}
@@ -272,8 +269,8 @@ export function ElsewhereView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Open ${service.name} on its provider`}
-                                        title="Open on the provider"
+                                        aria-label={t("elsewhere.openOnProvider", { name: service.name })}
+                                        title={t("elsewhere.openOnProviderTitle")}
                                         asChild
                                     >
                                         <Link href={service.inspectUrl} target="_blank" rel="noreferrer">
@@ -287,8 +284,8 @@ export function ElsewhereView({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={`Check ${service.name} again`}
-                                    title="Check again"
+                                    aria-label={t("elsewhere.checkNamed", { name: service.name })}
+                                    title={t("elsewhere.check")}
                                     onClick={() => void refresh(service.id)}
                                 >
                                     <RefreshCw className="size-4 shrink-0" />
@@ -305,15 +302,15 @@ export function ElsewhereView({
                                         ) : (
                                             <RotateCw className="size-4 shrink-0" />
                                         )}
-                                        Deploy
+                                        {t("elsewhere.deploy")}
                                     </Button>
                                 )}
                                 {canAdd && (
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Run ${service.name} on a Polaris server instead`}
-                                        title="Run it on a Polaris server"
+                                        aria-label={t("elsewhere.bringHomeNamed", { name: service.name })}
+                                        title={t("elsewhere.bringHome")}
                                         onClick={() => setBringing(service)}
                                     >
                                         <HardDriveDownload className="size-4 shrink-0" />
@@ -323,8 +320,8 @@ export function ElsewhereView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Remove ${service.name} from this board`}
-                                        title="Remove from this board"
+                                        aria-label={t("elsewhere.removeNamed", { name: service.name })}
+                                        title={t("elsewhere.removeFromBoard")}
                                         onClick={() => setRemoving(service)}
                                     >
                                         <Trash2 className="size-4 shrink-0" />
@@ -364,10 +361,10 @@ export function ElsewhereView({
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.name ?? ""}
-                kind="service"
+                kind={t("elsewhere.serviceKind")}
                 requireTyping={false}
-                description="It stays exactly where it is and keeps running. This only takes it off this board."
-                confirmLabel="Remove"
+                description={t("elsewhere.removeDescription")}
+                confirmLabel={t("elsewhere.remove")}
                 onConfirm={remove}
             />
         </div>
@@ -395,6 +392,7 @@ function AddDialog({
     onClose: () => void;
     onAdded: (service: ExternalServiceView) => void;
 }) {
+    const t = useTranslations("deploy");
     const [account, setAccount] = useState(accounts[0]?.id ?? "");
     const [environment, setEnvironment] = useState(environments[0]?.id ?? "");
     const [choices, setChoices] = useState<ProviderChoice[] | null>(null);
@@ -438,7 +436,7 @@ function AddDialog({
 
         if (!picked?.externalId) {
             setSaving(false);
-            setError("Pick the service itself, not the project it is in.");
+            setError(t("elsewhere.pickService"));
             return;
         }
 
@@ -468,16 +466,13 @@ function AddDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Add a service running elsewhere</DialogTitle>
-                    <DialogDescription>
-                        Polaris does not build or serve it. It shows what the provider last
-                        released, and can ask them to release it again.
-                    </DialogDescription>
+                    <DialogTitle>{t("elsewhere.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("elsewhere.addDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">Account</span>
+                        <span className="text-xs text-muted-foreground">{t("move.out.account")}</span>
                         <Select
                             value={account}
                             onValueChange={setAccount}
@@ -485,20 +480,19 @@ function AddDialog({
                                 value: entry.id,
                                 label: `${entry.label} (${entry.provider})`
                             }))}
-                            aria-label="Account"
+                            aria-label={t("move.out.account")}
                         />
                     </label>
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            Project there<span className="text-danger"> *</span>
+                            {t("move.out.projectThere")}<span className="text-danger"> *</span>
                         </span>
                         {choices === null ? (
                             <Skeleton className="h-8 w-full" />
                         ) : choices.length === 0 ? (
                             <span className="text-xs text-muted-foreground">
-                                That account has no projects Polaris can see. Check that the token
-                                covers the team they are under.
+                                {t("elsewhere.noProjects")}
                             </span>
                         ) : (
                             <Select
@@ -512,7 +506,7 @@ function AddDialog({
                                     if (picked && !name.trim()) setName(picked.name.split(" / ").at(-1) ?? "");
                                 }}
                                 options={choices.map((entry) => ({ value: entry.id, label: entry.name }))}
-                                aria-label="Project there"
+                                aria-label={t("move.out.projectThere")}
                             />
                         )}
                     </label>
@@ -520,11 +514,11 @@ function AddDialog({
                     {asksForChild && project && (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">
-                                Service<span className="text-danger"> *</span>
+                                {t("move.out.service")}<span className="text-danger"> *</span>
                             </span>
                             {children.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">
-                                    That project has no services yet.
+                                    {t("move.out.noServices")}
                                 </span>
                             ) : (
                                 <Select
@@ -534,7 +528,7 @@ function AddDialog({
                                         value: entry.id,
                                         label: entry.name
                                     }))}
-                                    aria-label="Service"
+                                    aria-label={t("move.out.service")}
                                 />
                             )}
                         </label>
@@ -543,17 +537,17 @@ function AddDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">
-                                Name here<span className="text-danger"> *</span>
+                                {t("move.home.nameHere")}<span className="text-danger"> *</span>
                             </span>
                             <Input
                                 value={name}
                                 maxLength={60}
                                 onChange={(event) => setName(event.target.value)}
-                                aria-label="Name here"
+                                aria-label={t("move.home.nameHere")}
                             />
                         </label>
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">Environment</span>
+                            <span className="text-xs text-muted-foreground">{t("move.home.environment")}</span>
                             <Select
                                 value={environment}
                                 onValueChange={setEnvironment}
@@ -561,7 +555,7 @@ function AddDialog({
                                     value: entry.id,
                                     label: entry.name
                                 }))}
-                                aria-label="Environment"
+                                aria-label={t("move.home.environment")}
                             />
                         </label>
                     </div>
@@ -575,11 +569,11 @@ function AddDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
-                        Cancel
+                        {t("move.cancel")}
                     </Button>
                     <Button onClick={() => void submit()} disabled={!ready || saving} aria-disabled={!ready || saving}>
                         {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                        {saving ? "Adding" : "Add"}
+                        {saving ? t("elsewhere.adding") : t("elsewhere.addButton")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
