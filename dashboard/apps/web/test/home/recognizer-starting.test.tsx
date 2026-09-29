@@ -17,6 +17,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomeSettingsView } from "@polaris-app/places/src/screens/settings/settings-view";
+import "@/components/app-host/client";
 
 let answering = false;
 let enabled = true;

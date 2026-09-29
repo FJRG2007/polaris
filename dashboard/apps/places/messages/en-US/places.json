@@ -828,5 +828,80 @@
         "bare": "**{who}**",
         "title": "{who} at {where}",
         "message": "{said} - [see it]({href})"
+    },
+    "devices": {
+        "kinds": {
+            "lock": "Lock",
+            "opener": "Door opener",
+            "switch": "Switch",
+            "outlet": "Socket",
+            "light": "Light",
+            "sensor": "Sensor"
+        },
+        "groups": {
+            "lock": "Doors",
+            "opener": "Doors",
+            "switch": "Switches and sockets",
+            "outlet": "Switches and sockets",
+            "light": "Lights",
+            "sensor": "Sensors"
+        },
+        "states": {
+            "locked": "Locked",
+            "unlocked": "Unlocked",
+            "unlatched": "Open",
+            "moving": "Moving",
+            "jammed": "Jammed",
+            "uncalibrated": "Not calibrated",
+            "on": "On",
+            "off": "Off",
+            "unknown": "Not answering"
+        },
+        "doors": {
+            "open": "Door open",
+            "closed": "Door closed",
+            "unknown": "Door state unknown"
+        },
+        "actions": {
+            "lock": "Lock",
+            "unlock": "Unlock",
+            "unlatch": "Open",
+            "turn-on": "On",
+            "turn-off": "Off"
+        },
+        "via": {
+            "polaris": "from Polaris",
+            "app": "from the app",
+            "keypad": "on the keypad",
+            "fob": "with a fob",
+            "button": "on the device",
+            "auto": "automatically",
+            "manual": "by hand"
+        },
+        "sentences": {
+            "lock": "Locked",
+            "unlock": "Unlocked",
+            "unlatch": "Opened",
+            "turn-on": "Turned on",
+            "turn-off": "Turned off",
+            "lock-and-go": "Locked behind whoever left",
+            "door-opened": "Door opened",
+            "door-closed": "Door closed",
+            "door-ajar": "Door left open",
+            "calibrated": "Calibrated",
+            "other": "Something happened"
+        },
+        "kindStates": {
+            "lock": {
+                "unlatched": "Latch open"
+            },
+            "opener": {
+                "locked": "Idle",
+                "unlatched": "Letting through"
+            }
+        },
+        "event": "{what}{hasActor, select, yes { by {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
+        "failedBecause": "{line} - {note}",
+        "failed": "{line} - it did not finish"
     }
 }

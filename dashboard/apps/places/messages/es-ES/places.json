@@ -828,5 +828,80 @@
         "bare": "**{who}**",
         "title": "{who} en {where}",
         "message": "{said} - [verlo]({href})"
+    },
+    "devices": {
+        "kinds": {
+            "lock": "Cerradura",
+            "opener": "Abrepuertas",
+            "switch": "Interruptor",
+            "outlet": "Enchufe",
+            "light": "Luz",
+            "sensor": "Sensor"
+        },
+        "groups": {
+            "lock": "Puertas",
+            "opener": "Puertas",
+            "switch": "Interruptores y enchufes",
+            "outlet": "Interruptores y enchufes",
+            "light": "Luces",
+            "sensor": "Sensores"
+        },
+        "states": {
+            "locked": "Cerrada",
+            "unlocked": "Abierta",
+            "unlatched": "Abierta",
+            "moving": "Girando",
+            "jammed": "Atascada",
+            "uncalibrated": "Sin calibrar",
+            "on": "Encendido",
+            "off": "Apagado",
+            "unknown": "No responde"
+        },
+        "kindStates": {
+            "lock": {
+                "unlatched": "Sin pestillo"
+            },
+            "opener": {
+                "locked": "Parado",
+                "unlatched": "Dejando pasar"
+            }
+        },
+        "doors": {
+            "open": "Puerta abierta",
+            "closed": "Puerta cerrada",
+            "unknown": "Puerta sin datos"
+        },
+        "actions": {
+            "lock": "Cerrar",
+            "unlock": "Abrir",
+            "unlatch": "Abrir",
+            "turn-on": "Encender",
+            "turn-off": "Apagar"
+        },
+        "via": {
+            "polaris": "desde Polaris",
+            "app": "desde la app",
+            "keypad": "en el teclado",
+            "fob": "con llavero",
+            "button": "en el dispositivo",
+            "auto": "automáticamente",
+            "manual": "a mano"
+        },
+        "sentences": {
+            "lock": "Cerrada",
+            "unlock": "Abierta",
+            "unlatch": "Abierta",
+            "turn-on": "Encendido",
+            "turn-off": "Apagado",
+            "lock-and-go": "Cerrada tras quien salió",
+            "door-opened": "Puerta abierta",
+            "door-closed": "Puerta cerrada",
+            "door-ajar": "Puerta sin cerrar",
+            "calibrated": "Calibrada",
+            "other": "Pasó algo"
+        },
+        "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
+        "failedBecause": "{line} - {note}",
+        "failed": "{line} - no terminó"
     }
 }

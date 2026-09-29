@@ -14,6 +14,8 @@
  */
 
 import { wallClock, zonedInstant } from "@polaris/core";
+import type { PlacesTranslator } from "./i18n";
+import { englishPlaces as en, type PlacesKey } from "../../messages";
 
 /** What a device does, which is what decides the buttons it gets. */
 export const DEVICE_KINDS = ["lock", "opener", "switch", "outlet", "light", "sensor"] as const;
@@ -21,23 +23,23 @@ export const DEVICE_KINDS = ["lock", "opener", "switch", "outlet", "light", "sen
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
 
 export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
-    lock: "Lock",
-    opener: "Door opener",
-    switch: "Switch",
-    outlet: "Socket",
-    light: "Light",
-    sensor: "Sensor"
+    lock: en("devices.kinds.lock"),
+    opener: en("devices.kinds.opener"),
+    switch: en("devices.kinds.switch"),
+    outlet: en("devices.kinds.outlet"),
+    light: en("devices.kinds.light"),
+    sensor: en("devices.kinds.sensor")
 };
 
 /** Devices of the same sort, listed together. A place has a handful of doors and
  *  can have thirty sockets, and reading them as one list is reading neither. */
 export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
-    lock: "Doors",
-    opener: "Doors",
-    switch: "Switches and sockets",
-    outlet: "Switches and sockets",
-    light: "Lights",
-    sensor: "Sensors"
+    lock: en("devices.groups.lock"),
+    opener: en("devices.groups.opener"),
+    switch: en("devices.groups.switch"),
+    outlet: en("devices.groups.outlet"),
+    light: en("devices.groups.light"),
+    sensor: en("devices.groups.sensor")
 };
 
 /** Whether a word off a device row is a kind this build knows. A device synced by
@@ -66,15 +68,15 @@ export const DEVICE_STATES = [
 export type DeviceState = (typeof DEVICE_STATES)[number];
 
 export const DEVICE_STATE_LABELS: Readonly<Record<DeviceState, string>> = {
-    locked: "Locked",
-    unlocked: "Unlocked",
-    unlatched: "Open",
-    moving: "Moving",
-    jammed: "Jammed",
-    uncalibrated: "Not calibrated",
-    on: "On",
-    off: "Off",
-    unknown: "Not answering"
+    locked: en("devices.states.locked"),
+    unlocked: en("devices.states.unlocked"),
+    unlatched: en("devices.states.unlatched"),
+    moving: en("devices.states.moving"),
+    jammed: en("devices.states.jammed"),
+    uncalibrated: en("devices.states.uncalibrated"),
+    on: en("devices.states.on"),
+    off: en("devices.states.off"),
+    unknown: en("devices.states.unknown")
 };
 
 /**
@@ -89,15 +91,29 @@ export const DEVICE_STATE_LABELS: Readonly<Record<DeviceState, string>> = {
  * and calling the first of those "Locked" was the vendor's number leaking through
  * a word.
  */
-const KIND_STATE_LABELS: Readonly<
-    Partial<Record<DeviceKind, Partial<Record<DeviceState, string>>>>
-> = {
-    lock: { unlatched: "Latch open" },
-    opener: { locked: "Idle", unlatched: "Letting through" }
-};
+export function stateLabel(kind: string, state: DeviceState, t: PlacesTranslator = en): string {
+    const own = `devices.kindStates.${deviceKind(kind)}.${state}`;
+    return t.has(own) ? t(own as PlacesKey) : t(`devices.states.${state}`);
+}
 
-export function stateLabel(kind: string, state: DeviceState): string {
-    return KIND_STATE_LABELS[deviceKind(kind)]?.[state] ?? DEVICE_STATE_LABELS[state];
+/** What a kind of device is called, in the reader's words. */
+export function kindText(kind: string, t: PlacesTranslator = en): string {
+    return t(`devices.kinds.${deviceKind(kind)}`);
+}
+
+/** The heading a kind of device is listed under, in the reader's words. */
+export function groupText(kind: string, t: PlacesTranslator = en): string {
+    return t(`devices.groups.${deviceKind(kind)}`);
+}
+
+/** What the paired door sensor says, or nothing without one. */
+export function doorText(state: DoorState, t: PlacesTranslator = en): string {
+    return state === "none" ? "" : t(`devices.doors.${state}`);
+}
+
+/** The button for an action, in the reader's words. */
+export function actionText(action: DeviceAction, t: PlacesTranslator = en): string {
+    return t(`devices.actions.${action}`);
 }
 
 /** What a device that measures rather than does last read. Text and a unit as
@@ -151,9 +167,9 @@ export const DOOR_STATES = ["open", "closed", "unknown", "none"] as const;
 export type DoorState = (typeof DOOR_STATES)[number];
 
 export const DOOR_STATE_LABELS: Readonly<Record<DoorState, string>> = {
-    open: "Door open",
-    closed: "Door closed",
-    unknown: "Door state unknown",
+    open: en("devices.doors.open"),
+    closed: en("devices.doors.closed"),
+    unknown: en("devices.doors.unknown"),
     none: ""
 };
 
@@ -163,11 +179,11 @@ export const DEVICE_ACTIONS = ["lock", "unlock", "unlatch", "turn-on", "turn-off
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
 
 export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
-    lock: "Lock",
-    unlock: "Unlock",
-    unlatch: "Open",
-    "turn-on": "On",
-    "turn-off": "Off"
+    lock: en("devices.actions.lock"),
+    unlock: en("devices.actions.unlock"),
+    unlatch: en("devices.actions.unlatch"),
+    "turn-on": en("devices.actions.turn-on"),
+    "turn-off": en("devices.actions.turn-off")
 };
 
 /** The same actions as something a sentence can be built out of. The label on a
@@ -266,13 +282,13 @@ export const DEVICE_VIA = [
 export type DeviceVia = (typeof DEVICE_VIA)[number];
 
 export const DEVICE_VIA_LABELS: Readonly<Record<DeviceVia, string>> = {
-    polaris: "from Polaris",
-    app: "from the app",
-    keypad: "on the keypad",
-    fob: "with a fob",
-    button: "on the device",
-    auto: "automatically",
-    manual: "by hand",
+    polaris: en("devices.via.polaris"),
+    app: en("devices.via.app"),
+    keypad: en("devices.via.keypad"),
+    fob: en("devices.via.fob"),
+    button: en("devices.via.button"),
+    auto: en("devices.via.auto"),
+    manual: en("devices.via.manual"),
     system: ""
 };
 
@@ -289,19 +305,6 @@ export interface DeviceEventView {
     readonly at: string;
 }
 
-const ACTION_SENTENCES: Readonly<Record<string, string>> = {
-    lock: "Locked",
-    unlock: "Unlocked",
-    unlatch: "Opened",
-    "turn-on": "Turned on",
-    "turn-off": "Turned off",
-    "lock-and-go": "Locked behind whoever left",
-    "door-opened": "Door opened",
-    "door-closed": "Door closed",
-    "door-ajar": "Door left open",
-    calibrated: "Calibrated",
-    other: "Something happened"
-};
 
 /**
  * One line for one entry in the history.
@@ -311,13 +314,27 @@ const ACTION_SENTENCES: Readonly<Record<string, string>> = {
  * three ways. A failed action says so first: the reason somebody is reading this
  * list at all is usually that a door did not do what it was told.
  */
-export function describeEvent(event: DeviceEventView): string {
-    const what = ACTION_SENTENCES[event.action] ?? ACTION_SENTENCES.other;
-    const by = event.actor ? ` by ${event.actor}` : "";
-    const how = DEVICE_VIA_LABELS[event.via as DeviceVia] ?? "";
-    const line = `${what}${by}${how ? ` ${how}` : ""}`;
+export function describeEvent(
+    event: DeviceEventView,
+    t: PlacesTranslator = en,
+    /** The failure's own words, in the reader's language where Places wrote them. */
+    note: (said: string) => string = (said) => said
+): string {
+    const sentence = `devices.sentences.${event.action}`;
+    const what = t.has(sentence) ? t(sentence as PlacesKey) : t("devices.sentences.other");
+    const via = `devices.via.${event.via}`;
+    const how = t.has(via) ? t(via as PlacesKey) : "";
+    const line = t("devices.event", {
+        what,
+        actor: event.actor,
+        hasActor: event.actor ? "yes" : "no",
+        how,
+        hasHow: how ? "yes" : "no"
+    });
     if (event.outcome === "ok") return line;
-    return event.note ? `${line} - ${event.note}` : `${line} - it did not finish`;
+    return event.note
+        ? t("devices.failedBecause", { line, note: note(event.note) })
+        : t("devices.failed", { line });
 }
 
 /** How far back the usage chart looks, in days. A month is what makes a weekly
