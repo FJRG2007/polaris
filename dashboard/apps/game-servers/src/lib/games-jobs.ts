@@ -360,6 +360,19 @@ export function gameJobTable(): readonly AppJob[] {
             run: async () => (await import("./minecraft/events/events-service")).sweepEvents()
         },
         {
+            key: "game-challenges",
+            // Every minute: a server with challenges on gets its loop back after
+            // a restart, and a day, week or month that came round gets its new
+            // draw even between two of the loop's own looks. The loop reads
+            // progress every twenty seconds in this process.
+            everyMs: Number(process.env.POLARIS_GAME_CHALLENGES_MS) || MINUTE,
+            // Leased: two passes would each close the same day and pay everybody
+            // who finished something twice.
+            leaseMs: 5 * MINUTE,
+            run: async () =>
+                (await import("./minecraft/challenges/challenges-service")).sweepChallenges()
+        },
+        {
             key: "game-xray",
             // Every minute, and all it does is start the loop that places and
             // watches the Anti X-Ray honeypots on a server that has lost it -

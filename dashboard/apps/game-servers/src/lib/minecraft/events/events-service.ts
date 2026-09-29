@@ -2560,6 +2560,8 @@ async function finish(
     /** What of a team duel's or build battle's arena and its players is still
      *  to undo once this is over. */
     let arenaLeftover: stored.ArenaLeftover | null | undefined;
+    /** What it came to for the challenges (`challenges/challenges-service.ts`). */
+    let forChallenges: { ranked: string[]; podium: string[]; rounds: Record<string, number> } | null = null;
 
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
@@ -2587,6 +2589,11 @@ async function finish(
                     ? took
                     : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
             const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
+            forChallenges = {
+                ranked: counted.filter((name) => !disqualified.has(name.toLowerCase())),
+                podium: placed.map((one) => one.name),
+                rounds: preset.kind === "trivia" ? { ...run.points } : {}
+            };
             const online = new Set(
                 commands
                     .readWhere(await server.say([commands.WHERE]))
@@ -2752,6 +2759,15 @@ async function finish(
         console.warn("polaris: recording an event failed", installedAppId, String(error))
     );
     if (loops.get(installedAppId) === loop) loops.delete(installedAppId);
+    // Events feed the challenges: taking part, the podium, trivia rounds won.
+    if (forChallenges) {
+        const result = { participants: run.participants.length, ...forChallenges };
+        void import("../challenges/challenges-service")
+            .then((challenges) => challenges.creditEventResults(installedAppId, result))
+            .catch((error: unknown) =>
+                console.warn("polaris: counting an event for challenges failed", installedAppId, String(error))
+            );
+    }
 }
 
 /**

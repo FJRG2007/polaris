@@ -277,6 +277,10 @@
         "web/src/app/u/[username]/follow-lists.tsx",
         "web/src/app/u/[username]/page.tsx",
         "web/src/app/u/[username]/profile-actions.tsx",
-        "web/src/app/u/[username]/profile-card.tsx"
+        "web/src/app/u/[username]/profile-card.tsx",
+        "game-servers/src/screens/installed/minecraft-challenges.tsx",
+        "game-servers/src/screens/installed/minecraft-challenges-parts.tsx",
+        "game-servers/src/screens/installed/challenges-actions.ts",
+        "game-servers/src/screens/installed/challenges-text.ts"
     ]
 }

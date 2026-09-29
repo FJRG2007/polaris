@@ -26,6 +26,7 @@ import { MinecraftChatLink } from "./minecraft-chat-link";
 import { MinecraftSidebar } from "./minecraft-sidebar";
 import { MinecraftXray } from "./minecraft-xray";
 import { MinecraftEvents } from "./minecraft-events";
+import { MinecraftChallenges } from "./minecraft-challenges";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
@@ -540,6 +541,14 @@ export function MinecraftPanel({
             {tab === "events" && (
                 <CardBoundary name="Events">
                     <MinecraftEvents
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.console")}
+                    />
+                </CardBoundary>
+            )}
+            {tab === "challenges" && (
+                <CardBoundary name="Challenges">
+                    <MinecraftChallenges
                         installedAppId={installedAppId}
                         canManage={held.includes("games.console")}
                     />

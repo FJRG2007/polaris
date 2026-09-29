@@ -3902,6 +3902,37 @@ model MinecraftAnticheatFlag {
     @@index([installedAppId, player, at])
 }
 
+// One player's challenges on one Minecraft server: what they were dealt today,
+// this week and on the month's card, and how far each has got. The shape is
+// the game-servers app's own (`challenges/state.ts`), kept as JSON because it
+// changes with the catalogue and is only ever read whole, one player at a time.
+model MinecraftChallengePlayer {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // Lowercased, which is what rows are found by, and as the game spells it.
+    player         String
+    playerName     String
+    data           String
+    updatedAt      DateTime @updatedAt
+
+    @@unique([installedAppId, player])
+    @@index([installedAppId, updatedAt])
+}
+
+// A player's season on the challenge pass: points, tier and streak. Scoped to
+// one server ("server:<installedAppId>"), or to a group of an owner's servers
+// that share a season ("group:<ownerId>:<name>"), where the holder is the
+// linked Polaris account ("user:<id>") rather than the name ("player:<name>").
+model MinecraftChallengeLedger {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    scope     String
+    holder    String
+    data      String
+    updatedAt DateTime @updatedAt
+
+    @@unique([scope, holder])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------
