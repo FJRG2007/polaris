@@ -578,13 +578,22 @@ function answer(sent: string): string {
     if (line.includes("sort=nearest"))
         return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
     if (line.startsWith("give ")) {
-        const [, name, item] = line.split(" ") as [string, string, string];
+        const [, name, item, count = "1"] = line.split(" ") as [string, string, string, string?];
         if (!itemReadable(item))
             return refuse(line, "Expected whitespace to end one argument, but found trailing data");
         if (world.unknownItems.includes(item)) return `Unknown item '${item}'`;
-        return world.online.includes(name) ? `Gave 1 [Item] to ${name}` : "No player was found";
+        if (!world.online.includes(name)) return "No player was found";
+        // 1.17 on: at most a hundred stacks in one give; a sword stacks to one.
+        if (item.endsWith("_sword") && Number(count) > 100)
+            return "Can't give more than 100 of [Diamond Sword]";
+        return `Gave ${count} [Item] to ${name}`;
     }
-    if (line.startsWith("xp add ")) return "Gave 10 experience levels to somebody";
+    const levels = /^xp add (\S+) (\d+) levels$/.exec(line);
+    if (levels) {
+        return world.online.includes(levels[1]!)
+            ? `Gave ${levels[2]} experience levels to ${levels[1]}`
+            : "No player was found";
+    }
     if (line === "execute if entity @e[tag=pe_boss]")
         return world.bossAlive ? "Test passed, count: 1" : "Test failed";
     if (line === "data get entity @e[tag=pe_boss,limit=1] Pos") {
@@ -1235,6 +1244,44 @@ describe("the minute sweep", () => {
         await events.sweepEvents();
         expect(world.sent).toContain("give Ana minecraft:emerald 2");
         expect(state().pending).toEqual([]);
+    });
+
+    it("gives a prize once to a player whose name reads like an error", async () => {
+        world.online = ["ErrorBoy", "Unknown_1"];
+        setUp([catalog.newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
+        const reward = { items: [{ id: "minecraft:emerald", count: 2 }], levels: 3 };
+        config[catalog.EVENT_STATE_KEY] = {
+            pending: ["ErrorBoy", "Unknown_1"].map((player, index) => ({
+                id: `p${index}`,
+                player,
+                reward,
+                event: "Fishing contest",
+                createdAt: Date.now()
+            }))
+        };
+        await events.sweepEvents();
+        await events.sweepEvents();
+        for (const name of ["ErrorBoy", "Unknown_1"]) {
+            expect(world.sent.filter((line) => line === `give ${name} minecraft:emerald 2`)).toHaveLength(1);
+            expect(world.sent.filter((line) => line === `xp add ${name} 3 levels`)).toHaveLength(1);
+        }
+        expect(state().pending).toEqual([]);
+    });
+
+    it("keeps a prize the game refused as too many, rather than calling it given", async () => {
+        setUp([catalog.newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
+        const reward = { items: [{ id: "minecraft:diamond_sword", count: 150 }], levels: 0 };
+        config[catalog.EVENT_STATE_KEY] = {
+            pending: [
+                { id: "p1", player: "Ana", reward, event: "Fishing contest", createdAt: Date.now() }
+            ]
+        };
+        await events.sweepEvents();
+        expect(state().pending.map((one) => one.reward)).toEqual([reward]);
     });
 
     it("keeps only what did not arrive, so nothing is given twice", async () => {

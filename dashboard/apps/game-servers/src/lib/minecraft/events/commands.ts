@@ -1346,9 +1346,15 @@ export function rewardCommands(
     return lines;
 }
 
-/** Whether a `give` reached somebody, rather than a server saying nobody is called that. */
+/**
+ * Whether a `give` or an `xp add` reached somebody: the game's own word that it
+ * did - `Gave 2 [Diamond] to Ana`, `Gave 5 experience levels to Ana` - in every
+ * version from 1.13. Anything else did not arrive. Looking for the words of a
+ * refusal instead read a player called ErrorBoy's prize as refused and gave it
+ * again, and read `Can't give more than 6400 of ...` as given.
+ */
 export function gaveIt(output: string): boolean {
-    return !/no player|not found|unknown|incorrect|expected|invalid|error/i.test(output);
+    return /^\s*Gave \d+ /m.test(stripFormatting(output));
 }
 
 // ------------------------------------------------------------------ the end

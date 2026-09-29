@@ -203,6 +203,11 @@ describe("reading what the server says", () => {
     it("knows a prize that reached somebody from one that did not", () => {
         expect(commands.gaveIt("Gave 5 [Diamond] to Ana")).toBe(true);
         expect(commands.gaveIt("No player was found")).toBe(false);
+        expect(commands.gaveIt("Gave 1 [Diamond] to ErrorBoy")).toBe(true);
+        expect(commands.gaveIt("Gave 5 experience levels to Unknown_1\n")).toBe(true);
+        expect(commands.gaveIt("Can't give more than 6400 of [Stick]")).toBe(false);
+        expect(commands.gaveIt("Error: Player not found.")).toBe(false);
+        expect(commands.gaveIt("")).toBe(false);
     });
 });
 
