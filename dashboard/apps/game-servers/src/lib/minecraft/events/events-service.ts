@@ -68,7 +68,10 @@ function eventServer(server: ServerContainer): ServerContainer {
         if (server.edition !== "java") return false;
         const said = await server.say([commands.BUKKIT_PROBE]).catch(() => "");
         if (said.trim().length > 0)
-            bukkitServers.set(server.installedAppId, { at: Date.now(), bukkit: commands.isBukkit(said) });
+            bukkitServers.set(server.installedAppId, {
+                at: Date.now(),
+                bukkit: commands.isBukkit(said)
+            });
         return commands.isBukkit(said);
     };
     const named = async (lines: readonly string[]) =>
@@ -1476,7 +1479,7 @@ async function supplyDrop(
         await server.sayAll([commands.placeChest(found, options.loot), commands.CLEAR_MARK]);
         // Placed, and unopened: a protected area or a plugin that refused the
         // block would otherwise read as a chest somebody already opened.
-        if (commands.readTest(await server.say([commands.chestUnopened(found)])) !== "passed") {
+        if ((await chestTest(server, found)) !== "passed") {
             await retryPlace(installedAppId, loop, server, found);
             return null;
         }
@@ -1505,7 +1508,7 @@ async function supplyDrop(
         await persist(installedAppId, loop);
     }
     lines.push(commands.beam(place));
-    const answer = commands.readTest(await server.say([commands.chestUnopened(place)]));
+    const answer = await chestTest(server, place);
     if (answer !== "failed") return null;
     const opener =
         commands.readWhere(await server.say([commands.nearest(place, 8)]))[0]?.name ?? null;
@@ -1710,7 +1713,7 @@ async function treasureHunt(
     const points = { ...loop.run.points };
     for (const [index, chest] of chests.entries()) {
         if (chest.opened) continue;
-        const answer = commands.readTest(await server.say([commands.chestUnopened(chest)]));
+        const answer = await chestTest(server, chest);
         if (answer !== "failed") continue;
         const by =
             commands.readWhere(await server.say([commands.nearest(chest, hunt.OPENER_REACH)]))[0]
@@ -1811,13 +1814,12 @@ async function hideTreasure(
             await server.sayAll([hunt.hideChest(found, options.loot), commands.CLEAR_MARK]);
             // Down, and unopened: a protected area that refused the block reads
             // as nothing there.
-            placed =
-                commands.readTest(await server.say([commands.chestUnopened(found)])) === "passed";
+            placed = (await chestTest(server, found)) === "passed";
         }
         if (!placed) {
             // Given up without taking the chunks of the chests already down.
             await server.sayAll([
-                ...(air ? [commands.removeChest(found)] : []),
+                ...(air ? commands.removeChestLines(found) : []),
                 commands.CLEAR_MARK,
                 ...commands.release(found, target),
                 ...hunt.holdChests(before.held)
@@ -1859,9 +1861,9 @@ async function settlePendingChest(
     const last = loop.run.chests.at(-1);
     if (!place || !last || last.opened) return;
     if (last.x !== place.x || last.y !== place.y || last.z !== place.z) return;
-    const there = commands.readTest(await server.say([commands.chestUnopened(last)])) === "passed";
+    const there = (await chestTest(server, last)) === "passed";
     if (!there) {
-        await server.sayAll([commands.removeChest(last)]);
+        await server.sayAll(commands.removeChestLines(last));
         loop.run = { ...loop.run, chests: loop.run.chests.slice(0, -1) };
     }
     loop.run = {
@@ -2481,6 +2483,26 @@ async function stageFlavour(server: ServerContainer): Promise<stage.Flavour> {
         items: (await serverAtLeast(server, [1, 20, 5])) ? "components" : "nbt",
         top: (await serverAtLeast(server, [1, 18])) ? 319 : 255
     };
+}
+
+/**
+ * Whether an event chest is still unopened: `Test passed` while it holds its
+ * loot table. A server that cannot read the question at all - 1.13, before
+ * `execute if data` - is asked by the tables themselves instead.
+ */
+async function chestTest(
+    server: ServerContainer,
+    point: { x: number; y: number; z: number }
+): Promise<ReturnType<typeof commands.readTest>> {
+    const answer = commands.readTest(await server.say([commands.chestUnopened(point)]));
+    if (answer !== "unknown") return answer;
+    let seen: ReturnType<typeof commands.readTest> = "unknown";
+    for (const line of commands.chestUnopenedByTable(point)) {
+        const one = commands.readTest(await server.say([line]));
+        if (one === "passed" || one === "unloaded") return one;
+        if (one === "failed") seen = "failed";
+    }
+    return seen;
 }
 
 class PlaceNotFound extends Error {

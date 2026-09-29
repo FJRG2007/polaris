@@ -25,8 +25,7 @@ describe("an answer run together", () => {
     });
 
     it("asks for the names online where a number meets the next name", () => {
-        const said =
-            "Alba has the following entity data: 0Bruno has the following entity data: 0";
+        const said = "Alba has the following entity data: 0Bruno has the following entity data: 0";
         expect(read(said).needsRoster).toBe(true);
         expect([...arena.readGamemodes(read(said, ["Alba", "Bruno"]).text)]).toEqual([
             ["Alba", "survival"],
@@ -35,8 +34,7 @@ describe("an answer run together", () => {
     });
 
     it("reads a name that starts with a digit as that name, not as part of the number", () => {
-        const said =
-            "Ana has the following entity data: 002Fast has the following entity data: 2";
+        const said = "Ana has the following entity data: 002Fast has the following entity data: 2";
         // Read as it came, the 0 and the 2 run together and 02Fast is "Fast".
         expect([...arena.readGamemodes(said)].map(([name]) => name)).not.toContain("02Fast");
         const modes = arena.readGamemodes(read(said, ["Ana", "02Fast", "Fast"]).text);
@@ -47,10 +45,10 @@ describe("an answer run together", () => {
     });
 
     it("reads homes glued the same way", () => {
-        const x = read("Ana has the following entity data: -120Bo has the following entity data: 7", [
-            "Ana",
-            "Bo"
-        ]).text;
+        const x = read(
+            "Ana has the following entity data: -120Bo has the following entity data: 7",
+            ["Ana", "Bo"]
+        ).text;
         const z = read("Ana has the following entity data: 5Bo has the following entity data: -9", [
             "Ana",
             "Bo"
@@ -82,8 +80,7 @@ describe("an answer run together", () => {
     });
 
     it("takes NeoForge's answer a line each as it is", () => {
-        const said =
-            "Ana has the following entity data: 0\nBen has the following entity data: 1\n";
+        const said = "Ana has the following entity data: 0\nBen has the following entity data: 1\n";
         const out = read(said);
         expect(out.needsRoster).toBe(false);
         expect([...arena.readGamemodes(out.text)]).toEqual([
@@ -113,9 +110,10 @@ describe("a name with a team's prefix and suffix", () => {
         const said =
             "[VIP] Ana [AFK] has the following entity data: [1.0d, 64.0d, 1.0d]VIPBen has the following entity data: [2.0d, 64.0d, 2.0d]";
         expect(read(said).needsRoster).toBe(true);
-        expect(commands.readWhere(read(said, ["Ana", "Ben"]).text).map((one) => one.name)).toEqual(
-            ["Ana", "Ben"]
-        );
+        expect(commands.readWhere(read(said, ["Ana", "Ben"]).text).map((one) => one.name)).toEqual([
+            "Ana",
+            "Ben"
+        ]);
     });
 
     it("is read out of a score too, which shows it from 1.20.3", () => {
@@ -170,9 +168,9 @@ describe("an answer too long for one packet", () => {
         expect(pages.readPage).toBe(
             "execute in minecraft:overworld as @a[distance=0..,tag=pe_page] run data get entity @s Pos"
         );
-        expect(replies.pagedRead("execute as @a run scoreboard players get @s pe_score")!.readPage).toBe(
-            "execute as @a[tag=pe_page] run scoreboard players get @s pe_score"
-        );
+        expect(
+            replies.pagedRead("execute as @a run scoreboard players get @s pe_score")!.readPage
+        ).toBe("execute as @a[tag=pe_page] run scoreboard players get @s pe_score");
         for (const line of [...pages.start, ...pages.next, ...pages.end])
             expect(line).toMatch(/^tag @a(\[tag=pe_page\])? (add|remove) pe_(seen|page)$/);
     });
@@ -181,9 +179,9 @@ describe("an answer too long for one packet", () => {
         expect(replies.isPlayerRead(commands.WHERE)).toBe(true);
         expect(replies.isPlayerRead(commands.READ_SCORES)).toBe(true);
         expect(replies.isPlayerRead(commands.IN_OVERWORLD)).toBe(true);
-        expect(replies.isPlayerRead("minecraft:execute as @a run minecraft:data get entity @s Pos")).toBe(
-            true
-        );
+        expect(
+            replies.isPlayerRead("minecraft:execute as @a run minecraft:data get entity @s Pos")
+        ).toBe(true);
         expect(replies.isPlayerRead(commands.READ_MARK)).toBe(false);
         expect(replies.isPlayerRead(commands.BOSS_WHERE)).toBe(false);
     });

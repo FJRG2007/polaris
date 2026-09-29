@@ -160,7 +160,7 @@ export function huntCleanup(
     held: readonly { x: number; z: number }[]
 ): string[] {
     return [
-        ...chests.filter((one) => !one.opened).map((one) => commands.removeChest(one)),
+        ...chests.filter((one) => !one.opened).flatMap((one) => commands.removeChestLines(one)),
         ...chunks([...held, ...chests]).map((point) => commands.forceloadRemove(point.x, point.z))
     ];
 }

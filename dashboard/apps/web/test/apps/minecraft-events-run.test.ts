@@ -59,6 +59,8 @@ interface World {
     markAt: [number, number];
     /** Chests standing in the world, as `x y z`, and the ones opened. */
     chests: string[];
+    /** The loot table the chests were put down with. */
+    chestTable: string;
     opened: string[];
     /** Nothing is air: every chest the event tries to put down is refused. */
     solid: boolean;
@@ -154,6 +156,7 @@ const world: World = {
     markFollows: false,
     markAt: [300, 0],
     chests: [],
+    chestTable: "",
     opened: [],
     solid: false,
     caught: [],
@@ -233,11 +236,28 @@ function itemReadable(item: string): boolean {
 }
 
 /** The commands EssentialsX takes over from vanilla, by the names vanilla has. */
-const ESSENTIALS = /(^|^execute .*? run )(kill|give|tp|teleport|gamemode|clear|xp|experience|time|weather|item) /;
+const ESSENTIALS =
+    /(^|^execute .*? run )(kill|give|tp|teleport|gamemode|clear|xp|experience|time|weather|item) /;
 
 function answer(sent: string): string {
     world.sent.push(sent);
     let line = sent;
+    // No `execute if data` before 1.14: a chest is asked about by its loot table.
+    if (/ if data /.test(line) && !events.atLeast(world.version, [1, 14]))
+        return refuse(line, "Incorrect argument for command");
+    const byTable =
+        /^execute in minecraft:overworld if block (\S+ \S+ \S+) minecraft:chest\{LootTable:"([^"]+)"\}( run setblock \S+ \S+ \S+ minecraft:air replace)?$/.exec(
+            line
+        );
+    if (byTable) {
+        const at = byTable[1]!;
+        const unopened =
+            world.chests.includes(at) &&
+            !world.opened.includes(at) &&
+            byTable[2] === world.chestTable;
+        if (byTable[3] && unopened) world.chests = world.chests.filter((one) => one !== at);
+        return unopened ? (byTable[3] ? "Changed the block" : "Test passed") : "Test failed";
+    }
     if (line === "minecraft:difficulty") {
         // Only a Bukkit-family server has vanilla's commands under `minecraft:`.
         return world.bukkit
@@ -316,7 +336,10 @@ function answer(sent: string): string {
     }
     if (line === "execute as @a[tag=pe_in] run data get entity @s Dimension") {
         return inArena
-            .map((name) => `${name} has the following entity data: ${dimension("minecraft:overworld")}`)
+            .map(
+                (name) =>
+                    `${name} has the following entity data: ${dimension("minecraft:overworld")}`
+            )
             .join("\n");
     }
     const air = /^execute in minecraft:overworld if block (-?\d+ -?\d+ -?\d+) minecraft:air$/.exec(
@@ -558,6 +581,7 @@ function answer(sent: string): string {
                 line
             );
         if (hidden) {
+            world.chestTable = /LootTable:"([^"]+)"/.exec(line)![1]!;
             if (!world.solid && !world.chests.includes(hidden[1]!)) world.chests.push(hidden[1]!);
             return world.solid ? "Test failed" : "Changed the block";
         }
@@ -684,7 +708,10 @@ function heard(line: string): string {
     if (line === "list uuids") {
         world.sent.push(line);
         return `There are ${world.online.length} of a max of 100 players online: ${world.online
-            .map((name, index) => `${name} (00000000-0000-0000-0000-${String(index).padStart(12, "0")})`)
+            .map(
+                (name, index) =>
+                    `${name} (00000000-0000-0000-0000-${String(index).padStart(12, "0")})`
+            )
             .join(", ")}`;
     }
     let out: string;
@@ -698,7 +725,10 @@ function heard(line: string): string {
         world.sent[world.sent.length - 1] = line;
     } else out = answer(line);
     for (const [name, [before, after]] of Object.entries(world.display))
-        out = out.replace(new RegExp(`(^|\\n)${name} has `, "g"), `$1${before}${name}${after} has `);
+        out = out.replace(
+            new RegExp(`(^|\\n)${name} has `, "g"),
+            `$1${before}${name}${after} has `
+        );
     if (world.glued) out = out.replace(/\n(?=\S+.* has )/g, "");
     if (out.length > 4096) {
         const first = out.slice(0, 4096);
@@ -726,7 +756,10 @@ const server = {
             world.versionIn === "latest"
                 ? script.includes("latest.log")
                 : world.versionIn === "archive" && script.includes(".log.gz");
-        return { code: 0, output: looks ? `Starting minecraft server version ${world.version}` : "" };
+        return {
+            code: 0,
+            output: looks ? `Starting minecraft server version ${world.version}` : ""
+        };
     },
     runOk: async () => "",
     readFile: async () => new ReadableStream(),
@@ -852,6 +885,7 @@ beforeEach(() => {
     world.markFollows = false;
     world.markAt = [300, 0];
     world.chests = [];
+    world.chestTable = "";
     world.opened = [];
     world.solid = false;
     world.caught = [];
@@ -1138,9 +1172,13 @@ describe("a supply drop", () => {
             line.includes("setblock 300 70 0 minecraft:air")
         );
         expect(removals.length).toBeGreaterThan(0);
-        expect(removals.every((line) => line.includes("if data block 300 70 0 LootTable"))).toBe(
-            true
-        );
+        expect(
+            removals.every((line) =>
+                /if data block 300 70 0 LootTable|if block 300 70 0 minecraft:chest\{LootTable:"/.test(
+                    line
+                )
+            )
+        ).toBe(true);
     });
 
     it("lets go of the chunk it was trying when it is called off before landing", async () => {
@@ -1338,7 +1376,9 @@ describe("the minute sweep", () => {
         await events.sweepEvents();
         await events.sweepEvents();
         for (const name of ["ErrorBoy", "Unknown_1"]) {
-            expect(world.sent.filter((line) => line === `give ${name} minecraft:emerald 2`)).toHaveLength(1);
+            expect(
+                world.sent.filter((line) => line === `give ${name} minecraft:emerald 2`)
+            ).toHaveLength(1);
             expect(world.sent.filter((line) => line === `xp add ${name} 3 levels`)).toHaveLength(1);
         }
         expect(state().pending).toEqual([]);
@@ -2092,7 +2132,10 @@ describe("what the audit found", () => {
     });
 
     it("reads a podium out of a crowd too big for one answer, with an accent in the title", async () => {
-        world.online = Array.from({ length: 100 }, (_, index) => `Pescador${String(index).padStart(2, "0")}`);
+        world.online = Array.from(
+            { length: 100 },
+            (_, index) => `Pescador${String(index).padStart(2, "0")}`
+        );
         world.glued = true;
         world.scoreTitle = "Gran concurso de pesca en el r\u00edo del norte";
         const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
@@ -2105,7 +2148,9 @@ describe("what the audit found", () => {
             startedBy: null
         });
         await play(2_100);
-        world.scores = Object.fromEntries(world.online.map((name, index) => [name, index === 95 ? 90 : 1]));
+        world.scores = Object.fromEntries(
+            world.online.map((name, index) => [name, index === 95 ? 90 : 1])
+        );
         await play(3 * 60_000);
         expect(state().history[0]?.podium[0]).toEqual({ place: 1, name: "Pescador95", score: 90 });
         // The page tags are gone again.
@@ -2275,6 +2320,9 @@ function touchesBlocks(lines: readonly string[]): string[] {
                 line
             ) &&
             !/if block (\S+ \S+ \S+) minecraft:chest if data block \1 LootTable run setblock \1 minecraft:air replace$/.test(
+                line
+            ) &&
+            !/if block (\S+ \S+ \S+) minecraft:chest\{LootTable:"[^"]+"\} run setblock \1 minecraft:air replace$/.test(
                 line
             )
     );
@@ -3372,9 +3420,9 @@ describe("a parkour race on a server before 1.16", () => {
         chat(["Ana", "join"], ["Ben", "join"]);
         await play(42_100);
         expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana", "Ben"]);
-        expect(state().run?.stage?.saved.every((one) => one.dimension === "minecraft:overworld")).toBe(
-            true
-        );
+        expect(
+            state().run?.stage?.saved.every((one) => one.dimension === "minecraft:overworld")
+        ).toBe(true);
     });
 });
 
@@ -4022,6 +4070,39 @@ describe("a server with EssentialsX on it", () => {
             "minecraft:difficulty"
         ]);
         expect(world.sent).toContain("kill @e[tag=pe_mob]");
+    });
+});
+
+describe("a treasure hunt on 1.13, which has no `execute if data`", () => {
+    it("finds its chests unopened, sees one opened, and takes the rest away at the end", async () => {
+        world.version = "1.13.2";
+        world.markFollows = true;
+        world.online = ["Ana", "Ben"];
+        setUp([
+            {
+                ...catalog.newPreset("treasure-hunt", "hunt"),
+                minutes: 9,
+                options: { ...catalog.newPreset("treasure-hunt", "hunt").options, chests: 2 }
+            }
+        ]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        for (let tick = 0; tick < 60 && (state().run?.chests.length ?? 0) < 2; tick += 1)
+            await play(2_100);
+        expect(state().run?.chests).toHaveLength(2);
+        const [first] = state().run!.chests;
+        world.opened.push(`${first!.x} ${first!.y} ${first!.z}`);
+        await play(4_200);
+        expect(state().run?.chests.filter((one) => one.opened)).toHaveLength(1);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        // The unopened one is gone, the opened one is the finder's.
+        expect(world.chests).toEqual([`${first!.x} ${first!.y} ${first!.z}`]);
     });
 });
 

@@ -72,7 +72,12 @@ export function pagedRead(line: string): {
 } | null {
     const found = /^(.*?\bas )@a(?:\[([^\]]*)\])?( .*)$/.exec(line);
     if (!found) return null;
-    const [, before, filters, after] = found as unknown as [string, string, string | undefined, string];
+    const [, before, filters, after] = found as unknown as [
+        string,
+        string,
+        string | undefined,
+        string
+    ];
     const selector = (extra: string) => `@a[${filters ? `${filters},` : ""}${extra}]`;
     return {
         start: ["tag @a remove pe_seen", "tag @a remove pe_page"],
@@ -182,7 +187,10 @@ export function canonicalReplies(output: string, roster: readonly string[] | nul
     return { text: output, needsRoster: false };
 }
 
-function named(display: string, roster: readonly string[] | null): { name: string; unsure: boolean } {
+function named(
+    display: string,
+    roster: readonly string[] | null
+): { name: string; unsure: boolean } {
     const trimmed = display.trim();
     const name = nameIn(trimmed, roster);
     return { name: name ?? trimmed, unsure: !NAME.test(trimmed) || name === null };

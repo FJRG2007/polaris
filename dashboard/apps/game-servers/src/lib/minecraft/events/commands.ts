@@ -489,7 +489,8 @@ export function readTest(output: string): "passed" | "failed" | "unloaded" | "un
  */
 export const PROBE_COMPONENTS =
     "clear @a[tag=pe_probe] minecraft:stone[minecraft:custom_data={polaris_event:1b}] 0";
-export const PROBE_ATTRIBUTE = "attribute @e[tag=pe_probe,limit=1] minecraft:generic.max_health get";
+export const PROBE_ATTRIBUTE =
+    "attribute @e[tag=pe_probe,limit=1] minecraft:generic.max_health get";
 
 /** Whether the game read a probe as a command it knows, rather than refusing it. */
 export function probeParsed(output: string): boolean {
@@ -959,6 +960,31 @@ export function nearest(point: { x: number; y: number; z: number }, within: numb
 export function removeChest(point: { x: number; y: number; z: number }): string {
     const at = `${point.x} ${point.y} ${point.z}`;
     return `execute in minecraft:overworld if block ${at} minecraft:chest if data block ${at} LootTable run setblock ${at} minecraft:air replace`;
+}
+
+/**
+ * The same two, the way 1.13 can ask them: `execute if data` came in 1.14, so
+ * there the chest is matched by the loot table it still holds - one line per
+ * table an event puts in a chest. Every newer version reads these too, and finds
+ * nothing left to take once `removeChest` has.
+ */
+export function chestUnopenedByTable(point: { x: number; y: number; z: number }): string[] {
+    const at = `${point.x} ${point.y} ${point.z}`;
+    return Object.values(LOOT).map(
+        (table) =>
+            `execute in minecraft:overworld if block ${at} minecraft:chest{LootTable:"${table}"}`
+    );
+}
+
+/** Both ways to take an unopened event chest away: every version, and 1.13. */
+export function removeChestLines(point: { x: number; y: number; z: number }): string[] {
+    const at = `${point.x} ${point.y} ${point.z}`;
+    return [
+        removeChest(point),
+        ...chestUnopenedByTable(point).map(
+            (line) => `${line} run setblock ${at} minecraft:air replace`
+        )
+    ];
 }
 
 /** A column of light over a point, seen from far off. */
@@ -1517,7 +1543,7 @@ export function cleanup(
     if (preset.kind === "blood-moon") lines.push(...daybreak(rules, timeBefore));
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
-    if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));
+    if (preset.kind === "supply-drop" && place) lines.push(...removeChestLines(place));
     // Its teams and counts; the arena and the players are `closeArena`'s.
     if (preset.kind === "team-duel") lines.push(...duelTeardown());
     lines.push(...release(preset.kind === "explorer" ? null : place, target));

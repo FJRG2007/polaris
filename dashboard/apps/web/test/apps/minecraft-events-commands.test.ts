@@ -605,7 +605,9 @@ describe("vanilla's own commands on a Bukkit-family server", () => {
             commands.namespaced(
                 "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
             )
-        ).toBe("minecraft:execute in minecraft:overworld run minecraft:tp Ana 1.000 64.000 2.000 0.0 0.0");
+        ).toBe(
+            "minecraft:execute in minecraft:overworld run minecraft:tp Ana 1.000 64.000 2.000 0.0 0.0"
+        );
         expect(
             commands.namespaced(
                 'execute as @e[tag=pe_boss,nbt={CustomName:"a run b"}] at @s run execute as @a run give @s minecraft:stone 1'
@@ -840,7 +842,7 @@ describe("a treasure hunt", () => {
             ]
         );
         const removals = lines.filter((line) => line.includes("setblock"));
-        expect(removals).toEqual([commands.removeChest(chest(100, 100))]);
+        expect(removals).toEqual(commands.removeChestLines(chest(100, 100)));
         expect(removals[0]).toContain(
             "if block 100 70 100 minecraft:chest if data block 100 70 100 LootTable"
         );
