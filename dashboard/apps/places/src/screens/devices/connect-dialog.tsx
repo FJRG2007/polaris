@@ -41,9 +41,18 @@ import {
     Select
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
+import type { PlacesTranslator } from "../../lib/i18n";
+import { englishPlaces } from "../../../messages";
 
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
+
+/** A make's name as the picker shows it: its own, or the words for the
+ *  catch-all that is not a make. */
+function brandWords(brand: string, t: PlacesTranslator): string {
+    return brand === englishPlaces("connections.brandMqtt") ? t("connections.brandMqtt") : brand;
+}
 
 /** What comes back once something is connected: everything the screen behind this
  *  has to redraw, so it never has to go and ask again. */
@@ -55,26 +64,30 @@ export interface Connected {
 /** What a make brings in, as one line. Written once because the card shows it and
  *  carries the same words as its own title, and two of those drifting apart is a
  *  tooltip that says something the row does not. */
-function kindsOf(entry: registry.DeviceBrand): string {
-    return entry.kinds.map((kind) => kinds.DEVICE_KIND_LABELS[kind].toLowerCase()).join(", ");
+function kindsOf(entry: registry.DeviceBrand, t: PlacesTranslator): string {
+    return entry.kinds.map((kind) => kinds.kindText(kind, t).toLowerCase()).join(", ");
 }
 
 function Field({
+    connection,
     field,
     value,
     onChange
 }: {
+    connection: registry.DeviceConnection;
     field: registry.ConnectionField;
     value: string;
     onChange: (value: string) => void;
 }) {
-    const issue = registry.fieldIssue(field, value);
+    const t = usePlacesT();
+    const words = registry.fieldWords(t, connection, field);
+    const issue = registry.fieldIssue(field, value, t, words.label);
     return (
         <label className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">
-                {field.label}
+                {words.label}
                 {field.optional === true ? (
-                    <span className="text-foreground-subtle"> optional</span>
+                    <span className="text-foreground-subtle"> {t("deviceDialog.optional")}</span>
                 ) : (
                     <span className="text-danger"> *</span>
                 )}
@@ -83,11 +96,11 @@ function Field({
                 <Select
                     value={value || field.defaultValue || ""}
                     onValueChange={onChange}
-                    options={field.choices.map((choice) => ({
+                    options={(words.choices ?? []).map((choice) => ({
                         value: choice.value,
                         label: choice.label
                     }))}
-                    aria-label={field.label}
+                    aria-label={words.label}
                 />
             ) : (
                 <Input
@@ -95,12 +108,12 @@ function Field({
                     value={value}
                     spellCheck={false}
                     autoComplete="off"
-                    placeholder={field.placeholder}
+                    placeholder={words.placeholder}
                     onChange={(event) => onChange(event.target.value)}
-                    aria-label={field.label}
+                    aria-label={words.label}
                 />
             )}
-            {field.hint && <span className="text-xs text-foreground-subtle">{field.hint}</span>}
+            {words.hint && <span className="text-xs text-foreground-subtle">{words.hint}</span>}
             {issue && <span className="text-xs text-danger">{issue}</span>}
         </label>
     );
@@ -119,6 +132,7 @@ export function ConnectDialog({
     onClose: () => void;
     onConnected: (result: Connected) => void;
 }) {
+    const t = usePlacesT();
     const brands = useMemo(() => registry.deviceBrands(), []);
     const [brand, setBrand] = useState(brands[0]?.brand ?? "");
     const [chosen, setChosen] = useState(
@@ -133,6 +147,7 @@ export function ConnectDialog({
     const connection = registry.deviceConnection(connectionId);
     const ofBrand = useMemo(() => registry.connectionsOfBrand(brand), [brand]);
     const complete = connection ? registry.fieldsComplete(connection, fields) : false;
+    const said = connection ? registry.connectionWords(t, connection) : null;
 
     /** A make with one way in is not a question, so the second list is only drawn
      *  where there is something to weigh up - and picking a make always settles on
@@ -178,19 +193,19 @@ export function ConnectDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {reconnect ? `Reconnect ${reconnect.label}` : "Connect devices"}
+                        {reconnect ? t("connect.reconnectTitle", { name: reconnect.label }) : t("connect.title")}
                     </DialogTitle>
                     <DialogDescription>
                         {reconnect
-                            ? "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes."
-                            : "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place."}
+                            ? t("connect.reconnectIntro")
+                            : t("connect.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     {!reconnect && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">Make</span>
+                            <span className="text-xs text-muted-foreground">{t("connect.make")}</span>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {brands.map((entry) => (
                                     <button
@@ -212,15 +227,15 @@ export function ConnectDialog({
                                         <span className="flex min-w-0 flex-col">
                                             <span
                                                 className="truncate text-sm font-medium"
-                                                title={entry.brand}
+                                                title={brandWords(entry.brand, t)}
                                             >
-                                                {entry.brand}
+                                                {brandWords(entry.brand, t)}
                                             </span>
                                             <span
                                                 className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                title={kindsOf(entry)}
+                                                title={kindsOf(entry, t)}
                                             >
-                                                {kindsOf(entry)}
+                                                {kindsOf(entry, t)}
                                             </span>
                                         </span>
                                     </button>
@@ -231,7 +246,7 @@ export function ConnectDialog({
 
                     {!reconnect && ofBrand.length > 1 && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">How to reach it</span>
+                            <span className="text-xs text-muted-foreground">{t("connect.how")}</span>
                             <div className="flex flex-col gap-2">
                                 {ofBrand.map((entry, index) => (
                                     <button
@@ -256,17 +271,17 @@ export function ConnectDialog({
                                         />
                                         <span className="flex min-w-0 flex-col gap-0.5">
                                             <span className="text-sm font-medium">
-                                                {entry.label}
+                                                {registry.connectionWords(t, entry).label}
                                                 {index === 0 && (
                                                     <span className="text-foreground-subtle">
                                                         {" "}
-                                                        - recommended
+                                                        {t("connect.recommended")}
                                                     </span>
                                                 )}
                                             </span>
                                             <span className="text-[0.6875rem] text-muted-foreground">
-                                                {registry.REACH_LABELS[entry.reach]} -{" "}
-                                                {entry.summary}
+                                                {registry.connectionWords(t, entry).reach} -{" "}
+                                                {registry.connectionWords(t, entry).summary}
                                             </span>
                                         </span>
                                     </button>
@@ -282,36 +297,32 @@ export function ConnectDialog({
                                     slug={connection.logo}
                                     className="size-4 w-6 shrink-0 object-contain"
                                 />
-                                {connection.label} - {registry.REACH_LABELS[connection.reach]}
+                                {said?.label} - {said?.reach}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                                {connection.summary}
-                            </span>
-                            {connection.note && (
-                                <span className="text-xs text-foreground-subtle">
-                                    {connection.note}
-                                </span>
+                            <span className="text-xs text-muted-foreground">{said?.summary}</span>
+                            {said?.note && (
+                                <span className="text-xs text-foreground-subtle">{said.note}</span>
                             )}
                         </div>
                     )}
 
-                    {connection?.steps && (
+                    {said && said.steps.length > 0 && (
                         <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
-                            {connection.steps.map((step, index) => (
+                            {said.steps.map((step, index) => (
                                 <li key={step}>
-                                    {index === 0 && connection.link ? (
+                                    {index === 0 && said.link && step.includes(said.link.label) ? (
                                         <>
-                                            {step.split(connection.link.label)[0]}
+                                            {step.split(said.link.label)[0]}
                                             <Link
-                                                href={connection.link.href}
+                                                href={said.link.href}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="inline-flex items-center gap-1 text-foreground underline"
                                             >
-                                                {connection.link.label}
+                                                {said.link.label}
                                                 <ExternalLink className="size-3" />
                                             </Link>
-                                            {step.split(connection.link.label)[1]}
+                                            {step.split(said.link.label)[1]}
                                         </>
                                     ) : (
                                         step
@@ -321,9 +332,11 @@ export function ConnectDialog({
                         </ol>
                     )}
 
-                    {connection?.fields.map((field) => (
+                    {connection &&
+                        connection.fields.map((field) => (
                         <Field
                             key={field.key}
+                            connection={connection}
                             field={field}
                             value={fields[field.key] ?? ""}
                             onChange={(value) =>
@@ -334,15 +347,15 @@ export function ConnectDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            Name for this connection{" "}
-                            <span className="text-foreground-subtle">optional</span>
+                            {t("connect.label")}{" "}
+                            <span className="text-foreground-subtle">{t("deviceDialog.optional")}</span>
                         </span>
                         <Input
                             value={label}
                             maxLength={60}
-                            placeholder={reconnect?.label ?? connection?.brand ?? ""}
+                            placeholder={reconnect?.label ?? (connection ? brandWords(connection.brand, t) : "")}
                             onChange={(event) => setLabel(event.target.value)}
-                            aria-label="Name for this connection"
+                            aria-label={t("connect.label")}
                         />
                     </label>
 
@@ -358,7 +371,7 @@ export function ConnectDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button
                         onClick={() => void submit()}
@@ -366,7 +379,7 @@ export function ConnectDialog({
                         aria-disabled={!complete || saving}
                     >
                         {saving && <Loader2 className="size-4 animate-spin" />}
-                        {saving ? "Checking" : "Connect"}
+                        {saving ? t("connect.checking") : t("connect.connect")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

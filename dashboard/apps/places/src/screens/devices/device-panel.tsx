@@ -20,6 +20,8 @@
 
 import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
+import { usePlacesT } from "../use-places-t";
+import { placesRefusalText } from "../../lib/refusal-text";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeviceAction, DeviceEventView, DeviceView } from "../../lib/device-kinds";
 import {
@@ -109,15 +111,16 @@ function StatePill({ device }: { device: DeviceView }) {
     // A sensor has no state to be in - it has a reading, and that is what the
     // badge is for on one. A sensor whose reading has not arrived says so rather
     // than borrowing the word a lock uses for the same silence.
+    const t = usePlacesT();
     const reading = kinds.readingLine(device.reading);
     return (
         <Badge className={cn("gap-1.5", stateClass(device))}>
             {device.state === "moving" && <Loader2 className="size-3 animate-spin" />}
             {!device.online
-                ? "Not answering"
+                ? t("devices.states.unknown")
                 : kinds.deviceKind(device.kind) === "sensor"
-                  ? reading || "Nothing read yet"
-                  : kinds.stateLabel(device.kind, device.state)}
+                  ? reading || t("devicesView.nothingRead")
+                  : kinds.stateLabel(device.kind, device.state, t)}
         </Badge>
     );
 }
@@ -136,6 +139,7 @@ export function DeviceControls({
     onAct: (action: DeviceAction) => void;
     className?: string;
 }) {
+    const t = usePlacesT();
     if (!canControl) return null;
     // Nothing to press on something that only measures. Left silent rather than
     // explained: a row of buttons that is not there needs no note, and a sentence
@@ -146,7 +150,7 @@ export function DeviceControls({
     if (!device.controllable) {
         return (
             <p className={cn("text-xs text-muted-foreground", className)}>
-                Set to be watched rather than operated.
+                {t("devicePanel.watchOnly")}
             </p>
         );
     }
@@ -174,7 +178,7 @@ export function DeviceControls({
                         ) : (
                             <Icon className="size-4" />
                         )}
-                        {kinds.DEVICE_ACTION_LABELS[action]}
+                        {kinds.actionText(action, t)}
                     </Button>
                 );
             })}
@@ -198,6 +202,7 @@ export function DevicePanel({
     onEdit: (device: DeviceView) => void;
 }) {
     const format = useDisplayFormat();
+    const t = usePlacesT();
     const [events, setEvents] = useState<DeviceEventView[] | null>(null);
     const [used, setUsed] = useState<number[] | null>(null);
     const [busy, setBusy] = useState<DeviceAction | null>(null);
@@ -245,7 +250,7 @@ export function DevicePanel({
             // written to here.
             await load();
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "That did not work.");
+            setError(caught instanceof Error ? caught.message : t("devicePanel.failed"));
         } finally {
             setBusy(null);
         }
@@ -261,7 +266,7 @@ export function DevicePanel({
                             <StatePill device={device} />
                             {device.doorState !== "none" && (
                                 <span className="text-xs text-muted-foreground">
-                                    {kinds.DOOR_STATE_LABELS[device.doorState]}
+                                    {kinds.doorText(device.doorState, t)}
                                 </span>
                             )}
                             {canManage && (
@@ -274,8 +279,8 @@ export function DevicePanel({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Share ${device.name}`}
-                                        title="Share"
+                                        aria-label={t("cameras.shareName", { name: device.name })}
+                                        title={t("cameras.share")}
                                         onClick={() => setSharing(true)}
                                     >
                                         <Share2 className="size-4" />
@@ -283,8 +288,8 @@ export function DevicePanel({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={`Edit ${device.name}`}
-                                        title="Edit"
+                                        aria-label={t("devicePanel.editName", { name: device.name })}
+                                        title={t("devicePanel.edit")}
                                         onClick={() => onEdit(device)}
                                     >
                                         <Pencil className="size-4" />
@@ -316,10 +321,12 @@ export function DevicePanel({
                                     {[
                                         device.zone,
                                         device.model,
-                                        device.firmware && `firmware ${device.firmware}`,
+                                        device.firmware &&
+                                            t("devicePanel.firmware", { version: device.firmware }),
                                         device.batteryPercent !== null &&
-                                            `battery ${device.batteryPercent}%`,
-                                        device.stateAt && `read at ${format.time(device.stateAt)}`
+                                            t("devicePanel.battery", { percent: device.batteryPercent }),
+                                        device.stateAt &&
+                                            t("devicePanel.readAt", { time: format.time(device.stateAt) })
                                     ]
                                         .filter(Boolean)
                                         .join(" - ")}
@@ -327,8 +334,7 @@ export function DevicePanel({
                                 {device.batteryCritical && (
                                     <p className="flex items-center gap-1.5 text-xs text-danger">
                                         <BatteryLow className="size-3.5 shrink-0" />
-                                        The battery is nearly flat. Once it runs out it stops
-                                        answering, and whatever it does has to be done by hand.
+                                        {t("devicePanel.batteryLow")}
                                     </p>
                                 )}
                                 {error && (
@@ -342,12 +348,12 @@ export function DevicePanel({
                             </section>
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
-                                <h3 className="text-sm font-medium">Used</h3>
+                                <h3 className="text-sm font-medium">{t("devicePanel.used")}</h3>
                                 {used === null ? (
                                     <Skeleton className="h-32 w-full" />
                                 ) : (
                                     <TimeSeriesChart
-                                        label={`Times used, last ${kinds.USAGE_DAYS} days`}
+                                        label={t("devicePanel.usage", { days: kinds.USAGE_DAYS })}
                                         points={days.map((day) => ({ t: day.t, v: day.count }))}
                                         from={days[0]?.t ?? Date.now()}
                                         to={days[days.length - 1]?.t ?? Date.now()}
@@ -359,7 +365,7 @@ export function DevicePanel({
                             </section>
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
-                                <h3 className="text-sm font-medium">History</h3>
+                                <h3 className="text-sm font-medium">{t("devicePanel.history")}</h3>
                                 {events === null ? (
                                     <div className="flex flex-col gap-2">
                                         <Skeleton className="h-6 w-full" />
@@ -368,8 +374,8 @@ export function DevicePanel({
                                     </div>
                                 ) : events.length === 0 ? (
                                     <EmptyState
-                                        title="Nothing recorded yet."
-                                        description="Everything this has been told to do lands here, including whatever did not finish."
+                                        title={t("devicePanel.emptyTitle")}
+                                        description={t("devicePanel.emptyBody")}
                                     />
                                 ) : (
                                     <ul className="divide-y divide-border rounded-lg border border-border">
@@ -384,7 +390,9 @@ export function DevicePanel({
                                                         event.outcome === "ok" ? "" : "text-danger"
                                                     )}
                                                 >
-                                                    {kinds.describeEvent(event)}
+                                                    {kinds.describeEvent(event, t, (note) =>
+                                                        placesRefusalText(t, note)
+                                                    )}
                                                 </span>
                                                 <span className="text-xs tabular-nums text-foreground-subtle">
                                                     {format.dateTime(event.at)}

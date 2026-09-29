@@ -34,6 +34,8 @@ import {
     Switch
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
+import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
 
@@ -48,6 +50,7 @@ export function DeviceDialog({
     onClose: () => void;
     onSaved: (device: DeviceView) => void;
 }) {
+    const t = usePlacesT();
     const [name, setName] = useState("");
     const [zone, setZone] = useState("");
     const [placeId, setPlaceId] = useState("");
@@ -64,9 +67,10 @@ export function DeviceDialog({
         setError("");
     }, [device]);
 
-    const nameIssue = name.trim()
+    const issue = name.trim()
         ? (deviceEditSchema.shape.name.safeParse(name).error?.issues[0]?.message ?? null)
         : null;
+    const nameIssue = issue ? placesRefusalText(t, issue) : null;
     const canSubmit = name.trim().length > 0 && !nameIssue && !saving;
 
     const submit = async () => {
@@ -96,23 +100,22 @@ export function DeviceDialog({
         <Dialog open={device !== null} onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{device?.name ?? "Door"}</DialogTitle>
+                    <DialogTitle>{device?.name ?? t("deviceDialog.door")}</DialogTitle>
                     <DialogDescription>
-                        {device?.model || "Connected through the account it is on."} Everything else
-                        about it is read back from that account.
+                        {device?.model || t("deviceDialog.connected")} {t("deviceDialog.readBack")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            Name <span className="text-danger">*</span>
+                            {t("placeDialog.name")} <span className="text-danger">*</span>
                         </span>
                         <Input
                             autoFocus
                             value={name}
                             maxLength={80}
-                            aria-label="Name"
+                            aria-label={t("placeDialog.name")}
                             onChange={(event) => setName(event.target.value)}
                         />
                         {nameIssue && <span className="text-xs text-danger">{nameIssue}</span>}
@@ -120,28 +123,28 @@ export function DeviceDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            Area <span className="text-foreground-subtle">optional</span>
+                            {t("cameras.area")} <span className="text-foreground-subtle">{t("deviceDialog.optional")}</span>
                         </span>
                         <Input
                             value={zone}
                             maxLength={60}
-                            aria-label="Area"
-                            placeholder="Reception"
+                            aria-label={t("cameras.area")}
+                            placeholder={t("deviceDialog.areaPlaceholder")}
                             onChange={(event) => setZone(event.target.value)}
                         />
                         <span className="text-xs text-foreground-subtle">
-                            Doors and cameras in the same area are shown together.
+                            {t("deviceDialog.areaHint")}
                         </span>
                     </label>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">Place</span>
+                        <span className="text-xs text-muted-foreground">{t("deviceDialog.place")}</span>
                         <Select
                             value={placeId}
                             onValueChange={setPlaceId}
-                            aria-label="Place"
+                            aria-label={t("deviceDialog.place")}
                             options={[
-                                { value: "", label: "Not decided yet" },
+                                { value: "", label: t("deviceDialog.noPlace") },
                                 ...places.map((place) => ({ value: place.id, label: place.name }))
                             ]}
                         />
@@ -149,15 +152,15 @@ export function DeviceDialog({
 
                     <label className="flex items-center justify-between gap-3">
                         <span className="flex flex-col gap-0.5">
-                            <span className="text-sm">Operate from Polaris</span>
+                            <span className="text-sm">{t("deviceDialog.operate")}</span>
                             <span className="text-xs text-foreground-subtle">
-                                Off leaves the state and the history and takes away the buttons.
+                                {t("deviceDialog.operateHint")}
                             </span>
                         </span>
                         <Switch
                             checked={controllable}
                             onChange={setControllable}
-                            aria-label="Operate from Polaris"
+                            aria-label={t("deviceDialog.operate")}
                         />
                     </label>
 
@@ -173,10 +176,10 @@ export function DeviceDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button onClick={() => void submit()} disabled={!canSubmit}>
-                        {saving ? "Saving" : "Save"}
+                        {saving ? t("deviceDialog.saving") : t("common.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

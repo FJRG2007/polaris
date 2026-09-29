@@ -36,6 +36,9 @@ import type { DeviceAction, DeviceView } from "../../lib/device-kinds";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
+import type { PlacesTranslator } from "../../lib/i18n";
+import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -56,14 +59,17 @@ const REFRESH_MS = 30_000;
  * always at the top - which is what somebody opening this screen in a hurry came
  * for.
  */
-function groupDevices(devices: readonly DeviceView[]): { label: string; devices: DeviceView[] }[] {
+function groupDevices(
+    devices: readonly DeviceView[],
+    t: PlacesTranslator
+): { label: string; devices: DeviceView[] }[] {
     const groups = new Map<string, { label: string; devices: DeviceView[] }>();
     for (const kind of kinds.DEVICE_KINDS) {
-        const label = kinds.DEVICE_GROUP_LABELS[kind];
+        const label = kinds.groupText(kind, t);
         if (!groups.has(label)) groups.set(label, { label, devices: [] });
     }
     for (const device of devices) {
-        groups.get(kinds.DEVICE_GROUP_LABELS[kinds.deviceKind(device.kind)])?.devices.push(device);
+        groups.get(kinds.groupText(device.kind, t))?.devices.push(device);
     }
     return [...groups.values()].filter((group) => group.devices.length > 0);
 }
@@ -78,6 +84,7 @@ export function DevicesView({
     canManage: boolean;
 }) {
     const format = useDisplayFormat();
+    const t = usePlacesT();
     const [devices, setDevices] = useState<DeviceView[] | null>(null);
     const [accounts, setAccounts] = useState<DeviceAccountView[]>([]);
     const [connecting, setConnecting] = useState(false);
@@ -90,7 +97,7 @@ export function DevicesView({
     const [refreshing, setRefreshing] = useState(false);
     const [busy, setBusy] = useState<{ id: string; action: DeviceAction } | null>(null);
     const [error, setError] = useState("");
-    const groups = useMemo(() => groupDevices(devices ?? []), [devices]);
+    const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
 
     useEffect(() => {
         let cancelled = false;
@@ -222,7 +229,7 @@ export function DevicesView({
 
     // Still reading: the bar's own frame, with the button that connects
     // something already live. Only the accounts and the devices wait, since they
-    // are what the read decides. "Check again" waits too - there is nothing yet
+    // are what the read decides. t("devicesView.checkAgain") waits too - there is nothing yet
     // to check again.
     if (devices === null) {
         return (
@@ -234,7 +241,7 @@ export function DevicesView({
                         {canManage && (
                             <Button size="sm" onClick={() => setConnecting(true)}>
                                 <Plus className="size-4 shrink-0" />
-                                Connect a device
+                                {t("devicesView.connect")}
                             </Button>
                         )}
                     </div>
@@ -250,17 +257,17 @@ export function DevicesView({
         return (
             <>
                 <EmptyState
-                    title="Nothing connected yet."
+                    title={t("devicesView.emptyTitle")}
                     description={
                         canManage
-                            ? "Connect what your locks, switches and lights are on and they appear here, with their state, their controls and everything they have done."
-                            : "Somebody who administers Places can connect what the devices are on."
+                            ? t("devicesView.emptyManage")
+                            : t("devicesView.emptyView")
                     }
                     action={
                         canManage ? (
                             <Button size="sm" onClick={() => setConnecting(true)}>
                                 <Plus className="size-4 shrink-0" />
-                                Connect a device
+                                {t("devicesView.connect")}
                             </Button>
                         ) : undefined
                     }
@@ -289,18 +296,18 @@ export function DevicesView({
                             {account.status === "ok"
                                 ? account.lastSyncedAt
                                     ? format.time(account.lastSyncedAt)
-                                    : "not checked yet"
+                                    : t("devicesView.notChecked")
                                 : account.status === "unauthorized"
-                                  ? "refusing what it was given"
-                                  : "not answering"}
+                                  ? t("devicesView.refusing")
+                                  : t("devicesView.notAnswering")}
                         </span>
                         {canManage && (
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 className="size-6 p-0"
-                                aria-label={`Disconnect ${account.label}`}
-                                title={`Disconnect ${account.label}`}
+                                aria-label={t("devicesView.disconnectName", { name: account.label })}
+                                title={t("devicesView.disconnectName", { name: account.label })}
                                 onClick={() => setDisconnecting(account)}
                             >
                                 <Unplug className="size-3.5" />
@@ -312,14 +319,14 @@ export function DevicesView({
                 {canManage && (
                     <Button size="sm" onClick={() => setConnecting(true)}>
                         <Plus className="size-4 shrink-0" />
-                        Connect a device
+                        {t("devicesView.connect")}
                     </Button>
                 )}
                 <Button
                     size="sm"
                     variant="ghost"
-                    aria-label="Check again"
-                    title="Check again"
+                    aria-label={t("devicesView.checkAgain")}
+                    title={t("devicesView.checkAgain")}
                     disabled={refreshing}
                     onClick={() => void sync()}
                 >
@@ -336,13 +343,13 @@ export function DevicesView({
                     >
                         <p className="flex-1 text-sm text-danger">
                             {account.status === "unauthorized"
-                                ? `${account.label} is refusing what Polaris opens it with, so its devices are not being read. It was probably revoked.`
-                                : `${account.label} could not be reached, so its devices are as they were when it last answered.`}
-                            {account.statusNote ? ` ${account.statusNote}` : ""}
+                                ? t("devicesView.refused", { name: account.label })
+                                : t("devicesView.unreachable", { name: account.label })}
+                            {account.statusNote ? ` ${placesRefusalText(t, account.statusNote)}` : ""}
                         </p>
                         {canManage && account.status === "unauthorized" && (
                             <Button size="sm" onClick={() => setReconnecting(account)}>
-                                Reconnect
+                                {t("devicesView.reconnect")}
                             </Button>
                         )}
                     </div>
@@ -359,16 +366,14 @@ export function DevicesView({
 
             {devices.some((device) => device.placeId === null) && (
                 <p className="text-xs text-muted-foreground">
-                    An account arrives knowing what it holds and not where any of it is, so anything
-                    marked not placed is on every place&apos;s list. Open one to say which it
-                    belongs to.
+                    {t("devicesView.unplacedNote")}
                 </p>
             )}
 
             {devices.length === 0 ? (
                 <EmptyState
-                    title="The account answered with nothing."
-                    description="Check that this is the account the devices are on, and that what it was connected with may see them."
+                    title={t("devicesView.nothingTitle")}
+                    description={t("devicesView.nothingBody")}
                 />
             ) : (
                 <div className="flex flex-col gap-6">
@@ -405,24 +410,25 @@ export function DevicesView({
                                                     className={cn("shrink-0", stateClass(device))}
                                                 >
                                                     {!device.online
-                                                        ? "Not answering"
+                                                        ? t("devices.states.unknown")
                                                         : kinds.deviceKind(device.kind) === "sensor"
                                                           ? kinds.readingLine(device.reading) ||
-                                                            "Nothing read yet"
+                                                            t("devicesView.nothingRead")
                                                           : kinds.stateLabel(
                                                                 device.kind,
-                                                                device.state
+                                                                device.state,
+                                                                t
                                                             )}
                                                 </Badge>
                                                 {device.batteryCritical && (
                                                     <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
                                                         <BatteryLow className="size-3 shrink-0" />
-                                                        Battery
+                                                        {t("power.labels.battery")}
                                                     </Badge>
                                                 )}
                                                 {device.placeId === null && (
                                                     <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
-                                                        Not placed
+                                                        {t("devicesView.notPlaced")}
                                                     </Badge>
                                                 )}
                                             </span>
@@ -432,10 +438,10 @@ export function DevicesView({
                                                     device.model,
                                                     device.doorState === "none"
                                                         ? null
-                                                        : kinds.DOOR_STATE_LABELS[device.doorState],
+                                                        : kinds.doorText(device.doorState, t),
                                                     device.batteryPercent === null
                                                         ? null
-                                                        : `Battery ${device.batteryPercent}%`
+                                                        : t("devicesView.batteryPercent", { percent: device.batteryPercent })
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" - ")}
@@ -486,9 +492,14 @@ export function DevicesView({
                 onOpenChange={(open) => (open ? undefined : setDisconnecting(null))}
                 name={disconnecting?.label ?? ""}
                 kind="connection"
+                title={t("devicesView.disconnectTitle")}
+                question={t.rich("devicesView.disconnectQuestion", {
+                    name: disconnecting?.label ?? "",
+                    em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
+                })}
                 requireTyping={false}
-                description="Its devices go with it, and so does everything they have done. Polaris keeps no copy of a building it has been told it has no business with."
-                confirmLabel="Disconnect"
+                description={t("devicesView.disconnectBody")}
+                confirmLabel={t("devicesView.disconnect")}
                 onConfirm={disconnect}
             />
         </div>
