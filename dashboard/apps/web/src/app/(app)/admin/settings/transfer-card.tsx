@@ -16,7 +16,7 @@ import { Loader2 } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { BREACHED_PASSWORD_MESSAGE, IDENTITY_PASSWORD_MESSAGE } from "@polaris/core";
+import { validationMessage } from "@/components/i18n/validation-message";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
@@ -31,7 +31,7 @@ function tooShort(value: string): boolean {
 export function TransferCard({ identity }: { identity: readonly string[] }) {
     const format = useDisplayFormat();
     const t = useTranslations("admin");
-    const tc = useTranslations("common");
+    const tv = useTranslations("validation");
     const [exportPass, setExportPass] = useState("");
     const [exportConfirm, setExportConfirm] = useState("");
     const [exporting, setExporting] = useState(false);
@@ -47,14 +47,9 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
 
     // The file is only as safe as this passphrase once it leaves: one already in a
     // breach list, or made of this deployment's own name, is the first guess.
-    // The hook answers in the shared English sentences; they are the two it can give.
+    // The hook answers in core's shared English sentences, translated here.
     const unsafe = usePasswordSafety(exportPass, ["polaris", ...identity]);
-    const unsafeText =
-        unsafe === BREACHED_PASSWORD_MESSAGE
-            ? tc("passwordSafety.breached")
-            : unsafe === IDENTITY_PASSWORD_MESSAGE
-              ? tc("passwordSafety.identity")
-              : unsafe;
+    const unsafeText = unsafe === null ? null : validationMessage(tv, unsafe);
     const exportProblem =
         (tooShort(exportPass) ? t("settings.transfer.tooShort", { min: MIN_PASSPHRASE }) : null) ??
         unsafeText ??

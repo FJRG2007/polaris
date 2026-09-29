@@ -24,7 +24,7 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 import { changePasswordAction, recoverPasswordAction } from "./actions";
 import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
 import { Feedback } from "./setting-card";
-import { knownMessage, questionLabel } from "./known-messages";
+import { knownMessage, questionLabel } from "./known-sentences";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ChangePasswordDialog({

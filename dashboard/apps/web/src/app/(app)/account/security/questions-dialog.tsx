@@ -16,7 +16,7 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 import { clearSecurityQuestionsAction, setSecurityQuestionsAction } from "./actions";
 import { Feedback } from "./setting-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { knownMessage, questionLabel } from "./known-messages";
+import { knownMessage, questionLabel } from "./known-sentences";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const CUSTOM = "__custom__";

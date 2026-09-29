@@ -19,7 +19,7 @@ import { PlainNames } from "@/components/person-name";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
-        <Messages namespaces={["admin"]}>
+        <Messages namespaces={["admin", "validation"]}>
             <PlainNames>{children}</PlainNames>
         </Messages>
     );

@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
@@ -22,7 +23,7 @@ vi.mock("../../src/app/(app)/account/security/two-factor-actions", () => ({
 const { BackupCodesCard } = await import("../../src/app/(app)/account/security/backup-codes-card");
 
 function render(props: { twoFactorEnabled: boolean; remaining: number | null; lock?: { reason: string } }): string {
-    return renderToStaticMarkup(<BackupCodesCard {...props} />);
+    return renderToStaticMarkup(withMessages(<BackupCodesCard {...props} />));
 }
 
 describe("the backup codes card", () => {

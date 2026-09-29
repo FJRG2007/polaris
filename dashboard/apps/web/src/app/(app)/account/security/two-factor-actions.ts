@@ -20,7 +20,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
-import { methodLabel } from "./known-messages";
+import { methodLabel } from "./known-sentences";
 import { firstIssue, localized } from "./action-messages";
 import { normalizePeerId } from "@/lib/messaging-service";
 import { bridgeSend } from "@/lib/messaging/bridge-client";

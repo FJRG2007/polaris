@@ -1,1 +1,379 @@
-{}
+{
+    "form": {
+        "name": "Nombre",
+        "handle": "Identificador",
+        "description": "Descripción",
+        "create": "Crear",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "identifier": "Correo o nombre de usuario",
+        "identifierPlaceholder": "alguien@example.com",
+        "role": "Rol",
+        "roleFor": "Rol de {name}",
+        "you": "(tú)",
+        "leave": "Salir",
+        "remove": "Quitar",
+        "removeName": "Quitar a {name}",
+        "delete": "Eliminar",
+        "ofLimit": "{count} de {limit}"
+    },
+    "list": {
+        "title": "Organizaciones",
+        "intro": "Trabajo que pertenece a un grupo y no a ti. Los miembros llegan a él a través de los equipos a los que la organización da sus espacios.",
+        "none": "Todavía no formas parte de ninguna organización.",
+        "count": "{count, plural, one {# organización} other {# organizaciones}}",
+        "new": "Nueva organización",
+        "emptyTitle": "Una organización es dueña de espacios en nombre de un grupo.",
+        "emptyBody": "Añade personas a su plantilla, agrúpalas en equipos y da un espacio a un equipo. Así, unirse al equipo es lo único que hace falta para llegar al trabajo.",
+        "teams": "{count, plural, one {# equipo} other {# equipos}}",
+        "spaces": "{count, plural, one {# espacio} other {# espacios}}",
+        "invitations": {
+            "heading": "{count, plural, one {Tienes una invitación} other {Tienes # invitaciones}}",
+            "askedBy": "{name} te ha invitado a unirte como {role}",
+            "accept": "Aceptar",
+            "decline": "Rechazar la invitación a {org}"
+        },
+        "restricted": {
+            "hint": "Solo llegas a lo que alguien de allí te ha concedido directamente.",
+            "leaveTitle": "¿Salir de {org}?",
+            "leaveBody": "Pierdes todo lo que te concedió. Alguien de allí puede volver a invitarte."
+        },
+        "create": {
+            "title": "Nueva organización",
+            "body": "Será tuya. Después añade personas a su plantilla y ponlas en equipos.",
+            "bodyWithLimit": "Será tuya. Después añade personas a su plantilla y ponlas en equipos. Este Polaris permite hasta {limit} miembros.",
+            "namePlaceholder": "Acme Diseño",
+            "handlePlaceholder": "acme-diseno",
+            "handleHint": "Se usa en los enlaces. No puede ser uno con el que ya inicie sesión una cuenta.",
+            "descriptionPlaceholder": "Para qué es esta organización"
+        }
+    },
+    "overview": {
+        "tiles": {
+            "people": "Personas",
+            "teams": "Equipos",
+            "spaces": "Espacios",
+            "roles": "Roles",
+            "domains": "Dominios",
+            "services": "Servicios"
+        },
+        "recently": "Recientemente",
+        "allActivity": "Toda la actividad",
+        "nothingYet": "Aquí todavía no se ha hecho nada.",
+        "started": "Creada en {year} por {name}."
+    },
+    "activity": {
+        "title": "Actividad",
+        "intro": "Todo lo que se ha hecho en {org}: sus personas, sus equipos, sus roles, sus dominios y su trabajo. Lo que alguien hace en su propia cuenta no aparece aquí.",
+        "who": "Quién",
+        "empty": "Aquí todavía no se ha hecho nada."
+    },
+    "billing": {
+        "title": "Facturación",
+        "intro": "Lo que usaron cada mes los proyectos de {org}, con las tarifas de este Polaris, y el presupuesto con el que se compara.",
+        "refresh": "Actualizar",
+        "stale": "Se muestra el último extracto leído. {reason}",
+        "empty": "Esta organización todavía no tiene proyectos. Un proyecto creado mientras es el estante abierto le pertenece."
+    },
+    "budget": {
+        "title": "Presupuesto mensual",
+        "noPrices": "Este Polaris no tiene precios configurados, así que el extracto solo muestra el uso y no hay nada con lo que comparar un presupuesto.",
+        "setPrices": "Configurar precios",
+        "adminsSetThem": "Los configuran sus administradores.",
+        "whoIsTold": "Quienes gestionan los ajustes de esta organización reciben un aviso cuando un mes llega al {thresholds} del presupuesto.",
+        "threshold": "{value} %",
+        "spentOf": "{spent} de {amount}",
+        "otherCurrency": "Este presupuesto se fijó en {was} y ahora los precios están en {now}. Vuelve a fijarlo en {now} para que se siga midiendo.",
+        "used": "Presupuesto usado",
+        "usedShare": "{share} % usado.",
+        "usedShareIn": "{share} % usado en {month}.",
+        "inputLabel": "Presupuesto mensual en {currency}",
+        "perMonth": "{currency} al mes",
+        "save": "Guardar presupuesto",
+        "set": "Fijar presupuesto",
+        "remove": "Quitar el presupuesto",
+        "removeTitle": "¿Quitar el presupuesto?",
+        "removeBody": "Nadie recibirá un aviso cuando el gasto de esta organización supere el 80 % o el 100 % de un mes.",
+        "removeConfirm": "Quitar presupuesto"
+    },
+    "domains": {
+        "title": "Dominios",
+        "intro": "Dominios de {org}, para que sus servicios respondan en su propio nombre y no en el de este Polaris."
+    },
+    "spaces": {
+        "emptyTitle": "{org} todavía no tiene trabajo",
+        "emptyBody": "Cambia a {org} en la cabecera y crea un espacio en Tareas. Pertenecerá a la organización y no a ti, y seguirá ahí aunque alguien se vaya.",
+        "openTasks": "Abrir Tareas",
+        "archived": "archivado",
+        "reachedBy": "{count, plural, one {# tarea} other {# tareas}} - llegan {teams}",
+        "openToRoster": "{count, plural, one {# tarea} other {# tareas}} - abierto a toda esta plantilla",
+        "noTeam": "{count, plural, one {# tarea} other {# tareas}} - todavía no llega ningún equipo",
+        "footer": "Un equipo llega a un espacio porque se le ha concedido, y eso se hace desde los ajustes de acceso del propio espacio en Tareas."
+    },
+    "people": {
+        "title": "Personas",
+        "search": "Buscar personas",
+        "columns": {
+            "person": "Persona",
+            "teams": "Equipos",
+            "joined": "Se unió",
+            "role": "Rol"
+        },
+        "noMatch": "Aquí nadie coincide con «{query}».",
+        "noTeams": "Ninguno",
+        "leaveOrg": "Salir de esta organización",
+        "leaveTitle": "¿Salir de esta organización?",
+        "leaveBody": "Perderás todo lo que te dieron sus equipos.",
+        "removeTitle": "¿Quitar a {name}?",
+        "removeBody": "También sale de todos los equipos de aquí y pierde aquello a lo que llegaban esos equipos.",
+        "waiting": "Pendiente de aceptar",
+        "emailedBy": "Enviada por correo por {name}",
+        "notEmailed": "Todavía no se ha enviado por correo - invitó {name}",
+        "invitedBy": "Invitó {name}",
+        "invitedByWithContact": "Invitó {name} - {contact}",
+        "until": "Hasta el {date}",
+        "sendAgain": "Reenviar",
+        "sendAgainLabel": "Reenviar la invitación a {email}",
+        "sendAgainFailed": "{reason} Copia el enlace nuevo desde Invitar a alguien.",
+        "sentAgain": "Reenviada a {email}.",
+        "withdraw": "Retirar",
+        "withdrawLabel": "Retirar la invitación a {name}",
+        "withdrawTitle": "¿Retirar la invitación a {name}?",
+        "withdrawEmailBody": "El enlace deja de funcionar al momento. No se le avisa.",
+        "withdrawAccountBody": "No se le avisa. Puedes volver a invitarle cuando quieras.",
+        "invite": {
+            "title": "Invitar a alguien",
+            "submit": "Invitar",
+            "notEmailed": "La invitación se ha creado pero no se ha podido enviar por correo. Copia el enlace de abajo.",
+            "emailed": "Invitación enviada por correo a {email}.",
+            "sent": "Invitación enviada. La verá la próxima vez que inicie sesión.",
+            "full": "Este Polaris permite {limit} miembros por organización, contando las invitaciones que nadie ha respondido.",
+            "rolesHint": "Lo que puede hacer este rol se configura en <roles>Roles</roles>.",
+            "newPeople": "Un correo sin cuenta detrás recibe un enlace que crea la cuenta y la une aquí.",
+            "existingOnly": "Desde aquí solo se puede invitar a personas que ya tienen cuenta.",
+            "linkHint": "Entrega tú este enlace. Funciona una vez y caduca en 7 días.",
+            "copyLink": "Copiar el enlace de invitación",
+            "copied": "Enlace copiado.",
+            "defaultRole": "Las invitaciones nuevas ofrecen {picker} por defecto.",
+            "defaultRoleLabel": "El rol que ofrecen por defecto las invitaciones nuevas"
+        }
+    },
+    "teams": {
+        "title": "Equipos",
+        "new": "Nuevo equipo",
+        "columns": {
+            "team": "Equipo",
+            "people": "Personas",
+            "reaches": "Llega a"
+        },
+        "empty": "Los espacios se dan a los equipos. Aquí todavía nada llega a ningún trabajo.",
+        "noGrants": "Nada todavía",
+        "grants": "{count, plural, one {# concesión} other {# concesiones}}",
+        "deleteLabel": "Eliminar {name}",
+        "deleteTitle": "¿Eliminar {name}?",
+        "deleteBody": "Todos sus miembros pierden aquello a lo que llegaba este equipo. El trabajo en sí no se toca.",
+        "full": "Este Polaris permite {limit} equipos por organización.",
+        "create": {
+            "title": "Nuevo equipo",
+            "body": "Añádele personas y luego dale un espacio en Tareas. Todos sus miembros llegan a ese espacio.",
+            "namePlaceholder": "Diseño",
+            "handlePlaceholder": "diseno",
+            "descriptionPlaceholder": "En qué trabaja este equipo"
+        },
+        "panel": {
+            "fallbackTitle": "Equipo",
+            "description": "{description} Todos sus miembros llegan a lo que se le haya dado.",
+            "defaultDescription": "Un equipo de {org}. Todos sus miembros llegan a lo que se le haya dado.",
+            "nobody": "Todavía no hay nadie en este equipo.",
+            "leave": "Salir de este equipo",
+            "add": "Añadir",
+            "addHint": "Tienen que estar ya en la organización. {hint}",
+            "reaches": "A qué llega este equipo",
+            "nothing": "Nada todavía. Un espacio se da a un equipo desde los ajustes de acceso del propio espacio en Tareas."
+        },
+        "roles": {
+            "member": "Miembro",
+            "maintainer": "Responsable"
+        },
+        "roleHints": {
+            "member": "Llega a todo lo que se ha concedido al equipo.",
+            "maintainer": "Lo mismo, y además añade y quita a las personas del equipo."
+        },
+        "spaceRoles": {
+            "guest": "Invitado",
+            "member": "Miembro",
+            "admin": "Administrador"
+        }
+    },
+    "roles": {
+        "intro": "Un rol decide qué puede hacer alguien en toda esta organización. Quién tiene cada uno se configura en <people>Personas</people>.",
+        "new": "Nuevo rol",
+        "builtIn": "integrado",
+        "noImplicitAccess": "sin acceso implícito",
+        "people": "{count, plural, one {# persona} other {# personas}}",
+        "deleteLabel": "Eliminar el rol {name}",
+        "deleteTitle": "¿Eliminar el rol {name}?",
+        "deleteNobody": "Nadie lo tiene, así que nadie pierde nada.",
+        "deleteSome": "{count, plural, one {# persona pasa} other {# personas pasan}} a ser Miembro y pierden lo que les daba este rol.",
+        "deleteConfirm": "Eliminar rol",
+        "locked": "Lo tiene todo aquí, incluido lo que añada una versión futura de Polaris. Es el rol que mantiene la organización en marcha, así que no se puede restringir.",
+        "restrictedNone": "Solo llega a lo que se le concede directamente: no a la plantilla, ni a los archivos, ni al trabajo interno.",
+        "restrictedSome": "{held} de {total} permisos, sin ver la plantilla, los archivos ni el trabajo interno.",
+        "plainNone": "Ve la organización y aquello a lo que llegan sus equipos, y nada más.",
+        "plainSome": "{held} de {total} permisos.",
+        "create": {
+            "title": "Nuevo rol",
+            "body": "Ponle el nombre del trabajo que la gente hace de verdad aquí. Todos los que lo tienen ven la organización; a qué más llega lo decides tú.",
+            "namePlaceholder": "Colaborador externo",
+            "handlePlaceholder": "colaborador",
+            "descriptionPlaceholder": "Para qué está aquí alguien con este rol"
+        },
+        "areas": {
+            "general": "General",
+            "people": "Personas",
+            "work": "Trabajo"
+        },
+        "permissions": {
+            "orgRead": "Ver la organización, sus personas y sus equipos",
+            "settingsManage": "Cambiar el nombre, el identificador, la descripción y la foto",
+            "activityRead": "Leer lo que se ha hecho aquí",
+            "peopleManage": "Añadir y quitar personas, y fijar su rol",
+            "teamsManage": "Crear equipos y gestionar sus miembros",
+            "rolesManage": "Definir qué pueden hacer los roles de la organización",
+            "spacesManage": "Crear y administrar los espacios de la organización",
+            "deployManage": "Desplegar y configurar los servicios de la organización",
+            "domainsManage": "Añadir y verificar los dominios de la organización",
+            "vaultManage": "Gestionar las colecciones y los miembros de la bóveda compartida",
+            "driveManage": "Añadir y cambiar los archivos de la organización",
+            "mailManage": "Repartir los buzones de la organización"
+        }
+    },
+    "settings": {
+        "chat": {
+            "title": "Chat",
+            "label": "Un chat propio",
+            "hint": "Las conversaciones entre las personas de aquí se quedan aquí, separadas de las que tienen con todos los demás. Cambian entre las dos igual que cambian de estante, en la cabecera. Si más adelante lo desactivas, las conversaciones vuelven en lugar de ocultarse."
+        },
+        "profile": {
+            "title": "Perfil",
+            "descriptionPlaceholder": "A qué se dedica esta organización"
+        },
+        "handle": {
+            "title": "Identificador",
+            "confirmTitle": "¿Cambiar el identificador?",
+            "confirmBody": "Todos los enlaces a /account/organizations/{slug} dejan de funcionar. Habrá que actualizar cualquier cosa que alguien haya apuntado.",
+            "confirm": "Cambiarlo",
+            "change": "Cambiar",
+            "hint": "Los enlaces que ya se han repartido dejarán de funcionar."
+        },
+        "transfer": {
+            "title": "Traspasarla",
+            "nobody": "Solo se puede traspasar la organización a alguien que ya esté en la plantilla, y todavía no hay nadie más.",
+            "to": "Traspasar a",
+            "newOwner": "Nuevo propietario",
+            "choose": "Elige a alguien",
+            "confirmTitle": "¿Traspasar {org} a {name}?",
+            "confirmBody": "Pasa a ser el propietario y tú sigues como administrador. Solo esa persona puede deshacerlo.",
+            "confirm": "Traspasar"
+        },
+        "danger": {
+            "title": "Eliminar",
+            "body": "Al eliminarla se van con ella {spaces, plural, one {# espacio} other {# espacios}} y {tasks, plural, one {# tarea} other {# tareas}}, junto con sus equipos, roles y dominios.",
+            "projects": "También se van sus {count, plural, one {# proyecto de despliegue} other {# proyectos de despliegue}}, y se detienen los servicios que ejecutan.",
+            "drive": "Su Drive y todo lo que contiene se van con ella.",
+            "button": "Eliminar organización",
+            "dialogBody": "Se eliminan con ella {spaces, plural, one {# espacio} other {# espacios}} y {tasks, plural, one {# tarea} other {# tareas}}, junto con sus equipos, roles y dominios.",
+            "cannotUndo": "Esto no se puede deshacer."
+        }
+    },
+    "successor": {
+        "title": "Sucesor",
+        "intro": "Alguien que puede cerrar esta organización si tú ya no estás. No recibe nada más: ni su trabajo, ni su plantilla, ni una forma de actuar como tú. Sin uno, responde por ella quien hayas nombrado en tu propia cuenta.",
+        "change": "Cambiar",
+        "nameOne": "Nombrar uno",
+        "removeLabel": "Quitar el sucesor de esta organización",
+        "fromAccount": "Desde tu cuenta",
+        "nobody": "Nadie. Nombra a alguien aquí o en tu propia cuenta, o esta organización no se podrá cerrar cuando ya no estés.",
+        "dialog": {
+            "removeTitle": "Quitar el sucesor de {org}",
+            "changeTitle": "Cambiar el sucesor de {org}",
+            "nameTitle": "Nombrar un sucesor para {org}",
+            "removeBody": "{name} deja de responder por {org}. Vuelve a encargarse quien hayas nombrado en tu propia cuenta, y puedes nombrar a alguien aquí cuando quieras.",
+            "who": "Quién",
+            "search": "Busca por nombre de usuario, nombre completo o correo",
+            "warning": "Podrá eliminar {org} y todo lo que contiene. No podrá leerla, abrirla ni cambiar nada de ella mientras tú estés. Esto no es un testamento y no está por encima de uno.",
+            "nameThem": "Nombrarle"
+        }
+    },
+    "mailboxes": {
+        "title": "Buzones",
+        "intro": "Direcciones que esta organización ha dado a su gente. Aparecen en Correo cuando la persona cambia a esta organización. Nadie de aquí puede leerlas.",
+        "handOne": "Repartir uno",
+        "empty": "Todavía ninguno. Reparte una dirección de la empresa y estará esperando a su titular la próxima vez que abra Correo en esta organización.",
+        "holderDetail": "{holder} - {detail}",
+        "takeBack": "Retirarlo",
+        "takeBackTitle": "¿Retirar {address}?",
+        "takeBackBody": "{holder} lo pierde aquí, junto con todo lo que Polaris guarda para él: el correo en caché, los filtros y plantillas que escribió, la firma y los borradores. El buzón en sí y su correo no se tocan, y se puede volver a repartir.",
+        "takenBack": "Se ha retirado {address}.",
+        "dialogTitle": "Repartir un buzón",
+        "done": "Ya lo tiene {holder}. Su correo está en camino.",
+        "whoFor": "Para quién es",
+        "states": {
+            "ok": "Conectando",
+            "auth": "Contraseña rechazada",
+            "unreachable": "No se puede contactar",
+            "never": "Aún sin probar"
+        }
+    },
+    "validation": {
+        "enterName": "Escribe un nombre",
+        "handleEdges": "No puede empezar ni terminar por -",
+        "roleHandleCharacters": "Usa letras, números o -",
+        "enterIdentifier": "Escribe un correo o un nombre de usuario",
+        "amountLike": "Escribe una cantidad como 250",
+        "enterAmount": "Escribe una cantidad",
+        "budgetPositive": "Un presupuesto tiene que ser mayor que cero",
+        "budgetTooLarge": "Eso es más de lo que Polaris puede controlar"
+    },
+    "errors": {
+        "checkDetails": "Revisa los datos y vuelve a intentarlo",
+        "checkHandle": "Revisa el identificador y vuelve a intentarlo",
+        "checkAmount": "Revisa la cantidad y vuelve a intentarlo",
+        "checkForm": "Revisa el formulario.",
+        "checkDetailsShort": "Revisa los datos.",
+        "confirmFirst": "Primero confirma que eres tú",
+        "pickRole": "Elige un rol",
+        "noSeparateChats": "Este Polaris no ofrece chats separados",
+        "createOrg": "No se ha podido crear la organización",
+        "saveOrg": "No se ha podido guardar la organización",
+        "saveThat": "No se ha podido guardar",
+        "changeHandle": "No se ha podido cambiar el identificador",
+        "handOver": "No se ha podido traspasar la organización",
+        "deleteOrg": "No se ha podido eliminar la organización",
+        "invite": "No se ha podido invitar a esa persona",
+        "resend": "No se ha podido reenviar esa invitación",
+        "withdraw": "No se ha podido retirar esa invitación",
+        "answer": "No se ha podido responder a esa invitación",
+        "changeRole": "No se ha podido cambiar ese rol",
+        "removePerson": "No se ha podido quitar a esa persona",
+        "createTeam": "No se ha podido crear el equipo",
+        "saveTeam": "No se ha podido guardar el equipo",
+        "deleteTeam": "No se ha podido eliminar el equipo",
+        "addToTeam": "No se ha podido añadir a esa persona al equipo",
+        "removeFromTeam": "No se ha podido quitar a esa persona del equipo",
+        "createRole": "No se ha podido crear el rol",
+        "saveRole": "No se ha podido guardar el rol",
+        "deleteRole": "No se ha podido eliminar el rol",
+        "readTeam": "No se ha podido leer el equipo",
+        "noPrices": "Este Polaris todavía no tiene precios configurados, así que un presupuesto no tiene con qué compararse.",
+        "saveBudget": "No se ha podido guardar el presupuesto. Vuelve a intentarlo.",
+        "removeBudget": "No se ha podido quitar el presupuesto. Vuelve a intentarlo.",
+        "orgGone": "Esa organización ya no existe",
+        "ownerOnly": "Solo el propietario puede nombrar quién se hace cargo de esta organización",
+        "sayWho": "Di quién",
+        "nameSuccessor": "No se ha podido nombrar a ese sucesor.",
+        "chooseHolder": "Elige para quién es este buzón.",
+        "handOut": "No se ha podido repartir ese buzón.",
+        "takeBack": "No se ha podido retirar ese buzón."
+    }
+}

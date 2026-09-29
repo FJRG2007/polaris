@@ -10,7 +10,7 @@
  * Server-only: it reads the request's language.
  */
 
-import { knownMessage } from "./known-messages";
+import { knownMessage } from "./known-sentences";
 import { getTranslations } from "@/lib/i18n/request";
 
 /** Translate a reply's error, when it has one. Anything else in it is untouched. */

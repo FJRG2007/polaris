@@ -68,5 +68,280 @@
             "defaultMax": "Tras 30 días sin usarla",
             "hint": "Para desbloquear se pide tu PIN, o tu contraseña si no tienes PIN."
         }
+    },
+    "errors": {
+        "needsProof": "Vuelve a confirmar que eres tú antes de cambiar esto.",
+        "noLongerConnected": "Esa cuenta ya no está conectada.",
+        "pickOfferedWait": "Elige una de las esperas que se ofrecen.",
+        "checkForm": "Revisa el formulario.",
+        "unreadable": "No se ha podido leer.",
+        "enterCode": "Introduce el código de 6 dígitos.",
+        "tooManyAttempts": "Demasiados intentos. Vuelve a intentarlo dentro de {minutes, plural, one {# minuto} other {# minutos}}.",
+        "tooManyCodes": "Se han pedido demasiados códigos. Vuelve a intentarlo dentro de {minutes, plural, one {# minuto} other {# minutos}}.",
+        "notVerified": "No hemos podido verificarlo. Revisa tus respuestas o el código y vuelve a intentarlo.",
+        "approvalNeedsPin": "Primero desactiva la aprobación de inicios de sesión desde una sesión abierta: pide este PIN.",
+        "authenticatorFirst": "Primero desactiva la app de autenticación: un inicio de sesión pide uno de los dos, no ambos.",
+        "pinFirst": "Primero configura un PIN de desbloqueo rápido: aprobar un inicio de sesión lo pide.",
+        "connectWhatsAppFirst": "Primero conecta uno de tus canales de WhatsApp: el código se envía por él.",
+        "messageNotSent": "No se ha podido enviar el mensaje.",
+        "methodCannotSend": "{method} todavía no puede enviar nada.",
+        "unknownPasskey": "Llave de acceso desconocida.",
+        "passkeyGone": "Esa llave de acceso ya no está en tu cuenta.",
+        "successorFailed": "No se ha podido nombrar a ese sucesor.",
+        "confirmFirst": "Primero confirma que eres tú.",
+        "codeNotSent": "No se ha podido enviar un código.",
+        "unknownSession": "Sesión desconocida.",
+        "useSignOut": "Usa Cerrar sesión para terminar esta sesión.",
+        "unknownSetting": "Ajuste desconocido.",
+        "sessionGone": "Esa sesión ya no está iniciada.",
+        "deviceForgotten": "Ese dispositivo ya no se recuerda.",
+        "unknownConnection": "Conexión desconocida.",
+        "connectionEnded": "Esa conexión ya ha terminado."
+    },
+    "phone": {
+        "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."
+    },
+    "sessions": {
+        "signedItselfOut": "{name} cerró su propia sesión."
+    },
+    "stepUp": {
+        "title": "Confirma que eres tú"
+    },
+    "dialog": {
+        "done": "Hecho",
+        "currentPassword": "Contraseña actual",
+        "waiting": "Esperando...",
+        "continue": "Continuar",
+        "accountPassword": "Contraseña de la cuenta",
+        "removing": "Quitando..."
+    },
+    "backupCodes": {
+        "title": "Códigos de respaldo",
+        "offDescription": "Códigos de un solo uso que te dejan entrar sin la app de autenticación. Vienen con ella.",
+        "description": "Códigos de un solo uso que sustituyen a la app de autenticación cuando no la tienes a mano.",
+        "unknown": "Desconocido",
+        "unreadable": "No se ha podido leer el juego guardado. Generar uno nuevo lo sustituye.",
+        "noneLeft": "No queda ninguno",
+        "allUsed": "Se han usado todos los códigos. Sin la app de autenticación no hay forma de volver a entrar.",
+        "left": "{count, plural, one {Queda #} other {Quedan #}}",
+        "runningLow": "Quedan pocos. Genera un juego nuevo antes de necesitarlo.",
+        "newCodes": "Códigos nuevos",
+        "notGenerated": "No se han podido generar los códigos.",
+        "newTitle": "Tus nuevos códigos de respaldo",
+        "generateTitle": "Generar nuevos códigos de respaldo",
+        "saveNow": "Guárdalos ahora. Es la única vez que se muestran.",
+        "oldStopWorking": "Tus códigos actuales dejan de funcionar al instante, también los que hayas impreso.",
+        "panelLabel": "Cada código funciona una vez. Guárdalos en algún sitio al que llegues sin el móvil.",
+        "panelDefault": "Códigos de respaldo: cada uno funciona una vez, guárdalos en un lugar seguro. No se vuelven a mostrar.",
+        "generating": "Generando...",
+        "generate": "Generar",
+        "copy": "Copiar",
+        "download": "Descargar",
+        "print": "Imprimir",
+        "formats": {
+            "txt": "Texto (.txt)",
+            "json": "JSON (.json)",
+            "csv": "CSV (.csv)",
+            "pdf": "PDF (.pdf)"
+        }
+    },
+    "connected": {
+        "title": "Cuentas conectadas",
+        "description": "Elige cuáles de las cuentas que has conectado pueden iniciar tu sesión.",
+        "empty": "No has conectado ninguna. Conecta una en Cuentas conectadas para usarla aquí.",
+        "stepUp": "Cambiar qué cuentas pueden iniciar tu sesión decide cómo se llega a esta cuenta. No se te volverá a pedir en un par de minutos.",
+        "allowed": "Iniciar sesión con esta cuenta de {provider}",
+        "notAllowed": "{provider} no está permitido como forma de entrar en este Polaris",
+        "switch": "Iniciar sesión con {account}",
+        "challenge": {
+            "title": "Pedir también mi segundo paso",
+            "description": "Al iniciar sesión así respondes primero al otro servicio, así que Polaris no vuelve a preguntar salvo que tú quieras.",
+            "label": "Pedir mi segundo paso después de que una cuenta conectada inicie mi sesión",
+            "enforced": "Este Polaris lo pide en todas las cuentas."
+        }
+    },
+    "lockdown": {
+        "title": "Bloquear esta cuenta",
+        "lockedTitle": "Esta cuenta está bloqueada",
+        "description": "Para cuando crees que otra persona ha entrado en tu cuenta y necesitas que todo se pare mientras averiguas qué ha pasado.",
+        "lockedDescription": "Seguirá así hasta que lo levantes. Se ha avisado a un administrador y lo está revisando.",
+        "effects": {
+            "protection": "No se puede cambiar nada de cómo está protegida tu cuenta: ni la contraseña, ni el segundo paso, ni una llave de acceso, ni una cuenta conectada.",
+            "signIn": "Ningún inicio de sesión nuevo funciona, por muy correcta que sea la contraseña.",
+            "devices": "Los dispositivos que ya tienen la sesión iniciada siguen funcionando, así que no te quedas fuera para levantarlo.",
+            "administrator": "Se avisa a un administrador, que revisa la cuenta."
+        },
+        "whatYouSaid": "Lo que dijiste: {note}",
+        "lift": "Levantar el bloqueo",
+        "lockItDown": "Bloquearla",
+        "leaving": {
+            "title": "Desactivar la cuenta o irte",
+            "description": "Las dos opciones cierran la sesión en todos los dispositivos. Basta con volver a iniciar sesión para deshacer cualquiera de ellas: no hay nada más que hacer ni nadie a quien pedírselo.",
+            "switchOff": "Desactivar temporalmente",
+            "delete": "Eliminar cuenta"
+        },
+        "confirm": {
+            "lockdown": {
+                "title": "¿Bloquear esta cuenta?",
+                "description": "No se puede cambiar nada de cómo está protegida y ningún inicio de sesión nuevo funciona. Los dispositivos que ya tienen la sesión iniciada siguen funcionando, así que puedes volver a levantarlo."
+            },
+            "lift": {
+                "title": "¿Levantar el bloqueo?",
+                "description": "Los inicios de sesión y los ajustes de seguridad vuelven a funcionar. Al administrador que revisa tu cuenta no le afecta en ningún caso.",
+                "confirm": "Levantarlo"
+            },
+            "disabled": {
+                "title": "¿Desactivar esta cuenta?",
+                "description": "Desaparece para todos los demás y se cierra la sesión en todos los dispositivos. Inicia sesión cuando quieras y vuelve al momento.",
+                "confirm": "Desactivarla"
+            },
+            "deleting": {
+                "title": "¿Eliminar esta cuenta?",
+                "description": "No se borra nada durante {days} días, y si inicias sesión antes se cancela. Después desaparece y no se puede recuperar.",
+                "confirm": "Eliminarla"
+            }
+        },
+        "noteLabel": "¿Qué está pasando?",
+        "notePlaceholder": "Opcional. Lo lee quien revise esto."
+    },
+    "passkeys": {
+        "title": "Llaves de acceso",
+        "description": "Inicia sesión con tu dispositivo en lugar de con una contraseña. Cada llave de acceso funciona en la dirección desde la que se añadió, así que añade una por cada dirección que uses.",
+        "nameTooLong": "Que tenga menos de {max} caracteres.",
+        "nameTaken": "Ya tienes una llave de acceso con este nombre.",
+        "notCompleted": "No se ha completado. Vuelve a intentarlo.",
+        "removeTitle": "¿Quitar {name}?",
+        "removeDescription": "Ese dispositivo ya no podrá iniciar sesión con esta llave de acceso.",
+        "remove": "Quitar",
+        "removeNamed": "Quitar {name}",
+        "columns": {
+            "name": "Nombre",
+            "addedFrom": "Añadida desde",
+            "address": "Dirección",
+            "worksOn": "Funciona en",
+            "added": "Añadida",
+            "lastUsed": "Último uso"
+        },
+        "empty": "Todavía no hay llaves de acceso. Añade una para iniciar sesión con este dispositivo.",
+        "browserOn": "{browser} en {os}",
+        "notRecorded": "Sin registrar",
+        "neverUsed": "Nunca usada",
+        "onIpAddress": "Estás en una dirección IP. Una llave de acceso necesita un nombre de host, así que abre Polaris en un dominio o en su nombre local para añadir una.",
+        "plainHttp": "Esta dirección se sirve por HTTP sin cifrar, y los navegadores solo crean llaves de acceso por HTTPS. Abre Polaris en {host} por HTTPS para añadir una.",
+        "noneHere": "Ninguna funciona en {host}. Añade una para iniciar sesión aquí con tu dispositivo.",
+        "namePlaceholder": "Pon nombre a este dispositivo",
+        "nameLabel": "Nombre de la llave de acceso",
+        "add": "Añadir una llave de acceso",
+        "confirmTitle": "Confirma tu contraseña",
+        "confirmDescription": "Añadir una llave de acceso añade una forma de entrar en tu cuenta, así que primero pide tu contraseña. Después te preguntará tu dispositivo.",
+        "naming": "Se llamará \"{name}\"."
+    },
+    "emailLink": {
+        "title": "Iniciar sesión con un enlace por correo",
+        "description": "Un enlace enviado a tu dirección abre la cuenta sin tu contraseña. Funciona una vez, caduca en 10 minutos y se sigue pidiendo tu segundo paso.",
+        "label": "Iniciar sesión con un enlace que me llegue por correo",
+        "cannotSend": "Este Polaris todavía no puede enviar correo, así que no hay adónde mandar el enlace."
+    },
+    "methods": {
+        "totp": {
+            "label": "App de autenticación"
+        },
+        "email": {
+            "label": "Código por correo"
+        },
+        "whatsapp": {
+            "label": "Código por WhatsApp"
+        }
+    },
+    "password": {
+        "changeTitle": "Cambiar la contraseña",
+        "minimum": "Usa al menos 10 caracteres.",
+        "mismatch": "Las contraseñas nuevas no coinciden.",
+        "changed": "Contraseña cambiada. Se ha cerrado la sesión en todas las demás sesiones.",
+        "new": "Contraseña nueva",
+        "confirm": "Confirma la contraseña nueva",
+        "changing": "Cambiando...",
+        "recoverTitle": "Establecer una contraseña nueva",
+        "recoverDescription": "Demuestra que eres tú sin tu contraseña actual y luego elige una nueva.",
+        "noWayToVerify": "Configura primero preguntas de seguridad o una app de autenticación: sin una de ellas no hay forma de verificarte aquí.",
+        "authenticator": "App de autenticación",
+        "authenticatorCode": "Código de la app de autenticación",
+        "set": "Contraseña establecida. Se ha cerrado la sesión en todas las demás sesiones.",
+        "setButton": "Establecer contraseña"
+    },
+    "pin": {
+        "setTitle": "Configurar un PIN de desbloqueo",
+        "changeTitle": "Cambiar tu PIN de desbloqueo",
+        "description": "De 4 a 6 dígitos, solo para volver a abrir un panel bloqueado.",
+        "pin": "PIN",
+        "confirm": "Confirma el PIN",
+        "save": "Guardar PIN",
+        "removeTitle": "Quitar tu PIN de desbloqueo",
+        "removeDescription": "Entonces un panel bloqueado pedirá tu contraseña.",
+        "remove": "Quitar PIN"
+    },
+    "questions": {
+        "writeOwn": "Escribir mi propia pregunta",
+        "duplicate": "Usa una pregunta distinta para cada respuesta.",
+        "description": "Hay que responder bien las {count} para establecer una contraseña nueva sin la anterior.",
+        "number": "Pregunta {number}",
+        "yourQuestion": "Tu pregunta",
+        "answer": "Respuesta",
+        "save": "Guardar preguntas",
+        "removeTitle": "Quitar las preguntas de seguridad",
+        "removeDescription": "Sin ellas, una contraseña olvidada solo se puede recuperar con un código de la app de autenticación.",
+        "suggestions": {
+            "pet": "¿Cómo se llamaba tu primera mascota?",
+            "city": "¿En qué ciudad naciste?",
+            "car": "¿De qué marca era tu primer coche?",
+            "sibling": "¿Cuál es el segundo nombre de tu hermano o hermana mayor?",
+            "school": "¿Cómo se llamaba tu primer colegio?",
+            "street": "¿En qué calle vivías a los diez años?"
+        }
+    },
+    "known": {
+        "lockedDown": "Tu cuenta está bloqueada. Levanta el bloqueo en Seguridad antes de cambiar nada más.",
+        "wrongPassword": "La contraseña actual no es correcta.",
+        "passkeyUnnamed": "Pon nombre a esta llave de acceso antes de añadirla.",
+        "passkeyNameTaken": "Ya tienes una llave de acceso con ese nombre.",
+        "noCodesIssued": "No se ha emitido ningún código. Vuelve a intentarlo.",
+        "addPhoneFirst": "Primero añade un número de teléfono.",
+        "phoneAlreadyConfirmed": "Ese número ya está confirmado.",
+        "askForCodeFirst": "Primero pide un código.",
+        "codeExpired": "Ese código ha caducado. Pide uno nuevo.",
+        "tooManyWrongTries": "Demasiados intentos fallidos. Pide un código nuevo.",
+        "wrongCode": "Ese código no es correcto.",
+        "notAWayToConfirm": "Esa no es una forma con la que esta cuenta pueda confirmar.",
+        "wrongStepUpPassword": "Esa contraseña no es correcta.",
+        "signInNotWaiting": "Ese inicio de sesión ya no está esperando.",
+        "wrongPin": "Ese PIN no es correcto.",
+        "reportSelf": "No puedes denunciarte a ti mismo.",
+        "reportFailed": "No se ha podido denunciar esa cuenta.",
+        "sameAsVault": "Esa es la contraseña maestra de tu bóveda. Si son la misma, quien descubra una tendrá también la bóveda.",
+        "successorAmbiguous": "Hay más de una cuenta con ese nombre: usa su nombre de usuario o su correo",
+        "successorNoMatch": "Ninguna cuenta coincide con ese nombre de usuario, nombre o correo",
+        "successorSelf": "Nombra a otra persona: no puedes ser tu propio sucesor",
+        "successorFailed": "No se ha podido nombrar a ese sucesor",
+        "noConfirmedAddress": "No hay ningún correo confirmado en tu cuenta.",
+        "noEmailChannel": "Polaris no tiene ningún canal de correo desde el que enviar.",
+        "confirmPhoneFirst": "Primero confirma un número de teléfono en tu perfil.",
+        "noWhatsAppChannel": "Ninguno de tus canales de WhatsApp está conectado.",
+        "noAuthenticator": "Esta cuenta no tiene configurada ninguna app de autenticación.",
+        "twoStepOff": "La verificación en dos pasos está desactivada.",
+        "pinDigits": "Usa de 4 a 6 dígitos",
+        "pinsDiffer": "Los PIN no coinciden",
+        "unsupportedLock": "Tiempo de bloqueo no admitido",
+        "unsupportedLifetime": "Duración de sesión no admitida",
+        "unsupportedWait": "Espera no admitida",
+        "answerTooShort": "La respuesta es demasiado corta",
+        "answerTooLong": "La respuesta es demasiado larga",
+        "questionTooShort": "La pregunta es demasiado corta",
+        "enterCode": "Introduce el código de 6 dígitos",
+        "answerOrCode": "Responde a tus preguntas de seguridad o usa un código de la app de autenticación",
+        "methodOffDefault": "Activa el método antes de hacerlo el predeterminado",
+        "phoneFormat": "Usa el formato internacional, por ejemplo +34600111222",
+        "enterPassword": "Introduce tu contraseña",
+        "passwordMinLength": "La contraseña nueva debe tener al menos {count} caracteres.",
+        "setQuestions": "Configura {count} preguntas"
     }
 }

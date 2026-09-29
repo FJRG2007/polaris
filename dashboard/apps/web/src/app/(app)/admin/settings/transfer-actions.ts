@@ -44,9 +44,9 @@ export async function exportInstanceAction(
     const parsed = passphraseSchema.safeParse(passphrase);
     if (!parsed.success) return { error: await passphraseRefusal(passphrase) };
     // Asked again here: the screen's answer is advice the server does not take on trust.
-    const tc = await getTranslations("common");
-    if (passwordMatchesIdentity(parsed.data, ["polaris", user.email, user.name])) return { error: tc("passwordSafety.identity") };
-    if (await passwordIsBreached(parsed.data)) return { error: tc("passwordSafety.breached") };
+    const tv = await getTranslations("validation");
+    if (passwordMatchesIdentity(parsed.data, ["polaris", user.email, user.name])) return { error: tv("passwordIdentity") };
+    if (await passwordIsBreached(parsed.data)) return { error: tv("passwordBreached") };
     const file = await newTransferFile();
     try {
         const summary = await transfer.exportInstance(parsed.data, file.path);

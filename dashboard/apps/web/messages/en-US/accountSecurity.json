@@ -68,5 +68,280 @@
             "defaultMax": "After 30 days unused",
             "hint": "Unlocking asks for your PIN, or your password when no PIN is set."
         }
+    },
+    "errors": {
+        "needsProof": "Confirm it is you again before changing this.",
+        "noLongerConnected": "That account is no longer connected.",
+        "pickOfferedWait": "Pick one of the offered waits.",
+        "checkForm": "Check the form.",
+        "unreadable": "That could not be read.",
+        "enterCode": "Enter the 6-digit code.",
+        "tooManyAttempts": "Too many attempts. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "tooManyCodes": "Too many codes asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "notVerified": "We could not verify that. Check your answers or code and try again.",
+        "approvalNeedsPin": "Turn off approving sign-ins from an open session first - it asks for this PIN.",
+        "authenticatorFirst": "Turn the authenticator app off first - a sign-in asks for one of the two, not both.",
+        "pinFirst": "Set a quick unlock PIN first - approving a sign-in asks for it.",
+        "connectWhatsAppFirst": "Connect one of your WhatsApp channels first - the code is sent through it.",
+        "messageNotSent": "The message could not be sent.",
+        "methodCannotSend": "{method} cannot send anything yet.",
+        "unknownPasskey": "Unknown passkey.",
+        "passkeyGone": "That passkey is no longer on your account.",
+        "successorFailed": "Could not name that successor.",
+        "confirmFirst": "Confirm it is you first.",
+        "codeNotSent": "Could not send a code.",
+        "unknownSession": "Unknown session.",
+        "useSignOut": "Use Sign out to end this session.",
+        "unknownSetting": "Unknown setting.",
+        "sessionGone": "That session is no longer signed in.",
+        "deviceForgotten": "That device is no longer remembered.",
+        "unknownConnection": "Unknown connection.",
+        "connectionEnded": "That connection has already ended."
+    },
+    "phone": {
+        "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."
+    },
+    "sessions": {
+        "signedItselfOut": "{name} signed itself out."
+    },
+    "stepUp": {
+        "title": "Confirm it is you"
+    },
+    "dialog": {
+        "done": "Done",
+        "currentPassword": "Current password",
+        "waiting": "Waiting...",
+        "continue": "Continue",
+        "accountPassword": "Account password",
+        "removing": "Removing..."
+    },
+    "backupCodes": {
+        "title": "Backup codes",
+        "offDescription": "Single-use codes that get you in without the authenticator. They come with it.",
+        "description": "Single-use codes that stand in for the authenticator when you cannot reach it.",
+        "unknown": "Unknown",
+        "unreadable": "The stored set could not be read. Generating a new one replaces it.",
+        "noneLeft": "None left",
+        "allUsed": "Every code has been used. Without the authenticator there is no way back in.",
+        "left": "{count} left",
+        "runningLow": "Running low. Generate a new set before you need one.",
+        "newCodes": "New codes",
+        "notGenerated": "The codes could not be generated.",
+        "newTitle": "Your new backup codes",
+        "generateTitle": "Generate new backup codes",
+        "saveNow": "Save these now. This is the only time they are shown.",
+        "oldStopWorking": "Your current codes stop working straight away, including any you have printed.",
+        "panelLabel": "Each code works once. Keep them somewhere you can reach without your phone.",
+        "panelDefault": "Backup codes - each works once, store them somewhere safe. They are not shown again.",
+        "generating": "Generating...",
+        "generate": "Generate",
+        "copy": "Copy",
+        "download": "Download",
+        "print": "Print",
+        "formats": {
+            "txt": "Text (.txt)",
+            "json": "JSON (.json)",
+            "csv": "CSV (.csv)",
+            "pdf": "PDF (.pdf)"
+        }
+    },
+    "connected": {
+        "title": "Connected accounts",
+        "description": "Choose which of the accounts you have connected can sign you in.",
+        "empty": "You have not connected any. Connect one under Connected accounts to use it here.",
+        "stepUp": "Changing which accounts can sign you in decides how this account is reached. You will not be asked again for a couple of minutes.",
+        "allowed": "Sign in with this {provider} account",
+        "notAllowed": "{provider} is not allowed as a way in on this Polaris",
+        "switch": "Sign in with {account}",
+        "challenge": {
+            "title": "Ask for my second step too",
+            "description": "Signing in this way answers the other service first, so Polaris does not ask again unless you want it to.",
+            "label": "Ask for my second step after a connected account signs me in",
+            "enforced": "This Polaris asks for it on every account."
+        }
+    },
+    "lockdown": {
+        "title": "Lock this account down",
+        "lockedTitle": "This account is locked down",
+        "description": "For when you think somebody else is in your account and you need everything to stop while you work out what happened.",
+        "lockedDescription": "It stays this way until you lift it. An administrator has been told and is looking at it.",
+        "effects": {
+            "protection": "Nothing about how your account is protected can be changed - not the password, not the second step, not a passkey, not a connected account.",
+            "signIn": "No new sign-in works, however correct the password is.",
+            "devices": "The devices already signed in keep working, so you do not lock yourself out of lifting it.",
+            "administrator": "An administrator is told, and looks at the account."
+        },
+        "whatYouSaid": "What you said: {note}",
+        "lift": "Lift the lockdown",
+        "lockItDown": "Lock it down",
+        "leaving": {
+            "title": "Switching off, and leaving",
+            "description": "Both sign out every device. Signing in again is all it takes to undo either - there is nothing else to do and nobody to ask.",
+            "switchOff": "Switch off temporarily",
+            "delete": "Delete account"
+        },
+        "confirm": {
+            "lockdown": {
+                "title": "Lock this account down?",
+                "description": "Nothing about how it is protected can be changed and no new sign-in works. The devices already signed in keep working, so you can lift it again."
+            },
+            "lift": {
+                "title": "Lift the lockdown?",
+                "description": "Sign-ins and security settings work again. The administrator looking at your account is not affected either way.",
+                "confirm": "Lift it"
+            },
+            "disabled": {
+                "title": "Switch this account off?",
+                "description": "It disappears for everybody else and every device is signed out. Sign in whenever you like and it comes straight back.",
+                "confirm": "Switch it off"
+            },
+            "deleting": {
+                "title": "Delete this account?",
+                "description": "Nothing is removed for {days} days, and signing in before then calls it off. After that it is gone and cannot be brought back.",
+                "confirm": "Delete it"
+            }
+        },
+        "noteLabel": "What is happening?",
+        "notePlaceholder": "Optional. Whoever looks at this reads it."
+    },
+    "passkeys": {
+        "title": "Passkeys",
+        "description": "Sign in with your device instead of a password. Each passkey works on the address it was added from, so add one per address you use.",
+        "nameTooLong": "Keep it under {max} characters.",
+        "nameTaken": "You already have a passkey with this name.",
+        "notCompleted": "That did not complete. Try again.",
+        "removeTitle": "Remove {name}?",
+        "removeDescription": "That device can no longer sign in with this passkey.",
+        "remove": "Remove",
+        "removeNamed": "Remove {name}",
+        "columns": {
+            "name": "Name",
+            "addedFrom": "Added from",
+            "address": "Address",
+            "worksOn": "Works on",
+            "added": "Added",
+            "lastUsed": "Last used"
+        },
+        "empty": "No passkeys yet. Add one to sign in with this device.",
+        "browserOn": "{browser} on {os}",
+        "notRecorded": "Not recorded",
+        "neverUsed": "Never used",
+        "onIpAddress": "You are on an IP address. A passkey needs a hostname, so open Polaris on a domain or on its local name to add one.",
+        "plainHttp": "This address is served over plain HTTP, and browsers only create passkeys over HTTPS. Open Polaris on {host} over HTTPS to add one.",
+        "noneHere": "None of these work on {host}. Add one to sign in here with your device.",
+        "namePlaceholder": "Name this device",
+        "nameLabel": "Passkey name",
+        "add": "Add a passkey",
+        "confirmTitle": "Confirm your password",
+        "confirmDescription": "Adding a passkey adds a way into your account, so it asks for your password first. Your device will prompt you next.",
+        "naming": "Naming it \"{name}\"."
+    },
+    "emailLink": {
+        "title": "Sign in with an emailed link",
+        "description": "A link sent to your address opens the account without your password. It works once, expires in 10 minutes, and your second step is still asked for.",
+        "label": "Sign in with a link emailed to me",
+        "cannotSend": "This Polaris cannot send email yet, so there is nowhere to send the link."
+    },
+    "methods": {
+        "totp": {
+            "label": "Authenticator app"
+        },
+        "email": {
+            "label": "Email code"
+        },
+        "whatsapp": {
+            "label": "WhatsApp code"
+        }
+    },
+    "password": {
+        "changeTitle": "Change password",
+        "minimum": "Use at least 10 characters.",
+        "mismatch": "The new passwords do not match.",
+        "changed": "Password changed. Every other session was signed out.",
+        "new": "New password",
+        "confirm": "Confirm new password",
+        "changing": "Changing...",
+        "recoverTitle": "Set a new password",
+        "recoverDescription": "Prove it is you without your current password, then choose a new one.",
+        "noWayToVerify": "Set security questions or an authenticator first - without one of them there is no way to verify you here.",
+        "authenticator": "Authenticator",
+        "authenticatorCode": "Authenticator code",
+        "set": "Password set. Every other session was signed out.",
+        "setButton": "Set password"
+    },
+    "pin": {
+        "setTitle": "Set an unlock PIN",
+        "changeTitle": "Change your unlock PIN",
+        "description": "4 to 6 digits, used only to reopen a locked dashboard.",
+        "pin": "PIN",
+        "confirm": "Confirm PIN",
+        "save": "Save PIN",
+        "removeTitle": "Remove your unlock PIN",
+        "removeDescription": "A locked dashboard will then ask for your password.",
+        "remove": "Remove PIN"
+    },
+    "questions": {
+        "writeOwn": "Write my own question",
+        "duplicate": "Use a different question for each answer.",
+        "description": "All {count} must be answered correctly to set a new password without the old one.",
+        "number": "Question {number}",
+        "yourQuestion": "Your question",
+        "answer": "Answer",
+        "save": "Save questions",
+        "removeTitle": "Remove security questions",
+        "removeDescription": "Without them, a forgotten password can only be recovered with an authenticator code.",
+        "suggestions": {
+            "pet": "What was the name of your first pet?",
+            "city": "What city were you born in?",
+            "car": "What was the make of your first car?",
+            "sibling": "What is your oldest sibling's middle name?",
+            "school": "What was the name of your first school?",
+            "street": "What street did you live on at age ten?"
+        }
+    },
+    "known": {
+        "lockedDown": "Your account is locked down. Lift it under Security before changing anything else.",
+        "wrongPassword": "Current password is incorrect.",
+        "passkeyUnnamed": "Name this passkey before adding it.",
+        "passkeyNameTaken": "One of your passkeys is already called that.",
+        "noCodesIssued": "No codes were issued. Try again.",
+        "addPhoneFirst": "Add a phone number first.",
+        "phoneAlreadyConfirmed": "That number is already confirmed.",
+        "askForCodeFirst": "Ask for a code first.",
+        "codeExpired": "That code has expired. Ask for a new one.",
+        "tooManyWrongTries": "Too many wrong tries. Ask for a new code.",
+        "wrongCode": "That code is not right.",
+        "notAWayToConfirm": "That is not a way this account can confirm.",
+        "wrongStepUpPassword": "That password is not right.",
+        "signInNotWaiting": "That sign-in is no longer waiting.",
+        "wrongPin": "That PIN is not right.",
+        "reportSelf": "You cannot report yourself.",
+        "reportFailed": "That account could not be reported.",
+        "sameAsVault": "That is your vault's master password. If they are the same, whoever learns one has the vault as well.",
+        "successorAmbiguous": "More than one account has that name - use their username or email address",
+        "successorNoMatch": "No account matches that username, name or email address",
+        "successorSelf": "Name somebody else - you cannot succeed yourself",
+        "successorFailed": "Could not name that successor",
+        "noConfirmedAddress": "No confirmed address on your account.",
+        "noEmailChannel": "Polaris has no email channel to send from.",
+        "confirmPhoneFirst": "Confirm a phone number on your profile first.",
+        "noWhatsAppChannel": "None of your WhatsApp channels is connected.",
+        "noAuthenticator": "No authenticator is set up on this account.",
+        "twoStepOff": "Two-step verification is off.",
+        "pinDigits": "Use 4 to 6 digits",
+        "pinsDiffer": "The PINs do not match",
+        "unsupportedLock": "Unsupported lock timeout",
+        "unsupportedLifetime": "Unsupported session lifetime",
+        "unsupportedWait": "Unsupported wait",
+        "answerTooShort": "Answer is too short",
+        "answerTooLong": "Answer is too long",
+        "questionTooShort": "Question is too short",
+        "enterCode": "Enter the 6-digit code",
+        "answerOrCode": "Answer your security questions or use an authenticator code",
+        "methodOffDefault": "Turn the method on before making it the default",
+        "phoneFormat": "Use the international form, for example +34600111222",
+        "enterPassword": "Enter your password",
+        "passwordMinLength": "New password must be at least {count} characters.",
+        "setQuestions": "Set {count} questions"
     }
 }

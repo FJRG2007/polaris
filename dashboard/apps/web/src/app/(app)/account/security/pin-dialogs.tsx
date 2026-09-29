@@ -14,7 +14,7 @@ import { setPinSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
 import { Feedback } from "./setting-card";
-import { knownMessage } from "./known-messages";
+import { knownMessage } from "./known-sentences";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function SetPinDialog({

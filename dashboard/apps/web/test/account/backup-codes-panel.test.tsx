@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { withMessages } from "../setup/i18n";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BACKUP_CODE_FORMATS } from "../../src/lib/backup-codes";
 import { BackupCodesPanel } from "../../src/app/(app)/account/security/backup-codes-panel";
@@ -21,25 +22,25 @@ const ACCOUNT = "ada@example.com";
 
 describe("the backup codes panel", () => {
     it("shows every code it was given", () => {
-        const markup = renderToStaticMarkup(<BackupCodesPanel codes={CODES} account={ACCOUNT} />);
+        const markup = renderToStaticMarkup(withMessages(<BackupCodesPanel codes={CODES} account={ACCOUNT} />));
         for (const code of CODES) expect(markup).toContain(code);
     });
 
     it("offers all three ways of keeping them", () => {
-        const markup = renderToStaticMarkup(<BackupCodesPanel codes={CODES} account={ACCOUNT} />);
+        const markup = renderToStaticMarkup(withMessages(<BackupCodesPanel codes={CODES} account={ACCOUNT} />));
         expect(markup).toContain("Copy");
         expect(markup).toContain("Download");
         expect(markup).toContain("Print");
     });
 
     it("says the codes are not shown again, since they are not", () => {
-        const markup = renderToStaticMarkup(<BackupCodesPanel codes={CODES} account={ACCOUNT} />);
+        const markup = renderToStaticMarkup(withMessages(<BackupCodesPanel codes={CODES} account={ACCOUNT} />));
         expect(markup).toContain("not shown again");
     });
 
     it("takes a caller's wording when the moment needs different words", () => {
         const markup = renderToStaticMarkup(
-            <BackupCodesPanel codes={CODES} account={ACCOUNT} label="Keep these somewhere safe." />
+            withMessages(<BackupCodesPanel codes={CODES} account={ACCOUNT} label="Keep these somewhere safe." />)
         );
         expect(markup).toContain("Keep these somewhere safe.");
         expect(markup).not.toContain("not shown again");

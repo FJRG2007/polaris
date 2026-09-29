@@ -6,9 +6,5 @@
     },
     "meta": {
         "description": "Panel de control para tu home lab: archivos, conexiones y más."
-    },
-    "passwordSafety": {
-        "identity": "Esa contraseña se parece demasiado a tu nombre, nombre de usuario o dirección. Elige algo que no tenga que ver con la cuenta.",
-        "breached": "Esa contraseña ha aparecido en una filtración de datos conocida. Elige otra."
     }
 }

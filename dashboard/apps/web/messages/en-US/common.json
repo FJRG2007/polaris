@@ -6,9 +6,5 @@
     },
     "meta": {
         "description": "Home-lab control plane - drive, connections, and more."
-    },
-    "passwordSafety": {
-        "identity": "That password is too close to your name, username or address. Pick something unrelated to the account.",
-        "breached": "That password has appeared in a known data breach. Pick a different one."
     }
 }

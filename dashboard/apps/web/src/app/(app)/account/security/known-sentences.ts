@@ -78,8 +78,7 @@ const EXACT: ReadonlyMap<string, SecurityKey> = new Map<string, SecurityKey>([
     ["Answer your security questions or use an authenticator code", "known.answerOrCode"],
     ["Turn the method on before making it the default", "known.methodOffDefault"],
     ["Use the international form, for example +34600111222", "known.phoneFormat"],
-    ["Enter your password", "known.enterPassword"],
-    [`Set ${core.SECURITY_QUESTION_COUNT} questions`, "known.setQuestions"]
+    ["Enter your password", "known.enterPassword"]
 ]);
 
 /** Sentences with a number in them. */
@@ -100,6 +99,7 @@ const COUNTED: readonly (readonly [RegExp, (t: NamespaceTranslator<"accountSecur
         /^Too many codes asked for\. Try again in (\d+) minutes?\.$/,
         (t, match) => t("errors.tooManyCodes", { minutes: Number(match[1]) })
     ],
+    [/^Set (\d+) questions$/, (t, match) => t("known.setQuestions", { count: Number(match[1]) })],
     [
         /^Too many attempts\. Try again in (\d+) minutes?\.$/,
         (t, match) => t("errors.tooManyAttempts", { minutes: Number(match[1]) })
