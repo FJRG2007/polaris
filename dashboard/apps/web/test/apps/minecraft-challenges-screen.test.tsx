@@ -173,6 +173,22 @@ describe("the Challenges tab", () => {
         spy.mockRestore();
     });
 
+    it("puts the switch back and says so when the save never arrives", async () => {
+        render(<MinecraftChallenges installedAppId={ID} canManage />);
+        answerRead({ view });
+        const actions = await import("@polaris-app/game-servers/src/screens/installed/challenges-actions");
+        const spy = vi
+            .spyOn(actions, "saveChallengesAction")
+            .mockRejectedValueOnce(new Error("Failed to fetch"));
+        const toggle = (await screen.findByLabelText("Challenges on")) as HTMLInputElement;
+        const before = toggle.getAttribute("aria-checked") ?? String(toggle.checked);
+        fireEvent.click(toggle);
+        await waitFor(() => expect(screen.getByText("The challenges could not be saved")).toBeTruthy());
+        const after = screen.getByLabelText("Challenges on");
+        expect(after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)).toBe(before);
+        spy.mockRestore();
+    });
+
     it("explains every challenge in the catalogue", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         fireEvent.click(screen.getByText("Catalogue"));

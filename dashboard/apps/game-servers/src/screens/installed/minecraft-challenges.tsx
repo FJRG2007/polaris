@@ -329,7 +329,9 @@ export function MinecraftChallenges({
         setView({ ...view, settings });
         setDraft((current) => (current ? { ...current, enabled } : current));
         startTransition(async () => {
-            const answer = await actions.saveChallengesAction({ installedAppId, settings });
+            const answer = await actions
+                .saveChallengesAction({ installedAppId, settings })
+                .catch(() => ({ view: undefined, error: undefined }));
             if (!answer.view) {
                 setView(before);
                 setDraft((current) => (current ? { ...current, enabled: before.settings.enabled } : current));
@@ -346,7 +348,9 @@ export function MinecraftChallenges({
         if (!draft || problem) return;
         setError(null);
         startTransition(async () => {
-            const answer = await actions.saveChallengesAction({ installedAppId, settings: draft });
+            const answer = await actions
+                .saveChallengesAction({ installedAppId, settings: draft })
+                .catch(() => ({ view: undefined, error: undefined }));
             if (!answer.view) {
                 setError(answer.error ?? t("errors.saveFailed"));
                 return;
@@ -364,10 +368,9 @@ export function MinecraftChallenges({
         });
         if (!sure) return;
         startTransition(async () => {
-            const answer = await actions.resetChallengePlayerAction({
-                installedAppId,
-                player: name
-            });
+            const answer = await actions
+                .resetChallengePlayerAction({ installedAppId, player: name })
+                .catch(() => ({ view: undefined, error: undefined }));
             if (answer.view) accept(answer.view, false);
             else setError(answer.error ?? t("errors.saveFailed"));
         });
