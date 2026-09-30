@@ -58,14 +58,24 @@ const SECTION_KEY = "minecraft-challenges:section";
 function rememberedSection(): Section {
     try {
         const kept = localStorage.getItem(SECTION_KEY);
-        return (SECTIONS as readonly string[]).includes(kept ?? "") ? (kept as Section) : "overview";
+        return (SECTIONS as readonly string[]).includes(kept ?? "")
+            ? (kept as Section)
+            : "overview";
     } catch {
         return "overview";
     }
 }
 
 /** One number at the top, with what it means under it. Null is still loading. */
-function Stat({ label, value, detail }: { label: string; value: string | null; detail: string | null }) {
+function Stat({
+    label,
+    value,
+    detail
+}: {
+    label: string;
+    value: string | null;
+    detail: string | null;
+}) {
     return (
         <div className="flex min-w-0 flex-col gap-0.5 rounded-md border border-border px-3 py-2">
             <dt className="truncate text-xs text-muted-foreground" title={label}>
@@ -334,7 +344,9 @@ export function MinecraftChallenges({
                 .catch(() => ({ view: undefined, error: undefined }));
             if (!answer.view) {
                 setView(before);
-                setDraft((current) => (current ? { ...current, enabled: before.settings.enabled } : current));
+                setDraft((current) =>
+                    current ? { ...current, enabled: before.settings.enabled } : current
+                );
                 setError(answer.error ?? t("errors.saveFailed"));
                 return;
             }
@@ -455,7 +467,9 @@ export function MinecraftChallenges({
                         <Stat
                             label={t("stats.season")}
                             value={view ? String(view.season.number) : null}
-                            detail={view ? t("stats.daysLeft", { left: view.season.daysLeft }) : null}
+                            detail={
+                                view ? t("stats.daysLeft", { left: view.season.daysLeft }) : null
+                            }
                         />
                         <Stat
                             label={t("stats.players")}
@@ -617,7 +631,8 @@ export function MinecraftChallenges({
                                     </p>
                                     {!view ? (
                                         <ui.Skeleton className="h-24 w-full" />
-                                    ) : view.players.filter((one) => one.points > 0).length === 0 ? (
+                                    ) : view.players.filter((one) => one.points > 0).length ===
+                                      0 ? (
                                         <p className="text-sm text-muted-foreground">
                                             {t("season.noOneYet")}
                                         </p>
@@ -654,14 +669,19 @@ export function MinecraftChallenges({
                                                 {t("season.past")}
                                             </p>
                                             {view.seasons.slice(0, 5).map((one) => (
-                                                <p key={one.key} className="text-xs text-muted-foreground">
+                                                <p
+                                                    key={one.key}
+                                                    className="text-xs text-muted-foreground"
+                                                >
                                                     {one.champions.length > 0
                                                         ? t("season.pastLine", {
-                                                              season: one.key.split("#")[1] ?? one.key,
+                                                              season:
+                                                                  one.key.split("#")[1] ?? one.key,
                                                               names: one.champions.join(", ")
                                                           })
                                                         : t("season.pastNobody", {
-                                                              season: one.key.split("#")[1] ?? one.key
+                                                              season:
+                                                                  one.key.split("#")[1] ?? one.key
                                                           })}
                                                 </p>
                                             ))}
@@ -680,7 +700,9 @@ export function MinecraftChallenges({
                         <ui.CardBody className="flex flex-col gap-3">
                             <div>
                                 <p className="text-sm font-medium">{t("players.title")}</p>
-                                <p className="text-xs text-muted-foreground">{t("players.intro")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("players.intro")}
+                                </p>
                             </div>
                             {!view ? (
                                 <div className="flex flex-col gap-2" aria-busy="true">
@@ -709,7 +731,9 @@ export function MinecraftChallenges({
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 max-w-2xl">
                                     <p className="text-sm font-medium">{t("goals.title")}</p>
-                                    <p className="text-xs text-muted-foreground">{t("goals.intro")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("goals.intro")}
+                                    </p>
                                 </div>
                                 {settings && !locked && settings.community.goals.length < 20 && (
                                     <ui.Button
@@ -768,7 +792,9 @@ export function MinecraftChallenges({
                                             language
                                         );
                                         const share =
-                                            goal.target > 0 ? Math.min(1, goal.total / goal.target) : 0;
+                                            goal.target > 0
+                                                ? Math.min(1, goal.total / goal.target)
+                                                : 0;
                                         const top = Object.values(goal.shares)
                                             .sort((left, right) => right.value - left.value)
                                             .slice(0, 5);
@@ -801,7 +827,9 @@ export function MinecraftChallenges({
                                                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                                                     <div
                                                         className="h-full rounded-full bg-primary"
-                                                        style={{ width: `${Math.round(share * 100)}%` }}
+                                                        style={{
+                                                            width: `${Math.round(share * 100)}%`
+                                                        }}
                                                     />
                                                 </div>
                                                 <p className="text-xs tabular-nums text-muted-foreground">
@@ -860,10 +888,15 @@ export function MinecraftChallenges({
                                                             value={goal.template}
                                                             disabled={locked}
                                                             aria-label={t("goals.challenge")}
-                                                            options={communityTemplates.map((one) => ({
-                                                                value: one.id,
-                                                                label: catalog.shapeOf(one, language)
-                                                            }))}
+                                                            options={communityTemplates.map(
+                                                                (one) => ({
+                                                                    value: one.id,
+                                                                    label: catalog.shapeOf(
+                                                                        one,
+                                                                        language
+                                                                    )
+                                                                })
+                                                            )}
                                                             onValueChange={(value) =>
                                                                 update({ template: value })
                                                             }
@@ -882,7 +915,8 @@ export function MinecraftChallenges({
                                                                     ? catalog.inUnit(
                                                                           catalog.templateOf(
                                                                               goal.template
-                                                                          ) ?? catalog.TEMPLATES[0]!,
+                                                                          ) ??
+                                                                              catalog.TEMPLATES[0]!,
                                                                           goal.target
                                                                       )
                                                                     : ""
@@ -892,12 +926,15 @@ export function MinecraftChallenges({
                                                                     goal.template
                                                                 );
                                                                 const divisor = template
-                                                                    ? catalog.UNIT_DIVISOR[template.unit]
+                                                                    ? catalog.UNIT_DIVISOR[
+                                                                          template.unit
+                                                                      ]
                                                                     : 1;
                                                                 update({
                                                                     target: Math.round(
-                                                                        parts.numberOf(event.target.value) *
-                                                                            divisor
+                                                                        parts.numberOf(
+                                                                            event.target.value
+                                                                        ) * divisor
                                                                     )
                                                                 });
                                                             }}
@@ -912,7 +949,9 @@ export function MinecraftChallenges({
                                                             disabled={locked}
                                                             value={goal.start}
                                                             onChange={(event) =>
-                                                                update({ start: event.target.value })
+                                                                update({
+                                                                    start: event.target.value
+                                                                })
                                                             }
                                                         />
                                                     </label>
@@ -926,11 +965,15 @@ export function MinecraftChallenges({
                                                             max={31}
                                                             disabled={locked}
                                                             value={
-                                                                Number.isFinite(goal.days) ? goal.days : ""
+                                                                Number.isFinite(goal.days)
+                                                                    ? goal.days
+                                                                    : ""
                                                             }
                                                             onChange={(event) =>
                                                                 update({
-                                                                    days: parts.numberOf(event.target.value)
+                                                                    days: parts.numberOf(
+                                                                        event.target.value
+                                                                    )
                                                                 })
                                                             }
                                                         />
@@ -967,14 +1010,17 @@ export function MinecraftChallenges({
                                                     {goal.rewards.map((reward, tier) => (
                                                         <parts.PayoutEditor
                                                             key={tier}
-                                                            label={t("goals.tierN", { tier: tier + 1 })}
+                                                            label={t("goals.tierN", {
+                                                                tier: tier + 1
+                                                            })}
                                                             value={reward}
                                                             t={t}
                                                             locked={locked}
                                                             onChange={(next) =>
                                                                 update({
-                                                                    rewards: goal.rewards.map((one, at) =>
-                                                                        at === tier ? next : one
+                                                                    rewards: goal.rewards.map(
+                                                                        (one, at) =>
+                                                                            at === tier ? next : one
                                                                     )
                                                                 })
                                                             }
@@ -1036,12 +1082,19 @@ export function MinecraftChallenges({
                         <ui.CardBody className="flex flex-col gap-4">
                             <div>
                                 <p className="text-sm font-medium">{t("rewards.title")}</p>
-                                <p className="text-xs text-muted-foreground">{t("rewards.intro")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("rewards.intro")}
+                                </p>
                             </div>
                             {!settings ? (
                                 <ui.Skeleton className="h-40 w-full" />
                             ) : (
-                                <RewardFields settings={settings} nested={nested} t={t} locked={locked} />
+                                <RewardFields
+                                    settings={settings}
+                                    nested={nested}
+                                    t={t}
+                                    locked={locked}
+                                />
                             )}
                         </ui.CardBody>
                     </ui.Card>
@@ -1062,7 +1115,9 @@ export function MinecraftChallenges({
                             <ui.CardBody className="flex flex-col gap-3">
                                 <div>
                                     <p className="text-sm font-medium">{t("catalogue.title")}</p>
-                                    <p className="text-xs text-muted-foreground">{t("catalogue.intro")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("catalogue.intro")}
+                                    </p>
                                 </div>
                                 <ui.Skeleton className="h-40 w-full" />
                             </ui.CardBody>
@@ -1168,7 +1223,15 @@ function NumberField({
 }
 
 /** The groups the settings are read under. */
-type SettingsGroup = "schedule" | "layers" | "difficulty" | "who" | "shown" | "cheats" | "season" | "shared";
+type SettingsGroup =
+    | "schedule"
+    | "layers"
+    | "difficulty"
+    | "who"
+    | "shown"
+    | "cheats"
+    | "season"
+    | "shared";
 
 function SettingsFields({
     settings,
@@ -1515,7 +1578,9 @@ function RewardFields({
                             value={rewards.weekly[tier]}
                             t={t}
                             locked={locked}
-                            onChange={(next) => set({ weekly: { ...rewards.weekly, [tier]: next } })}
+                            onChange={(next) =>
+                                set({ weekly: { ...rewards.weekly, [tier]: next } })
+                            }
                         />
                     ))}
                 </div>
@@ -1573,7 +1638,9 @@ function RewardFields({
                             locked={locked}
                             onChange={(next) =>
                                 set({
-                                    streak: rewards.streak.map((one, at) => (at === index ? next : one))
+                                    streak: rewards.streak.map((one, at) =>
+                                        at === index ? next : one
+                                    )
                                 })
                             }
                         />

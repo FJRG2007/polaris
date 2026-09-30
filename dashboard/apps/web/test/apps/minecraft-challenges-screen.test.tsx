@@ -115,7 +115,14 @@ describe("the Challenges tab", () => {
         expect(screen.getByText("Challenges")).toBeTruthy();
         // The summary opens first; every other part is one press away.
         expect(screen.getByText("Season and bingo")).toBeTruthy();
-        for (const part of ["Summary", "Players", "Community", "Settings", "Rewards", "Catalogue"]) {
+        for (const part of [
+            "Summary",
+            "Players",
+            "Community",
+            "Settings",
+            "Rewards",
+            "Catalogue"
+        ]) {
             expect(screen.getByText(part)).toBeTruthy();
         }
         expect(screen.getByText("Today's challenges")).toBeTruthy();
@@ -160,32 +167,44 @@ describe("the Challenges tab", () => {
     it("puts the switch back and says why when the save is refused", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         answerRead({ view });
-        const actions = await import("@polaris-app/game-servers/src/screens/installed/challenges-actions");
+        const actions = await import(
+            "@polaris-app/game-servers/src/screens/installed/challenges-actions"
+        );
         const spy = vi
             .spyOn(actions, "saveChallengesAction")
             .mockResolvedValueOnce({ error: "The challenges could not be saved" } as never);
         const toggle = (await screen.findByLabelText("Challenges on")) as HTMLInputElement;
         const before = toggle.getAttribute("aria-checked") ?? String(toggle.checked);
         fireEvent.click(toggle);
-        await waitFor(() => expect(screen.getByText("The challenges could not be saved")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("The challenges could not be saved")).toBeTruthy()
+        );
         const after = screen.getByLabelText("Challenges on");
-        expect(after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)).toBe(before);
+        expect(
+            after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)
+        ).toBe(before);
         spy.mockRestore();
     });
 
     it("puts the switch back and says so when the save never arrives", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         answerRead({ view });
-        const actions = await import("@polaris-app/game-servers/src/screens/installed/challenges-actions");
+        const actions = await import(
+            "@polaris-app/game-servers/src/screens/installed/challenges-actions"
+        );
         const spy = vi
             .spyOn(actions, "saveChallengesAction")
             .mockRejectedValueOnce(new Error("Failed to fetch"));
         const toggle = (await screen.findByLabelText("Challenges on")) as HTMLInputElement;
         const before = toggle.getAttribute("aria-checked") ?? String(toggle.checked);
         fireEvent.click(toggle);
-        await waitFor(() => expect(screen.getByText("The challenges could not be saved")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("The challenges could not be saved")).toBeTruthy()
+        );
         const after = screen.getByLabelText("Challenges on");
-        expect(after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)).toBe(before);
+        expect(
+            after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)
+        ).toBe(before);
         spy.mockRestore();
     });
 
