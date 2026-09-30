@@ -197,8 +197,8 @@
     "rewards": {
         "title": "Premios",
         "intro": "Los retos dan puntos de temporada y niveles. Los objetos salen de los hitos de temporada, los plenos y el cartón de bingo, así el gasto en objetos de la temporada está en un solo sitio.",
-        "daily": "Retos diarios",
-        "weekly": "Cada semanal",
+        "daily": "Reto diario",
+        "weekly": "Reto semanal",
         "sweepDaily": "Los tres diarios",
         "sweepWeekly": "Los tres semanales",
         "square": "Cada casilla de bingo",
