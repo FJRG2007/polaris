@@ -2,10 +2,12 @@
  * Whether a newer extension has been published, and what that means for the
  * person running this one.
  *
- * An extension loaded by hand never updates itself. That is the whole point of
- * the warning: somebody who unpacked a .zip into `chrome://extensions` in March
- * is still running March's build, with nothing anywhere that would ever say so -
- * and unlike the dashboard, this cannot update itself even in principle.
+ * An extension loaded by hand never updates itself unless something replaces its
+ * files. The install script now leaves exactly that behind - a job that swaps in
+ * each new release - but a copy loaded before it, a zip unpacked by hand, and
+ * Firefox's temporary add-on have nothing of the kind: somebody who unpacked a
+ * .zip in March is still running March's build, with nothing anywhere that would
+ * ever say so.
  *
  * What to tell them depends entirely on how it got here, so that is read rather
  * than assumed. A build installed from a store is updated by the store once the
@@ -20,8 +22,12 @@
  * after the ninth.
  */
 
-/** How this build got here, in the two answers that change what to say. */
-export type InstallKind = "store" | "manual";
+/**
+ * How this build got here, in the three answers that change what to say: from a
+ * store, loaded from a folder the install script keeps current (`auto` - see
+ * `lib/self-update.ts`), or loaded by hand with nothing keeping it current.
+ */
+export type InstallKind = "store" | "auto" | "manual";
 
 /** A newer build, and what the reader can do about it. */
 export interface UpdateNotice {
@@ -40,18 +46,20 @@ export interface VersionAnswer {
 }
 
 function segments(version: string): number[] {
-    return version
-        .trim()
-        .replace(/^v/i, "")
-        // A prerelease suffix is not part of the ordering this needs: the server
-        // never offers one (`pickRelease` drops prereleases), so anything after a
-        // dash is noise rather than a decision.
-        .split("-")[0]!
-        .split(".")
-        .map((part) => {
-            const number = Number.parseInt(part, 10);
-            return Number.isFinite(number) ? number : 0;
-        });
+    return (
+        version
+            .trim()
+            .replace(/^v/i, "")
+            // A prerelease suffix is not part of the ordering this needs: the server
+            // never offers one (`pickRelease` drops prereleases), so anything after a
+            // dash is noise rather than a decision.
+            .split("-")[0]!
+            .split(".")
+            .map((part) => {
+                const number = Number.parseInt(part, 10);
+                return Number.isFinite(number) ? number : 0;
+            })
+    );
 }
 
 /**
@@ -86,8 +94,12 @@ export function isNewer(available: string, running: string): boolean {
  * everything that is not plainly a store install is told how to do it by hand,
  * which is the direction that leaves nobody stranded on an old build.
  */
-export function installKind(installType: string | undefined | null): InstallKind {
-    return installType === "normal" ? "store" : "manual";
+export function installKind(installType: string | undefined | null, covered = false): InstallKind {
+    if (installType === "normal") return "store";
+    // Only an unpacked load can be kept current by replacing its files, and only
+    // one whose folder the updater marked as its own.
+    if (installType === "development" && covered) return "auto";
+    return "manual";
 }
 
 /**
@@ -100,12 +112,13 @@ export function installKind(installType: string | undefined | null): InstallKind
 export function noticeFor(
     answer: VersionAnswer | null,
     running: string,
-    installType: string | undefined | null
+    installType: string | undefined | null,
+    covered = false
 ): UpdateNotice | null {
     if (!answer) return null;
     const { version, url } = answer;
     if (typeof version !== "string" || version === "") return null;
     if (typeof url !== "string" || url === "") return null;
     if (!isNewer(version, running)) return null;
-    return { version, url, kind: installKind(installType) };
+    return { version, url, kind: installKind(installType, covered) };
 }

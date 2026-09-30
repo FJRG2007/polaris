@@ -65,6 +65,7 @@ describe("where the extension looks", () => {
         expect(source).toContain('browser.alarms.create("update-check"');
         expect(source).toContain("void checkForUpdate();");
         // The popup's request reads what the check left behind.
-        expect(source).toContain("return { ok: true, update: await UPDATE.getValue() };");
+        expect(source).toContain("update: await currentNotice()");
+        expect(source).toContain("const held = await UPDATE.getValue();");
     });
 });

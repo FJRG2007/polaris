@@ -25,7 +25,16 @@ const STATUS: VaultStatus = {
     awaitingApproval: false,
     organizations: [],
     shelf: null,
-    face: null
+    face: null,
+    servers: [
+        {
+            origin: "https://polaris.example",
+            name: null,
+            host: "polaris.example",
+            active: true,
+            accounts: 1
+        }
+    ]
 };
 
 beforeEach(() => {
@@ -38,7 +47,7 @@ afterEach(() => {
 });
 
 const bar = (status: VaultStatus) =>
-    renderToStaticMarkup(<TopBar status={status} onChange={async () => {}} />);
+    renderToStaticMarkup(<TopBar status={status} onChange={async () => {}} onOpen={() => {}} />);
 
 describe("the top bar", () => {
     it("greets the account by its first name, by the clock", () => {
@@ -84,6 +93,19 @@ describe("the home screen", () => {
         expect(vaultState({ ...STATUS, connected: false })).toBe("Not connected yet");
         expect(vaultState(STATUS)).toBe("Locked");
         expect(vaultState({ ...STATUS, unlocked: true })).toBe("Open");
+    });
+
+    it("lists the servers, naming the one in front", () => {
+        const markup = renderToStaticMarkup(<Home status={STATUS} onOpen={() => {}} />);
+        expect(markup).toContain("Servers");
+        expect(markup).toContain("polaris.example");
+        const named = renderToStaticMarkup(
+            <Home
+                status={{ ...STATUS, servers: [{ ...STATUS.servers[0]!, name: "Home lab" }] }}
+                onOpen={() => {}}
+            />
+        );
+        expect(named).toContain("Home lab");
     });
 });
 

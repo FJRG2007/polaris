@@ -8,10 +8,10 @@
  * current was to repeat the whole install, which is exactly what the scripts
  * were written to avoid.
  *
- * Running it a second time replaces the extension in the same fixed folder, and
- * an unpacked extension is re-read from the folder it was loaded from. That is
- * what turns an update into the refresh arrow on the extensions page rather than
- * another "Load unpacked".
+ * It puts the extension in one fixed folder and sets up a job of the user's own
+ * that replaces the files there when a new version is published; the extension
+ * notices and restarts into them. Running it again is safe and changes nothing
+ * that is already current.
  *
  * Held as values rather than written into the page, so the address is built in
  * one place and can be asserted without a DOM. The repository is passed in
@@ -23,10 +23,15 @@
  * a script to keep current.
  */
 
-export type InstallOs = "windows" | "unix";
+import {
+    INSTALL_OSES,
+    detectOs,
+    installLine,
+    installShell,
+    type InstallOs
+} from "@polaris/core/extension-install";
 
-/** Where the scripts sit in the repository. */
-const SCRIPT_PATH = "dashboard/apps/extension/scripts";
+export { INSTALL_OSES, detectOs, type InstallOs };
 
 export interface InstallCommand {
     readonly os: InstallOs;
@@ -38,37 +43,18 @@ export interface InstallCommand {
     readonly command: string;
 }
 
-/** Both choices, in the order they are offered. */
-export const INSTALL_OSES: readonly InstallOs[] = ["windows", "unix"];
-
+/** The line itself is built in `@polaris/core/extension-install`, which the
+ *  extension's popup reads too, so the two can never offer different lines. */
 export function installCommand(os: InstallOs, repo: string): InstallCommand {
-    const scripts = `https://raw.githubusercontent.com/${repo}/main/${SCRIPT_PATH}`;
-    if (os === "windows") {
-        return {
-            os,
-            // i18n-ignore a system's name
-            label: "Windows",
-            shell: "PowerShell",
-            command: `irm ${scripts}/install.ps1 | iex`
-        };
-    }
     return {
         os,
-        // i18n-ignore the downloads screen says it in the reader's words
-        label: "macOS and Linux",
-        shell: "Terminal",
-        command: `curl -fsSL ${scripts}/install.sh | sh`
+        label:
+            os === "windows"
+                ? // i18n-ignore a system's name
+                  "Windows"
+                : // i18n-ignore the downloads screen says it in the reader's words
+                  "macOS and Linux",
+        shell: installShell(os),
+        command: installLine(os, repo)
     };
-}
-
-/**
- * Which line to put in front of the reader first.
- *
- * Windows is the only one worth telling apart, because the other command covers
- * everything else. Anything unrecognised gets the shell line rather than the
- * PowerShell one: that is the answer that is right more often, and both are one
- * click apart in the picker anyway.
- */
-export function detectOs(userAgent: string): InstallOs {
-    return /windows|win32|win64/i.test(userAgent) ? "windows" : "unix";
 }

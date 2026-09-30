@@ -964,7 +964,7 @@
             "description": "Fills a login, saves a new one, and unlocks from your vault. It asks the browser for permission to talk to this Polaris and no other, and holds no standing access to the pages you open.",
             "store": "From your browser's store",
             "notYet": "Not there yet",
-            "storeHint": "The store version is the one that keeps itself up to date, so it is worth waiting for if you can.",
+            "storeHint": "Loading it yourself below keeps it just as current now, so there is no need to wait for the store.",
             "loadYourself": "Load it yourself",
             "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself."
         },
@@ -976,9 +976,9 @@
             "cliHint": "For managing your things from your own computer, and for opening a tunnel from it to a service here. Nothing to install yet, so there is no command to copy."
         },
         "command": {
-            "title": "One line, and the same one to update",
+            "title": "One line, and it keeps itself up to date",
             "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. It puts the extension in one fixed folder, so the first run is the only one that needs Load unpacked - after that, run the same line and press the refresh arrow on the Polaris card. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current.",
+            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every few hours and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current.",
             "unix": "macOS and Linux"
         },
         "steps": {

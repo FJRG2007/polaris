@@ -964,7 +964,7 @@
             "description": "Rellena un inicio de sesión, guarda uno nuevo y desbloquea desde tu bóveda. Pide permiso al navegador para hablar con este Polaris y con ningún otro, y no tiene acceso permanente a las páginas que abres.",
             "store": "Desde la tienda de tu navegador",
             "notYet": "Todavía no está",
-            "storeHint": "La versión de la tienda es la que se actualiza sola, así que merece la pena esperarla si puedes.",
+            "storeHint": "Cargarla tú mismo abajo la mantiene igual de al día, así que no hace falta esperar a la tienda.",
             "loadYourself": "Cárgala tú mismo",
             "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión."
         },
@@ -976,9 +976,9 @@
             "cliHint": "Para gestionar tus cosas desde tu propio ordenador y abrir desde él un túnel a un servicio de aquí. Todavía no hay nada que instalar, así que no hay ningún comando que copiar."
         },
         "command": {
-            "title": "Una línea, y la misma para actualizar",
+            "title": "Una línea, y se mantiene al día sola",
             "system": "En qué sistema la instalas",
-            "hint": "Pégala en {shell}. Pone la extensión en una carpeta fija, así que solo la primera vez hace falta Cargar descomprimida; después, ejecuta la misma línea y pulsa la flecha de recargar en la tarjeta de Polaris. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día.",
+            "hint": "Pégala en {shell}. La primera vez, pulsa Cargar descomprimida y elige la carpeta que indica. Después busca una versión nueva cada pocas horas y la extensión se reinicia en ella sola. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día.",
             "unix": "macOS y Linux"
         },
         "steps": {

@@ -25,8 +25,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionSteps } from "./extension-steps";
+import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone, Terminal } from "lucide-react";
@@ -54,7 +54,9 @@ export default async function DownloadsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("downloads.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("downloads.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
 
@@ -83,15 +85,19 @@ export default async function DownloadsPage() {
                             {t("downloads.extension.store")}
                             <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
                         </p>
-                        <p className="text-muted-foreground">{t("downloads.extension.storeHint")}</p>
+                        <p className="text-muted-foreground">
+                            {t("downloads.extension.storeHint")}
+                        </p>
                     </div>
 
                     <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
                         <p className="font-medium">{t("downloads.extension.loadYourself")}</p>
                         {/* First, because it is the only way on this screen that
-                            makes the next version a refresh arrow instead of the
-                            whole install again. The zip and the steps stay under
-                            it for anybody who would rather do it by hand. */}
+                            keeps itself current afterward - the line sets up a
+                            job that swaps in new releases and the extension
+                            restarts into them on its own. The zip and the steps
+                            stay under it for anybody who would rather do it by
+                            hand, with nothing keeping that copy current. */}
                         <ExtensionCommand repo={repo} />
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
@@ -129,7 +135,9 @@ export default async function DownloadsPage() {
                         <Smartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <div>
                             <p className="font-medium">{t("downloads.later.mobile")}</p>
-                            <p className="text-muted-foreground">{t("downloads.later.mobileHint")}</p>
+                            <p className="text-muted-foreground">
+                                {t("downloads.later.mobileHint")}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-start gap-3">

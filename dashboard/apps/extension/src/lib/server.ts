@@ -14,11 +14,29 @@
  */
 
 import { storage } from "#imports";
+import { withServer, type SavedServer } from "@/lib/servers";
 
 /** Where the vault answers, as an origin with no trailing slash. */
 const ORIGIN = storage.defineItem<string | null>("local:server.origin", {
     fallback: null
 });
+
+/**
+ * Every server this browser has been pointed at, with the names somebody gave
+ * them - see `lib/servers`. Local, like the address: an address is not a secret,
+ * and a list that emptied on every restart would be no list at all.
+ */
+const SERVERS = storage.defineItem<SavedServer[]>("local:servers.list", { fallback: [] });
+
+/** The servers as stored. */
+export async function savedServers(): Promise<SavedServer[]> {
+    return SERVERS.getValue();
+}
+
+/** Replace the stored list. */
+export async function saveServers(next: readonly SavedServer[]): Promise<void> {
+    await SERVERS.setValue([...next]);
+}
 
 /**
  * Reading an address is pure, and the popup needs it too - to know whether its
@@ -50,9 +68,16 @@ export async function holdsOrigin(origin: string): Promise<boolean> {
     return browser.permissions.contains({ origins: [`${origin}/*`] });
 }
 
-/** Remember the server, once it has answered and been granted. */
+/**
+ * Remember the server, once it has answered and been granted - as the one in
+ * front, and in the list of servers, so every address somebody has used is one
+ * they can go back to.
+ */
 export async function rememberOrigin(origin: string): Promise<void> {
-    await ORIGIN.setValue(origin);
+    await Promise.all([
+        ORIGIN.setValue(origin),
+        SERVERS.setValue(withServer(await SERVERS.getValue(), origin))
+    ]);
 }
 
 /** Forget it, on signing out of this server for good. */

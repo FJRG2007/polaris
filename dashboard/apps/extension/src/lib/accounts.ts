@@ -60,7 +60,13 @@ export interface ParkedAccount {
     readonly origin: string;
     readonly email: string | null;
     readonly name: string | null;
-    readonly refresh: string;
+    /**
+     * The vault session, or null for an account whose browser is connected to
+     * Polaris but not yet signed in to the vault. That half-way state is worth
+     * keeping too: switching to another server and back must not throw away a
+     * connection somebody approved a minute ago.
+     */
+    readonly refresh: string | null;
     readonly wrapped: WrappedKeys | null;
     readonly accountKey: string | null;
     /** The connection this browser holds to it, when it has one. Null for a

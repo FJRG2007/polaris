@@ -1052,3 +1052,191 @@ button.copied {
     width: 18px;
     height: 18px;
 }
+
+/* The home screen's second line under a section, truncated rather than wrapped:
+   a server's name or host has no length worth trusting. */
+.section-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * The servers. A row is the server itself - pressing it puts it in front - with
+ * its two actions after it. The name gives way before the actions do.
+ */
+.server-row {
+    align-items: center;
+    padding: 4px 12px 4px 4px;
+}
+
+.server {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 10px;
+    background: transparent;
+    color: hsl(var(--foreground));
+    font-weight: 400;
+    text-align: left;
+}
+
+.server:hover:not(:disabled):not([aria-current]),
+.server:focus-visible {
+    background: hsl(var(--elevated));
+}
+
+.server[aria-current] {
+    cursor: default;
+}
+
+.server-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.server-text .shown {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.server-where {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.server-host {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.server-where > span:last-child {
+    flex: none;
+}
+
+.badge {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.14);
+    color: hsl(var(--primary));
+    font-size: 11px;
+}
+
+/* Renaming a row, and adding a server: a field with its two buttons under it. */
+.rename,
+.add-server {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.rename {
+    padding: 6px 0 6px 10px;
+}
+
+.rename-acts {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* Cancel never gives up its width; a confirmation that names a long server
+   wraps inside its own button instead. */
+.rename-acts > button {
+    flex: none;
+    white-space: nowrap;
+}
+
+.rename-acts > button.danger {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.problem.inline {
+    margin: 0;
+}
+
+button[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: default;
+}
+
+button.danger {
+    background: hsl(var(--danger));
+}
+
+/* The question before a server is removed: over the popup, not a page of its own. */
+.dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: hsl(var(--background) / 0.72);
+}
+
+.dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--elevated));
+    box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
+    overflow-wrap: anywhere;
+}
+
+.dialog p {
+    margin: 0;
+}
+
+/* The update line: the command, which scrolls sideways inside its own box
+   rather than widening the popup, and its copy button. */
+.notice p {
+    margin: 0 0 6px;
+}
+
+.notice-act {
+    margin-bottom: 6px;
+}
+
+.install-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.install-line code {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 4px 6px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--field));
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: pre;
+}
+
+.install-line button.icon {
+    flex: none;
+}
