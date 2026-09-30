@@ -1083,7 +1083,8 @@
         "anticheat": "Anti-cheat",
         "access": "Access",
         "schedule": "Schedule",
-        "settings": "Settings"
+        "settings": "Settings",
+        "moderation": "Moderation"
     },
     "itemSlots": {
         "empty": "Empty slot",

@@ -1981,5 +1981,29 @@
         "perKillHint": "Puntos de experiencia, de 0 a 100. Un zombi da 5.",
         "perOre": "Extra por mena minada",
         "perOreHint": "Puntos de experiencia, de 0 a 100. La mena de carbón da hasta 2."
+    },
+    "moderation": {
+        "announcements": {
+            "title": "Anuncios de mods",
+            "intro": "Algunos mods saludan a cada jugador que entra con agradecimientos, consejos o la dirección de otro servidor. Polaris los bloquea; permite uno aquí para dejarlo pasar.",
+            "summaryBlocked": "Anuncios de mods: bloqueados",
+            "blocked": "Bloqueado",
+            "allowed": "Permitido",
+            "waiting": "Pendiente",
+            "unreadable": "Ilegible",
+            "appliesOnJoin": "Se aplica la próxima vez que entre cada jugador. Sin reiniciar.",
+            "appliesOnRestart": "Se aplica tras reiniciar.",
+            "allow": "Permitir",
+            "allowNamed": "Permitir los anuncios de {name}",
+            "stopped": "Arranca el servidor para revisar sus mods.",
+            "none": "Ningún mod de este servidor se anuncia.",
+            "pendingHint": "Pendiente: se ajusta en cuanto el mod escriba su configuración, en el próximo arranque.",
+            "unreadableHint": "Ilegible: Polaris no pudo entender la configuración de este mod y la dejó como estaba.",
+            "readFailed": "No se pudieron leer los mods del servidor.",
+            "saveFailed": "No se pudo cambiar ese ajuste.",
+            "restartReason": "Ajustes de anuncios de mods",
+            "restartTitle": "Un mod lee este ajuste al arrancar el servidor",
+            "restartDetail": "Reinicia el servidor para aplicarlo. Quien esté jugando se desconecta un momento."
+        }
     }
 }

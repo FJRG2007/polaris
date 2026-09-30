@@ -1083,7 +1083,8 @@
         "anticheat": "Antitrampas",
         "access": "Acceso",
         "schedule": "Horario",
-        "settings": "Ajustes"
+        "settings": "Ajustes",
+        "moderation": "Moderación"
     },
     "itemSlots": {
         "empty": "Hueco vacío",

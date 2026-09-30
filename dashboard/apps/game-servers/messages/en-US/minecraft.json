@@ -1981,5 +1981,29 @@
         "perKillHint": "Experience points, 0 to 100. A zombie gives 5.",
         "perOre": "Extra per ore mined",
         "perOreHint": "Experience points, 0 to 100. Coal ore gives up to 2."
+    },
+    "moderation": {
+        "announcements": {
+            "title": "Mod announcements",
+            "intro": "Some mods greet every player who joins with thanks, tips or another server's address. Polaris blocks them; allow one here to let it through.",
+            "summaryBlocked": "Mod announcements: blocked",
+            "blocked": "Blocked",
+            "allowed": "Allowed",
+            "waiting": "Pending",
+            "unreadable": "Unreadable",
+            "appliesOnJoin": "Takes effect as each player next joins. No restart needed.",
+            "appliesOnRestart": "Takes effect after a restart.",
+            "allow": "Allow",
+            "allowNamed": "Allow {name} announcements",
+            "stopped": "Start the server to check its mods.",
+            "none": "No mod on this server announces itself.",
+            "pendingHint": "Pending: set as soon as the mod writes its config, on the server's next start.",
+            "unreadableHint": "Unreadable: Polaris could not follow this mod's config file, so it left it as it is.",
+            "readFailed": "Could not read the server's mods.",
+            "saveFailed": "Could not change that setting.",
+            "restartReason": "Mod announcement settings",
+            "restartTitle": "A mod reads this setting when the server starts",
+            "restartDetail": "Restart the server to apply it. Anybody playing is disconnected for a moment."
+        }
     }
 }

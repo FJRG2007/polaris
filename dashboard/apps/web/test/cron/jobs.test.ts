@@ -112,6 +112,8 @@ describe("the work Polaris runs on a schedule", () => {
             // could each start the event that had come due.
             "game-events",
             "game-health",
+            // Two passes would each rewrite the same mod's config file at once.
+            "game-mod-announcements",
             "game-schedules",
             // Two runners would each archive the same world with `tar`, inside
             // the same container, onto the same disk - and the copy that is worth

@@ -52,6 +52,7 @@ import type { ServerPresence } from "../../lib/games-service";
 import type { PlayerTimeout } from "../../lib/player-timeout";
 import { useGamePresence } from "../../components/use-game-presence";
 import { RestartPlanner } from "./restart-planner";
+import { MinecraftModeration } from "./minecraft-moderation";
 import { useLoginState } from "./minecraft-polaris-login";
 import { hasBuildFor } from "../../lib/minecraft/polaris-login";
 import { MinecraftJoinPassword } from "./minecraft-join-password";
@@ -576,6 +577,15 @@ export function MinecraftPanel({
                     ) : (
                         <MinecraftXray installedAppId={installedAppId} canManage={canManage} />
                     ))}
+                {tab === "moderation" && (
+                    <CardBoundary name="Moderation">
+                        <MinecraftModeration
+                            installedAppId={installedAppId}
+                            canManage={canManage}
+                            running={isRunning}
+                        />
+                    </CardBoundary>
+                )}
                 {tab === "players" && (
                     <MinecraftPlayers
                         installedAppId={installedAppId}

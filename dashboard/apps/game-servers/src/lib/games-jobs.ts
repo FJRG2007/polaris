@@ -393,6 +393,17 @@ export function gameJobTable(): readonly AppJob[] {
             leaseMs: 15 * MINUTE,
             run: async () =>
                 (await import("./minecraft/polaris-anticheat-service")).adoptAnticheatDefaults()
+        },
+        {
+            key: "game-mod-announcements",
+            // The mods that greet every joining player with thanks, tips or
+            // another server's address, quietened on every running modded
+            // server: one listing of its mods folder, and a config file edited
+            // only where the setting is not already what the operator wants.
+            everyMs: Number(process.env.POLARIS_GAME_ANNOUNCEMENTS_MS) || 5 * MINUTE,
+            leaseMs: 10 * MINUTE,
+            run: async () =>
+                (await import("./minecraft/mod-announcements-service")).sweepModAnnouncements()
         }
     ];
 }

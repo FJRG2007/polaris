@@ -58,6 +58,7 @@ import {
     Mic,
     MessageCircle,
     MessageSquare,
+    MessageSquareWarning,
     MessagesSquare,
     MonitorSmartphone,
     Network,
@@ -2122,6 +2123,12 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "teleport",
             "diamonds"
         ]
+    },
+    moderation: {
+        label: "Moderation", // i18n-ignore
+        icon: MessageSquareWarning,
+        group: TALKING_GROUP,
+        keywords: ["spam", "announcement", "securitycraft", "thanks message", "advertising", "chat filter"]
     },
     settings: {
         label: "Settings", // i18n-ignore

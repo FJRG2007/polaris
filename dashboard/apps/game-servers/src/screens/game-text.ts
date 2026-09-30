@@ -38,6 +38,7 @@ const TAB_WORDS: Readonly<Record<string, GameKey<"games">>> = {
     Usage: "tabs.usage",
     Security: "tabs.security",
     "Anti-cheat": "tabs.anticheat",
+    Moderation: "tabs.moderation",
     Access: "tabs.access",
     Schedule: "tabs.schedule",
     Settings: "tabs.settings"

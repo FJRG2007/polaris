@@ -79,6 +79,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // Anti X-Ray and the movement watch: reading the evidence is a moderator's,
     // as it is on the players it is about.
     { slug: "anticheat", label: "Anti-cheat", permission: "games.moderate", games: ["minecraft"] }, // i18n-ignore
+    // What reaches the players' chat that nobody on the server wrote: mods that
+    // announce themselves on every join. A moderator's, like the Anti-cheat tab.
+    { slug: "moderation", label: "Moderation", permission: "games.moderate", games: ["minecraft"] }, // i18n-ignore
     { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
     // Restarts, backups, sleeping when empty: when things happen on their own.
     { slug: "schedule", label: "Schedule", permission: "games.manage", games: EVERY_GAME }, // i18n-ignore
