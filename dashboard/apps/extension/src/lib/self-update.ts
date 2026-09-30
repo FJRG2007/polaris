@@ -18,11 +18,12 @@
  * as far as the extension is concerned - session storage is cleared (also
  * checked), and that is where the vault's session and every set-aside account
  * live, on purpose. So it waits for a moment where the restart costs nothing
- * anybody is in the middle of: no vault open, no login being filled or held to
- * be offered, no approval being waited on, no popup open, nothing being
- * answered. A vault that is open all day is started into on the next browser
- * start instead, which loads the new folder by itself - or from the popup's
- * "Start it now", which says what it costs.
+ * anybody is in the middle of: no vault open, no account set aside on another
+ * server, no login being filled or held to be offered, no approval being
+ * waited on, no popup open, nothing being answered. A vault that is open all
+ * day is started into on the next browser start instead, which loads the new
+ * folder by itself - or from the popup's "Start it now", which says what it
+ * costs.
  *
  * Everything here is pure; the worker supplies the facts.
  */

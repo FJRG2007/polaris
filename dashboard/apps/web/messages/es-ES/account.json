@@ -964,7 +964,7 @@
             "description": "Rellena un inicio de sesión, guarda uno nuevo y desbloquea desde tu bóveda. Pide permiso al navegador para hablar con este Polaris y con ningún otro, y no tiene acceso permanente a las páginas que abres.",
             "store": "Desde la tienda de tu navegador",
             "notYet": "Todavía no está",
-            "storeHint": "La versión de la tienda es la que se actualiza sola, así que merece la pena esperarla si puedes.",
+            "storeHint": "Cargarla tú mismo abajo la mantiene igual de al día, así que no hace falta esperar a la tienda.",
             "loadYourself": "Cárgala tú mismo",
             "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión."
         },

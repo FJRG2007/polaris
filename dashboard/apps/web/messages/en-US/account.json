@@ -964,7 +964,7 @@
             "description": "Fills a login, saves a new one, and unlocks from your vault. It asks the browser for permission to talk to this Polaris and no other, and holds no standing access to the pages you open.",
             "store": "From your browser's store",
             "notYet": "Not there yet",
-            "storeHint": "The store version is the one that keeps itself up to date, so it is worth waiting for if you can.",
+            "storeHint": "Loading it yourself below keeps it just as current now, so there is no need to wait for the store.",
             "loadYourself": "Load it yourself",
             "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself."
         },

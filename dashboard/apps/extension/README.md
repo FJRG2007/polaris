@@ -234,17 +234,18 @@ The extension notices by itself. An unpacked extension serves its own files from
 the folder as it is now, so the worker fetching its own `manifest.json` reads the
 new version while `runtime.getManifest()` still reports the running one. It
 restarts into it with `runtime.reload()` once nothing would be cut short - no
-vault open, no login held or half filled, no approval pending, no popup open
-(`src/lib/self-update.ts`). A restart clears session storage, as a browser
-restart does, which is why an open vault waits: it is started on the next lock,
-the next browser start, or the popup's "Start it now".
+vault open, no account set aside on another server, no login held or half
+filled, no approval pending, no popup open (`src/lib/self-update.ts`). A
+restart clears session storage, as a browser restart does, which is why an
+open vault or a parked account waits: it is started on the next lock, the next
+browser start, or the popup's "Start it now".
 
 ## Finding out it is out of date
 
 An extension loaded by hand never updates itself unless something replaces its
-files, and nothing in a browser will ever mention it. So the worker asks - when the browser starts, and twice a day
-after that - and the popup carries a line above whichever screen is showing when
-there is something to say.
+files, and nothing in a browser will ever mention it. So the worker asks - when
+the browser starts, and twice a day after that - and the popup carries a line
+above whichever screen is showing when there is something to say.
 
 It asks **your Polaris**, not GitHub. The manifest declares no host permission,
 the one origin this may reach is the one you named, and the dashboard already
@@ -260,9 +261,9 @@ new version and there is nothing for you to do. An unpacked folder the install
 script's job keeps current - it writes `polaris-updater.json` into the folder -
 is told the same. Any other unpacked Chromium copy is shown the one line to run,
 for its system, which sets that job up. Firefox's temporary add-on has nothing on
-disk to keep current, and the line points at the steps on your own Polaris. Anything else - put there by other software, or by
-policy - is told the same as loaded-by-hand, because Polaris cannot promise those
-are being kept current.
+disk to keep current, and the line points at the steps on your own Polaris.
+Anything else - put there by other software, or by policy - is told the same as
+loaded-by-hand, because Polaris cannot promise those are being kept current.
 
 ## Lifting it out of this monorepo
 

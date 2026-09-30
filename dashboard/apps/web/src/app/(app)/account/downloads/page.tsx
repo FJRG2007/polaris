@@ -25,8 +25,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionSteps } from "./extension-steps";
+import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone, Terminal } from "lucide-react";
@@ -89,9 +89,11 @@ export default async function DownloadsPage() {
                     <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
                         <p className="font-medium">{t("downloads.extension.loadYourself")}</p>
                         {/* First, because it is the only way on this screen that
-                            makes the next version a refresh arrow instead of the
-                            whole install again. The zip and the steps stay under
-                            it for anybody who would rather do it by hand. */}
+                            keeps itself current afterward - the line sets up a
+                            job that swaps in new releases and the extension
+                            restarts into them on its own. The zip and the steps
+                            stay under it for anybody who would rather do it by
+                            hand, with nothing keeping that copy current. */}
                         <ExtensionCommand repo={repo} />
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
