@@ -1,9 +1,7 @@
 [
     "game-servers/challenges:goals.add (es-ES)",
     "game-servers/challenges:layer.card (es-ES)",
-    "game-servers/challenges:rewards.weekly (es-ES)",
     "game-servers/challenges:season.past (es-ES)",
-    "game-servers/challenges:settings.layerSeason (es-ES)",
     "game-servers/challenges:status.off (es-ES)",
     "places/places:cameras.off (es-ES)",
     "places/places:cameras.share (es-ES)",
