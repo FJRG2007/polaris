@@ -81,20 +81,33 @@ function rewardText(t: GameText<"minecraft">, reward: catalog.Reward, joiner = "
 
 const givesSomething = (reward: catalog.Reward) => reward.items.length > 0 || reward.levels > 0;
 
-/** Every prize of an event on one line: "1st 5 diamond + 15 levels · 2nd ... · All: 8 ...". */
+/** The podium places that pay a prize of their own. A place with none is paid the
+ *  taking-part prize, so it is not listed apart: "everybody else" covers it. */
+function podiumPrizes(t: GameText<"minecraft">, rewards: catalog.Rewards) {
+    return (
+        [
+            [t("events.facts.first"), rewards.first],
+            [t("events.facts.second"), rewards.second],
+            [t("events.facts.third"), rewards.third]
+        ] as const
+    ).filter(([, reward]) => givesSomething(reward));
+}
+
+/** Every prize of an event on one line: "1st 5 diamond + 15 levels · 2nd ... ·
+ *  Everybody else: 8 ...", or "Everybody: ..." when no place pays its own. */
 function prizesLine(t: GameText<"minecraft">, rewards: catalog.Rewards): string {
-    const places = [
-        [t("events.facts.first"), rewards.first],
-        [t("events.facts.second"), rewards.second],
-        [t("events.facts.third"), rewards.third]
-    ] as const;
-    const parts = places
-        .filter(([, reward]) => givesSomething(reward))
-        .map(([place, reward]) =>
-            t("events.prizes.entry", { place, reward: rewardText(t, reward, " + ") })
+    const places = podiumPrizes(t, rewards);
+    const parts = places.map(([place, reward]) =>
+        t("events.prizes.entry", { place, reward: rewardText(t, reward, " + ") })
+    );
+    if (givesSomething(rewards.everyone)) {
+        const reward = rewardText(t, rewards.everyone, " + ");
+        parts.push(
+            places.length > 0
+                ? t("events.prizes.everyone", { reward })
+                : t("events.prizes.everybody", { reward })
         );
-    if (givesSomething(rewards.everyone))
-        parts.push(t("events.prizes.everyone", { reward: rewardText(t, rewards.everyone, " + ") }));
+    }
     return parts.join(" · ") || t("events.prizes.none");
 }
 
@@ -343,13 +356,12 @@ function EventExplained({
         );
     }
     if (info.competitive) {
-        const prizes = [
-            [t("events.facts.first"), preset.rewards.first],
-            [t("events.facts.second"), preset.rewards.second],
-            [t("events.facts.third"), preset.rewards.third],
-            [t("events.facts.takingPart"), preset.rewards.everyone]
-        ] as const;
-        const given = prizes.filter(([, reward]) => reward.items.length > 0 || reward.levels > 0);
+        const places = podiumPrizes(t, preset.rewards);
+        const everybody =
+            places.length > 0 ? t("events.facts.takingPart") : t("events.facts.everybody");
+        const given = givesSomething(preset.rewards.everyone)
+            ? [...places, [everybody, preset.rewards.everyone] as const]
+            : places;
         facts.push(
             given.length > 0
                 ? t("events.facts.prizes", {

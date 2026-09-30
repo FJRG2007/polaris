@@ -174,6 +174,37 @@ describe("the Events tab", () => {
         expect(screen.getByText(/ - Sin premios$/)).toBeTruthy();
     });
 
+    it("leaves out a place with no prize of its own, and says everybody when none has one", async () => {
+        const nothing = { items: [], levels: 0 };
+        const bottles = { items: [{ id: "minecraft:experience_bottle", count: 8 }], levels: 0 };
+        const gap = {
+            ...catalog.newPreset("fishing", "fish"),
+            rewards: {
+                first: { items: [], levels: 15 },
+                second: nothing,
+                third: { items: [], levels: 5 },
+                everyone: bottles
+            }
+        };
+        const flat = {
+            ...catalog.newPreset("mining-rush", "rush"),
+            rewards: { first: nothing, second: nothing, third: nothing, everyone: bottles }
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: { ...view, config: { ...config, presets: [gap, flat] } } });
+        expect(
+            await screen.findByText(
+                / - 1st 15 levels · 3rd 5 levels · Everybody else: 8 experience bottle$/
+            )
+        ).toBeTruthy();
+        const row = screen.getByText(/ - Everybody: 8 experience bottle$/);
+        expect(row.getAttribute("title")).toBe(row.textContent);
+        expect(row.className).toContain("truncate");
+        expect(row.parentElement?.className).toContain("min-w-0");
+        fireEvent.click(screen.getByLabelText("What Mining rush is"));
+        expect(screen.getByText("Prizes - everybody: 8 experience bottle.")).toBeTruthy();
+    });
+
     it("draws its sections before the server answers", () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         expect(screen.getByText("Now")).toBeTruthy();

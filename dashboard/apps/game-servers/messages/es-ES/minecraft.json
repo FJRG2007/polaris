@@ -1671,6 +1671,7 @@
             "second": "2.º",
             "third": "3.º",
             "takingPart": "el resto",
+            "everybody": "todos",
             "prizes": "Premios - {list}.",
             "noPrizes": "Sin premios.",
             "needsPlayers": "{count, plural, one {Necesita # jugador conectado.} other {Necesita # jugadores conectados.}}",
@@ -1798,6 +1799,7 @@
         "prizes": {
             "entry": "{place} {reward}",
             "everyone": "El resto: {reward}",
+            "everybody": "Todos: {reward}",
             "none": "Sin premios"
         }
     },
