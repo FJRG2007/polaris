@@ -58,6 +58,9 @@ export function PlayerRecordPanel({
     const format = useDisplayFormat();
     const history = record?.history;
     const seen = (history?.visits ?? 0) > 0;
+    // For somebody on, when the visit they are on began: the last moment they were
+    // seen is now, which says nothing.
+    const latest = history?.online ? history.onSince : (history?.lastSeen ?? null);
 
     if (!seen && !stats) {
         return (
@@ -76,7 +79,7 @@ export function PlayerRecordPanel({
                     <Figure label={t("history.firstSeen")} value={history.firstSeen ? format.date(history.firstSeen) : "-"} />
                     <Figure
                         label={history.online ? t("history.onSince") : t("history.lastSeen")}
-                        value={history.lastSeen ? format.dateTime(history.lastSeen) : "-"}
+                        value={latest ? format.dateTime(latest) : "-"}
                     />
                 </div>
             )}

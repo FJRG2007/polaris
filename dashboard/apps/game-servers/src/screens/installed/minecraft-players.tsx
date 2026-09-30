@@ -1152,6 +1152,20 @@ function PlayerRow({
     );
 }
 
+/** How often a row's relative times are worked out again. They are in minutes. */
+const RELATIVE_TICK_MS = 30_000;
+
+/** The time now, moved on every `everyMs`, for a component whose text says how
+ *  long ago something was. */
+function useClock(everyMs: number): number {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), everyMs);
+        return () => clearInterval(timer);
+    }, [everyMs]);
+    return now;
+}
+
 /**
  * What a player is doing, in the words somebody watching the server would use.
  *
@@ -1176,6 +1190,9 @@ function StatusCell({
     const { playerPresence } = usePlayerWords();
     const t = useGameText("minecraft");
     const format = useDisplayFormat();
+    // "since 3m ago" is a phrase inside a sentence, so it cannot be the element
+    // that re-renders itself; the row's own clock moves it on instead.
+    const clock = useClock(RELATIVE_TICK_MS);
     const away = player.presence === "playing" && idleSince !== null;
     const badge = away ? (
         <Badge
@@ -1200,7 +1217,10 @@ function StatusCell({
     return (
         <div className="flex flex-col items-start gap-0.5">
             {badge}
-            {(player.sessions.length > 0 || player.lastSeen !== null) && (
+            {/* Somebody playing gets a line only with the start of the visit they are
+                on: nothing is better than a time that answers another question. */}
+            {(player.lastSeen !== null ||
+                (player.presence !== "playing" && player.sessions.length > 0)) && (
                 <button
                     type="button"
                     onClick={() => onOpen("history")}
@@ -1208,7 +1228,7 @@ function StatusCell({
                     title={t("playersTab.historyOf", { name: player.name })}
                 >
                     {t(player.presence === "playing" ? "playersTab.since" : "playersTab.lastOn", {
-                        when: relativeTime(player.lastSeen, format, t("players.timeNotLogged"))
+                        when: relativeTime(player.lastSeen, format, t("players.timeNotLogged"), clock)
                     })}
                 </button>
             )}

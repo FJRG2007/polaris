@@ -118,6 +118,8 @@ describe("what somebody's visits add up to", () => {
         expect(history.playedMs).toBe(60 * 60 * 1000);
         expect(history.online).toBe(true);
         expect(history.lastSeen).toEqual(NOW);
+        // "On since" is when that visit began, not the last moment it was seen.
+        expect(history.onSince).toEqual(at("2026-08-13T20:00:00.000Z"));
     });
 
     it("adds up every visit and remembers the first", () => {
@@ -151,6 +153,7 @@ describe("what somebody's visits add up to", () => {
             lastSeen: null,
             playedMs: 0,
             online: false,
+            onSince: null,
             longestMs: 0
         });
     });

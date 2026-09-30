@@ -75,7 +75,10 @@ export async function playingMinecraftNow(
             installedAppId: { in: [...new Set(agreed.map((link) => link.installedAppId))] },
             leftAt: null
         },
-        select: { installedAppId: true, name: true, joinedAt: true }
+        select: { installedAppId: true, name: true, joinedAt: true },
+        // Newest first, so that of two left open by an interrupted pass the card
+        // says when the visit they are on began, not an older one.
+        orderBy: { joinedAt: "desc" }
     });
     const visits: MinecraftVisit[] = [];
     for (const link of agreed) {

@@ -109,14 +109,113 @@ export function rosterChange(open: readonly OpenSession[], roster: readonly Rost
     };
 }
 
+/** What the server's own log says about one player's connection, for the games
+ *  that print one (see `minecraft/sessions`' `logConnection`). */
+export interface LoggedConnection {
+    /** Whether the log has them connected. */
+    readonly online: boolean;
+    /** When the connection they are on started. */
+    readonly since: Date | null;
+    /** When they last left - for somebody on, the departure before this visit. */
+    readonly lastLeft: Date | null;
+}
+
+/** A visit still open, with when it began - what the log is compared against. */
+export interface TimedSession extends OpenSession {
+    readonly joinedAt: Date;
+}
+
+/** The rows one pass writes. */
+export interface SessionWrites {
+    readonly close: readonly { readonly id: string; readonly leftAt: Date }[];
+    readonly open: readonly { readonly player: RosterPlayer; readonly joinedAt: Date }[];
+}
+
+/**
+ * How far past the start of a visit a join in the log has to be before it is a
+ * second connection rather than the one that opened it. The two clocks are the
+ * same machine's, and the log's stamp is the earlier of the two by however long
+ * the look that noticed took; this is slack for that and nothing else.
+ */
+const SAME_JOIN_MS = 10_000;
+
+/**
+ * The rows to write for a change in the roster, timed by the log where it has
+ * something to say.
+ *
+ * Asking who is on reports a moment, not what happened between two of them: a
+ * player who dropped and came back inside one look never appears to have left,
+ * and their visit kept the start of the first connection for the rest of the day.
+ * The log saw every one of those, so a kept visit whose player the log has joining
+ * again after it began is closed where they left and a new one opened where they
+ * came back. Arrivals and departures take the log's time too, which is when it
+ * happened rather than when somebody next looked.
+ *
+ * With no log - ARK, FiveM, or a read that failed - this is the roster change as
+ * it was, stamped `now`.
+ */
+export function sessionWrites(
+    open: readonly TimedSession[],
+    change: RosterChange,
+    roster: readonly RosterPlayer[],
+    logged: ReadonlyMap<string, LoggedConnection> | null,
+    now: Date
+): SessionWrites {
+    const at = now.getTime();
+    const logOf = (name: string): LoggedConnection | null =>
+        logged?.get(name.trim().toLowerCase()) ?? null;
+    const byId = new Map(open.map((session) => [session.id, session]));
+    const close: { id: string; leftAt: Date }[] = [];
+    const opened: { player: RosterPlayer; joinedAt: Date }[] = [];
+
+    const gone = new Set(change.left);
+    for (const id of change.left) {
+        const session = byId.get(id);
+        const log = session ? logOf(session.name) : null;
+        const left = log && !log.online ? log.lastLeft : null;
+        const valid = left && session && left.getTime() >= session.joinedAt.getTime() && left.getTime() <= at;
+        close.push({ id, leftAt: valid ? left : now });
+    }
+
+    for (const player of change.arrived) {
+        const log = logOf(player.name);
+        const since = log?.online ? log.since : null;
+        opened.push({ player, joinedAt: since && since.getTime() <= at ? since : now });
+    }
+
+    for (const session of open) {
+        if (gone.has(session.id)) continue;
+        const log = logOf(session.name);
+        const since = log?.online ? log.since : null;
+        if (!since || since.getTime() > at) continue;
+        const start = session.joinedAt.getTime();
+        if (since.getTime() <= start + SAME_JOIN_MS) continue;
+        // They left and came back after this visit began. The departure before
+        // this connection is when the last one ended, where the log kept it.
+        const left = log?.lastLeft?.getTime() ?? Number.NaN;
+        const end = Number.isNaN(left) || left < start || left > since.getTime() ? since : new Date(left);
+        const player =
+            roster.find((entry) => entry.name.trim().toLowerCase() === session.name.trim().toLowerCase()) ??
+            { name: session.name, id: session.playerId };
+        close.push({ id: session.id, leftAt: end });
+        opened.push({ player, joinedAt: since });
+    }
+
+    return { close, open: opened };
+}
+
 /** When one player was last on, for the line under their row. */
 export interface PlayerSeen {
-    /** When their latest visit started - which is when they arrived, for
-     *  somebody who is still playing. */
+    /** When their latest visit started. */
     readonly since: string | null;
     /** When they were last seen leaving. Null for somebody whose only visit is
      *  the one they are on. */
     readonly lastSeen: string | null;
+    /** When the visit they are on now started, and null when none is open. This,
+     *  not `since` and never `lastSeen`, is what "playing since" means: the end of
+     *  the visit before is when they left, not when they arrived. Optional because
+     *  a reading kept from before it was recorded does not carry it. */
+    readonly open?: string | null;
 }
 
 /**
@@ -153,6 +252,51 @@ export function seenFor(
     return null;
 }
 
+/**
+ * The record with what the live feed says on top: when each player on began the
+ * visit they are on, as of a few seconds ago rather than as of the last poll.
+ *
+ * Only the open visit is touched - the feed knows nothing about departures - and
+ * only for players the feed has a time for.
+ */
+export function withLiveSince(
+    seen: Readonly<Record<string, PlayerSeen>>,
+    players: readonly { readonly name: string; readonly id: string | null; readonly since?: string | null }[]
+): Readonly<Record<string, PlayerSeen>> {
+    const live = players.filter((player) => player.since);
+    if (live.length === 0) return seen;
+    const next: Record<string, PlayerSeen> = { ...seen };
+    let changed = false;
+    for (const player of live) {
+        for (const key of [
+            ...(player.id ? [seenKey({ name: "", id: player.id })] : []),
+            seenKey({ name: player.name, id: null })
+        ]) {
+            const held = next[key];
+            // The later of the two: the poll can have caught a reconnect the
+            // frame in hand has not.
+            const open = laterOf(held?.open ?? null, player.since ?? null);
+            if (held && held.open === open) continue;
+            next[key] = {
+                since: laterOf(held?.since ?? null, open),
+                lastSeen: held?.lastSeen ?? null,
+                open
+            };
+            changed = true;
+        }
+    }
+    // The same object when the feed said nothing new, so nothing drawn from it
+    // is drawn again.
+    return changed ? next : seen;
+}
+
+/** The later of two stamps, either of which may be missing. */
+export function laterOf(left: string | null, right: string | null): string | null {
+    if (!left) return right;
+    if (!right) return left;
+    return Date.parse(right) > Date.parse(left) ? right : left;
+}
+
 /** One visit, as the history reads it back. */
 export interface PlayerVisit {
     readonly joinedAt: Date;
@@ -170,6 +314,9 @@ export interface PlayerHistory {
     readonly playedMs: number;
     /** The visit in progress, if there is one. */
     readonly online: boolean;
+    /** When the visit in progress began, which is what "On since" says. Null
+     *  while nothing is open. */
+    readonly onSince: Date | null;
     /** How long the longest single visit lasted. */
     readonly longestMs: number;
 }
@@ -183,7 +330,15 @@ export interface PlayerHistory {
  */
 export function historyOf(visits: readonly PlayerVisit[], now: Date): PlayerHistory {
     if (visits.length === 0) {
-        return { visits: 0, firstSeen: null, lastSeen: null, playedMs: 0, online: false, longestMs: 0 };
+        return {
+            visits: 0,
+            firstSeen: null,
+            lastSeen: null,
+            playedMs: 0,
+            online: false,
+            onSince: null,
+            longestMs: 0
+        };
     }
 
     let first = visits[0]!.joinedAt.getTime();
@@ -191,6 +346,7 @@ export function historyOf(visits: readonly PlayerVisit[], now: Date): PlayerHist
     let played = 0;
     let longest = 0;
     let online = false;
+    let onSince: number | null = null;
 
     for (const visit of visits) {
         const from = visit.joinedAt.getTime();
@@ -202,7 +358,11 @@ export function historyOf(visits: readonly PlayerVisit[], now: Date): PlayerHist
         last = Math.max(last, to);
         played += length;
         longest = Math.max(longest, length);
-        if (visit.leftAt === null) online = true;
+        if (visit.leftAt === null) {
+            online = true;
+            // The newest, should an interrupted pass have left two open.
+            onSince = Math.max(onSince ?? from, from);
+        }
     }
 
     return {
@@ -211,6 +371,7 @@ export function historyOf(visits: readonly PlayerVisit[], now: Date): PlayerHist
         lastSeen: new Date(last),
         playedMs: played,
         online,
+        onSince: onSince === null ? null : new Date(onSince),
         longestMs: longest
     };
 }
@@ -338,11 +499,18 @@ export type PresenceLine =
 
 export function presenceLine(input: {
     readonly online: boolean;
-    readonly seen: { readonly since: string | null; readonly lastSeen: string | null } | null;
+    readonly seen: {
+        readonly since: string | null;
+        readonly lastSeen: string | null;
+        readonly open?: string | null;
+    } | null;
     readonly addedAt: string | null;
 }): PresenceLine {
     const { online, seen, addedAt } = input;
-    if (online && seen?.since) return { kind: "since", iso: seen.since };
+    // The visit that is open. A reading from before that was kept falls back
+    // to the newest start, which is the same visit whenever one is open.
+    const current = seen?.open !== undefined ? seen.open : (seen?.since ?? null);
+    if (online && current) return { kind: "since", iso: current };
     if (!online) {
         // The end of their last visit, or its start for one that was never closed:
         // a server stopped while somebody was playing leaves a visit open forever,

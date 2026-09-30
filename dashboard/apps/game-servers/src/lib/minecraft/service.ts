@@ -18,7 +18,7 @@ import { gameMessage } from "../game-message";
 import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { withTimeout } from "@polaris/core";
+import { gameOfServer, withTimeout } from "@polaris/core";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { liveContext } from "./live-values";
 import { gameServerAddress } from "./address";
@@ -1134,6 +1134,26 @@ export async function getPlayerSessions(
     return parsePlayerSessions(
         await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL)
     );
+}
+
+/**
+ * The same, for a record keeper that looks at every kind of game server: null for
+ * an install that is not a Minecraft server, whose log is not in this format and
+ * is not worth reading for it.
+ *
+ * Read on the install's own owner, whoever is watching: the callers are the sweep
+ * and the live feed, both of which only ever reach servers their reader may see,
+ * and a server somebody was invited to keeps its record like any other.
+ */
+export async function getPlayerSessionsIfMinecraft(
+    installedAppId: string
+): Promise<readonly PlayerSessionEvent[] | null> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, status: { not: "removed" } },
+        select: { catalogId: true, ownerId: true }
+    });
+    if (!row || gameOfServer(row.catalogId)?.id !== "minecraft") return null;
+    return getPlayerSessions(row.ownerId, installedAppId);
 }
 
 /** Operators, whitelisted players and bans, as the server has them on disk. */
