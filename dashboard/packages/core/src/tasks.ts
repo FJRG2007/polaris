@@ -817,7 +817,9 @@ export interface StatusColumn {
  * it something else keeps its own.
  *
  * Case and surrounding space do not make a new column - "In Progress" and "in
- * progress" are the same column to everyone reading the board.
+ * progress" are the same column to everyone reading the board. Nor does
+ * spelling: spaces created before the default closed status became "Canceled"
+ * still have "Cancelled", and both are the one column.
  */
 export function statusColumns(
     statuses: readonly { id: string; name: string; color: string }[]
@@ -825,7 +827,7 @@ export function statusColumns(
     const columns: StatusColumn[] = [];
     const byName = new Map<string, StatusColumn>();
     for (const status of statuses) {
-        const key = status.name.trim().toLowerCase();
+        const key = status.name.trim().toLowerCase().replace(/cancelled/g, "canceled");
         const existing = byName.get(key);
         if (existing) {
             existing.ids.push(status.id);

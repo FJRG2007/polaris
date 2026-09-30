@@ -497,6 +497,15 @@ describe("grouping", () => {
             ]);
         });
 
+        it("keeps an older space's Cancelled in the same column as a newer space's Canceled", () => {
+            const columns = engine.statusColumns([
+                { id: "old-closed", name: "Cancelled", color: "#71717a" },
+                { id: "new-closed", name: "Canceled", color: "#71717a" }
+            ]);
+            expect(columns).toHaveLength(1);
+            expect(columns[0]?.ids).toEqual(["old-closed", "new-closed"]);
+        });
+
         it("puts every space's row for a name into that one column", () => {
             const groups = engine.groupTasks(
                 [task({ id: "one", statusId: "a-todo" }), task({ id: "two", statusId: "b-todo" })],

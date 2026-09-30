@@ -388,12 +388,12 @@ export const TASK_GROUP_LABELS: Record<TaskGroupField, string> = {
  * is a column of its own and the only thing that column can ever hold. Hidden
  * there, the column is drawn empty while holding work, and a card dragged into
  * it disappears the moment it is let go: the move saved, the status changed, and
- * nothing on the screen said where the task went. "Cancelled" is that column on
+ * nothing on the screen said where the task went. "Canceled" is that column on
  * every space, since it is one of the statuses a new space starts with.
  *
  * So the filter stands down when closed work has somewhere of its own to be.
  * Grouped by status a task can only land in the group of its own status, so
- * letting it through cannot put a cancelled task anywhere except Cancelled.
+ * letting it through cannot put a cancelled task anywhere except Canceled.
  */
 export function hidesClosedWork(groupBy: TaskGroupField, showClosed: boolean): boolean {
     return !showClosed && groupBy !== "status";
