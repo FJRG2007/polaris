@@ -21,12 +21,12 @@
 
 import { Button, cn } from "@polaris/ui";
 import { useCallback, useState } from "react";
-import { HardDrive, Loader2, Trash2 } from "lucide-react";
 import type { HostSpace } from "@/lib/deploy/host-space";
 import { useConfirm } from "@/components/confirm-dialog";
+import { HardDrive, Loader2, Trash2 } from "lucide-react";
 import { useLiveRead } from "@/components/use-live-resource";
-import { hostSpaceAction, reclaimBuildCacheAction, reclaimHostSpaceAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { hostSpaceAction, reclaimBuildCacheAction, reclaimHostSpaceAction } from "./actions";
 
 /** Slow: this is a picture of a disk, and a disk does not change between two
  *  glances at it. Re-read straight after a reclaim, which is when it does. */
@@ -102,7 +102,9 @@ export function ContainerStorage() {
                     >
                         <div className="min-w-0">
                             <p className="text-[0.9375rem] font-medium leading-none">{size(row.value)}</p>
-                            <p className="mt-1 text-[0.6875rem] text-muted-foreground">{row.label}</p>
+                            <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground" title={row.label}>
+                                {row.label}
+                            </p>
                         </div>
                         {/* The build cache on its own, for somebody who looked at
                             the number and wants exactly that gone. Nothing in it is

@@ -23,11 +23,11 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, Plus } from "lucide-react";
 import { RunsOnSnippet } from "./runs-on-snippet";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import type { RunnerHostReadiness } from "@/lib/runners/runner-service";
 import { createRunnerPoolAction, probeRunnerHostAction } from "./actions";
 import { EMPTY_SCOPE, ScopeField, toScope, type ScopeState } from "./scope-field";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { knownRunnerText, runnerText } from "@/lib/runners/words";
 import {
     Button,
     Dialog,
@@ -297,7 +297,10 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                             />
                             <span className="font-medium">{t("dialog.advanced")}</span>
                             {advanced ? null : (
-                                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                <span
+                                    className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                                    title={advancedSummary()}
+                                >
                                     {advancedSummary()}
                                 </span>
                             )}
@@ -371,7 +374,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                     <div className="flex gap-2">
                                         <Field
                                             label={t("dialog.atOnce")}
-                                            className="w-24"
+                                            className="w-28"
                                             error={issue("limits")}
                                         >
                                             <Input

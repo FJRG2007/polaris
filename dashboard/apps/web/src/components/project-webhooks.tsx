@@ -16,13 +16,13 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useDisplayFormat } from "@/components/display-format";
-import type { ProjectWebhookView } from "@/lib/deploy-project-service";
-import { Button, Checkbox, Input, Select, Switch, ConfirmDeleteDialog } from "@polaris/ui";
-import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
-import { CheckCircle2, CircleAlert, Loader2, Plus, Send, Trash2, Webhook } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { deliveryText } from "@/lib/notifications/delivery-words";
+import type { ProjectWebhookView } from "@/lib/deploy-project-service";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { Button, Checkbox, Input, Select, Switch, ConfirmDeleteDialog } from "@polaris/ui";
+import { CheckCircle2, CircleAlert, Loader2, Plus, Send, Trash2, Webhook } from "lucide-react";
+import { PROJECT_WEBHOOK_EVENTS, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS, type WebhookFormat } from "@polaris/core";
 
 /** A deploy event as the catalog names it: `webhooks.events.<event>`. */
 const EVENT_KEYS: Readonly<Record<string, NamespaceKey<"components">>> = {
@@ -140,7 +140,14 @@ export function ProjectWebhooks({
                                     {hook.status === "error" && <CircleAlert className="size-3.5 shrink-0 text-danger" />}
                                 </p>
                                 <p className="truncate font-mono text-xs text-muted-foreground">{hook.targetHint}</p>
-                                <p className="truncate text-xs text-muted-foreground">
+                                <p
+                                    className="truncate text-xs text-muted-foreground"
+                                    title={
+                                        hook.events.length === 0
+                                            ? t("webhooks.everyEvent")
+                                            : hook.events.map((id) => eventLabel(t, id)).join(", ")
+                                    }
+                                >
                                     {hook.events.length === 0
                                         ? t("webhooks.everyEvent")
                                         : hook.events.map((id) => eventLabel(t, id)).join(", ")}

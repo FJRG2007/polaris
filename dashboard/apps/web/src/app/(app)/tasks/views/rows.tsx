@@ -12,16 +12,16 @@
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
-import { dropEdge, neighbours, type DropEdge } from "../drop-edge";
 import { useRowCursor } from "./row-cursor";
 import { cn, EmptyState } from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
 import { PriorityMark } from "@/components/priority-mark";
-import { useDisplayFormat } from "@/components/display-format";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
-import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import { columnStatusIds, reorderColumns } from "./board";
+import { useDisplayFormat } from "@/components/display-format";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { dropEdge, neighbours, type DropEdge } from "../drop-edge";
+import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import {
     commandsFor,
     TaskControls,
@@ -364,7 +364,9 @@ export function ListView(props: ViewProps) {
                                 )}
                             </button>
                             {group.color && <StatusDot color={group.color} />}
-                            <h3 className="text-sm font-medium">{group.label}</h3>
+                            <h3 className="min-w-0 truncate text-sm font-medium" title={group.label}>
+                                {group.label}
+                            </h3>
                             <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
                                 {group.tasks.length}
                             </span>

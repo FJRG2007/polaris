@@ -8,8 +8,8 @@
  */
 
 import { Badge, cn } from "@polaris/ui";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 type Answer<T> = { error: string } | ({ error?: undefined } & T);
 
@@ -124,13 +124,16 @@ export function VerdictBadge({ verdict, label }: { verdict: Verdict; label?: str
     return <Badge variant={variant}>{label ?? t(`verdicts.${verdict}`)}</Badge>;
 }
 
-/** The server's state, as one badge. */
+/** The server's state, as one badge. On one line and never squeezed: it sits at
+ *  the end of a row whose name column truncates instead, and "Instalación parada"
+ *  broken over two lines reads as two badges. */
 export function StatusBadge({ status }: { status: string }) {
     const t = useTranslations("mailServer");
-    if (status === "ready") return <Badge variant="success">{t("status.ready")}</Badge>;
-    if (status === "down") return <Badge variant="danger">{t("status.down")}</Badge>;
-    if (status === "failed") return <Badge variant="danger">{t("status.failed")}</Badge>;
-    return <Badge variant="primary">{t("status.settingUp")}</Badge>;
+    const fixed = "shrink-0 whitespace-nowrap";
+    if (status === "ready") return <Badge variant="success" className={fixed}>{t("status.ready")}</Badge>;
+    if (status === "down") return <Badge variant="danger" className={fixed}>{t("status.down")}</Badge>;
+    if (status === "failed") return <Badge variant="danger" className={fixed}>{t("status.failed")}</Badge>;
+    return <Badge variant="primary" className={fixed}>{t("status.settingUp")}</Badge>;
 }
 
 /** A sentence a panel could not load past. */

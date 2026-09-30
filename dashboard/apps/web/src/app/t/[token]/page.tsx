@@ -16,8 +16,8 @@ import Link from "next/link";
 import { LogIn } from "lucide-react";
 import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
-import { getPublicTask } from "@/lib/tasks/share-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { getPublicTask } from "@/lib/tasks/share-service";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 
@@ -58,7 +58,9 @@ function Shell({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="flex items-start gap-3 py-1.5 text-sm">
-            <span className="w-28 shrink-0 text-xs text-muted-foreground">{label}</span>
+            <span className="w-28 shrink-0 truncate text-xs text-muted-foreground" title={label}>
+                {label}
+            </span>
             <div className="min-w-0 flex-1">{children}</div>
         </div>
     );

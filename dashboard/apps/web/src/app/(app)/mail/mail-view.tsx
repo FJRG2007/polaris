@@ -23,13 +23,10 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ThreadView } from "./thread-view";
-import { mailOptionLabel } from "./option-label";
-import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { SenderFace } from "./sender-face";
 import { MailSearch } from "./mail-search";
+import { mailOptionLabel } from "./option-label";
 import { useMailLayout } from "./use-mail-layout";
 import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
@@ -39,9 +36,12 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { mailShortcuts, useMailKeys } from "./use-mail-keys";
 import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
@@ -1395,7 +1395,10 @@ export function MailView({
                         />
                         {selected.length === 0 ? (
                             <>
-                                <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">
+                                <h1
+                                    className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight"
+                                    title={context.title}
+                                >
                                     {context.title}
                                 </h1>
                                 <Button

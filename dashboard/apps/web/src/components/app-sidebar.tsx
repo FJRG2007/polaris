@@ -30,15 +30,15 @@ import * as nav from "@/lib/apps";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
-import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { railCount } from "@/lib/waiting-counts";
 import { useOrgNav } from "@/components/use-org-nav";
+import { badgeLabel } from "@/lib/notification-badge";
 import { useAppUnread } from "@/components/app-unread";
 import { useAdminWaiting } from "@/components/admin-waiting";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { railCount } from "@/lib/waiting-counts";
 import { useInstalledNav } from "@/components/use-installed-nav";
-import { badgeLabel } from "@/lib/notification-badge";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 export function AppSidebar({
     appIds = [],
@@ -138,13 +138,18 @@ export function AppSidebar({
                     href={subapp.parent.href}
                     className="mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                    <ChevronLeft className="size-3.5" />
-                    {label(subapp.parent.label)}
+                    <ChevronLeft className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate" title={label(subapp.parent.label)}>
+                        {label(subapp.parent.label)}
+                    </span>
                 </Link>
             ) : null}
             {groups.map((group, index) => (
                 <div key={group.label} className={cn("flex flex-col gap-0.5", index > 0 && "mt-4")}>
-                    <p className="px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
+                    <p
+                        className="truncate px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle"
+                        title={group.label}
+                    >
                         {group.label}
                     </p>
                     {group.items.map((item) => (

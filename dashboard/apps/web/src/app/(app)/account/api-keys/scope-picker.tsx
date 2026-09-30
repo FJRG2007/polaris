@@ -25,12 +25,12 @@
  */
 
 import { useMemo, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { ChevronRight, Search, X } from "lucide-react";
 import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
 import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS } from "@/lib/api-key-scopes";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -164,7 +164,7 @@ export function ScopePicker({
                                         expanded && "rotate-90"
                                     )}
                                 />
-                                <span className="min-w-0 flex-1 truncate font-medium">
+                                <span className="min-w-0 flex-1 truncate font-medium" title={group.title}>
                                     {group.title}
                                 </span>
                                 <span

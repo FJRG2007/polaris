@@ -16,8 +16,8 @@
  */
 
 import type { PickedFile } from "./picked-file";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn, Button, Dialog, DialogContent, EmptyState, Input, Select } from "@polaris/ui";
 import {
     ArrowLeft,
@@ -257,7 +257,9 @@ export function FilePickerDialog({
                                     }}
                                 >
                                     <entry.icon className="size-4 shrink-0" aria-hidden />
-                                    {t(`files.tabs.${entry.id}`)}
+                                    <span className="min-w-0 truncate" title={t(`files.tabs.${entry.id}`)}>
+                                        {t(`files.tabs.${entry.id}`)}
+                                    </span>
                                 </button>
                             ))}
                         </nav>

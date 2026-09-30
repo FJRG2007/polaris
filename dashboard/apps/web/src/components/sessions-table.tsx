@@ -19,15 +19,15 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { clientKindText, signInText } from "@/lib/sign-in-words";
 import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
-import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import type { SessionView } from "@/lib/session-directory";
-import { addressLine, DeviceAddress } from "@/components/device-address";
 import { readClientDevice } from "@/lib/vault/client-device";
+import { clientKindText, signInText } from "@/lib/sign-in-words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { ExtensionSessionView } from "@/lib/extension/sessions";
+import { addressLine, DeviceAddress } from "@/components/device-address";
 import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
 import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
 
@@ -259,7 +259,9 @@ export function SessionsTable({
                                                 {session.locked ? <Badge>{t("sessionsTable.locked")}</Badge> : null}
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
-                                                <Badge>{signInText(t, session.signIn)}</Badge>
+                                                <Badge className="max-w-full" title={signInText(t, session.signIn)}>
+                                                    <span className="min-w-0 truncate">{signInText(t, session.signIn)}</span>
+                                                </Badge>
                                                 {/* Only where it is actually on. A
                                                     badge on every row saying a session
                                                     is not pinned is a column of "no". */}
@@ -494,7 +496,9 @@ export function SessionsTable({
                                                         {device.os}
                                                     </span>
                                                 ) : null}
-                                                <Badge variant="neutral">{kind}</Badge>
+                                                <Badge variant="neutral" className="max-w-full" title={kind}>
+                                                    <span className="min-w-0 truncate">{kind}</span>
+                                                </Badge>
                                             </p>
                                             {/* The columns the narrow layouts drop,
                                                 folded back in, exactly as the rows

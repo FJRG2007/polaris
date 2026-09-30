@@ -317,7 +317,12 @@ function RuleRow({
                         onChange={onToggle}
                         aria-label={rule.enabled ? t("list.disable", { name: rule.name }) : t("list.enable", { name: rule.name })}
                     />
-                    <span className="text-xs text-muted-foreground">{rule.enabled ? t("list.active") : t("list.off")}</span>
+                    <span
+                        className="min-w-0 truncate text-xs text-muted-foreground"
+                        title={rule.enabled ? t("list.active") : t("list.off")}
+                    >
+                        {rule.enabled ? t("list.active") : t("list.off")}
+                    </span>
                 </div>
             </td>
             <td className="px-2 py-3.5 align-top text-right">

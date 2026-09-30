@@ -17,17 +17,17 @@
  */
 
 import Link from "next/link";
-import { readJson } from "@/lib/read-json";
 import { KeysPanel } from "./keys-panel";
+import { readJson } from "@/lib/read-json";
 import { PlansPanel } from "./plans-panel";
 import { formatBytes } from "@polaris/core";
+import { kindLabel } from "@/lib/backups/words";
 import { ProtectDialog } from "./protect-dialog";
 import { ActivityPanel } from "./activity-panel";
+import { readReasonText } from "@/lib/read-json";
+import { RESOURCE_KINDS } from "@/lib/backups/kinds";
 import { DestinationsPanel } from "./destinations-panel";
 import { useDisplayFormat } from "@/components/display-format";
-import { RESOURCE_KINDS } from "@/lib/backups/kinds";
-import { kindLabel } from "@/lib/backups/words";
-import { readReasonText } from "@/lib/read-json";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { BackupOverview, DestinationSummary, PlanSummary, ResourceRow } from "./types";
@@ -340,7 +340,8 @@ function ProtectedTable({
                     value={kind}
                     onValueChange={setKind}
                     aria-label={t("table.filterType")}
-                    className="w-44"
+                    // Room for the longest kind in Spanish ("Base de datos de Polaris").
+                    className="w-52"
                     options={[
                         { value: "", label: t("table.everyType") },
                         ...RESOURCE_KINDS.map((entry) => ({

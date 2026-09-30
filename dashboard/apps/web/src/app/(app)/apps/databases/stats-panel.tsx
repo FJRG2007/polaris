@@ -35,13 +35,13 @@
 
 import * as actions from "./actions";
 import { formatBytes } from "@polaris/core";
-import { grouped } from "@/app/(app)/apps/firewall/page-parts";
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { DatabaseStats, StatValue } from "@/lib/data/stats";
-import type { DatabaseInsights } from "@/lib/data/insights";
 import { dataText, statText } from "@/lib/data/words";
+import type { DatabaseInsights } from "@/lib/data/insights";
+import { grouped } from "@/app/(app)/apps/firewall/page-parts";
+import type { DatabaseStats, StatValue } from "@/lib/data/stats";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardBody, Select, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
 
 /** How often a reading is taken. Fast enough to watch something happen, slow
@@ -182,7 +182,10 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                 {Object.keys(latest.gauges).map((key) => (
                     <Card key={key}>
                         <CardBody className="flex flex-col gap-0.5 p-3">
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span
+                                className="truncate text-xs text-muted-foreground"
+                                title={statText(t, latest.labels[key] ?? key)}
+                            >
                                 {statText(t, latest.labels[key] ?? key)}
                             </span>
                             <span className="text-lg font-semibold tabular-nums">

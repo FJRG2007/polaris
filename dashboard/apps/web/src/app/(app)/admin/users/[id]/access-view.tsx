@@ -13,12 +13,12 @@ import { useRouter } from "next/navigation";
 import { setUserRoleAction } from "../actions";
 import { CapabilitiesCard } from "./capabilities-card";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { AccessExplanation, ResourceGrantView } from "@/lib/access-explain-service";
-import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Badge, Button, Card, CardBody, Checkbox, Select, Skeleton } from "@polaris/ui";
+import type { AccessExplanation, ResourceGrantView } from "@/lib/access-explain-service";
 import {
     removeUserGrantAction,
     setUserGroupAction,
@@ -321,14 +321,14 @@ function ResourcesCard({
                                 className="flex items-center justify-between gap-3 py-2"
                             >
                                 <div className="flex min-w-0 flex-col gap-0.5">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex min-w-0 items-center gap-2">
                                         <span
                                             className="truncate text-sm"
                                             title={grant.resourceLabel}
                                         >
                                             {grant.resourceLabel}
                                         </span>
-                                        <Badge>{grant.kindLabel}</Badge>
+                                        <Badge className="shrink-0 whitespace-nowrap">{grant.kindLabel}</Badge>
                                         {grant.effect === "deny" && (
                                             <Badge className="border-danger-edge text-danger">
                                                 {t("usersDetail.accessView.resources.deny")}

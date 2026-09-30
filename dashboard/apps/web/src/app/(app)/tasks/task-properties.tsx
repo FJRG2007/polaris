@@ -12,13 +12,13 @@
 
 import { useState } from "react";
 import * as pickers from "./pickers";
+import { optionLabel } from "./option-label";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { AvatarStack } from "@/components/avatar";
 import { TimerControl } from "./task-conversation";
 import { CustomFieldEditor } from "./custom-fields";
-import { optionLabel } from "./option-label";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SpaceContext } from "@/lib/tasks/facts";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Ban,
     CalendarDays,
@@ -55,7 +55,11 @@ export function Property({
         <div className="flex flex-col gap-1 py-1 sm:flex-row sm:items-start sm:gap-3">
             <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:w-32 sm:pt-1.5">
                 <span className="shrink-0 opacity-70">{icon}</span>
-                {label}
+                {/* The column is a fixed width beside the value, so a longer
+                    translation is cut here with the whole name on hover. */}
+                <span className="min-w-0 truncate" title={label}>
+                    {label}
+                </span>
             </span>
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</div>
         </div>

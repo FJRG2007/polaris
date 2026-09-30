@@ -63,7 +63,7 @@ export function ScopePicker({
         <Select
             value={kind}
             aria-label={t("picker.scope")}
-            className="h-8 min-w-0 flex-1 font-medium md:w-40 md:min-w-[10rem] md:flex-none"
+            className="h-8 min-w-0 flex-1 font-medium md:w-48 md:min-w-[12rem] md:flex-none"
             options={kinds.map((entry) => ({ value: entry, label: scopeKindLabel(t, entry) }))}
             onValueChange={(value) => {
                 const nextKind = value as ScopeKind;

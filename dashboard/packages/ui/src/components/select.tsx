@@ -183,7 +183,14 @@ export function Select({
                     {selected && (
                         <>
                             {selected.icon}
-                            <span className="truncate">{selected.label}</span>
+                            {/* A long label is cut to the trigger's width; the whole of it
+                                is still there on hover. */}
+                            <span
+                                className="truncate"
+                                title={typeof selected.label === "string" ? selected.label : undefined}
+                            >
+                                {selected.label}
+                            </span>
                         </>
                     )}
                 </RadixSelect.Value>

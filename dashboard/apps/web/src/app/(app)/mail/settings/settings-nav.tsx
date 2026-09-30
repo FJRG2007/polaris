@@ -44,7 +44,8 @@ export function SettingsNav() {
                         href={href}
                         aria-current={pathname === href ? "page" : undefined}
                         className={cn(
-                            "rounded-md px-2.5 py-1 text-[13px]",
+                            // One line per tab; the row wraps between tabs instead.
+                            "whitespace-nowrap rounded-md px-2.5 py-1 text-[13px]",
                             pathname === href
                                 ? "bg-card font-medium text-foreground"
                                 : "text-muted-foreground hover:bg-card hover:text-foreground"

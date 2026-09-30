@@ -21,8 +21,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
-import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
 import { countryFlag, countryName, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
+import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
@@ -32,8 +32,8 @@ import {
     setTrackerEnabledAction,
     type AnalyticsOverview
 } from "./actions";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Thousands separators without a locale: the browser's separator disagrees with the
  *  server on the first render, and it is not the reader's chosen format either. */
@@ -580,7 +580,7 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                                     <th className="px-2 py-1.5 font-medium">{t("recent.lastSeen")}</th>
                                     <th className="px-2 py-1.5 font-medium">{t("recent.address")}</th>
                                     <th className="px-2 py-1.5 font-medium">{t("recent.whereFrom")}</th>
-                                    <th className="px-2 py-1.5 font-medium">{t("recent.lastPage")}</th>
+                                    <th className="whitespace-nowrap px-2 py-1.5 font-medium">{t("recent.lastPage")}</th>
                                     <th className="px-2 py-1.5 font-medium">{t("recent.client")}</th>
                                     <th className="px-2 py-1.5 text-right font-medium">{t("breakdowns.pages")}</th>
                                     <th className="px-2 py-1.5 text-right font-medium">{t("recent.time")}</th>

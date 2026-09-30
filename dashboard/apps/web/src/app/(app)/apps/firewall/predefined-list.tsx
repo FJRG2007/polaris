@@ -134,8 +134,14 @@ export function PredefinedRuleList({
                                                 aria-label={on ? t("list.disable", { name: row.name }) : t("list.enable", { name: row.name })}
                                             />
                                             <span
-                                                className="text-xs text-muted-foreground"
-                                                title={decided ? decided.why : undefined}
+                                                className="min-w-0 truncate text-xs text-muted-foreground"
+                                                title={
+                                                    decided
+                                                        ? decided.why
+                                                        : on
+                                                          ? t("list.active")
+                                                          : t("list.off")
+                                                }
                                             >
                                                 {decided ? decided.label : on ? t("list.active") : t("list.off")}
                                             </span>
