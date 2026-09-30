@@ -15,11 +15,7 @@ const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
     experimental: { serverActions: { bodySizeLimit: "32mb" } },
-    transpilePackages: [
-        "@polaris/ui",
-        "@polaris/file-parse",
-        "@polaris/app-host"
-    ],
+    transpilePackages: ["@polaris/ui", "@polaris/file-parse", "@polaris/app-host"],
     serverExternalPackages: [
         "@prisma/client",
         "@polaris/db",

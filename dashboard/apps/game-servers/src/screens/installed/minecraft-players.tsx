@@ -652,7 +652,10 @@ export function MinecraftPlayers({
                                         setError(message.error ?? null);
                                     }}
                                 />
-                                <InventoryImportButton installedAppId={installedAppId} onDone={onChanged} />
+                                <InventoryImportButton
+                                    installedAppId={installedAppId}
+                                    onDone={onChanged}
+                                />
                             </>
                         )}
                         <Button

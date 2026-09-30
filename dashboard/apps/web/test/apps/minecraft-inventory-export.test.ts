@@ -32,7 +32,9 @@ function slotOf(name: string): number {
 function stored(argument: string): { id: string; data: string | null } {
     if (era === "tag") {
         const brace = argument.indexOf("{");
-        return brace === -1 ? { id: argument, data: null } : { id: argument.slice(0, brace), data: argument.slice(brace) };
+        return brace === -1
+            ? { id: argument, data: null }
+            : { id: argument.slice(0, brace), data: argument.slice(brace) };
     }
     const bracket = argument.indexOf("[");
     if (bracket === -1) return { id: argument, data: null };
@@ -64,9 +66,13 @@ async function say(argv: string[]): Promise<string> {
         const one = /^Inventory\[\{Slot:(-?\d+)b\}\]$/.exec(path ?? "");
         if (one) {
             const stack = bag.get(Number(one[1]));
-            return stack ? `${player} has the following entity data: ${entry(Number(one[1]), stack)}` : `Found no elements matching ${path}`;
+            return stack
+                ? `${player} has the following entity data: ${entry(Number(one[1]), stack)}`
+                : `Found no elements matching ${path}`;
         }
-        const all = [...bag.entries()].sort(([a], [b]) => a - b).map(([slot, stack]) => entry(slot, stack));
+        const all = [...bag.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([slot, stack]) => entry(slot, stack));
         return `${player} has the following entity data: [${all.join(", ")}]`;
     }
     if (command === "item") {
@@ -79,9 +85,13 @@ async function say(argv: string[]): Promise<string> {
     }
     if (command === "clear") {
         const item = rest[1] ?? "";
-        const speaks = era === "components" ? item.includes("[") || !item.includes("{") : !item.includes("[");
-        if (!speaks) return "Expected whitespace to end one argument, but found trailing data...<--[HERE]";
-        return bags.has(rest[0] ?? "") ? `No items were found on player ${rest[0]}` : "No player was found";
+        const speaks =
+            era === "components" ? item.includes("[") || !item.includes("{") : !item.includes("[");
+        if (!speaks)
+            return "Expected whitespace to end one argument, but found trailing data...<--[HERE]";
+        return bags.has(rest[0] ?? "")
+            ? `No items were found on player ${rest[0]}`
+            : "No player was found";
     }
     return "";
 }
@@ -100,31 +110,53 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    withServerContainer: async (_ownerId: string, _installedAppId: string, run: (server: unknown) => Promise<unknown>) =>
-        run(server)
+    withServerContainer: async (
+        _ownerId: string,
+        _installedAppId: string,
+        run: (server: unknown) => Promise<unknown>
+    ) => run(server)
 }));
 
-vi.mock("@polaris-app/game-servers/src/lib/recent-items", () => ({ recentlyGivenItems: async () => [] }));
+vi.mock("@polaris-app/game-servers/src/lib/recent-items", () => ({
+    recentlyGivenItems: async () => []
+}));
 
-const server = { edition: "java", installedAppId: "server", say, run: async () => ({ code: 0, output: "" }) };
+const server = {
+    edition: "java",
+    installedAppId: "server",
+    say,
+    run: async () => ({ code: 0, output: "" })
+};
 
 const transfer = await import("@polaris-app/game-servers/src/lib/minecraft/inventory-transfer");
-const service = await import("@polaris-app/game-servers/src/lib/minecraft/inventory-transfer-service");
-const { readLiveInventory } = await import("@polaris-app/game-servers/src/lib/minecraft/inventory-service");
+const service = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/inventory-transfer-service"
+);
+const { readLiveInventory } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/inventory-service"
+);
 const queue = await import("@polaris-app/game-servers/src/lib/minecraft/queue");
 
 const SWORD =
     '{"minecraft:custom_name": {text:"Excalibur",color:"gold"}, "minecraft:damage": 40, "minecraft:enchantments": {levels: {"minecraft:sharpness": 5, "minecraft:unbreaking": 3}}}';
 const SHULKER =
     '{"minecraft:container": [{item: {count: 64, id: "minecraft:diamond"}, slot: 0}, {item: {count: 16, id: "minecraft:golden_apple"}, slot: 1}]}';
-const LEGACY_SWORD = '{Damage: 40, Enchantments: [{id: "minecraft:sharpness", lvl: 5s}], display: {Name: \'"Excalibur"\'}}';
+const LEGACY_SWORD =
+    '{Damage: 40, Enchantments: [{id: "minecraft:sharpness", lvl: 5s}], display: {Name: \'"Excalibur"\'}}';
 
 function modernBag(): Map<number, Stored> {
     return new Map<number, Stored>([
         [0, { id: "minecraft:diamond_sword", count: 1, data: SWORD }],
         [1, { id: "minecraft:arrow", count: 64, data: null }],
         [9, { id: "minecraft:shulker_box", count: 1, data: SHULKER }],
-        [103, { id: "minecraft:diamond_helmet", count: 1, data: '{"minecraft:enchantments": {levels: {"minecraft:protection": 4}}}' }],
+        [
+            103,
+            {
+                id: "minecraft:diamond_helmet",
+                count: 1,
+                data: '{"minecraft:enchantments": {levels: {"minecraft:protection": 4}}}'
+            }
+        ],
         [-106, { id: "minecraft:shield", count: 1, data: null }]
     ]);
 }
@@ -145,13 +177,20 @@ describe("a bag exported and imported back", () => {
         bags.set("Bob", new Map());
         const before = await bagOf("Alice");
         const text = transfer.toJson(
-            transfer.exportFile([{ name: "Alice", takenAt: "2026-09-30T10:00:00.000Z", live: true, items: before }], "1.21.4")
+            transfer.exportFile(
+                [{ name: "Alice", takenAt: "2026-09-30T10:00:00.000Z", live: true, items: before }],
+                "1.21.4"
+            )
         );
         const read = transfer.parseTransfer(text);
         expect(read.ok).toBe(true);
         if (!read.ok) return;
         expect(read.file.era).toBe("components");
-        const plan = transfer.planImport(await bagOf("Bob"), read.file.players[0]!.items, "replace");
+        const plan = transfer.planImport(
+            await bagOf("Bob"),
+            read.file.players[0]!.items,
+            "replace"
+        );
         const done = await service.applyPlanNow(server as never, "server", "Bob", plan);
         expect(done).toEqual({ written: 5, skipped: [] });
         expect(await bagOf("Bob")).toEqual(before);
@@ -160,21 +199,43 @@ describe("a bag exported and imported back", () => {
 
     it("keeps an older server's tag data exactly too", async () => {
         era = "tag";
-        bags.set("Alice", new Map([[5, { id: "minecraft:diamond_sword", count: 1, data: LEGACY_SWORD }]]));
+        bags.set(
+            "Alice",
+            new Map([[5, { id: "minecraft:diamond_sword", count: 1, data: LEGACY_SWORD }]])
+        );
         bags.set("Bob", new Map([[5, { id: "minecraft:dirt", count: 3, data: null }]]));
         const before = await bagOf("Alice");
-        const read = transfer.parseTransfer(transfer.toJson(transfer.exportFile([{ name: "Alice", takenAt: "x", live: true, items: before }], "1.20.1")));
+        const read = transfer.parseTransfer(
+            transfer.toJson(
+                transfer.exportFile(
+                    [{ name: "Alice", takenAt: "x", live: true, items: before }],
+                    "1.20.1"
+                )
+            )
+        );
         expect(read.ok && read.file.era).toBe("tag");
         if (!read.ok) return;
-        const plan = transfer.planImport(await bagOf("Bob"), read.file.players[0]!.items, "replace");
+        const plan = transfer.planImport(
+            await bagOf("Bob"),
+            read.file.players[0]!.items,
+            "replace"
+        );
         await service.applyPlanNow(server as never, "server", "Bob", plan);
-        expect(bags.get("Bob")!.get(5)).toEqual({ id: "minecraft:diamond_sword", count: 1, data: LEGACY_SWORD });
+        expect(bags.get("Bob")!.get(5)).toEqual({
+            id: "minecraft:diamond_sword",
+            count: 1,
+            data: LEGACY_SWORD
+        });
     });
 
     it("leaves a slot that changed since the preview as it is", async () => {
         bags.set("Bob", new Map([[0, { id: "minecraft:dirt", count: 1, data: null }]]));
         const seen = await bagOf("Bob");
-        const plan = transfer.planImport(seen, [{ slot: 0, id: "minecraft:stone", count: 5, data: null }], "replace");
+        const plan = transfer.planImport(
+            seen,
+            [{ slot: 0, id: "minecraft:stone", count: 5, data: null }],
+            "replace"
+        );
         bags.get("Bob")!.set(0, { id: "minecraft:dirt", count: 2, data: null });
         const done = await service.applyPlanNow(server as never, "server", "Bob", plan);
         expect(done.skipped).toEqual([0]);
@@ -190,7 +251,8 @@ describe("what an import changes, shown before it happens", () => {
         const current = [dirt(0), dirt(1), stone(2)];
         const incoming = [stone(0), stone(2), stone(3)];
         const replace = transfer.planImport(current, incoming, "replace");
-        const change = (plan: typeof replace, slot: number) => plan.find((one) => one.slot === slot)?.change;
+        const change = (plan: typeof replace, slot: number) =>
+            plan.find((one) => one.slot === slot)?.change;
         expect(change(replace, 0)).toBe("replace");
         expect(change(replace, 1)).toBe("remove");
         expect(change(replace, 2)).toBe("keep");
@@ -205,32 +267,77 @@ describe("what an import changes, shown before it happens", () => {
     });
 
     it("refuses by name a stack that does not fit a command or sits where only a mod writes", () => {
-        const long = { slot: 4, id: "minecraft:shulker_box", count: 1, data: { era: "components" as const, snbt: `{"minecraft:custom_name": "${"x".repeat(600)}"}` } };
+        const long = {
+            slot: 4,
+            id: "minecraft:shulker_box",
+            count: 1,
+            data: {
+                era: "components" as const,
+                snbt: `{"minecraft:custom_name": "${"x".repeat(600)}"}`
+            }
+        };
         const modded = { slot: 150, id: "minecraft:stone", count: 1, data: null };
         const plan = transfer.planImport([], [long, modded], "fill");
-        expect(plan.find((one) => one.slot === 4)).toMatchObject({ change: "refused", refused: "too-long", wanted: long });
-        expect(plan.find((one) => one.slot === 150)).toMatchObject({ change: "refused", refused: "slot" });
+        expect(plan.find((one) => one.slot === 4)).toMatchObject({
+            change: "refused",
+            refused: "too-long",
+            wanted: long
+        });
+        expect(plan.find((one) => one.slot === 150)).toMatchObject({
+            change: "refused",
+            refused: "slot"
+        });
         expect(transfer.writesOf(plan)).toEqual([]);
     });
 });
 
 describe("a file that cannot be imported", () => {
     const file = () =>
-        transfer.exportFile([{ name: "Alice", takenAt: "x", live: false, items: [{ slot: 0, id: "minecraft:stone", count: 1, data: null }] }], null);
+        transfer.exportFile(
+            [
+                {
+                    name: "Alice",
+                    takenAt: "x",
+                    live: false,
+                    items: [{ slot: 0, id: "minecraft:stone", count: 1, data: null }]
+                }
+            ],
+            null
+        );
 
     it("is refused with a reason, never read partly", () => {
         expect(transfer.parseTransfer("not json")).toEqual({ ok: false, problem: "notJson" });
-        expect(transfer.parseTransfer(`${transfer.CSV_MARK}\r\nPlayer,Slot`)).toEqual({ ok: false, problem: "csv" });
-        expect(transfer.parseTransfer(JSON.stringify({ format: "other" }))).toEqual({ ok: false, problem: "notInventory" });
+        expect(transfer.parseTransfer(`${transfer.CSV_MARK}\r\nPlayer,Slot`)).toEqual({
+            ok: false,
+            problem: "csv"
+        });
+        expect(transfer.parseTransfer(JSON.stringify({ format: "other" }))).toEqual({
+            ok: false,
+            problem: "notInventory"
+        });
         const twice = file();
         twice.players[0]!.items.push({ slot: 0, id: "minecraft:dirt", count: 1, data: null });
-        expect(transfer.parseTransfer(JSON.stringify(twice))).toEqual({ ok: false, problem: "duplicateSlot" });
+        expect(transfer.parseTransfer(JSON.stringify(twice))).toEqual({
+            ok: false,
+            problem: "duplicateSlot"
+        });
         const mixed = { ...file(), era: "tag" as const };
-        mixed.players[0]!.items[0] = { slot: 0, id: "minecraft:stone", count: 1, data: { era: "components", snbt: "{}" } };
-        expect(transfer.parseTransfer(JSON.stringify(mixed))).toEqual({ ok: false, problem: "mixedEra" });
+        mixed.players[0]!.items[0] = {
+            slot: 0,
+            id: "minecraft:stone",
+            count: 1,
+            data: { era: "components", snbt: "{}" }
+        };
+        expect(transfer.parseTransfer(JSON.stringify(mixed))).toEqual({
+            ok: false,
+            problem: "mixedEra"
+        });
         const hostile = file();
         (hostile.players[0]!.items[0] as { id: string }).id = "minecraft:stone 64\nop Mallory";
-        expect(transfer.parseTransfer(JSON.stringify(hostile))).toEqual({ ok: false, problem: "notInventory" });
+        expect(transfer.parseTransfer(JSON.stringify(hostile))).toEqual({
+            ok: false,
+            problem: "notInventory"
+        });
     });
 
     it("from another syntax does not fit, and a plain one fits anywhere", () => {
@@ -251,21 +358,42 @@ describe("CSV, for reading", () => {
 
     it("says it cannot be imported, and reads a stack's name, enchantments and damage", async () => {
         bags.set("Alice", modernBag());
-        const file = transfer.exportFile([{ name: "Alice", takenAt: "x", live: true, items: await bagOf("Alice") }], null);
-        const csv = transfer.toCsv(file, ["Player", "Slot", "Where", "Item", "Count", "Details"], (slot) => `slot ${slot}`);
+        const file = transfer.exportFile(
+            [{ name: "Alice", takenAt: "x", live: true, items: await bagOf("Alice") }],
+            null
+        );
+        const csv = transfer.toCsv(
+            file,
+            ["Player", "Slot", "Where", "Item", "Count", "Details"],
+            (slot) => `slot ${slot}`
+        );
         const lines = csv.split("\r\n");
         expect(lines[0]).toBe(transfer.CSV_MARK);
-        expect(lines).toContain('Alice,0,slot 0,minecraft:diamond_sword,1,"""Excalibur""; sharpness 5, unbreaking 3; damage 40"');
-        expect(transfer.summarize({ slot: 0, id: "x:y", count: 1, data: { era: "tag", snbt: LEGACY_SWORD } })).toBe(
-            '"Excalibur"; sharpness 5; damage 40'
+        expect(lines).toContain(
+            'Alice,0,slot 0,minecraft:diamond_sword,1,"""Excalibur""; sharpness 5, unbreaking 3; damage 40"'
         );
+        expect(
+            transfer.summarize({
+                slot: 0,
+                id: "x:y",
+                count: 1,
+                data: { era: "tag", snbt: LEGACY_SWORD }
+            })
+        ).toBe('"Excalibur"; sharpness 5; damage 40');
         expect(transfer.parseTransfer(csv)).toEqual({ ok: false, problem: "csv" });
     });
 });
 
 describe("an import for somebody who is not on", () => {
     it("waits in the queue with every stack exactly as the file carries it", () => {
-        const items = [{ slot: 0, id: "minecraft:diamond_sword", count: 1, data: { era: "components" as const, snbt: SWORD } }];
+        const items = [
+            {
+                slot: 0,
+                id: "minecraft:diamond_sword",
+                count: 1,
+                data: { era: "components" as const, snbt: SWORD }
+            }
+        ];
         const payload = { kind: "import-bag" as const, mode: "replace" as const, items };
         const { kind, ...rest } = payload;
         expect(queue.NEEDS_PLAYER["import-bag"]).toBe(true);
@@ -273,15 +401,34 @@ describe("an import for somebody who is not on", () => {
     });
 
     it("lands when they join, and is refused on a server that speaks another syntax", async () => {
-        const items = [{ slot: 0, id: "minecraft:diamond_sword", count: 1, data: { era: "components" as const, snbt: SWORD } }];
+        const items = [
+            {
+                slot: 0,
+                id: "minecraft:diamond_sword",
+                count: 1,
+                data: { era: "components" as const, snbt: SWORD }
+            }
+        ];
         bags.set("Carol", new Map([[0, { id: "minecraft:dirt", count: 1, data: null }]]));
-        const done = await service.applyQueuedImport(server as never, "server", "Carol", items, "replace");
+        const done = await service.applyQueuedImport(
+            server as never,
+            "server",
+            "Carol",
+            items,
+            "replace"
+        );
         expect(done.written).toBe(1);
-        expect(bags.get("Carol")!.get(0)).toEqual({ id: "minecraft:diamond_sword", count: 1, data: SWORD });
+        expect(bags.get("Carol")!.get(0)).toEqual({
+            id: "minecraft:diamond_sword",
+            count: 1,
+            data: SWORD
+        });
 
         era = "tag";
         bags.set("Dave", new Map());
-        await expect(service.applyQueuedImport(server as never, "server", "Dave", items, "replace")).rejects.toThrow("era");
+        await expect(
+            service.applyQueuedImport(server as never, "server", "Dave", items, "replace")
+        ).rejects.toThrow("era");
         expect(bags.get("Dave")!.size).toBe(0);
     });
 });

@@ -244,7 +244,13 @@ async function apply(
     if (action.payload.kind === "import-bag") {
         const payload = action.payload;
         try {
-            await applyQueuedImport(server, installedAppId, action.username, payload.items, payload.mode);
+            await applyQueuedImport(
+                server,
+                installedAppId,
+                action.username,
+                payload.items,
+                payload.mode
+            );
         } catch (caught) {
             const why = caught instanceof Error ? caught.message : "";
             throw new Error(

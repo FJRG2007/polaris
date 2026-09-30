@@ -124,14 +124,26 @@ export function InventoryExportMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onSelect={() =>
-                        run((file) => download(`${base}-${stamp()}.json`, transfer.toJson(file), "application/json"))
+                        run((file) =>
+                            download(
+                                `${base}-${stamp()}.json`,
+                                transfer.toJson(file),
+                                "application/json"
+                            )
+                        )
                     }
                 >
                     {t("inventoryTransfer.downloadJson")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onSelect={() =>
-                        run((file) => download(`${base}-${stamp()}.csv`, csvOf(t, file), "text/csv;charset=utf-8"))
+                        run((file) =>
+                            download(
+                                `${base}-${stamp()}.csv`,
+                                csvOf(t, file),
+                                "text/csv;charset=utf-8"
+                            )
+                        )
                     }
                 >
                     {t("inventoryTransfer.downloadCsv")}
@@ -175,7 +187,9 @@ export function InventoryImportButton({
     );
 }
 
-type Preview = NonNullable<Awaited<ReturnType<typeof actions.previewInventoryImportAction>>["previews"]>[number];
+type Preview = NonNullable<
+    Awaited<ReturnType<typeof actions.previewInventoryImportAction>>["previews"]
+>[number];
 
 function stackText(t: GameText<"minecraft">, item: InventoryItem | null): string {
     if (!item) return t("inventoryTransfer.empty");
@@ -225,7 +239,10 @@ function InventoryImportDialog({
             reset();
             const result = await actions
                 .previewInventoryImportAction({ installedAppId, text, mode, single })
-                .catch(() => ({ previews: undefined, error: t("inventoryTransfer.couldNotImport") }));
+                .catch(() => ({
+                    previews: undefined,
+                    error: t("inventoryTransfer.couldNotImport")
+                }));
             if (result.error) setError(result.error);
             else setPreviews(result.previews ?? []);
         });
@@ -254,17 +271,32 @@ function InventoryImportDialog({
                         items: one.plan.flatMap((slot) => (slot.before ? [slot.before] : []))
                     }))
                 })
-                .catch(() => ({ outcomes: undefined, error: t("inventoryTransfer.couldNotImport") }));
+                .catch(() => ({
+                    outcomes: undefined,
+                    error: t("inventoryTransfer.couldNotImport")
+                }));
             if (result.error) {
                 setError(result.error);
                 return;
             }
             const lines: string[] = [];
             for (const outcome of result.outcomes ?? []) {
-                if (outcome.queued) lines.push(t("inventoryTransfer.queued", { name: outcome.player }));
-                else lines.push(t("inventoryTransfer.done", { name: outcome.player, count: outcome.written }));
+                if (outcome.queued)
+                    lines.push(t("inventoryTransfer.queued", { name: outcome.player }));
+                else
+                    lines.push(
+                        t("inventoryTransfer.done", {
+                            name: outcome.player,
+                            count: outcome.written
+                        })
+                    );
                 if (outcome.skipped.length > 0)
-                    lines.push(t("inventoryTransfer.skipped", { name: outcome.player, count: outcome.skipped.length }));
+                    lines.push(
+                        t("inventoryTransfer.skipped", {
+                            name: outcome.player,
+                            count: outcome.skipped.length
+                        })
+                    );
             }
             setResults(lines);
             setPreviews(null);
@@ -277,10 +309,14 @@ function InventoryImportDialog({
             <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>
-                        {into ? t("inventoryTransfer.importTitle") : t("inventoryTransfer.importAllTitle")}
+                        {into
+                            ? t("inventoryTransfer.importTitle")
+                            : t("inventoryTransfer.importAllTitle")}
                     </DialogTitle>
                     <DialogDescription>
-                        {into ? t("inventoryTransfer.importHint") : t("inventoryTransfer.importAllHint")}
+                        {into
+                            ? t("inventoryTransfer.importHint")
+                            : t("inventoryTransfer.importAllHint")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
@@ -312,13 +348,19 @@ function InventoryImportDialog({
                                 reset();
                             }}
                         />
-                        <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInput.current?.click()}
+                        >
                             <FileUp className="size-4" aria-hidden />
                             {t("inventoryTransfer.chooseFile")}
                         </Button>
                         {into && names.length > 1 ? (
                             <label className="flex items-center gap-2 text-sm">
-                                <span className="text-muted-foreground">{t("inventoryTransfer.fromFile")}</span>
+                                <span className="text-muted-foreground">
+                                    {t("inventoryTransfer.fromFile")}
+                                </span>
                                 <Select
                                     value={source ?? ""}
                                     onValueChange={(value) => {
@@ -365,47 +407,83 @@ function InventoryImportDialog({
                                     <span className="text-muted-foreground">
                                         {one.online
                                             ? t("inventoryTransfer.applyNow", { name: one.player })
-                                            : t("inventoryTransfer.waitsForJoin", { name: one.player })}
+                                            : t("inventoryTransfer.waitsForJoin", {
+                                                  name: one.player
+                                              })}
                                     </span>
                                 </p>
                                 {!one.online && one.basis === "none" ? (
-                                    <p className="text-xs text-muted-foreground">{t("inventoryTransfer.basisNone")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("inventoryTransfer.basisNone")}
+                                    </p>
                                 ) : null}
                                 {!one.online && one.basis === "kept" && one.keptAt ? (
                                     <p className="text-xs text-muted-foreground">
-                                        {t("inventoryTransfer.basisKept", { when: display.dateTime(one.keptAt) })}
+                                        {t("inventoryTransfer.basisKept", {
+                                            when: display.dateTime(one.keptAt)
+                                        })}
                                     </p>
                                 ) : null}
                                 {changes.length === 0 ? (
                                     <p className="text-xs text-muted-foreground">
-                                        {t("inventoryTransfer.nothingChanges", { name: one.player })}
+                                        {t("inventoryTransfer.nothingChanges", {
+                                            name: one.player
+                                        })}
                                     </p>
                                 ) : (
                                     <table className="w-full text-left text-xs">
                                         <thead className="text-muted-foreground">
                                             <tr>
-                                                <th className="py-1 pr-2 font-normal">{t("inventoryTransfer.slot")}</th>
-                                                <th className="py-1 pr-2 font-normal">{t("inventoryTransfer.now")}</th>
-                                                <th className="py-1 pr-2 font-normal">{t("inventoryTransfer.after")}</th>
+                                                <th className="py-1 pr-2 font-normal">
+                                                    {t("inventoryTransfer.slot")}
+                                                </th>
+                                                <th className="py-1 pr-2 font-normal">
+                                                    {t("inventoryTransfer.now")}
+                                                </th>
+                                                <th className="py-1 pr-2 font-normal">
+                                                    {t("inventoryTransfer.after")}
+                                                </th>
                                                 <th className="py-1 font-normal" />
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {changes.map((slot) => (
-                                                <tr key={slot.slot} className="border-t border-border/60 align-top">
-                                                    <td className="py-1 pr-2 whitespace-nowrap">{slotLabelIn(t, slot.slot)}</td>
-                                                    <td className="py-1 pr-2 break-all">{stackText(t, slot.before)}</td>
+                                                <tr
+                                                    key={slot.slot}
+                                                    className="border-t border-border/60 align-top"
+                                                >
+                                                    <td className="py-1 pr-2 whitespace-nowrap">
+                                                        {slotLabelIn(t, slot.slot)}
+                                                    </td>
                                                     <td className="py-1 pr-2 break-all">
-                                                        {stackText(t, slot.change === "refused" ? (slot.wanted ?? null) : slot.after)}
+                                                        {stackText(t, slot.before)}
+                                                    </td>
+                                                    <td className="py-1 pr-2 break-all">
+                                                        {stackText(
+                                                            t,
+                                                            slot.change === "refused"
+                                                                ? (slot.wanted ?? null)
+                                                                : slot.after
+                                                        )}
                                                         {slot.refused ? (
                                                             <span className="block text-danger">
-                                                                {t(`inventoryTransfer.refusals.${slot.refused}`)}
+                                                                {t(
+                                                                    `inventoryTransfer.refusals.${slot.refused}`
+                                                                )}
                                                             </span>
                                                         ) : null}
                                                     </td>
                                                     <td className="py-1">
-                                                        <Badge variant={slot.change === "refused" ? "danger" : "neutral"}>
-                                                            {t(`inventoryTransfer.changes.${slot.change as Exclude<transfer.SlotChange, "keep">}`)}
+                                                        <Badge
+                                                            variant={
+                                                                slot.change === "refused"
+                                                                    ? "danger"
+                                                                    : "neutral"
+                                                            }
+                                                        >
+                                                            {t(
+                                                                `inventoryTransfer.changes.${slot.change as Exclude<transfer.SlotChange, "keep">}`
+                                                            )}
                                                         </Badge>
                                                     </td>
                                                 </tr>
@@ -423,12 +501,20 @@ function InventoryImportDialog({
                     </Button>
                     {previews && writes > 0 ? (
                         <Button onClick={apply} disabled={pending}>
-                            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                            ) : null}
                             {t("inventoryTransfer.confirm")}
                         </Button>
                     ) : (
-                        <Button onClick={preview} disabled={!ready || pending} aria-disabled={!ready || pending}>
-                            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                        <Button
+                            onClick={preview}
+                            disabled={!ready || pending}
+                            aria-disabled={!ready || pending}
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                            ) : null}
                             {t("inventoryTransfer.preview")}
                         </Button>
                     )}

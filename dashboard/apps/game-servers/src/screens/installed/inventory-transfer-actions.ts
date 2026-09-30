@@ -17,7 +17,10 @@ import { getServerPlayers, withServerContainer } from "../../lib/minecraft/servi
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
 
-const playerName = z.string().trim().regex(/^[A-Za-z0-9_]{1,16}$/);
+const playerName = z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_]{1,16}$/);
 
 async function onlinePlayers(ownerId: string, installedAppId: string): Promise<string[]> {
     const status = await getServerPlayers(ownerId, installedAppId).catch(() => null);
@@ -36,7 +39,10 @@ export async function exportInventoriesAction(input: {
     const parsed = z
         .object({
             installedAppId: z.string().uuid(),
-            players: z.union([z.literal("all"), z.array(playerName).min(1).max(transfer.MOST_PLAYERS)])
+            players: z.union([
+                z.literal("all"),
+                z.array(playerName).min(1).max(transfer.MOST_PLAYERS)
+            ])
         })
         .safeParse(input);
     const t = await gameWords("minecraft");
@@ -44,11 +50,22 @@ export async function exportInventoriesAction(input: {
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const online = await onlinePlayers(access.ownerId, parsed.data.installedAppId);
-        const result = await service.exportBags(access.ownerId, parsed.data.installedAppId, parsed.data.players, online);
-        if (!result.file) return { error: t("inventoryTransfer.nothingToExport"), missing: result.missing };
+        const result = await service.exportBags(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.players,
+            online
+        );
+        if (!result.file)
+            return { error: t("inventoryTransfer.nothingToExport"), missing: result.missing };
         return { file: result.file, missing: result.missing };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : t("inventoryTransfer.couldNotExport") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : t("inventoryTransfer.couldNotExport")
+        };
     }
 }
 
@@ -64,9 +81,15 @@ const importSchema = z.object({
 type ImportInput = z.infer<typeof importSchema>;
 
 /** Who gets which bag, out of a file already read. */
-function targetsOf(file: transfer.TransferFile, single: ImportInput["single"]): service.ImportTarget[] | null {
-    if (!single) return file.players.map((player) => ({ player: player.name, items: player.items }));
-    const from = file.players.find((player) => player.name.toLowerCase() === single.from.toLowerCase());
+function targetsOf(
+    file: transfer.TransferFile,
+    single: ImportInput["single"]
+): service.ImportTarget[] | null {
+    if (!single)
+        return file.players.map((player) => ({ player: player.name, items: player.items }));
+    const from = file.players.find(
+        (player) => player.name.toLowerCase() === single.from.toLowerCase()
+    );
     return from ? [{ player: single.into, items: from.items }] : null;
 }
 
@@ -98,12 +121,19 @@ export async function previewInventoryImportAction(input: ImportInput): Promise<
             return {
                 error: t("inventoryTransfer.problems.wrongSyntax", {
                     file: t(`inventoryTransfer.eras.${read.file.era}`),
-                    server: preview.era ? t(`inventoryTransfer.eras.${preview.era}`) : t("inventoryTransfer.eras.none")
+                    server: preview.era
+                        ? t(`inventoryTransfer.eras.${preview.era}`)
+                        : t("inventoryTransfer.eras.none")
                 })
             };
         return { previews: preview.previews, fileEra: read.file.era };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : t("inventoryTransfer.couldNotImport") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : t("inventoryTransfer.couldNotImport")
+        };
     }
 }
 
@@ -116,7 +146,9 @@ const stackList = z.array(transfer.transferStackSchema).max(64);
  * they join.
  */
 export async function importInventoriesAction(
-    input: ImportInput & { seen: { player: string; online: boolean; items: z.infer<typeof stackList> }[] }
+    input: ImportInput & {
+        seen: { player: string; online: boolean; items: z.infer<typeof stackList> }[];
+    }
 ): Promise<{ outcomes?: service.ImportOutcome[]; error?: string }> {
     const parsed = importSchema
         .extend({
@@ -134,7 +166,9 @@ export async function importInventoriesAction(
     const { installedAppId, mode } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        const online = new Set((await onlinePlayers(access.ownerId, installedAppId)).map((name) => name.toLowerCase()));
+        const online = new Set(
+            (await onlinePlayers(access.ownerId, installedAppId)).map((name) => name.toLowerCase())
+        );
         const seen = new Map(parsed.data.seen.map((one) => [one.player.toLowerCase(), one]));
         const outcomes: service.ImportOutcome[] = [];
         await withServerContainer(access.ownerId, installedAppId, async (server) => {
@@ -144,7 +178,9 @@ export async function importInventoriesAction(
                     throw new Error(
                         t("inventoryTransfer.problems.wrongSyntax", {
                             file: t(`inventoryTransfer.eras.${read.file.era}`),
-                            server: era ? t(`inventoryTransfer.eras.${era}`) : t("inventoryTransfer.eras.none")
+                            server: era
+                                ? t(`inventoryTransfer.eras.${era}`)
+                                : t("inventoryTransfer.eras.none")
                         })
                     );
             }
@@ -161,7 +197,12 @@ export async function importInventoriesAction(
                     continue;
                 }
                 const plan = transfer.planImport(previewed.items, target.items, mode);
-                const done = await service.applyPlanNow(server, installedAppId, target.player, plan);
+                const done = await service.applyPlanNow(
+                    server,
+                    installedAppId,
+                    target.player,
+                    plan
+                );
                 outcomes.push({ player: target.player, ...done, queued: false });
             }
         });
@@ -182,6 +223,11 @@ export async function importInventoriesAction(
             });
         return { outcomes };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : t("inventoryTransfer.couldNotImport") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : t("inventoryTransfer.couldNotImport")
+        };
     }
 }

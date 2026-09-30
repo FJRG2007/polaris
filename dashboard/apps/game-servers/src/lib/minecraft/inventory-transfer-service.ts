@@ -26,7 +26,11 @@ interface Bag {
     readonly items: InventoryItem[];
 }
 
-async function bagOf(installedAppId: string, server: ServerContainer, name: string): Promise<Bag | null> {
+async function bagOf(
+    installedAppId: string,
+    server: ServerContainer,
+    name: string
+): Promise<Bag | null> {
     const reading = await readLiveInventory(server.say, name).catch(() => null);
     if (reading?.answered && reading.unreadable === 0) {
         const takenAt = new Date();
@@ -40,7 +44,11 @@ async function bagOf(installedAppId: string, server: ServerContainer, name: stri
 /** The version the server said it started as, when its log still says. */
 async function serverVersion(server: ServerContainer): Promise<string | null> {
     const result = await server
-        .run(["sh", "-c", "grep -m1 -o 'Starting minecraft server version [^ ]*' /data/logs/latest.log"])
+        .run([
+            "sh",
+            "-c",
+            "grep -m1 -o 'Starting minecraft server version [^ ]*' /data/logs/latest.log"
+        ])
         .catch(() => null);
     return /version (\S+)/.exec(result?.output ?? "")?.[1] ?? null;
 }
@@ -53,8 +61,14 @@ const PARSED = /found \d+ matching|no items were found|no player was found|no en
  * count of zero stone with a component, then with a tag. Neither changes
  * anything. Null when it takes neither.
  */
-export async function serverEra(server: ServerContainer, player: string): Promise<transfer.Era | null> {
-    const ask = async (item: string) => PARSED.test(stripFormatting(await server.say(["clear", player, item, "0"]).catch(() => "")));
+export async function serverEra(
+    server: ServerContainer,
+    player: string
+): Promise<transfer.Era | null> {
+    const ask = async (item: string) =>
+        PARSED.test(
+            stripFormatting(await server.say(["clear", player, item, "0"]).catch(() => ""))
+        );
     if (await ask("minecraft:stone[minecraft:custom_data={polaris:1b}]")) return "components";
     if (await ask("minecraft:stone{polaris:1b}")) return "tag";
     return null;
@@ -68,9 +82,7 @@ export async function exportBags(
     online: readonly string[]
 ): Promise<{ file: transfer.TransferFile | null; missing: string[] }> {
     const wanted =
-        names === "all"
-            ? await everyKnownPlayer(installedAppId, online)
-            : [...new Set(names)];
+        names === "all" ? await everyKnownPlayer(installedAppId, online) : [...new Set(names)];
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const onlineSet = new Set(online.map((name) => name.toLowerCase()));
         const bags: Bag[] = [];
@@ -89,14 +101,18 @@ export async function exportBags(
     });
 }
 
-async function everyKnownPlayer(installedAppId: string, online: readonly string[]): Promise<string[]> {
+async function everyKnownPlayer(
+    installedAppId: string,
+    online: readonly string[]
+): Promise<string[]> {
     const kept = await prisma.playerInventorySnapshot.findMany({
         where: { installedAppId },
         select: { username: true },
         orderBy: { username: "asc" }
     });
     const seen = new Map<string, string>();
-    for (const name of [...online, ...kept.map((row) => row.username)]) if (!seen.has(name.toLowerCase())) seen.set(name.toLowerCase(), name);
+    for (const name of [...online, ...kept.map((row) => row.username)])
+        if (!seen.has(name.toLowerCase())) seen.set(name.toLowerCase(), name);
     return [...seen.values()];
 }
 
@@ -132,14 +148,17 @@ export async function previewImport(
     online: readonly string[]
 ): Promise<{ era: transfer.Era | null; fits: boolean; previews: ImportPreview[] }> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const era = fileEra === "plain" ? null : await serverEra(server, targets[0]?.player ?? "Steve");
+        const era =
+            fileEra === "plain" ? null : await serverEra(server, targets[0]?.player ?? "Steve");
         const fits = era === null ? fileEra === "plain" : transfer.eraFits(fileEra, era);
         if (!fits) return { era, fits, previews: [] };
         const onlineSet = new Set(online.map((name) => name.toLowerCase()));
         const previews: ImportPreview[] = [];
         for (const target of targets) {
             const isOn = onlineSet.has(target.player.toLowerCase());
-            const live = isOn ? await readLiveInventory(server.say, target.player).catch(() => null) : null;
+            const live = isOn
+                ? await readLiveInventory(server.say, target.player).catch(() => null)
+                : null;
             const kept = live?.answered ? null : await readSnapshot(installedAppId, target.player);
             const current = live?.answered ? live.items : (kept?.items ?? []);
             previews.push({
@@ -190,7 +209,15 @@ export async function applyPlanNow(
             continue;
         }
         try {
-            if (argument?.ok && one.after) await writeSlot(server, installedAppId, player, one.slot, argument.value, one.after.count);
+            if (argument?.ok && one.after)
+                await writeSlot(
+                    server,
+                    installedAppId,
+                    player,
+                    one.slot,
+                    argument.value,
+                    one.after.count
+                );
             else await writeSlot(server, installedAppId, player, one.slot, AIR, 1);
             written += 1;
         } catch {
@@ -220,5 +247,10 @@ export async function applyQueuedImport(
     }
     const reading = await readLiveInventory(server.say, player);
     if (!reading.answered || reading.unreadable > 0) throw new Error("unread");
-    return applyPlanNow(server, installedAppId, player, transfer.planImport(reading.items, items, mode));
+    return applyPlanNow(
+        server,
+        installedAppId,
+        player,
+        transfer.planImport(reading.items, items, mode)
+    );
 }

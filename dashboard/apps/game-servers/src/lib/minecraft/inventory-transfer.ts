@@ -22,7 +22,12 @@
 
 import { z } from "zod";
 import type { InventoryItem } from "./inventory";
-import { itemArgument, replaceSlot, writableSlots, type ItemArgumentRefusal } from "./item-argument";
+import {
+    itemArgument,
+    replaceSlot,
+    writableSlots,
+    type ItemArgumentRefusal
+} from "./item-argument";
 
 export const TRANSFER_FORMAT = "polaris.minecraft.inventory";
 export const TRANSFER_VERSION = 1;
@@ -66,9 +71,12 @@ const playerSchema = z
         live: z.boolean(),
         items: z.array(transferStackSchema).max(64)
     })
-    .refine((player) => new Set(player.items.map((item) => item.slot)).size === player.items.length, {
-        params: { problem: "duplicateSlot" }
-    });
+    .refine(
+        (player) => new Set(player.items.map((item) => item.slot)).size === player.items.length,
+        {
+            params: { problem: "duplicateSlot" }
+        }
+    );
 
 /** The file, as exported and as an import checks it. Shared by the screen and the server. */
 export const transferSchema = z
@@ -89,7 +97,9 @@ export const transferSchema = z
         { params: { problem: "mixedEra" } }
     )
     .refine(
-        (file) => new Set(file.players.map((player) => player.name.toLowerCase())).size === file.players.length,
+        (file) =>
+            new Set(file.players.map((player) => player.name.toLowerCase())).size ===
+            file.players.length,
         { params: { problem: "duplicatePlayer" } }
     );
 
@@ -122,7 +132,12 @@ function fileEra(players: readonly { readonly items: readonly InventoryItem[] }[
 
 /** Bags as a file. Stacks are copied as read - slot, id, count and the raw data span. */
 export function exportFile(
-    players: readonly { readonly name: string; readonly takenAt: string; readonly live: boolean; readonly items: readonly InventoryItem[] }[],
+    players: readonly {
+        readonly name: string;
+        readonly takenAt: string;
+        readonly live: boolean;
+        readonly items: readonly InventoryItem[];
+    }[],
     serverVersion: string | null,
     now: Date = new Date()
 ): TransferFile {
@@ -153,7 +168,9 @@ export function toJson(file: TransferFile): string {
 }
 
 /** A file read back, or why it cannot be. */
-export function parseTransfer(text: string): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
+export function parseTransfer(
+    text: string
+): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
     if (text.length > MOST_FILE_CHARS) return { ok: false, problem: "tooBig" };
     const trimmed = text.trim();
     if (trimmed.startsWith(CSV_MARK)) return { ok: false, problem: "csv" };
@@ -165,7 +182,9 @@ export function parseTransfer(text: string): { ok: true; file: TransferFile } | 
     }
     const parsed = transferSchema.safeParse(raw);
     if (parsed.success) return { ok: true, file: parsed.data };
-    const said = parsed.error.issues.map((issue) => (issue as { params?: { problem?: string } }).params?.problem);
+    const said = parsed.error.issues.map(
+        (issue) => (issue as { params?: { problem?: string } }).params?.problem
+    );
     for (const problem of ["mixedEra", "duplicateSlot", "duplicatePlayer"] as const)
         if (said.includes(problem)) return { ok: false, problem };
     return { ok: false, problem: "notInventory" };
@@ -197,7 +216,11 @@ export interface PlannedSlot {
 
 function sameStack(left: InventoryItem | null, right: InventoryItem | null): boolean {
     if (left === null || right === null) return left === right;
-    return left.id === right.id && left.count === right.count && (left.data?.snbt ?? null) === (right.data?.snbt ?? null);
+    return (
+        left.id === right.id &&
+        left.count === right.count &&
+        (left.data?.snbt ?? null) === (right.data?.snbt ?? null)
+    );
 }
 
 /**
@@ -213,14 +236,18 @@ export function planImport(
 ): PlannedSlot[] {
     const now = new Map(current.map((item) => [item.slot, item]));
     const next = new Map(incoming.map((item) => [item.slot, item]));
-    const slots = new Set<number>([...incoming.map((item) => item.slot), ...(mode === "replace" ? writableSlots() : [])]);
+    const slots = new Set<number>([
+        ...incoming.map((item) => item.slot),
+        ...(mode === "replace" ? writableSlots() : [])
+    ]);
     const planned: PlannedSlot[] = [];
     for (const slot of [...slots].sort((left, right) => left - right)) {
         const before = now.get(slot) ?? null;
         const wanted = next.get(slot) ?? null;
         if (wanted !== null) {
             const argument = itemArgument(wanted);
-            const refused = replaceSlot(slot) === null ? ("slot" as const) : argument.ok ? null : argument.why;
+            const refused =
+                replaceSlot(slot) === null ? ("slot" as const) : argument.ok ? null : argument.why;
             if (refused) {
                 planned.push({ slot, before, after: before, change: "refused", refused, wanted });
                 continue;
@@ -245,7 +272,9 @@ export function planImport(
 
 /** The slots an import writes, in the order they are written. */
 export function writesOf(plan: readonly PlannedSlot[]): PlannedSlot[] {
-    return plan.filter((one) => one.change === "add" || one.change === "replace" || one.change === "remove");
+    return plan.filter(
+        (one) => one.change === "add" || one.change === "replace" || one.change === "remove"
+    );
 }
 
 // ------------------------------------------------------------------ CSV, for people
@@ -276,11 +305,16 @@ export function summarize(item: InventoryItem): string {
 }
 
 function nameIn(snbt: string): string | null {
-    const component = /"minecraft:custom_name"\s*:\s*(\{[^{}]*\}|'[^']*'|"(?:[^"\\]|\\.)*")/.exec(snbt)?.[1];
+    const component = /"minecraft:custom_name"\s*:\s*(\{[^{}]*\}|'[^']*'|"(?:[^"\\]|\\.)*")/.exec(
+        snbt
+    )?.[1];
     const legacy = /\bName\s*:\s*('[^']*'|"(?:[^"\\]|\\.)*")/.exec(snbt)?.[1];
     const raw = component ?? legacy;
     if (!raw) return null;
-    const text = /text\s*:\s*"((?:[^"\\]|\\.)*)"|"text"\s*:\s*"((?:[^"\\]|\\.)*)"|\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*?)\\"/.exec(raw);
+    const text =
+        /text\s*:\s*"((?:[^"\\]|\\.)*)"|"text"\s*:\s*"((?:[^"\\]|\\.)*)"|\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*?)\\"/.exec(
+            raw
+        );
     const found = text?.[1] ?? text?.[2] ?? text?.[3];
     if (found !== undefined) return found;
     return raw.replace(/^['"]|['"]$/g, "").replace(/^"|"$/g, "") || null;
@@ -289,11 +323,16 @@ function nameIn(snbt: string): string | null {
 function enchantmentsIn(snbt: string): string[] {
     const found: string[] = [];
     // Components: {"minecraft:enchantments": {levels: {"minecraft:sharpness": 5}}}, or without `levels` from 1.21.5.
-    const component = /"minecraft:enchantments"\s*:\s*\{(?:levels\s*:\s*)?\{?([^{}]*)\}/.exec(snbt)?.[1];
+    const component = /"minecraft:enchantments"\s*:\s*\{(?:levels\s*:\s*)?\{?([^{}]*)\}/.exec(
+        snbt
+    )?.[1];
     if (component)
-        for (const match of component.matchAll(/"(?:minecraft:)?([a-z_]+)"\s*:\s*(\d+)/g)) found.push(`${match[1]} ${match[2]}`);
+        for (const match of component.matchAll(/"(?:minecraft:)?([a-z_]+)"\s*:\s*(\d+)/g))
+            found.push(`${match[1]} ${match[2]}`);
     // Before: Enchantments: [{id: "minecraft:sharpness", lvl: 5s}].
-    for (const match of snbt.matchAll(/\{\s*(?:id\s*:\s*"(?:minecraft:)?([a-z_]+)"\s*,\s*lvl\s*:\s*(\d+)s?|lvl\s*:\s*(\d+)s?\s*,\s*id\s*:\s*"(?:minecraft:)?([a-z_]+)")\s*\}/g)) {
+    for (const match of snbt.matchAll(
+        /\{\s*(?:id\s*:\s*"(?:minecraft:)?([a-z_]+)"\s*,\s*lvl\s*:\s*(\d+)s?|lvl\s*:\s*(\d+)s?\s*,\s*id\s*:\s*"(?:minecraft:)?([a-z_]+)")\s*\}/g
+    )) {
         const id = match[1] ?? match[4];
         const level = match[2] ?? match[3];
         if (id && level) found.push(`${id} ${level}`);
@@ -302,12 +341,18 @@ function enchantmentsIn(snbt: string): string[] {
 }
 
 /** Bags as rows somebody can read: one per stack. `slotName` names a slot in the reader's words. */
-export function toCsv(file: TransferFile, header: readonly string[], slotName: (slot: number) => string): string {
+export function toCsv(
+    file: TransferFile,
+    header: readonly string[],
+    slotName: (slot: number) => string
+): string {
     const lines = [CSV_MARK, header.map(csvCell).join(",")];
     for (const player of file.players)
         for (const item of player.items)
             lines.push(
-                [player.name, item.slot, slotName(item.slot), item.id, item.count, summarize(item)].map(csvCell).join(",")
+                [player.name, item.slot, slotName(item.slot), item.id, item.count, summarize(item)]
+                    .map(csvCell)
+                    .join(",")
             );
     return `${lines.join("\r\n")}\r\n`;
 }
