@@ -472,7 +472,15 @@
         "deviceRefused": "The device refused the request.",
         "tplinkAccount": "The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.",
         "tplinkNothing": "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
-        "tplinkCannot": "A TP-Link device cannot be told to do that"
+        "tplinkCannot": "A TP-Link device cannot be told to do that",
+        "addressNoPath": "Write the address as 192.168.1.30, with no path",
+        "shellyNot": "That address answered, but not as a Shelly.",
+        "shellyPassword": "The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.",
+        "shellyNeedsPassword": "This Shelly has a password. Add it to the connection.",
+        "shellyThrottled": "The Shelly is refusing requests for a while after too many wrong passwords.",
+        "shellyNothing": "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
+        "shellyCannot": "A Shelly cannot be told to do that",
+        "shellyChannelGone": "That device is no longer on this Shelly."
     },
     "connections": {
         "nuki-web": {
@@ -621,6 +629,30 @@
                 },
                 "password": {
                     "label": "TP-Link password"
+                }
+            }
+        },
+        "shelly-local": {
+            "label": "Shelly on your own network",
+            "summary": "A Shelly relay, plug, dimmer or bulb, answered directly at its address. No account needed.",
+            "note": "Every Shelly, old or new, answers on its own network, so nothing goes through a cloud and it keeps working without the internet. One connection is one Shelly: each relay or light channel on it becomes a row. Blinds and meters are left out for now.",
+            "steps": {
+                "s0": "Find the Shelly's IP address in your router's list of connected devices, and give it a fixed one there if you can.",
+                "s1": "If you set a password on it in the Shelly app, add it here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.30"
+                },
+                "password": {
+                    "label": "Password",
+                    "hint": "Only if you turned on authentication for this Shelly."
+                },
+                "username": {
+                    "label": "Username",
+                    "hint": "Only older Shelly devices use one, and it is admin unless you changed it."
                 }
             }
         },

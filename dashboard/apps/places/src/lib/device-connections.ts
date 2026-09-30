@@ -371,6 +371,45 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["outlet", "switch", "light"],
         search: ["kasa", "tplink", "hs100", "hs110", "hs300", "kp115", "kl130", "smart plug", "power strip", "local"]
+    },
+    // Shelly: its own local API is the one way in, and the best one - no account,
+    // no cloud, and every generation answers it.
+    {
+        id: "shelly-local",
+        brand: "Shelly",
+        logo: "shelly",
+        label: en("connections.shelly-local.label"),
+        reach: "same-network",
+        summary: en("connections.shelly-local.summary"),
+        note: en("connections.shelly-local.note"),
+        steps: [en("connections.shelly-local.steps.s0"), en("connections.shelly-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.shelly-local.fields.host.label"),
+                hint: en("connections.shelly-local.fields.host.hint"),
+                placeholder: en("connections.shelly-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.shelly-local.fields.password.label"),
+                hint: en("connections.shelly-local.fields.password.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "username",
+                label: en("connections.shelly-local.fields.username.label"),
+                hint: en("connections.shelly-local.fields.username.hint"),
+                defaultValue: "admin",
+                optional: true,
+                maxLength: 50
+            }
+        ],
+        kinds: ["switch", "outlet", "light"],
+        search: ["shelly", "relay", "plug", "dimmer", "bulb", "plus", "pro", "gen3", "gen4", "local"]
     }
 ];
 

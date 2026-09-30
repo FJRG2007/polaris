@@ -472,7 +472,15 @@
         "deviceRefused": "El dispositivo rechazó la petición.",
         "tplinkAccount": "El dispositivo no aceptó esa cuenta de TP-Link. Usa el correo y la contraseña con los que entras en la app Tapo o Kasa.",
         "tplinkNothing": "Ese dispositivo TP-Link no es un enchufe, un interruptor ni una bombilla, así que no hay nada que controlar.",
-        "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso"
+        "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso",
+        "addressNoPath": "Escribe la dirección como 192.168.1.30, sin ruta",
+        "shellyNot": "Esa dirección respondió, pero no como un Shelly.",
+        "shellyPassword": "El Shelly rechazó la contraseña. Es la que se fija en la app Shelly, en los ajustes de autenticación del dispositivo.",
+        "shellyNeedsPassword": "Este Shelly tiene contraseña. Añádela a la conexión.",
+        "shellyThrottled": "El Shelly rechaza peticiones durante un rato tras demasiadas contraseñas erróneas.",
+        "shellyNothing": "Ese Shelly no tiene relé ni luz que controlar. Persianas y medidores aún no se pueden manejar desde Polaris.",
+        "shellyCannot": "A un Shelly no se le puede pedir eso",
+        "shellyChannelGone": "Ese dispositivo ya no está en este Shelly."
     },
     "connections": {
         "nuki-web": {
@@ -621,6 +629,30 @@
                 },
                 "password": {
                     "label": "Clave de TP-Link"
+                }
+            }
+        },
+        "shelly-local": {
+            "label": "Shelly en tu propia red",
+            "summary": "Un relé, enchufe, regulador o bombilla Shelly, que responde en su dirección. Sin cuenta.",
+            "note": "Todos los Shelly, antiguos o nuevos, responden en su propia red, así que nada pasa por una nube y sigue funcionando sin internet. Una conexión es un Shelly: cada canal de relé o de luz es una fila. Persianas y medidores quedan fuera por ahora.",
+            "steps": {
+                "s0": "Busca la dirección IP del Shelly en la lista de conectados de tu router, y fíjasela ahí si puedes.",
+                "s1": "Si le pusiste contraseña en la app Shelly, añádela aquí."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.30"
+                },
+                "password": {
+                    "label": "Contraseña",
+                    "hint": "Solo si activaste la autenticación en este Shelly."
+                },
+                "username": {
+                    "label": "Usuario",
+                    "hint": "Solo los Shelly antiguos lo usan, y es admin salvo que lo cambiaras."
                 }
             }
         },
