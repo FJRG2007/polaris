@@ -404,6 +404,32 @@ describe("CSV", () => {
             )
         ).toEqual({ ok: false, problem: "notInventory" });
     });
+
+    it("refuses a slot or count that is blank or not a whole number", () => {
+        const row = (slot: string, count: string) =>
+            `${transfer.CSV_MARK} v1 era=plain server= exported=2026-10-01T00:00:00.000Z\r\nh\r\nAlice,${slot},,minecraft:stone,${count},,,2026-10-01T00:00:00.000Z,live\r\n`;
+        expect(transfer.parseTransfer(row("3", "5"))).toMatchObject({ ok: true });
+        for (const [slot, count] of [["", "5"], ["3", ""], [" 5", "5"], ["0x10", "5"], ["1e1", "5"], ["3", "2.0"]])
+            expect(transfer.parseTransfer(row(slot!, count!))).toEqual({ ok: false, problem: "notInventory" });
+    });
+
+    it("reads back a text cell that was kept from starting a formula", () => {
+        expect(transfer.csvCell("'=x")).toBe("''=x");
+        const file = transfer.exportFile(
+            [
+                {
+                    name: "Alice",
+                    takenAt: "2026-10-01T00:00:00.000Z",
+                    live: true,
+                    items: [{ slot: 1, id: "-ns:item", count: 2, data: null }]
+                }
+            ],
+            null
+        );
+        const csv = transfer.toCsv(file, HEADER, (slot) => `slot ${slot}`);
+        expect(csv).toContain("'-ns:item");
+        expect(transfer.parseTransfer(csv)).toEqual({ ok: true, file });
+    });
 });
 
 describe("an import for somebody who is not on", () => {

@@ -296,11 +296,14 @@ export const CSV_MARK = "# Polaris inventory export";
 /** How the first CSV exports began: they carried no raw data, so they cannot be imported. */
 export const READ_ONLY_CSV_MARK = "# Polaris inventory export - for reading only";
 
+/** How a text cell may not start as it is: what a spreadsheet would run, or the quote that marks it. */
+const FORMULA_START = /^[=+\-@\t\r']/;
+
 /** A cell as CSV writes it: quoted when it has to be, and never read as a formula. */
 export function csvCell(value: string | number): string {
     let text = String(value);
     // A cell a spreadsheet would run: =, +, - or @ first, or a tab or return. A number is only a number.
-    if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    if (typeof value === "string" && FORMULA_START.test(text)) text = `'${text}`;
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -422,6 +425,16 @@ function csvRows(text: string): string[][] {
     return rows;
 }
 
+/** A text cell as it was before `csvCell` kept it from being read as a formula. */
+function textCell(cell: string): string {
+    return cell.startsWith("'") && FORMULA_START.test(cell.slice(1)) ? cell.slice(1) : cell;
+}
+
+/** A whole number as `toCsv` writes it; anything else, a blank cell included, is not one. */
+function wholeCell(cell: string): number {
+    return /^-?\d+$/.test(cell) ? Number(cell) : Number.NaN;
+}
+
 /**
  * A CSV export read back into the shape the JSON has, for the same schema to
  * check. Null when it is not one: no mark line, or a row of the wrong width.
@@ -436,7 +449,7 @@ function fromCsv(text: string): unknown {
     for (const cells of rows) {
         if (cells.length === 1 && cells[0] === "") continue;
         if (cells.length !== 9) return null;
-        const [name, slot, , id, count, , data, takenAt, live] = cells as [
+        const [name, slot, , id, count, , data, takenAt, live] = cells.map(textCell) as [
             string, string, string, string, string, string, string, string, string
         ];
         const player =
@@ -444,9 +457,9 @@ function fromCsv(text: string): unknown {
         players.set(name, player);
         if (id === "") continue;
         player.items.push({
-            slot: Number(slot),
+            slot: wholeCell(slot),
             id,
-            count: Number(count),
+            count: wholeCell(count),
             data: data === "" ? null : { era, snbt: data }
         });
     }
