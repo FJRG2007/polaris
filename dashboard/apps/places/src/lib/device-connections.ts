@@ -479,6 +479,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "shelly-local",
         brand: "Shelly",
+        recommended: true,
         logo: "shelly",
         label: en("connections.shelly-local.label"),
         reach: "same-network",
@@ -520,6 +521,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "hue-bridge",
         brand: "Philips Hue",
+        recommended: true,
         logo: "philipshue",
         label: en("connections.hue-bridge.label"),
         reach: "same-network",
@@ -556,6 +558,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "dirigera-hub",
         brand: "IKEA",
+        recommended: true,
         logo: "ikea",
         label: en("connections.dirigera-hub.label"),
         reach: "same-network",
@@ -583,6 +586,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "home-assistant",
         brand: "Home Assistant",
+        recommended: true,
         logo: "homeassistant",
         label: en("connections.home-assistant.label"),
         reach: "same-network",
@@ -619,6 +623,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "switchbot-cloud",
         brand: "SwitchBot",
+        recommended: true,
         logo: "switchbot",
         label: en("connections.switchbot-cloud.label"),
         reach: "anywhere",
