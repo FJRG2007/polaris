@@ -30,6 +30,7 @@
  */
 
 import { z } from "zod";
+import { noteStreamTrouble } from "@/lib/reachability";
 
 /** A frame as it reaches a subscriber. */
 export interface SharedFrame {
@@ -157,6 +158,11 @@ function followStream(
             if (stopped) return;
             if (holder) channel?.postMessage({ kind: "frame", data: event.data } satisfies Relay);
             onFrame({ data: event.data, owner: true });
+        };
+        // A dropped connection is the first sign that Polaris stopped answering.
+        // EventSource reconnects by itself; this only asks whether it can.
+        opened.onerror = () => {
+            if (!stopped) noteStreamTrouble();
         };
         source = opened;
     }

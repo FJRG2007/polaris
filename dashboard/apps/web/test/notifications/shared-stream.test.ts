@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { subscribeSharedStream, type SharedFrame } from "@/lib/shared-stream";
 
+const trouble = vi.fn();
+vi.mock("@/lib/reachability", () => ({ noteStreamTrouble: () => trouble() }));
+
 /**
  * The browser pieces this leans on, small enough to drive by hand: connections
  * that only open when told to, a channel that delivers synchronously so a test
@@ -18,10 +21,16 @@ import { subscribeSharedStream, type SharedFrame } from "@/lib/shared-stream";
 class FakeEventSource {
     static opened: FakeEventSource[] = [];
     onmessage: ((event: { data: string }) => void) | null = null;
+    onerror: (() => void) | null = null;
     closed = false;
 
     constructor(readonly url: string) {
         FakeEventSource.opened.push(this);
+    }
+
+    /** The connection dropping, which the browser reports and then retries. */
+    fail(): void {
+        this.onerror?.();
     }
 
     /** The server pushing a frame down this connection. */
@@ -141,6 +150,27 @@ afterEach(() => {
     for (const stop of stops) stop();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+});
+
+describe("a dropped connection", () => {
+    it("asks whether Polaris still answers", async () => {
+        trouble.mockClear();
+        here();
+        await settle();
+        live()[0].fail();
+        expect(trouble).toHaveBeenCalledTimes(1);
+    });
+
+    it("says nothing for a connection this tab has already closed", async () => {
+        trouble.mockClear();
+        here();
+        await settle();
+        const source = live()[0];
+        for (const stop of stops) stop();
+        stops = [];
+        source.fail();
+        expect(trouble).not.toHaveBeenCalled();
+    });
 });
 
 describe("inside one tab", () => {

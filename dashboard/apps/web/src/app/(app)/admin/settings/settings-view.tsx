@@ -20,6 +20,7 @@
  */
 
 import type { SettingsOverview } from "./overview";
+import { clearUpdateInProgress, markUpdateInProgress } from "@/lib/update-in-progress";
 import { LogViewer } from "@/components/log-viewer";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { PublicUrls } from "@/lib/legal/service";
@@ -391,6 +392,9 @@ export function SettingsView({
     function rememberRunStart(at: number): void {
         try {
             sessionStorage.setItem(RUN_START_KEY, String(at));
+            // Every tab on this device: while the new build takes over, the
+            // connection banner says "updating" rather than "can't reach Polaris".
+            markUpdateInProgress();
         } catch {
             // Nothing to do about it, and nothing that stops the update.
         }
@@ -399,6 +403,7 @@ export function SettingsView({
     function forgetRunStart(): void {
         try {
             sessionStorage.removeItem(RUN_START_KEY);
+            clearUpdateInProgress();
         } catch {
             // As above.
         }

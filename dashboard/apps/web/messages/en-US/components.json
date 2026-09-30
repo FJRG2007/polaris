@@ -1238,6 +1238,10 @@
     "network": {
         "offline": "You're offline. Polaris will catch up when you reconnect.",
         "back": "Back online",
-        "slowCall": "Your connection is slow: video and voice may break up."
+        "slowCall": "Your connection is slow: video and voice may break up.",
+        "unreachable": "Can't reach Polaris right now. Retrying.",
+        "updating": "Polaris is updating. It will be back in a moment.",
+        "polarisBack": "Polaris is back",
+        "retry": "Try now"
     }
 }

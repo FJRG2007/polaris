@@ -24,6 +24,7 @@
  */
 
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { noteRequestFailure, noteResponseStatus } from "@/lib/reachability";
 
 /** A read that worked, or why it did not. `status` is the server's, absent when
  *  the request never got an answer at all. */
@@ -35,9 +36,11 @@ export async function readJson<T>(url: string): Promise<ReadResult<T>> {
     let response: Response;
     try {
         response = await fetch(url, { cache: "no-store" });
-    } catch {
+    } catch (caught) {
+        noteRequestFailure(caught);
         return { ok: false, reason: "Polaris could not be reached. Check the connection and try again." };
     }
+    noteResponseStatus(response.status);
     // The content type is what separates an answer from the sign-in page standing
     // in for one: the redirect was already followed, so the status is 200 either
     // way and only the body says which happened.

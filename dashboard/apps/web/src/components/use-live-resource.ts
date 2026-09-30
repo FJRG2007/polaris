@@ -18,6 +18,7 @@
  */
 
 import { mergeUnchanged } from "@/lib/structural-merge";
+import { noteRequestFailure, noteResponseStatus } from "@/lib/reachability";
 import { useShelfScope } from "@/components/shelf-scope";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { readSnapshot, writeSnapshot, type Snapshot } from "@/lib/snapshot-cache";
@@ -183,6 +184,7 @@ export function useLiveRead<T>({
                 writeSnapshot(cacheKey, merged);
             })
             .catch((caught: unknown) => {
+                noteRequestFailure(caught);
                 if (!current()) return;
                 // A failed refresh leaves the last good reading on screen rather
                 // than blanking a panel that was fine a moment ago.
@@ -292,6 +294,7 @@ export function useLiveResource<T>({
     const load = useCallback(
         async (signal: AbortSignal): Promise<T> => {
             const res = await fetch(url, { cache: "no-store", signal });
+            noteResponseStatus(res.status);
             const body: unknown = await res.json();
             if (!res.ok) {
                 const message =

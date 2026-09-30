@@ -9,6 +9,7 @@
  */
 
 import { checkForNewBuild } from "@/lib/new-build";
+import { noteRequestFailure } from "@/lib/reachability";
 
 /** What the caller sees instead of a crash. Next hides the server's real message in
  *  production, so there is nothing specific to say - and the one cause a reader can
@@ -38,6 +39,8 @@ export async function runAction<T>(call: () => Promise<T>, onFailure: (message: 
         // rather than assumed, and not awaited: the caller gets its answer now, and
         // if the deployment really has moved on the banner says so a moment later.
         void checkForNewBuild();
+        // Or Polaris is not answering at all, which the connection banner says.
+        noteRequestFailure(caught);
         onFailure(failed);
         return null;
     }

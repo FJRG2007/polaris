@@ -1238,6 +1238,10 @@
     "network": {
         "offline": "Sin conexión. Polaris se pondrá al día al reconectar.",
         "back": "Reconectado",
-        "slowCall": "Tu conexión es lenta: el vídeo y la voz pueden cortarse."
+        "slowCall": "Tu conexión es lenta: el vídeo y la voz pueden cortarse.",
+        "unreachable": "No se puede contactar con Polaris ahora. Reintentando.",
+        "updating": "Polaris se está actualizando. Volverá en un momento.",
+        "polarisBack": "Polaris ha vuelto",
+        "retry": "Reintentar"
     }
 }
