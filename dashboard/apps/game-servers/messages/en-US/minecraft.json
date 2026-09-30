@@ -1520,7 +1520,7 @@
             },
             "world-boss": {
                 "label": "World boss",
-                "summary": "A boss with a health bar everybody sees appears near the players. Damage dealt close to it is counted; if it falls, the podium goes by damage and everybody who hit it is rewarded.",
+                "summary": "A boss drawn at random appears near the players, in a sky arena or on open ground. It fights in three phases, with warned attacks and a shield of minions, and grows with every fighter. Damage dealt close to it is counted; if it falls, the podium goes by damage, everybody who hit it is rewarded and the final blow earns a trophy.",
                 "unit": "damage"
             },
             "fishing": {
@@ -1675,7 +1675,15 @@
             "prizes": "Prizes - {list}.",
             "noPrizes": "No prizes set.",
             "needsPlayers": "{count, plural, one {Needs # player on the server.} other {Needs # players on the server.}}",
-            "needsJoiners": "{count, plural, one {Goes ahead with # player joined.} other {Goes ahead with # players joined, or is called off.}}"
+            "needsJoiners": "{count, plural, one {Goes ahead with # player joined.} other {Goes ahead with # players joined, or is called off.}}",
+            "bossDrawn": "A boss drawn at random each time from: {bosses}.",
+            "bossChosen": "Always {boss}.",
+            "bossFight": "{difficulty}. Three phases: from two thirds of its health, minions shield it until they are killed; from one third, it rages. Every attack is warned a second before it lands, and its health grows with every fighter.",
+            "bossArena": "Fought in a closed glass arena built only into empty air 30 blocks over open ground, away from every bed, and taken down afterwards. A beam of light takes players up; there they play in adventure mode, and at the end they are put back at the beam, even after a restart or when they next log in.",
+            "bossGround": "Fought on open ground away from every bed. Nothing it does breaks or places a block, and it cannot be trapped: it comes to whoever it cannot reach.",
+            "bossKeeps": "Keep inventory is on while it runs, so dying costs nothing, and pets, horses and villagers near it take no damage. The server setting comes back afterwards, even after a restart.",
+            "bossGriefing": "Mob griefing is off while {bosses} fights, so no block is changed. The server setting comes back afterwards, even after a restart.",
+            "bossPrizes": "Prizes are multiplied by {times} on this difficulty, and the final blow earns a named trophy."
         },
         "errors": {
             "read": "The events could not be read",
@@ -1772,6 +1780,8 @@
             "itemsPerReward": "At most {count} items per reward",
             "levelsAtMost": "At most {count} levels",
             "chooseEffect": "Choose at least one effect",
+            "witherArenaOnly": "The Wither fights only in the sky arena",
+            "chooseBoss": "Choose at least one boss that can fight here",
             "killsOrOres": "Give something for kills, ores or both",
             "wavesAtLeast": "{count, plural, one {At least # wave} other {At least # waves}}",
             "wavesAtMost": "{count, plural, one {At most # wave} other {At most # waves}}",
@@ -1821,7 +1831,6 @@
         "theyBlowHolesInWhatever": "Their blasts hurt players; nothing built is broken.",
         "whichBoss": "Which boss",
         "health": "Health",
-        "between100And1024A": "Between 100 and 1024. A player with iron gear deals about 8 a hit.",
         "rounds": "Rounds",
         "3To15": "3 to 15",
         "secondsARound": "Seconds a round",
@@ -1910,7 +1919,11 @@
                 "wither-skeleton": "The Warlord (wither skeleton)",
                 "ravager": "The Juggernaut (ravager)",
                 "vindicator": "The Executioner (vindicator)",
-                "husk": "The Desert King (husk)"
+                "husk": "The Desert King (husk)",
+                "evoker": "The Archmage (evoker)",
+                "captain": "The Captain (pillager)",
+                "wither": "The Blight (Wither)",
+                "random": "Random each time"
             },
             "intensity": {
                 "low": "Low",
@@ -1946,6 +1959,11 @@
             "theme": {
                 "random": "Built-in",
                 "mine": "My own"
+            },
+            "bossDifficulty": {
+                "normal": "Normal",
+                "hard": "Hard",
+                "epic": "Epic"
             }
         },
         "place": {
@@ -1989,7 +2007,17 @@
         "perOreHint": "Experience points, 0 to 100. Coal ore gives up to 2.",
         "minPlayers": "Minimum player count",
         "minPlayersJoined": "Called off when fewer join during the countdown.",
-        "minPlayersOnline": "It does not start with fewer players on the server."
+        "minPlayersOnline": "It does not start with fewer players on the server.",
+        "bossDifficulty": "Difficulty",
+        "bossDifficultyHint": "Epic by default. A harder boss has more health, hits harder, attacks more often and pays more.",
+        "skyArena": "Sky arena",
+        "skyArenaHint": "A closed glass arena built into empty air 30 blocks up and reached through a beam of light, so nothing of the fight reaches the ground. The Wither fights only here.",
+        "bossPool": "Drawn from",
+        "bossPoolHint": "One of these is drawn each time it runs.",
+        "bossPoolEmpty": "Keep at least one boss that can fight here.",
+        "witherNeedsArena": "The Wither fights only in the sky arena.",
+        "baseHealth": "Base health",
+        "baseHealthHint": "100 to 1024: its health for one fighter on Normal. Harder levels and every fighter who joins raise it."
     },
     "moderation": {
         "announcements": {

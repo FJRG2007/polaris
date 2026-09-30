@@ -1373,6 +1373,7 @@
         "game-servers/src/screens/installed/event-options-gathering.tsx",
         "game-servers/src/screens/installed/event-options-rare-catch.tsx",
         "game-servers/src/screens/installed/event-options-treasure-hunt.tsx",
+        "game-servers/src/screens/installed/event-options-world-boss.tsx",
         "game-servers/src/screens/installed/event-options-xp-boost.tsx",
         "game-servers/src/screens/installed/events-actions.ts",
         "game-servers/src/screens/installed/game-console.tsx",

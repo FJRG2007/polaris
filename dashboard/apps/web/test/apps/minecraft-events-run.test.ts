@@ -157,6 +157,17 @@ interface World {
     raw: Record<string, number>;
     /** Who shot a bow near the boss since the last look. */
     shooters: string[];
+    /** Unknown: a server that answers to neither name of the rule. */
+    mobGriefing: "true" | "false" | "unknown";
+    /** Who is fighting the boss on the land, nearest first, each a step further off. */
+    fighters: string[];
+    /** The second phase's minions still alive. */
+    minionsLeft: number;
+    /** Who stands in the beam up to a boss's sky arena. */
+    lift: string[];
+    /** How far the nearest fighter stands from the boss, and whether blocks close it in on every side. */
+    fighterGap: number;
+    bossBoxed: boolean;
 }
 
 const world: World = {
@@ -239,7 +250,13 @@ const world: World = {
     levels: {},
     bossHealth: 400,
     raw: {},
-    shooters: []
+    shooters: [],
+    mobGriefing: "true",
+    fighters: [],
+    minionsLeft: 0,
+    lift: [],
+    fighterGap: 2,
+    bossBoxed: false
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -624,7 +641,7 @@ function answer(sent: string): string {
         return refuse(line, "Unknown command");
     // A boss's own data: its attributes by the names of its version - camelCase
     // up to 1.15 - and anything else passed over.
-    const summoned = /run summon minecraft:\S+ ~ ~ ~ \{.*Tags:\["pe_boss"\].*\}$/.exec(line);
+    const summoned = /run summon minecraft:\S+ \S+ \S+ \S+ \{.*Tags:\["pe_boss"\].*\}$/.exec(line);
     if (summoned) {
         world.bossMaxHealth = 20;
         const legacy = /\{Name:"generic\.maxHealth",Base:([\d.]+)d\}/.exec(line);
@@ -799,7 +816,48 @@ function answer(sent: string): string {
         // A server that shows operators every command's answer, as they come.
         return "Gamerule sendCommandFeedback is currently set to: true";
     }
-    if (line === "gamerule mobGriefing") return "Gamerule mobGriefing is currently set to: true";
+    if (line === "gamerule mobGriefing") {
+        return world.mobGriefing === "unknown"
+            ? "Unknown or incomplete command, see below for error"
+            : `Gamerule mobGriefing is currently set to: ${world.mobGriefing}`;
+    }
+    const griefing = /^gamerule mobGriefing (true|false)$/.exec(line);
+    if (griefing) {
+        world.mobGriefing = griefing[1] as "true" | "false";
+        return `Gamerule mobGriefing is now set to: ${griefing[1]}`;
+    }
+    // A world boss's fighters, from where it stands or where it is going to.
+    if (
+        line.includes("as @a[distance=..40,gamemode=!creative,gamemode=!spectator") &&
+        line.endsWith("run data get entity @s Pos")
+    ) {
+        const fighters = line.includes("sort=furthest,limit=1")
+            ? world.fighters.slice(-1)
+            : world.fighters;
+        return fighters
+            .map((name) => {
+                const step = world.fighterGap + 8 * world.fighters.indexOf(name);
+                return `${name} has the following entity data: [${310.5 + step}d, 70.0d, 4.5d]`;
+            })
+            .join("\n");
+    }
+    if (
+        line.startsWith(
+            "execute at @e[tag=pe_boss,limit=1] align xz positioned ~0.5 ~ ~0.5 unless block ~1 ~ ~ minecraft:air "
+        )
+    )
+        return world.bossAlive && world.bossBoxed ? "Test passed" : "Test failed";
+    if (line === "execute if entity @e[tag=pe_bshield]")
+        return world.minionsLeft > 0 ? `Test passed, count: ${world.minionsLeft}` : "Test failed";
+    if (
+        line.includes(
+            "tag=!pe_in,gamemode=!creative,gamemode=!spectator] run data get entity @s Pos"
+        )
+    ) {
+        return world.lift
+            .map((name) => `${name} has the following entity data: [300.5d, 64.0d, 2.5d]`)
+            .join("\n");
+    }
     if (line === "gamerule keepInventory") {
         return world.keepInventory === "unknown"
             ? "Unknown or incomplete command, see below for error"
@@ -1032,7 +1090,8 @@ function answer(sent: string): string {
     if (line.includes("sort=nearest"))
         return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
     if (line.startsWith("give ")) {
-        const [, name, item, count = "1"] = line.split(" ") as [string, string, string, string?];
+        const given = /^give (\S+) (.+?)(?: (\d+))?$/.exec(line)!;
+        const [name, item, count = "1"] = [given[1]!, given[2]!, given[3]];
         if (!itemReadable(item))
             return refuse(line, "Expected whitespace to end one argument, but found trailing data");
         if (world.unknownItems.includes(item)) return `Unknown item '${item}'`;
@@ -1045,7 +1104,9 @@ function answer(sent: string): string {
         if (bag) {
             const fits = Math.min(Number(count), world.room[name] ?? Number(count));
             world.room[name] = (world.room[name] ?? fits) - fits;
-            bag[item] = (bag[item] ?? 0) + fits;
+            // Counted by the item alone, whatever name or data the stack carries.
+            const id = item.replace(/[[{].*$/, "");
+            bag[id] = (bag[id] ?? 0) + fits;
         }
         return `Gave ${count} [Item] to ${name}`;
     }
@@ -1469,6 +1530,12 @@ beforeEach(() => {
     world.bossHealth = 400;
     world.raw = {};
     world.shooters = [];
+    world.mobGriefing = "true";
+    world.fighters = [];
+    world.minionsLeft = 0;
+    world.lift = [];
+    world.fighterGap = 2;
+    world.bossBoxed = false;
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -2088,9 +2155,31 @@ describe("trivia", () => {
     });
 });
 
+/** A world boss fought on the land, always The Warlord, on Normal: the
+ *  counting and the prizes, apart from the draw and the arena. */
+function groundBoss(
+    id: string,
+    minutes: number,
+    options: Partial<catalog.EventOptions<"world-boss">> = {}
+): catalog.EventPreset {
+    const preset = catalog.newPreset("world-boss", id);
+    return {
+        ...preset,
+        minutes,
+        options: {
+            ...(preset.options as catalog.EventOptions<"world-boss">),
+            choice: "chosen",
+            boss: "wither-skeleton",
+            difficulty: "normal",
+            arena: false,
+            ...options
+        }
+    };
+}
+
 describe("a world boss", () => {
     it("appears with its health and name, counts damage near it, and falls", async () => {
-        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
+        const boss = groundBoss("boss", 10);
         setUp([boss]);
         await events.startEvent({
             ownerId: "owner",
@@ -2106,8 +2195,9 @@ describe("a world boss", () => {
                     line.includes("summon minecraft:wither_skeleton") && line.includes("pe_boss")
             )
         ).toBe(true);
+        // 400 on Normal is 500 for one fighter.
         expect(world.sent).toContain(
-            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 400"
+            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 500"
         );
         // 1.21.4: the name is still written as JSON in a string.
         expect(
@@ -2134,7 +2224,7 @@ describe("a world boss", () => {
     });
 
     it("is not taken as felled when it is out of reach and somebody far off kills its kind", async () => {
-        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
+        const boss = groundBoss("boss", 10);
         setUp([boss]);
         await events.startEvent({
             ownerId: "owner",
@@ -2156,7 +2246,7 @@ describe("a world boss", () => {
     });
 
     it("gives nobody a prize when it got away", async () => {
-        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 3 };
+        const boss = groundBoss("boss", 3);
         setUp([boss]);
         await events.startEvent({
             ownerId: "owner",
@@ -2174,9 +2264,12 @@ describe("a world boss", () => {
 });
 
 describe("a world boss fought at range", () => {
-    const boss = () => ({ ...catalog.newPreset("world-boss", "boss"), minutes: 10 });
+    const boss = () => groundBoss("boss", 10);
 
     it("shares the health nobody's melee accounts for among those fighting it, and always places the killer", async () => {
+        // Both at it from the start: its health is set for them, and it never
+        // heals for want of a fighter.
+        world.fighters = ["Ana", "Ben"];
         setUp([boss()]);
         await startArena("boss");
         await play(8_100);
@@ -2229,6 +2322,325 @@ describe("a world boss fought at range", () => {
         const gives = world.sent.filter((line) => line.startsWith("give "));
         expect(gives.some((line) => line.startsWith("give Ana "))).toBe(true);
         expect(new Set(gives).size).toBe(gives.length);
+    });
+});
+
+describe("a world boss fight", () => {
+    const start = async () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+
+    it("is shielded by minions in its second phase until they are killed, and rages in its third", async () => {
+        world.fighters = ["Ana"];
+        world.bossHealth = 500;
+        setUp([groundBoss("boss", 10)]);
+        await start();
+        await play(8_100);
+        expect(state().run?.boss).toMatchObject({
+            kind: "wither-skeleton",
+            standing: true,
+            max: 500,
+            phase: 1
+        });
+        expect(world.sent).toContain("bossbar set polaris:event color yellow");
+
+        world.bossHealth = 300;
+        world.minionsLeft = 3;
+        await play(2_100);
+        expect(state().run?.boss).toMatchObject({ phase: 2, shielded: true, broken: false });
+        expect(world.sent).toContain("bossbar set polaris:event color purple");
+        const minions = world.sent.filter((line) => line.includes("summon minecraft:skeleton"));
+        expect(minions.length).toBeGreaterThanOrEqual(3);
+        expect(minions.every((line) => line.includes('"pe_bshield"'))).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes(" title @a[distance=..40,") &&
+                    line.includes("Kill the minions to break the shield")
+            )
+        ).toBe(true);
+
+        await play(2_100);
+        expect(world.sent).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 4 true"
+        );
+
+        world.minionsLeft = 0;
+        const before = world.sent.length;
+        await play(2_100);
+        expect(state().run?.boss?.broken).toBe(true);
+        expect(world.sent.slice(before)).toContain(
+            "effect clear @e[tag=pe_boss,limit=1] minecraft:resistance"
+        );
+        expect(world.sent.slice(before).some((line) => line.includes("The shield is broken"))).toBe(
+            true
+        );
+
+        world.bossHealth = 150;
+        await play(2_100);
+        expect(state().run?.boss?.phase).toBe(3);
+        expect(world.sent).toContain("bossbar set polaris:event color red");
+        expect(world.sent).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:strength 6 0 true"
+        );
+    });
+
+    it("grows for every fighter who comes, keeping what was already taken off it", async () => {
+        world.fighters = ["Ana"];
+        world.bossHealth = 500;
+        setUp([groundBoss("boss", 10)]);
+        await start();
+        await play(8_100);
+        expect(state().run?.boss?.max).toBe(500);
+        world.bossHealth = 400;
+        world.fighters = ["Ana", "Ben"];
+        await play(2_100);
+        expect(world.sent).toContain(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 750"
+        );
+        expect(world.sent).toContain("data merge entity @e[tag=pe_boss,limit=1] {Health:650f}");
+        expect(world.sent).toContain("bossbar set polaris:event max 750");
+        expect(state().run?.boss).toMatchObject({ max: 750, fighters: ["Ana", "Ben"] });
+    });
+
+    it("heals slowly while nobody fights it, and warns of each attack before it lands", async () => {
+        world.bossHealth = 400;
+        setUp([groundBoss("boss", 10)]);
+        await start();
+        await play(10_100);
+        expect(world.sent).toContain("data merge entity @e[tag=pe_boss,limit=1] {Health:410f}");
+        expect(world.sent.some((line) => line.includes("it is healing"))).toBe(true);
+        // Nobody near: no attack.
+        expect(world.sent.some((line) => line.includes("run damage @s"))).toBe(false);
+
+        world.fighters = ["Ana", "Ben"];
+        await play(4_100);
+        const warned = world.sent.findIndex(
+            (line) =>
+                line.includes("run particle minecraft:crit") ||
+                line.includes("run particle minecraft:flame") ||
+                line.includes("run particle minecraft:portal") ||
+                line.includes("run particle minecraft:witch")
+        );
+        expect(warned).toBeGreaterThan(0);
+        const landed = world.sent.findIndex(
+            (line, index) =>
+                index > warned &&
+                (line.includes("run damage @s") ||
+                    line.includes(" run tp @s ~ ~ ~") ||
+                    line.includes("summon minecraft:vex") ||
+                    line.startsWith("execute at Ben run tp @e[tag=pe_boss"))
+        );
+        expect(landed).toBeGreaterThan(warned);
+    });
+
+    it("gets out of a box built round it, even one that fights from afar and stands still to shoot", async () => {
+        world.fighters = ["Ana"];
+        world.fighterGap = 5;
+        setUp([groundBoss("boss", 10, { boss: "captain" })]);
+        await start();
+        await play(12_100);
+        // Standing still to shoot, in the open: it stays where it is.
+        expect(world.sent).not.toContain("execute at Ana run tp @e[tag=pe_boss,limit=1] ~ ~ ~");
+        world.bossBoxed = true;
+        await play(8_100);
+        expect(world.sent).toContain("execute at Ana run tp @e[tag=pe_boss,limit=1] ~ ~ ~");
+    });
+
+    it("gets out of a box with somebody standing right against it, a wall between them", async () => {
+        world.fighters = ["Ana"];
+        setUp([groundBoss("boss", 10, { boss: "ravager" })]);
+        await start();
+        // It never moves, two blocks from Ana: brought beside her.
+        await play(14_100);
+        expect(world.sent).toContain("execute at Ana run tp @e[tag=pe_boss,limit=1] ~ ~ ~");
+    });
+
+    it("holds mob griefing off for a ravager on the land, keeps inventories, and gives both back", async () => {
+        world.mobGriefing = "true";
+        setUp([groundBoss("boss", 10, { boss: "ravager" })]);
+        await start();
+        await play(4_100);
+        expect(state().run?.gamerules).toMatchObject({
+            mobGriefing: "true",
+            keepInventory: "false"
+        });
+        expect(world.sent).toContain("gamerule mobGriefing false");
+        expect(world.sent).toContain("gamerule keepInventory true");
+        // What a restarted Polaris would send, from the stored run alone.
+        const cleanup = events.cleanupOf(state().run!);
+        expect(cleanup).toContain("gamerule mobGriefing true");
+        expect(cleanup).toContain("gamerule keepInventory false");
+        expect(cleanup).toContain("kill @e[tag=pe_bmob]");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_100);
+        expect(world.sent.filter((line) => line.startsWith("gamerule mobGriefing ")).at(-1)).toBe(
+            "gamerule mobGriefing true"
+        );
+        expect(world.sent).toContain("execute as @e[tag=pe_bmob] at @s run tp @s ~ -1000 ~");
+        expect(world.sent).toContain("kill @e[tag=pe_bmob]");
+        expect(state().history[0]?.outcome).toBe("cancelled");
+    });
+
+    it("leaves mob griefing as the server has it for a boss that changes no block", async () => {
+        world.mobGriefing = "true";
+        setUp([groundBoss("boss", 10, { boss: "husk" })]);
+        await start();
+        await play(4_100);
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent.some((line) => line.startsWith("gamerule mobGriefing "))).toBe(false);
+        expect(state().run?.gamerules).not.toHaveProperty("mobGriefing");
+    });
+
+    it("does not start where it cannot hold mob griefing off", async () => {
+        world.mobGriefing = "unknown";
+        setUp([groundBoss("boss", 10, { boss: "ravager" })]);
+        await start();
+        await play(4_100);
+        expect(state().history[0]?.outcome).toBe("failed");
+        expect(world.sent.some((line) => line.includes("summon minecraft:ravager"))).toBe(false);
+    });
+
+    it("pays more on a harder level, and the final blow a named trophy", async () => {
+        world.fighters = ["Ana", "Ben"];
+        world.bag = { Ana: {}, Ben: {} };
+        world.room = { Ana: 640, Ben: 640 };
+        setUp([groundBoss("boss", 10, { difficulty: "epic" })]);
+        await start();
+        await play(8_100);
+        world.scores = { Ana: 180, Ben: 60 };
+        world.bossAlive = false;
+        await play(2_100);
+        const entry = state().history[0]!;
+        expect(entry.note).toBe("Defeated; the final blow by Ana");
+        expect(world.sent).toContain("give Ana minecraft:diamond 10");
+        expect(world.sent).toContain("give Ben minecraft:diamond 6");
+        const trophy = world.sent.find((line) =>
+            line.startsWith("give Ana minecraft:nether_star[")
+        );
+        expect(trophy).toContain("Trophy: The Warlord");
+        // 1.21.4 reads a name as JSON in a string: that is what is sent, and nothing it would refuse.
+        expect(trophy).toContain(`minecraft:custom_name='{"text":"Trophy: The Warlord"`);
+        expect(world.sent.some((line) => line.includes("minecraft:custom_name={text:"))).toBe(
+            false
+        );
+        const ana = entry.delivered.find((one) => one.name === "Ana");
+        expect(ana?.items).toContainEqual({ id: "minecraft:nether_star", count: 1, dropped: 0 });
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw Ana ") && line.includes("trophy"))
+        ).toBe(true);
+    });
+
+    it("stands in a closed arena in the sky, takes players up through the beam and puts them back", async () => {
+        const preset = groundBoss("boss", 10, { arena: true });
+        setUp([preset]);
+        await start();
+        await play(12_100);
+        const run = state().run!;
+        expect(run.stage?.built).toBe(true);
+        expect(run.boss?.standing).toBe(true);
+        const origin = run.stage!.origin!;
+        const built = world.sent.filter(
+            (line) => line.includes(" run fill ") && line.endsWith(" keep")
+        );
+        expect(built.some((line) => line.endsWith("minecraft:light_blue_stained_glass keep"))).toBe(
+            true
+        );
+        expect(
+            built.filter((line) => line.endsWith("minecraft:white_stained_glass keep"))
+        ).toHaveLength(5);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith(
+                    `execute in minecraft:overworld run summon minecraft:wither_skeleton ${origin.x + 0.5} ${origin.y + 1} ${origin.z + 0.5} `
+                )
+            )
+        ).toBe(true);
+        // Its place is the beam, on the ground under it.
+        expect(run.place).toMatchObject({ x: origin.x, z: origin.z });
+        expect(run.place!.y).toBeLessThan(origin.y);
+
+        world.lift = ["Ana"];
+        await play(2_100);
+        expect(world.sent).toContain("tag Ana add pe_in");
+        expect(world.sent).toContain("gamemode adventure Ana");
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        world.lift = [];
+
+        await events.cancelEvent("owner", SERVER);
+        await play(6_100);
+        const sent = world.sent;
+        const mobsGone = sent.indexOf(
+            "kill @e[tag=pe_boss]",
+            sent.lastIndexOf("tag Ana add pe_in")
+        );
+        const firstRemoved = sent.findIndex((line) =>
+            line.includes("minecraft:air replace minecraft:white_stained_glass")
+        );
+        expect(mobsGone).toBeGreaterThan(0);
+        expect(firstRemoved).toBeGreaterThan(mobsGone);
+        expect(
+            sent.some((line) =>
+                line.includes("minecraft:air replace minecraft:light_blue_stained_glass")
+            )
+        ).toBe(true);
+        expect(sent).toContain("gamemode survival Ana");
+        expect(sent).toContain("tag Ana remove pe_in");
+        expect(state().stageLeftovers).toEqual([]);
+        expect(state().history[0]?.outcome).toBe("cancelled");
+    });
+});
+
+describe("a Wither felled in its arena", () => {
+    it("drops no star of its own: one left lying is taken, one picked up is taken back, and nobody's own", async () => {
+        const plain = "minecraft:nether_star[!minecraft:custom_name]";
+        world.version = "1.21.4";
+        world.bag = { Ana: { [plain]: 2 }, Ben: {} };
+        setUp([groundBoss("boss", 10, { arena: true, boss: "wither" })]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(12_100);
+        world.lift = ["Ana"];
+        await play(2_100);
+        world.lift = [];
+        expect(state().run?.boss?.carried).toEqual({ Ana: 2 });
+        // It falls; Ana stood where its star landed and has three now.
+        world.bag.Ana![plain] = 3;
+        world.bossAlive = false;
+        await play(2_100);
+        const sent = world.sent;
+        const scored = sent.findIndex((line) =>
+            line.includes(
+                'nbt={Item:{id:"minecraft:nether_star"}}] store result score @s pe_sum run data get entity @s Age'
+            )
+        );
+        const taken = sent.findIndex(
+            (line) =>
+                line.endsWith("kill @e[type=minecraft:item,scores={pe_sum=..-1}]") ||
+                /kill @e\[type=minecraft:item,.*scores=\{pe_sum=\.\.-1\}\]$/.test(line)
+        );
+        const cleared = sent.indexOf(`clear Ana ${plain} 1`);
+        expect(scored).toBeGreaterThan(0);
+        expect(taken).toBeGreaterThan(scored);
+        expect(cleared).toBeGreaterThan(taken);
+        // Never a named star, and never more than the one she picked up.
+        expect(
+            sent.some(
+                (line) =>
+                    /^clear Ana minecraft:nether_star [1-9]/.test(line) ||
+                    line === `clear Ana ${plain} 3`
+            )
+        ).toBe(false);
     });
 });
 
@@ -5347,7 +5759,7 @@ describe("a world boss's health", () => {
         "is what the event set on %s",
         async (version) => {
             world.version = version;
-            setUp([{ ...catalog.newPreset("world-boss", "boss"), minutes: 3 }]);
+            setUp([groundBoss("boss", 3)]);
             await events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -5356,9 +5768,9 @@ describe("a world boss's health", () => {
                 startedBy: null
             });
             await play(8_100);
-            const health = (state().run?.preset.options as catalog.EventOptions<"world-boss">)
-                .health;
-            expect(world.bossMaxHealth).toBe(Math.min(health, 1024));
+            // 400 on Normal for one fighter.
+            expect(state().run?.boss?.max).toBe(500);
+            expect(world.bossMaxHealth).toBe(500);
         }
     );
 });
@@ -5367,7 +5779,7 @@ describe("a world boss whose server's version is unknown", () => {
     it.each(["1.20.1", "1.21.4", "1.21.5", "26.1"])("wears its own name on %s", async (version) => {
         world.version = version;
         world.versionIn = "none";
-        setUp([{ ...catalog.newPreset("world-boss", "boss"), minutes: 3 }]);
+        setUp([groundBoss("boss", 3)]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -5851,7 +6263,7 @@ describe("each player reads their own language", () => {
 
 describe("the clock", () => {
     it("starts when the boss stands, with the whole of its time ahead, and says it is getting ready until then", async () => {
-        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
+        const boss = groundBoss("boss", 10);
         setUp([boss]);
         await startArena("boss");
         await play(100);

@@ -19,7 +19,7 @@ import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
 
 export const SCORE = "pe_score";
-const SUM = "pe_sum";
+export const SUM = "pe_sum";
 const TMP = "pe_tmp";
 const CONST = "pe_const";
 const DEATHS = "pe_death";
@@ -897,7 +897,11 @@ export function builtUnder(
  *  space taken away. */
 export function silent(output: string): boolean {
     // eslint-disable-next-line no-control-regex
-    return stripFormatting(output).replace(/\u001b?\[[0-9;]*m/g, "").trim().length === 0;
+    return (
+        stripFormatting(output)
+            .replace(/\u001b?\[[0-9;]*m/g, "")
+            .trim().length === 0
+    );
 }
 
 /** Whether the game refused a block name it does not know, rather than answering. */
@@ -1257,45 +1261,14 @@ const BOSS_ENTITY: Readonly<Record<EventOptions<"world-boss">["boss"], string>> 
     "wither-skeleton": "wither_skeleton",
     ravager: "ravager",
     vindicator: "vindicator",
-    husk: "husk"
+    husk: "husk",
+    evoker: "evoker",
+    captain: "pillager",
+    wither: "wither"
 };
 
 export function bossEntity(boss: EventOptions<"world-boss">["boss"]): string {
     return BOSS_ENTITY[boss];
-}
-
-/**
- * The boss, on the marker.
- *
- * Named separately (`bossNameCommand`) because how a name is written into an
- * entity changed in 1.21.5, and the attributes separately too, because their
- * ids lost the `generic.` in 1.21.2 - both are tried in the order that fails
- * cleanly on the other versions.
- *
- * There is no `attribute` command before 1.16, so the same attributes go in the
- * boss's own data as well, by the names 1.13 to 1.15 give them - a health bar
- * of 20 hearts' worth otherwise, nearly empty from the start. A newer version
- * does not know those names and passes them over.
- */
-export function summonBoss(boss: EventOptions<"world-boss">["boss"], health: number): string[] {
-    const attributes = legacyAttributes(health)
-        .map(([name, base]) => `{Name:"${name}",Base:${base}d}`)
-        .join(",");
-    return [
-        `kill @e[tag=${BOSS_TAG}]`,
-        `execute at @e[tag=${MARK_TAG},limit=1] run summon minecraft:${BOSS_ENTITY[boss]} ~ ~ ~ {Tags:["${BOSS_TAG}"],PersistenceRequired:1b,Glowing:1b,CustomNameVisible:1b,Attributes:[${attributes}],Health:${Math.min(health, 1024)}f}`
-    ];
-}
-
-/** `bossAttributes` by the names 1.13-1.15 use; their health stops at 1024. */
-function legacyAttributes(health: number): [string, number][] {
-    return [
-        ["generic.maxHealth", Math.min(health, 1024)],
-        ["generic.knockbackResistance", 0.8],
-        ["generic.armor", 10],
-        ["generic.attackDamage", 12],
-        ["generic.followRange", 48]
-    ];
 }
 
 /**
@@ -1414,7 +1387,8 @@ export function readRawNear(at: { x: number; y: number; z: number } | null): str
 
 /** Every shot since the last look summed into one count, ready to be read. */
 export const SHOTS_SUMMED = SHOTS.slice(1).map(
-    (objective) => `execute as @a run scoreboard players operation @s ${SHOTS[0]} += @s ${objective}`
+    (objective) =>
+        `execute as @a run scoreboard players operation @s ${SHOTS[0]} += @s ${objective}`
 );
 
 /** Who near the boss (or where it fell) has shot since the last look. */
@@ -1445,8 +1419,7 @@ export function unseenShares(
     const rest = Math.round(lost) - meleeTotal;
     const shares = new Map<string, number>();
     const hitters = near.filter((name) => (melee.get(name) ?? 0) > 0);
-    const takers =
-        shooters.length > 0 ? [...shooters] : hitters.length > 0 ? hitters : near;
+    const takers = shooters.length > 0 ? [...shooters] : hitters.length > 0 ? hitters : near;
     if (rest <= 0 || takers.length === 0) return shares;
     const each = Math.floor(rest / takers.length);
     let spare = rest - each * takers.length;

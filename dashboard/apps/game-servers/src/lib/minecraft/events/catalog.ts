@@ -123,7 +123,43 @@ export const HUNT_TARGETS = [
     "enderman"
 ] as const;
 export const LOOT_TABLES = ["treasure", "dungeon", "bastion", "end-city", "ancient-city"] as const;
-export const BOSS_KINDS = ["wither-skeleton", "ravager", "vindicator", "husk"] as const;
+export const BOSS_KINDS = [
+    "wither-skeleton",
+    "ravager",
+    "vindicator",
+    "husk",
+    "evoker",
+    "captain",
+    "wither"
+] as const;
+export type BossKind = (typeof BOSS_KINDS)[number];
+/** Bosses whose attacks would reach the land, fought only in the sky arena: the
+ *  Wither's skulls explode. */
+export const ARENA_ONLY_BOSSES: readonly BossKind[] = ["wither"];
+/** How hard a world boss is. Epic is the default: players found the old boss easy. */
+export const BOSS_DIFFICULTIES = ["normal", "hard", "epic"] as const;
+export type BossDifficulty = (typeof BOSS_DIFFICULTIES)[number];
+
+/** Bosses that change blocks when `mobGriefing` is on - a ravager's leaves and
+ *  crops, an evoker's sheep - which it is held off for, on the land. */
+export const BLOCK_CHANGING_BOSSES: readonly BossKind[] = ["ravager", "evoker"];
+/** What a world boss's prizes are multiplied by on each difficulty. */
+export const BOSS_PRIZE_TIMES: Readonly<Record<BossDifficulty, number>> = {
+    normal: 1,
+    hard: 1.5,
+    epic: 2
+};
+
+/** Whether a fight has to hold `mobGriefing` off: the Wither always, since its
+ *  skulls would break even the arena; a boss that changes blocks, on the land. */
+export function holdsGriefing(kind: BossKind, arena: boolean): boolean {
+    return ARENA_ONLY_BOSSES.includes(kind) || (!arena && BLOCK_CHANGING_BOSSES.includes(kind));
+}
+
+/** The bosses a world boss can be drawn from, with or without the sky arena. */
+export function bossesFor(arena: boolean, pool: readonly BossKind[] = BOSS_KINDS): BossKind[] {
+    return pool.filter((kind) => arena || !ARENA_ONLY_BOSSES.includes(kind));
+}
 export const INTENSITIES = ["low", "medium", "high"] as const;
 export const TRIVIA_MODES = ["questions", "scramble", "mixed"] as const;
 export const LANGUAGES = ["en", "es"] as const;
@@ -171,6 +207,14 @@ const triviaQuestionSchema = z.object({
 
 export type TriviaQuestion = z.infer<typeof triviaQuestionSchema>;
 
+/** A world boss saved before there was a choice keeps fighting as it did: its
+ *  own boss, on Normal, on the land. */
+function legacyWorldBoss(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    if ("choice" in value || !("boss" in value)) return value;
+    return { choice: "chosen", difficulty: "normal", arena: false, ...value };
+}
+
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
 export const optionsSchemas = {
@@ -185,11 +229,40 @@ export const optionsSchemas = {
         intensity: z.enum(INTENSITIES).default("medium"),
         creepers: z.boolean().default(false)
     }),
-    "world-boss": z.object({
-        boss: z.enum(BOSS_KINDS).default("wither-skeleton"),
-        health: z.number().int().min(100).max(1024).default(400),
-        place: placeSchema.default({ mode: "players" })
-    }),
+    "world-boss": z.preprocess(
+        legacyWorldBoss,
+        z
+            .object({
+                /** Drawn from `pool` each time, or always `boss`. */
+                choice: z.enum(["random", "chosen"]).default("random"),
+                boss: z.enum(BOSS_KINDS).default("wither-skeleton"),
+                pool: z
+                    .array(z.enum(BOSS_KINDS))
+                    .max(BOSS_KINDS.length)
+                    .transform((kinds) => [...new Set(kinds)])
+                    .default([...BOSS_KINDS]),
+                difficulty: z.enum(BOSS_DIFFICULTIES).default("epic"),
+                /** Fought in a closed arena built into empty air, so nothing it does
+                 *  reaches the land. */
+                arena: z.boolean().default(true),
+                /** Its health for one fighter on Normal; harder levels and more
+                 *  fighters raise it. */
+                health: z.number().int().min(100).max(1024).default(400),
+                place: placeSchema.default({ mode: "players" })
+            })
+            .refine(
+                (value) =>
+                    value.arena ||
+                    value.choice === "random" ||
+                    !ARENA_ONLY_BOSSES.includes(value.boss),
+                { message: problem("witherArenaOnly"), path: ["boss"] }
+            )
+            .refine(
+                (value) =>
+                    value.choice === "chosen" || bossesFor(value.arena, value.pool).length > 0,
+                { message: problem("chooseBoss"), path: ["pool"] }
+            )
+    ),
     fishing: z.object({}),
     trivia: z.object({
         rounds: z.number().int().min(3).max(15).default(8),
@@ -1043,9 +1116,10 @@ export function joinersNeeded(preset: EventPreset): number {
 }
 
 /** The events that bring mobs up near the players, and so hold mob griefing
- *  off while they run (`commands.GRIEF_RULES`). */
+ *  off while they run (`commands.GRIEF_RULES`). A world boss holds it itself,
+ *  only where its fight could change a block (`holdsGriefing`). */
 export function summonsMobs(preset: EventPreset): boolean {
-    return preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "waves";
+    return preset.kind === "blood-moon" || preset.kind === "waves";
 }
 
 /** The events players fight each other in, which a server with PvP off cannot run. */

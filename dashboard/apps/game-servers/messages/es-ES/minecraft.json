@@ -1520,7 +1520,7 @@
             },
             "world-boss": {
                 "label": "Jefe mundial",
-                "summary": "Aparece cerca de los jugadores un jefe con una barra de vida que ven todos. Cuenta el daño hecho cerca de él; si cae, el podio va por daño y se premia a todos los que le golpearon.",
+                "summary": "Aparece cerca de los jugadores un jefe elegido al azar, en una arena aérea o en terreno abierto. Lucha en tres fases, con ataques avisados y un escudo de esbirros, y crece con cada jugador. Cuenta el daño hecho cerca de él; si cae, el podio va por daño, se premia a todos los que le golpearon y el golpe final gana un trofeo.",
                 "unit": "daño"
             },
             "fishing": {
@@ -1675,7 +1675,15 @@
             "prizes": "Premios - {list}.",
             "noPrizes": "Sin premios.",
             "needsPlayers": "{count, plural, one {Necesita # jugador conectado.} other {Necesita # jugadores conectados.}}",
-            "needsJoiners": "{count, plural, one {Sigue adelante con # jugador apuntado.} other {Sigue adelante con # jugadores apuntados, o se cancela.}}"
+            "needsJoiners": "{count, plural, one {Sigue adelante con # jugador apuntado.} other {Sigue adelante con # jugadores apuntados, o se cancela.}}",
+            "bossDrawn": "Cada vez sale un jefe al azar entre: {bosses}.",
+            "bossChosen": "Siempre {boss}.",
+            "bossFight": "{difficulty}. Tres fases: desde dos tercios de su vida, unos esbirros lo protegen hasta que mueren; desde un tercio, entra en furia. Cada ataque se avisa un segundo antes y su vida crece con cada jugador.",
+            "bossArena": "Se lucha en una arena cerrada de cristal construida solo en aire vacío a 30 bloques sobre terreno abierto, lejos de cualquier cama, y se desmonta después. Un haz de luz sube a los jugadores; allí juegan en modo aventura y al final vuelven al haz, incluso tras un reinicio o cuando vuelvan a entrar.",
+            "bossGround": "Se lucha en terreno abierto lejos de cualquier cama. Nada de lo que hace rompe ni coloca un bloque, y no se le puede encerrar: va a por quien no alcanza.",
+            "bossKeeps": "Mientras dura se conserva el inventario, así que morir no cuesta nada, y las mascotas, caballos y aldeanos cercanos no reciben daño. El ajuste del servidor vuelve después, incluso tras un reinicio.",
+            "bossGriefing": "El vandalismo de mobs se apaga mientras lucha {bosses}, así que no cambia ningún bloque. El ajuste del servidor vuelve después, incluso tras un reinicio.",
+            "bossPrizes": "Los premios se multiplican por {times} en esta dificultad, y el golpe final gana un trofeo con nombre."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -1772,6 +1780,8 @@
             "itemsPerReward": "Como máximo {count} objetos por premio",
             "levelsAtMost": "Como máximo {count} niveles",
             "chooseEffect": "Elige al menos un efecto",
+            "witherArenaOnly": "El Wither solo lucha en la arena aérea",
+            "chooseBoss": "Elige al menos un jefe que pueda luchar aquí",
             "killsOrOres": "Da algo por muertes, por menas o por ambas",
             "wavesAtLeast": "{count, plural, one {Al menos # oleada} other {Al menos # oleadas}}",
             "wavesAtMost": "{count, plural, one {Como máximo # oleada} other {Como máximo # oleadas}}",
@@ -1821,7 +1831,6 @@
         "theyBlowHolesInWhatever": "Sus explosiones dañan a los jugadores; nada construido se rompe.",
         "whichBoss": "Qué jefe",
         "health": "Vida",
-        "between100And1024A": "Entre 100 y 1024. Un jugador con equipo de hierro hace unos 8 por golpe.",
         "rounds": "Rondas",
         "3To15": "3 a 15",
         "secondsARound": "Segundos por ronda",
@@ -1910,7 +1919,11 @@
                 "wither-skeleton": "El Caudillo (esqueleto wither)",
                 "ravager": "El Coloso (devastador)",
                 "vindicator": "El Verdugo (vindicador)",
-                "husk": "El Rey del Desierto (momia)"
+                "husk": "El Rey del Desierto (momia)",
+                "evoker": "El Archimago (invocador)",
+                "captain": "El Capitán (saqueador)",
+                "wither": "La Plaga (Wither)",
+                "random": "Al azar cada vez"
             },
             "intensity": {
                 "low": "Baja",
@@ -1946,6 +1959,11 @@
             "theme": {
                 "random": "Incluidos",
                 "mine": "Propios"
+            },
+            "bossDifficulty": {
+                "normal": "Normal",
+                "hard": "Difícil",
+                "epic": "Épico"
             }
         },
         "place": {
@@ -1989,7 +2007,17 @@
         "perOreHint": "Puntos de experiencia, de 0 a 100. La mena de carbón da hasta 2.",
         "minPlayers": "Mínimo de jugadores",
         "minPlayersJoined": "Se cancela si se apuntan menos durante la cuenta atrás.",
-        "minPlayersOnline": "No empieza con menos jugadores conectados."
+        "minPlayersOnline": "No empieza con menos jugadores conectados.",
+        "bossDifficulty": "Dificultad",
+        "bossDifficultyHint": "Épico por defecto. Un jefe más difícil tiene más vida, golpea más fuerte, ataca más a menudo y da más premio.",
+        "skyArena": "Arena aérea",
+        "skyArenaHint": "Una arena cerrada de cristal construida en aire vacío a 30 bloques de altura, a la que se sube por un haz de luz, para que nada del combate llegue al suelo. El Wither solo lucha aquí.",
+        "bossPool": "Sorteo entre",
+        "bossPoolHint": "Cada vez que se juega sale uno de estos.",
+        "bossPoolEmpty": "Deja al menos un jefe que pueda luchar aquí.",
+        "witherNeedsArena": "El Wither solo lucha en la arena aérea.",
+        "baseHealth": "Vida base",
+        "baseHealthHint": "De 100 a 1024: su vida para un solo jugador en Normal. Los niveles más difíciles y cada jugador que se une la aumentan."
     },
     "moderation": {
         "announcements": {

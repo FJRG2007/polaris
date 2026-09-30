@@ -92,10 +92,12 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
 
 const retried: string[] = [];
 
-const { MinecraftEvents } =
-    await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
-const { EventEditor } =
-    await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+const { MinecraftEvents } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
+);
+const { EventEditor } = await import(
+    "@polaris-app/game-servers/src/screens/installed/event-editor"
+);
 
 afterEach(() => {
     cleanup();
@@ -350,6 +352,60 @@ describe("setting up a horde defence", () => {
     });
 });
 
+describe("setting up a world boss", () => {
+    it("asks how hard, whether in the sky arena, and which bosses it draws from", () => {
+        const saved: catalog.EventPreset[] = [];
+        render(
+            <EventEditor
+                preset={catalog.newPreset("world-boss", "boss")}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        expect(screen.getByText("Difficulty")).toBeTruthy();
+        expect(screen.getByText("Epic")).toBeTruthy();
+        expect(
+            (screen.getByLabelText("Sky arena") as HTMLButtonElement).getAttribute("aria-checked")
+        ).toBe("true");
+        expect(screen.getByText("Drawn from")).toBeTruthy();
+        // Every boss in the pool, the Wither too while the arena is on.
+        expect(screen.getByLabelText("The Blight (Wither)")).toBeTruthy();
+        fireEvent.click(screen.getByText("Hard"));
+        fireEvent.click(screen.getByLabelText("The Captain (pillager)"));
+        // Off the arena: the Wither cannot be drawn.
+        fireEvent.click(screen.getByLabelText("Sky arena"));
+        expect((screen.getByLabelText("The Blight (Wither)") as HTMLButtonElement).disabled).toBe(
+            true
+        );
+        fireEvent.click(screen.getByText("Done"));
+        const options = saved.at(-1)!.options as catalog.EventOptions<"world-boss">;
+        expect(options.difficulty).toBe("hard");
+        expect(options.arena).toBe(false);
+        expect(options.choice).toBe("random");
+        expect(options.pool).not.toContain("captain");
+    });
+
+    it("explains the fight, the arena, the rules it holds and what it pays", async () => {
+        const withBoss = {
+            ...view,
+            config: { ...config, presets: [catalog.newPreset("world-boss", "boss")] }
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: withBoss });
+        await waitFor(() => expect(screen.getByLabelText("What World boss is")).toBeTruthy());
+        fireEvent.click(screen.getByLabelText("What World boss is"));
+        expect(screen.getByText(/A boss drawn at random each time from/)).toBeTruthy();
+        expect(screen.getByText(/Epic\. Three phases/)).toBeTruthy();
+        expect(screen.getByText(/closed glass arena built only into empty air/)).toBeTruthy();
+        expect(screen.getByText(/Keep inventory is on while it runs/)).toBeTruthy();
+        expect(
+            screen.getByText(/Mob griefing is off while The Blight \(Wither\) fights/)
+        ).toBeTruthy();
+        expect(screen.getByText(/multiplied by 2 on this difficulty/)).toBeTruthy();
+    });
+});
+
 describe("setting up a meteor shower", () => {
     it("asks how many meteors, how big and of what, and says what is wrong", () => {
         const preset = catalog.newPreset("meteor-shower", "meteors");
@@ -373,8 +429,9 @@ describe("setting up a meteor shower", () => {
 
 describe("the parkour and spleef editors", () => {
     it("sets a course's jumps, difficulty and height, and says a wrong one beside the field", async () => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         const saved: unknown[] = [];
         render(
             <EventEditor
@@ -398,8 +455,9 @@ describe("the parkour and spleef editors", () => {
     });
 
     it("says how big a spleef floor comes out", async () => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         render(
             <EventEditor
                 preset={catalog.newPreset("spleef", "floor")}
@@ -434,8 +492,9 @@ describe("the parkour and spleef editors", () => {
 
 describe("the editor of an event players join", () => {
     const edit = async (preset: catalog.EventPreset, saved: catalog.EventPreset[]) => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         render(
             <EventEditor
                 preset={preset}
@@ -540,8 +599,9 @@ describe("the editor in Spanish", () => {
     });
 
     it("names each choice in the reader's language", async () => {
-        const { options, LOOT_LABELS } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { options, LOOT_LABELS } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         const { gameCatalogs } = await import("@polaris-app/game-servers/messages");
         expect(options(gameCatalogs.translator("es-ES", "minecraft"), LOOT_LABELS)[0]).toEqual({
             value: "treasure",

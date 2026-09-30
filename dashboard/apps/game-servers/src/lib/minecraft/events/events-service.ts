@@ -45,17 +45,19 @@ import * as stageService from "./kinds/stage-service";
 import * as parkour from "./kinds/parkour";
 import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
+import * as bossService from "./kinds/boss-service";
 import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import type { GameKey } from "../../../../messages";
 
-type RefusalKey = GameKey<"minecraft"> extends infer K
-    ? K extends `events.errors.${infer R}`
-        ? R
-        : never
-    : never;
+type RefusalKey =
+    GameKey<"minecraft"> extends infer K
+        ? K extends `events.errors.${infer R}`
+            ? R
+            : never
+        : never;
 
 /** Why the screen's request was refused, carried as its catalog key until the
  *  action that answers it writes it in the reader's language (`messageText`). */
@@ -140,8 +142,7 @@ function eventServer(server: ServerContainer, installedAppId: string): ServerCon
             const roster = replies.rosterNames(await one(replies.ROSTER).catch(() => ""));
             return replies.canonicalReplies(whole, roster).text;
         },
-        sayAll: async (lines) =>
-            server.sayAll(await named(speech.localizeAll(lines, audience())))
+        sayAll: async (lines) => server.sayAll(await named(speech.localizeAll(lines, audience())))
     };
 }
 
@@ -224,12 +225,6 @@ interface Loop {
     lastSave: number;
     /** Its results are being handed out: no tick, sweep or Cancel plays it again. */
     finishing: boolean;
-    /** World boss: where it was last seen standing. */
-    bossAt: stored.Point | null;
-    /** World boss: its health at the last look, to tell what it lost since. */
-    bossHealth: number | null;
-    /** How this server writes a name into an entity, and its attribute ids. */
-    modern: { ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
     logFrom: number | null;
     /** Which names this server knows its ground blocks by, once asked; `none`
@@ -504,8 +499,7 @@ export async function startEvent(input: {
     const config = settingsOf(row.config);
     const preset = config.presets.find((one) => one.id === input.presetId);
     if (!preset) throw new Error(gameMessage("minecraft", "events.problems.eventGone"));
-    if (!preset.enabled && input.trigger !== "manual")
-        throw new Error(refused("switchedOff"));
+    if (!preset.enabled && input.trigger !== "manual") throw new Error(refused("switchedOff"));
 
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error(refused("notRunning"));
@@ -637,7 +631,8 @@ export async function startEvent(input: {
         voting: false,
         doneOffered: false,
         done: [],
-        buildEndsAt: null
+        buildEndsAt: null,
+        boss: null
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -704,7 +699,10 @@ export async function forgetPending(installedAppId: string, pendingId: string): 
  * A player's things an event could not give back, tried again from their
  * barrels - or their database copy - now. Answers how it went.
  */
-export async function retryStash(installedAppId: string, id: string): Promise<stashService.GiveBack> {
+export async function retryStash(
+    installedAppId: string,
+    id: string
+): Promise<stashService.GiveBack> {
     const row = await readRow(installedAppId);
     if (!row) throw new Error(refused("noServer"));
     return withServerContainer(row.ownerId, installedAppId, async (server) => {
@@ -765,9 +763,6 @@ function startLoop(
         lastSample: 0,
         lastSave: Date.now(),
         finishing: false,
-        bossAt: null,
-        bossHealth: null,
-        modern: null,
         logFrom: null,
         ground: null,
         sounded: new Set(),
@@ -1162,9 +1157,12 @@ async function begin(
         lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
     }
     if (preset.kind === "world-boss") {
-        lines.push(
-            ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
-        );
+        // The boss drawn, and the rules its fight holds written down before
+        // they are changed, so whatever ends it - a restart included - puts
+        // them back.
+        const held = await bossService.begin(kindContext(installedAppId, loop, server, now));
+        if (held.refused) return finish(installedAppId, loop, server, "failed", held.refused);
+        lines.push(...held.lines);
     }
     if (catalog.summonsMobs(preset)) {
         // Nothing it brings up tramples a farm, breaks a door or blows a hole
@@ -1336,7 +1334,7 @@ async function play(
             decided = await supplyDrop(installedAppId, loop, server, now, lines);
             break;
         case "world-boss":
-            decided = await worldBoss(installedAppId, loop, server, now, lines);
+            decided = await bossService.tick(kindContext(installedAppId, loop, server, now), lines);
             break;
         case "king-of-the-hill":
             decided = await kingOfTheHill(installedAppId, loop, server, lines);
@@ -1751,114 +1749,6 @@ async function supplyDrop(
     return opener ? `Found by ${opener}` : "Opened";
 }
 
-async function worldBoss(
-    installedAppId: string,
-    loop: Loop,
-    server: ServerContainer,
-    now: number,
-    lines: string[]
-): Promise<string | null> {
-    const options = loop.run.preset.options as catalog.EventOptions<"world-boss">;
-    const language = loop.language;
-    const name = messages.bossName(options.boss, language);
-    if (!loop.run.place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, 24, SPOT_RADIUS);
-        if (found === "failed") throw new PlaceNotFound();
-        if (!found) return null;
-        const modern = loop.modern ?? (loop.modern = await modernity(server));
-        await server.sayAll(commands.summonBoss(options.boss, options.health));
-        if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "passed") {
-            await retryPlace(installedAppId, loop, server, found);
-            return null;
-        }
-        const other = commands.bossAttributes(options.health, !modern.ids);
-        for (const [index, line] of commands.bossAttributes(options.health, modern.ids).entries()) {
-            if (!commands.attributeWorked(await server.say([line]))) {
-                await server.say([other[index] as string]);
-            }
-        }
-        await server.sayAll([
-            commands.bossHeal(options.health),
-            // Both ways a name has been written, the older first: up to 1.21.4 the
-            // newer is not a name at all and is passed over; from 1.21.5 the older
-            // would show as its own text, and the newer replaces it.
-            // Over its head, one name for everybody: the server's own language.
-            commands.bossNameCommand(messages.bossName(options.boss, loop.home), false),
-            commands.bossNameCommand(messages.bossName(options.boss, loop.home), true),
-            commands.CLEAR_MARK,
-            `bossbar set ${commands.BAR} max ${options.health}`,
-            commands.say(
-                messages.tag(language) +
-                    messages.bossAppeared(name, found.x, found.y, found.z, language)
-            ),
-            commands.sound(commands.SOUNDS.boss)
-        ]);
-        return null;
-    }
-    const left = (loop.run.endsAt - now) / 1000;
-    lines.push(
-        `bossbar set ${commands.BAR} name ${commands.text(`&c${messages.barName(name, left)}`)}`,
-        `bossbar set ${commands.BAR} players @a`,
-        commands.bossBarHealth(),
-        ...commands.bossDamageTick()
-    );
-    if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "failed") {
-        loop.bossAt = commands.readPoint(await server.say([commands.BOSS_WHERE])) ?? loop.bossAt;
-        const health = commands.readHealth(await server.say([commands.BOSS_HEALTH]));
-        if (health !== null) {
-            await creditUnseen(server, loop.bossHealth === null ? 0 : loop.bossHealth - health, null);
-            loop.bossHealth = health;
-        }
-        lines.push(commands.BOSS_KILLS_RESET);
-        return null;
-    }
-    // Gone from the world: killed, if somebody where it was last seen has a
-    // kill of its kind since then - otherwise it is only out of reach,
-    // somewhere nobody is.
-    const last = loop.bossAt ?? loop.run.place;
-    const killers = commands
-        .readWhere(await server.say([commands.BOSS_KILLERS]))
-        .filter(
-            (one) =>
-                Math.hypot(one.x - last.x, one.y - last.y, one.z - last.z) <= commands.BOSS_REACH
-        );
-    if (killers.length === 0) return null;
-    const by = killers[0]!.name;
-    // The rest of its health went in its last moments: the final blows, counted
-    // where it fell before anything else empties them.
-    if (loop.bossAt) {
-        await creditUnseen(server, loop.bossHealth ?? 0, loop.bossAt);
-        await server.sayAll(commands.bossDamageAt(loop.bossAt));
-        loop.bossHealth = 0;
-    }
-    loop.run = { ...loop.run, decidedBy: by };
-    lines.push(commands.say(messages.tag(language) + messages.bossFell(name, by, language)));
-    return `Defeated; the final blow by ${by}`;
-}
-
-/**
- * What the boss lost that nobody's melee accounts for - arrows, a trident, magic,
- * a mod's weapon, none of which the game's `damage_dealt` counts - shared evenly
- * among the players fighting near it (`commands.unseenShares`). `lost` is in
- * health points; `at` is where it fell, once it has.
- */
-async function creditUnseen(
-    server: ServerContainer,
-    lost: number,
-    at: stored.Point | null
-): Promise<void> {
-    // Shots that hit nothing are kept until something is lost: they did shoot.
-    if (!(lost > 0)) return;
-    const melee = commands.readScores(await server.say([commands.readRawNear(at)]));
-    await server.sayAll(commands.SHOTS_SUMMED);
-    const shooters = [...commands.readScores(await server.say([commands.readShootersNear(at)])).keys()];
-    const shares = commands.unseenShares(lost * 10, melee, shooters);
-    await server.sayAll([
-        ...[...shares].map(([name, share]) => commands.shareLine(name, share)),
-        ...commands.SHOTS_RESET
-    ]);
-}
-
 async function kingOfTheHill(
     installedAppId: string,
     loop: Loop,
@@ -2224,10 +2114,9 @@ function roundOf(
     run: stored.EventRun,
     language: speech.Speech
 ): { kind: "question" | "scramble"; asked: string; answer: string; accepted: string[] } {
-    const each = Object.fromEntries(speech.LANGUAGES.map((one) => [one, roundIn(run, one)])) as Record<
-        catalog.Language,
-        ReturnType<typeof roundIn>
-    >;
+    const each = Object.fromEntries(
+        speech.LANGUAGES.map((one) => [one, roundIn(run, one)])
+    ) as Record<catalog.Language, ReturnType<typeof roundIn>>;
     const first = each[speech.LANGUAGES[0]];
     const pick = (value: (one: ReturnType<typeof roundIn>) => string) =>
         speech.pickIn(
@@ -2314,8 +2203,7 @@ async function triviaTick(
                 `&f${asked.answer}`
             ),
             commands.say(
-                messages.tag(language) +
-                    messages.roundWon(winner, asked.answer, language)
+                messages.tag(language) + messages.roundWon(winner, asked.answer, language)
             ),
             commands.sound(commands.SOUNDS.win)
         );
@@ -2325,13 +2213,8 @@ async function triviaTick(
     if (now >= (loop.run.roundEndsAt ?? now)) {
         loop.run = { ...loop.run, roundEndsAt: null, closedAt: now };
         lines.push(
-            ...commands.titleCommands(
-                messages.roundMissedTitle(language),
-                `&f${asked.answer}`
-            ),
-            commands.say(
-                messages.tag(language) + messages.roundMissed(asked.answer, language)
-            )
+            ...commands.titleCommands(messages.roundMissedTitle(language), `&f${asked.answer}`),
+            commands.say(messages.tag(language) + messages.roundMissed(asked.answer, language))
         );
         await persist(installedAppId, loop);
         return null;
@@ -2881,6 +2764,9 @@ async function finish(
     const bringBack = async (to: ServerContainer): Promise<void> => {
         if (broughtBack) return;
         broughtBack = true;
+        // The boss and everything it summoned out first: its arena is about
+        // to come down under them.
+        if (preset.kind === "world-boss") await to.sayAll(bossService.mobsGone());
         if (stageLeftover) {
             const flavour = loop.flavour ?? (await stageFlavour(to));
             stageLeftover = await stageService.settle(to, stageLeftover, flavour, language);
@@ -2929,7 +2815,12 @@ async function finish(
                 preset.kind === "world-boss"
                     ? took
                     : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
-            const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
+            const owed = plan.prizes(
+                placed,
+                counted,
+                preset.kind === "world-boss" ? bossService.rewardsOf(run) : preset.rewards,
+                disqualified
+            );
             forChallenges = {
                 ranked: counted.filter((name) => !disqualified.has(name.toLowerCase())),
                 podium: placed.map((one) => one.name),
@@ -2963,20 +2854,40 @@ async function finish(
                         createdAt: Date.now()
                     });
             }
+            // The final blow's trophy, besides whatever the podium paid.
+            if (
+                preset.kind === "world-boss" &&
+                run.decidedBy &&
+                online.has(run.decidedBy.toLowerCase())
+            ) {
+                const trophy = await bossService.awardTrophy(
+                    server,
+                    run,
+                    loop.home,
+                    (await serverAtLeast(server, [1, 21, 5]))
+                        ? "text"
+                        : (await serverAtLeast(server, [1, 20, 5]))
+                          ? "json"
+                          : "tag"
+                );
+                if (trophy) {
+                    const killer = run.decidedBy.toLowerCase();
+                    const at = delivered.findIndex((one) => one.name.toLowerCase() === killer);
+                    const item = { id: trophy.id, count: trophy.count, dropped: trophy.dropped };
+                    if (at >= 0)
+                        delivered[at] = {
+                            ...delivered[at]!,
+                            items: [...delivered[at]!.items, item]
+                        };
+                    else delivered.push({ name: run.decidedBy, items: [item], levels: 0 });
+                }
+            }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
             if (catalog.playsInArena(preset))
                 lines.push(...arenaService.resultLines(run, language));
             if (preset.kind === "world-boss" && !run.decidedBy) {
                 lines.push(
-                    commands.say(
-                        messages.bossEscaped(
-                            messages.bossName(
-                                (preset.options as catalog.EventOptions<"world-boss">).boss,
-                                language
-                            ),
-                            language
-                        )
-                    )
+                    commands.say(messages.bossEscaped(bossService.nameOf(run, language), language))
                 );
             } else if (preset.kind === "supply-drop" && !run.decidedBy) {
                 lines.push(commands.say(messages.dropLost(language)));
@@ -3097,6 +3008,7 @@ async function finish(
         console.warn("polaris: recording an event failed", installedAppId, String(error))
     );
     if (loops.get(installedAppId) === loop) loops.delete(installedAppId);
+    bossService.forget(run.id);
     // Events feed the challenges: taking part, the podium, trivia rounds won.
     if (forChallenges) {
         const result = { participants: run.participants.length, ...forChallenges };
@@ -3141,6 +3053,10 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "treasure-hunt":
             after.push(...hunt.huntCleanup(run.chests, run.held));
+            break;
+        case "world-boss":
+            // Its minions, vexes and fangs, while their chunks are still held.
+            before.push(...bossService.mobsGone());
             break;
         case "gathering":
             after.push(...gather.gatheringCleanup());
@@ -3440,11 +3356,6 @@ async function give(
             levels: handed.delivery.levels
         }
     };
-}
-
-/** Whether this server's attribute ids have lost their `generic.`: the one tried first. */
-async function modernity(server: ServerContainer): Promise<{ ids: boolean }> {
-    return { ids: await serverAtLeast(server, [1, 21, 2]) };
 }
 
 const VERSION_LINE = "Starting minecraft server version [^ ]*";
@@ -3776,7 +3687,10 @@ async function deliverPending(
             if (!catalog.PLAYER_NAME.test(one.player)) continue;
             const handed = await give(server, one.player, one.reward);
             const rest = handed.left;
-            arrived.push({ runId: one.id.slice(0, -(one.player.length + 1)), prize: handed.delivered });
+            arrived.push({
+                runId: one.id.slice(0, -(one.player.length + 1)),
+                prize: handed.delivered
+            });
             if (!rest) {
                 left.set(one.id, null);
                 await server.say([

@@ -19,6 +19,7 @@ import { EventEditor } from "./event-editor";
 import { hostUi } from "@polaris/app-host/client";
 import { CATCH_LABELS } from "./event-options-rare-catch";
 import { MATERIAL_LABELS } from "./event-options-gathering";
+import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
@@ -343,6 +344,8 @@ function EventExplained({
     if (catalog.playsInArena(preset)) {
         facts.push(t("events.facts.arena"));
     }
+    if (preset.kind === "world-boss")
+        facts.push(...worldBossFacts(t, preset.options as catalog.EventOptions<"world-boss">));
     if (catalog.keepsDay(preset)) facts.push(t("events.facts.keepsDay"));
     if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
         facts.push(t("events.facts.overworld"));
