@@ -89,6 +89,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     shelly: brand.ShellyMark,
     philipshue: brand.PhilipsHueMark,
     ikea: brand.IkeaMark,
+    homeassistant: brand.HomeAssistantMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
     aws: brand.AwsMark

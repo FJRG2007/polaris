@@ -475,6 +475,41 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["light", "outlet", "sensor"],
         search: ["ikea", "dirigera", "tradfri", "home smart", "hub", "bulb", "outlet", "zigbee", "local"]
+    },
+    // Home Assistant: its REST API with a long-lived token is the one way in,
+    // and the fastest to set up - one connection brings the whole house.
+    {
+        id: "home-assistant",
+        brand: "Home Assistant",
+        logo: "homeassistant",
+        label: en("connections.home-assistant.label"),
+        reach: "same-network",
+        summary: en("connections.home-assistant.summary"),
+        note: en("connections.home-assistant.note"),
+        steps: [
+            en("connections.home-assistant.steps.s0"),
+            en("connections.home-assistant.steps.s1"),
+            en("connections.home-assistant.steps.s2")
+        ],
+        fields: [
+            {
+                key: "url",
+                label: en("connections.home-assistant.fields.url.label"),
+                hint: en("connections.home-assistant.fields.url.hint"),
+                placeholder: en("connections.home-assistant.fields.url.placeholder"),
+                maxLength: 300
+            },
+            {
+                key: "token",
+                label: en("connections.home-assistant.fields.token.label"),
+                placeholder: en("connections.home-assistant.fields.token.placeholder"),
+                secret: true,
+                minLength: 20,
+                maxLength: 1000
+            }
+        ],
+        kinds: ["switch", "outlet", "light", "lock", "sensor"],
+        search: ["home assistant", "hass", "homeassistant", "zigbee", "z-wave", "zwave", "local", "whole house"]
     }
 ];
 

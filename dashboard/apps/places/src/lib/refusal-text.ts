@@ -128,6 +128,13 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.", "refusals.dirigeraToken"],
     ["The DIRIGERA hub refused the request.", "refusals.dirigeraRefused"],
     ["An IKEA device cannot be told to do that", "refusals.ikeaCannot"],
+    ["Write the address as http://homeassistant.local:8123, with no path", "refusals.haAddress"],
+    ["Home Assistant refused the token. Make a new long-lived access token on your Home Assistant profile page.", "refusals.haToken"],
+    ["That address answered, but not as Home Assistant.", "refusals.haNot"],
+    ["Home Assistant is restarting. Try again in a moment.", "refusals.haRestarting"],
+    ["Home Assistant would not do that. The device may not support it.", "refusals.haUnsupported"],
+    ["Home Assistant refused the request.", "refusals.haRefused"],
+    ["Home Assistant has no switches, lights, locks or sensors for Polaris to show.", "refusals.haNothing"],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

@@ -493,7 +493,14 @@
         "dirigeraPress": "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
         "dirigeraToken": "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.",
         "dirigeraRefused": "The DIRIGERA hub refused the request.",
-        "ikeaCannot": "An IKEA device cannot be told to do that"
+        "ikeaCannot": "An IKEA device cannot be told to do that",
+        "haAddress": "Write the address as http://homeassistant.local:8123, with no path",
+        "haToken": "Home Assistant refused the token. Make a new long-lived access token on your Home Assistant profile page.",
+        "haNot": "That address answered, but not as Home Assistant.",
+        "haRestarting": "Home Assistant is restarting. Try again in a moment.",
+        "haUnsupported": "Home Assistant would not do that. The device may not support it.",
+        "haRefused": "Home Assistant refused the request.",
+        "haNothing": "Home Assistant has no switches, lights, locks or sensors for Polaris to show."
     },
     "connections": {
         "nuki-web": {
@@ -704,6 +711,27 @@
                     "label": "Hub address",
                     "hint": "On the same network as Polaris.",
                     "placeholder": "192.168.1.25"
+                }
+            }
+        },
+        "home-assistant": {
+            "label": "Home Assistant",
+            "summary": "Every switch, light, lock and sensor your Home Assistant already has, from one connection.",
+            "note": "Whatever Home Assistant talks to arrives through it: Zigbee, Z-Wave and its cloud integrations included. Polaris reads states and sends the same on, off, lock and unlock you would press there. Blinds, thermostats and media players are left out for now.",
+            "steps": {
+                "s0": "In Home Assistant, open your profile page.",
+                "s1": "Under Long-lived access tokens, create one called Polaris and copy it. It is shown once.",
+                "s2": "Paste it here with the address you open Home Assistant at."
+            },
+            "fields": {
+                "url": {
+                    "label": "Home Assistant address",
+                    "hint": "The one you open it at. Port 8123 is assumed if you give only an address.",
+                    "placeholder": "http://homeassistant.local:8123"
+                },
+                "token": {
+                    "label": "Access token",
+                    "placeholder": "Paste the long-lived token"
                 }
             }
         },
