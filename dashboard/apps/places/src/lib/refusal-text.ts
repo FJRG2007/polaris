@@ -96,6 +96,17 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Tuya answered with something unexpected.", "refusals.tuyaOdd"],
     ["Tuya refused the keys. They may have been revoked, or the project may not cover these devices.", "refusals.tuyaKeys"],
     ["Tuya refused the request.", "refusals.tuyaRefused"],
+    ["The device did not answer in time.", "refusals.deviceSlow"],
+    ["The device's certificate is not one Polaris can trust, so nothing was sent to it.", "refusals.deviceCertificate"],
+    ["The device at that address is not the one Polaris was connected to. Connect it again.", "refusals.deviceSwapped"],
+    ["The device answered with far more than Polaris reads from one.", "refusals.deviceTooMuch"],
+    ["The device could not be reached.", "refusals.deviceUnreachable"],
+    ["That connection is missing the device's address", "refusals.noDeviceAddress"],
+    ["The device answered with something unexpected.", "refusals.deviceOdd"],
+    ["The device refused the request.", "refusals.deviceRefused"],
+    ["The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.", "refusals.tplinkAccount"],
+    ["That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.", "refusals.tplinkNothing"],
+    ["A TP-Link device cannot be told to do that", "refusals.tplinkCannot"],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

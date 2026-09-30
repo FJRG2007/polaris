@@ -461,7 +461,18 @@
         "schemaPerson": "Persona no válida",
         "schemaSubnet": "Escríbelo como 192.168.1.0/24",
         "schemaConnect": "Elige cómo conectarlo",
-        "relayStatus": "El relé lo rechazó ({status})."
+        "relayStatus": "El relé lo rechazó ({status}).",
+        "deviceSlow": "El dispositivo no respondió a tiempo.",
+        "deviceCertificate": "El certificado del dispositivo no es de fiar, así que no se le envió nada.",
+        "deviceSwapped": "El dispositivo en esa dirección no es el que se conectó. Vuelve a conectarlo.",
+        "deviceTooMuch": "El dispositivo respondió con mucho más de lo que Polaris lee.",
+        "deviceUnreachable": "No se pudo llegar al dispositivo.",
+        "noDeviceAddress": "A esa conexión le falta la dirección del dispositivo",
+        "deviceOdd": "El dispositivo respondió algo inesperado.",
+        "deviceRefused": "El dispositivo rechazó la petición.",
+        "tplinkAccount": "El dispositivo no aceptó esa cuenta de TP-Link. Usa el correo y la contraseña con los que entras en la app Tapo o Kasa.",
+        "tplinkNothing": "Ese dispositivo TP-Link no es un enchufe, un interruptor ni una bombilla, así que no hay nada que controlar.",
+        "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso"
     },
     "connections": {
         "nuki-web": {
@@ -563,6 +574,53 @@
                 "region": {
                     "label": "Región",
                     "hint": "En el que se creó el proyecto. Los dispositivos solo existen en ese, así que cualquier otro responde como si la cuenta estuviera vacía."
+                }
+            }
+        },
+        "tapo-local": {
+            "label": "Tapo en tu propia red",
+            "summary": "Un enchufe, regleta, interruptor o bombilla que responde en su dirección, con la cuenta que usas en la app Tapo.",
+            "note": "Nada pasa por los servidores de TP-Link, así que responde en milisegundos y sigue funcionando cuando su nube no. Una conexión es un dispositivo: una regleta trae cada una de sus tomas. Los enchufes con firmware Tapo muy antiguo usan un protocolo anterior que Polaris no habla; actualizarlos en la app Tapo lo arregla.",
+            "steps": {
+                "s0": "Busca la dirección IP del dispositivo en la lista de dispositivos conectados de tu router. Fijársela ahí hace que esto siga funcionando.",
+                "s1": "Usa el correo y la contraseña con los que entras en la app Tapo.",
+                "s2": "Añade una conexión por dispositivo."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.40"
+                },
+                "email": {
+                    "label": "Correo TP-Link",
+                    "placeholder": "El que usas en la app Tapo"
+                },
+                "password": {
+                    "label": "Clave de TP-Link"
+                }
+            }
+        },
+        "kasa-local": {
+            "label": "Kasa en tu propia red",
+            "summary": "Un enchufe, regleta o bombilla Kasa antiguo, que responde en su dirección. Casi todos van sin cuenta.",
+            "note": "Los Kasa con firmware antiguo responden a cualquiera en la red, así que basta con la dirección. El firmware nuevo pide la cuenta de TP-Link, la misma de la app Kasa. Una conexión es un dispositivo: una regleta trae cada una de sus tomas.",
+            "steps": {
+                "s0": "Busca la dirección IP del dispositivo en la lista de conectados de tu router, y fíjasela ahí si puedes.",
+                "s1": "Si Polaris dice que el dispositivo se negó, añade el correo y la contraseña de la app Kasa."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.41"
+                },
+                "email": {
+                    "label": "Correo TP-Link",
+                    "hint": "Solo para firmware nuevo. Si no, déjalo vacío."
+                },
+                "password": {
+                    "label": "Clave de TP-Link"
                 }
             }
         },

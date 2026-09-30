@@ -461,7 +461,18 @@
         "schemaPerson": "Unknown person",
         "schemaSubnet": "Write it as 192.168.1.0/24",
         "schemaConnect": "Pick how to connect it",
-        "relayStatus": "The relay refused it ({status})."
+        "relayStatus": "The relay refused it ({status}).",
+        "deviceSlow": "The device did not answer in time.",
+        "deviceCertificate": "The device's certificate is not one Polaris can trust, so nothing was sent to it.",
+        "deviceSwapped": "The device at that address is not the one Polaris was connected to. Connect it again.",
+        "deviceTooMuch": "The device answered with far more than Polaris reads from one.",
+        "deviceUnreachable": "The device could not be reached.",
+        "noDeviceAddress": "That connection is missing the device's address",
+        "deviceOdd": "The device answered with something unexpected.",
+        "deviceRefused": "The device refused the request.",
+        "tplinkAccount": "The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.",
+        "tplinkNothing": "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
+        "tplinkCannot": "A TP-Link device cannot be told to do that"
     },
     "connections": {
         "nuki-web": {
@@ -563,6 +574,53 @@
                 "region": {
                     "label": "Data centre",
                     "hint": "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty."
+                }
+            }
+        },
+        "tapo-local": {
+            "label": "Tapo on your own network",
+            "summary": "A plug, strip, switch or bulb answered directly at its address, with the account you use in the Tapo app.",
+            "note": "Nothing goes through TP-Link's servers, so it answers in milliseconds and keeps working when their cloud does not. One connection is one device: a strip brings in each of its outlets. Plugs on very old Tapo firmware use an earlier handshake Polaris does not speak; updating them in the Tapo app fixes that.",
+            "steps": {
+                "s0": "Find the device's IP address in your router's list of connected devices. Giving it a fixed address there keeps this working.",
+                "s1": "Use the email and password you sign into the Tapo app with.",
+                "s2": "Add one connection per device."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.40"
+                },
+                "email": {
+                    "label": "TP-Link email",
+                    "placeholder": "The one you use in the Tapo app"
+                },
+                "password": {
+                    "label": "TP-Link password"
+                }
+            }
+        },
+        "kasa-local": {
+            "label": "Kasa on your own network",
+            "summary": "An older Kasa plug, strip or bulb, answered directly at its address. Most need no account.",
+            "note": "Kasa devices on older firmware answer anyone on the network, so the address is enough. Newer firmware asks for the TP-Link account, the same one as the Kasa app. One connection is one device: a strip brings in each of its outlets.",
+            "steps": {
+                "s0": "Find the device's IP address in your router's list of connected devices, and give it a fixed one there if you can.",
+                "s1": "If Polaris says the device refused, add the email and password you use in the Kasa app."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.41"
+                },
+                "email": {
+                    "label": "TP-Link email",
+                    "hint": "Only for newer firmware. Leave empty otherwise."
+                },
+                "password": {
+                    "label": "TP-Link password"
                 }
             }
         },

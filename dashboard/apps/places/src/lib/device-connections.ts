@@ -296,6 +296,81 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "smart plug",
             "wall switch"
         ]
+    },
+    // TP-Link: Tapo first. Every Tapo and every Kasa on current firmware answers
+    // it, so it is the one that works for the most houses; the Kasa entry is for
+    // the older plugs that need no account at all.
+    {
+        id: "tapo-local",
+        brand: "TP-Link",
+        logo: "tplink",
+        label: en("connections.tapo-local.label"),
+        reach: "same-network",
+        summary: en("connections.tapo-local.summary"),
+        note: en("connections.tapo-local.note"),
+        steps: [
+            en("connections.tapo-local.steps.s0"),
+            en("connections.tapo-local.steps.s1"),
+            en("connections.tapo-local.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.tapo-local.fields.host.label"),
+                hint: en("connections.tapo-local.fields.host.hint"),
+                placeholder: en("connections.tapo-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.tapo-local.fields.email.label"),
+                placeholder: en("connections.tapo-local.fields.email.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.tapo-local.fields.password.label"),
+                secret: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: ["tapo", "kasa", "tplink", "smart plug", "power strip", "bulb", "p100", "p110", "p300", "l530", "local"]
+    },
+    {
+        id: "kasa-local",
+        brand: "TP-Link",
+        logo: "tplink",
+        label: en("connections.kasa-local.label"),
+        reach: "same-network",
+        summary: en("connections.kasa-local.summary"),
+        note: en("connections.kasa-local.note"),
+        steps: [en("connections.kasa-local.steps.s0"), en("connections.kasa-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.kasa-local.fields.host.label"),
+                hint: en("connections.kasa-local.fields.host.hint"),
+                placeholder: en("connections.kasa-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.kasa-local.fields.email.label"),
+                hint: en("connections.kasa-local.fields.email.hint"),
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.kasa-local.fields.password.label"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: ["kasa", "tplink", "hs100", "hs110", "hs300", "kp115", "kl130", "smart plug", "power strip", "local"]
     }
 ];
 
