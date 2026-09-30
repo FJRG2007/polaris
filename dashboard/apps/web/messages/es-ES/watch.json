@@ -171,7 +171,7 @@
     },
     "cards": {
         "noHistory": "Aún falta historial",
-        "sortBy": "Ordenar por",
+        "sortBy": "Orden",
         "sortLabel": "Ordenar {label} por",
         "order": {
             "cpu": "CPU",

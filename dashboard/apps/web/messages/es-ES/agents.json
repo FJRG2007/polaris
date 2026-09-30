@@ -289,7 +289,7 @@
     "repos": {
         "add": "Añadir repositorio",
         "none": "Aún no hay repositorios. Añade uno y el agente empezará a responder cuando se le mencione ahí.",
-        "runsOn": "Se ejecuta en",
+        "runsOn": "Corre en",
         "model": "Modelo",
         "private": "Privado",
         "workflowKept": "Polaris mantiene al día este archivo de workflow. Ábrelo en GitHub.",

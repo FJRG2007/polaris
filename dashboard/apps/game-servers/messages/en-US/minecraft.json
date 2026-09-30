@@ -1671,6 +1671,7 @@
             "second": "2nd",
             "third": "3rd",
             "takingPart": "everybody else",
+            "everybody": "everybody",
             "prizes": "Prizes - {list}.",
             "noPrizes": "No prizes set.",
             "needsPlayers": "{count, plural, one {Needs # player on the server.} other {Needs # players on the server.}}",
@@ -1798,6 +1799,7 @@
         "prizes": {
             "entry": "{place} {reward}",
             "everyone": "Everybody else: {reward}",
+            "everybody": "Everybody: {reward}",
             "none": "No prizes"
         }
     },

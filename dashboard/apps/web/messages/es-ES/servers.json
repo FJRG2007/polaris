@@ -264,7 +264,7 @@
         "images": "Imágenes",
         "buildCache": "Caché de compilación",
         "title": "Disco de contenedores",
-        "deleteCache": "Eliminar la caché de compilación",
+        "deleteCache": "Borrar caché de compilación",
         "deleteCacheTitle": "¿Eliminar {size} de caché de compilación?",
         "deleteCacheBody": "Es solo lo que dejaron compilaciones anteriores para acelerar las siguientes. No afecta a nada en marcha; la próxima compilación de cada app tardará más mientras se vuelve a generar.",
         "deleteCacheConfirm": "Eliminar caché",

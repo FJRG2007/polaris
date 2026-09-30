@@ -92,12 +92,10 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
 
 const retried: string[] = [];
 
-const { MinecraftEvents } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
-);
-const { EventEditor } = await import(
-    "@polaris-app/game-servers/src/screens/installed/event-editor"
-);
+const { MinecraftEvents } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
+const { EventEditor } =
+    await import("@polaris-app/game-servers/src/screens/installed/event-editor");
 
 afterEach(() => {
     cleanup();
@@ -172,6 +170,37 @@ describe("the Events tab", () => {
         const row = await screen.findByText(/1\.º 1 nivel · El resto: 2 niveles$/);
         expect(row.textContent).toMatch(/^Concurso de pesca - /);
         expect(screen.getByText(/ - Sin premios$/)).toBeTruthy();
+    });
+
+    it("leaves out a place with no prize of its own, and says everybody when none has one", async () => {
+        const nothing = { items: [], levels: 0 };
+        const bottles = { items: [{ id: "minecraft:experience_bottle", count: 8 }], levels: 0 };
+        const gap = {
+            ...catalog.newPreset("fishing", "fish"),
+            rewards: {
+                first: { items: [], levels: 15 },
+                second: nothing,
+                third: { items: [], levels: 5 },
+                everyone: bottles
+            }
+        };
+        const flat = {
+            ...catalog.newPreset("mining-rush", "rush"),
+            rewards: { first: nothing, second: nothing, third: nothing, everyone: bottles }
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: { ...view, config: { ...config, presets: [gap, flat] } } });
+        expect(
+            await screen.findByText(
+                / - 1st 15 levels · 3rd 5 levels · Everybody else: 8 experience bottle$/
+            )
+        ).toBeTruthy();
+        const row = screen.getByText(/ - Everybody: 8 experience bottle$/);
+        expect(row.getAttribute("title")).toBe(row.textContent);
+        expect(row.className).toContain("truncate");
+        expect(row.parentElement?.className).toContain("min-w-0");
+        fireEvent.click(screen.getByLabelText("What Mining rush is"));
+        expect(screen.getByText("Prizes - everybody: 8 experience bottle.")).toBeTruthy();
     });
 
     it("draws its sections before the server answers", () => {
@@ -344,9 +373,8 @@ describe("setting up a meteor shower", () => {
 
 describe("the parkour and spleef editors", () => {
     it("sets a course's jumps, difficulty and height, and says a wrong one beside the field", async () => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         const saved: unknown[] = [];
         render(
             <EventEditor
@@ -370,9 +398,8 @@ describe("the parkour and spleef editors", () => {
     });
 
     it("says how big a spleef floor comes out", async () => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         render(
             <EventEditor
                 preset={catalog.newPreset("spleef", "floor")}
@@ -407,9 +434,8 @@ describe("the parkour and spleef editors", () => {
 
 describe("the editor of an event players join", () => {
     const edit = async (preset: catalog.EventPreset, saved: catalog.EventPreset[]) => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         render(
             <EventEditor
                 preset={preset}
@@ -514,9 +540,8 @@ describe("the editor in Spanish", () => {
     });
 
     it("names each choice in the reader's language", async () => {
-        const { options, LOOT_LABELS } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { options, LOOT_LABELS } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         const { gameCatalogs } = await import("@polaris-app/game-servers/messages");
         expect(options(gameCatalogs.translator("es-ES", "minecraft"), LOOT_LABELS)[0]).toEqual({
             value: "treasure",

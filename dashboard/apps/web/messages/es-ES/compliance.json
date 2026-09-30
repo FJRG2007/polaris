@@ -30,7 +30,7 @@
     },
     "retention": {
         "d1": "Un día",
-        "d7": "Una semana",
+        "d7": "7 días",
         "d30": "30 días",
         "d90": "3 meses",
         "d180": "6 meses",
@@ -39,7 +39,7 @@
     },
     "sections": {
         "authentication": {
-            "title": "Inicio de sesión y segundo factor"
+            "title": "Acceso y segundo factor"
         },
         "sessions": {
             "title": "Sesiones"
@@ -130,7 +130,7 @@
         "secretClear": "Variables secretas guardadas sin cifrar",
         "plainVariables": "Variables no marcadas secretas",
         "storedAsWritten": "{count}, guardadas tal cual",
-        "runnerSecrets": "Secretos de runners",
+        "runnerSecrets": "Secretos de runner",
         "allEncrypted": "{count}, todos cifrados en reposo",
         "overHttps": "Dominios de servicios servidos por HTTPS",
         "letsEncrypt": "Con un certificado de Let's Encrypt",
