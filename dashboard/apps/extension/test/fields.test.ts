@@ -171,6 +171,18 @@ describe("what the form is for", () => {
         expect(whole).toMatchObject({ fullName: 0, username: 1 });
     });
 
+    it("reads a box named fullname as the whole name, not the surname hiding in it", () => {
+        const form = readForm([
+            field({ words: "email", type: "email", form: FORM }),
+            field({ words: "fullname fn full name", form: FORM }),
+            field({ type: "password", autocomplete: "new-password", form: FORM })
+        ]);
+        expect(form).toMatchObject({ fullName: 1, givenName: null, familyName: null });
+
+        const halves = readForm([field({ words: "fname" }), field({ words: "lname" })]);
+        expect(halves).toMatchObject({ givenName: 0, familyName: 1 });
+    });
+
     it("never offers to fill a new password with the saved one", () => {
         const form = readForm([
             field({ words: "email", form: FORM }),

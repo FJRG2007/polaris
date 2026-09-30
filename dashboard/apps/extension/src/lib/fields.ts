@@ -259,8 +259,11 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
 /** Which part of somebody's name a box asks for. */
 type NameKind = "full" | "given" | "family";
 
-const GIVEN_WORDS = /first.?name|given.?name|fname|\bnombre\b(?! completo| de usuario)/i;
-const FAMILY_WORDS = /last.?name|surname|family.?name|lname|apellido/i;
+// `fname` and `lname` as words of their own: inside `fullname` the letters
+// `lname` are there too, and a full-name box read as a surname got only the
+// last half of somebody's name.
+const GIVEN_WORDS = /first.?name|given.?name|\bfname\b|\bnombre\b(?! completo| de usuario)/i;
+const FAMILY_WORDS = /last.?name|surname|family.?name|\blname\b|apellido/i;
 const FULL_WORDS = /full.?name|nombre completo|(?:^|\s)name(?:\s|$)/i;
 
 /** Which part of a name this box is for, or null for a box that is not one. The
