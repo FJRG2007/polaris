@@ -19,7 +19,7 @@ describe("the evidence in Spanish", () => {
     it("names every area and says what it found", () => {
         const report = evidence.buildEvidence(readings(), spanish);
         const titles = report.sections.map((section) => section.title);
-        expect(titles).toContain("Inicio de sesión y segundo factor");
+        expect(titles).toContain("Acceso y segundo factor");
         expect(titles).toContain("Copias de seguridad");
         expect(report.outsidePolaris[0]).toBe("Si están cifrados los discos de las máquinas en las que funciona Polaris.");
     });
