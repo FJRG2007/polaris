@@ -97,7 +97,14 @@ export const BOSSES: Readonly<Record<BossKind, BossProfile>> = {
     },
     husk: { entity: "husk", hand: null, head: null, minion: "zombie", guard: 0 },
     // Its sheep: an evoker turns a blue one red when `mobGriefing` is on.
-    evoker: { entity: "evoker", hand: null, head: null, minion: "vindicator", guard: 0, ranged: true },
+    evoker: {
+        entity: "evoker",
+        hand: null,
+        head: null,
+        minion: "vindicator",
+        guard: 0,
+        ranged: true
+    },
     // Never a patrol leader: killing one would hand its killer Bad Omen, and a
     // raid would follow them home.
     captain: {
@@ -227,7 +234,11 @@ const RESISTANCE_STEP = 0.2;
 const RESISTANCE_MAX = 4;
 
 /** The health it should fight with, all told, for this many fighters. */
-export function effectiveHealth(base: number, difficulty: BossDifficulty, fighters: number): number {
+export function effectiveHealth(
+    base: number,
+    difficulty: BossDifficulty,
+    fighters: number
+): number {
     const level = DIFFICULTY[difficulty];
     return Math.round(base * level.health * (1 + level.perFighter * (Math.max(1, fighters) - 1)));
 }
@@ -245,8 +256,12 @@ export function effectImmune(kind: BossKind): boolean {
  * in levels of Resistance, which make every point of health worth more. A boss
  * immune to effects keeps its health, up to the cap.
  */
-export function splitHealth(effective: number, immune = false): { health: number; resistance: number } {
-    if (immune) return { health: Math.max(1, Math.min(HEALTH_CAP, Math.ceil(effective))), resistance: 0 };
+export function splitHealth(
+    effective: number,
+    immune = false
+): { health: number; resistance: number } {
+    if (immune)
+        return { health: Math.max(1, Math.min(HEALTH_CAP, Math.ceil(effective))), resistance: 0 };
     for (let resistance = 0; resistance <= RESISTANCE_MAX; resistance += 1) {
         const health = Math.ceil(effective * (1 - RESISTANCE_STEP * resistance));
         if (health <= HEALTH_CAP) return { health: Math.max(1, health), resistance };
@@ -283,7 +298,10 @@ export function minionCount(difficulty: BossDifficulty, fighters: number): numbe
 }
 
 /** The prizes, multiplied for the difficulty. */
-export function scaledRewards(rewards: catalog.Rewards, difficulty: BossDifficulty): catalog.Rewards {
+export function scaledRewards(
+    rewards: catalog.Rewards,
+    difficulty: BossDifficulty
+): catalog.Rewards {
     const by = DIFFICULTY[difficulty].prize;
     const one = (reward: catalog.Reward): catalog.Reward => ({
         items: reward.items.map((item) => ({
@@ -484,7 +502,12 @@ function legacyAttributes(health: number, level: Difficulty): string {
 }
 
 /** The boss, standing at `at`: tagged, never despawning, dropping nothing. */
-export function summonLines(kind: BossKind, difficulty: BossDifficulty, health: number, at: Point): string[] {
+export function summonLines(
+    kind: BossKind,
+    difficulty: BossDifficulty,
+    health: number,
+    at: Point
+): string[] {
     const profile = BOSSES[kind];
     const level = DIFFICULTY[difficulty];
     const attributes = legacyAttributes(health, level);
@@ -529,8 +552,15 @@ export function maxHealthLine(health: number, modernIds: boolean): string {
 
 /** What it holds and wears: a summoned mob with data is handed nothing. `item
  *  replace` from 1.17, `replaceitem` before; the other fails and changes nothing. */
-export function equipLines(selector: string, slot: "weapon.mainhand" | "armor.head", item: string): string[] {
-    return [`item replace entity ${selector} ${slot} with ${item}`, `replaceitem entity ${selector} ${slot} ${item}`];
+export function equipLines(
+    selector: string,
+    slot: "weapon.mainhand" | "armor.head",
+    item: string
+): string[] {
+    return [
+        `item replace entity ${selector} ${slot} with ${item}`,
+        `replaceitem entity ${selector} ${slot} ${item}`
+    ];
 }
 
 export function bossEquipLines(kind: BossKind): string[] {
@@ -568,7 +598,9 @@ export function upkeepLines(
     );
     if (options.shield) lines.push(`effect give ${BOSS} minecraft:resistance ${seconds} 4 true`);
     else if (state.resistance > 0)
-        lines.push(`effect give ${BOSS} minecraft:resistance ${seconds} ${state.resistance - 1} true`);
+        lines.push(
+            `effect give ${BOSS} minecraft:resistance ${seconds} ${state.resistance - 1} true`
+        );
     if (state.phase === 3) {
         lines.push(
             `effect give ${BOSS} minecraft:strength ${seconds} ${level.rage.strength} true`,
@@ -624,7 +656,8 @@ export function spareBystanders(seconds = 6): string {
 
 /** An evoker's own vexes and fangs counted as the fight's, so the end takes them too. */
 export const ADOPT_SUMMONED = ["vex", "evoker_fangs"].map(
-    (type) => `${AT_BOSS} run tag @e[type=minecraft:${type},distance=..48,tag=!${FIGHT_TAG}] add ${FIGHT_TAG}`
+    (type) =>
+        `${AT_BOSS} run tag @e[type=minecraft:${type},distance=..48,tag=!${FIGHT_TAG}] add ${FIGHT_TAG}`
 );
 
 /** The fight's own mobs never go far: brought back to the boss past 24 blocks. */
@@ -649,8 +682,15 @@ export function healLine(health: number): string {
  * Closed in on every side where it stands - a box built round it: passes only
  * when none of the four blocks beside the one its feet are in is air.
  */
-export const ENCLOSED = `execute at ${BOSS} align xz positioned ~0.5 ~ ~0.5 ${["~1 ~ ~", "~-1 ~ ~", "~ ~ ~1", "~ ~ ~-1"]
-    .flatMap((beside) => ["air", "cave_air"].map((air) => `unless block ${beside} minecraft:${air}`))
+export const ENCLOSED = `execute at ${BOSS} align xz positioned ~0.5 ~ ~0.5 ${[
+    "~1 ~ ~",
+    "~-1 ~ ~",
+    "~ ~ ~1",
+    "~ ~ ~-1"
+]
+    .flatMap((beside) =>
+        ["air", "cave_air"].map((air) => `unless block ${beside} minecraft:${air}`)
+    )
     .join(" ")}`;
 
 /** In water: where it could drown or turn into something else. */
@@ -729,7 +769,9 @@ export function minionLines(
     difficulty: BossDifficulty = "normal"
 ): string[] {
     const minion = BOSSES[kind].minion;
-    const tags = shield ? `"${FIGHT_TAG}","${SHIELD_TAG}","${NEW_TAG}"` : `"${FIGHT_TAG}","${NEW_TAG}"`;
+    const tags = shield
+        ? `"${FIGHT_TAG}","${SHIELD_TAG}","${NEW_TAG}"`
+        : `"${FIGHT_TAG}","${NEW_TAG}"`;
     const data = `{Tags:[${tags}],Glowing:1b,${KEEPS_NOTHING}}`;
     const offsets = [
         [2, 0],
@@ -752,12 +794,17 @@ export function minionLines(
     }
     // Nowhere open round it: at its feet, so the phase is never without them.
     if (count > 0)
-        lines.push(`${AT_BOSS} unless entity @e[tag=${NEW_TAG}] run summon minecraft:${minion} ~ ~ ~ ${data}`);
+        lines.push(
+            `${AT_BOSS} unless entity @e[tag=${NEW_TAG}] run summon minecraft:${minion} ~ ~ ~ ${data}`
+        );
     const fresh = `@e[tag=${NEW_TAG}]`;
     const hand = MINION_HANDS[minion];
     if (hand) lines.push(...equipLines(fresh, "weapon.mainhand", hand));
     if (CALLS_FOR_HELP.includes(minion)) {
-        for (const id of ["minecraft:spawn_reinforcements", "minecraft:zombie.spawn_reinforcements"])
+        for (const id of [
+            "minecraft:spawn_reinforcements",
+            "minecraft:zombie.spawn_reinforcements"
+        ])
             lines.push(`execute as ${fresh} run attribute @s ${id} base set 0`);
     }
     const health = DIFFICULTY[difficulty].minionHealth;
@@ -778,7 +825,10 @@ export const SHIELD_LEFT = `execute if entity @e[tag=${SHIELD_TAG}]`;
 export const SHIELD_SHOWN = `${AT_BOSS} run particle minecraft:enchant ~ ~1.2 ~ 1 1.2 1 0.5 60 force`;
 
 /** The shield taken off at once when its last minion falls. */
-export const SHIELD_DOWN = [`effect clear ${BOSS} minecraft:resistance`, `data merge entity ${BOSS} {Invulnerable:0b}`];
+export const SHIELD_DOWN = [
+    `effect clear ${BOSS} minecraft:resistance`,
+    `data merge entity ${BOSS} {Invulnerable:0b}`
+];
 
 // ------------------------------------------------------------------ abilities
 
@@ -800,7 +850,9 @@ export const ABILITY_GAP_S = 5;
 const PHASE_PACE: Readonly<Record<Phase, number>> = { 1: 1, 2: 0.85, 3: 0.6 };
 
 export function cooldownMs(ability: Ability, difficulty: BossDifficulty, phase: Phase): number {
-    return Math.round(BASE_COOLDOWN[ability] * DIFFICULTY[difficulty].cooldown * PHASE_PACE[phase] * 1000);
+    return Math.round(
+        BASE_COOLDOWN[ability] * DIFFICULTY[difficulty].cooldown * PHASE_PACE[phase] * 1000
+    );
 }
 
 export function gapMs(difficulty: BossDifficulty, phase: Phase): number {
@@ -973,7 +1025,10 @@ export function abilityLines(ability: Ability, ctx: AbilityContext): AbilityLine
                     warnBar
                 ],
                 act: [
-                    ...Array.from({ length: count }, () => `${AT_BOSS} run summon minecraft:vex ~ ~1.5 ~ ${vex}`),
+                    ...Array.from(
+                        { length: count },
+                        () => `${AT_BOSS} run summon minecraft:vex ~ ~1.5 ~ ${vex}`
+                    ),
                     soundAt("minecraft:entity.evoker.cast_spell", 1)
                 ]
             };
@@ -1039,7 +1094,9 @@ export function trophyArguments(name: string, lore: string, spelling: NameSpelli
         const asJson = `${TROPHY_ITEM}[minecraft:custom_name=${quoted(json(name, "gold"))},minecraft:lore=[${quoted(json(lore, "gray"))}],minecraft:enchantment_glint_override=true]`;
         return spelling === "text" ? [asText, asJson] : [asJson, asText];
     }
-    return [`${TROPHY_ITEM}{display:{Name:${quoted(json(name, "gold"))},Lore:[${quoted(json(lore, "gray"))}]}}`];
+    return [
+        `${TROPHY_ITEM}{display:{Name:${quoted(json(name, "gold"))},Lore:[${quoted(json(lore, "gray"))}]}}`
+    ];
 }
 
 // ------------------------------------------------------------------ the end
@@ -1060,7 +1117,10 @@ export function bossCleanup(): string[] {
 
 /** The rules the fight holds, as the run writes them down: each list's names,
  *  and the value the fight wants. */
-export function heldRules(kind: BossKind, arena: boolean): { names: readonly string[]; value: "true" | "false" }[] {
+export function heldRules(
+    kind: BossKind,
+    arena: boolean
+): { names: readonly string[]; value: "true" | "false" }[] {
     const rules: { names: readonly string[]; value: "true" | "false" }[] = [
         { names: KEEP_INVENTORY, value: "true" }
     ];

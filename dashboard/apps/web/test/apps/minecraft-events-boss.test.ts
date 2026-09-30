@@ -43,8 +43,12 @@ describe("the options", () => {
 
     it("refuse the Wither chosen for the land, and a pool with nothing that can fight there", () => {
         const schema = catalog.optionsSchemas["world-boss"];
-        expect(schema.safeParse({ choice: "chosen", boss: "wither", arena: false }).success).toBe(false);
-        expect(schema.safeParse({ choice: "chosen", boss: "wither", arena: true }).success).toBe(true);
+        expect(schema.safeParse({ choice: "chosen", boss: "wither", arena: false }).success).toBe(
+            false
+        );
+        expect(schema.safeParse({ choice: "chosen", boss: "wither", arena: true }).success).toBe(
+            true
+        );
         expect(schema.safeParse({ pool: ["wither"], arena: false }).success).toBe(false);
         expect(schema.safeParse({ pool: ["wither"], arena: true }).success).toBe(true);
     });
@@ -91,7 +95,9 @@ describe("its health", () => {
 
     it("keeps what was lost when more fighters come, and adds their share", () => {
         // Half gone of 500, then a second fighter adds 250: 500 of 750.
-        expect(boss.toppedUp(250, { health: 500, resistance: 0 }, { health: 750, resistance: 0 }, 250)).toBe(500);
+        expect(
+            boss.toppedUp(250, { health: 500, resistance: 0 }, { health: 750, resistance: 0 }, 250)
+        ).toBe(500);
         // Across a Resistance level: worth is kept in effective health.
         const before = boss.splitHealth(1000);
         const after = boss.splitHealth(1500);
@@ -134,27 +140,44 @@ describe("its phases", () => {
             expect(line).toContain("drop_chances:{");
         }
         // Only into two blocks of air round the boss, and at its feet as a last resort.
-        expect(summons.slice(0, 3).every((line) => line.includes("if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air"))).toBe(true);
+        expect(
+            summons
+                .slice(0, 3)
+                .every((line) =>
+                    line.includes("if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air")
+                )
+        ).toBe(true);
         expect(lines.some((line) => line.includes("spawn_reinforcements base set 0"))).toBe(true);
         expect(lines.at(-1)).toBe("tag @e[tag=pe_bnew] remove pe_bnew");
     });
 
     it("never have minions of the boss's own kind, whose death would read as the boss's", () => {
-        for (const kind of catalog.BOSS_KINDS) expect(boss.BOSSES[kind].minion).not.toBe(boss.BOSSES[kind].entity);
+        for (const kind of catalog.BOSS_KINDS)
+            expect(boss.BOSSES[kind].minion).not.toBe(boss.BOSSES[kind].entity);
     });
 
     it("keep up the shield, the rage and its immunities only for a few seconds at a time", () => {
         const state = { ...boss.freshState("husk", options()), phase: 3, resistance: 2 };
         const shielded = boss.upkeepLines(state, { rides: true, shield: true });
-        expect(shielded).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 4 true");
-        expect(shielded).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:fire_resistance 6 0 true");
-        expect(shielded).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:water_breathing 6 0 true");
+        expect(shielded).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 4 true"
+        );
+        expect(shielded).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:fire_resistance 6 0 true"
+        );
+        expect(shielded).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:water_breathing 6 0 true"
+        );
         expect(shielded).toContain("ride @e[tag=pe_boss,limit=1] dismount");
-        expect(shielded).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:strength 6 1 true");
+        expect(shielded).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:strength 6 1 true"
+        );
         expect(shielded).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:speed 6 1 true");
         const open = boss.upkeepLines({ ...state, phase: 1 }, { rides: false, shield: false });
         expect(open).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 1 true");
-        expect(open.some((line) => line.includes("strength") || line.startsWith("ride "))).toBe(false);
+        expect(open.some((line) => line.includes("strength") || line.startsWith("ride "))).toBe(
+            false
+        );
     });
 });
 
@@ -169,8 +192,12 @@ describe("a Wither, which no effect can be given to", () => {
         const shielded = boss.upkeepLines(state, { rides: true, shield: true });
         expect(shielded).toContain("data merge entity @e[tag=pe_boss,limit=1] {Invulnerable:1b}");
         expect(shielded.some((line) => line.startsWith("effect "))).toBe(false);
-        expect(boss.SHIELD_DOWN).toContain("data merge entity @e[tag=pe_boss,limit=1] {Invulnerable:0b}");
-        expect(boss.immuneRageLines()).toContain("attribute @e[tag=pe_boss,limit=1] minecraft:flying_speed base set 0.9");
+        expect(boss.SHIELD_DOWN).toContain(
+            "data merge entity @e[tag=pe_boss,limit=1] {Invulnerable:0b}"
+        );
+        expect(boss.immuneRageLines()).toContain(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:flying_speed base set 0.9"
+        );
     });
 });
 
@@ -180,7 +207,9 @@ describe("its attacks", () => {
     it("wait their turn, and come sooner in harder levels and later phases", () => {
         expect(boss.cooldownMs("shockwave", "normal", 1)).toBe(12_000);
         expect(boss.cooldownMs("shockwave", "epic", 1)).toBeLessThan(12_000);
-        expect(boss.cooldownMs("shockwave", "epic", 3)).toBeLessThan(boss.cooldownMs("shockwave", "epic", 1));
+        expect(boss.cooldownMs("shockwave", "epic", 3)).toBeLessThan(
+            boss.cooldownMs("shockwave", "epic", 1)
+        );
         const last = { shockwave: at(0), pull: at(0), burst: at(0) };
         // Too soon after the last one of any.
         expect(boss.nextAbility(last, at(0), at(3), "normal", 1, 20)).toBeNull();
@@ -205,20 +234,29 @@ describe("its attacks", () => {
                 expect(lines.warn.some((line) => line.includes(" particle "))).toBe(true);
                 expect(lines.warn.some((line) => line.includes(" playsound "))).toBe(true);
                 expect(lines.act.length).toBeGreaterThan(0);
-                for (const line of [...lines.warn, ...lines.act]) expect(line).not.toMatch(BLOCK_EDITS);
+                for (const line of [...lines.warn, ...lines.act])
+                    expect(line).not.toMatch(BLOCK_EDITS);
             }
         }
     });
 
     it("hurt with `damage` from 1.19.4, and with instant damage before", () => {
-        const context = { arena: false, difficulty: "hard" as const, target: null, warning: "!", markers: true };
+        const context = {
+            arena: false,
+            difficulty: "hard" as const,
+            target: null,
+            warning: "!",
+            markers: true
+        };
         const modern = boss.abilityLines("shockwave", { ...context, damage: true }).act.join("\n");
         expect(modern).toContain(
             "run execute as @a[distance=..6,gamemode=!creative,gamemode=!spectator] run damage @s 8 minecraft:mob_attack by @e[tag=pe_boss,limit=1]"
         );
         const legacy = boss.abilityLines("shockwave", { ...context, damage: false }).act.join("\n");
         expect(legacy).not.toContain(" damage @s ");
-        expect(legacy).toContain("effect give @a[distance=..6,gamemode=!creative,gamemode=!spectator] minecraft:instant_damage 1 0 true");
+        expect(legacy).toContain(
+            "effect give @a[distance=..6,gamemode=!creative,gamemode=!spectator] minecraft:instant_damage 1 0 true"
+        );
     });
 
     it("move a player only into two blocks of air", () => {
@@ -233,39 +271,78 @@ describe("its attacks", () => {
         const moves = pull.filter((line) => line.includes(" tp @s "));
         expect(moves.length).toBe(2);
         for (const line of moves) {
-            expect(line).toContain("@a[tag=pe_in,distance=4..,gamemode=!creative,gamemode=!spectator]");
-            expect(line).toContain("if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air run tp @s ~ ~ ~");
+            expect(line).toContain(
+                "@a[tag=pe_in,distance=4..,gamemode=!creative,gamemode=!spectator]"
+            );
+            expect(line).toContain(
+                "if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air run tp @s ~ ~ ~"
+            );
         }
     });
 
     it("move a player through no wall: every block on the way is air", () => {
-        const context = { arena: true, difficulty: "normal" as const, damage: true, target: null, warning: "!", markers: true };
+        const context = {
+            arena: true,
+            difficulty: "normal" as const,
+            damage: true,
+            target: null,
+            warning: "!",
+            markers: true
+        };
         const clear = "if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air";
         const path = (step: number) => Array(3).fill(`positioned ^ ^ ^${step} ${clear}`).join(" ");
         const moved = (ability: "pull" | "shockwave") =>
             boss.abilityLines(ability, context).act.find((line) => line.includes(" tp @s "));
-        expect(moved("pull")).toContain(`facing entity @e[tag=pe_boss,limit=1] feet ${path(1)} run tp @s ~ ~ ~`);
-        expect(moved("shockwave")).toContain(`facing entity @e[tag=pe_boss,limit=1] feet ${path(-1)} run tp @s ~ ~ ~`);
+        expect(moved("pull")).toContain(
+            `facing entity @e[tag=pe_boss,limit=1] feet ${path(1)} run tp @s ~ ~ ~`
+        );
+        expect(moved("shockwave")).toContain(
+            `facing entity @e[tag=pe_boss,limit=1] feet ${path(-1)} run tp @s ~ ~ ~`
+        );
     });
 
     it("leap only at a player, and not at all without one", () => {
-        const context = { arena: false, difficulty: "normal" as const, damage: true, warning: "!", markers: true };
+        const context = {
+            arena: false,
+            difficulty: "normal" as const,
+            damage: true,
+            warning: "!",
+            markers: true
+        };
         expect(boss.abilityLines("leap", { ...context, target: "Ana" }).act[0]).toBe(
             "execute at Ana run tp @e[tag=pe_boss,limit=1] ~ ~ ~"
         );
-        expect(boss.abilityLines("leap", { ...context, target: "@a" })).toEqual({ warn: [], act: [] });
-        expect(boss.abilityLines("leap", { ...context, target: null })).toEqual({ warn: [], act: [] });
+        expect(boss.abilityLines("leap", { ...context, target: "@a" })).toEqual({
+            warn: [],
+            act: []
+        });
+        expect(boss.abilityLines("leap", { ...context, target: null })).toEqual({
+            warn: [],
+            act: []
+        });
     });
 
     it("raise fangs only in the arena, where they were warned of, and send vexes on the land", () => {
-        const context = { difficulty: "epic" as const, damage: true, target: null, warning: "!", markers: false };
+        const context = {
+            difficulty: "epic" as const,
+            damage: true,
+            target: null,
+            warning: "!",
+            markers: false
+        };
         const sky = boss.abilityLines("burst", { ...context, arena: true });
-        expect(sky.warn[0]).toContain("summon minecraft:armor_stand ~ ~ ~ {Tags:[\"pe_bmob\",\"pe_bfang\"],Marker:1b");
-        expect(sky.act.filter((line) => line.includes("summon minecraft:evoker_fangs"))).toHaveLength(5);
+        expect(sky.warn[0]).toContain(
+            'summon minecraft:armor_stand ~ ~ ~ {Tags:["pe_bmob","pe_bfang"],Marker:1b'
+        );
+        expect(
+            sky.act.filter((line) => line.includes("summon minecraft:evoker_fangs"))
+        ).toHaveLength(5);
         expect(sky.act).toContain("kill @e[tag=pe_bfang]");
         // Fallen during the warning: nothing bites the winners.
         for (const line of sky.act.filter((one) => one.includes("evoker_fangs ~ ~ ~")))
-            expect(line.startsWith("execute if entity @e[tag=pe_boss,limit=1] at @e[tag=pe_bfang]")).toBe(true);
+            expect(
+                line.startsWith("execute if entity @e[tag=pe_boss,limit=1] at @e[tag=pe_bfang]")
+            ).toBe(true);
         const land = boss.abilityLines("burst", { ...context, arena: false });
         expect(land.act.join("\n")).not.toContain("evoker_fangs");
         const vexes = land.act.filter((line) => line.includes("summon minecraft:vex"));
@@ -293,16 +370,26 @@ describe("what a boss drops whatever its loot table says", () => {
     });
 
     it("is counted and taken back without a name, so a trophy is never taken", () => {
-        expect(boss.plainCountLine("Ana", "minecraft:nether_star")).toBe("clear Ana minecraft:nether_star[!minecraft:custom_name] 0");
-        expect(boss.takeBackLine("Ana", "minecraft:nether_star", 1)).toBe("clear Ana minecraft:nether_star[!minecraft:custom_name] 1");
+        expect(boss.plainCountLine("Ana", "minecraft:nether_star")).toBe(
+            "clear Ana minecraft:nether_star[!minecraft:custom_name] 0"
+        );
+        expect(boss.takeBackLine("Ana", "minecraft:nether_star", 1)).toBe(
+            "clear Ana minecraft:nether_star[!minecraft:custom_name] 1"
+        );
     });
 });
 
 describe("the boss itself", () => {
     it("is summoned tagged, persistent, dropping nothing, and never a raid captain", () => {
-        const [clear, summon] = boss.summonLines("captain", "epic", 900, { x: 10.5, y: 64, z: -3.5 });
+        const [clear, summon] = boss.summonLines("captain", "epic", 900, {
+            x: 10.5,
+            y: 64,
+            z: -3.5
+        });
         expect(clear).toBe("kill @e[tag=pe_boss]");
-        expect(summon).toMatch(/^execute in minecraft:overworld run summon minecraft:pillager 10\.5 64 -3\.5 \{/);
+        expect(summon).toMatch(
+            /^execute in minecraft:overworld run summon minecraft:pillager 10\.5 64 -3\.5 \{/
+        );
         for (const part of [
             'Tags:["pe_boss"]',
             "PersistenceRequired:1b",
@@ -318,19 +405,29 @@ describe("the boss itself", () => {
 
     it("is given its attributes by both spellings, and no reinforcements for a husk", () => {
         const modern = boss.attributeLines("husk", "normal", 500, true);
-        expect(modern[0]).toBe("attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 500");
-        expect(modern).toContain("attribute @e[tag=pe_boss,limit=1] minecraft:spawn_reinforcements base set 0");
+        expect(modern[0]).toBe(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 500"
+        );
+        expect(modern).toContain(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:spawn_reinforcements base set 0"
+        );
         expect(boss.attributeLines("husk", "normal", 500, false)[0]).toBe(
             "attribute @e[tag=pe_boss,limit=1] minecraft:generic.max_health base set 500"
         );
-        expect(boss.attributeLines("evoker", "normal", 500, true).some((line) => line.includes("reinforcements"))).toBe(false);
+        expect(
+            boss
+                .attributeLines("evoker", "normal", 500, true)
+                .some((line) => line.includes("reinforcements"))
+        ).toBe(false);
     });
 
     it("spares every creature near it that is neither a player, its own nor a monster", () => {
         const line = boss.spareBystanders();
-        expect(line.startsWith(
-            "execute as @e[tag=pe_boss,limit=1] at @s run effect give @e[distance=..48,type=!minecraft:player,tag=!pe_boss,tag=!pe_bmob,type=!minecraft:zombie,"
-        )).toBe(true);
+        expect(
+            line.startsWith(
+                "execute as @e[tag=pe_boss,limit=1] at @s run effect give @e[distance=..48,type=!minecraft:player,tag=!pe_boss,tag=!pe_bmob,type=!minecraft:zombie,"
+            )
+        ).toBe(true);
         expect(line.endsWith("] minecraft:resistance 6 4 true")).toBe(true);
         expect(line).not.toContain("type=!minecraft:wolf");
         expect(Buffer.byteLength(line)).toBeLessThan(1014);
@@ -380,7 +477,9 @@ describe("the sky arena", () => {
         const side = volume.x2 - volume.x1 + 1;
         const tall = volume.y2 - volume.y1 + 1;
         expect(count).toBe(side * side * tall - (side - 2) * (side - 2) * (tall - 2));
-        expect(stage.probeBoxes(volume).reduce((sum, box) => sum + stage.volumeOf(box), 0)).toBe(stage.volumeOf(volume));
+        expect(stage.probeBoxes(volume).reduce((sum, box) => sum + stage.volumeOf(box), 0)).toBe(
+            stage.volumeOf(volume)
+        );
     });
 
     it("puts players and the boss on its floor, inside the walls", () => {
@@ -400,14 +499,18 @@ describe("the sky arena", () => {
         expect(boss.leftArena(origin, at(-3), "minecraft:overworld")).toBe(false);
         expect(boss.leftArena(origin, at(-28), "minecraft:overworld")).toBe(true);
         expect(boss.leftArena(origin, at(1), "minecraft:the_nether")).toBe(true);
-        expect(boss.leftArena(origin, { x: origin.x + 200, y: origin.y + 1, z: origin.z }, undefined)).toBe(true);
+        expect(
+            boss.leftArena(origin, { x: origin.x + 200, y: origin.y + 1, z: origin.z }, undefined)
+        ).toBe(true);
     });
 
     it("takes players up tagged first, then moves them, then into adventure mode", () => {
         const lines = boss.admitLines("Ana", { x: 1.5, y: 95, z: 2.5, yaw: 90 });
         expect(lines[0]).toBe("tag Ana add pe_in");
         expect(lines.at(-1)).toBe("gamemode adventure Ana");
-        expect(boss.inLift({ x: 10, y: 64, z: 20 })).toContain("tag=!pe_in,gamemode=!creative,gamemode=!spectator");
+        expect(boss.inLift({ x: 10, y: 64, z: 20 })).toContain(
+            "tag=!pe_in,gamemode=!creative,gamemode=!spectator"
+        );
     });
 
     it("lets somebody who left go in their own game mode, without moving them", () => {
@@ -432,23 +535,44 @@ describe("the sky arena", () => {
 describe("the prizes", () => {
     it("are multiplied for the difficulty", () => {
         const scaled = boss.scaledRewards(catalog.DEFAULT_REWARDS, "epic");
-        expect(scaled.first).toEqual({ items: [{ id: "minecraft:diamond", count: 10 }], levels: 30 });
+        expect(scaled.first).toEqual({
+            items: [{ id: "minecraft:diamond", count: 10 }],
+            levels: 30
+        });
         expect(boss.scaledRewards(catalog.DEFAULT_REWARDS, "hard").third).toEqual({
             items: [{ id: "minecraft:diamond", count: 2 }],
             levels: 8
         });
-        expect(boss.scaledRewards(catalog.DEFAULT_REWARDS, "normal")).toEqual(catalog.DEFAULT_REWARDS);
+        expect(boss.scaledRewards(catalog.DEFAULT_REWARDS, "normal")).toEqual(
+            catalog.DEFAULT_REWARDS
+        );
     });
 
     it("name the trophy the way each version reads a name, its own spelling first", () => {
         // 1.21.5 on: an SNBT text component; the JSON string only if that is refused.
-        const [snbt, fallback] = boss.trophyArguments("Trofeo: El Señor", "Golpe final - Épico", "text");
-        expect(snbt).toContain('minecraft:custom_name={text:"Trofeo: El Se\\u00f1or",color:"gold",italic:0b}');
-        expect(fallback).toContain(`minecraft:custom_name='{"text":"Trofeo: El Se\\\\u00f1or","color":"gold","italic":false}'`);
+        const [snbt, fallback] = boss.trophyArguments(
+            "Trofeo: El Señor",
+            "Golpe final - Épico",
+            "text"
+        );
+        expect(snbt).toContain(
+            'minecraft:custom_name={text:"Trofeo: El Se\\u00f1or",color:"gold",italic:0b}'
+        );
+        expect(fallback).toContain(
+            `minecraft:custom_name='{"text":"Trofeo: El Se\\\\u00f1or","color":"gold","italic":false}'`
+        );
         // 1.20.5 to 1.21.4 read a name as JSON in a string, and refuse the SNBT one.
-        const [json, last] = boss.trophyArguments("Trofeo: El Señor", "Golpe final - Épico", "json");
-        expect(json).toContain(`minecraft:custom_name='{"text":"Trofeo: El Se\\\\u00f1or","color":"gold","italic":false}'`);
-        expect(json).toContain(`minecraft:lore=['{"text":"Golpe final - \\\\u00c9pico","color":"gray","italic":false}']`);
+        const [json, last] = boss.trophyArguments(
+            "Trofeo: El Señor",
+            "Golpe final - Épico",
+            "json"
+        );
+        expect(json).toContain(
+            `minecraft:custom_name='{"text":"Trofeo: El Se\\\\u00f1or","color":"gold","italic":false}'`
+        );
+        expect(json).toContain(
+            `minecraft:lore=['{"text":"Golpe final - \\\\u00c9pico","color":"gray","italic":false}']`
+        );
         expect(last).toContain("minecraft:custom_name={text:");
         const [legacy] = boss.trophyArguments("Trophy: The Warlord", "Final blow - Epic", "tag");
         expect(legacy).toBe(

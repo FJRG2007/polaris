@@ -52,11 +52,12 @@ import { containerFileSize, readContainerFile, readContainerRange } from "../../
 import { gameMessage, gameMessageIn } from "../../game-message";
 import type { GameKey } from "../../../../messages";
 
-type RefusalKey = GameKey<"minecraft"> extends infer K
-    ? K extends `events.errors.${infer R}`
-        ? R
-        : never
-    : never;
+type RefusalKey =
+    GameKey<"minecraft"> extends infer K
+        ? K extends `events.errors.${infer R}`
+            ? R
+            : never
+        : never;
 
 /** Why the screen's request was refused, carried as its catalog key until the
  *  action that answers it writes it in the reader's language (`messageText`). */
@@ -141,8 +142,7 @@ function eventServer(server: ServerContainer, installedAppId: string): ServerCon
             const roster = replies.rosterNames(await one(replies.ROSTER).catch(() => ""));
             return replies.canonicalReplies(whole, roster).text;
         },
-        sayAll: async (lines) =>
-            server.sayAll(await named(speech.localizeAll(lines, audience())))
+        sayAll: async (lines) => server.sayAll(await named(speech.localizeAll(lines, audience())))
     };
 }
 
@@ -499,8 +499,7 @@ export async function startEvent(input: {
     const config = settingsOf(row.config);
     const preset = config.presets.find((one) => one.id === input.presetId);
     if (!preset) throw new Error(gameMessage("minecraft", "events.problems.eventGone"));
-    if (!preset.enabled && input.trigger !== "manual")
-        throw new Error(refused("switchedOff"));
+    if (!preset.enabled && input.trigger !== "manual") throw new Error(refused("switchedOff"));
 
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error(refused("notRunning"));
@@ -700,7 +699,10 @@ export async function forgetPending(installedAppId: string, pendingId: string): 
  * A player's things an event could not give back, tried again from their
  * barrels - or their database copy - now. Answers how it went.
  */
-export async function retryStash(installedAppId: string, id: string): Promise<stashService.GiveBack> {
+export async function retryStash(
+    installedAppId: string,
+    id: string
+): Promise<stashService.GiveBack> {
     const row = await readRow(installedAppId);
     if (!row) throw new Error(refused("noServer"));
     return withServerContainer(row.ownerId, installedAppId, async (server) => {
@@ -2112,10 +2114,9 @@ function roundOf(
     run: stored.EventRun,
     language: speech.Speech
 ): { kind: "question" | "scramble"; asked: string; answer: string; accepted: string[] } {
-    const each = Object.fromEntries(speech.LANGUAGES.map((one) => [one, roundIn(run, one)])) as Record<
-        catalog.Language,
-        ReturnType<typeof roundIn>
-    >;
+    const each = Object.fromEntries(
+        speech.LANGUAGES.map((one) => [one, roundIn(run, one)])
+    ) as Record<catalog.Language, ReturnType<typeof roundIn>>;
     const first = each[speech.LANGUAGES[0]];
     const pick = (value: (one: ReturnType<typeof roundIn>) => string) =>
         speech.pickIn(
@@ -2202,8 +2203,7 @@ async function triviaTick(
                 `&f${asked.answer}`
             ),
             commands.say(
-                messages.tag(language) +
-                    messages.roundWon(winner, asked.answer, language)
+                messages.tag(language) + messages.roundWon(winner, asked.answer, language)
             ),
             commands.sound(commands.SOUNDS.win)
         );
@@ -2213,13 +2213,8 @@ async function triviaTick(
     if (now >= (loop.run.roundEndsAt ?? now)) {
         loop.run = { ...loop.run, roundEndsAt: null, closedAt: now };
         lines.push(
-            ...commands.titleCommands(
-                messages.roundMissedTitle(language),
-                `&f${asked.answer}`
-            ),
-            commands.say(
-                messages.tag(language) + messages.roundMissed(asked.answer, language)
-            )
+            ...commands.titleCommands(messages.roundMissedTitle(language), `&f${asked.answer}`),
+            commands.say(messages.tag(language) + messages.roundMissed(asked.answer, language))
         );
         await persist(installedAppId, loop);
         return null;
@@ -2860,7 +2855,11 @@ async function finish(
                     });
             }
             // The final blow's trophy, besides whatever the podium paid.
-            if (preset.kind === "world-boss" && run.decidedBy && online.has(run.decidedBy.toLowerCase())) {
+            if (
+                preset.kind === "world-boss" &&
+                run.decidedBy &&
+                online.has(run.decidedBy.toLowerCase())
+            ) {
                 const trophy = await bossService.awardTrophy(
                     server,
                     run,
@@ -2876,7 +2875,10 @@ async function finish(
                     const at = delivered.findIndex((one) => one.name.toLowerCase() === killer);
                     const item = { id: trophy.id, count: trophy.count, dropped: trophy.dropped };
                     if (at >= 0)
-                        delivered[at] = { ...delivered[at]!, items: [...delivered[at]!.items, item] };
+                        delivered[at] = {
+                            ...delivered[at]!,
+                            items: [...delivered[at]!.items, item]
+                        };
                     else delivered.push({ name: run.decidedBy, items: [item], levels: 0 });
                 }
             }
@@ -3685,7 +3687,10 @@ async function deliverPending(
             if (!catalog.PLAYER_NAME.test(one.player)) continue;
             const handed = await give(server, one.player, one.reward);
             const rest = handed.left;
-            arrived.push({ runId: one.id.slice(0, -(one.player.length + 1)), prize: handed.delivered });
+            arrived.push({
+                runId: one.id.slice(0, -(one.player.length + 1)),
+                prize: handed.delivered
+            });
             if (!rest) {
                 left.set(one.id, null);
                 await server.say([

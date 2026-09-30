@@ -88,7 +88,9 @@ export function rageLine(boss: string, language: Language): string {
 export function warning(ability: Ability, arena: boolean, language: Language): string {
     switch (ability) {
         case "shockwave":
-            return language === "es" ? "&c¡Onda expansiva! Aléjate" : "&cShockwave! Get away from it";
+            return language === "es"
+                ? "&c¡Onda expansiva! Aléjate"
+                : "&cShockwave! Get away from it";
         case "leap":
             return language === "es" ? "&c¡Va a por ti!" : "&cIt is coming for you!";
         case "pull":

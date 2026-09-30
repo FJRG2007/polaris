@@ -897,7 +897,11 @@ export function builtUnder(
  *  space taken away. */
 export function silent(output: string): boolean {
     // eslint-disable-next-line no-control-regex
-    return stripFormatting(output).replace(/\u001b?\[[0-9;]*m/g, "").trim().length === 0;
+    return (
+        stripFormatting(output)
+            .replace(/\u001b?\[[0-9;]*m/g, "")
+            .trim().length === 0
+    );
 }
 
 /** Whether the game refused a block name it does not know, rather than answering. */
@@ -1383,7 +1387,8 @@ export function readRawNear(at: { x: number; y: number; z: number } | null): str
 
 /** Every shot since the last look summed into one count, ready to be read. */
 export const SHOTS_SUMMED = SHOTS.slice(1).map(
-    (objective) => `execute as @a run scoreboard players operation @s ${SHOTS[0]} += @s ${objective}`
+    (objective) =>
+        `execute as @a run scoreboard players operation @s ${SHOTS[0]} += @s ${objective}`
 );
 
 /** Who near the boss (or where it fell) has shot since the last look. */
@@ -1414,8 +1419,7 @@ export function unseenShares(
     const rest = Math.round(lost) - meleeTotal;
     const shares = new Map<string, number>();
     const hitters = near.filter((name) => (melee.get(name) ?? 0) > 0);
-    const takers =
-        shooters.length > 0 ? [...shooters] : hitters.length > 0 ? hitters : near;
+    const takers = shooters.length > 0 ? [...shooters] : hitters.length > 0 ? hitters : near;
     if (rest <= 0 || takers.length === 0) return shares;
     const each = Math.floor(rest / takers.length);
     let spare = rest - each * takers.length;

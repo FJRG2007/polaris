@@ -827,8 +827,13 @@ function answer(sent: string): string {
         return `Gamerule mobGriefing is now set to: ${griefing[1]}`;
     }
     // A world boss's fighters, from where it stands or where it is going to.
-    if (line.includes("as @a[distance=..40,gamemode=!creative,gamemode=!spectator") && line.endsWith("run data get entity @s Pos")) {
-        const fighters = line.includes("sort=furthest,limit=1") ? world.fighters.slice(-1) : world.fighters;
+    if (
+        line.includes("as @a[distance=..40,gamemode=!creative,gamemode=!spectator") &&
+        line.endsWith("run data get entity @s Pos")
+    ) {
+        const fighters = line.includes("sort=furthest,limit=1")
+            ? world.fighters.slice(-1)
+            : world.fighters;
         return fighters
             .map((name) => {
                 const step = world.fighterGap + 8 * world.fighters.indexOf(name);
@@ -836,11 +841,19 @@ function answer(sent: string): string {
             })
             .join("\n");
     }
-    if (line.startsWith("execute at @e[tag=pe_boss,limit=1] align xz positioned ~0.5 ~ ~0.5 unless block ~1 ~ ~ minecraft:air "))
+    if (
+        line.startsWith(
+            "execute at @e[tag=pe_boss,limit=1] align xz positioned ~0.5 ~ ~0.5 unless block ~1 ~ ~ minecraft:air "
+        )
+    )
         return world.bossAlive && world.bossBoxed ? "Test passed" : "Test failed";
     if (line === "execute if entity @e[tag=pe_bshield]")
         return world.minionsLeft > 0 ? `Test passed, count: ${world.minionsLeft}` : "Test failed";
-    if (line.includes("tag=!pe_in,gamemode=!creative,gamemode=!spectator] run data get entity @s Pos")) {
+    if (
+        line.includes(
+            "tag=!pe_in,gamemode=!creative,gamemode=!spectator] run data get entity @s Pos"
+        )
+    ) {
         return world.lift
             .map((name) => `${name} has the following entity data: [300.5d, 64.0d, 2.5d]`)
             .join("\n");
@@ -2328,7 +2341,12 @@ describe("a world boss fight", () => {
         setUp([groundBoss("boss", 10)]);
         await start();
         await play(8_100);
-        expect(state().run?.boss).toMatchObject({ kind: "wither-skeleton", standing: true, max: 500, phase: 1 });
+        expect(state().run?.boss).toMatchObject({
+            kind: "wither-skeleton",
+            standing: true,
+            max: 500,
+            phase: 1
+        });
         expect(world.sent).toContain("bossbar set polaris:event color yellow");
 
         world.bossHealth = 300;
@@ -2341,25 +2359,35 @@ describe("a world boss fight", () => {
         expect(minions.every((line) => line.includes('"pe_bshield"'))).toBe(true);
         expect(
             world.sent.some(
-                (line) => line.includes(" title @a[distance=..40,") && line.includes("Kill the minions to break the shield")
+                (line) =>
+                    line.includes(" title @a[distance=..40,") &&
+                    line.includes("Kill the minions to break the shield")
             )
         ).toBe(true);
 
         await play(2_100);
-        expect(world.sent).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 4 true");
+        expect(world.sent).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:resistance 6 4 true"
+        );
 
         world.minionsLeft = 0;
         const before = world.sent.length;
         await play(2_100);
         expect(state().run?.boss?.broken).toBe(true);
-        expect(world.sent.slice(before)).toContain("effect clear @e[tag=pe_boss,limit=1] minecraft:resistance");
-        expect(world.sent.slice(before).some((line) => line.includes("The shield is broken"))).toBe(true);
+        expect(world.sent.slice(before)).toContain(
+            "effect clear @e[tag=pe_boss,limit=1] minecraft:resistance"
+        );
+        expect(world.sent.slice(before).some((line) => line.includes("The shield is broken"))).toBe(
+            true
+        );
 
         world.bossHealth = 150;
         await play(2_100);
         expect(state().run?.boss?.phase).toBe(3);
         expect(world.sent).toContain("bossbar set polaris:event color red");
-        expect(world.sent).toContain("effect give @e[tag=pe_boss,limit=1] minecraft:strength 6 0 true");
+        expect(world.sent).toContain(
+            "effect give @e[tag=pe_boss,limit=1] minecraft:strength 6 0 true"
+        );
     });
 
     it("grows for every fighter who comes, keeping what was already taken off it", async () => {
@@ -2372,7 +2400,9 @@ describe("a world boss fight", () => {
         world.bossHealth = 400;
         world.fighters = ["Ana", "Ben"];
         await play(2_100);
-        expect(world.sent).toContain("attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 750");
+        expect(world.sent).toContain(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 750"
+        );
         expect(world.sent).toContain("data merge entity @e[tag=pe_boss,limit=1] {Health:650f}");
         expect(world.sent).toContain("bossbar set polaris:event max 750");
         expect(state().run?.boss).toMatchObject({ max: 750, fighters: ["Ana", "Ben"] });
@@ -2390,12 +2420,21 @@ describe("a world boss fight", () => {
 
         world.fighters = ["Ana", "Ben"];
         await play(4_100);
-        const warned = world.sent.findIndex((line) => line.includes("run particle minecraft:crit") || line.includes("run particle minecraft:flame") || line.includes("run particle minecraft:portal") || line.includes("run particle minecraft:witch"));
+        const warned = world.sent.findIndex(
+            (line) =>
+                line.includes("run particle minecraft:crit") ||
+                line.includes("run particle minecraft:flame") ||
+                line.includes("run particle minecraft:portal") ||
+                line.includes("run particle minecraft:witch")
+        );
         expect(warned).toBeGreaterThan(0);
         const landed = world.sent.findIndex(
             (line, index) =>
                 index > warned &&
-                (line.includes("run damage @s") || line.includes(" run tp @s ~ ~ ~") || line.includes("summon minecraft:vex") || line.startsWith("execute at Ben run tp @e[tag=pe_boss"))
+                (line.includes("run damage @s") ||
+                    line.includes(" run tp @s ~ ~ ~") ||
+                    line.includes("summon minecraft:vex") ||
+                    line.startsWith("execute at Ben run tp @e[tag=pe_boss"))
         );
         expect(landed).toBeGreaterThan(warned);
     });
@@ -2427,7 +2466,10 @@ describe("a world boss fight", () => {
         setUp([groundBoss("boss", 10, { boss: "ravager" })]);
         await start();
         await play(4_100);
-        expect(state().run?.gamerules).toMatchObject({ mobGriefing: "true", keepInventory: "false" });
+        expect(state().run?.gamerules).toMatchObject({
+            mobGriefing: "true",
+            keepInventory: "false"
+        });
         expect(world.sent).toContain("gamerule mobGriefing false");
         expect(world.sent).toContain("gamerule keepInventory true");
         // What a restarted Polaris would send, from the stored run alone.
@@ -2437,7 +2479,9 @@ describe("a world boss fight", () => {
         expect(cleanup).toContain("kill @e[tag=pe_bmob]");
         await events.cancelEvent("owner", SERVER);
         await play(4_100);
-        expect(world.sent.filter((line) => line.startsWith("gamerule mobGriefing ")).at(-1)).toBe("gamerule mobGriefing true");
+        expect(world.sent.filter((line) => line.startsWith("gamerule mobGriefing ")).at(-1)).toBe(
+            "gamerule mobGriefing true"
+        );
         expect(world.sent).toContain("execute as @e[tag=pe_bmob] at @s run tp @s ~ -1000 ~");
         expect(world.sent).toContain("kill @e[tag=pe_bmob]");
         expect(state().history[0]?.outcome).toBe("cancelled");
@@ -2476,14 +2520,20 @@ describe("a world boss fight", () => {
         expect(entry.note).toBe("Defeated; the final blow by Ana");
         expect(world.sent).toContain("give Ana minecraft:diamond 10");
         expect(world.sent).toContain("give Ben minecraft:diamond 6");
-        const trophy = world.sent.find((line) => line.startsWith("give Ana minecraft:nether_star["));
+        const trophy = world.sent.find((line) =>
+            line.startsWith("give Ana minecraft:nether_star[")
+        );
         expect(trophy).toContain("Trophy: The Warlord");
         // 1.21.4 reads a name as JSON in a string: that is what is sent, and nothing it would refuse.
         expect(trophy).toContain(`minecraft:custom_name='{"text":"Trophy: The Warlord"`);
-        expect(world.sent.some((line) => line.includes("minecraft:custom_name={text:"))).toBe(false);
+        expect(world.sent.some((line) => line.includes("minecraft:custom_name={text:"))).toBe(
+            false
+        );
         const ana = entry.delivered.find((one) => one.name === "Ana");
         expect(ana?.items).toContainEqual({ id: "minecraft:nether_star", count: 1, dropped: 0 });
-        expect(world.sent.some((line) => line.startsWith("tellraw Ana ") && line.includes("trophy"))).toBe(true);
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw Ana ") && line.includes("trophy"))
+        ).toBe(true);
     });
 
     it("stands in a closed arena in the sky, takes players up through the beam and puts them back", async () => {
@@ -2495,12 +2545,20 @@ describe("a world boss fight", () => {
         expect(run.stage?.built).toBe(true);
         expect(run.boss?.standing).toBe(true);
         const origin = run.stage!.origin!;
-        const built = world.sent.filter((line) => line.includes(" run fill ") && line.endsWith(" keep"));
-        expect(built.some((line) => line.endsWith("minecraft:light_blue_stained_glass keep"))).toBe(true);
-        expect(built.filter((line) => line.endsWith("minecraft:white_stained_glass keep"))).toHaveLength(5);
+        const built = world.sent.filter(
+            (line) => line.includes(" run fill ") && line.endsWith(" keep")
+        );
+        expect(built.some((line) => line.endsWith("minecraft:light_blue_stained_glass keep"))).toBe(
+            true
+        );
+        expect(
+            built.filter((line) => line.endsWith("minecraft:white_stained_glass keep"))
+        ).toHaveLength(5);
         expect(
             world.sent.some((line) =>
-                line.startsWith(`execute in minecraft:overworld run summon minecraft:wither_skeleton ${origin.x + 0.5} ${origin.y + 1} ${origin.z + 0.5} `)
+                line.startsWith(
+                    `execute in minecraft:overworld run summon minecraft:wither_skeleton ${origin.x + 0.5} ${origin.y + 1} ${origin.z + 0.5} `
+                )
             )
         ).toBe(true);
         // Its place is the beam, on the ground under it.
@@ -2517,11 +2575,20 @@ describe("a world boss fight", () => {
         await events.cancelEvent("owner", SERVER);
         await play(6_100);
         const sent = world.sent;
-        const mobsGone = sent.indexOf("kill @e[tag=pe_boss]", sent.lastIndexOf("tag Ana add pe_in"));
-        const firstRemoved = sent.findIndex((line) => line.includes("minecraft:air replace minecraft:white_stained_glass"));
+        const mobsGone = sent.indexOf(
+            "kill @e[tag=pe_boss]",
+            sent.lastIndexOf("tag Ana add pe_in")
+        );
+        const firstRemoved = sent.findIndex((line) =>
+            line.includes("minecraft:air replace minecraft:white_stained_glass")
+        );
         expect(mobsGone).toBeGreaterThan(0);
         expect(firstRemoved).toBeGreaterThan(mobsGone);
-        expect(sent.some((line) => line.includes("minecraft:air replace minecraft:light_blue_stained_glass"))).toBe(true);
+        expect(
+            sent.some((line) =>
+                line.includes("minecraft:air replace minecraft:light_blue_stained_glass")
+            )
+        ).toBe(true);
         expect(sent).toContain("gamemode survival Ana");
         expect(sent).toContain("tag Ana remove pe_in");
         expect(state().stageLeftovers).toEqual([]);
@@ -2535,7 +2602,13 @@ describe("a Wither felled in its arena", () => {
         world.version = "1.21.4";
         world.bag = { Ana: { [plain]: 2 }, Ben: {} };
         setUp([groundBoss("boss", 10, { arena: true, boss: "wither" })]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "boss", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(12_100);
         world.lift = ["Ana"];
         await play(2_100);
@@ -2546,14 +2619,28 @@ describe("a Wither felled in its arena", () => {
         world.bossAlive = false;
         await play(2_100);
         const sent = world.sent;
-        const scored = sent.findIndex((line) => line.includes("nbt={Item:{id:\"minecraft:nether_star\"}}] store result score @s pe_sum run data get entity @s Age"));
-        const taken = sent.findIndex((line) => line.endsWith("kill @e[type=minecraft:item,scores={pe_sum=..-1}]") || /kill @e\[type=minecraft:item,.*scores=\{pe_sum=\.\.-1\}\]$/.test(line));
+        const scored = sent.findIndex((line) =>
+            line.includes(
+                'nbt={Item:{id:"minecraft:nether_star"}}] store result score @s pe_sum run data get entity @s Age'
+            )
+        );
+        const taken = sent.findIndex(
+            (line) =>
+                line.endsWith("kill @e[type=minecraft:item,scores={pe_sum=..-1}]") ||
+                /kill @e\[type=minecraft:item,.*scores=\{pe_sum=\.\.-1\}\]$/.test(line)
+        );
         const cleared = sent.indexOf(`clear Ana ${plain} 1`);
         expect(scored).toBeGreaterThan(0);
         expect(taken).toBeGreaterThan(scored);
         expect(cleared).toBeGreaterThan(taken);
         // Never a named star, and never more than the one she picked up.
-        expect(sent.some((line) => /^clear Ana minecraft:nether_star [1-9]/.test(line) || line === `clear Ana ${plain} 3`)).toBe(false);
+        expect(
+            sent.some(
+                (line) =>
+                    /^clear Ana minecraft:nether_star [1-9]/.test(line) ||
+                    line === `clear Ana ${plain} 3`
+            )
+        ).toBe(false);
     });
 });
 

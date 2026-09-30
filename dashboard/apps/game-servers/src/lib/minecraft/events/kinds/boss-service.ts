@@ -154,7 +154,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * could otherwise change a block. Answers the lines to send, or why it cannot
  * go ahead: a rule it cannot read is one it cannot hold or give back.
  */
-export async function begin(ctx: KindContext): Promise<{ lines: string[]; refused: string | null }> {
+export async function begin(
+    ctx: KindContext
+): Promise<{ lines: string[]; refused: string | null }> {
     const state = stateOf(ctx);
     const before: Record<string, string> = {};
     const lines: string[] = [];
@@ -173,7 +175,8 @@ export async function begin(ctx: KindContext): Promise<{ lines: string[]; refuse
         if (!held && rule.names === boss.MOB_GRIEFING) {
             return {
                 lines: [],
-                refused: "The server would not say whether mobs may change blocks, so the boss could not promise to leave the world as it was"
+                refused:
+                    "The server would not say whether mobs may change blocks, so the boss could not promise to leave the world as it was"
             };
         }
     }
@@ -259,7 +262,9 @@ async function creditUnseen(
     if (!(lost > 0)) return;
     const melee = commands.readScores(await server.say([commands.readRawNear(at)]));
     await server.sayAll(commands.SHOTS_SUMMED);
-    const shooters = [...commands.readScores(await server.say([commands.readShootersNear(at)])).keys()];
+    const shooters = [
+        ...commands.readScores(await server.say([commands.readShootersNear(at)])).keys()
+    ];
     const shares = commands.unseenShares(lost * 10, melee, shooters);
     await server.sayAll([
         ...[...shares].map(([name, share]) => commands.shareLine(name, share)),
@@ -295,7 +300,8 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
     const options = optionsOf(ctx.run);
     if (!state.arena) {
         const found = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS);
-        if (found === "failed") throw new EventStopped("No dry ground was found for it near the players");
+        if (found === "failed")
+            throw new EventStopped("No dry ground was found for it near the players");
         if (!found) return;
         const near = commands.readWhere(
             await ctx.server.say([
@@ -303,7 +309,14 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
             ])
         );
         const at = { x: found.x + 0.5, y: found.y, z: found.z + 0.5 };
-        if (!(await summon(ctx, memory, at, near.map((one) => one.name)))) {
+        if (
+            !(await summon(
+                ctx,
+                memory,
+                at,
+                near.map((one) => one.name)
+            ))
+        ) {
             await ctx.giveUpPlace(found);
             return;
         }
@@ -314,7 +327,8 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
     const origin = stageOf(ctx).origin;
     if (!origin) {
         const ground = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS);
-        if (ground === "failed") throw new EventStopped("No dry ground was found for it near the players");
+        if (ground === "failed")
+            throw new EventStopped("No dry ground was found for it near the players");
         if (!ground) return;
         const { top } = await versionOf(ctx, memory);
         let y = ground.y + boss.ARENA_HEIGHT;
@@ -344,7 +358,10 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
         await ctx.persist();
         let whole = true;
         for (const box of boxes) {
-            if (stage.fillCount(await ctx.server.say([stage.buildLine(box)])) !== stage.volumeOf(box))
+            if (
+                stage.fillCount(await ctx.server.say([stage.buildLine(box)])) !==
+                stage.volumeOf(box)
+            )
                 whole = false;
         }
         changeStage(ctx, { built: true });
@@ -381,7 +398,8 @@ async function provedEmpty(ctx: KindContext, memory: Memory): Promise<boolean> {
     }
     let cleared = true;
     for (const box of probes) {
-        if (stage.fillCount(await ctx.server.say([stage.removeLine(box)])) === null) cleared = false;
+        if (stage.fillCount(await ctx.server.say([stage.removeLine(box)])) === null)
+            cleared = false;
     }
     if (cleared) changeStage(ctx, { boxes: kept });
     if (!unloaded && cleared && filled === stage.volumeOf(volume)) return true;
@@ -444,8 +462,13 @@ async function summon(
         commands.bossNameCommand(name, false),
         commands.bossNameCommand(name, true),
         ...boss.bossEquipLines(state.kind),
-        ...boss.upkeepLines({ ...state, resistance: split.resistance }, { rides: false, shield: false }),
-        ...(profile.guard > 0 ? boss.minionLines(state.kind, profile.guard, false, state.difficulty) : []),
+        ...boss.upkeepLines(
+            { ...state, resistance: split.resistance },
+            { rides: false, shield: false }
+        ),
+        ...(profile.guard > 0
+            ? boss.minionLines(state.kind, profile.guard, false, state.difficulty)
+            : []),
         commands.CLEAR_MARK,
         `bossbar set ${commands.BAR} max ${split.health}`,
         boss.barColourLine(1)
@@ -519,7 +542,11 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
         if (now > was) {
             health = boss.toppedUp(health, before, after, now - was);
             const other = boss.maxHealthLine(after.health, !version.ids);
-            if (!commands.attributeWorked(await server.say([boss.maxHealthLine(after.health, version.ids)])))
+            if (
+                !commands.attributeWorked(
+                    await server.say([boss.maxHealthLine(after.health, version.ids)])
+                )
+            )
                 await server.say([other]);
             await server.sayAll([
                 boss.healLine(health),
@@ -528,7 +555,12 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
             memory.health = health;
             state = change(ctx, { max: after.health, resistance: after.resistance });
             if (count > 1)
-                lines.push(boss.tellFighters(state.arena, messages.tag(language) + say.stronger(name, count, language)));
+                lines.push(
+                    boss.tellFighters(
+                        state.arena,
+                        messages.tag(language) + say.stronger(name, count, language)
+                    )
+                );
         }
         await ctx.persist();
     }
@@ -539,10 +571,17 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
     if (phase > state.phase) {
         for (let next = state.phase + 1; next <= phase; next += 1) {
             if (next === 2) {
-                const count = boss.minionCount(state.difficulty, Math.max(1, state.fighters.length));
+                const count = boss.minionCount(
+                    state.difficulty,
+                    Math.max(1, state.fighters.length)
+                );
                 lines.push(
                     boss.barColourLine(2),
-                    ...boss.titleToFighters(state.arena, say.phaseTitle(2, language), say.phaseSubtitle(2, language)),
+                    ...boss.titleToFighters(
+                        state.arena,
+                        say.phaseTitle(2, language),
+                        say.phaseSubtitle(2, language)
+                    ),
                     commands.say(messages.tag(language) + say.shieldUp(name, language)),
                     ...boss.minionLines(state.kind, count, true, state.difficulty),
                     boss.soundAt("minecraft:entity.evoker.prepare_summon", 0.7)
@@ -550,7 +589,11 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
             } else {
                 lines.push(
                     boss.barColourLine(3),
-                    ...boss.titleToFighters(state.arena, say.phaseTitle(3, language), say.phaseSubtitle(3, language)),
+                    ...boss.titleToFighters(
+                        state.arena,
+                        say.phaseTitle(3, language),
+                        say.phaseSubtitle(3, language)
+                    ),
                     commands.say(messages.tag(language) + say.rageLine(name, language)),
                     ...(boss.effectImmune(state.kind) ? boss.immuneRageLines() : []),
                     boss.soundAt("minecraft:entity.ender_dragon.growl", 1)
@@ -604,7 +647,8 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
             health = Math.min(state.max, health + state.max * HEAL_SHARE);
             lines.push(boss.healLine(health));
             memory.health = Math.round(health);
-            if (!memory.alone) lines.push(commands.say(messages.tag(language) + say.healing(name, language)));
+            if (!memory.alone)
+                lines.push(commands.say(messages.tag(language) + say.healing(name, language)));
         }
         memory.alone = true;
         const lair = ctx.run.place;
@@ -613,7 +657,11 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
     } else {
         memory.alone = false;
         const moved = seen.previous
-            ? Math.hypot(seen.at.x - seen.previous.x, seen.at.y - seen.previous.y, seen.at.z - seen.previous.z)
+            ? Math.hypot(
+                  seen.at.x - seen.previous.x,
+                  seen.at.y - seen.previous.y,
+                  seen.at.z - seen.previous.z
+              )
             : Number.POSITIVE_INFINITY;
         // Standing still is being trapped - even right against somebody, with
         // a wall between them; brought beside them, where it already stood, it
@@ -680,7 +728,9 @@ async function arenaTick(
     const lift = state.lift;
     if (lift) {
         lines.push(boss.liftBeam(lift));
-        const stepping = commands.readWhere(await server.say([boss.inLift(lift)])).map((one) => one.name);
+        const stepping = commands
+            .readWhere(await server.say([boss.inLift(lift)]))
+            .map((one) => one.name);
         if (stepping.length > 0) await admit(ctx, origin, stepping, lines);
     }
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
@@ -740,7 +790,9 @@ async function admit(
     if (drops && (await versionOf(ctx, memoryOf(ctx.run.id))).components) {
         const carried = { ...stateOf(ctx).carried };
         for (const one of fresh) {
-            const count = delivery.readCount(await server.say([boss.plainCountLine(one.name, drops)]));
+            const count = delivery.readCount(
+                await server.say([boss.plainCountLine(one.name, drops)])
+            );
             if (count !== null) carried[one.name] = count;
         }
         change(ctx, { carried });
@@ -796,16 +848,26 @@ export async function awardTrophy(
         written.trophyLore(run.boss.difficulty, home),
         spelling
     );
-    const before = delivery.readCount(await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)]));
+    const before = delivery.readCount(
+        await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)])
+    );
     for (const argument of args) {
         const answer = await server.say([`give ${killer} ${argument} 1`]);
         if (!commands.gaveIt(answer)) continue;
-        const after = delivery.readCount(await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)]));
-        const kept = before !== null && after !== null ? Math.min(1, Math.max(0, after - before)) : 1;
+        const after = delivery.readCount(
+            await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)])
+        );
+        const kept =
+            before !== null && after !== null ? Math.min(1, Math.max(0, after - before)) : 1;
         await server.sayAll([
             `tellraw ${killer} ${commands.text(messages.tag(speech.EVERY) + say.trophyGiven(speech.EVERY))}`
         ]);
-        return { id: boss.TROPHY_ITEM, count: 1, dropped: 1 - kept, label: delivery.labelIn(answer) };
+        return {
+            id: boss.TROPHY_ITEM,
+            count: 1,
+            dropped: 1 - kept,
+            label: delivery.labelIn(answer)
+        };
     }
     return null;
 }

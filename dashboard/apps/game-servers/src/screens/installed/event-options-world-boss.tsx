@@ -109,7 +109,9 @@ export function WorldBossOptions({
             {value.choice === "random" ? (
                 <fieldset className="flex flex-col gap-2 text-sm">
                     <legend className="font-medium">{t("editor.bossPool")}</legend>
-                    <span className="text-xs text-muted-foreground">{t("editor.bossPoolHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("editor.bossPoolHint")}
+                    </span>
                     {catalog.BOSS_KINDS.map((kind) => {
                         const allowed = usable.includes(kind);
                         const on = allowed && pool.includes(kind);
@@ -142,7 +144,9 @@ export function WorldBossOptions({
                     min={100}
                     max={1024}
                     value={Number.isFinite(value.health) ? value.health : ""}
-                    onChange={(event) => onChange({ ...value, health: numberOf(event.target.value) })}
+                    onChange={(event) =>
+                        onChange({ ...value, health: numberOf(event.target.value) })
+                    }
                 />
             </Field>
             <PlaceField
@@ -175,7 +179,8 @@ export function worldBossFacts(t: GameText<"minecraft">, value: Value): string[]
         t(value.arena ? "events.facts.bossArena" : "events.facts.bossGround"),
         t("events.facts.bossKeeps")
     ];
-    if (griefing.length > 0) facts.push(t("events.facts.bossGriefing", { bosses: names(griefing) }));
+    if (griefing.length > 0)
+        facts.push(t("events.facts.bossGriefing", { bosses: names(griefing) }));
     facts.push(t("events.facts.bossPrizes", { times: catalog.BOSS_PRIZE_TIMES[value.difficulty] }));
     return facts;
 }
