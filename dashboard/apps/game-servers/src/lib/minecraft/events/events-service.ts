@@ -202,6 +202,16 @@ const SAVE_EVERY_MS = 60_000;
 const GIVE_UP_AFTER_MS = 2 * 60_000;
 /** How many places are tried before an event that needs one gives up. */
 const PLACE_TRIES = 10;
+
+/** After how many tries an event that may come near a home starts coming in closer. */
+const NEAR_AFTER = 4;
+
+/** How a place is looked for: on land to stand on, or anywhere nothing is built
+ *  for what goes up in the air; and whether it may come in near a home. */
+interface PlaceHow {
+    readonly surface?: "ground" | "open";
+    readonly nearHome?: boolean;
+}
 /** How much ground a chest or a boss is judged by around where it goes. */
 const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
@@ -1418,7 +1428,8 @@ async function findPlace(
     clearance = commands.HOME_CLEARANCE,
     /** Whether a fixed point is where it happens, or only where to look round
      *  - for an event of many places, which must not all be the one spot. */
-    asGiven = true
+    asGiven = true,
+    how: PlaceHow = {}
 ): Promise<stored.Point | "failed" | null> {
     const chosen = asGiven && place.mode === "fixed" && loop.run.placeTries === 0;
     if (!loop.run.target) {
@@ -1436,7 +1447,11 @@ async function findPlace(
                 spawnWorld ?? "",
                 respawnWorld ?? ""
             );
-            point = commands.clearPoint(centre, distance, homes, Math.random, clearance);
+            // Nothing further out would do - the players live on an island, say:
+            // an event that changes nothing and brings nothing hostile comes in
+            // closer, halving the distance each try, and nearer a home.
+            const look = commands.searchReach(distance, radius, loop.run.placeTries, how.nearHome === true, clearance, NEAR_AFTER);
+            point = commands.clearPoint(centre, look.reach, homes, Math.random, look.clearance);
         }
         if (!point) {
             loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
@@ -1455,7 +1470,7 @@ async function findPlace(
     if (await dropMark(server, x, z)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
         landed = point;
-        if (point && (chosen || (await siteIsOpen(loop, server, point, radius)))) {
+        if (point && (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))) {
             // The marker can come down a block or two from the column tried - an
             // older server spreads it - and so in the next chunk: that chunk is
             // the one held from now on, and the one tried let go of.
@@ -1491,7 +1506,9 @@ async function siteIsOpen(
     loop: Loop,
     server: ServerContainer,
     centre: stored.Point,
-    radius: number
+    radius: number,
+    /** `open` for what is built in the air: open water under it is as good as land. */
+    surface: "ground" | "open" = "ground"
 ): Promise<boolean> {
     const reach = radius + 1;
     const area = `${centre.x - reach} ${centre.z - reach} ${centre.x + reach} ${centre.z + reach}`;
@@ -1507,6 +1524,13 @@ async function siteIsOpen(
             // Water or lava where the game would not put the marker down: never
             // somewhere to stand, and never allowed at the centre.
             let fine = ground !== null && Math.abs(ground.y - centre.y) <= commands.SITE_STEP;
+            if (
+                fine &&
+                ground &&
+                surface === "open" &&
+                commands.readTest(await server.say([commands.waterUnder(ground)])) === "passed"
+            )
+                continue;
             if (ground && (await builtOn(loop, server, ground)) === true) {
                 // A tree is rough ground; anything else - a build, water - is not
                 // somewhere to put anything.
@@ -1648,8 +1672,10 @@ function kindContext(
             loop.run = next;
         },
         persist: () => persist(installedAppId, loop),
-        findPlace: (place, distance, radius) =>
-            findPlace(installedAppId, loop, server, place, distance, radius),
+        findPlace: (place, distance, radius, surface) =>
+            findPlace(installedAppId, loop, server, place, distance, radius, commands.HOME_CLEARANCE, true, {
+                surface: surface ?? "ground"
+            }),
         giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),
@@ -1704,7 +1730,11 @@ async function supplyDrop(
             server,
             options.place,
             options.distance,
-            SPOT_RADIUS
+            SPOT_RADIUS,
+            commands.HOME_CLEARANCE,
+            true,
+            // A chest changes nothing: on an island it comes in to the island.
+            { nearHome: true }
         );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
@@ -1763,7 +1793,11 @@ async function kingOfTheHill(
             server,
             options.place,
             32,
-            options.radius
+            options.radius,
+            commands.HOME_CLEARANCE,
+            true,
+            // A circle to stand in changes nothing: on an island it comes in to the island.
+            { nearHome: true }
         );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
@@ -1950,7 +1984,10 @@ async function hideTreasure(
             server,
             { mode: "players" },
             hunt.huntDistance(options, Math.random),
-            SPOT_RADIUS
+            SPOT_RADIUS,
+            commands.HOME_CLEARANCE,
+            true,
+            { nearHome: true }
         );
         if (found === "failed") return enough();
         if (!found) continue;
@@ -2615,7 +2652,10 @@ function stageTools(
                 place,
                 commands.HOME_CLEARANCE + radius,
                 radius,
-                commands.HOME_CLEARANCE + radius
+                commands.HOME_CLEARANCE + radius,
+                true,
+                // Built in the air: over the sea as well as over land.
+                { surface: "open" }
             );
             if (found === "failed") throw new PlaceNotFound();
             return found;

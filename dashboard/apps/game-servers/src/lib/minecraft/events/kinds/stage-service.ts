@@ -479,6 +479,8 @@ async function returnOne(
         const how = await stashService.giveBack(server, saved.name, saved.stash, keep, then);
         return how === "done" || how === "failed";
     };
+    // Nothing from here on can make them fall to their death.
+    await server.sayAll(stage.fallProof(saved.name));
     // Sent back by an end that was stopped before it wrote so: not moved again.
     const say = (line: string) => server.say([line]);
     if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
@@ -876,7 +878,7 @@ export async function settle(
         // Whatever is still standing on it - a pet, a mob - floats down
         // rather than falls when it goes.
         const bounds = stage.boundsOf(boxes);
-        if (bounds) await server.sayAll([stage.floatDown(bounds, 60)]);
+        if (bounds) await server.sayAll([stage.floatDown(bounds, 60), ...stage.fallProofOver(bounds)]);
         const standing: stage.Box[] = [];
         for (const box of [...boxes].reverse()) {
             if (stage.fillCount(await server.say([stage.removeLine(box)])) === null)

@@ -24,6 +24,7 @@
  */
 
 import * as arena from "./arena";
+import * as stage from "./stage";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
@@ -58,7 +59,9 @@ export interface KindContext {
     findPlace(
         place: catalog.EventPlace,
         distance: number,
-        radius: number
+        radius: number,
+        /** `open` for what is built in the air, where open water under it will do. */
+        surface?: "ground" | "open"
     ): Promise<stored.Point | "failed" | null>;
     /** The place given up and another looked for; throws once the tries run out. */
     giveUpPlace(point: stored.Point): Promise<void>;
@@ -245,7 +248,7 @@ async function raise(ctx: KindContext): Promise<void> {
                 ? duel.DUEL_REACH
                 : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
-        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach);
+        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "open");
         if (found === "failed") throw new EventStopped(NO_PLACE);
         return;
     }
@@ -906,6 +909,7 @@ export async function closeArena(
             // Sent back by an end that was stopped before it wrote so: not moved again.
             const say = (line: string) => server.say([line]);
             if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) {
+                await server.sayAll(stage.fallProof(one.name));
                 if (!(await giveBack())) remaining.push(one);
                 continue;
             }
@@ -914,7 +918,7 @@ export async function closeArena(
                 remaining.push(one);
                 continue;
             }
-            await server.say([arena.leftArena(one.name)]);
+            await server.sayAll([arena.homeMode(one), arena.leftArena(one.name)]);
             const thrown = box ? arena.sendThrown(box, one) : null;
             if (thrown) await server.say([thrown]);
             if (language) {
@@ -934,6 +938,8 @@ export async function closeArena(
                 arena.forceloadArea(left.arena.box, true),
                 ...(left.marker ? [arena.killMarkedDrops(left.arena.box, left.marker)] : [])
             ]);
+            // Whoever is still up there - somebody who walked in, a pet - floats down.
+            await server.sayAll(stage.fallProofOver(left.arena.box));
             let whole = true;
             for (const line of arena.teardown(left.arena)) {
                 if (arena.notLoaded(await server.say([line]))) whole = false;

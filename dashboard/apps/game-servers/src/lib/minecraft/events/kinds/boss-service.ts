@@ -326,7 +326,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 
     const origin = stageOf(ctx).origin;
     if (!origin) {
-        const ground = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS);
+        const ground = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS, "open");
         if (ground === "failed")
             throw new EventStopped("No dry ground was found for it near the players");
         if (!ground) return;

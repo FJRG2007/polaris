@@ -1917,7 +1917,13 @@ describe("the kit is marked, and only it is taken back", () => {
             const clears = lines.filter((line) => line.startsWith("clear "));
             expect(clears).toHaveLength(build.KIT_IDS.length);
             expect(clears.every((line) => line.includes("polaris_event:1b"))).toBe(true);
-            expect(lines.at(-1)).toBe("gamemode survival Ana");
+            // Fall-proof first; their game mode only once home.
+            expect(lines.slice(0, 2)).toEqual([
+                "effect give Ana minecraft:slow_falling 10 0 true",
+                "effect give Ana minecraft:resistance 10 4 true"
+            ]);
+            expect(lines.some((line) => line.startsWith("gamemode "))).toBe(false);
+            expect(arena.homeMode(ANA)).toBe("gamemode survival Ana");
         }
         expect(arena.sendHome(ANA)).toBe(
             "execute in minecraft:the_nether run tp Ana 10.250 64.000 -3.500 90.0 10.0"

@@ -29,6 +29,8 @@ interface World {
     arrived: boolean;
     /** Every column tried is water. */
     allWater: boolean;
+    /** Open sea everywhere: the marker comes down on the water, which is nobody's build. */
+    sea: boolean;
     /** Where whoever has a kill of the boss's kind is standing. */
     killerAt: [number, number, number];
     /** Item ids the server does not know. */
@@ -183,6 +185,7 @@ const world: World = {
     deaths: {},
     arrived: false,
     allWater: false,
+    sea: false,
     killerAt: [305, 70, 2],
     unknownItems: [],
     dims: {},
@@ -880,7 +883,10 @@ function answer(sent: string): string {
             .map(([name, value]) => `${name} has ${value} [pe_whit]`)
             .join("\n");
     }
+    if (/^execute in minecraft:overworld if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line))
+        return world.sea ? "Test passed" : "Test failed";
     if (line.startsWith("execute in minecraft:overworld unless block")) {
+        if (world.sea) return "Test passed";
         const refused = world.refusedGround.find(
             (id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`)
         );
@@ -1394,6 +1400,7 @@ const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/
 const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
+const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -1462,6 +1469,7 @@ beforeEach(() => {
     world.deaths = {};
     world.arrived = false;
     world.allWater = false;
+    world.sea = false;
     world.killerAt = [305, 70, 2];
     world.unknownItems = [];
     world.dims = {};
@@ -4344,6 +4352,33 @@ describe("a meteor shower", () => {
         expect(Math.hypot(target!.x, target!.z)).toBeGreaterThanOrEqual(48);
     });
 
+    it("comes in to an island for a chest when all round it is sea, and gives up for meteors", async () => {
+        world.sea = true;
+        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+        setUp([drop]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await play(70_000);
+        expect(state().history[0]?.outcome).toBe("failed");
+        // How each try looks: its own distance first, then in, as near as a home allows.
+        expect(commands.searchReach(600, 1, 3, true, 48)).toEqual({ reach: 600, clearance: 48 });
+        expect(commands.searchReach(600, 1, 4, true, 48)).toEqual({ reach: 300, clearance: 9 });
+        expect(commands.searchReach(600, 1, 9, true, 48)).toEqual({ reach: 9, clearance: 9 });
+        expect(commands.searchReach(600, 1, 9, false, 48)).toEqual({ reach: 600, clearance: 48 });
+        const tried = world.sent
+            .map((line) => /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line))
+            .filter((match): match is RegExpExecArray => match !== null)
+            .map((match) => [Number(match[1]), Number(match[2])] as const)
+            // Where the simulated marker always comes down, held as it lands: not a try.
+            .filter(([x, z]) => !(x === world.markAt[0] && z === world.markAt[1]));
+        expect(tried.length).toBeGreaterThan(5);
+        // The players stand within 20 blocks of 0 0: the first tries keep a home's
+        // clearance, the last ones come in next to them. A try's distance inside
+        // its reach is drawn at random, so only the clearance is a promise.
+        const far = (point: readonly [number, number]) => Math.hypot(point[0], point[1]);
+        expect(Math.min(...tried.slice(0, 3).map(far))).toBeGreaterThanOrEqual(48 - 20);
+        expect(far(tried[tried.length - 1]!)).toBeLessThan(48);
+    });
+
     it("gives up when there is nowhere dry for any meteor, and places nothing", async () => {
         world.allWater = true;
         setUp([shower(3)]);
@@ -4410,7 +4445,14 @@ function keptTheRules(): void {
     for (const one of built) expect(removed).toContain(one);
     for (const line of takesItems(world.sent).filter((one) => one.startsWith("clear ")))
         expect(line).toContain("custom_data={polaris_event:1b}");
-    expect(world.sent.some((line) => /minecraft:(lava|fire|tnt|water)\b/.test(line))).toBe(false);
+    // Never put down; asking whether a column is open water is only asking.
+    expect(
+        world.sent.some(
+            (line) =>
+                /minecraft:(lava|fire|tnt|water)\b/.test(line) &&
+                !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line)
+        )
+    ).toBe(false);
 }
 
 describe("a parkour race", () => {
@@ -4527,6 +4569,10 @@ describe("a parkour race", () => {
         );
         expect(world.sent).toContain("gamemode survival Ana");
         expect(world.sent).toContain("gamemode survival Ben");
+        // Fall-proof before being moved off the course.
+        const proof = world.sent.indexOf("effect give Ben minecraft:slow_falling 10 0 true");
+        expect(proof).toBeGreaterThan(0);
+        expect(world.sent.findIndex((line, index) => index > proof && line.startsWith("execute in minecraft:overworld run tp Ben "))).toBeGreaterThan(proof);
         expect(world.inside.size).toBe(0);
         expect(after.stageLeftovers).toEqual([]);
         keptTheRules();
@@ -5307,6 +5353,17 @@ describe("players' own things through an arena", () => {
 describe("a team duel", () => {
     const duelOf = (minutes = 3) => ({ ...catalog.newPreset("team-duel", "duel"), minutes });
 
+    it("finds its place over the open sea round an island, where it is built in the air", async () => {
+        world.online = ["Ana", "Ben"];
+        world.sea = true;
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        await play(10_000);
+        expect(state().run?.arena).toBeTruthy();
+        expect(state().run?.readyAt).not.toBeNull();
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(true);
+    });
+
     it("never runs its clock back up while the arena goes up", async () => {
         world.online = ["Ana", "Ben"];
         setUp([duelOf()]);
@@ -6028,6 +6085,19 @@ describe("a build battle", () => {
             `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:red_stained_glass`
         );
         expect(world.sent).toContain("gamemode survival Ana");
+        // Nobody falls at the end: fall-proof before anything moves them, their
+        // own game mode only once they are home, and the platform down last.
+        const sent = world.sent;
+        const proof = sent.indexOf("effect give Ana minecraft:slow_falling 10 0 true");
+        const home = sent.findIndex((line, index) => index > proof && /^execute in minecraft:overworld run tp Ana /.test(line));
+        expect(proof).toBeGreaterThan(0);
+        expect(sent[proof + 1]).toBe("effect give Ana minecraft:resistance 10 4 true");
+        expect(home).toBeGreaterThan(proof);
+        expect(sent.lastIndexOf("gamemode survival Ana")).toBeGreaterThan(home);
+        const teardown = sent.findIndex((line) => line.includes(" minecraft:air replace minecraft:red_stained_glass"));
+        const everyone = sent.findIndex((line) => line.startsWith("execute in minecraft:overworld run effect give @e[") && line.endsWith("minecraft:slow_falling 10 0 true"));
+        expect(everyone).toBeGreaterThan(home);
+        expect(teardown).toBeGreaterThan(everyone);
         expect(after.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
     });
