@@ -190,7 +190,9 @@ export function parseTransfer(
     return checked(raw);
 }
 
-function checked(raw: unknown): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
+function checked(
+    raw: unknown
+): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
     const parsed = transferSchema.safeParse(raw);
     if (parsed.success) return { ok: true, file: parsed.data };
     const said = parsed.error.issues.map(
@@ -442,18 +444,35 @@ function wholeCell(cell: string): number {
 function fromCsv(text: string): unknown {
     const [first, , ...rows] = csvRows(text);
     const mark = first?.join(",") ?? "";
-    const meta = /^# Polaris inventory export v(\d+) era=(\w+) server=(.*) exported=(\S+)$/.exec(mark);
+    const meta = /^# Polaris inventory export v(\d+) era=(\w+) server=(.*) exported=(\S+)$/.exec(
+        mark
+    );
     if (!meta) return null;
     const era = meta[2]!;
-    const players = new Map<string, { name: string; takenAt: string; live: boolean; items: unknown[] }>();
+    const players = new Map<
+        string,
+        { name: string; takenAt: string; live: boolean; items: unknown[] }
+    >();
     for (const cells of rows) {
         if (cells.length === 1 && cells[0] === "") continue;
         if (cells.length !== 9) return null;
         const [name, slot, , id, count, , data, takenAt, live] = cells.map(textCell) as [
-            string, string, string, string, string, string, string, string, string
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string
         ];
-        const player =
-            players.get(name) ?? { name, takenAt, live: live === "live", items: [] as unknown[] };
+        const player = players.get(name) ?? {
+            name,
+            takenAt,
+            live: live === "live",
+            items: [] as unknown[]
+        };
         players.set(name, player);
         if (id === "") continue;
         player.items.push({

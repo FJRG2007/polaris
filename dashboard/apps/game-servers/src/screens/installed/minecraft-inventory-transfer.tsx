@@ -53,9 +53,7 @@ function download(name: string, body: string, type: string): void {
 function csvOf(t: GameText<"minecraft">, file: transfer.TransferFile): string {
     const header = (
         ["player", "slot", "where", "item", "count", "details", "data", "takenAt", "live"] as const
-    ).map((key) =>
-        t(`inventoryTransfer.csvHeader.${key}`)
-    );
+    ).map((key) => t(`inventoryTransfer.csvHeader.${key}`));
     return transfer.toCsv(file, header, (slot) => slotLabelIn(t, slot));
 }
 

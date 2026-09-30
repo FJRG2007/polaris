@@ -345,7 +345,17 @@ describe("a file that cannot be imported", () => {
 });
 
 describe("CSV", () => {
-    const HEADER = ["Player", "Slot", "Where", "Item", "Count", "Details", "Data", "Read at", "Source"];
+    const HEADER = [
+        "Player",
+        "Slot",
+        "Where",
+        "Item",
+        "Count",
+        "Details",
+        "Data",
+        "Read at",
+        "Source"
+    ];
 
     it("escapes commas, quotes and line breaks, and never starts a formula", () => {
         expect(transfer.csvCell('a,"b"')).toBe('"a,""b"""');
@@ -383,7 +393,12 @@ describe("CSV", () => {
         bags.set("Alice", modernBag());
         const file = transfer.exportFile(
             [
-                { name: "Alice", takenAt: "2026-10-01T00:00:00.000Z", live: true, items: await bagOf("Alice") },
+                {
+                    name: "Alice",
+                    takenAt: "2026-10-01T00:00:00.000Z",
+                    live: true,
+                    items: await bagOf("Alice")
+                },
                 { name: "Bob", takenAt: "2026-10-01T00:00:00.000Z", live: false, items: [] }
             ],
             "1.21.4 NeoForge"
@@ -409,8 +424,18 @@ describe("CSV", () => {
         const row = (slot: string, count: string) =>
             `${transfer.CSV_MARK} v1 era=plain server= exported=2026-10-01T00:00:00.000Z\r\nh\r\nAlice,${slot},,minecraft:stone,${count},,,2026-10-01T00:00:00.000Z,live\r\n`;
         expect(transfer.parseTransfer(row("3", "5"))).toMatchObject({ ok: true });
-        for (const [slot, count] of [["", "5"], ["3", ""], [" 5", "5"], ["0x10", "5"], ["1e1", "5"], ["3", "2.0"]])
-            expect(transfer.parseTransfer(row(slot!, count!))).toEqual({ ok: false, problem: "notInventory" });
+        for (const [slot, count] of [
+            ["", "5"],
+            ["3", ""],
+            [" 5", "5"],
+            ["0x10", "5"],
+            ["1e1", "5"],
+            ["3", "2.0"]
+        ])
+            expect(transfer.parseTransfer(row(slot!, count!))).toEqual({
+                ok: false,
+                problem: "notInventory"
+            });
     });
 
     it("reads back a text cell that was kept from starting a formula", () => {
