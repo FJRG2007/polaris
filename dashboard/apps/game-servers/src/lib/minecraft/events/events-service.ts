@@ -634,7 +634,10 @@ export async function startEvent(input: {
         tally: {},
         votes: {},
         theme: null,
-        voting: false
+        voting: false,
+        doneOffered: false,
+        done: [],
+        buildEndsAt: null
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {

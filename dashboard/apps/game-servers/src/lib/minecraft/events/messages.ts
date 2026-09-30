@@ -996,6 +996,59 @@ export function voteTitle(language: Language): string {
     return language === "es" ? "&a¡A votar!" : "&aTime to vote!";
 }
 
+/** The [Done] button offered to each builder a while into the building. */
+export function doneOffer(language: Language): {
+    lead: string;
+    done: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: "&e¿Has terminado tu construcción?",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              done: { label: "[Terminado]", hover: "Cuando todos terminen, empieza la votación" }
+          }
+        : {
+              lead: "&eFinished your build?",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              done: { label: "[Done]", hover: "When everybody is done, the vote starts" }
+          };
+}
+
+/** Said to a builder who pressed [Done], with the way back. */
+export function doneMarked(language: Language): {
+    lead: string;
+    undo: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: "&aMarcado como terminado.",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              undo: { label: "[Seguir construyendo]", hover: "Quitar el terminado y seguir" }
+          }
+        : {
+              lead: "&aMarked as done.",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              undo: { label: "[Undo]", hover: "Take it back and keep building" }
+          };
+}
+
+/** Said to a builder who took [Done] back, before the button again. */
+export function undoMarked(language: Language): string {
+    return language === "es" ? "&7Sigues construyendo." : "&7Back to building.";
+}
+
+/** The side panel's title while builders mark themselves done. */
+export function doneListTitle(done: number, total: number, language: Language): string {
+    return language === "es" ? `&6&lTerminado: ${done}/${total}` : `&6&lDone: ${done}/${total}`;
+}
+
+/** Everybody still building is done: the vote comes early. */
+export function allDone(language: Language): string {
+    return language === "es"
+        ? "&aTodos han terminado: empieza la votación."
+        : "&aEverybody is done: the vote starts now.";
+}
+
 export function voteHow(language: Language): string {
     return language === "es"
         ? "&fEscribe en el chat el número de la mejor parcela, que no sea la tuya. Un voto cada uno."

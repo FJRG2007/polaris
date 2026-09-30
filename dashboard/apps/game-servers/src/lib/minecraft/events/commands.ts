@@ -1634,13 +1634,16 @@ export function release(
 // ------------------------------------------------------------------ joining with a click
 
 /**
- * What a player's [Join] and [Leave] buttons set: `/trigger` is the one command
- * every player may run without being an operator, so a click in the chat can
- * answer for them. 1 is join, 2 is leave; read and set back to 0 each tick.
+ * What a player's buttons set: `/trigger` is the one command every player may
+ * run without being an operator, so a click in the chat can answer for them.
+ * 1 is join, 2 is leave; 3 and 4 a builder's [Done] and [Undo]. Read and set
+ * back to 0 each tick.
  */
 export const JOIN_TRIGGER = "pe_join";
 export const JOIN_VALUE = 1;
 export const LEAVE_VALUE = 2;
+export const DONE_VALUE = 3;
+export const UNDO_VALUE = 4;
 
 /** The side panel through the countdown: who has joined so far. */
 export const JOIN_LIST = "pe_joined";
@@ -1693,36 +1696,49 @@ export function joinButtons(
     join: { label: string; hover: string },
     leave: { label: string; hover: string }
 ): string {
-    const button = (label: { label: string; hover: string }, color: string, value: number) => {
-        const command = `/trigger ${JOIN_TRIGGER} set ${value}`;
+    return buttonsLine("@a", lead, [
+        { ...join, color: "green", value: JOIN_VALUE },
+        { ...leave, color: "gray", value: LEAVE_VALUE }
+    ]);
+}
+
+/** A line to `target` - everybody, or one player - that ends in buttons, each
+ *  setting the trigger to its value when clicked. */
+export function buttonsLine(
+    target: string,
+    lead: string,
+    buttons: readonly { label: string; hover: string; color: string; value: number }[]
+): string {
+    const button = (one: (typeof buttons)[number]) => {
+        const command = `/trigger ${JOIN_TRIGGER} set ${one.value}`;
         return {
-            text: label.label,
-            color,
+            text: one.label,
+            color: one.color,
             bold: true,
             clickEvent: { action: "run_command", value: command },
             click_event: { action: "run_command", command },
-            hoverEvent: { action: "show_text", contents: label.hover },
-            hover_event: { action: "show_text", value: label.hover }
+            hoverEvent: { action: "show_text", contents: one.hover },
+            hover_event: { action: "show_text", value: one.hover }
         };
     };
     const intro = JSON.parse(text(lead)) as unknown;
-    const parts = [
-        "",
-        ...(Array.isArray(intro) ? intro : [intro]),
-        " ",
-        button(join, "green", JOIN_VALUE),
-        " ",
-        button(leave, "gray", LEAVE_VALUE)
-    ];
-    return `tellraw @a ${asciiJson(JSON.stringify(parts))}`;
+    const parts: unknown[] = ["", ...(Array.isArray(intro) ? intro : [intro])];
+    for (const one of buttons) parts.push(" ", button(one));
+    return `tellraw ${target} ${asciiJson(JSON.stringify(parts))}`;
 }
 
+const PRESSED: Readonly<Record<number, string>> = {
+    [JOIN_VALUE]: "join",
+    [LEAVE_VALUE]: "leave",
+    [DONE_VALUE]: "done",
+    [UNDO_VALUE]: "undo"
+};
+
 /** A chat line in the server log's own shape, for a button pressed: whatever
- *  reads the chat for `join` and `leave` reads a press the same way. */
+ *  reads the chat for `join`, `leave`, `done` or `undo` reads a press the same way. */
 export function pressedLine(name: string, value: number): string | null {
-    if (value === JOIN_VALUE) return `[00:00:00] [Server thread/INFO]: <${name}> join`;
-    if (value === LEAVE_VALUE) return `[00:00:00] [Server thread/INFO]: <${name}> leave`;
-    return null;
+    const word = PRESSED[value];
+    return word ? `[00:00:00] [Server thread/INFO]: <${name}> ${word}` : null;
 }
 
 export function cleanup(

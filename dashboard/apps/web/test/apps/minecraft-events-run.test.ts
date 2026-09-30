@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface World {
     online: string[];
+    /** Buttons pressed in the chat since the last look: the trigger's value by player. */
+    pressed: Record<string, number>;
     scores: Record<string, number>;
     chestOpenedAfter: number;
     chestChecks: number;
@@ -159,6 +161,7 @@ interface World {
 
 const world: World = {
     online: [],
+    pressed: {},
     scores: {},
     chestOpenedAfter: 3,
     chestChecks: 0,
@@ -500,6 +503,15 @@ const ESSENTIALS =
 function answer(sent: string): string {
     world.sent.push(sent);
     let line = sent;
+    if (line === "execute as @a[scores={pe_join=1..}] run scoreboard players get @s pe_join")
+        return Object.entries(world.pressed)
+            .filter(([name]) => world.online.includes(name))
+            .map(([name, value]) => `${name} has ${value} [pe_join]`)
+            .join("\n");
+    if (line === "scoreboard players set @a[scores={pe_join=1..}] pe_join 0") {
+        world.pressed = {};
+        return "";
+    }
     // No `execute if data` before 1.14: a chest is asked about by its loot table.
     if (/ if data /.test(line) && !events.atLeast(world.version, [1, 14]))
         return refuse(line, "Incorrect argument for command");
@@ -1276,6 +1288,7 @@ async function play(ms: number): Promise<void> {
 beforeEach(() => {
     vi.useFakeTimers({ now: Date.parse("2026-09-28T20:00:00Z") });
     world.online = ["Ana", "Ben"];
+    world.pressed = {};
     world.scores = {};
     world.chestOpenedAfter = 3;
     world.chestChecks = 0;
@@ -5400,6 +5413,95 @@ describe("a build battle", () => {
         expect(world.sent).toContain("gamemode survival Ana");
         expect(after.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+});
+
+describe("a build battle's [Done] button", () => {
+    const battle = (minutes = 3) => ({
+        ...catalog.newPreset("build-battle", "build"),
+        minutes,
+        options: { ...catalog.optionsSchemas["build-battle"].parse({}), voteSeconds: 30 }
+    });
+    const offers = (name: string) =>
+        world.sent.filter((line) => line.startsWith(`tellraw ${name} `) && line.includes("/trigger pe_join set 3"));
+    const panel = () =>
+        world.sent.filter((line) => line.startsWith("scoreboard objectives modify pe_joined displayname "));
+
+    it("is offered a minute in, and ends the building at once when every builder pressed it", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        world.links = { Ben: "user-es" };
+        world.locales = { "user-es": "es-ES" };
+        setUp([battle()]);
+        await joinAndStart("build");
+        const readyAt = state().run!.readyAt!;
+        // Not before a minute in: a third of three minutes is longer.
+        await play(readyAt + 50_000 - Date.now());
+        expect(offers("Ana")).toEqual([]);
+        await play(12_000);
+        expect(offers("Ana")).toHaveLength(1);
+        expect(offers("Ana")[0]).toContain("[Done]");
+        // In each builder's own language, and only to builders.
+        expect(offers("Ben")[0]).toContain("[Terminado]");
+        expect(offers("Cy")).toEqual([]);
+        // Clicked in either spelling of the click the game has had.
+        expect(offers("Ana")[0]).toContain('"click_event":{"action":"run_command","command":"/trigger pe_join set 3"}');
+        expect(offers("Ana")[0]).toContain('"clickEvent":{"action":"run_command","value":"/trigger pe_join set 3"}');
+
+        // Ana presses it, then takes it back; Ben types it.
+        world.pressed = { Ana: 3 };
+        await play(2_100);
+        expect(state().run?.done).toEqual(["Ana"]);
+        expect(world.sent.some((line) => line.startsWith("tellraw Ana ") && line.includes("/trigger pe_join set 4") && line.includes("[Undo]"))).toBe(true);
+        expect(panel().at(-1)).toContain("Done: 1/2");
+        world.pressed = { Ana: 4 };
+        await play(2_100);
+        expect(state().run?.done).toEqual([]);
+        expect(offers("Ana")).toHaveLength(2);
+        chat(["Ben", "terminado"]);
+        await play(2_100);
+        expect(state().run?.done).toEqual(["Ben"]);
+        expect(state().run?.voting).toBe(false);
+        expect(world.sent.some((line) => line.startsWith("tellraw Ben ") && line.includes("[Seguir construyendo]"))).toBe(true);
+
+        // The last one done: the vote starts now, with its own time ahead.
+        world.pressed = { Ana: 3 };
+        await play(2_100);
+        const run = state().run!;
+        expect(run.voting).toBe(true);
+        expect(run.buildEndsAt).not.toBeNull();
+        expect(run.endsAt - run.buildEndsAt!).toBe(30_000);
+        expect(run.buildEndsAt! - readyAt).toBeLessThan(3 * 60_000);
+        // The panel goes back to the votes, and the triggers are cleared at the end.
+        expect(world.sent).toContain("scoreboard objectives remove pe_joined");
+        expect(world.sent).toContain("scoreboard objectives setdisplay sidebar pe_score");
+        await play(40_000);
+        expect(state().run).toBeNull();
+        expect(world.sent).toContain("scoreboard objectives remove pe_join");
+    });
+
+    it("is not held up by a builder who left", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([battle()]);
+        await joinAndStart("build");
+        await play(state().run!.readyAt! + 62_000 - Date.now());
+        world.online = ["Ana"];
+        world.pressed = { Ana: 3 };
+        await play(2_100);
+        expect(state().run?.voting).toBe(true);
+    });
+
+    it("runs its whole time when somebody never presses it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([battle()]);
+        await joinAndStart("build");
+        const readyAt = state().run!.readyAt!;
+        await play(readyAt + 62_000 - Date.now());
+        world.pressed = { Ana: 3 };
+        await play(60_000);
+        expect(state().run?.voting).toBe(false);
+        expect(state().run?.buildEndsAt).toBeNull();
+        await play(readyAt + 3 * 60_000 + 2_100 - Date.now());
+        expect(state().run?.voting).toBe(true);
     });
 });
 

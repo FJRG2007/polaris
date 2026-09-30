@@ -194,6 +194,34 @@ export function kitCommands(name: string, marker: Marker): string[] {
     ];
 }
 
+// ------------------------------------------------------------------ done early
+
+/** How far into the building the [Done] button is offered: a minute, or a third
+ *  of the building time when that is shorter. */
+export function doneOfferAfter(buildMs: number): number {
+    return Math.min(60_000, Math.floor(buildMs / 3));
+}
+
+/** A builder saying they are done, or taking it back - pressed or typed. */
+export function readDone(said: string): "done" | "undo" | null {
+    const word = said.trim().toLowerCase();
+    if (word === "done" || word === "terminado") return "done";
+    if (word === "undo" || word === "seguir") return "undo";
+    return null;
+}
+
+/** Everybody still here is done: every builder on the server is in the list,
+ *  and there is at least one. A builder who left does not hold it up. */
+export function everybodyDone(
+    builders: readonly string[],
+    here: ReadonlySet<string>,
+    done: readonly string[]
+): boolean {
+    const present = builders.filter((name) => here.has(name.toLowerCase()));
+    const marked = new Set(done.map((name) => name.toLowerCase()));
+    return present.length > 0 && present.every((name) => marked.has(name.toLowerCase()));
+}
+
 // ------------------------------------------------------------------ the vote
 
 /** A plot's number, alone on the line: `3` or `#3`. */

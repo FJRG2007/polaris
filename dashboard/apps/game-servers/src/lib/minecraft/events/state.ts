@@ -194,7 +194,14 @@ export const runSchema = z.object({
     /** A build battle's theme, in the players' language. */
     theme: z.string().nullable().default(null),
     /** A build battle: the building is over and the vote is on. */
-    voting: z.boolean().default(false)
+    voting: z.boolean().default(false),
+    /** A build battle: the [Done] button has been offered to the builders. */
+    doneOffered: z.boolean().default(false),
+    /** A build battle: the builders who pressed [Done] and have not taken it back. */
+    done: z.array(z.string()).default([]),
+    /** A build battle: when the building ended early, everybody done - its own
+     *  time otherwise (`readyAt` and the minutes). */
+    buildEndsAt: z.number().nullable().default(null)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };

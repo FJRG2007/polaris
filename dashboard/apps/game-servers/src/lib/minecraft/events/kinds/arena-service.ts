@@ -591,7 +591,7 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
     const box = run.arena!.box;
     const now = ctx.now;
     const theme = run.theme ?? "";
-    const buildEnds = run.readyAt! + run.preset.minutes * 60_000;
+    const buildEnds = run.buildEndsAt ?? run.readyAt! + run.preset.minutes * 60_000;
     const memory = memoryOf(run.id);
     const count = run.joined.length;
     // The tour: everybody stands at one plot after another, a few seconds each.
@@ -631,11 +631,18 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
                 )
             );
         }
-        return;
+        // Everybody still here pressed [Done]: the vote now, not when the time is up.
+        if (!(await doneTick(ctx, lines, here))) return;
     }
     if (!run.voting) {
         // Said while building is not a vote.
         await ctx.chat();
+        // The list of who is done gives the side panel back to the votes.
+        if (run.doneOffered)
+            lines.push(
+                commands.JOIN_LIST_OFF,
+                `scoreboard objectives setdisplay sidebar ${commands.SCORE}`
+            );
         // The kit taken back, and any of it lying about, so nothing more can be
         // placed - on anybody's plot - while everybody tours them.
         if (run.marker) lines.push(arena.killMarkedDrops(box, run.marker));
@@ -704,6 +711,78 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
             )
         );
     }
+}
+
+/**
+ * The [Done] button, a while into the building: offered to each builder in
+ * their language, read with the join buttons' trigger (and typed `done` /
+ * `undo`), shown on the side panel as "Done: 2/5". True once every builder
+ * still on the server is done - the building then ends at once and the vote
+ * takes its own time from now.
+ */
+async function doneTick(
+    ctx: KindContext,
+    lines: string[],
+    here: ReadonlyMap<string, unknown>
+): Promise<boolean> {
+    const run = ctx.run;
+    const language = ctx.language;
+    if (ctx.now < run.readyAt! + build.doneOfferAfter(run.preset.minutes * 60_000)) return false;
+    const builders = new Map(run.entrants.map((one) => [lower(one.name), one.name]));
+    const doneButton = (lead: string, name: string) => {
+        const offer = messages.doneOffer(language);
+        return commands.buttonsLine(name, messages.tag(language) + lead, [
+            { ...offer.done, color: "green", value: commands.DONE_VALUE }
+        ]);
+    };
+    if (!run.doneOffered) {
+        lines.push(...commands.joinTriggerLines());
+        for (const name of builders.values())
+            lines.push(doneButton(messages.doneOffer(language).lead, name));
+        ctx.run = { ...ctx.run, doneOffered: true };
+        await ctx.persist();
+    }
+    let done = ctx.run.done;
+    for (const said of (await ctx.chat()) ?? []) {
+        const name = builders.get(lower(said.name));
+        const word = build.readDone(said.text);
+        if (!name || !word) continue;
+        const marked = done.some((one) => lower(one) === lower(name));
+        if (word === "done" && !marked) {
+            done = [...done, name];
+            const back = messages.doneMarked(language);
+            lines.push(
+                commands.buttonsLine(name, messages.tag(language) + back.lead, [
+                    { ...back.undo, color: "gray", value: commands.UNDO_VALUE }
+                ])
+            );
+        } else if (word === "undo" && marked) {
+            done = done.filter((one) => lower(one) !== lower(name));
+            lines.push(doneButton(messages.undoMarked(language), name));
+        }
+    }
+    if (done !== ctx.run.done) {
+        ctx.run = { ...ctx.run, done };
+        await ctx.persist();
+    }
+    const present = [...builders.values()].filter((name) => here.has(lower(name)));
+    const finished = present.filter((name) => done.some((one) => lower(one) === lower(name)));
+    lines.push(
+        ...commands.joinListLines(
+            messages.doneListTitle(finished.length, present.length, language),
+            finished
+        )
+    );
+    if (!build.everybodyDone([...builders.values()], new Set(here.keys()), done)) return false;
+    const options = run.preset.options as catalog.EventOptions<"build-battle">;
+    ctx.run = {
+        ...ctx.run,
+        buildEndsAt: ctx.now,
+        endsAt: ctx.now + options.voteSeconds * 1000
+    };
+    lines.push(commands.say(messages.tag(language) + messages.allDone(language)));
+    await ctx.persist();
+    return true;
 }
 
 // ------------------------------------------------------------------ the end
