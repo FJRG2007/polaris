@@ -79,7 +79,9 @@ export class EventStopped extends Error {}
 export class TooFew extends EventStopped {}
 
 const NO_PLACE = "No dry ground was found for it near the players";
-const TOO_FEW = "Fewer than two players joined";
+/** Why it was called off, as the history keeps it (and `messages.cancelReason`
+ *  says it to players). */
+const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it needs ${needed}`;
 /** How far from the players the ground under an arena is looked for. */
 const PLACE_DISTANCE = 32;
 /** Ticks an arena's chunks are waited for before its site is given up. */
@@ -200,7 +202,7 @@ async function enrol(ctx: KindContext, lines: string[]): Promise<void> {
             )
         ]);
         lines.length = 0;
-        throw new TooFew(TOO_FEW);
+        throw new TooFew(tooFew(taking.length, needed));
     }
     ctx.run = { ...ctx.run, joined: taking, enrolled: true };
     await ctx.persist();
@@ -374,8 +376,9 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 stash: null
             });
         }
-        if (run.entrants.length + fresh.length < catalog.joinersNeeded(run.preset)) {
-            throw new TooFew(TOO_FEW);
+        const needed = catalog.joinersNeeded(run.preset);
+        if (run.entrants.length + fresh.length < needed) {
+            throw new TooFew(tooFew(run.entrants.length + fresh.length, needed));
         }
         ctx.run = { ...ctx.run, entrants: [...run.entrants, ...fresh], marker, kit };
         await ctx.persist();

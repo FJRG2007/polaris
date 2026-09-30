@@ -466,6 +466,7 @@ describe("the editor in Spanish", () => {
             />
         );
         expect(screen.getByText("Fuera a (corazones)")).toBeTruthy();
+        expect(screen.getByText("Se cancela si se apuntan menos durante la cuenta atrás.")).toBeTruthy();
         expect(screen.getByText("El mismo para todos, y se retira al final.")).toBeTruthy();
         expect(screen.getByText(/La arena se construye 30 bloques en alto/)).toBeTruthy();
         expect(screen.queryByText(/around a player who is in the Overworld/)).toBeNull();
@@ -495,6 +496,9 @@ describe("the editor in Spanish", () => {
             />
         );
         expect(screen.getByText("Caza del tesoro")).toBeTruthy();
+        expect(screen.getByText("Mínimo de jugadores")).toBeTruthy();
+        expect(screen.getByText("No empieza con menos jugadores conectados.")).toBeTruthy();
+        expect((screen.getByLabelText(/^Mínimo de jugadores/) as HTMLInputElement).value).toBe("2");
         expect(screen.getAllByText("Ponle un nombre").length).toBeGreaterThan(0);
         fireEvent.change(screen.getByLabelText(/^Cofres/), { target: { value: "11" } });
         await waitFor(() => expect(screen.getAllByText("Como máximo 10").length).toBeGreaterThan(0));

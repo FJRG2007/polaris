@@ -198,7 +198,10 @@ function EventExplained({
                   rounds: (preset.options as catalog.EventOptions<"trivia">).rounds,
                   seconds: (preset.options as catalog.EventOptions<"trivia">).seconds
               })
-            : t("events.facts.lasts", { minutes: catalog.runMinutes(preset) })
+            : t("events.facts.lasts", { minutes: catalog.runMinutes(preset) }),
+        catalog.takesJoiners(preset)
+            ? t("events.facts.needsJoiners", { count: catalog.joinersNeeded(preset) })
+            : t("events.facts.needsPlayers", { count: catalog.minPlayersOf(preset) })
     ];
     if (preset.kind === "happy-hour") {
         const options = preset.options as catalog.EventOptions<"happy-hour">;

@@ -399,7 +399,28 @@ describe("a competition with prizes, on its own", () => {
         expect(catalog.awardsPrizes(happy)).toBe(false);
         expect(catalog.awardsPrizes(unrewarded)).toBe(false);
         expect(catalog.activeNeeded(happy, loose)).toBe(1);
-        expect(catalog.activeNeeded(unrewarded, loose)).toBe(1);
+        expect(catalog.activeNeeded({ ...unrewarded, minPlayers: 1 }, loose)).toBe(1);
+    });
+
+    it("waits for the event's own minimum of players, two for a competition by default", () => {
+        expect(catalog.minPlayersOf(unrewarded)).toBe(2);
+        expect(catalog.activeNeeded(unrewarded, loose)).toBe(2);
+        expect(catalog.minPlayersOf(happy)).toBe(1);
+        expect(catalog.activeNeeded({ ...happy, minPlayers: 3 }, loose)).toBe(3);
+        // Saved before the setting existed: the kind's default.
+        expect(catalog.minPlayersOf({ ...fishing, minPlayers: undefined })).toBe(2);
+        expect(catalog.minPlayersOf({ ...happy, minPlayers: undefined })).toBe(1);
+        // Never fewer than two join a duel, and more when the event asks for more.
+        const duel = catalog.newPreset("team-duel", "duel");
+        expect(catalog.joinersNeeded({ ...duel, minPlayers: 1 })).toBe(2);
+        expect(catalog.joinersNeeded({ ...duel, minPlayers: 4 })).toBe(4);
+        const bare = { first: catalog.NO_REWARD, second: catalog.NO_REWARD, third: catalog.NO_REWARD };
+        const practice = {
+            ...catalog.newPreset("parkour", "p"),
+            minPlayers: 1,
+            rewards: { ...bare, everyone: catalog.NO_REWARD }
+        };
+        expect(catalog.joinersNeeded(practice)).toBe(1);
     });
 
     it("is left out of the draw for one player alone, who still gets the rest", () => {

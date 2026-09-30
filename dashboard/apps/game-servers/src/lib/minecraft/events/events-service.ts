@@ -510,6 +510,12 @@ export async function startEvent(input: {
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error(refused("notRunning"));
     if (seen.size === 0) throw new Error(refused("nobodyOn"));
+    // Its own minimum, counted on the server as it starts - or, for an event
+    // players join, on who joined when the countdown ends.
+    const fewest = catalog.minPlayersOf(preset);
+    if (!catalog.takesJoiners(preset) && seen.size < fewest) {
+        throw new Error(refused("tooFewPlayers", { count: seen.size, needed: fewest }));
+    }
     // The chunks somebody already keeps loaded - a farm, a spawn - before the
     // event loads any: whatever it lets go of at the end, never these.
     const keepForced = await withServerContainer(

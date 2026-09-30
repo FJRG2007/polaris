@@ -1763,6 +1763,46 @@ describe("the minute sweep", () => {
         expect(state().run?.trigger).toBe("random");
     });
 
+    it("does not start with fewer players on than its minimum, and says why", async () => {
+        world.online = ["Ana"];
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }]);
+        const refused = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "rush",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        expect(refused).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+        expect(world.sent.some((line) => line.includes("bossbar add"))).toBe(false);
+        // An operator who lets one play alone sets the minimum to one.
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3, minPlayers: 1 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        expect(state().run?.preset.id).toBe("rush");
+    });
+
+    it("skips, not fails, a scheduled event below its own minimum", async () => {
+        world.online = ["Ana", "Ben"];
+        const boost = { ...catalog.newPreset("xp-boost", "boost"), minutes: 5, minPlayers: 3 };
+        setUp([boost], { minActive: 1 }, [
+            { id: "at8", presetId: "boost", enabled: true, days: [], at: "20:00" }
+        ]);
+        await events.sweepEvents();
+        const entry = state().history[0];
+        expect(entry).toMatchObject({ outcome: "skipped", trigger: "scheduled" });
+        expect(entry?.note).toMatch(/^Skipped: [0-2] active of the 3 it waits for$/);
+        expect(state().run).toBeNull();
+    });
+
     it("skips a scheduled event when too few are playing, and says so", async () => {
         const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 5 };
         world.online = ["Ana"];
@@ -2200,7 +2240,7 @@ describe("the others", () => {
 
     it("draws the circle's edge and a column of light, and tells each player the way", async () => {
         world.online = ["Ana"];
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3, minPlayers: 1 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -4759,6 +4799,27 @@ describe("a team duel", () => {
         expect(state().run).toBeNull();
     });
 
+    it("is called off, with the reason, when fewer join than the event's own minimum", async () => {
+        world.online = ["Ana", "Ben", "Cai"];
+        setUp([{ ...duelOf(), minPlayers: 3 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "duel",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(40_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 2 joined; it needs 3"
+        });
+        expect(fills()).toEqual([]);
+    });
+
     it("is off, with nothing built and nobody moved, when fewer than two join", async () => {
         setUp([duelOf()]);
         await events.startEvent({
@@ -4775,7 +4836,7 @@ describe("a team duel", () => {
         expect(after.run).toBeNull();
         expect(after.history[0]).toMatchObject({
             outcome: "cancelled",
-            note: "Fewer than two players joined"
+            note: "Only 1 joined; it needs 2"
         });
         expect(fills()).toEqual([]);
         expect(world.sent.some((line) => / run tp (Ana|Ben) /.test(line))).toBe(false);

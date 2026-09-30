@@ -1028,6 +1028,31 @@ export function EventEditor({
                         </Field>
                     )}
 
+                    <Field
+                        label={t("editor.minPlayers")}
+                        hint={
+                            catalog.takesJoiners(draft)
+                                ? t("editor.minPlayersJoined")
+                                : t("editor.minPlayersOnline")
+                        }
+                        problem={problemAt(issues, "minPlayers")}
+                    >
+                        <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            className="w-32"
+                            value={
+                                Number.isFinite(catalog.minPlayersOf(draft))
+                                    ? catalog.minPlayersOf(draft)
+                                    : ""
+                            }
+                            onChange={(event) =>
+                                change({ minPlayers: numberOf(event.target.value) })
+                            }
+                        />
+                    </Field>
+
                     <OptionsFields
                         preset={draft}
                         issues={issues}

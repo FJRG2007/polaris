@@ -382,6 +382,16 @@ const presetBase = z.object({
      *  for taking part. Absent on an event saved before it existed, which then
      *  reads its kind's default (`minScoreOf`). */
     minScore: z.number().int().min(1, problem("atLeast", { count: 1 })).max(1_000_000).optional(),
+    /** Below this many players it does not go ahead: players who joined, for an
+     *  event players join; players on the server when it starts, for the rest.
+     *  Absent on an event saved before it existed, which then reads its kind's
+     *  default (`minPlayersOf`). */
+    minPlayers: z
+        .number()
+        .int()
+        .min(1, problem("atLeast", { count: 1 }))
+        .max(50, problem("atMost", { count: 50 }))
+        .optional(),
     rewards: rewardsSchema
 });
 
@@ -670,6 +680,7 @@ export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].e
                   ? 5
                   : 10,
         minScore: DEFAULT_MIN_SCORE[kind],
+        minPlayers: defaultMinPlayers(kind),
         options,
         rewards: KIND_INFO[kind].competitive
             ? DEFAULT_REWARDS
@@ -770,9 +781,18 @@ export function awardsPrizes(preset: EventPreset): boolean {
 export const PRIZE_COMPETITION_FLOOR = 2;
 
 export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
-    return awardsPrizes(preset)
-        ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR)
-        : settings.minActive;
+    const floor = Math.max(settings.minActive, minPlayersOf(preset));
+    return awardsPrizes(preset) ? Math.max(floor, PRIZE_COMPETITION_FLOOR) : floor;
+}
+
+/** The fewest players an event goes ahead with (`minPlayers`): two for a
+ *  competition, one for the rest, unless the operator chose otherwise. */
+export function minPlayersOf(preset: EventPreset): number {
+    return preset.minPlayers ?? defaultMinPlayers(preset.kind);
+}
+
+export function defaultMinPlayers(kind: EventKind): number {
+    return KIND_INFO[kind].competitive ? 2 : 1;
 }
 
 /**
@@ -992,13 +1012,15 @@ export function countdownSecondsFor(preset: EventPreset, settings: EventSettings
         : settings.countdownSeconds;
 }
 
-/** How many must join for it to go ahead: two for what one player cannot play -
- *  a spleef, a duel, a build battle voted on by the others - and for any
- *  competition with prizes. */
+/** How many must join for it to go ahead: the event's own minimum, and never
+ *  fewer than two for what one player cannot play - a spleef, a duel, a build
+ *  battle voted on by the others - or for any competition with prizes. */
 export function joinersNeeded(preset: EventPreset): number {
-    return preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
-        ? PRIZE_COMPETITION_FLOOR
-        : 1;
+    const floor =
+        preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
+            ? PRIZE_COMPETITION_FLOOR
+            : 1;
+    return Math.max(floor, minPlayersOf(preset));
 }
 
 /** The events players fight each other in, which a server with PvP off cannot run. */

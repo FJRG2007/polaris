@@ -1672,7 +1672,9 @@
             "third": "3.º",
             "takingPart": "por participar",
             "prizes": "Premios - {list}.",
-            "noPrizes": "Sin premios."
+            "noPrizes": "Sin premios.",
+            "needsPlayers": "{count, plural, one {Necesita # jugador conectado.} other {Necesita # jugadores conectados.}}",
+            "needsJoiners": "{count, plural, one {Sigue adelante con # jugador apuntado.} other {Sigue adelante con # jugadores apuntados, o se cancela.}}"
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -1700,7 +1702,8 @@
             "needsNewer": "{kind} necesita Minecraft 1.16 o posterior, y este servidor usa una versión anterior.",
             "anotherOn": "Ya hay otro evento en marcha. Deja que acabe o cancélalo antes.",
             "noneOn": "Nada en marcha",
-            "alreadyStarted": "Ya ha empezado"
+            "alreadyStarted": "Ya ha empezado",
+            "tooFewPlayers": "{count, plural, one {Solo hay # jugador conectado} other {Solo hay # jugadores conectados}}; este evento necesita {needed}"
         },
         "starting": "{name} está empezando.",
         "deleteTitle": "¿Borrar {name}?",
@@ -1980,7 +1983,10 @@
         "perKill": "Extra por mob matado",
         "perKillHint": "Puntos de experiencia, de 0 a 100. Un zombi da 5.",
         "perOre": "Extra por mena minada",
-        "perOreHint": "Puntos de experiencia, de 0 a 100. La mena de carbón da hasta 2."
+        "perOreHint": "Puntos de experiencia, de 0 a 100. La mena de carbón da hasta 2.",
+        "minPlayers": "Mínimo de jugadores",
+        "minPlayersJoined": "Se cancela si se apuntan menos durante la cuenta atrás.",
+        "minPlayersOnline": "No empieza con menos jugadores conectados."
     },
     "moderation": {
         "announcements": {

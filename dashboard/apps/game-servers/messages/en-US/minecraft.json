@@ -1672,7 +1672,9 @@
             "third": "3rd",
             "takingPart": "taking part",
             "prizes": "Prizes - {list}.",
-            "noPrizes": "No prizes set."
+            "noPrizes": "No prizes set.",
+            "needsPlayers": "{count, plural, one {Needs # player on the server.} other {Needs # players on the server.}}",
+            "needsJoiners": "{count, plural, one {Goes ahead with # player joined.} other {Goes ahead with # players joined, or is called off.}}"
         },
         "errors": {
             "read": "The events could not be read",
@@ -1700,7 +1702,8 @@
             "needsNewer": "{kind} needs Minecraft 1.16 or later, and this server runs an older one.",
             "anotherOn": "Another event is on. Let it finish or cancel it first.",
             "noneOn": "No event is on",
-            "alreadyStarted": "It has already started"
+            "alreadyStarted": "It has already started",
+            "tooFewPlayers": "{count, plural, one {Only # player is on the server} other {Only # players are on the server}}; this event needs {needed}"
         },
         "starting": "{name} is starting.",
         "deleteTitle": "Delete {name}?",
@@ -1980,7 +1983,10 @@
         "perKill": "Extra per mob killed",
         "perKillHint": "Experience points, 0 to 100. A zombie gives 5.",
         "perOre": "Extra per ore mined",
-        "perOreHint": "Experience points, 0 to 100. Coal ore gives up to 2."
+        "perOreHint": "Experience points, 0 to 100. Coal ore gives up to 2.",
+        "minPlayers": "Minimum player count",
+        "minPlayersJoined": "Called off when fewer join during the countdown.",
+        "minPlayersOnline": "It does not start with fewer players on the server."
     },
     "moderation": {
         "announcements": {
