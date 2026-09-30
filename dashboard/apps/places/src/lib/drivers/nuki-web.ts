@@ -107,7 +107,7 @@ const LOG_VIA: Readonly<Record<number, string>> = {
  *  and they are the reason anybody opens the history. */
 const LOG_FAILURES: Readonly<Record<number, string>> = {
     1: "the motor was blocked",
-    2: "it was cancelled",
+    2: "it was canceled",
     3: "it had just been asked",
     4: "the lock was busy",
     5: "the battery is too low to turn the motor",
@@ -117,8 +117,8 @@ const LOG_FAILURES: Readonly<Record<number, string>> = {
     9: "the lock refused it",
     10: "night mode refused it",
     224: "the code was wrong",
-    225: "the fingerprint was not recognised",
-    226: "the tag was not recognised",
+    225: "the fingerprint was not recognized",
+    226: "the tag was not recognized",
     254: "the lock reported an error",
     255: "the lock reported an error"
 };
