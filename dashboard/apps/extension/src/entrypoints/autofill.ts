@@ -197,9 +197,11 @@ async function start(): Promise<void> {
         passwordAsked.add(box);
         // The fill puts the cursor in the box as it types, and the list must not
         // drop down there to offer what is being typed.
+        const offered = offeredOn.has(box);
         offeredOn.add(box);
         void askBackground({ kind: "continueSignIn" }).then((reply) => {
             if (reply.ok) dismiss();
+            else if (!offered) offeredOn.delete(box);
         });
     };
 
@@ -221,11 +223,13 @@ async function start(): Promise<void> {
         const [first] = boxes;
         if (!first || claimed.has(first) || boxes.some((box) => box.value !== "")) return;
         claimed.add(first);
-        for (const box of boxes) offeredOn.add(box);
+        const fresh = boxes.filter((box) => !offeredOn.has(box));
+        for (const box of fresh) offeredOn.add(box);
         void askBackground({ kind: "secondStepCode" }).then((reply) => {
             // A list that dropped down on the box while the code was on its way
             // is offering what has just been typed.
             if (reply.ok) dismiss();
+            else for (const box of fresh) offeredOn.delete(box);
         });
     };
 

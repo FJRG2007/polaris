@@ -2164,7 +2164,15 @@ function typeIntoPage(
                 (element) =>
                     last.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING
             );
-            return after.find(isSubmitType) ?? fitting.find(isSubmitType) ?? after[0] ?? null;
+            const labelled = after.filter((element) =>
+                [
+                    element.textContent ?? "",
+                    element.getAttribute("aria-label") ?? "",
+                    element.getAttribute("title") ?? "",
+                    element instanceof HTMLInputElement ? element.value : ""
+                ].some((text) => text.trim() !== "")
+            );
+            return after.find(isSubmitType) ?? fitting.find(isSubmitType) ?? labelled[0] ?? null;
         };
         const disabled = (element: Element): boolean =>
             (element as HTMLButtonElement).disabled === true ||
@@ -2180,8 +2188,8 @@ function typeIntoPage(
                 window.setTimeout(press, 150);
                 return;
             }
-            if (found && !disabled(found)) {
-                (found as HTMLElement).click();
+            if (found) {
+                if (!disabled(found)) (found as HTMLElement).click();
                 return;
             }
             if (last.form) {
@@ -2218,11 +2226,12 @@ function typeIntoPage(
 async function fill(
     id: string,
     page: PageContext | null = null,
-    only: "code" | null = null
+    only: "code" | null = null,
+    submit = false
 ): Promise<messages.Reply> {
     const target = page ?? (await activeTab());
     if (!target) return { ok: false, error: await say("errors.noPageToFill") };
-    const running = fillTab(id, target, only);
+    const running = fillTab(id, target, only, submit);
     filling.set(target.tabId, running);
     try {
         return await running;
@@ -2244,7 +2253,8 @@ const filling = new Map<number, Promise<messages.Reply>>();
 async function fillTab(
     id: string,
     target: PageContext,
-    only: "code" | null
+    only: "code" | null,
+    submit: boolean
 ): Promise<messages.Reply> {
     const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
@@ -2281,8 +2291,8 @@ async function fillTab(
             func: typeIntoPage,
             args:
                 only === "code"
-                    ? [null, null, code, true]
-                    : [login.username, login.password, code, true]
+                    ? [null, null, code, submit]
+                    : [login.username, login.password, code, submit]
         });
         const filled = outcome?.result as
             | { user?: boolean; pass?: boolean; code?: boolean }
@@ -2924,7 +2934,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 }
                 // Typed and submitted here, like the steps before it, so the
                 // page is never handed the code to do it with.
-                return fill(held.itemId, page, "code");
+                return fill(held.itemId, page, "code", true);
             }
 
             case "continueSignIn": {
@@ -2937,7 +2947,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // is - the site switched off, the item saved for this page - and
                 // it is what remembers the code step, when the login has one.
                 await SECOND_STEP.setValue(null);
-                return fill(held.itemId, page);
+                return fill(held.itemId, page, null, true);
             }
 
             case "openUnlock":
@@ -3054,7 +3064,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "fill":
-                return fill(request.id, page);
+                return fill(request.id, page, null, true);
 
             // Both end in a sync, so both write the items of whichever account was
             // in front when they started - which has to still be the one in front
