@@ -33,13 +33,12 @@
  */
 
 import { prisma } from "@polaris/db";
-import { host } from "@polaris/app-host";
 import { addressMatches } from "./access";
 import { BROADCAST_TAG } from "./broadcast";
 import { parseJoinAddresses } from "./parse";
 import { gameOfServer } from "@polaris/core";
 import { playerSelector } from "./announcement";
-import { editionOf, withServerContainer } from "./service";
+import { editionOf, readPlayerLog, withServerContainer } from "./service";
 import { signInAddresses } from "../game-sign-in-addresses";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 
@@ -75,11 +74,6 @@ const LEAST_LABEL = 16;
 
 /** The shortest the words are cut to so the line fits in one command. */
 const LEAST_TEXT = 24;
-
-/** How much log to read back for a player's join line, as the address sweep does. */
-const JOIN_LOG_TAIL = 400;
-
-const { readAppRuntimeLog } = host.deployService;
 
 /** The game's formatting character and anything that is not a printable line. */
 function literal(value: string, max: number): string {
@@ -200,7 +194,7 @@ export async function relayTargets(
         let found = joins.get(install.id);
         if (!found) {
             found = install.applicationId
-                ? readAppRuntimeLog(install.applicationId, install.ownerId, JOIN_LOG_TAIL)
+                ? readPlayerLog(install.ownerId, install.id)
                       .then(parseJoinAddresses)
                       .catch(() => new Map<string, string>())
                 : Promise.resolve(new Map<string, string>());

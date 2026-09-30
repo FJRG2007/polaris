@@ -29,6 +29,7 @@ import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
+import { PLAYER_LOG_SCRIPT, playerLogLines } from "./player-log";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
@@ -1125,15 +1126,35 @@ export async function setPlayerExperience(
     });
 }
 
+/**
+ * The server's lines about players arriving and leaving, as container-log lines
+ * (`<RFC3339> <line>`), oldest first.
+ *
+ * Picked out of the server's own log files inside the container (see
+ * `player-log`), because the container's log is where every RCON command Polaris
+ * sends leaves two lines, and its tail can hold nothing else. The container's log
+ * is still read when that finds no files - Bedrock writes none - or the container
+ * cannot be asked, which is also the only record of a server that is not running.
+ */
+export async function readPlayerLog(ownerId: string, installedAppId: string): Promise<string> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (install.edition === "java" && install.running) {
+        const picked = await withPorts(install, ownerId, (ports) =>
+            ports.runIn(install.container, ["sh", "-c", PLAYER_LOG_SCRIPT])
+        )
+            .then((result) => (result.code === 0 ? playerLogLines(result.output) : null))
+            .catch(() => null);
+        if (picked !== null) return picked;
+    }
+    return readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL);
+}
+
 /** Every join and leave the server's log still holds, oldest first. */
 export async function getPlayerSessions(
     ownerId: string,
     installedAppId: string
 ): Promise<readonly PlayerSessionEvent[]> {
-    const install = await resolveInstall(ownerId, installedAppId);
-    return parsePlayerSessions(
-        await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL)
-    );
+    return parsePlayerSessions(await readPlayerLog(ownerId, installedAppId));
 }
 
 /**

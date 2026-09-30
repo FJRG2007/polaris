@@ -137,6 +137,7 @@ vi.mock("@polaris-app/game-servers/src/lib/game-sign-in-addresses", () => ({
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: () => "java",
+    readPlayerLog: async () => joinLog,
     getServerPlayers: async () => ({
         answering: true,
         players: { online: online.length, max: 20, players: online }
