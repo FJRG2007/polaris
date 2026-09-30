@@ -112,7 +112,10 @@ const SERVICE_IMAGES: Record<string, string> = {
     // Tuya publish no vector mark anywhere that is theirs to take one from, so
     // this is their own icon file. One flat brand orange on nothing, which is why
     // it reads on both surfaces without being touched.
-    tuya: "/logos/tuya.webp"
+    tuya: "/logos/tuya.webp",
+    // SwitchBot's own wordmark, as their site serves it (switch-bot.com). Not in
+    // any vector registry; their single brand red reads on both surfaces.
+    switchbot: "/logos/switchbot.svg"
 };
 
 /**

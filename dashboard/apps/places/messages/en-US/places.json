@@ -500,7 +500,14 @@
         "haRestarting": "Home Assistant is restarting. Try again in a moment.",
         "haUnsupported": "Home Assistant would not do that. The device may not support it.",
         "haRefused": "Home Assistant refused the request.",
-        "haNothing": "Home Assistant has no switches, lights, locks or sensors for Polaris to show."
+        "haNothing": "Home Assistant has no switches, lights, locks or sensors for Polaris to show.",
+        "switchbotKeys": "SwitchBot refused the token and secret. They may have been reset in the app, or today's allowance of requests is used up.",
+        "switchbotUnreachable": "SwitchBot could not be reached. Try again in a moment.",
+        "switchbotRate": "SwitchBot is answering too many requests at once. Try again in a minute.",
+        "switchbotOdd": "SwitchBot answered with something unexpected.",
+        "switchbotOffline": "The device is not answering SwitchBot right now.",
+        "switchbotRefused": "SwitchBot refused the request.",
+        "switchbotCannot": "A SwitchBot device cannot be told to do that"
     },
     "connections": {
         "nuki-web": {
@@ -732,6 +739,27 @@
                 "token": {
                     "label": "Access token",
                     "placeholder": "Paste the long-lived token"
+                }
+            }
+        },
+        "switchbot-cloud": {
+            "label": "SwitchBot account",
+            "summary": "Plugs, Bots, locks, lights and sensors on your SwitchBot account, reachable from anywhere.",
+            "note": "Everything goes through SwitchBot's servers, so Bluetooth devices need a SwitchBot Hub. The account allows 10,000 requests a day, so the state shown here can be a few minutes old until you refresh. Curtains, humidifiers and infrared remotes are left out for now.",
+            "steps": {
+                "s0": "Open the SwitchBot app, then Profile > Preferences > About.",
+                "s1": "Tap the app version ten times until Developer Options appears.",
+                "s2": "Open Developer Options, tap Get Token, and copy the token and the secret key here."
+            },
+            "link": "SwitchBot's API documentation",
+            "fields": {
+                "token": {
+                    "label": "Token",
+                    "placeholder": "Found in Developer Options"
+                },
+                "secret": {
+                    "label": "Secret key",
+                    "placeholder": "Shown under the token"
                 }
             }
         },

@@ -135,6 +135,13 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Home Assistant would not do that. The device may not support it.", "refusals.haUnsupported"],
     ["Home Assistant refused the request.", "refusals.haRefused"],
     ["Home Assistant has no switches, lights, locks or sensors for Polaris to show.", "refusals.haNothing"],
+    ["SwitchBot refused the token and secret. They may have been reset in the app, or today's allowance of requests is used up.", "refusals.switchbotKeys"],
+    ["SwitchBot could not be reached. Try again in a moment.", "refusals.switchbotUnreachable"],
+    ["SwitchBot is answering too many requests at once. Try again in a minute.", "refusals.switchbotRate"],
+    ["SwitchBot answered with something unexpected.", "refusals.switchbotOdd"],
+    ["The device is not answering SwitchBot right now.", "refusals.switchbotOffline"],
+    ["SwitchBot refused the request.", "refusals.switchbotRefused"],
+    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

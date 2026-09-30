@@ -500,7 +500,14 @@
         "haRestarting": "Home Assistant se está reiniciando. Inténtalo en un momento.",
         "haUnsupported": "Home Assistant no lo hizo. Puede que el dispositivo no lo admita.",
         "haRefused": "Home Assistant rechazó la petición.",
-        "haNothing": "Home Assistant no tiene interruptores, luces, cerraduras ni sensores que Polaris pueda mostrar."
+        "haNothing": "Home Assistant no tiene interruptores, luces, cerraduras ni sensores que Polaris pueda mostrar.",
+        "switchbotKeys": "SwitchBot rechazó el token y la clave. Puede que se cambiaran en la app o que se haya agotado el cupo de peticiones de hoy.",
+        "switchbotUnreachable": "No se pudo llegar a SwitchBot. Inténtalo en un momento.",
+        "switchbotRate": "SwitchBot está recibiendo demasiadas peticiones. Inténtalo en un minuto.",
+        "switchbotOdd": "SwitchBot respondió algo inesperado.",
+        "switchbotOffline": "El dispositivo no responde a SwitchBot ahora mismo.",
+        "switchbotRefused": "SwitchBot rechazó la petición.",
+        "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso"
     },
     "connections": {
         "nuki-web": {
@@ -732,6 +739,27 @@
                 "token": {
                     "label": "Token de acceso",
                     "placeholder": "Pega el token de larga duración"
+                }
+            }
+        },
+        "switchbot-cloud": {
+            "label": "Cuenta de SwitchBot",
+            "summary": "Enchufes, Bots, cerraduras, luces y sensores de tu cuenta de SwitchBot, desde cualquier sitio.",
+            "note": "Todo pasa por los servidores de SwitchBot, así que los dispositivos Bluetooth necesitan un SwitchBot Hub. La cuenta permite 10.000 peticiones al día, así que el estado puede tener unos minutos hasta que actualices. Cortinas, humidificadores y mandos infrarrojos quedan fuera por ahora.",
+            "steps": {
+                "s0": "Abre la app SwitchBot y ve a Perfil > Preferencias > Acerca de.",
+                "s1": "Toca la versión de la app diez veces hasta que aparezcan las Opciones de desarrollador.",
+                "s2": "Abre las Opciones de desarrollador, toca Get Token y copia aquí el token y la clave secreta."
+            },
+            "link": "la documentación de SwitchBot",
+            "fields": {
+                "token": {
+                    "label": "Token",
+                    "placeholder": "De Opciones de desarrollador"
+                },
+                "secret": {
+                    "label": "Clave secreta",
+                    "placeholder": "Aparece bajo el token"
                 }
             }
         },

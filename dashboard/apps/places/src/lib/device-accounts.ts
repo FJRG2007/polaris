@@ -24,6 +24,7 @@ import { NUKI_WEB, nukiWebDriver } from "./drivers/nuki-web";
 import { NUKI_LOCAL, nukiLocalDriver } from "./drivers/nuki-local";
 import { TUYA_CLOUD, tuyaCloudDriver } from "./drivers/tuya-cloud";
 import { MQTT_DISCOVERY, mqttDiscoveryDriver } from "./drivers/mqtt-discovery";
+import { SWITCHBOT_CLOUD, switchBotCloudDriver } from "./drivers/switchbot-cloud";
 import { HOME_ASSISTANT, homeAssistantDriver } from "./drivers/home-assistant";
 import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
 import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
@@ -47,7 +48,8 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [SHELLY_LOCAL]: shellyLocalDriver,
     [HUE_BRIDGE]: hueBridgeDriver,
     [DIRIGERA_HUB]: dirigeraHubDriver,
-    [HOME_ASSISTANT]: homeAssistantDriver
+    [HOME_ASSISTANT]: homeAssistantDriver,
+    [SWITCHBOT_CLOUD]: switchBotCloudDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {

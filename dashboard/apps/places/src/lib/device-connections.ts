@@ -106,6 +106,7 @@ export interface DeviceConnection {
 
 const NUKI_TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
 const TUYA_CONSOLE = "https://iot.tuya.com/";
+const SWITCHBOT_API_DOCS = "https://github.com/OpenWonderLabs/SwitchBotAPI";
 
 /**
  * Every way in, best first within each brand.
@@ -510,6 +511,44 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["switch", "outlet", "light", "lock", "sensor"],
         search: ["home assistant", "hass", "homeassistant", "zigbee", "z-wave", "zwave", "local", "whole house"]
+    },
+    // SwitchBot: their cloud API is the one documented way in, and the most
+    // convenient - a token and a secret from the app, and every device on the
+    // account arrives, including the Bluetooth ones behind a hub.
+    {
+        id: "switchbot-cloud",
+        brand: "SwitchBot",
+        logo: "switchbot",
+        label: en("connections.switchbot-cloud.label"),
+        reach: "anywhere",
+        summary: en("connections.switchbot-cloud.summary"),
+        note: en("connections.switchbot-cloud.note"),
+        steps: [
+            en("connections.switchbot-cloud.steps.s0"),
+            en("connections.switchbot-cloud.steps.s1"),
+            en("connections.switchbot-cloud.steps.s2")
+        ],
+        link: { label: en("connections.switchbot-cloud.link"), href: SWITCHBOT_API_DOCS },
+        fields: [
+            {
+                key: "token",
+                label: en("connections.switchbot-cloud.fields.token.label"),
+                placeholder: en("connections.switchbot-cloud.fields.token.placeholder"),
+                secret: true,
+                minLength: 16,
+                maxLength: 500
+            },
+            {
+                key: "secret",
+                label: en("connections.switchbot-cloud.fields.secret.label"),
+                placeholder: en("connections.switchbot-cloud.fields.secret.placeholder"),
+                secret: true,
+                minLength: 8,
+                maxLength: 500
+            }
+        ],
+        kinds: ["outlet", "switch", "lock", "light", "sensor"],
+        search: ["switchbot", "switch bot", "bot", "smart lock", "plug mini", "meter", "contact sensor", "curtain"]
     }
 ];
 
