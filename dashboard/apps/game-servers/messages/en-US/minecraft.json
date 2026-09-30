@@ -1607,7 +1607,7 @@
             "skipped": "Skipped",
             "failed": "Failed"
         },
-        "levels": "{count} levels",
+        "levels": "{count, plural, one {# level} other {# levels}}",
         "nothing": "Nothing",
         "difficulties": {
             "easy": "easy",
@@ -1712,7 +1712,6 @@
         "nextFrom": "The next drawn event comes from {date}.",
         "rounds": "{count} rounds",
         "minutes": "{count} min",
-        "firstPlace": "first place: {reward}",
         "canComeRound": "{name} can come round on its own",
         "whatIs": "What {name} is",
         "runNow": "Run {name} now",
@@ -1792,6 +1791,11 @@
             "busyNow": "Waiting: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Waiting for # active player in the Overworld ({have} now)} other {Waiting for # active players in the Overworld ({have} now)}}} other {{needed, plural, one {Waiting for # active player ({have} now)} other {Waiting for # active players ({have} now)}}}}",
             "couldNotStart": "The drawn event could not start"
+        },
+        "prizes": {
+            "entry": "{place} {reward}",
+            "everyone": "All: {reward}",
+            "none": "No prizes"
         }
     },
     "editor": {

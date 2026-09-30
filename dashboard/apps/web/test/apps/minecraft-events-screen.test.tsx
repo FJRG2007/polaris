@@ -144,6 +144,32 @@ describe("the Events tab", () => {
         expect(screen.getByText(/Prizes - 1st: 5 diamond, 15 levels/)).toBeTruthy();
     });
 
+    it("lists every prize of an event on its row, whole in the tooltip", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view });
+        const line =
+            "1st 5 diamond + 15 levels · 2nd 3 diamond + 10 levels · 3rd 1 diamond + 5 levels · All: 8 experience bottle";
+        const row = await screen.findAllByTitle(`Fishing contest - 10 min - ${line}`);
+        expect(row[0]?.textContent).toBe(`Fishing contest - 10 min - ${line}`);
+        expect(row[0]?.className).toContain("truncate");
+    });
+
+    it("lists the prizes in the reader's language, and says when there are none", async () => {
+        locale = "es-ES";
+        const nothing = { items: [], levels: 0 };
+        const bare = { first: nothing, second: nothing, third: nothing, everyone: nothing };
+        const none = { ...catalog.newPreset("mining-rush", "rush"), rewards: bare };
+        const levels = {
+            ...catalog.newPreset("fishing", "fish"),
+            rewards: { ...bare, first: { items: [], levels: 1 }, everyone: { items: [], levels: 2 } }
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: { ...view, config: { ...config, presets: [levels, none] } } });
+        const row = await screen.findByText(/1\.º 1 nivel · Todos: 2 niveles$/);
+        expect(row.textContent).toMatch(/^Concurso de pesca - /);
+        expect(screen.getByText(/ - Sin premios$/)).toBeTruthy();
+    });
+
     it("draws its sections before the server answers", () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         expect(screen.getByText("Now")).toBeTruthy();

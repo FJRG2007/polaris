@@ -1607,7 +1607,7 @@
             "skipped": "Saltado",
             "failed": "Fallido"
         },
-        "levels": "{count} niveles",
+        "levels": "{count, plural, one {# nivel} other {# niveles}}",
         "nothing": "Nada",
         "difficulties": {
             "easy": "fácil",
@@ -1712,7 +1712,6 @@
         "nextFrom": "El próximo evento sorteado llega a partir del {date}.",
         "rounds": "{count} rondas",
         "minutes": "{count} min",
-        "firstPlace": "primer puesto: {reward}",
         "canComeRound": "{name} puede salir por sí solo",
         "whatIs": "Qué es {name}",
         "runNow": "Lanzar {name} ya",
@@ -1792,6 +1791,11 @@
             "busyNow": "Esperando: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Esperando a # jugador activo en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos en el mundo normal ({have} ahora)}}} other {{needed, plural, one {Esperando a # jugador activo ({have} ahora)} other {Esperando a # jugadores activos ({have} ahora)}}}}",
             "couldNotStart": "El evento sorteado no pudo empezar"
+        },
+        "prizes": {
+            "entry": "{place} {reward}",
+            "everyone": "Todos: {reward}",
+            "none": "Sin premios"
         }
     },
     "editor": {

@@ -71,12 +71,31 @@ function clock(ms: number): string {
         : `${minutes}:${seconds}`;
 }
 
-function rewardText(t: GameText<"minecraft">, reward: catalog.Reward): string {
+function rewardText(t: GameText<"minecraft">, reward: catalog.Reward, joiner = ", "): string {
     const parts = reward.items.map(
         (item) => `${item.count} ${item.id.replace(/^minecraft:/, "").replace(/_/g, " ")}`
     );
     if (reward.levels > 0) parts.push(t("events.levels", { count: reward.levels }));
-    return parts.join(", ") || t("events.nothing");
+    return parts.join(joiner) || t("events.nothing");
+}
+
+const givesSomething = (reward: catalog.Reward) => reward.items.length > 0 || reward.levels > 0;
+
+/** Every prize of an event on one line: "1st 5 diamond + 15 levels · 2nd ... · All: 8 ...". */
+function prizesLine(t: GameText<"minecraft">, rewards: catalog.Rewards): string {
+    const places = [
+        [t("events.facts.first"), rewards.first],
+        [t("events.facts.second"), rewards.second],
+        [t("events.facts.third"), rewards.third]
+    ] as const;
+    const parts = places
+        .filter(([, reward]) => givesSomething(reward))
+        .map(([place, reward]) =>
+            t("events.prizes.entry", { place, reward: rewardText(t, reward, " + ") })
+        );
+    if (givesSomething(rewards.everyone))
+        parts.push(t("events.prizes.everyone", { reward: rewardText(t, rewards.everyone, " + ") }));
+    return parts.join(" · ") || t("events.prizes.none");
 }
 
 function lowerFirst(text: string): string {
@@ -85,6 +104,30 @@ function lowerFirst(text: string): string {
 
 function newId(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** An event's row, under its name: the kind, how long, and every prize - cut to the
+ *  row's width, the whole of it in the tooltip. */
+function PresetDetail({ preset }: { preset: catalog.EventPreset }) {
+    const t = useGameText("minecraft");
+    const length =
+        preset.kind === "trivia"
+            ? t("events.rounds", {
+                  count: (preset.options as catalog.EventOptions<"trivia">).rounds
+              })
+            : t("events.minutes", { count: preset.minutes });
+    const detail = [
+        kindLabel(t, preset.kind),
+        length,
+        catalog.KIND_INFO[preset.kind].competitive ? prizesLine(t, preset.rewards) : null
+    ]
+        .filter(Boolean)
+        .join(" - ");
+    return (
+        <p className="truncate text-xs text-muted-foreground" title={detail}>
+            {detail}
+        </p>
+    );
 }
 
 /** The days a rule applies on, as toggles. None picked means every day. */
@@ -726,22 +769,7 @@ export function MinecraftEvents({
                                             >
                                                 {preset.name}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                {kindLabel(t, preset.kind)}
-                                                {" - "}
-                                                {preset.kind === "trivia"
-                                                    ? t("events.rounds", {
-                                                          count: (
-                                                              preset.options as catalog.EventOptions<"trivia">
-                                                          ).rounds
-                                                      })
-                                                    : t("events.minutes", {
-                                                          count: preset.minutes
-                                                      })}
-                                                {catalog.KIND_INFO[preset.kind].competitive
-                                                    ? ` - ${t("events.firstPlace", { reward: rewardText(t, preset.rewards.first) })}`
-                                                    : ""}
-                                            </p>
+                                            <PresetDetail preset={preset} />
                                         </div>
                                         <ui.Switch
                                             checked={preset.enabled}
