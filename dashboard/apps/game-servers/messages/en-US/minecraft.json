@@ -1816,7 +1816,7 @@
         "howHard": "How hard",
         "howManyMobsRiseAround": "How many mobs rise around each player every 40 seconds: 2, 3 or 5.",
         "creepersToo": "Creepers too",
-        "theyBlowHolesInWhatever": "They blow holes in whatever is built nearby.",
+        "theyBlowHolesInWhatever": "Their blasts hurt players; nothing built is broken.",
         "whichBoss": "Which boss",
         "health": "Health",
         "between100And1024A": "Between 100 and 1024. A player with iron gear deals about 8 a hit.",

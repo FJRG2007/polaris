@@ -738,6 +738,7 @@ function answer(sent: string): string {
         // A server that shows operators every command's answer, as they come.
         return "Gamerule sendCommandFeedback is currently set to: true";
     }
+    if (line === "gamerule mobGriefing") return "Gamerule mobGriefing is currently set to: true";
     if (line === "gamerule keepInventory") {
         return world.keepInventory === "unknown"
             ? "Unknown or incomplete command, see below for error"
@@ -2199,6 +2200,12 @@ describe("a blood moon", () => {
         // The night is held still, so it neither runs out nor is slept through.
         expect(world.sent).toContain("gamerule doDaylightCycle false");
         expect(world.sent).toContain("gamerule doWeatherCycle false");
+        // What it brings up tramples no farm and breaks nothing built, from
+        // before the first of them rises.
+        const griefOff = world.sent.indexOf("gamerule mobGriefing false");
+        expect(griefOff).toBeGreaterThanOrEqual(0);
+        expect(griefOff).toBeLessThan(world.sent.findIndex((line) => line.includes("run summon minecraft:")));
+        expect(state().run?.gamerules.mobGriefing).toBe("true");
         expect(
             world.sent.filter((line) => line.includes("run summon minecraft:")).length
         ).toBeGreaterThan(0);
@@ -2216,6 +2223,9 @@ describe("a blood moon", () => {
         // And the server gets back what it had.
         expect(world.sent).toContain("gamerule doDaylightCycle true");
         expect(world.sent).toContain("gamerule doWeatherCycle true");
+        expect(world.sent.filter((line) => line.startsWith("gamerule mobGriefing ")).at(-1)).toBe(
+            "gamerule mobGriefing true"
+        );
         expect(world.sent).toContain("kill @e[tag=pe_mob]");
         // Its night is the event: phantoms are left as the server has them.
         expect(world.sent.some((line) => line.startsWith("gamerule doInsomnia"))).toBe(false);
@@ -3405,8 +3415,10 @@ describe("a horde defence", () => {
         // Nothing is lost to a death: keepInventory on, the server's own
         // value written down first.
         expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent).toContain("gamerule mobGriefing false");
         expect(state().run?.gamerules).toEqual({
             keepInventory: "false",
+            mobGriefing: "true",
             sendCommandFeedback: "true"
         });
         expect(state().run?.place).toEqual({ x: 300, y: 70, z: 0 });

@@ -1166,6 +1166,21 @@ async function begin(
             ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
         );
     }
+    if (catalog.summonsMobs(preset)) {
+        // Nothing it brings up tramples a farm, breaks a door or blows a hole
+        // in anybody's home: mob griefing off for exactly the event, written
+        // down first so even a restart right after puts it back.
+        const before: Record<string, string> = {};
+        for (const rule of commands.GRIEF_RULES) {
+            const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+            if (value === null) continue;
+            before[rule] = value;
+            break;
+        }
+        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        await persist(installedAppId, loop);
+        lines.push(...Object.keys(before).map((rule) => commands.setRule(rule, "false")));
+    }
     if (preset.kind === "blood-moon") {
         // Held still until dawn: the clock, or the night runs out before the
         // event does or is slept through; the weather, or the rain clears.

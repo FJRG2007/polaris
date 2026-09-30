@@ -1073,6 +1073,15 @@ export const DAY_RULES = [
     ["doInsomnia", "spawn_phantoms"]
 ] as const;
 
+/**
+ * The rule that lets a mob change the world: trample a farm, break a door, blow
+ * a hole, take a block. An event that brings mobs up beside the players - their
+ * homes included - holds it off while it runs, so nothing it summons touches
+ * anything built; what it was is written down and put back exactly. Its name
+ * before 1.21.11, then after.
+ */
+export const GRIEF_RULES = ["mobGriefing", "mob_griefing"] as const;
+
 /** Midday: the day held still at its brightest. The world goes on from there. */
 export const MIDDAY = "time set 6000";
 

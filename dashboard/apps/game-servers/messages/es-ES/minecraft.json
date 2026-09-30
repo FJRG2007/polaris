@@ -1816,7 +1816,7 @@
         "howHard": "Dificultad",
         "howManyMobsRiseAround": "Cuántos mobs surgen alrededor de cada jugador cada 40 segundos: 2, 3 o 5.",
         "creepersToo": "Con creepers",
-        "theyBlowHolesInWhatever": "Abren agujeros en lo que haya construido cerca.",
+        "theyBlowHolesInWhatever": "Sus explosiones dañan a los jugadores; nada construido se rompe.",
         "whichBoss": "Qué jefe",
         "health": "Vida",
         "between100And1024A": "Entre 100 y 1024. Un jugador con equipo de hierro hace unos 8 por golpe.",

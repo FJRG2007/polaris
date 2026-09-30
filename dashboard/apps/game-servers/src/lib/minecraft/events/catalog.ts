@@ -1023,6 +1023,12 @@ export function joinersNeeded(preset: EventPreset): number {
     return Math.max(floor, minPlayersOf(preset));
 }
 
+/** The events that bring mobs up near the players, and so hold mob griefing
+ *  off while they run (`commands.GRIEF_RULES`). */
+export function summonsMobs(preset: EventPreset): boolean {
+    return preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "waves";
+}
+
 /** The events players fight each other in, which a server with PvP off cannot run. */
 export function needsPvp(preset: EventPreset): boolean {
     return preset.kind === "team-duel";
