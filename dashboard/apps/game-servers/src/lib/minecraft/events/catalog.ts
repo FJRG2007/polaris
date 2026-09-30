@@ -13,16 +13,17 @@
  */
 
 import { z } from "zod";
-import type { GameKey } from "../../../../messages";
 import { gameMessage } from "../../game-message";
+import type { GameKey } from "../../../../messages";
 
 /** A schema's complaint, carried as its catalog key until a reader's language is
  *  known (`lib/game-message`): the screen and the actions write it out. */
-type ProblemKey = GameKey<"minecraft"> extends infer K
-    ? K extends `events.problems.${infer P}`
-        ? P
-        : never
-    : never;
+type ProblemKey =
+    GameKey<"minecraft"> extends infer K
+        ? K extends `events.problems.${infer P}`
+            ? P
+            : never
+        : never;
 const problem = (key: ProblemKey, params?: Readonly<Record<string, number>>): string =>
     gameMessage("minecraft", `events.problems.${key}`, params);
 
@@ -66,11 +67,7 @@ export const PLAYER_NAME = /^\.?[A-Za-z0-9_]{1,16}$/;
 const ITEM_ID = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 
 export const rewardItemSchema = z.object({
-    id: z
-        .string()
-        .trim()
-        .toLowerCase()
-        .regex(ITEM_ID, problem("itemId")),
+    id: z.string().trim().toLowerCase().regex(ITEM_ID, problem("itemId")),
     count: z
         .number()
         .int()
@@ -80,7 +77,11 @@ export const rewardItemSchema = z.object({
 
 export const rewardSchema = z.object({
     items: z.array(rewardItemSchema).max(6, problem("itemsPerReward", { count: 6 })),
-    levels: z.number().int().min(0).max(100, problem("levelsAtMost", { count: 100 }))
+    levels: z
+        .number()
+        .int()
+        .min(0)
+        .max(100, problem("levelsAtMost", { count: 100 }))
 });
 
 export type Reward = z.infer<typeof rewardSchema>;
@@ -90,7 +91,8 @@ export const rewardsSchema = z.object({
     first: rewardSchema,
     second: rewardSchema,
     third: rewardSchema,
-    /** For everybody who took part - scored at all, and on a blood moon survived the night. */
+    /** For everybody off the podium who took part - scored at all, and on a blood moon
+     *  survived the night. Never on top of a place's own prize. */
     everyone: rewardSchema
 });
 
@@ -236,9 +238,19 @@ export const optionsSchemas = {
     "xp-boost": z
         .object({
             /** Experience points on top of the game's own, per mob killed. */
-            perKill: z.number().int().min(0).max(100, problem("atMost", { count: 100 })).default(5),
+            perKill: z
+                .number()
+                .int()
+                .min(0)
+                .max(100, problem("atMost", { count: 100 }))
+                .default(5),
             /** And per ore block mined. */
-            perOre: z.number().int().min(0).max(100, problem("atMost", { count: 100 })).default(3)
+            perOre: z
+                .number()
+                .int()
+                .min(0)
+                .max(100, problem("atMost", { count: 100 }))
+                .default(3)
         })
         .refine((value) => value.perKill > 0 || value.perOre > 0, {
             message: problem("killsOrOres")
@@ -381,7 +393,12 @@ const presetBase = z.object({
     /** The least a player must score to be ranked at all, and to get the prize
      *  for taking part. Absent on an event saved before it existed, which then
      *  reads its kind's default (`minScoreOf`). */
-    minScore: z.number().int().min(1, problem("atLeast", { count: 1 })).max(1_000_000).optional(),
+    minScore: z
+        .number()
+        .int()
+        .min(1, problem("atLeast", { count: 1 }))
+        .max(1_000_000)
+        .optional(),
     /** Below this many players it does not go ahead: players who joined, for an
      *  event players join; players on the server when it starts, for the rest.
      *  Absent on an event saved before it existed, which then reads its kind's
@@ -921,7 +938,9 @@ export function readyToPlay(run: {
         case "waves":
             return run.place !== null;
         case "explorer":
-            return (preset.options as EventOptions<"explorer">).mode !== "race" || run.place !== null;
+            return (
+                (preset.options as EventOptions<"explorer">).mode !== "race" || run.place !== null
+            );
         case "treasure-hunt":
             return run.hidden;
         case "meteor-shower":

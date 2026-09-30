@@ -1078,7 +1078,7 @@ export function EventEditor({
                                 />
                                 <RewardEditor
                                     label={t("editor.secondPlace")}
-                                    hint=""
+                                    hint={t("editor.emptyPlaceGetsTheRest")}
                                     value={rewards.second}
                                     issues={issues}
                                     path={["rewards", "second"]}
@@ -1088,7 +1088,7 @@ export function EventEditor({
                                 />
                                 <RewardEditor
                                     label={t("editor.thirdPlace")}
-                                    hint=""
+                                    hint={t("editor.emptyPlaceGetsTheRest")}
                                     value={rewards.third}
                                     issues={issues}
                                     path={["rewards", "third"]}

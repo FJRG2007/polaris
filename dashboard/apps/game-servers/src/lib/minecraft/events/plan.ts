@@ -402,9 +402,11 @@ export function podium(
 }
 
 /**
- * What each player is owed: their place's prize, and the prize for taking part
- * on top of it. `took` is everybody who took part, as the event defines it.
- * Empty prizes are left out, so nobody is sent nothing.
+ * What each player is owed: their place's prize on the podium, and the prize
+ * for taking part for everybody else who took part - never both. A place with
+ * no prize of its own counts as off the podium, so nobody placed is left with
+ * less than those below them. `took` is everybody who took part, as the event
+ * defines it. Empty prizes are left out, so nobody is sent nothing.
  */
 export function prizes(
     placed: readonly Placed[],
@@ -418,15 +420,19 @@ export function prizes(
         3: rewards.third
     };
     const owed = new Map<string, Reward>();
-    const add = (name: string, reward: Reward) => {
-        if (reward.items.length === 0 && reward.levels === 0) return;
+    const add = (name: string, reward: Reward | undefined) => {
+        if (!reward || (reward.items.length === 0 && reward.levels === 0)) return;
         const held = owed.get(name) ?? { items: [], levels: 0 };
         owed.set(name, {
             items: [...held.items, ...reward.items],
             levels: held.levels + reward.levels
         });
     };
-    for (const one of placed) add(one.name, byPlace[one.place] ?? { items: [], levels: 0 });
-    for (const name of took) if (!disqualified.has(name.toLowerCase())) add(name, rewards.everyone);
+    for (const one of placed) add(one.name, byPlace[one.place]);
+    const paid = new Set([...owed.keys()].map((name) => name.toLowerCase()));
+    for (const name of took) {
+        const key = name.toLowerCase();
+        if (!disqualified.has(key) && !paid.has(key)) add(name, rewards.everyone);
+    }
     return [...owed.entries()].map(([name, reward]) => ({ name, reward }));
 }

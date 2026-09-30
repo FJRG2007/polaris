@@ -149,7 +149,10 @@ export function allAir(spots: readonly Spot[]): string {
 }
 
 /** Put down into air only: the barrels, then their casing. */
-export function placeLines(blocks: { barrels: readonly Spot[]; casing: readonly Spot[] }): string[] {
+export function placeLines(blocks: {
+    barrels: readonly Spot[];
+    casing: readonly Spot[];
+}): string[] {
     return [
         ...blocks.barrels.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrel keep`),
         ...blocks.casing.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrier keep`)
@@ -224,6 +227,27 @@ export function dropLines(name: string, barrels: readonly Spot[], kept: Kept): s
     return [
         `execute at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",count:1},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
         `execute as ${it} run item replace entity @s contents from block ${at(barrel)} container.${kept.container}`,
+        `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`
+    ];
+}
+
+/**
+ * The same drop as the game wrote items before 1.20.5, sent after `dropLines`
+ * in the same batch: there the summon above makes an empty item (its `count`
+ * is not read), which is gone at once. So the placeholder with `Count`, only
+ * where no drop is lying, and the copy taken from the barrel's list of items
+ * (an item entity has no `contents` slot there), only onto an item written the
+ * old way. What the copy carries of its barrel slot is taken off again.
+ */
+export function legacyDropLines(name: string, barrels: readonly Spot[], kept: Kept): string[] {
+    const barrel = barrels[kept.barrel];
+    if (!barrel) return [];
+    const tag = dropTag(kept);
+    const it = `@e[type=minecraft:item,tag=${tag},limit=1]`;
+    return [
+        `execute unless entity @e[type=minecraft:item,tag=${tag}] at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",Count:1b},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
+        `execute as ${it} unless data entity @s Item.count run data modify entity @s Item set from block ${at(barrel)} Items[{Slot:${kept.container}b}]`,
+        `execute as ${it} run data remove entity @s Item.Slot`,
         `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`
     ];
 }
