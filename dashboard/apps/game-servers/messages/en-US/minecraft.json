@@ -643,7 +643,7 @@
         "copyJson": "Copy as JSON",
         "downloadJson": "Download JSON",
         "downloadCsv": "Download CSV",
-        "csvHint": "CSV is for reading only and cannot be imported back.",
+        "csvHint": "CSV opens in a spreadsheet and imports back like JSON.",
         "copied": "Copied",
         "copyFailed": "Could not copy. Download the file instead.",
         "nothingToExport": "Polaris has no copy of anybody's inventory yet.",
@@ -655,7 +655,7 @@
         "importHint": "Paste an exported JSON file or choose one. Nothing changes until you confirm.",
         "importAllHint": "Every inventory in the file goes to the player of the same name. Nothing changes until you confirm.",
         "chooseFile": "Choose file",
-        "pasteHere": "Paste the exported JSON here",
+        "pasteHere": "Paste the exported JSON or CSV here",
         "fromFile": "From the file",
         "into": "Into",
         "mode": "How",
@@ -696,7 +696,10 @@
             "where": "Where",
             "item": "Item",
             "count": "Count",
-            "details": "Details"
+            "details": "Details",
+            "data": "Data",
+            "takenAt": "Read at",
+            "live": "Source"
         },
         "eras": {
             "components": "Minecraft 1.20.5 or later",
@@ -708,7 +711,7 @@
             "notJson": "That is not an exported inventory file.",
             "tooBig": "That file is too big to import.",
             "notInventory": "That file is not an inventory export Polaris can read.",
-            "csv": "A CSV export cannot be imported. Use the JSON file.",
+            "csv": "This CSV is from an older export and cannot be imported. Export it again.",
             "mixedEra": "That file mixes items from different Minecraft versions.",
             "duplicateSlot": "That file puts two stacks in one slot.",
             "duplicatePlayer": "That file lists the same player twice.",
