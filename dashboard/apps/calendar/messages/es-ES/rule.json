@@ -1,0 +1,75 @@
+{
+    "alarm": {
+        "after": "{time} después",
+        "afterAt": "{time} después {one, select, yes {a la} other {a las}} {at}",
+        "afterEnd": "{time} después del final",
+        "atEnd": "Al terminar",
+        "atStart": "Al empezar",
+        "before": "{time} antes",
+        "beforeAt": "{time} antes {one, select, yes {a la} other {a las}} {at}",
+        "beforeEnd": "{time} antes del final",
+        "days": "{n, plural, one {# día} other {# días}}",
+        "hours": "{n, plural, one {# hora} other {# horas}}",
+        "minutes": "{n, plural, one {# minuto} other {# minutos}}",
+        "onDate": "El {date}",
+        "onDay": "El mismo día {one, select, yes {a la} other {a las}} {at}",
+        "weeks": "{n, plural, one {# semana} other {# semanas}}"
+    },
+    "every": {
+        "daily": "{interval, plural, one {Cada día} other {Cada # días}}",
+        "hourly": "{interval, plural, one {Cada hora} other {Cada # horas}}",
+        "minutely": "{interval, plural, one {Cada minuto} other {Cada # minutos}}",
+        "monthly": "{interval, plural, one {Cada mes} other {Cada # meses}}",
+        "secondly": "{interval, plural, one {Cada segundo} other {Cada # segundos}}",
+        "weekly": "{interval, plural, one {Cada semana} other {Cada # semanas}}",
+        "yearly": "{interval, plural, one {Cada año} other {Cada # años}}"
+    },
+    "ordinal": {
+        "last": "último",
+        "n1": "primer",
+        "n2": "segundo",
+        "n3": "tercer",
+        "n4": "cuarto",
+        "n5": "quinto",
+        "other": "número {n}",
+        "secondLast": "penúltimo"
+    },
+    "parse": {
+        "duplicateEvent": "Se omitió una segunda copia de \"{name}\".",
+        "duplicateOccurrence": "Se omitió una segunda copia de una repetición de \"{name}\".",
+        "eventUnreadable": "Un evento no se pudo leer y se omitió.",
+        "noCalendar": "El archivo no contiene ningún calendario.",
+        "notJson": "El archivo parece jCal pero no es un JSON válido.",
+        "partUnreadable": "Una parte del archivo no se pudo leer y se omitió.",
+        "todoUnreadable": "Una tarea no se pudo leer y se omitió."
+    },
+    "pattern": {
+        "count": "{base}, {count, plural, one {# vez} other {# veces}}",
+        "dayItem": "el {day}",
+        "days": "{base} {days}",
+        "fromEnd": "{n, plural, one {el último} other {el # desde el final}}",
+        "monthDays": "{base} el día {days}",
+        "months": "{base} en {months}",
+        "ordinal": "{base} el {ordinal} {day}",
+        "ordinalItem": "el {ordinal} {day}",
+        "ordinalKind": "{base} el {ordinal} {kind, select, day {día} weekday {día laborable} other {día de fin de semana}}",
+        "setPos": "{base}, solo el {positions}",
+        "until": "{base}, hasta el {date}"
+    },
+    "validation": {
+        "allDayMismatch": "Los eventos de todo el día llevan fechas; los demás, horas.",
+        "colorForm": "Usa un color como #1a73e8.",
+        "dateForm": "Usa el formato AAAA-MM-DD.",
+        "dateTimeForm": "Usa el formato AAAA-MM-DDTHH:mm.",
+        "endBeforeStart": "El final es anterior al inicio.",
+        "invitedTwice": "Hay alguien invitado dos veces.",
+        "linkForm": "Usa un enlace que empiece por https://.",
+        "noSuchDate": "Una de las fechas no existe.",
+        "noSuchDay": "Ese día no existe.",
+        "rangesOverlap": "Dos franjas se solapan.",
+        "timeForm": "Usa HH:mm.",
+        "tooManyDates": "Demasiadas fechas.",
+        "unknownZone": "Zona horaria desconocida.",
+        "weekdayTwice": "Un día de la semana está repetido."
+    }
+}
