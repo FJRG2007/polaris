@@ -65,7 +65,7 @@ describe("the modules say what they said before, in English", () => {
 
 describe("in Spanish", () => {
     it("reads the menu, the lock and a refusal", () => {
-        expect(menuEntries(spanishWords)[3]?.title).toBe("Rellenar mi correo");
+        expect(menuEntries(spanishWords)[3]?.title).toBe("Poner mi correo");
         expect(timeoutChoices(spanishWords)[4]?.label).toBe("1 hora");
         const refused = readIntendedLogin({ name: "", username: "", password: "", uri: "" }, spanishWords);
         expect(refused.ok ? null : refused.error).toBe("Ponle un nombre para poder encontrarlo después.");
