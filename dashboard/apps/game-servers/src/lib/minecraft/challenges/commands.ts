@@ -70,6 +70,8 @@ export function button(
     return {
         text: label,
         color,
+        bold: true,
+        underlined: true,
         ...(spelling !== "modern"
             ? {
                   clickEvent: { action: "run_command", value: command },

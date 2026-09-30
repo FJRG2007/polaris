@@ -8,13 +8,16 @@
 
 import * as catalog from "./catalog";
 import type { Language } from "./catalog";
+import { PALETTE, mark } from "../events/messages";
+
+const { bad: BAD, reason: REASON, good: GOOD, warn: WARN, info: INFO } = PALETTE;
 
 type Text = catalog.Text;
 
 const pick = (text: Text, language: Language) => text[language];
 const t = (en: string, es: string): Text => ({ en, es });
 
-export const TAG: Text = t("&6&l[Challenges]&r ", "&6&l[Retos]&r ");
+export const TAG: Text = t(`${PALETTE.tag}[Challenges]&r `, `${PALETTE.tag}[Retos]&r `);
 export const MENU_BUTTON: Text = t("[Challenges]", "[Retos]");
 
 export function tag(language: Language): string {
@@ -111,30 +114,30 @@ export function footer(streak: number, tier: number, points: number, language: L
 
 export function locked(minutes: number, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Tus retos se desbloquean tras &f${minutes} min&7 de juego en este servidor.`
-        : `${tag(language)}&7Your challenges unlock after &f${minutes} min&7 of play on this server.`;
+        ? `${tag(language)}${WARN}Tus retos se desbloquean tras ${mark(`${minutes} min`, WARN)} de juego en este servidor.`
+        : `${tag(language)}${WARN}Your challenges unlock after ${mark(`${minutes} min`, WARN)} of play on this server.`;
 }
 
 export function notLinked(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Los retos son para jugadores con una cuenta de Polaris vinculada.`
-        : `${tag(language)}&7Challenges are for players linked to a Polaris account.`;
+        ? `${tag(language)}${WARN}Los retos son para jugadores con una cuenta de Polaris vinculada.`
+        : `${tag(language)}${WARN}Challenges are for players linked to a Polaris account.`;
 }
 
 export function nothingYet(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Los retos de hoy aún se están preparando. Prueba en un minuto.`
-        : `${tag(language)}&7Today's challenges are still being set up. Try again in a minute.`;
+        ? `${tag(language)}${INFO}Los retos de hoy aún se están preparando. Prueba en un minuto.`
+        : `${tag(language)}${INFO}Today's challenges are still being set up. Try again in a minute.`;
 }
 
 export function joinLine(left: number, language: Language): string {
     if (left === 0)
         return language === "es"
-            ? `${tag(language)}&aHas completado los retos de hoy.`
-            : `${tag(language)}&aYou have done today's challenges.`;
+            ? `${tag(language)}${GOOD}Has completado los retos de hoy.`
+            : `${tag(language)}${GOOD}You have done today's challenges.`;
     return language === "es"
-        ? `${tag(language)}&fTe ${left === 1 ? "queda &e1 reto" : `quedan &e${left} retos`}&f hoy.`
-        : `${tag(language)}&fYou have &e${left} ${left === 1 ? "challenge" : "challenges"}&f left today.`;
+        ? `${tag(language)}${INFO}Te ${left === 1 ? `queda ${mark("1 reto", INFO)}` : `quedan ${mark(`${left} retos`, INFO)}`} hoy.`
+        : `${tag(language)}${INFO}You have ${mark(`${left} ${left === 1 ? "challenge" : "challenges"}`, INFO)} left today.`;
 }
 
 export function completedTitle(language: Language): string {
@@ -143,8 +146,8 @@ export function completedTitle(language: Language): string {
 
 export function completedLine(title: string, reward: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&a¡Completado! &f${title}${reward ? ` &7- ${reward}` : ""}`
-        : `${tag(language)}&aDone! &f${title}${reward ? ` &7- ${reward}` : ""}`;
+        ? `${tag(language)}${GOOD}¡Completado! ${mark(title, GOOD)}${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}Done! ${mark(title, GOOD)}${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
 }
 
 /** `+20 pts, 2 levels, 3 diamond`. */
@@ -167,72 +170,72 @@ export function rewardText(
 
 export function rerolled(title: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Cambiado por: &f${title}`
-        : `${tag(language)}&7Swapped for: &f${title}`;
+        ? `${tag(language)}${INFO}Cambiado por: ${mark(title, INFO)}`
+        : `${tag(language)}${INFO}Swapped for: ${mark(title, INFO)}`;
 }
 
 export function noReroll(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7No te quedan cambios en este periodo, o no hay otro reto de esa dificultad.`
-        : `${tag(language)}&7No swaps left this period, or no other challenge of that difficulty.`;
+        ? `${tag(language)}${BAD}No se puede cambiar: ${REASON}no te quedan cambios en este periodo, o no hay otro reto de esa dificultad.`
+        : `${tag(language)}${BAD}Cannot swap: ${REASON}no swaps left this period, or no other challenge of that difficulty.`;
 }
 
 export function tracking(title: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Siguiendo: &f${title}`
-        : `${tag(language)}&7Tracking: &f${title}`;
+        ? `${tag(language)}${INFO}Siguiendo: ${mark(title, INFO)}`
+        : `${tag(language)}${INFO}Tracking: ${mark(title, INFO)}`;
 }
 
 export function untracked(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Ya no sigues ningún reto.`
-        : `${tag(language)}&7Not tracking a challenge any more.`;
+        ? `${tag(language)}${INFO}Ya no sigues ningún reto.`
+        : `${tag(language)}${INFO}Not tracking a challenge any more.`;
 }
 
 export function sweepLine(layer: "daily" | "weekly", reward: string, language: Language): string {
     if (layer === "daily")
         return language === "es"
-            ? `${tag(language)}&6¡Pleno diario! &7Los tres retos de hoy${reward ? ` &7- ${reward}` : ""}`
-            : `${tag(language)}&6Clean sweep! &7All three of today's${reward ? ` &7- ${reward}` : ""}`;
+            ? `${tag(language)}${GOOD}¡Pleno diario! Los tres retos de hoy${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+            : `${tag(language)}${GOOD}Clean sweep! All three of today's${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
     return language === "es"
-        ? `${tag(language)}&6¡Pleno semanal! &7Los tres retos de la semana${reward ? ` &7- ${reward}` : ""}`
-        : `${tag(language)}&6Weekly sweep! &7All three of this week's${reward ? ` &7- ${reward}` : ""}`;
+        ? `${tag(language)}${GOOD}¡Pleno semanal! Los tres retos de la semana${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}Weekly sweep! All three of this week's${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
 }
 
 export function streakLine(days: number, bonus: number, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&6¡Racha de ${days} días!${bonus > 0 ? ` &7+${bonus} pts` : ""}`
-        : `${tag(language)}&6${days}-day streak!${bonus > 0 ? ` &7+${bonus} pts` : ""}`;
+        ? `${tag(language)}${GOOD}¡Racha de ${mark(`${days} días`, GOOD)}!${bonus > 0 ? ` ${mark(`+${bonus} pts`, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}${mark(`${days}-day`, GOOD)} streak!${bonus > 0 ? ` ${mark(`+${bonus} pts`, GOOD)}` : ""}`;
 }
 
 export function comebackLine(bonus: number, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&6¡Bienvenido de vuelta! &7+${bonus} pts`
-        : `${tag(language)}&6Welcome back! &7+${bonus} pts`;
+        ? `${tag(language)}${GOOD}¡Bienvenido de vuelta! ${mark(`+${bonus} pts`, GOOD)}`
+        : `${tag(language)}${GOOD}Welcome back! ${mark(`+${bonus} pts`, GOOD)}`;
 }
 
 export function tierLine(tier: number, reward: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&bNivel de temporada ${tier}${reward ? ` &7- ${reward}` : ""}`
-        : `${tag(language)}&bSeason tier ${tier}${reward ? ` &7- ${reward}` : ""}`;
+        ? `${tag(language)}${GOOD}Nivel de temporada ${mark(tier, GOOD)}${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}Season tier ${mark(tier, GOOD)}${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
 }
 
 export function lineLine(lines: number, reward: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&6¡Línea de bingo!${lines > 1 ? ` (${lines})` : ""}${reward ? ` &7- ${reward}` : ""}`
-        : `${tag(language)}&6Bingo line!${lines > 1 ? ` (${lines})` : ""}${reward ? ` &7- ${reward}` : ""}`;
+        ? `${tag(language)}${GOOD}¡Línea de bingo!${lines > 1 ? ` (${lines})` : ""}${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}Bingo line!${lines > 1 ? ` (${lines})` : ""}${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
 }
 
 export function fullCardLine(reward: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&6&l¡Cartón completo!${reward ? ` &r&7- ${reward}` : ""}`
-        : `${tag(language)}&6&lFull card!${reward ? ` &r&7- ${reward}` : ""}`;
+        ? `${tag(language)}${GOOD}&l¡Cartón completo!${GOOD}${reward ? ` - ${mark(reward, GOOD)}` : ""}`
+        : `${tag(language)}${GOOD}&lFull card!${GOOD}${reward ? ` - ${mark(reward, GOOD)}` : ""}`;
 }
 
 export function capLine(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Has llegado al máximo de puntos de temporada de hoy. Los retos siguen dando niveles.`
-        : `${tag(language)}&7You have reached today's most season points. Challenges still give levels.`;
+        ? `${tag(language)}${WARN}Has llegado al máximo de puntos de temporada de hoy. ${INFO}Los retos siguen dando niveles.`
+        : `${tag(language)}${WARN}You have reached today's most season points. ${INFO}Challenges still give levels.`;
 }
 
 export function seasonLines(
@@ -296,14 +299,14 @@ export function goalTierLine(title: string, tier: number, language: Language): s
 
 export function goalRewardLine(reward: string, language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Por tu aportación: &f${reward}`
-        : `${tag(language)}&7For your part in it: &f${reward}`;
+        ? `${tag(language)}${GOOD}Por tu aportación: ${mark(reward, GOOD)}`
+        : `${tag(language)}${GOOD}For your part in it: ${mark(reward, GOOD)}`;
 }
 
 export function rewardWaiting(language: Language): string {
     return language === "es"
-        ? `${tag(language)}&7Lo que no ha cabido te llegará la próxima vez que entres.`
-        : `${tag(language)}&7Whatever did not arrive comes the next time you join.`;
+        ? `${tag(language)}${INFO}Lo que no ha cabido te llegará la próxima vez que entres.`
+        : `${tag(language)}${INFO}Whatever did not arrive comes the next time you join.`;
 }
 
 export function seasonEnded(
@@ -313,8 +316,8 @@ export function seasonEnded(
 ): string {
     const names = champions.join(", ");
     return language === "es"
-        ? `${tag(language)}&bTermina la temporada ${number}.${names ? ` &6Campeones: &f${names}` : ""}`
-        : `${tag(language)}&bSeason ${number} is over.${names ? ` &6Champions: &f${names}` : ""}`;
+        ? `${tag(language)}${WARN}Termina la temporada ${mark(number, WARN)}.${names ? ` Campeones: ${mark(names, WARN)}` : ""}`
+        : `${tag(language)}${WARN}Season ${mark(number, WARN)} is over.${names ? ` Champions: ${mark(names, WARN)}` : ""}`;
 }
 
 export function championTitle(number: number, language: Language): string {

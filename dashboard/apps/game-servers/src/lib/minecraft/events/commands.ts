@@ -1715,6 +1715,7 @@ export function buttonsLine(
             text: one.label,
             color: one.color,
             bold: true,
+            underlined: true,
             clickEvent: { action: "run_command", value: command },
             click_event: { action: "run_command", command },
             hoverEvent: { action: "show_text", contents: one.hover },

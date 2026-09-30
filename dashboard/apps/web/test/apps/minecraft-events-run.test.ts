@@ -1254,6 +1254,28 @@ const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/eve
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
 
+/** What a player reads of a command's text: the words of its JSON, without the
+ *  formatting that splits them into parts (a highlighted name, a number). */
+function visible(line: string): string {
+    // The JSON after the command and its target (which may hold brackets itself).
+    const at = line.search(/ [[{"]/) + 1;
+    if (at < 1) return line;
+    const walk = (node: unknown): string => {
+        if (typeof node === "string") return node;
+        if (Array.isArray(node)) return node.map(walk).join("");
+        if (node && typeof node === "object") {
+            const part = node as { text?: unknown; extra?: unknown };
+            return walk(part.text ?? "") + walk(part.extra ?? []);
+        }
+        return "";
+    };
+    try {
+        return line.slice(0, at) + walk(JSON.parse(line.slice(at)));
+    } catch {
+        return line;
+    }
+}
+
 /** What a refusal says to an English reader: the service carries catalog keys. */
 async function refusal(promise: Promise<unknown>): Promise<string | null> {
     try {
@@ -2151,11 +2173,10 @@ describe("a prize a full inventory has no room for", () => {
             world.sent.some(
                 (line) =>
                     line.startsWith("tellraw Ana ") &&
-                    line.includes("Your inventory was full") &&
-                    line.includes("4 [Item]")
+                    visible(line).includes("Inventory full: 4 [Item] fell at your feet")
             )
         ).toBe(true);
-        expect(world.sent.some((line) => line.startsWith("tellraw Ben ") && line.includes("inventory was full"))).toBe(false);
+        expect(world.sent.some((line) => line.startsWith("tellraw Ben ") && visible(line).includes("Inventory full"))).toBe(false);
         // Given once: the dropped ones are not kept owed.
         expect(world.sent.filter((line) => line === "give Ana minecraft:diamond 5")).toHaveLength(1);
         expect(state().pending).toEqual([]);
@@ -2987,7 +3008,7 @@ describe("a treasure hunt", () => {
         for (const number of [1, 2, 3])
             expect(
                 world.sent.some(
-                    (line) => line.startsWith("tellraw @a") && line.includes(`Treasure ${number}: `)
+                    (line) => line.startsWith("tellraw @a") && visible(line).includes(`Treasure ${number}: `)
                 )
             ).toBe(true);
         expect(world.sent.some((line) => line.startsWith("title Ana actionbar"))).toBe(true);
@@ -3460,7 +3481,7 @@ describe("a horde defence", () => {
         expect(
             world.sent.some(
                 (line) =>
-                    line.startsWith("title @a title") && line.includes("Wave 1 ran out of time")
+                    line.startsWith("title @a title") && visible(line).includes("Wave 1 ran out of time")
             )
         ).toBe(true);
         const kills = world.sent.filter((line) => line === "kill @e[tag=pe_mob]").length;
@@ -4191,7 +4212,7 @@ describe("spleef", () => {
         await play(2_100);
         expect(world.inside.has("Ben")).toBe(false);
         expect(
-            world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("Ben is out"))
+            world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes("Ben is out"))
         ).toBe(true);
         world.at.Cy = [arenaAt.centre.x, arenaAt.floor - 3, arenaAt.centre.z];
         await play(4_100);
@@ -4856,7 +4877,7 @@ describe("a team duel", () => {
         expect(
             world.sent.some(
                 (line) =>
-                    line.startsWith("tellraw @a") && line.includes("Only 1 joined and it needs 2")
+                    line.startsWith("tellraw @a") && visible(line).includes("Only 1 joined and it needs 2")
             )
         ).toBe(true);
     });
@@ -5511,7 +5532,7 @@ describe("each player reads their own language", () => {
         options: { rounds: 3, seconds: 15, mode: "questions" as const, questions: [] }
     });
     const sentTo = (selector: string, words: string) =>
-        world.sent.some((line) => line.startsWith(`tellraw ${selector} `) && line.includes(words));
+        world.sent.some((line) => line.startsWith(`tellraw ${selector} `) && visible(line).includes(words));
 
     it("asks a Spanish account's player in Spanish and everybody else in English, and takes either answer", async () => {
         world.links = { Ana: "user-es" };
@@ -5529,7 +5550,10 @@ describe("each player reads their own language", () => {
         // As the game's JSON writes it: every accent an escape.
         const escaped = (words: string) =>
             words.replace(/[\u0080-\uffff]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
-        expect(sentTo("@a[tag=pl_es]", escaped(spanish.question))).toBe(true);
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw @a[tag=pl_es] ") && line.includes(escaped(spanish.question)))
+        ).toBe(true);
+        expect(sentTo("@a[tag=pl_es]", spanish.question)).toBe(true);
         expect(sentTo("@a[tag=!pl_es]", "Question 1/3")).toBe(true);
         expect(
             world.sent.some(
@@ -5543,7 +5567,7 @@ describe("each player reads their own language", () => {
         chat(["Ana", spanish.answers[0]!]);
         await play(2_100);
         expect(state().run?.points ?? state().history[0]?.podium).toBeTruthy();
-        const won = world.sent.find((line) => line.startsWith("tellraw @a[tag=pl_es] ") && line.includes("Ana acert"));
+        const won = world.sent.find((line) => line.startsWith("tellraw @a[tag=pl_es] ") && visible(line).includes("Ana acert"));
         expect(won).toBeDefined();
         expect(sentTo("@a[tag=!pl_es]", "Ana got it")).toBe(true);
     });

@@ -14,6 +14,33 @@ type Text = Readonly<Record<Language, string>>;
 
 const pick = (text: Text, language: Language): string => text[language];
 
+/**
+ * One palette for every line an event or a challenge says in the chat, so each
+ * reads at a glance in a busy one: the tag in bold gold; a call-off, an
+ * elimination or a refusal in red with the reason after it in white; a prize,
+ * a win or a thing done in green; what to do next, a countdown or a warning in
+ * yellow; the rest in gray. The values a player looks for - names, numbers,
+ * places, the event's name, what was won - stand out in bold aqua whatever the
+ * line's colour. Shared with the challenges (`challenges/messages`).
+ */
+export const PALETTE = {
+    tag: "&6&l",
+    bad: "&c",
+    reason: "&f",
+    good: "&a",
+    warn: "&e",
+    info: "&7",
+    mark: "&b&l"
+} as const;
+
+/** A value picked out of a line, then the line's own colour again (a colour code
+ *  also ends the bold, as the game reads it). */
+export function mark(value: string | number, back: string): string {
+    return `${PALETTE.mark}${value}${back}`;
+}
+
+const { bad: BAD, reason: REASON, good: GOOD, warn: WARN, info: INFO } = PALETTE;
+
 
 /** What to do, in one line, said when the countdown starts and again at the start. */
 const RULES: Readonly<Record<EventKind, Text>> = {
@@ -82,12 +109,12 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Caen meteoritos de mena. Pícalos antes que nadie: cada bloque cuenta."
     },
     parkour: {
-        en: "Type join in the chat to take part. Fastest to the finish wins; a fall only sends you back to your checkpoint.",
-        es: "Escribe unirse en el chat para participar. Gana el más rápido en llegar a la meta; si caes, vuelves a tu último control."
+        en: "Fastest to the finish wins; a fall only sends you back to your checkpoint.",
+        es: "Gana el más rápido en llegar a la meta; si caes, vuelves a tu último control."
     },
     spleef: {
-        en: "Type join in the chat to take part. Dig the snow from under the others; the last one standing wins.",
-        es: "Escribe unirse en el chat para participar. Rompe la nieve bajo los demás; gana el último en pie."
+        en: "Dig the snow from under the others; the last one standing wins.",
+        es: "Rompe la nieve bajo los demás; gana el último en pie."
     },
     "team-duel": {
         en: "Two teams, the same sword and shield. Bring a rival low to score. Nothing of yours is lost, whatever happens.",
@@ -99,8 +126,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     }
 };
 
-export const TAG = "&6&l[Event]&r ";
-const TAG_ES = "&6&l[Evento]&r ";
+export const TAG = `${PALETTE.tag}[Event]&r `;
+const TAG_ES = `${PALETTE.tag}[Evento]&r `;
 
 export function tag(language: Language): string {
     return language === "es" ? TAG_ES : TAG;
@@ -120,10 +147,20 @@ export function rules(kind: EventKind, language: Language, race = false): string
 }
 
 export function startsIn(name: string, seconds: number, language: Language): string {
-    const when = clock(seconds);
+    const when = mark(clock(seconds), WARN);
     return language === "es"
-        ? `&e${name}&f empieza en &e${when}&f.`
-        : `&e${name}&f starts in &e${when}&f.`;
+        ? `${WARN}${mark(name, WARN)} empieza en ${when}.`
+        : `${WARN}${mark(name, WARN)} starts in ${when}.`;
+}
+
+/** The countdown's one line: when it starts, and what to do - in white. */
+export function startsInWithRules(
+    name: string,
+    seconds: number,
+    rulesText: string,
+    language: Language
+): string {
+    return `${startsIn(name, seconds, language)} ${REASON}${rulesText}`;
 }
 
 export function startsSoonTitle(language: Language): string {
@@ -134,8 +171,20 @@ export function startedTitle(language: Language): string {
     return language === "es" ? "&a¡Empieza!" : "&aIt has begun!";
 }
 
+/** The start's one line: the event's name, what to do, and how long it lasts. */
+export function startLine(
+    name: string,
+    rulesText: string,
+    minutes: number,
+    language: Language
+): string {
+    return `${mark(name, WARN)}: ${REASON}${rulesText} ${lasts(minutes, language)}`;
+}
+
 export function lasts(minutes: number, language: Language): string {
-    return language === "es" ? `&7Dura ${minutes} min.` : `&7It lasts ${minutes} min.`;
+    return language === "es"
+        ? `${INFO}Dura ${mark(minutes, INFO)} min.`
+        : `${INFO}It lasts ${mark(minutes, INFO)} min.`;
 }
 
 /** `Mining rush - 4:32`, for the boss bar. */
@@ -178,7 +227,7 @@ const PLACE_COLOURS = ["&6", "&7", "&c"];
 
 export function podiumLine(place: number, name: string, score: string, language: Language): string {
     const label = PLACES[language][place - 1] ?? `${place}`;
-    return `${PLACE_COLOURS[place - 1] ?? "&f"}${label} &f${name} &7- ${score}`;
+    return `${PLACE_COLOURS[place - 1] ?? "&f"}&l${label} ${mark(name, INFO)} - ${score}`;
 }
 
 export function winnerTitle(name: string, language: Language): string {
@@ -186,7 +235,7 @@ export function winnerTitle(name: string, language: Language): string {
 }
 
 export function nobodyScored(language: Language): string {
-    return language === "es" ? "&7Nadie puntuó esta vez." : "&7Nobody scored this time.";
+    return language === "es" ? `${INFO}Nadie puntuó esta vez.` : `${INFO}Nobody scored this time.`;
 }
 
 export function endedTitle(language: Language): string {
@@ -195,8 +244,9 @@ export function endedTitle(language: Language): string {
 
 export function cancelledLine(name: string, language: Language, reason?: string): string {
     const why = reason ? cancelReason(reason, language) : null;
-    if (language === "es") return `&7${name} se ha cancelado${why ? `: &f${why}` : "."}`;
-    return `&7${name} was called off${why ? `: &f${why}` : "."}`;
+    const event = mark(name, BAD);
+    if (language === "es") return `${BAD}${event} se ha cancelado${why ? `: ${REASON}${why}` : "."}`;
+    return `${BAD}${event} was called off${why ? `: ${REASON}${why}` : "."}`;
 }
 
 /**
@@ -220,53 +270,53 @@ export function cancelReason(note: string, language: Language): string {
 export function disqualifiedLine(names: readonly string[], language: Language): string {
     const list = names.join(", ");
     return language === "es"
-        ? `&7Fuera del podio (anti-cheat, creativo o AFK todo el evento): &c${list}`
-        : `&7Left off the podium (anti-cheat, creative, or AFK the whole time): &c${list}`;
+        ? `${INFO}Fuera del podio (anti-cheat, creativo o AFK todo el evento): ${BAD}${list}`
+        : `${INFO}Left off the podium (anti-cheat, creative, or AFK the whole time): ${BAD}${list}`;
 }
 
 export function rewardGiven(event: string, language: Language): string {
     return language === "es"
-        ? `&aHas recibido tu premio de &e${event}&a.`
-        : `&aYou received your prize from &e${event}&a.`;
+        ? `${GOOD}Has recibido tu premio de ${mark(event, GOOD)}.`
+        : `${GOOD}You received your prize from ${mark(event, GOOD)}.`;
 }
 
 /** Part of a prize the inventory had no room for, dropped where they stand. */
 export function droppedAtFeet(count: number, item: string, language: Language): string {
     return language === "es"
-        ? `&6Tu inventario estaba lleno: &e${count} ${item}&6 han caído a tus pies. Recógelos antes de que desaparezcan.`
-        : `&6Your inventory was full: &e${count} ${item}&6 fell at your feet. Pick them up before they despawn.`;
+        ? `${WARN}Inventario lleno: ${mark(`${count} ${item}`, WARN)} han caído a tus pies. Recógelos antes de que desaparezcan.`
+        : `${WARN}Inventory full: ${mark(`${count} ${item}`, WARN)} fell at your feet. Pick them up before they despawn.`;
 }
 
 export function rewardWaiting(language: Language): string {
     return language === "es"
-        ? "&7Quien no esté conectado recibirá su premio al volver."
-        : "&7Anybody not online gets their prize when they come back.";
+        ? `${INFO}Quien no esté conectado recibirá su premio al volver.`
+        : `${INFO}Anybody not online gets their prize when they come back.`;
 }
 
 // ------------------------------------------------------------------ supply drop
 
 export function dropArea(x: number, z: number, within: number, language: Language): string {
     return language === "es"
-        ? `&eEl suministro ha caído cerca de &fX ${x}, Z ${z}&e (a menos de ${within} bloques).`
-        : `&eThe supply drop landed near &fX ${x}, Z ${z}&e (within ${within} blocks).`;
+        ? `${WARN}El suministro ha caído cerca de ${mark(`X ${x}, Z ${z}`, WARN)} (a menos de ${within} bloques).`
+        : `${WARN}The supply drop landed near ${mark(`X ${x}, Z ${z}`, WARN)} (within ${within} blocks).`;
 }
 
 export function dropExact(x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eEl suministro está en &fX ${x} Y ${y} Z ${z}&e. Busca el haz de luz.`
-        : `&eThe supply drop is at &fX ${x} Y ${y} Z ${z}&e. Look for the beam of light.`;
+        ? `${WARN}El suministro está en ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}. Busca el haz de luz.`
+        : `${WARN}The supply drop is at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}. Look for the beam of light.`;
 }
 
 export function dropFound(name: string, language: Language): string {
     return language === "es"
-        ? `&a${name} ha encontrado el suministro.`
-        : `&a${name} found the supply drop.`;
+        ? `${GOOD}${mark(name, GOOD)} ha encontrado el suministro.`
+        : `${GOOD}${mark(name, GOOD)} found the supply drop.`;
 }
 
 export function dropLost(language: Language): string {
     return language === "es"
-        ? "&7Nadie encontró el suministro y se ha perdido."
-        : "&7Nobody found the supply drop, and it is gone.";
+        ? `${INFO}Nadie encontró el suministro y se ha perdido.`
+        : `${INFO}Nobody found the supply drop, and it is gone.`;
 }
 
 // ------------------------------------------------------------------ world boss
@@ -279,26 +329,32 @@ export function bossAppeared(
     language: Language
 ): string {
     return language === "es"
-        ? `&c${boss}&f ha aparecido en &eX ${x} Y ${y} Z ${z}&f.`
-        : `&c${boss}&f has appeared at &eX ${x} Y ${y} Z ${z}&f.`;
+        ? `${WARN}${mark(boss, WARN)} ha aparecido en ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}.`
+        : `${WARN}${mark(boss, WARN)} has appeared at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}.`;
 }
 
 export function bossFell(boss: string, by: string | null, language: Language): string {
     if (language === "es")
-        return by ? `&a${by} ha dado el golpe final a ${boss}.` : `&a${boss} ha caído.`;
-    return by ? `&a${by} landed the final blow on ${boss}.` : `&a${boss} has fallen.`;
+        return by
+            ? `${GOOD}${mark(by, GOOD)} ha dado el golpe final a ${mark(boss, GOOD)}.`
+            : `${GOOD}${mark(boss, GOOD)} ha caído.`;
+    return by
+        ? `${GOOD}${mark(by, GOOD)} landed the final blow on ${mark(boss, GOOD)}.`
+        : `${GOOD}${mark(boss, GOOD)} has fallen.`;
 }
 
 export function bossEscaped(boss: string, language: Language): string {
-    return language === "es" ? `&7${boss} ha escapado.` : `&7${boss} got away.`;
+    return language === "es"
+        ? `${INFO}${mark(boss, INFO)} ha escapado.`
+        : `${INFO}${mark(boss, INFO)} got away.`;
 }
 
 // ------------------------------------------------------------------ blood moon
 
 export function dawn(survivors: number, language: Language): string {
     return language === "es"
-        ? `&eAmanece. Han sobrevivido &f${survivors}&e.`
-        : `&eDawn breaks. &f${survivors}&e survived the night.`;
+        ? `${WARN}Amanece. Han sobrevivido ${mark(survivors, WARN)}.`
+        : `${WARN}Dawn breaks. ${mark(survivors, WARN)} survived the night.`;
 }
 
 // ------------------------------------------------------------------ trivia
@@ -310,7 +366,7 @@ export function questionLine(
     language: Language
 ): string {
     const label = language === "es" ? "Pregunta" : "Question";
-    return `&b${label} ${round}/${rounds}: &f${question}`;
+    return `${WARN}${label} ${mark(`${round}/${rounds}`, WARN)}: ${REASON}${question}`;
 }
 
 export function scrambleLine(
@@ -320,8 +376,8 @@ export function scrambleLine(
     language: Language
 ): string {
     return language === "es"
-        ? `&bRonda ${round}/${rounds}: &fordena la palabra &e${word}`
-        : `&bRound ${round}/${rounds}: &funscramble &e${word}`;
+        ? `${WARN}Ronda ${mark(`${round}/${rounds}`, WARN)}: ordena la palabra ${mark(word, WARN)}`
+        : `${WARN}Round ${mark(`${round}/${rounds}`, WARN)}: unscramble ${mark(word, WARN)}`;
 }
 
 /** The round, big in the middle of the screen as it is asked. */
@@ -368,31 +424,35 @@ export function roundMissedTitle(language: Language): string {
 }
 
 export function roundWon(name: string, answer: string, language: Language): string {
-    return language === "es" ? `&a${name} acertó: &f${answer}` : `&a${name} got it: &f${answer}`;
+    return language === "es"
+        ? `${GOOD}${mark(name, GOOD)} acertó: ${REASON}${answer}`
+        : `${GOOD}${mark(name, GOOD)} got it: ${REASON}${answer}`;
 }
 
 export function roundMissed(answer: string, language: Language): string {
     return language === "es"
-        ? `&7Nadie acertó. Era &f${answer}`
-        : `&7Nobody got it. It was &f${answer}`;
+        ? `${INFO}Nadie acertó. Era ${mark(answer, INFO)}`
+        : `${INFO}Nobody got it. It was ${mark(answer, INFO)}`;
 }
 
 // ------------------------------------------------------------------ explorer, king of the hill
 
 export function raceTarget(x: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eLa meta está en &fX ${x}, Z ${z}&e.`
-        : `&eThe finish is at &fX ${x}, Z ${z}&e.`;
+        ? `${WARN}La meta está en ${mark(`X ${x}, Z ${z}`, WARN)}.`
+        : `${WARN}The finish is at ${mark(`X ${x}, Z ${z}`, WARN)}.`;
 }
 
 export function raceWon(name: string, language: Language): string {
-    return language === "es" ? `&a${name} ha llegado el primero.` : `&a${name} got there first.`;
+    return language === "es"
+        ? `${GOOD}${mark(name, GOOD)} ha llegado el primero.`
+        : `${GOOD}${mark(name, GOOD)} got there first.`;
 }
 
 export function circleAt(x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eEl círculo está en &fX ${x} Y ${y} Z ${z}&e: busca la columna de luz. Tu barra de acción te dice hacia dónde ir.`
-        : `&eThe circle is at &fX ${x} Y ${y} Z ${z}&e: look for the column of light. Your action bar shows the way.`;
+        ? `${WARN}El círculo está en ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}: busca la columna de luz. Tu barra de acción te dice hacia dónde ir.`
+        : `${WARN}The circle is at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}: look for the column of light. Your action bar shows the way.`;
 }
 
 const HEADING_ES: Readonly<Record<Heading, string>> = {
@@ -420,15 +480,15 @@ export function hillInside(language: Language): string {
 }
 
 export function happyHourOver(language: Language): string {
-    return language === "es" ? "&7La hora feliz ha terminado." : "&7Happy hour is over.";
+    return language === "es" ? `${INFO}La hora feliz ha terminado.` : `${INFO}Happy hour is over.`;
 }
 
 // ------------------------------------------------------------------ horde defence
 
 export function wavesPointAt(x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eEl punto a defender está en &fX ${x} Y ${y} Z ${z}&e: busca la columna de luz. La primera oleada llega cuando haya alguien allí.`
-        : `&eThe point to hold is at &fX ${x} Y ${y} Z ${z}&e: look for the column of light. The first wave comes once somebody is there.`;
+        ? `${WARN}El punto a defender está en ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}: busca la columna de luz. La primera oleada llega cuando haya alguien allí.`
+        : `${WARN}The point to hold is at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}: look for the column of light. The first wave comes once somebody is there.`;
 }
 
 export function wavesPointTitle(language: Language): string {
@@ -483,13 +543,15 @@ export function waveWaiting(wave: number, waves: number, language: Language): st
 }
 
 export function waveCleared(wave: number, language: Language): string {
-    return language === "es" ? `&aOleada ${wave} superada` : `&aWave ${wave} cleared`;
+    return language === "es"
+        ? `${GOOD}Oleada ${mark(wave, GOOD)} superada`
+        : `${GOOD}Wave ${mark(wave, GOOD)} cleared`;
 }
 
 export function waveOver(wave: number, language: Language): string {
     return language === "es"
-        ? `&7Se acabó el tiempo de la oleada ${wave}`
-        : `&7Wave ${wave} ran out of time`;
+        ? `${INFO}Se acabó el tiempo de la oleada ${mark(wave, INFO)}`
+        : `${INFO}Wave ${mark(wave, INFO)} ran out of time`;
 }
 
 export function waveHeldBy(count: number, language: Language): string {
@@ -501,8 +563,8 @@ export function waveHeldBy(count: number, language: Language): string {
 /** At the end: how far the defence got. */
 export function wavesHeld(fought: number, waves: number, language: Language): string {
     return language === "es"
-        ? `&eSe han defendido &f${fought}&e de &f${waves}&e oleadas.`
-        : `&e${fought} of ${waves} waves were fought off.`;
+        ? `${WARN}Se han defendido ${mark(fought, WARN)} de ${mark(waves, WARN)} oleadas.`
+        : `${WARN}${mark(fought, WARN)} of ${mark(waves, WARN)} waves were fought off.`;
 }
 
 // ------------------------------------------------------------------ meteor shower
@@ -519,8 +581,8 @@ export function meteorAt(
     language: Language
 ): string {
     return language === "es"
-        ? `&eUn meteorito de &f${blocks}&e bloques de mena ha caído en &fX ${x} Y ${y} Z ${z}&e. Busca el haz de luz.`
-        : `&eA meteor of &f${blocks}&e ore blocks landed at &fX ${x} Y ${y} Z ${z}&e. Look for the beam of light.`;
+        ? `${WARN}Un meteorito de ${mark(blocks, WARN)} bloques de mena ha caído en ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}. Busca el haz de luz.`
+        : `${WARN}A meteor of ${mark(blocks, WARN)} ore blocks landed at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}. Look for the beam of light.`;
 }
 
 /** How far the latest meteor still unmined is from a player, and which way. */
@@ -543,8 +605,8 @@ export function meteorWaiting(language: Language): string {
 
 export function meteorMinedOut(language: Language): string {
     return language === "es"
-        ? "&7Un meteorito ha quedado vacío."
-        : "&7A meteor has been mined out.";
+        ? `${INFO}Un meteorito ha quedado vacío.`
+        : `${INFO}A meteor has been mined out.`;
 }
 
 /** A boss's name over its head. */
@@ -561,7 +623,7 @@ export function bossName(boss: string, language: Language): string {
 // ------------------------------------------------------------------ treasure hunt
 
 export function huntHiding(language: Language): string {
-    return language === "es" ? "&7Escondiendo los tesoros..." : "&7Hiding the treasures...";
+    return language === "es" ? `${INFO}Escondiendo los tesoros...` : `${INFO}Hiding the treasures...`;
 }
 
 /** The first clue: how far and which way from where everybody was. */
@@ -573,8 +635,8 @@ export function huntClueFar(
     language: Language
 ): string {
     return language === "es"
-        ? `&eTesoro ${number}: &fa unos ${metres} m al ${HEADING_ES[heading]}&e de X ${from.x}, Z ${from.z}.`
-        : `&eTreasure ${number}: &fabout ${metres} m ${heading}&e of X ${from.x}, Z ${from.z}.`;
+        ? `${WARN}Tesoro ${mark(number, WARN)}: a unos ${mark(`${metres} m`, WARN)} al ${HEADING_ES[heading]} de X ${from.x}, Z ${from.z}.`
+        : `${WARN}Treasure ${mark(number, WARN)}: about ${mark(`${metres} m`, WARN)} ${heading} of X ${from.x}, Z ${from.z}.`;
 }
 
 export function huntClueArea(
@@ -585,8 +647,8 @@ export function huntClueArea(
     language: Language
 ): string {
     return language === "es"
-        ? `&eTesoro ${number}: &fcerca de X ${x}, Z ${z}&e (a menos de ${within} bloques).`
-        : `&eTreasure ${number}: &fnear X ${x}, Z ${z}&e (within ${within} blocks).`;
+        ? `${WARN}Tesoro ${mark(number, WARN)}: cerca de ${mark(`X ${x}, Z ${z}`, WARN)} (a menos de ${within} bloques).`
+        : `${WARN}Treasure ${mark(number, WARN)}: near ${mark(`X ${x}, Z ${z}`, WARN)} (within ${within} blocks).`;
 }
 
 export function huntClueExact(
@@ -597,24 +659,25 @@ export function huntClueExact(
     language: Language
 ): string {
     return language === "es"
-        ? `&eTesoro ${number}: &fX ${x} Y ${y} Z ${z}`
-        : `&eTreasure ${number}: &fX ${x} Y ${y} Z ${z}`;
+        ? `${WARN}Tesoro ${mark(number, WARN)}: ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}`
+        : `${WARN}Treasure ${mark(number, WARN)}: ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}`;
 }
 
 export function huntBeams(language: Language): string {
     return language === "es"
-        ? "&eÚltimos minutos: los tesoros que quedan tienen un haz de luz."
-        : "&eLast minutes: the treasures left are marked by a beam of light.";
+        ? `${WARN}Últimos minutos: los tesoros que quedan tienen un haz de luz.`
+        : `${WARN}Last minutes: the treasures left are marked by a beam of light.`;
 }
 
 export function huntOpened(name: string, left: number, language: Language): string {
+    const who = mark(name, GOOD);
     if (language === "es")
         return left > 0
-            ? `&a${name} ha abierto un tesoro. &7Quedan ${left}.`
-            : `&a${name} ha abierto el último tesoro.`;
+            ? `${GOOD}${who} ha abierto un tesoro. ${INFO}Quedan ${mark(left, INFO)}.`
+            : `${GOOD}${who} ha abierto el último tesoro.`;
     return left > 0
-        ? `&a${name} opened a treasure. &7${left} left.`
-        : `&a${name} opened the last treasure.`;
+        ? `${GOOD}${who} opened a treasure. ${INFO}${mark(left, INFO)} left.`
+        : `${GOOD}${who} opened the last treasure.`;
 }
 
 /** Above the hotbar when a chest is close: how far and which way. */
@@ -633,9 +696,11 @@ export function huntLeftBar(left: number, total: number, language: Language): st
 export function huntUnfound(left: number, language: Language): string {
     if (language === "es")
         return left === 1
-            ? "&7Un tesoro se ha quedado sin encontrar."
-            : `&7${left} tesoros se han quedado sin encontrar.`;
-    return left === 1 ? "&7One treasure was never found." : `&7${left} treasures were never found.`;
+            ? `${INFO}Un tesoro se ha quedado sin encontrar.`
+            : `${INFO}${mark(left, INFO)} tesoros se han quedado sin encontrar.`;
+    return left === 1
+        ? `${INFO}One treasure was never found.`
+        : `${INFO}${mark(left, INFO)} treasures were never found.`;
 }
 
 // ------------------------------------------------------------------ gathering
@@ -661,8 +726,8 @@ export function materialName(material: GatherMaterial, language: Language): stri
 
 export function gatherTarget(material: GatherMaterial, language: Language): string {
     return language === "es"
-        ? `&eA recoger: &f${materialName(material, language)}`
-        : `&eGather: &f${materialName(material, language)}`;
+        ? `${WARN}A recoger: ${mark(materialName(material, language), WARN)}`
+        : `${WARN}Gather: ${mark(materialName(material, language), WARN)}`;
 }
 
 /** Above the hotbar: what to gather and how much of it so far. */
@@ -692,8 +757,8 @@ export function catchName(treasure: RareCatch | "any", language: Language): stri
 
 export function catchTarget(treasure: RareCatch | "any", language: Language): string {
     return language === "es"
-        ? `&eHay que pescar &f${catchName(treasure, language)}`
-        : `&eFish up &f${catchName(treasure, language)}`;
+        ? `${WARN}Hay que pescar ${mark(catchName(treasure, language), WARN)}`
+        : `${WARN}Fish up ${mark(catchName(treasure, language), WARN)}`;
 }
 
 /** Above the hotbar while it lasts, so nobody forgets what they are after. */
@@ -706,11 +771,13 @@ export function catchBar(treasure: RareCatch | "any", language: Language): strin
 }
 
 export function catchWon(name: string, language: Language): string {
-    return language === "es" ? `&a¡${name} lo ha pescado!` : `&a${name} fished it up!`;
+    return language === "es"
+        ? `${GOOD}¡${mark(name, GOOD)} lo ha pescado!`
+        : `${GOOD}${mark(name, GOOD)} fished it up!`;
 }
 
 export function catchMissed(language: Language): string {
-    return language === "es" ? "&7Nadie lo pescó a tiempo." : "&7Nobody fished it up in time.";
+    return language === "es" ? `${INFO}Nadie lo pescó a tiempo.` : `${INFO}Nobody fished it up in time.`;
 }
 
 // ------------------------------------------------------------------ experience boost
@@ -726,8 +793,8 @@ export function boostBar(perKill: number, perOre: number, language: Language): s
 
 export function boostOver(language: Language): string {
     return language === "es"
-        ? "&7La experiencia extra ha terminado."
-        : "&7The experience boost is over.";
+        ? `${INFO}La experiencia extra ha terminado.`
+        : `${INFO}The experience boost is over.`;
 }
 
 // ------------------------------------------------------------------ parkour, spleef
@@ -747,14 +814,14 @@ export function joinButtonsText(language: Language): {
 } {
     return language === "es"
         ? {
-              lead: "&ePulsa para participar (o escribe &funirse&e):",
+              lead: `${WARN}Pulsa para participar (o escribe ${mark("unirse", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               join: { label: "[Unirse]", hover: "Te llevamos al empezar y te devolvemos a donde estabas" },
               // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Salir]", hover: "Retirarte del evento" }
           }
         : {
-              lead: "&eClick to take part (or type &fjoin&e):",
+              lead: `${WARN}Click to take part (or type ${mark("join", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               join: { label: "[Join]", hover: "You are taken there when it starts and brought back after" },
               // i18n-ignore: in-game button, both languages here (speech picks one)
@@ -764,18 +831,18 @@ export function joinButtonsText(language: Language): {
 
 export function joinHint(language: Language): string {
     return language === "es"
-        ? "&eEscribe &funirse&e en el chat para participar. Te llevamos y te devolvemos a donde estabas."
-        : "&eType &fjoin&e in the chat to take part. You are taken there and brought back to where you were.";
+        ? `${WARN}Escribe ${mark("unirse", WARN)} en el chat para participar. Te llevamos y te devolvemos a donde estabas.`
+        : `${WARN}Type ${mark("join", WARN)} in the chat to take part. You are taken there and brought back to where you were.`;
 }
 
 export function joinedYou(language: Language): string {
     return language === "es"
-        ? "&aEstás dentro. Te llevamos al empezar; escribe &fsalir&a para retirarte."
-        : "&aYou are in. You are taken there when it starts; type &fleave&a to drop out.";
+        ? `${GOOD}Estás dentro. Te llevamos al empezar; escribe ${mark("salir", GOOD)} para retirarte.`
+        : `${GOOD}You are in. You are taken there when it starts; type ${mark("leave", GOOD)} to drop out.`;
 }
 
 export function leftYou(language: Language): string {
-    return language === "es" ? "&7Te has retirado." : "&7You dropped out.";
+    return language === "es" ? `${INFO}Te has retirado.` : `${INFO}You dropped out.`;
 }
 
 /** Above everybody's hotbar through the countdown. */
@@ -787,24 +854,24 @@ export function joinedBar(count: number, language: Language): string {
 
 export function notSurvival(language: Language): string {
     return language === "es"
-        ? "&7Cambia a supervivencia o aventura para participar."
-        : "&7Switch to survival or adventure to take part.";
+        ? `${WARN}Cambia a supervivencia o aventura para participar.`
+        : `${WARN}Switch to survival or adventure to take part.`;
 }
 
 export function tooLate(language: Language): string {
     return language === "es"
-        ? "&7Ya ha empezado. Apúntate en la próxima."
-        : "&7It has already started. Join the next one.";
+        ? `${INFO}Ya ha empezado. Apúntate en la próxima.`
+        : `${INFO}It has already started. Join the next one.`;
 }
 
 export function notEnoughJoined(joined: number, needed: number, language: Language): string {
     return language === "es"
-        ? `&7Solo se apuntaron ${joined} y hacen falta ${needed}: no se juega esta vez.`
-        : `&7Only ${joined} joined and it needs ${needed}: not this time.`;
+        ? `${BAD}Solo se apuntaron ${mark(joined, BAD)} y hacen falta ${mark(needed, BAD)}: ${REASON}no se juega esta vez.`
+        : `${BAD}Only ${mark(joined, BAD)} joined and it needs ${mark(needed, BAD)}: ${REASON}not this time.`;
 }
 
 export function backWhereYouWere(language: Language): string {
-    return language === "es" ? "&7Has vuelto a donde estabas." : "&7You are back where you were.";
+    return language === "es" ? `${INFO}Has vuelto a donde estabas.` : `${INFO}You are back where you were.`;
 }
 
 export function goTitle(language: Language): string {
@@ -839,8 +906,8 @@ export function checkpointTitle(
 
 export function backToCheckpoint(language: Language): string {
     return language === "es"
-        ? "&7De vuelta a tu último control."
-        : "&7Back to your last checkpoint.";
+        ? `${INFO}De vuelta a tu último control.`
+        : `${INFO}Back to your last checkpoint.`;
 }
 
 export function finishedLine(
@@ -850,8 +917,8 @@ export function finishedLine(
     language: Language
 ): string {
     return language === "es"
-        ? `&a${name} llega a la meta en &f${time}&a (puesto ${place}).`
-        : `&a${name} reached the finish in &f${time}&a (place ${place}).`;
+        ? `${GOOD}${mark(name, GOOD)} llega a la meta en ${mark(time, GOOD)} (puesto ${mark(place, GOOD)}).`
+        : `${GOOD}${mark(name, GOOD)} reached the finish in ${mark(time, GOOD)} (place ${mark(place, GOOD)}).`;
 }
 
 export function finishedBar(time: string, language: Language): string {
@@ -861,7 +928,7 @@ export function finishedBar(time: string, language: Language): string {
 }
 
 export function everybodyDone(language: Language): string {
-    return language === "es" ? "&eTodos han terminado." : "&eEverybody is done.";
+    return language === "es" ? `${WARN}Todos han terminado.` : `${WARN}Everybody is done.`;
 }
 
 export function spleefReadyTitle(language: Language): string {
@@ -880,8 +947,8 @@ export function spleefGo(language: Language): string {
 
 export function spleefOut(name: string, left: number, language: Language): string {
     return language === "es"
-        ? `&c${name} ha caído. &7Quedan ${left}.`
-        : `&c${name} is out. &7${left} left.`;
+        ? `${BAD}${mark(name, BAD)} ha caído. ${INFO}Quedan ${mark(left, INFO)}.`
+        : `${BAD}${mark(name, BAD)} is out. ${INFO}${mark(left, INFO)} left.`;
 }
 
 export function spleefOutTitle(language: Language): string {
@@ -896,32 +963,32 @@ export function spleefBar(left: number, language: Language): string {
 
 export function lastStanding(name: string, language: Language): string {
     return language === "es"
-        ? `&a${name} es el último en pie.`
-        : `&a${name} is the last one standing.`;
+        ? `${GOOD}${mark(name, GOOD)} es el último en pie.`
+        : `${GOOD}${mark(name, GOOD)} is the last one standing.`;
 }
 
 export function nobodyStanding(language: Language): string {
-    return language === "es" ? "&7No queda nadie en pie." : "&7Nobody is left standing.";
+    return language === "es" ? `${INFO}No queda nadie en pie.` : `${INFO}Nobody is left standing.`;
 }
 
 // ------------------------------------------------------------------ joining
 
 export function joinedLine(name: string, count: number, language: Language): string {
     return language === "es"
-        ? `&a${name} se ha unido &7(${count})`
-        : `&a${name} is in &7(${count})`;
+        ? `${GOOD}${mark(name, GOOD)} se ha unido ${INFO}(${count})`
+        : `${GOOD}${mark(name, GOOD)} is in ${INFO}(${count})`;
 }
 
 export function joinFull(language: Language): string {
     return language === "es"
-        ? "&7Ya está completo; te guardamos sitio en el próximo."
-        : "&7It is full; there is room in the next one.";
+        ? `${INFO}Ya está completo; te guardamos sitio en el próximo.`
+        : `${INFO}It is full; there is room in the next one.`;
 }
 
 export function takenBack(language: Language): string {
     return language === "es"
-        ? "&7Estás de vuelta. El kit del evento se ha retirado; todo lo tuyo sigue igual."
-        : "&7You are back. The event's kit was taken back; everything of yours is as it was.";
+        ? `${INFO}Estás de vuelta. El kit del evento se ha retirado; todo lo tuyo sigue igual.`
+        : `${INFO}You are back. The event's kit was taken back; everything of yours is as it was.`;
 }
 
 // ------------------------------------------------------------------ team duel
@@ -960,8 +1027,9 @@ export function duelStatus(side: number, eliminations: number, language: Languag
 }
 
 export function duelDown(name: string, by: string | null, language: Language): string {
-    if (language === "es") return by ? `&7${name} cae ante &f${by}` : `&7${name} ha caído`;
-    return by ? `&7${name} is out - &f${by}` : `&7${name} is out`;
+    const who = mark(name, BAD);
+    if (language === "es") return by ? `${BAD}${who} cae ante ${REASON}${by}` : `${BAD}${who} ha caído`;
+    return by ? `${BAD}${who} is out - ${REASON}${by}` : `${BAD}${who} is out`;
 }
 
 export function duelResult(red: number, blue: number, language: Language): string {
@@ -978,7 +1046,7 @@ export function themeTitle(language: Language): string {
 }
 
 export function themeLine(theme: string, language: Language): string {
-    return language === "es" ? `&eTema: &f${theme}` : `&eTheme: &f${theme}`;
+    return language === "es" ? `${WARN}Tema: ${mark(theme, WARN)}` : `${WARN}Theme: ${mark(theme, WARN)}`;
 }
 
 export function plotBar(
@@ -1003,12 +1071,12 @@ export function doneOffer(language: Language): {
 } {
     return language === "es"
         ? {
-              lead: "&e¿Has terminado tu construcción?",
+              lead: `${WARN}¿Has terminado tu construcción?`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               done: { label: "[Terminado]", hover: "Cuando todos terminen, empieza la votación" }
           }
         : {
-              lead: "&eFinished your build?",
+              lead: `${WARN}Finished your build?`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               done: { label: "[Done]", hover: "When everybody is done, the vote starts" }
           };
@@ -1021,12 +1089,12 @@ export function doneMarked(language: Language): {
 } {
     return language === "es"
         ? {
-              lead: "&aMarcado como terminado.",
+              lead: `${GOOD}Marcado como terminado.`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               undo: { label: "[Seguir construyendo]", hover: "Quitar el terminado y seguir" }
           }
         : {
-              lead: "&aMarked as done.",
+              lead: `${GOOD}Marked as done.`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
               undo: { label: "[Undo]", hover: "Take it back and keep building" }
           };
@@ -1034,7 +1102,7 @@ export function doneMarked(language: Language): {
 
 /** Said to a builder who took [Done] back, before the button again. */
 export function undoMarked(language: Language): string {
-    return language === "es" ? "&7Sigues construyendo." : "&7Back to building.";
+    return language === "es" ? `${INFO}Sigues construyendo.` : `${INFO}Back to building.`;
 }
 
 /** The side panel's title while builders mark themselves done. */
@@ -1045,14 +1113,14 @@ export function doneListTitle(done: number, total: number, language: Language): 
 /** Everybody still building is done: the vote comes early. */
 export function allDone(language: Language): string {
     return language === "es"
-        ? "&aTodos han terminado: empieza la votación."
-        : "&aEverybody is done: the vote starts now.";
+        ? `${GOOD}Todos han terminado: empieza la votación.`
+        : `${GOOD}Everybody is done: the vote starts now.`;
 }
 
 export function voteHow(language: Language): string {
     return language === "es"
-        ? "&fEscribe en el chat el número de la mejor parcela, que no sea la tuya. Un voto cada uno."
-        : "&fType the number of the best plot in the chat - not your own. One vote each.";
+        ? `${WARN}Escribe en el chat el ${mark("número", WARN)} de la mejor parcela, que no sea la tuya. Un voto cada uno.`
+        : `${WARN}Type the ${mark("number", WARN)} of the best plot in the chat - not your own. One vote each.`;
 }
 
 export function voteBar(plot: number, secondsLeft: number, language: Language): string {
@@ -1067,24 +1135,26 @@ export function plotTitle(plot: number, language: Language): string {
 
 export function voteCounted(plot: number, language: Language): string {
     return language === "es"
-        ? `&aVoto para la parcela ${plot} anotado.`
-        : `&aYour vote for plot ${plot} is in.`;
+        ? `${GOOD}Voto para la parcela ${mark(plot, GOOD)} anotado.`
+        : `${GOOD}Your vote for plot ${mark(plot, GOOD)} is in.`;
 }
 
 export function voteOwn(language: Language): string {
     return language === "es"
-        ? "&7No puedes votar tu propia parcela."
-        : "&7You cannot vote for your own plot.";
+        ? `${BAD}No puedes votar tu propia parcela.`
+        : `${BAD}You cannot vote for your own plot.`;
 }
 
 export function voteAgain(language: Language): string {
-    return language === "es" ? "&7Ya has votado." : "&7You have already voted.";
+    return language === "es" ? `${BAD}Ya has votado.` : `${BAD}You have already voted.`;
 }
 
 export function voteNoPlot(plot: number, language: Language): string {
-    return language === "es" ? `&7No hay parcela ${plot}.` : `&7There is no plot ${plot}.`;
+    return language === "es"
+        ? `${BAD}No hay parcela ${mark(plot, BAD)}.`
+        : `${BAD}There is no plot ${mark(plot, BAD)}.`;
 }
 
 export function themeWas(theme: string, language: Language): string {
-    return language === "es" ? `&7El tema era &f${theme}` : `&7The theme was &f${theme}`;
+    return language === "es" ? `${INFO}El tema era ${mark(theme, INFO)}` : `${INFO}The theme was ${mark(theme, INFO)}`;
 }

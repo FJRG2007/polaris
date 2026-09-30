@@ -875,14 +875,16 @@ describe("a treasure hunt", () => {
     it("tells the clues in three steps, and none for a chest already opened", () => {
         const chests = [chest(0, -300), chest(200, 0, true)];
         const origin = { x: 0, z: 0 };
+        // What a player reads of it, its colours aside.
+        const bare = (line: string | undefined) => (line ?? "").replace(/&[0-9a-fk-or]/g, "");
         const far = hunt.clues(chests, 1, origin, "en");
         expect(far).toHaveLength(1);
-        expect(far[0]).toContain("Treasure 1");
-        expect(far[0]).toContain("about 300 m north");
+        expect(bare(far[0])).toContain("Treasure 1");
+        expect(bare(far[0])).toContain("about 300 m north");
         const area = hunt.clues([chest(123, -277)], 2, origin, "es");
-        expect(area[0]).toContain("X 100, Z -300");
+        expect(bare(area[0])).toContain("X 100, Z -300");
         const exact = hunt.clues([chest(123, -277)], 3, origin, "en");
-        expect(exact[0]).toContain("X 123 Y 70 Z -277");
+        expect(bare(exact[0])).toContain("X 123 Y 70 Z -277");
         for (const line of [...far, ...area, ...exact]) expect(line).not.toMatch(/[{}]/);
     });
 

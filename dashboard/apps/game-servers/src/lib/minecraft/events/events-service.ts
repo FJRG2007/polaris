@@ -938,9 +938,15 @@ async function countdown(
                 commands.barColour(preset.kind)
             ),
             ...commands.titleCommands(messages.startsSoonTitle(language), `&e${title}`),
-            commands.say(messages.tag(language) + messages.startsIn(title, left, language)),
+            // One line: when, and what to do.
             commands.say(
-                `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
+                messages.tag(language) +
+                    messages.startsInWithRules(
+                        title,
+                        left,
+                        messages.rules(preset.kind, language, isRace(preset)),
+                        language
+                    )
             ),
             ...targetLines(loop.run, language),
             ...(catalog.takesJoiners(preset)
@@ -1128,12 +1134,17 @@ async function begin(
         ),
         ...commands.setupScoreboard(preset, `&6&l${preset.name}`),
         ...commands.titleCommands(messages.startedTitle(language), `&e${preset.name}`),
-        commands.say(messages.tag(language) + `&e&l${preset.name}`),
+        // One line: what it is, what to do, how long.
         commands.say(
-            `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
+            messages.tag(language) +
+                messages.startLine(
+                    preset.name,
+                    messages.rules(preset.kind, language, isRace(preset)),
+                    catalog.runMinutes(preset),
+                    language
+                )
         ),
         ...targetLines(loop.run, language),
-        commands.say(messages.tag(language) + messages.lasts(catalog.runMinutes(preset), language)),
         commands.sound(preset.kind === "blood-moon" ? commands.SOUNDS.horn : commands.SOUNDS.start)
     ];
     if (preset.kind === "gathering") {
