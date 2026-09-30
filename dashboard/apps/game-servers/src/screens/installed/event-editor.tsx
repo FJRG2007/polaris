@@ -33,6 +33,7 @@ import { RareCatchOptions } from "./event-options-rare-catch";
 import { XpBoostOptions } from "./event-options-xp-boost";
 import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
 import { ItemSlots } from "./item-slots";
+import { WorldBossOptions } from "./event-options-world-boss";
 
 const MINING_LABELS: Readonly<
     Record<(typeof catalog.MINING_TARGETS)[number], GameKey<"minecraft">>
@@ -59,13 +60,6 @@ export const LOOT_LABELS: Readonly<
     bastion: "editor.labels.loot.bastion",
     "end-city": "editor.labels.loot.end-city",
     "ancient-city": "editor.labels.loot.ancient-city"
-};
-
-const BOSS_LABELS: Readonly<Record<(typeof catalog.BOSS_KINDS)[number], GameKey<"minecraft">>> = {
-    "wither-skeleton": "editor.labels.boss.wither-skeleton",
-    ravager: "editor.labels.boss.ravager",
-    vindicator: "editor.labels.boss.vindicator",
-    husk: "editor.labels.boss.husk"
 };
 
 const INTENSITY_LABELS: Readonly<
@@ -414,45 +408,14 @@ function OptionsFields({
                 </>
             );
         }
-        case "world-boss": {
-            const value = preset.options as catalog.EventOptions<"world-boss">;
+        case "world-boss":
             return (
-                <>
-                    <Field label={t("editor.whichBoss")}>
-                        <Select
-                            value={value.boss}
-                            onValueChange={(boss) =>
-                                onChange({ ...value, boss: boss as typeof value.boss })
-                            }
-                            options={options(t, BOSS_LABELS)}
-                            aria-label={t("editor.whichBoss")}
-                        />
-                    </Field>
-                    <Field
-                        label={t("editor.health")}
-                        hint={t("editor.between100And1024A")}
-                        problem={problemAt(issues, "options", "health")}
-                    >
-                        <Input
-                            type="number"
-                            min={100}
-                            max={1024}
-                            value={Number.isFinite(value.health) ? value.health : ""}
-                            onChange={(event) =>
-                                onChange({ ...value, health: numberOf(event.target.value) })
-                            }
-                        />
-                    </Field>
-                    <PlaceField
-                        value={value.place}
-                        onChange={(place) => onChange({ ...value, place })}
-                        what={t("editor.place.boss")}
-                        issues={issues}
-                        path={["options", "place"]}
-                    />
-                </>
+                <WorldBossOptions
+                    value={preset.options as catalog.EventOptions<"world-boss">}
+                    onChange={onChange}
+                    issues={issues}
+                />
             );
-        }
         case "trivia": {
             const value = preset.options as catalog.EventOptions<"trivia">;
             return (

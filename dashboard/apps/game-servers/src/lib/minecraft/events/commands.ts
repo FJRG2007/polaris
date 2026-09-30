@@ -19,7 +19,7 @@ import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
 
 export const SCORE = "pe_score";
-const SUM = "pe_sum";
+export const SUM = "pe_sum";
 const TMP = "pe_tmp";
 const CONST = "pe_const";
 const DEATHS = "pe_death";
@@ -1257,45 +1257,14 @@ const BOSS_ENTITY: Readonly<Record<EventOptions<"world-boss">["boss"], string>> 
     "wither-skeleton": "wither_skeleton",
     ravager: "ravager",
     vindicator: "vindicator",
-    husk: "husk"
+    husk: "husk",
+    evoker: "evoker",
+    captain: "pillager",
+    wither: "wither"
 };
 
 export function bossEntity(boss: EventOptions<"world-boss">["boss"]): string {
     return BOSS_ENTITY[boss];
-}
-
-/**
- * The boss, on the marker.
- *
- * Named separately (`bossNameCommand`) because how a name is written into an
- * entity changed in 1.21.5, and the attributes separately too, because their
- * ids lost the `generic.` in 1.21.2 - both are tried in the order that fails
- * cleanly on the other versions.
- *
- * There is no `attribute` command before 1.16, so the same attributes go in the
- * boss's own data as well, by the names 1.13 to 1.15 give them - a health bar
- * of 20 hearts' worth otherwise, nearly empty from the start. A newer version
- * does not know those names and passes them over.
- */
-export function summonBoss(boss: EventOptions<"world-boss">["boss"], health: number): string[] {
-    const attributes = legacyAttributes(health)
-        .map(([name, base]) => `{Name:"${name}",Base:${base}d}`)
-        .join(",");
-    return [
-        `kill @e[tag=${BOSS_TAG}]`,
-        `execute at @e[tag=${MARK_TAG},limit=1] run summon minecraft:${BOSS_ENTITY[boss]} ~ ~ ~ {Tags:["${BOSS_TAG}"],PersistenceRequired:1b,Glowing:1b,CustomNameVisible:1b,Attributes:[${attributes}],Health:${Math.min(health, 1024)}f}`
-    ];
-}
-
-/** `bossAttributes` by the names 1.13-1.15 use; their health stops at 1024. */
-function legacyAttributes(health: number): [string, number][] {
-    return [
-        ["generic.maxHealth", Math.min(health, 1024)],
-        ["generic.knockbackResistance", 0.8],
-        ["generic.armor", 10],
-        ["generic.attackDamage", 12],
-        ["generic.followRange", 48]
-    ];
 }
 
 /**

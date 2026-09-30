@@ -17,6 +17,7 @@ import {
 } from "./catalog";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { stashSchema } from "./kinds/stash";
+import { bossStateSchema } from "./kinds/boss";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];
@@ -201,7 +202,9 @@ export const runSchema = z.object({
     done: z.array(z.string()).default([]),
     /** A build battle: when the building ended early, everybody done - its own
      *  time otherwise (`readyAt` and the minutes). */
-    buildEndsAt: z.number().nullable().default(null)
+    buildEndsAt: z.number().nullable().default(null),
+    /** A world boss: which one was drawn, and how its fight stands. */
+    boss: bossStateSchema.nullable().default(null)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };
