@@ -264,6 +264,8 @@ const world: World = {
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
 const stashRows = new Map<string, Record<string, unknown>>();
+/** The database copy cannot be deleted: a give-back stops after they are home. */
+let stashDeleteFails = false;
 const held: string[] = [];
 const released: string[] = [];
 
@@ -1319,9 +1321,10 @@ vi.mock("@polaris/db", () => ({
                 stashRows.delete(where.id);
                 return {};
             },
-            deleteMany: async ({ where }: { where: { id: string } }) => ({
-                count: stashRows.delete(where.id) ? 1 : 0
-            }),
+            deleteMany: async ({ where }: { where: { id: string } }) => {
+                if (stashDeleteFails) throw new Error("database unavailable");
+                return { count: stashRows.delete(where.id) ? 1 : 0 };
+            },
             update: async ({
                 where,
                 data
@@ -1481,6 +1484,7 @@ beforeEach(() => {
     world.insomnia = "true";
     world.inv = {};
     stashRows.clear();
+    stashDeleteFails = false;
     world.containers = new Map();
     world.drops = new Map();
     world.pickUp = false;
@@ -4354,6 +4358,7 @@ describe("a meteor shower", () => {
 
     it("comes in to an island for a chest when all round it is sea, and gives up for meteors", async () => {
         world.sea = true;
+        world.at = { Ana: [0, 64, 0], Ben: [10, 64, 0] };
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
         await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
@@ -5181,6 +5186,23 @@ describe("players' own things through an arena", () => {
         expect(back).toBeGreaterThan(kitOff);
         expect(prize).toBeGreaterThan(back);
         expect(state().arenaLeftovers).toEqual([]);
+    });
+
+    it("gives their game mode back once home, even when the give-back stops after", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        stashDeleteFails = true;
+        await play(3 * 60_000 + 10_000);
+        expect(state().arenaLeftovers.flatMap((one) => one.entrants.map((e) => e.name))).toContain(
+            "Ana"
+        );
+        const home = world.sent.findLastIndex((line) =>
+            line.startsWith("execute in minecraft:overworld run tp Ana ")
+        );
+        expect(home).toBeGreaterThan(-1);
+        expect(world.sent.indexOf("gamemode survival Ana", home)).toBeGreaterThan(home);
     });
 
     it("drops a stack at their feet, as theirs, when its slot is taken by the end", async () => {

@@ -891,8 +891,11 @@ export async function closeArena(
             // The kit off, then their own things back into their slots, then
             // home - where anything whose slot was taken is dropped at their feet.
             let home = false;
-            const goHome = async (): Promise<boolean> =>
-                (home = arena.wentHome(await server.say([arena.sendHome(one)])));
+            const goHome = async (): Promise<boolean> => {
+                home = arena.wentHome(await server.say([arena.sendHome(one)]));
+                if (home) await server.say([arena.homeMode(one)]);
+                return home;
+            };
             const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
                 if (!one.stash) return true;
                 const how = await stashService.giveBack(
@@ -918,7 +921,7 @@ export async function closeArena(
                 remaining.push(one);
                 continue;
             }
-            await server.sayAll([arena.homeMode(one), arena.leftArena(one.name)]);
+            await server.say([arena.leftArena(one.name)]);
             const thrown = box ? arena.sendThrown(box, one) : null;
             if (thrown) await server.say([thrown]);
             if (language) {
