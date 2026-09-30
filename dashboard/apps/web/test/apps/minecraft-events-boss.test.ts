@@ -28,10 +28,17 @@ describe("the options", () => {
         expect(value.pool).toEqual([...catalog.BOSS_KINDS]);
     });
 
-    it("read an event saved before the choice as drawn, keeping its health and place", () => {
-        const old = catalog.optionsSchemas["world-boss"].parse({ boss: "husk", health: 600 }) as Options;
-        expect(old.choice).toBe("random");
+    it("read an event saved before the choice as it fought: its own boss, on Normal, on the land", () => {
+        const schema = catalog.optionsSchemas["world-boss"];
+        const old = schema.parse({ boss: "husk", health: 600 }) as Options;
+        expect(old.choice).toBe("chosen");
+        expect(old.boss).toBe("husk");
+        expect(old.difficulty).toBe("normal");
+        expect(old.arena).toBe(false);
         expect(old.health).toBe(600);
+        const saved = schema.parse({ choice: "random", boss: "husk" }) as Options;
+        expect(saved.difficulty).toBe("epic");
+        expect(saved.arena).toBe(true);
     });
 
     it("refuse the Wither chosen for the land, and a pool with nothing that can fight there", () => {
@@ -229,6 +236,16 @@ describe("its attacks", () => {
             expect(line).toContain("@a[tag=pe_in,distance=4..,gamemode=!creative,gamemode=!spectator]");
             expect(line).toContain("if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air run tp @s ~ ~ ~");
         }
+    });
+
+    it("move a player through no wall: every block on the way is air", () => {
+        const context = { arena: true, difficulty: "normal" as const, damage: true, target: null, warning: "!", markers: true };
+        const clear = "if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air";
+        const path = (step: number) => Array(3).fill(`positioned ^ ^ ^${step} ${clear}`).join(" ");
+        const moved = (ability: "pull" | "shockwave") =>
+            boss.abilityLines(ability, context).act.find((line) => line.includes(" tp @s "));
+        expect(moved("pull")).toContain(`facing entity @e[tag=pe_boss,limit=1] feet ${path(1)} run tp @s ~ ~ ~`);
+        expect(moved("shockwave")).toContain(`facing entity @e[tag=pe_boss,limit=1] feet ${path(-1)} run tp @s ~ ~ ~`);
     });
 
     it("leap only at a player, and not at all without one", () => {

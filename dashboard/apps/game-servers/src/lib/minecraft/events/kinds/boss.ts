@@ -35,7 +35,7 @@
 import { z } from "zod";
 import * as stage from "./stage";
 import * as catalog from "../catalog";
-import { BAR, BOSS_FIGHT_REACH, BOSS_TAG, SUM, asciiJson, text } from "../commands";
+import { BAR, BOSS_FIGHT_REACH, BOSS_TAG, GRIEF_RULES, SUM, asciiJson, text } from "../commands";
 
 type Options = catalog.EventOptions<"world-boss">;
 type BossKind = catalog.BossKind;
@@ -132,7 +132,7 @@ const CALLS_FOR_HELP = ["husk", "zombie"];
 export const holdsGriefing = catalog.holdsGriefing;
 
 /** The rule held off, under every name it has had. */
-export const MOB_GRIEFING = ["mobGriefing", "mob_griefing"] as const;
+export const MOB_GRIEFING = GRIEF_RULES;
 /** The rule held on, under every name it has had. */
 export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;
 
@@ -846,10 +846,13 @@ function hurt(selector: string, amount: number, modern: boolean): string {
         : `effect give ${selector} minecraft:instant_damage 1 ${amount >= 10 ? 1 : 0} true`;
 }
 
-/** Moved `STEP` blocks along the way they face, only into two blocks of air. */
+/** Moved `STEP` blocks along the way they face, only through and into two
+ *  blocks of air: every block on the way is checked, so no wall is crossed. */
 function stepLine(selector: string, facing: string, towards: boolean): string {
-    const distance = towards ? STEP : -STEP;
-    return `execute as ${selector} at @s ${facing} positioned ^ ^ ^${distance} if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air run tp @s ~ ~ ~`;
+    const step = towards ? 1 : -1;
+    const clear = "if block ~ ~ ~ minecraft:air if block ~ ~1 ~ minecraft:air";
+    const path = Array.from({ length: STEP }, () => `positioned ^ ^ ^${step} ${clear}`).join(" ");
+    return `execute as ${selector} at @s ${facing} ${path} run tp @s ~ ~ ~`;
 }
 
 export interface AbilityLines {

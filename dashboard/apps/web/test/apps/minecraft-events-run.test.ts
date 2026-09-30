@@ -2443,6 +2443,16 @@ describe("a world boss fight", () => {
         expect(state().history[0]?.outcome).toBe("cancelled");
     });
 
+    it("leaves mob griefing as the server has it for a boss that changes no block", async () => {
+        world.mobGriefing = "true";
+        setUp([groundBoss("boss", 10, { boss: "husk" })]);
+        await start();
+        await play(4_100);
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent.some((line) => line.startsWith("gamerule mobGriefing "))).toBe(false);
+        expect(state().run?.gamerules).not.toHaveProperty("mobGriefing");
+    });
+
     it("does not start where it cannot hold mob griefing off", async () => {
         world.mobGriefing = "unknown";
         setUp([groundBoss("boss", 10, { boss: "ravager" })]);
