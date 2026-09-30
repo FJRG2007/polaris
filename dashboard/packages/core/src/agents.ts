@@ -196,7 +196,7 @@ export type AgentTrigger = (typeof AGENT_TRIGGERS)[number];
 export const AGENT_TRIGGER_LABELS: Record<AgentTrigger, string> = {
     mention: "Mentioned",
     "issue.opened": "Issue opened",
-    "issue.labeled": "Issue labelled",
+    "issue.labeled": "Issue labeled",
     "pr.opened": "Pull request opened",
     "pr.review_requested": "Review requested",
     "pr.review_submitted": "Review submitted",
@@ -246,7 +246,7 @@ export const AGENT_RUN_STATE_LABELS: Record<AgentRunState, string> = {
     running: "Running",
     succeeded: "Succeeded",
     failed: "Failed",
-    cancelled: "Cancelled"
+    cancelled: "Canceled"
 };
 
 /** Whether a run has stopped moving. */

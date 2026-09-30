@@ -63,7 +63,7 @@ export const taskDescription = z
 export const hexColor = z
     .string()
     .trim()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour");
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a color");
 
 const uuid = z.string().uuid();
 
@@ -130,7 +130,7 @@ export const TASK_STATUS_TYPE_HINTS: Record<TaskStatusType, string> = {
     blocked:
         "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
     done: "Finished work. Completing a task moves it to the first status of this kind.",
-    closed: "Filed away without being completed: cancelled, duplicate, or won't do."
+    closed: "Filed away without being completed: canceled, duplicate, or won't do."
 };
 
 /**
@@ -186,7 +186,7 @@ export const DEFAULT_TASK_STATUSES: readonly {
     { name: "On hold", type: "open", color: "#92400e" },
     { name: "In review", type: "active", color: "#eab308" },
     { name: "Done", type: "done", color: "#22c55e" },
-    { name: "Cancelled", type: "closed", color: "#71717a" }
+    { name: "Canceled", type: "closed", color: "#71717a" }
 ];
 
 /**

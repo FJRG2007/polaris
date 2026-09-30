@@ -81,7 +81,7 @@ export const ENGLISH_UI_STRINGS: UiStrings = {
     hidePassword: "Hide password",
     noData: "No data",
     noDataInRange: "No data in this range",
-    hexColour: "Hex colour",
+    hexColour: "Hex color",
     hexOf: (label) => `${label}: hex`,
     unit: "Unit",
     reply: "Reply",

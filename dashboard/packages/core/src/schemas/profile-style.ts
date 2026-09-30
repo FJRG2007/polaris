@@ -27,7 +27,7 @@ const hexField = z
     .string()
     .trim()
     .toLowerCase()
-    .refine((value) => readHex(value) !== null, "A colour has to be six hex digits, like #4f8ef7");
+    .refine((value) => readHex(value) !== null, "A color has to be six hex digits, like #4f8ef7");
 
 /** One of a catalogue's ids, or nothing. Built from the catalogue rather than
  *  written out, so an entry added or withdrawn there is added or withdrawn

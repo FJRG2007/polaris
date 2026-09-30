@@ -60,7 +60,7 @@ export const THEMES: readonly ThemeInfo[] = [
     {
         id: "graphite",
         label: "Graphite",
-        description: "Grey with no colour cast, for anyone the blue tint bothers.",
+        description: "Gray with no color cast, for anyone the blue tint bothers.",
         scheme: "dark"
     }
 ];

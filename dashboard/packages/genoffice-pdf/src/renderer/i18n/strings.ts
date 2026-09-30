@@ -475,7 +475,7 @@ export const strings = {
     savedOk: 'Saved',
     saveFailed: 'Save failed',
     saveVerifyFailed:
-      'Changes on page {pages} could not be written back intact, so the save was cancelled and the file left untouched; undo the affected edit and try again',
+      'Changes on page {pages} could not be written back intact, so the save was canceled and the file left untouched; undo the affected edit and try again',
     textEditNoMatch: 'This text cannot be edited: it could not be located in the document',
     textBlockOverflow:
       'The edited paragraph no longer fits: the extra lines would cover the content below. Shorten the text, or press Esc to discard the change',

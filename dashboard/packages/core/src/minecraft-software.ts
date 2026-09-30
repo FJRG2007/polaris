@@ -125,7 +125,7 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
     {
         id: "LEAF",
         name: "Leaf",
-        summary: "A Paper fork that trades a little vanilla behaviour for speed.",
+        summary: "A Paper fork that trades a little vanilla behavior for speed.",
         group: "established",
         loader: "paper",
         weight: "plugins"
