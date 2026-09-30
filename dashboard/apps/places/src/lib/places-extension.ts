@@ -54,6 +54,18 @@ export const placesExtension: AppExtension = {
             // beside it.
             leaseMs: 30 * MINUTE,
             run: async () => (await sweeps()).sweepHomeRetention()
+        },
+        {
+            key: "home-automations",
+            // A minute, which is the finest time of day an automation can name.
+            // A shorter delay inside a run sets its own timer as well; this is
+            // what resumes everything else, including after a restart.
+            everyMs: Number(process.env.POLARIS_HOME_AUTOMATIONS_MS) || MINUTE,
+            // Leased: one runner asks the devices and walks the clock. The runs
+            // themselves are claimed one by one, so a second runner could not
+            // double a step - but it would double every call to the accounts.
+            leaseMs: 5 * MINUTE,
+            run: async () => (await import("./automation-runtime")).tickAutomations()
         }
     ],
 

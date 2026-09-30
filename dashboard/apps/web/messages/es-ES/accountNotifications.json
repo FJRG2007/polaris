@@ -331,6 +331,10 @@
             "label": "Una cámara ha dejado de responder",
             "description": "Una cámara se ha quedado en silencio, o ha vuelto después de estarlo."
         },
+        "placesAutomation": {
+            "label": "Aviso de una automatización",
+            "description": "Un paso de una de tus automatizaciones pidió avisarte."
+        },
         "serverSpace": {
             "label": "Un servidor se queda sin espacio",
             "description": "Polaris ha liberado todo lo que no usaba nada y el disco sigue casi lleno."

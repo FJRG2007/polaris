@@ -172,6 +172,10 @@
         "settings": {
             "description": "Where the house keeps what it records, and what recognizes faces.",
             "title": "Settings"
+        },
+        "automations": {
+            "title": "Device automations",
+            "description": "What this place does by itself: switch off what was left on, lock what was left open, and tell you when."
         }
     },
     "placeDialog": {
@@ -461,7 +465,10 @@
         "schemaPerson": "Unknown person",
         "schemaSubnet": "Write it as 192.168.1.0/24",
         "schemaConnect": "Pick how to connect it",
-        "relayStatus": "The relay refused it ({status})."
+        "relayStatus": "The relay refused it ({status}).",
+        "automationGone": "That automation is not here",
+        "automationNewer": "That automation was saved by a newer Polaris",
+        "automationNames": "That automation names something that is not here"
     },
     "connections": {
         "nuki-web": {
@@ -1041,5 +1048,294 @@
         "tamper": "The {camera} camera may have been tampered with",
         "person": "Somebody is at the {camera}",
         "other": "A {kind} at the {camera}"
+    },
+    "automations": {
+        "anyValue": "Any value",
+        "missingDevice": "A device no longer here",
+        "missingAutomation": "An automation no longer here",
+        "toggle": "Switch over",
+        "attributes": {
+            "state": "Its state",
+            "door": "Its door",
+            "reading": "Its reading"
+        },
+        "triggers": {
+            "change": "A device changes",
+            "stays": "A device stays",
+            "threshold": "A reading crosses",
+            "time": "At a time",
+            "interval": "Every so often",
+            "manual": "Only by hand"
+        },
+        "conditions": {
+            "device": "A device's state",
+            "reading": "A reading is",
+            "time": "Between times",
+            "weekday": "On days"
+        },
+        "steps": {
+            "device": "Operate a device",
+            "delay": "Wait a while",
+            "wait": "Wait for a device",
+            "notify": "Notify me",
+            "run": "Run an automation"
+        },
+        "compare": {
+            "gt": "Above",
+            "gte": "At least",
+            "lt": "Below",
+            "lte": "At most",
+            "eq": "Exactly",
+            "ne": "Not"
+        },
+        "days": "{which, select, every {every day} weekdays {weekdays} weekends {weekends} other {{list}}}",
+        "units": {
+            "seconds": "{count, plural, one {# second} other {# seconds}}",
+            "minutes": "{count, plural, one {# minute} other {# minutes}}",
+            "hours": "{count, plural, one {# hour} other {# hours}}"
+        },
+        "say": {
+            "time": "At {time}, {days}",
+            "interval": "Every {every}",
+            "manual": "Only when run by hand",
+            "threshold": "{device} goes {direction, select, above {above} other {below}} {value}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
+            "stays": "{device} is {value} for {span}",
+            "is": "{device} {negate, select, yes {is not} other {is}} {value}",
+            "reading": "{device}: {compare} {value}",
+            "between": "Between {from} and {to}",
+            "on": "On {days}",
+            "act": "{action}: {device}",
+            "delay": "Wait {span}",
+            "wait": "Wait until {device} is {value}, up to {span}",
+            "notify": "Notify: {message}",
+            "run": "Run {name}"
+        },
+        "cause": {
+            "automation": "Started by {name}",
+            "manual": "Run by {name}",
+            "time": "At its time",
+            "interval": "On its interval",
+            "stays": "{device} was {value} for {span}",
+            "change": "{device} went from {from} to {to}"
+        },
+        "status": {
+            "queued": "Queued",
+            "waiting": "Waiting",
+            "running": "Running",
+            "succeeded": "Done",
+            "failed": "Failed",
+            "skipped": "Skipped",
+            "stopped": "Stopped",
+            "refused": "Refused",
+            "limited": "Held back"
+        },
+        "outcomes": {
+            "ok": "Done",
+            "failed": "Failed",
+            "refused": "Refused",
+            "timedOut": "Timed out",
+            "waiting": "Waiting",
+            "skipped": "Skipped"
+        },
+        "reasons": {
+            "conditions": "Its conditions did not hold, so nothing ran.",
+            "owner": "Whoever saved it no longer has the rights it needs here. Somebody who does has to open it and save it again.",
+            "loop": "Stopped: automations were starting each other in a loop.",
+            "limited": "Held back: it fired too many times in a few minutes. It runs again once that settles.",
+            "disabled": "Stopped because it was switched off.",
+            "timedOut": "Stopped: the device did not get there in time.",
+            "step": "Stopped at the step that failed.",
+            "fault": "Something went wrong running it. Nothing after that step ran."
+        },
+        "notes": {
+            "deviceGone": "That device is no longer here.",
+            "owner": "Whoever saved it can no longer operate devices here.",
+            "loop": "Not started: automations were starting each other in a loop.",
+            "failed": "The device did not answer. Nothing was changed.",
+            "notifyFailed": "The notification could not be sent.",
+            "automationGone": "That automation is no longer here.",
+            "automationOff": "That automation is switched off, so it was not started.",
+            "toggleUnknown": "Its state was not known, so there was nothing to switch over."
+        },
+        "errors": {
+            "broken": "Something in this card is not right. Remove it and add it again.",
+            "time": "Write a time as 07:30.",
+            "days": "Choose at least one day.",
+            "device": "Choose a device.",
+            "state": "Choose a value.",
+            "number": "Enter a number.",
+            "whole": "Use a whole number.",
+            "tooSmall": "That is too small.",
+            "tooBig": "That is too large.",
+            "tooLong": "That is too long.",
+            "tooMany": "That is as many as one automation can hold.",
+            "action": "Choose what to do.",
+            "message": "Write the message.",
+            "automation": "Choose an automation.",
+            "timeZone": "Its time zone is not one this server knows.",
+            "noTrigger": "Add at least one trigger.",
+            "noStep": "Add at least one step.",
+            "emptyGroup": "A group needs at least one condition.",
+            "sameState": "From and to are the same.",
+            "sameTime": "The start and the end are the same time.",
+            "name": "Give it a name.",
+            "place": "That place is no longer here.",
+            "deviceGone": "That device is no longer at this place.",
+            "attribute": "That device has nothing like that to watch.",
+            "notSensor": "Choose a sensor.",
+            "watchOnly": "That device is set to be watched, not operated.",
+            "cannotDo": "That device cannot do that.",
+            "runSelf": "An automation cannot start itself.",
+            "automationGone": "That automation is no longer here.",
+            "fix": "Some cards need fixing before it can be saved.",
+            "noControl": "You cannot operate the devices here, so an automation you save could not either.",
+            "noAutoOff": "That device has nothing to switch off by itself."
+        },
+        "notice": {
+            "title": "Automation: {name}"
+        },
+        "list": {
+            "intro": "What this place does by itself. Each one acts as whoever last saved it.",
+            "new": "New automation",
+            "blank": "Start empty",
+            "emptyTitle": "No automations yet",
+            "emptyManage": "Switch something off after a while, run it on a schedule, or have one device follow another.",
+            "emptyView": "Nobody has set any up for this place yet.",
+            "summary": "{when}{more, plural, =0 {} one { or # more} other { or # more}} - {steps, plural, one {# step} other {# steps}}",
+            "neverRan": "Never ran",
+            "turnOffName": "Switch off {name}",
+            "turnOnName": "Switch on {name}",
+            "log": "What it did",
+            "logName": "What {name} did",
+            "run": "Run now",
+            "runName": "Run {name} now",
+            "runOff": "Switch it on to run it",
+            "started": "Started",
+            "remove": "Remove",
+            "removeName": "Remove {name}",
+            "removeTitle": "Remove automation",
+            "removeQuestion": "Remove {name}?",
+            "removeBody": "It stops at once, including anything it was waiting to do, and its log goes with it."
+        },
+        "editor": {
+            "back": "All automations",
+            "view": "View",
+            "flow": "Flow",
+            "runs": "What it did",
+            "name": "Name",
+            "namePlaceholder": "Porch light off at night",
+            "enabled": "Switched on",
+            "on": "On",
+            "off": "Off",
+            "saveFirst": "Save your changes first",
+            "saved": "Saved.",
+            "readOnly": "You can read this automation. Changing it needs the right to manage Places.",
+            "when": "When",
+            "whenHint": "Any one of these starts it.",
+            "if": "If",
+            "ifEmpty": "Always. Add a condition to limit when it goes on.",
+            "ifHint": "It only goes on if these hold.",
+            "then": "Then",
+            "thenHint": "In this order.",
+            "addTrigger": "Add trigger",
+            "addCondition": "Add condition",
+            "addToGroup": "Add to group",
+            "addStep": "Add step",
+            "groupsMatch": "How the groups combine",
+            "allGroups": "All groups hold",
+            "anyGroup": "Any group holds",
+            "groupMatch": "How these combine",
+            "allOf": "All of these",
+            "anyOf": "Any of these",
+            "group": "Condition",
+            "removeGroup": "Remove group",
+            "triggerKind": "Kind of trigger",
+            "conditionKind": "Kind of condition",
+            "stepKind": "Kind of step",
+            "remove": "Remove",
+            "up": "Move up",
+            "down": "Move down",
+            "zone": "Times are in {zone}.",
+            "runsAs": "Acts as {name}."
+        },
+        "fields": {
+            "at": "At",
+            "days": "Days",
+            "every": "Every",
+            "minutesSuffix": "min",
+            "manualHint": "Starts only from Run now, or from another automation.",
+            "device": "Device",
+            "sensor": "Sensor",
+            "watch": "Watch",
+            "from": "From",
+            "to": "To",
+            "is": "Is",
+            "for": "For at least",
+            "direction": "Direction",
+            "above": "Goes above",
+            "below": "Goes below",
+            "value": "Value",
+            "test": "Test",
+            "isOption": "Is",
+            "isNotOption": "Is not",
+            "compare": "Compare",
+            "do": "Do",
+            "wait": "Wait for",
+            "until": "Until it is",
+            "giveUp": "Give up after",
+            "onTimeout": "If it never gets there",
+            "timeoutStop": "Stop here",
+            "timeoutContinue": "Carry on anyway",
+            "message": "Message",
+            "messagePlaceholder": "The porch light was left on",
+            "automation": "Automation to run",
+            "chooseAutomation": "Choose an automation",
+            "chooseDevice": "Choose a device",
+            "chooseValue": "Choose one",
+            "typeValue": "Type a value",
+            "noDevices": "No devices here to watch yet.",
+            "noSensors": "No sensors at this place.",
+            "noOperable": "No device here can be operated.",
+            "noControl": "You cannot operate devices, so a step cannot use them.",
+            "noOthers": "This place has no other automations yet.",
+            "unit": "Unit",
+            "units": {
+                "seconds": "Seconds",
+                "minutes": "Minutes",
+                "hours": "Hours"
+            }
+        },
+        "log": {
+            "title": "What it did",
+            "refresh": "Check again",
+            "emptyTitle": "It has not run yet",
+            "emptyBody": "Each time it fires, what it did and why is written here.",
+            "resumes": "Carries on at {time}.",
+            "noSteps": "No steps ran.",
+            "stepGone": "A step since removed"
+        },
+        "shortcut": {
+            "offTitle": "Turn off by itself",
+            "lockTitle": "Lock again by itself",
+            "offAfter": "Once it has been on for",
+            "lockAfter": "Once it has been unlocked for",
+            "minutes": "How long",
+            "add": "Add",
+            "made": "Added as {name}. <open>Open it</open> to change it."
+        },
+        "templates": {
+            "autoOff": {
+                "title": "Turn off after a while on",
+                "offName": "Turn off {device} after {span}",
+                "lockName": "Lock {device} after {span}"
+            },
+            "schedule": {
+                "title": "On and off on a schedule"
+            },
+            "follow": {
+                "title": "When one device changes, set another"
+            }
+        }
     }
 }
