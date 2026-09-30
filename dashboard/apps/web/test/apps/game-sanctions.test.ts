@@ -1,8 +1,9 @@
 /**
  * The bans, timeouts and kicks a game server put on its players, as the linked
- * account's standing page reads them: only players linked to that account, only
- * servers that still exist, what is still in force told apart from what is
- * over, and a pardon or a newer sanction closing the one before it.
+ * account's standing page reads them: only players linked to that account by a
+ * link it agrees with, only servers that still exist, what is still in force
+ * told apart from what is over, and a pardon or a newer sanction closing the one
+ * before it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,8 +24,9 @@ interface Row {
 }
 
 const fake = vi.hoisted(() => ({
-    links: [] as { installedAppId: string; player: string; userId: string }[],
-    installs: [] as { id: string; catalogId: string; name: string; status: string }[],
+    links: [] as { installedAppId: string; player: string; userId: string; followSignIns: boolean }[],
+    installs: [] as { id: string; ownerId: string; catalogId: string; name: string; status: string }[],
+    connections: [] as { userId: string; provider: string; label: string }[],
     rows: [] as Row[],
     sanctionQuery: null as unknown
 }));
@@ -39,6 +41,12 @@ vi.mock("@polaris/db", () => ({
         gamePlayerLink: {
             findMany: async ({ where }: { where: { userId: string } }) =>
                 fake.links.filter((link) => link.userId === where.userId)
+        },
+        userConnection: {
+            findMany: async ({ where }: { where: { userId: { in: string[] }; provider: string } }) =>
+                fake.connections.filter(
+                    (one) => where.userId.in.includes(one.userId) && one.provider === where.provider
+                )
         },
         installedApp: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
@@ -96,15 +104,17 @@ function row(overrides: Partial<Row>): Row {
 
 beforeEach(() => {
     fake.links = [
-        { installedAppId: "survival", player: "Ada", userId: "u-ada" },
-        { installedAppId: "ark", player: "76561198000000001", userId: "u-ada" },
-        { installedAppId: "survival", player: "Grace", userId: "u-grace" }
+        // Follows Ada's sign-ins; the ARK server is her own.
+        { installedAppId: "survival", player: "Ada", userId: "u-ada", followSignIns: true },
+        { installedAppId: "ark", player: "76561198000000001", userId: "u-ada", followSignIns: false },
+        { installedAppId: "survival", player: "Grace", userId: "u-grace", followSignIns: true }
     ];
     fake.installs = [
-        { id: "survival", catalogId: "minecraft", name: "Survival", status: "running" },
-        { id: "ark", catalogId: "ark", name: "The Island", status: "running" },
-        { id: "gone", catalogId: "minecraft", name: "Old world", status: "removed" }
+        { id: "survival", ownerId: "u-op", catalogId: "minecraft", name: "Survival", status: "running" },
+        { id: "ark", ownerId: "u-ada", catalogId: "ark", name: "The Island", status: "running" },
+        { id: "gone", ownerId: "u-op", catalogId: "minecraft", name: "Old world", status: "removed" }
     ];
+    fake.connections = [];
     fake.rows = [];
     fake.sanctionQuery = null;
 });
@@ -175,7 +185,7 @@ describe("the sanctions on an account's players", () => {
     });
 
     it("drops what ended before the window, and servers that no longer exist", async () => {
-        fake.links.push({ installedAppId: "gone", player: "Ada", userId: "u-ada" });
+        fake.links.push({ installedAppId: "gone", player: "Ada", userId: "u-ada", followSignIns: true });
         fake.rows = [
             row({ id: "old-kick", kind: "kick", at: new Date(NOW.getTime() - 120 * DAY) }),
             row({ id: "old-ban", kind: "ban", at: new Date(NOW.getTime() - 120 * DAY) }),
@@ -189,6 +199,42 @@ describe("the sanctions on an account's players", () => {
         fake.rows = [row({ id: "ark", installedAppId: "ark", player: "76561198000000001" })];
         const [sanction] = await service.sanctionsForUser("u-ada", NOW);
         expect(sanction).toMatchObject({ game: "ARK: Survival Evolved", server: "The Island" });
+    });
+});
+
+describe("a link the account does not agree with", () => {
+    it("shows nobody else's sanctions or reasons when an operator linked the wrong player", async () => {
+        // The operator linked Grace's player to Ada by mistake: not Ada's server,
+        // not the Minecraft account she connected, and not following her sign-ins.
+        fake.links.push({ installedAppId: "survival", player: "Grace", userId: "u-ada", followSignIns: false });
+        fake.rows = [
+            row({ id: "graces", player: "grace", reason: "Stole from the spawn chest" }),
+            row({ id: "adas", player: "ada" })
+        ];
+        const listed = await service.sanctionsForUser("u-ada", NOW);
+        expect(listed.map((sanction) => sanction.id)).toEqual(["adas"]);
+        expect(JSON.stringify(fake.sanctionQuery)).not.toContain("grace");
+    });
+
+    it("counts a player who is the Minecraft account the account connected", async () => {
+        fake.links = [{ installedAppId: "survival", player: "AdaPlays", userId: "u-ada", followSignIns: false }];
+        fake.connections = [{ userId: "u-ada", provider: "minecraft", label: "adaplays" }];
+        fake.rows = [row({ id: "hers", player: "adaplays" })];
+        expect((await service.sanctionsForUser("u-ada", NOW)).map((one) => one.id)).toEqual(["hers"]);
+    });
+
+    it("never takes a Minecraft name for somebody on another game", async () => {
+        fake.installs[1] = { ...fake.installs[1]!, ownerId: "u-op" };
+        fake.connections = [{ userId: "u-ada", provider: "minecraft", label: "76561198000000001" }];
+        fake.rows = [row({ id: "ark", installedAppId: "ark", player: "76561198000000001" })];
+        expect(await service.sanctionsForUser("u-ada", NOW)).toEqual([]);
+    });
+
+    it("is nothing at all when no link is agreed", async () => {
+        fake.links = [{ installedAppId: "survival", player: "Grace", userId: "u-ada", followSignIns: false }];
+        fake.rows = [row({ player: "grace" })];
+        expect(await service.sanctionsForUser("u-ada", NOW)).toEqual([]);
+        expect(fake.sanctionQuery).toBeNull();
     });
 });
 

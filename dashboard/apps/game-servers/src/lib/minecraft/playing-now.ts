@@ -10,15 +10,16 @@
  * Which player is which account is the same question the chat relay answers
  * (`relayReady` in `chat-relay`), minus the one part that reads a container's
  * log. A link an operator made between a player and an account counts where the
- * account agrees with it - the server is the account's own, the name is the
- * Minecraft account it connected, or the link follows the account's sign-ins
- * (whose addresses the join guard already enforces). A link that only says who
- * somebody is is the operator's word alone, and publishing where somebody is on
- * one person's say-so is exactly what this must not do.
+ * account agrees with it (`link-agreement`) - the server is the account's own,
+ * the name is the Minecraft account it connected, or the link follows the
+ * account's sign-ins (whose addresses the join guard already enforces). A link
+ * that only says who somebody is is the operator's word alone, and publishing
+ * where somebody is on one person's say-so is exactly what this must not do.
  */
 
 import { prisma } from "@polaris/db";
 import { gameOfServer } from "@polaris/core";
+import { accountAgrees, connectedMinecraftNames } from "../link-agreement";
 
 /** One visit, as the dashboard's presence card reads it. */
 export interface MinecraftVisit {
@@ -45,7 +46,7 @@ export async function playingMinecraftNow(
     });
     if (links.length === 0) return [];
 
-    const [installs, connected] = await Promise.all([
+    const [installs, ownNames] = await Promise.all([
         prisma.installedApp.findMany({
             where: {
                 id: { in: [...new Set(links.map((link) => link.installedAppId))] },
@@ -53,10 +54,7 @@ export async function playingMinecraftNow(
             },
             select: { id: true, ownerId: true, catalogId: true, name: true }
         }),
-        prisma.userConnection.findMany({
-            where: { userId: { in: [...new Set(links.map((link) => link.userId))] }, provider: "minecraft" },
-            select: { userId: true, label: true }
-        })
+        connectedMinecraftNames(links.map((link) => link.userId))
     ]);
     const minecraft = new Map(
         installs
@@ -64,18 +62,11 @@ export async function playingMinecraftNow(
             .map((install) => [install.id, install])
     );
     if (minecraft.size === 0) return [];
-    const ownNames = new Set(
-        connected.map((connection) => `${connection.userId}:${connection.label.toLowerCase()}`)
-    );
 
     const agreed = links.filter((link) => {
         const install = minecraft.get(link.installedAppId);
         if (!install) return false;
-        return (
-            install.ownerId === link.userId ||
-            link.followSignIns ||
-            ownNames.has(`${link.userId}:${link.player.toLowerCase()}`)
-        );
+        return accountAgrees(link, { ownerId: install.ownerId, minecraft: true }, ownNames);
     });
     if (agreed.length === 0) return [];
 

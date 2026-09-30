@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import { gameOfServer } from "@polaris/core";
+import { accountAgrees, connectedMinecraftNames } from "./link-agreement";
 import {
     SANCTION_HISTORY_DAYS,
     sanctionActive,
@@ -75,7 +76,9 @@ export async function clearSanctions(installedAppId: string): Promise<void> {
 /**
  * The sanctions on every player linked to this account, on servers that still
  * exist: those in force, and the rest from the last few months. In force first,
- * then newest first.
+ * then newest first. Only links the account agrees with count
+ * (`link-agreement`): a player linked to it by mistake is somebody else, and
+ * their sanctions and the reasons for them are theirs.
  */
 export async function sanctionsForUser(
     userId: string,
@@ -83,24 +86,42 @@ export async function sanctionsForUser(
 ): Promise<StandingSanction[]> {
     const links = await prisma.gamePlayerLink.findMany({
         where: { userId },
-        select: { installedAppId: true, player: true }
+        select: { installedAppId: true, player: true, userId: true, followSignIns: true }
     });
     if (links.length === 0) return [];
 
-    const installs = await prisma.installedApp.findMany({
-        where: {
-            id: { in: [...new Set(links.map((link) => link.installedAppId))] },
-            status: { not: "removed" }
-        },
-        select: { id: true, catalogId: true, name: true }
-    });
+    const [installs, ownNames] = await Promise.all([
+        prisma.installedApp.findMany({
+            where: {
+                id: { in: [...new Set(links.map((link) => link.installedAppId))] },
+                status: { not: "removed" }
+            },
+            select: { id: true, ownerId: true, catalogId: true, name: true }
+        }),
+        connectedMinecraftNames([userId])
+    ]);
     const servers = new Map(
         installs.flatMap((install) => {
             const game = gameOfServer(install.catalogId);
-            return game ? [[install.id, { game: game.name, server: install.name }] as const] : [];
+            return game
+                ? [
+                      [
+                          install.id,
+                          {
+                              game: game.name,
+                              server: install.name,
+                              ownerId: install.ownerId,
+                              minecraft: game.id === "minecraft"
+                          }
+                      ] as const
+                  ]
+                : [];
         })
     );
-    const linked = links.filter((link) => servers.has(link.installedAppId));
+    const linked = links.filter((link) => {
+        const server = servers.get(link.installedAppId);
+        return server ? accountAgrees(link, server, ownNames) : false;
+    });
     if (linked.length === 0) return [];
 
     const since = new Date(now.getTime() - SANCTION_HISTORY_DAYS * 24 * 60 * 60 * 1000);
