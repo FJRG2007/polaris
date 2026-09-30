@@ -96,6 +96,12 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Tuya answered with something unexpected.", "refusals.tuyaOdd"],
     ["Tuya refused the keys. They may have been revoked, or the project may not cover these devices.", "refusals.tuyaKeys"],
     ["Tuya refused the request.", "refusals.tuyaRefused"],
+    ["That connection is missing its sign-in", "refusals.noSignIn"],
+    ["Tuya no longer accepts this sign-in. Scan a new code from the app.", "refusals.tuyaSignedOut"],
+    [
+        "Tuya refused the User Code. Check it in the app under Me, Settings, Account and Security.",
+        "refusals.tuyaUserCode"
+    ],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
@@ -125,6 +131,7 @@ const SHAPED: readonly { readonly pattern: RegExp; readonly key: PlacesKey; read
     { pattern: /^Nuki refused the request \(HTTP (\d+)\)\.$/, key: "refusals.nukiHttp", params: ["status"] },
     { pattern: /^Tuya refused the keys: (.+)\.$/s, key: "refusals.tuyaKeysBecause", params: ["detail"] },
     { pattern: /^Tuya refused the request: (.+)\.$/s, key: "refusals.tuyaRefusedBecause", params: ["detail"] },
+    { pattern: /^Tuya refused the User Code: (.+)\.$/s, key: "refusals.tuyaUserCodeBecause", params: ["detail"] },
     { pattern: /^(.+) could not be reached$/s, key: "refusals.accountUnreachable", params: ["name"] },
     { pattern: /^The relay refused it \((\d+)\)\.$/, key: "refusals.relayStatus", params: ["status"] }
 ];

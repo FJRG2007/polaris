@@ -15,6 +15,7 @@
  * password or the relay's address.
  */
 
+import type { z } from "zod";
 import * as ptz from "../lib/ptz";
 import { cookies } from "next/headers";
 import * as relay from "../lib/relay";
@@ -1309,6 +1310,37 @@ export async function deviceUsageAction(
 }
 
 /**
+ * What a connect request asked for, checked: a connection that exists, and the
+ * fields it declared - normalized, and complete - with anything else dropped.
+ * Shared by typing a credential and by pairing, which ask the same questions
+ * before either does anything.
+ */
+async function connectionRequest<
+    S extends typeof schemas.deviceAccountSchema | typeof schemas.devicePairingSchema
+>(
+    schema: S,
+    input: unknown
+): Promise<
+    | { error: string }
+    | {
+          data: z.infer<S>;
+          connection: deviceConnections.DeviceConnection;
+          fields: Record<string, string>;
+      }
+> {
+    const parsed = schema.safeParse((input ?? {}) as Record<string, unknown>);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const connection = deviceConnections.deviceConnection(parsed.data.connection);
+    if (!connection) return { error: await say("refusals.cannotConnect") };
+    const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
+    if (!deviceConnections.fieldsComplete(connection, fields)) {
+        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
+    }
+    return { data: parsed.data as z.infer<S>, connection, fields };
+}
+
+/**
  * Connect an account, hub or box the devices are on.
  *
  * Administrative, as adding a camera is, and for a stronger reason: this is the
@@ -1325,20 +1357,14 @@ export async function connectDeviceAccountAction(input: unknown): Promise<{
     error?: string;
 }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
-    if (!parsed.success)
-        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
-    const connection = deviceConnections.deviceConnection(parsed.data.connection);
-    if (!connection) return { error: await say("refusals.cannotConnect") };
-    const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
-    if (!deviceConnections.fieldsComplete(connection, fields)) {
-        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
-    }
+    const request = await connectionRequest(schemas.deviceAccountSchema, input);
+    if ("error" in request) return { error: request.error };
+    const { data: parsed, connection, fields } = request;
 
     const result = await guard(async () => {
         await deviceAccounts.connectAccount(install.id, {
             connection: connection.id,
-            label: parsed.data.label,
+            label: parsed.label,
             fields
         });
         await devices.syncDevices(install.id);
@@ -1374,19 +1400,13 @@ export async function reconnectDeviceAccountAction(
     error?: string;
 }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
-    if (!parsed.success)
-        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
-    const connection = deviceConnections.deviceConnection(parsed.data.connection);
-    if (!connection) return { error: await say("refusals.cannotConnect") };
-    const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
-    if (!deviceConnections.fieldsComplete(connection, fields)) {
-        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
-    }
+    const request = await connectionRequest(schemas.deviceAccountSchema, input);
+    if ("error" in request) return { error: request.error };
+    const { data: parsed, connection, fields } = request;
 
     const result = await guard(async () => {
         await deviceAccounts.reconnectAccount(install.id, String(accountId), {
-            label: parsed.data.label,
+            label: parsed.label,
             fields
         });
         await devices.syncDevices(install.id);
@@ -1405,6 +1425,76 @@ export async function reconnectDeviceAccountAction(
         metadata: { connection: connection.id }
     });
     return { devices: result.value?.list, accounts: result.value?.connected };
+}
+
+/**
+ * Begin connecting by pairing: what to show - a code to scan, or a wait for a
+ * button - and the state the dialog hands back on every poll. Nothing is stored
+ * yet; the account exists once `pollDevicePairingAction` has an answer.
+ */
+export async function startDevicePairingAction(input: unknown): Promise<{
+    state?: Record<string, string>;
+    qr?: string;
+    error?: string;
+}> {
+    await requireHome("home.manage");
+    const request = await connectionRequest(schemas.devicePairingSchema, input);
+    if ("error" in request) return { error: request.error };
+    const result = await guard(() =>
+        deviceAccounts.startPairing(request.connection.id, request.fields)
+    );
+    if (result.error || !result.value) return { error: result.error };
+    return { state: { ...result.value.state }, qr: result.value.qr };
+}
+
+/**
+ * Ask whether a pairing has been accepted, and connect the account the moment it
+ * has - or put the new sign-in on an existing one, when that is what the dialog
+ * was opened for. `waiting` is the normal answer, and the dialog asks again.
+ */
+export async function pollDevicePairingAction(input: unknown): Promise<{
+    waiting?: boolean;
+    devices?: DeviceView[];
+    accounts?: deviceAccounts.DeviceAccountView[];
+    error?: string;
+}> {
+    const { user, install } = await requireHome("home.manage");
+    const request = await connectionRequest(schemas.devicePairingSchema, input);
+    if ("error" in request) return { error: request.error };
+    const { data: parsed, connection, fields } = request;
+
+    const result = await guard(async () => {
+        const answer = await deviceAccounts.pollPairing(connection.id, fields, parsed.state);
+        if (!answer.done) return null;
+        if (parsed.accountId) {
+            await deviceAccounts.reconnectAccount(install.id, parsed.accountId, {
+                label: parsed.label,
+                fields: answer.credentials
+            });
+        } else {
+            await deviceAccounts.connectAccount(install.id, {
+                connection: connection.id,
+                label: parsed.label,
+                fields: answer.credentials
+            });
+        }
+        await devices.syncDevices(install.id);
+        const { current } = await currentPlace(install.id);
+        return {
+            list: await devices.listDevices(install.id, current.id),
+            connected: await deviceAccounts.listAccounts(install.id)
+        };
+    });
+    if (result.error) return { error: result.error };
+    if (!result.value) return { waiting: true };
+    await recordAudit({
+        actorId: user.id,
+        action: parsed.accountId ? "places.deviceAccount.reconnect" : "places.deviceAccount.connect",
+        targetType: "installedApp",
+        targetId: install.id,
+        metadata: { connection: connection.id, paired: true }
+    });
+    return { devices: result.value.list, accounts: result.value.connected };
 }
 
 /** Take one connection away, and the devices and their history with it. */

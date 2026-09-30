@@ -22,9 +22,17 @@ import * as registry from "./device-connections";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { NUKI_WEB, nukiWebDriver } from "./drivers/nuki-web";
 import { NUKI_LOCAL, nukiLocalDriver } from "./drivers/nuki-local";
+import { TUYA_APP, tuyaAppDriver } from "./drivers/tuya-app";
 import { TUYA_CLOUD, tuyaCloudDriver } from "./drivers/tuya-cloud";
 import { MQTT_DISCOVERY, mqttDiscoveryDriver } from "./drivers/mqtt-discovery";
-import { DriverError, type Credentials, type DeviceDriver } from "./drivers/contract";
+import {
+    DriverError,
+    type Credentials,
+    type DeviceDriver,
+    type DevicePairing,
+    type PairingPoll,
+    type PairingStart
+} from "./drivers/contract";
 
 /**
  * Every driver Polaris has, by the connection it implements.
@@ -35,6 +43,7 @@ import { DriverError, type Credentials, type DeviceDriver } from "./drivers/cont
 const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [NUKI_WEB]: nukiWebDriver,
     [NUKI_LOCAL]: nukiLocalDriver,
+    [TUYA_APP]: tuyaAppDriver,
     [TUYA_CLOUD]: tuyaCloudDriver,
     [MQTT_DISCOVERY]: mqttDiscoveryDriver
 };
@@ -183,7 +192,11 @@ export async function listAccounts(installedAppId: string): Promise<DeviceAccoun
 
 /** One account with what it is opened with, for the service that is about to use
  *  it. The only function here that returns a credential, and it is never called
- *  by anything a request reaches directly. */
+ *  by anything a request reaches directly.
+ *
+ *  A credential that ages (a sign-in whose token lapses) is renewed here, before
+ *  it is handed out, and the replacement stored - so every caller gets one that
+ *  works and none of them has to know that some connections expire. */
 export async function accountWithCredentials(
     installedAppId: string,
     id: string
@@ -195,7 +208,34 @@ export async function accountWithCredentials(
     if (!row) throw new HomeError("That connection is not here");
     const credentials = readCredentials(row.secret);
     if (!credentials) throw new HomeError(`${row.label} has to be connected again`);
-    return { view: toView(row), credentials };
+    return { view: toView(row), credentials: await renewed(row.id, row.connection, credentials) };
+}
+
+/**
+ * The credentials as they should be used now: the stored ones, or the driver's
+ * replacement for them, written back before anything uses it.
+ *
+ * A renewal that is refused marks the account the way a refused sync would, so
+ * the screen offers the one button that fixes it; one that could not get through
+ * leaves the old credential stored, since it may still be good for a minute and
+ * the next use will try again.
+ */
+async function renewed(id: string, connection: string, credentials: Credentials): Promise<Credentials> {
+    const driver = DRIVERS[connection];
+    if (!driver?.renew) return credentials;
+    let next: Credentials | null;
+    try {
+        next = await driver.renew(credentials);
+    } catch (caught) {
+        if (caught instanceof DriverError) {
+            await markAccount(id, caught.kind === "unauthorized" ? "unauthorized" : "unreachable", caught.message);
+            throw new HomeError(caught.message);
+        }
+        throw caught;
+    }
+    if (!next) return credentials;
+    await prisma.placeDeviceAccount.updateMany({ where: { id }, data: { secret: sealCredentials(next) } });
+    return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,8 +321,32 @@ export async function reconnectAccount(
  * has just been told it has no business with.
  */
 export async function disconnectAccount(installedAppId: string, id: string): Promise<void> {
+    const row = await prisma.placeDeviceAccount.findFirst({
+        where: { id, installedAppId },
+        select: { connection: true, secret: true }
+    });
     const { count } = await prisma.placeDeviceAccount.deleteMany({ where: { id, installedAppId } });
-    if (count === 0) throw new HomeError("That connection is not here");
+    if (count === 0 || !row) throw new HomeError("That connection is not here");
+    await signOut(row.connection, row.secret);
+}
+
+/**
+ * Tell the other side, where it keeps a sign-in of its own, that this one is
+ * over - so the tokens stop working there rather than only being forgotten here.
+ *
+ * After the row is gone and never in its way: an account somebody asked to
+ * remove is removed whether or not a server elsewhere answers, and what went
+ * wrong is for the log.
+ */
+async function signOut(connection: string, sealed: string): Promise<void> {
+    const driver = DRIVERS[connection];
+    const credentials = driver?.forget ? readCredentials(sealed) : null;
+    if (!driver?.forget || !credentials) return;
+    try {
+        await driver.forget((await driver.renew?.(credentials)) ?? credentials);
+    } catch (caught) {
+        console.warn("places: a connection could not be signed out at its end", caught);
+    }
 }
 
 /** How the last call went, remembered rather than acted on. A refused credential
@@ -304,6 +368,39 @@ export async function markSynced(id: string): Promise<void> {
         where: { id },
         data: { status: "ok", statusNote: null, lastSyncedAt: new Date() }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Pairing
+// ---------------------------------------------------------------------------
+
+/** The pairing of a connection that is made by one, or a refusal: a request for
+ *  a connection that is typed, or one this build does not have, is not one to
+ *  start anything for. */
+function pairingOf(connection: string): DevicePairing {
+    const pairing = isConnectable(connection) ? DRIVERS[connection]?.pair : undefined;
+    if (!pairing || !registry.deviceConnection(connection)?.pairing) {
+        throw new HomeError("Polaris cannot connect that yet");
+    }
+    return pairing;
+}
+
+/** Begin one attempt at pairing: what to show, and what to hand back to `poll`. */
+export async function startPairing(connection: string, fields: Credentials): Promise<PairingStart> {
+    const pairing = pairingOf(connection);
+    return speaking(() => pairing.start(fields));
+}
+
+/** Whether the other side has agreed yet, and the credentials once it has. They
+ *  are not stored here: `connectAccount` proves them first, as it does a typed
+ *  credential. */
+export async function pollPairing(
+    connection: string,
+    fields: Credentials,
+    state: Readonly<Record<string, string>>
+): Promise<PairingPoll> {
+    const pairing = pairingOf(connection);
+    return speaking(() => pairing.poll(fields, state));
 }
 
 /** A driver's refusal, as one this app is willing to show. `DriverError` is

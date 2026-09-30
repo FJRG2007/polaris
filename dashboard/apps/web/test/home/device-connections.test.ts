@@ -82,3 +82,35 @@ describe("what a connection was given", () => {
         expect(registry.shownFields(connection!).map((field) => field.key)).not.toContain("token");
     });
 });
+
+describe("a connection made by pairing", () => {
+    const paired = registry.DEVICE_CONNECTIONS.filter((connection) => connection.pairing);
+
+    it("exists, so the checks below read something", () => {
+        expect(paired.map((connection) => connection.id)).toContain("tuya-app");
+    });
+
+    it("says what to show while it waits, in both languages", async () => {
+        const { placesCatalogs } = await import("@polaris-app/places/messages");
+        for (const locale of ["en-US", "es-ES"] as const) {
+            const t = placesCatalogs.translator(locale, "places");
+            for (const connection of paired) {
+                expect(registry.connectionWords(t, connection).pairingPrompt, `${locale} ${connection.id}`).toBeTruthy();
+            }
+        }
+    });
+
+    it("waits long enough to be scanned, and asks often enough to feel instant", () => {
+        for (const connection of paired) {
+            expect(connection.pairing!.pollMs).toBeGreaterThanOrEqual(1_000);
+            expect(connection.pairing!.lifetimeMs).toBeGreaterThan(connection.pairing!.pollMs * 10);
+        }
+    });
+
+    it("keeps the typed Tuya project as a second way in", () => {
+        expect(registry.connectionsOfBrand("Tuya").map((connection) => connection.id)).toEqual([
+            "tuya-app",
+            "tuya-cloud"
+        ]);
+    });
+});

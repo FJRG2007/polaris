@@ -461,7 +461,11 @@
         "schemaPerson": "Persona no válida",
         "schemaSubnet": "Escríbelo como 192.168.1.0/24",
         "schemaConnect": "Elige cómo conectarlo",
-        "relayStatus": "El relé lo rechazó ({status})."
+        "relayStatus": "El relé lo rechazó ({status}).",
+        "noSignIn": "A esa conexión le falta su inicio de sesión",
+        "tuyaSignedOut": "Tuya ya no acepta esta sesión. Escanea un código nuevo desde la app.",
+        "tuyaUserCode": "Tuya no aceptó el código de usuario. Revísalo en la app, en la seguridad de la cuenta.",
+        "tuyaUserCodeBecause": "Tuya no aceptó el código de usuario: {detail}."
     },
     "connections": {
         "nuki-web": {
@@ -539,6 +543,26 @@
                     "label": "Prefijo",
                     "hint": "Bajo qué se publican las descripciones. El valor por defecto de la convención, salvo que lo cambiaras."
                 }
+            }
+        },
+        "tuya-app": {
+            "label": "App Smart Life / Tuya Smart",
+            "summary": "Inicia sesión escaneando un código con la app que ya usas. Sin cuenta de desarrollador.",
+            "note": "Llega a todos los hogares de la cuenta a través de los servidores de Tuya. La sesión se renueva sola, y al quitar esta conexión Polaris también cierra la sesión en Tuya.",
+            "steps": {
+                "s0": "En la app Smart Life o Tuya Smart, abre tu perfil, toca el engranaje y entra en la seguridad de la cuenta.",
+                "s1": "Copia el código de usuario (User Code) que aparece abajo y pégalo aquí.",
+                "s2": "Escanea con la misma app el código que muestra Polaris: toca + y elige escanear."
+            },
+            "fields": {
+                "userCode": {
+                    "label": "Código de usuario de la app",
+                    "hint": "Está en la seguridad de la cuenta de la app. No es tu contraseña.",
+                    "placeholder": "De la app"
+                }
+            },
+            "pairing": {
+                "prompt": "En la app Smart Life o Tuya Smart, toca +, elige escanear y apunta a este código."
             }
         },
         "tuya-cloud": {
@@ -989,7 +1013,17 @@
         "how": "Cómo llegar",
         "label": "Nombre de la conexión",
         "checking": "Comprobando",
-        "connect": "Conectar"
+        "connect": "Conectar",
+        "pair": {
+            "showCode": "Ver código",
+            "start": "Empezar",
+            "waiting": "Esperando el escaneo",
+            "waitingPress": "Esperando el botón",
+            "expired": "Este código ha caducado.",
+            "newCode": "Otro código",
+            "codeLabel": "Código para escanear con la app",
+            "back": "Atrás"
+        }
     },
     "discover": {
         "intro": "Polaris pregunta primero a la red. Dale también un rango de direcciones si tus cámaras están tras un repetidor o un punto de acceso que lo bloquee.",

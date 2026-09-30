@@ -21,6 +21,29 @@
  * the normal case rather than the exception - a lock on the web account and on
  * its own bridge is a lock that still answers when either is out.
  *
+ * Some ways in are not typed but done: a code scanned with the maker's app, a
+ * button pressed on a bridge. Such a connection declares `pairing`, and its
+ * `fields` become what has to be known before the attempt starts (a user code, a
+ * bridge's address) rather than the credential itself. The rest is generic and
+ * no make needs a screen of its own for it:
+ *
+ * - The registry says what the reader is shown (`kind`: a code to scan, or a
+ *   button to press), how often to ask whether it has happened (`pollMs`) and
+ *   how long one attempt is given before a new one is offered (`lifetimeMs`).
+ *   Its words are `connections.<id>.pairing.prompt` in the catalogs: the one
+ *   line under the code or beside the wait.
+ * - The driver implements `pair` (`drivers/contract.ts`): `start` takes the
+ *   fields and answers a state and, for a code, what the code says; `poll`
+ *   takes them back and answers the credentials once the other side agrees.
+ *   The state is shown to the browser, so it never holds a secret.
+ * - `startDevicePairingAction` and `pollDevicePairingAction` run those two for
+ *   the connect dialog, which draws the step, polls on its own and stores the
+ *   account the moment the answer arrives - through the same `verify` as a
+ *   typed credential, so nothing that does not work is ever stored.
+ *
+ * A credential that ages is the driver's `renew`, stored by the account layer on
+ * every use; nothing here has to know about it.
+ *
  * Pure and client-safe: the picker and the server read the same list. That is a
  * rule with teeth rather than a note - every import here has to be pure too. This
  * file reached a provider's region list through its API client once, and the
@@ -67,6 +90,20 @@ export const REACH_LABELS: Readonly<Record<ConnectionReach, string>> = {
     "same-network": en("connections.reach.same-network")
 };
 
+/**
+ * How a connection that is done rather than typed is drawn and waited on. See the
+ * file header for the whole of it.
+ */
+export interface ConnectionPairing {
+    /** What the reader is shown: a code to scan, or a wait for a button. */
+    readonly kind: "qr" | "press";
+    /** How often the dialog asks whether it has happened. */
+    readonly pollMs: number;
+    /** How long one attempt is waited on before the dialog stops asking and
+     *  offers a new one. Polaris' own bound where the maker publishes none. */
+    readonly lifetimeMs: number;
+}
+
 /** One way of reaching one make's devices. */
 export interface DeviceConnection {
     /** Stored on the account row. Never shown. */
@@ -97,6 +134,9 @@ export interface DeviceConnection {
     readonly steps?: readonly string[];
     readonly link?: { readonly label: string; readonly href: string };
     readonly fields: readonly ConnectionField[];
+    /** Present when the connection is made by scanning or pressing something
+     *  once the fields are in, rather than by the fields alone. */
+    readonly pairing?: ConnectionPairing;
     /** What it can bring in, so a screen can say so before anything is typed. */
     readonly kinds: readonly DeviceKind[];
     /** Other words somebody might search for - the product it is part of, the
@@ -241,6 +281,50 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "broker",
             "discovery",
             "local"
+        ]
+    },
+    {
+        id: "tuya-app",
+        brand: "Tuya",
+        logo: "tuya",
+        label: en("connections.tuya-app.label"),
+        reach: "anywhere",
+        summary: en("connections.tuya-app.summary"),
+        note: en("connections.tuya-app.note"),
+        steps: [
+            en("connections.tuya-app.steps.s0"),
+            en("connections.tuya-app.steps.s1"),
+            en("connections.tuya-app.steps.s2")
+        ],
+        fields: [
+            {
+                key: "userCode",
+                label: en("connections.tuya-app.fields.userCode.label"),
+                hint: en("connections.tuya-app.fields.userCode.hint"),
+                placeholder: en("connections.tuya-app.fields.userCode.placeholder"),
+                maxLength: 64
+            }
+        ],
+        // Tuya's SDK says nothing about how long a code lasts, and a scan that
+        // is not confirmed answers the same as one that lapsed. Two minutes is
+        // Polaris' own bound: long enough to find the phone, short enough that
+        // a code left on a screen is not waited on for ever.
+        pairing: { kind: "qr", pollMs: 3_000, lifetimeMs: 120_000 },
+        kinds: ["switch", "outlet", "light"],
+        search: [
+            "smart life",
+            "tuya smart",
+            "qr",
+            "scan",
+            "app",
+            "switch",
+            "socket",
+            "plug",
+            "light",
+            "bulb",
+            "led",
+            "smart plug",
+            "wall switch"
         ]
     },
     {
@@ -443,7 +527,8 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
         note: say(`${base}.note`) ?? connection.note,
         steps: (connection.steps ?? []).map((step, index) => say(`${base}.steps.s${index}`) ?? step),
         link: connection.link ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label } : undefined,
-        reach: t(`connections.reach.${connection.reach}`)
+        reach: t(`connections.reach.${connection.reach}`),
+        pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined
     };
 }
 

@@ -461,7 +461,11 @@
         "schemaPerson": "Unknown person",
         "schemaSubnet": "Write it as 192.168.1.0/24",
         "schemaConnect": "Pick how to connect it",
-        "relayStatus": "The relay refused it ({status})."
+        "relayStatus": "The relay refused it ({status}).",
+        "noSignIn": "That connection is missing its sign-in",
+        "tuyaSignedOut": "Tuya no longer accepts this sign-in. Scan a new code from the app.",
+        "tuyaUserCode": "Tuya refused the User Code. Check it in the app under Me, Settings, Account and Security.",
+        "tuyaUserCodeBecause": "Tuya refused the User Code: {detail}."
     },
     "connections": {
         "nuki-web": {
@@ -539,6 +543,26 @@
                     "label": "Discovery prefix",
                     "hint": "What the descriptions are published under. The convention's own default, unless you changed it."
                 }
+            }
+        },
+        "tuya-app": {
+            "label": "Smart Life / Tuya Smart app",
+            "summary": "Sign in by scanning a code with the app your devices are already in. No developer account.",
+            "note": "It reaches every home on the app account through Tuya's servers. The sign-in renews itself, and removing this connection signs Polaris out at Tuya as well.",
+            "steps": {
+                "s0": "In the Smart Life or Tuya Smart app, open Me, tap the gear, then Account and Security.",
+                "s1": "Copy the User Code shown at the bottom and paste it below.",
+                "s2": "Scan the code Polaris shows with the same app: tap + or Add Device, then Scan."
+            },
+            "fields": {
+                "userCode": {
+                    "label": "User Code from the app",
+                    "hint": "Shown under Account and Security in the app. It is not your password.",
+                    "placeholder": "From the app"
+                }
+            },
+            "pairing": {
+                "prompt": "In the Smart Life or Tuya Smart app, tap + or Add Device, choose Scan and point it at this code."
             }
         },
         "tuya-cloud": {
@@ -989,7 +1013,17 @@
         "how": "How to reach it",
         "label": "Name for this connection",
         "checking": "Checking",
-        "connect": "Connect"
+        "connect": "Connect",
+        "pair": {
+            "showCode": "Show code",
+            "start": "Start",
+            "waiting": "Waiting for the scan",
+            "waitingPress": "Waiting for the button",
+            "expired": "This code has expired.",
+            "newCode": "New code",
+            "codeLabel": "Code to scan with the app",
+            "back": "Back"
+        }
     },
     "discover": {
         "intro": "Polaris asks the network first. Give it an address range as well if your cameras sit behind a repeater or an access point that blocks that.",
