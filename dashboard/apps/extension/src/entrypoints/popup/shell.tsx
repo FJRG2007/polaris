@@ -12,6 +12,7 @@
  * extension, and it has a way back out.
  */
 
+import { describeServer } from "@/lib/servers";
 import { describeAccount, accountHost } from "@/lib/accounts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstName, initials, tintFor } from "@polaris/core/faces";
@@ -20,7 +21,7 @@ import { ENGLISH, type Words } from "@/lib/words";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 
 /** The sections the home screen offers. */
-export type Section = "home" | "vault";
+export type Section = "home" | "vault" | "servers";
 
 const SECTION_KEY = "polaris.section";
 
@@ -34,7 +35,8 @@ const SECTION_KEY = "polaris.section";
 export function useSection(): [Section, (next: Section) => void] {
     const [section, setSection] = useState<Section>(() => {
         try {
-            return window.localStorage.getItem(SECTION_KEY) === "vault" ? "vault" : "home";
+            const held = window.localStorage.getItem(SECTION_KEY);
+            return held === "vault" || held === "servers" ? held : "home";
         } catch {
             return "home";
         }
@@ -229,10 +231,12 @@ function ShelfPicker({
  */
 function AccountMenu({
     status,
-    onChange
+    onChange,
+    onOpen
 }: {
     status: VaultStatus;
     onChange: () => Promise<void>;
+    onOpen: (section: Section) => void;
 }): React.JSX.Element {
     const t = useWords();
     const [open, setOpen] = useState(false);
@@ -283,6 +287,17 @@ function AccountMenu({
                         <span className="menu-text">{t("shell.openPolaris")}</span>
                     </button>
                 ) : null}
+                <button
+                    className="menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                        setOpen(false);
+                        onOpen("servers");
+                    }}
+                >
+                    <span className="menu-text">{t("shell.servers")}</span>
+                    <span className="muted small">{status.servers.length}</span>
+                </button>
                 {others.map((one) => (
                     <button
                         key={one.id}
@@ -320,10 +335,12 @@ function AccountMenu({
 /** The greeting, the shelf and the face, as the dashboard's header has them. */
 export function TopBar({
     status,
-    onChange
+    onChange,
+    onOpen
 }: {
     status: VaultStatus;
     onChange: () => Promise<void>;
+    onOpen: (section: Section) => void;
 }): React.JSX.Element {
     const t = useWords();
     const name = status.linkedAccount?.name ? firstName(status.linkedAccount.name) : "";
@@ -333,7 +350,7 @@ export function TopBar({
                 <p className="hello">{greeting(t, new Date(), name)}</p>
                 <ShelfPicker status={status} onChange={onChange} />
             </div>
-            <AccountMenu status={status} onChange={onChange} />
+            <AccountMenu status={status} onChange={onChange} onOpen={onOpen} />
         </div>
     );
 }
@@ -384,9 +401,34 @@ export function Home({
                         </svg>
                     </button>
                 </li>
+                <li className="section-row">
+                    <button className="section" onClick={() => onOpen("servers")}>
+                        <span className="section-mark" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <rect x="3" y="4" width="18" height="7" rx="2" />
+                                <rect x="3" y="13" width="18" height="7" rx="2" />
+                                <path d="M7 7.5h.01M7 16.5h.01" />
+                            </svg>
+                        </span>
+                        <span className="section-text">
+                            <span className="strong">{t("shell.servers")}</span>
+                            <span className="muted small section-sub">{activeServer(status)}</span>
+                        </span>
+                        <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m9 18 6-6-6-6" />
+                        </svg>
+                    </button>
+                </li>
             </ul>
         </main>
     );
+}
+
+/** The server in front, as its row in the list names it. */
+function activeServer(status: VaultStatus): string {
+    const active = status.servers.find((one) => one.active);
+    if (active) return describeServer(active);
+    return status.server ? accountHost(status.server) : "";
 }
 
 /** The line above a section, with the way back to the home screen. */

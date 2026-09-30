@@ -40,7 +40,9 @@
         "noInline": "This browser cannot show Polaris inside a page.",
         "nothingToCopy": "There is nothing to copy.",
         "wentWrong": "Something went wrong.",
-        "silentWorker": "Polaris did not answer. Open this again."
+        "silentWorker": "Polaris did not answer. Open this again.",
+        "unknownServer": "That server is not on the list any more.",
+        "serverNameTooLong": "A name can be up to {max} characters."
     },
     "menu": {
         "fill": "Fill the login for this site",
@@ -112,12 +114,19 @@
         "apps": "Apps",
         "vault": "Vault",
         "backLabel": "Back to the home screen",
-        "back": "Back"
+        "back": "Back",
+        "servers": "Servers"
     },
     "popup": {
         "update": {
             "store": "Version {version} is out. Your browser installs it once the store has reviewed it, so there is nothing to do here.",
-            "byHand": "Version {version} is out. This copy was loaded by hand, so it has to be loaded again the same way. <link>{where, select, polaris {The steps are on your Polaris} other {See what changed}}</link>."
+            "byHand": "Version {version} is out. This copy was loaded by hand, so it has to be loaded again the same way. <link>{where, select, polaris {The steps are on your Polaris} other {See what changed}}</link>.",
+            "auto": "Version {version} is out. This copy updates itself within a few hours.",
+            "ready": "Version {version} is installed. It starts by itself once the vault is locked and this is closed.",
+            "startNow": "Start it now",
+            "startNowHint": "Restarts the extension, so you sign in to the vault again.",
+            "runOnce": "Version {version} is out. Run this once in {shell} and this copy updates itself from then on:",
+            "copyLine": "Copy the line"
         },
         "connect": {
             "hint": "The address you open the dashboard at.",
@@ -251,5 +260,24 @@
         "update": "Update",
         "notNow": "Not now",
         "neverHere": "Never here"
+    },
+    "servers": {
+        "listLabel": "Polaris servers",
+        "inUse": "In use",
+        "accounts": "{count, plural, =0 {Not signed in} one {# account} other {# accounts}}",
+        "count": "{count, plural, one {# server} other {# servers}}",
+        "renameLabel": "Rename {name}",
+        "rename": "Rename",
+        "removeLabel": "Remove {name}",
+        "remove": "Remove",
+        "nameLabel": "Name for {host}",
+        "save": "Save",
+        "unchanged": "No changes to save",
+        "add": "Add a server",
+        "addButton": "Add",
+        "already": "That server is already on the list.",
+        "removeTitle": "Remove {name}?",
+        "removeSignsOut": "{count, plural, one {The account signed in on it here is signed out and this browser is disconnected from it.} other {The # accounts signed in on it here are signed out and this browser is disconnected from them.}}",
+        "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."
     }
 }

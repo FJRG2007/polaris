@@ -40,7 +40,9 @@
         "noInline": "Este navegador no puede mostrar Polaris dentro de una página.",
         "nothingToCopy": "No hay nada que copiar.",
         "wentWrong": "Algo ha fallado.",
-        "silentWorker": "Polaris no respondió. Vuelve a abrir esto."
+        "silentWorker": "Polaris no respondió. Vuelve a abrir esto.",
+        "unknownServer": "Ese servidor ya no está en la lista.",
+        "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres."
     },
     "menu": {
         "fill": "Rellenar el acceso de este sitio",
@@ -112,12 +114,19 @@
         "apps": "Apps",
         "vault": "Vault",
         "backLabel": "Volver al inicio",
-        "back": "Atrás"
+        "back": "Atrás",
+        "servers": "Servidores"
     },
     "popup": {
         "update": {
             "store": "Ya está disponible la versión {version}. Tu navegador la instala en cuanto la tienda la revise, así que aquí no hay nada que hacer.",
-            "byHand": "Ya está disponible la versión {version}. Esta copia se cargó a mano, así que hay que volver a cargarla de la misma forma. <link>{where, select, polaris {Los pasos están en tu Polaris} other {Ver qué ha cambiado}}</link>."
+            "byHand": "Ya está disponible la versión {version}. Esta copia se cargó a mano, así que hay que volver a cargarla de la misma forma. <link>{where, select, polaris {Los pasos están en tu Polaris} other {Ver qué ha cambiado}}</link>.",
+            "auto": "Ya está la versión {version}. Esta copia se actualiza sola en unas horas.",
+            "ready": "La versión {version} ya está instalada. Arranca sola al bloquear la bóveda y cerrar esto.",
+            "startNow": "Arrancarla ya",
+            "startNowHint": "Reinicia la extensión, así que vuelves a entrar en la bóveda.",
+            "runOnce": "Ya está la versión {version}. Ejecuta esto una vez en {shell} y esta copia se actualizará sola:",
+            "copyLine": "Copiar la línea"
         },
         "connect": {
             "hint": "La dirección en la que abres el panel.",
@@ -251,5 +260,24 @@
         "update": "Actualizar",
         "notNow": "Ahora no",
         "neverHere": "Aquí nunca"
+    },
+    "servers": {
+        "listLabel": "Servidores de Polaris",
+        "inUse": "En uso",
+        "accounts": "{count, plural, =0 {Sin sesión} one {# cuenta} other {# cuentas}}",
+        "count": "{count, plural, one {# servidor} other {# servidores}}",
+        "renameLabel": "Renombrar {name}",
+        "rename": "Renombrar",
+        "removeLabel": "Quitar {name}",
+        "remove": "Quitar",
+        "nameLabel": "Nombre para {host}",
+        "save": "Guardar",
+        "unchanged": "No hay cambios que guardar",
+        "add": "Añadir servidor",
+        "addButton": "Añadir",
+        "already": "Ese servidor ya está en la lista.",
+        "removeTitle": "¿Quitar {name}?",
+        "removeSignsOut": "{count, plural, one {Se cierra la sesión de su cuenta aquí y este navegador se desconecta de ella.} other {Se cierra la sesión de sus # cuentas aquí y este navegador se desconecta de ellas.}}",
+        "removeOnlyList": "Nadie tiene sesión en él aquí, así que solo sale de esta lista."
     }
 }

@@ -5,6 +5,7 @@ import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import * as accounts from "@/lib/accounts";
 import { breachCount } from "@/lib/breach";
+import type { WordKey } from "@/lib/words";
 import { searchLogins } from "@/lib/search";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
@@ -12,17 +13,16 @@ import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
+import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
-import { noticeFor, type UpdateNotice } from "@/lib/update";
 import { generatePassword } from "@polaris/core/password-generator";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
+import { installKind, isNewer, noticeFor, type UpdateNotice } from "@/lib/update";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
-import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
-import type { WordKey } from "@/lib/words";
 import {
     MENU,
     MENU_ENTRIES,
@@ -39,12 +39,16 @@ import {
     generateRsaKeyPair,
     symmetricKeyFromBytes
 } from "@polaris/vault-crypto";
+import * as servers from "@/lib/servers";
+import * as selfUpdate from "@/lib/self-update";
 import {
     currentOrigin,
     forgetOrigin,
     holdsOrigin,
     readOrigin,
     rememberOrigin,
+    saveServers,
+    savedServers,
     vaultBase
 } from "@/lib/server";
 
@@ -1519,6 +1523,19 @@ async function readAccount(): Promise<messages.ExtensionAccount | null> {
 }
 
 /**
+ * What identifies the account in front. The vault's email once there is one; the
+ * connection's before that, so an account that is only connected so far is
+ * still one row, and the same row once it signs in to the vault.
+ */
+function activeIdOf(
+    origin: string,
+    email: string | null,
+    linked: messages.ExtensionAccount | null
+): string {
+    return accounts.accountId(origin, email ?? linked?.email ?? null);
+}
+
+/**
  * The account in front, as a record that can be set aside.
  *
  * Null when there is no session to park - no address, or no token - which is the
@@ -1537,12 +1554,14 @@ async function activeAccount(): Promise<accounts.ParkedAccount | null> {
             LINK_ACCOUNT.getValue(),
             LINK_VAULT.getValue()
         ]);
-    if (!origin || !refresh) return null;
+    // A connection with no vault session yet is still an account to set aside:
+    // it is what switching to another server and back has to find again.
+    if (!origin || (!refresh && !linkToken)) return null;
     return {
-        id: accounts.accountId(origin, email),
+        id: activeIdOf(origin, email, linkAccount),
         origin,
         email,
-        name: who?.name ?? null,
+        name: who?.name ?? linkAccount?.name ?? null,
         refresh,
         wrapped,
         accountKey,
@@ -1705,6 +1724,83 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
     await dropParked(account.id);
 }
 
+/**
+ * Put a server in front: the account on it that was set aside last, or - when
+ * nobody is signed in there yet - that server's "connect this browser", with
+ * the account that was in front set aside to come back to.
+ *
+ * Called in a turn, like every other change of whose vault this is.
+ */
+async function bringServer(origin: string): Promise<void> {
+    if ((await currentOrigin()) === origin) {
+        // Already in front. Remembered anyway, so an address typed again is on
+        // the list even for an install from before there was one.
+        await rememberOrigin(origin);
+        return;
+    }
+    // A connection being asked for belongs to the server it was asked of: left
+    // running, its approval would be collected into whichever is in front.
+    await LINK_WAITING.setValue(null);
+    const parked = await PARKED.getValue();
+    const waiting = servers.accountOn(parked, origin);
+    if (waiting) {
+        await parkActive(parked.filter((one) => one.id !== waiting.id));
+        await makeActive(waiting);
+        await sync(true);
+    } else {
+        await parkActive(parked);
+        await clearActive();
+        // The connection was parked with the account a line above; emptying the
+        // slot is what makes this server connect as itself rather than being
+        // sent another server's token.
+        await forgetLink();
+        await rememberOrigin(origin);
+    }
+    await badge();
+    // Polaris's own pages are kept out of the inline script, and which pages
+    // those are has just changed.
+    void syncAutofill();
+}
+
+/**
+ * Forget a server: every account on it signed out of here, its connections
+ * ended on the server as Disconnect ends one, and the address off the list.
+ *
+ * Removing the server in front leaves the account set aside most recently in
+ * front, as signing out does - or, with none, the next server on the list at
+ * its "connect this browser", or the address screen when there is no other.
+ */
+async function removeServer(origin: string): Promise<void> {
+    const parked = await PARKED.getValue();
+    for (const one of parked.filter((account) => account.origin === origin)) {
+        if (one.link) await link.endLink(origin, one.link.token);
+        parkedVaults.delete(one.id);
+    }
+    const rest = parked.filter((account) => account.origin !== origin);
+    await PARKED.setValue(rest);
+    await saveServers(servers.withoutServer(await savedServers(), origin));
+
+    if ((await currentOrigin()) !== origin) return;
+    const token = await LINK_TOKEN.getValue();
+    if (token) await link.endLink(origin, token);
+    const leaving = await activeAccount();
+    if (leaving) parkedVaults.delete(leaving.id);
+    await clearActive();
+    await forgetLink();
+    await forgetOrigin();
+
+    const next = rest[rest.length - 1];
+    if (next) {
+        await PARKED.setValue(rest.slice(0, -1));
+        await makeActive(next);
+        await sync(true);
+    } else {
+        const other = (await savedServers())[0];
+        if (other && (await holdsOrigin(other.origin))) await rememberOrigin(other.origin);
+    }
+    void syncAutofill();
+}
+
 async function status(): Promise<messages.VaultStatus> {
     const [
         server,
@@ -1744,7 +1840,9 @@ async function status(): Promise<messages.VaultStatus> {
     // that is showing it the sign-in button.
     const account = refreshToken === null ? null : await readAccount();
     const activeId =
-        server !== null && refreshToken !== null ? accounts.accountId(server, email) : null;
+        server !== null && (refreshToken !== null || linkToken !== null)
+            ? activeIdOf(server, email, linkAccount)
+            : null;
 
     // The parked ones first and the active one last, so the list keeps the order
     // accounts were set aside in rather than reshuffling under somebody's cursor
@@ -1756,7 +1854,12 @@ async function status(): Promise<messages.VaultStatus> {
         origin: one.origin
     }));
     if (server !== null && activeId !== null) {
-        known.push({ id: activeId, name: account?.name ?? null, email, origin: server });
+        known.push({
+            id: activeId,
+            name: account?.name ?? linkAccount?.name ?? null,
+            email: email ?? linkAccount?.email ?? null,
+            origin: server
+        });
     }
 
     return {
@@ -1785,7 +1888,12 @@ async function status(): Promise<messages.VaultStatus> {
         // Read, never consumed: what became of a request that has ended is the
         // sign-in screen's to report, and reading it here would take the answer
         // away from the screen that says it out loud.
-        awaitingApproval: waiting?.state === "pending"
+        awaitingApproval: waiting?.state === "pending",
+        servers: servers.listServers(
+            await savedServers(),
+            server,
+            known.map((one) => one.origin)
+        )
     };
 }
 
@@ -2492,6 +2600,93 @@ const UPDATE_EVERY_MINUTES = 12 * 60;
  *  worker is not held open by it. */
 const UPDATE_TIMEOUT_MS = 10_000;
 
+/** How many messages are being answered right now - a fill among them. A
+ *  restart waits for none. */
+let answering = 0;
+
+/** Long enough for the reply to a "Start it now" to reach the popup. */
+const RESTART_DELAY_MS = 150;
+
+/** One of this extension's own files, as JSON, read from where it is served
+ *  from - for an unpacked copy, the folder on disk as it is now. */
+async function ownFile(path: string): Promise<unknown> {
+    try {
+        const response = await fetch(browser.runtime.getURL(`/${path}` as "/popup.html"), {
+            cache: "no-store"
+        });
+        return response.ok ? await response.json() : null;
+    } catch {
+        return null;
+    }
+}
+
+/** How this copy was installed, as the browser says. Null when it will not. */
+async function installType(): Promise<string | null> {
+    return (await browser.management.getSelf().catch(() => null))?.installType ?? null;
+}
+
+/**
+ * A newer version the updater has put on disk, waiting to be started, or null.
+ *
+ * Only for an unpacked copy: a store install is replaced by the store, and its
+ * files are not a folder anybody else writes to.
+ */
+async function diskVersion(): Promise<string | null> {
+    if ((await installType()) !== "development") return null;
+    const running = browser.runtime.getManifest().version;
+    return selfUpdate.waitingVersion(running, selfUpdate.versionIn(await ownFile("manifest.json")));
+}
+
+/** Whether the popup is on screen, over the toolbar or opened as a tab. A
+ *  browser without `getContexts` (Firefox) is answered by the other checks. */
+async function popupOpen(): Promise<boolean> {
+    const runtime = browser.runtime as unknown as {
+        getContexts?: (filter: object) => Promise<{ documentUrl?: string }[]>;
+    };
+    if (typeof runtime.getContexts !== "function") return false;
+    const popup = browser.runtime.getURL("/popup.html");
+    const found = await runtime.getContexts({}).catch(() => []);
+    return found.some((one) => one.documentUrl?.startsWith(popup) === true);
+}
+
+/**
+ * Restart into the version on disk, if there is one and nothing would be cut
+ * short - see `lib/self-update.ts` for what counts.
+ */
+async function restartIfWaiting(): Promise<void> {
+    if (!(await diskVersion())) return;
+    const [capture, second, first, waiting, linking] = await Promise.all([
+        CAPTURE.getValue(),
+        SECOND_STEP.getValue(),
+        FIRST_STEP.getValue(),
+        WAITING.getValue(),
+        LINK_WAITING.getValue()
+    ]);
+    const safe = selfUpdate.safeToRestart({
+        vaultOpen: (await vault()) !== null || parkedVaults.size > 0,
+        holdingLogin: capture !== null || second !== null || first !== null,
+        awaitingApproval: waiting?.state === "pending" || linking?.state === "pending",
+        popupOpen: await popupOpen(),
+        answering: answering > 0
+    });
+    if (safe) browser.runtime.reload();
+}
+
+/** Whether the install script's updater keeps this copy's folder current. */
+async function updaterCovers(): Promise<boolean> {
+    return selfUpdate.coveredBy(await ownFile(selfUpdate.UPDATER_MARKER));
+}
+
+/**
+ * The stored notice, as it stands now: gone once this version is the one out,
+ * and with how this copy is kept current read again.
+ */
+async function currentNotice(): Promise<UpdateNotice | null> {
+    const held = await UPDATE.getValue();
+    if (!held || !isNewer(held.version, browser.runtime.getManifest().version)) return null;
+    return { ...held, kind: installKind(await installType(), await updaterCovers()) };
+}
+
 /**
  * Ask this Polaris whether a newer extension is out, and remember the answer.
  *
@@ -2523,9 +2718,13 @@ async function checkForUpdate(): Promise<void> {
         });
         if (!response.ok) return;
         const answer = (await response.json()) as { version?: unknown; url?: unknown };
-        const self = await browser.management.getSelf().catch(() => null);
         await UPDATE.setValue(
-            noticeFor(answer, browser.runtime.getManifest().version, self?.installType)
+            noticeFor(
+                answer,
+                browser.runtime.getManifest().version,
+                await installType(),
+                await updaterCovers()
+            )
         );
     } catch {
         // Unreachable, or an answer that was not JSON. What is stored stands.
@@ -2588,7 +2787,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                         error: await say("errors.noPermission")
                     };
                 }
-                await rememberOrigin(origin);
+                // Through the same door as switching servers, so an address
+                // somebody has been signed in on before brings that account back
+                // rather than a second, empty session beside it.
+                await inTurn(() => bringServer(origin));
                 return { ok: true, status: await status() };
             }
 
@@ -2844,7 +3046,59 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (await REFRESH.getValue()) {
                     return { ok: false, error: await say("errors.signOutFirst") };
                 }
-                await forgetOrigin();
+                await inTurn(async () => {
+                    // A connection with no vault yet is set aside with the server
+                    // rather than left in the slot, where the next address typed
+                    // would be sent this one's token. The server stays on the list.
+                    await parkActive(await PARKED.getValue());
+                    await clearActive();
+                    await forgetLink();
+                    await forgetOrigin();
+                });
+                return { ok: true, status: await status() };
+            }
+
+            case "addServer": {
+                const origin = readOrigin(request.typed);
+                if (!origin) return { ok: false, error: await say("errors.notAnAddress") };
+                // Checked, never requested - the popup asked, from the press.
+                if (!(await holdsOrigin(origin))) {
+                    return { ok: false, error: await say("errors.noPermission") };
+                }
+                await inTurn(() => bringServer(origin));
+                return { ok: true, status: await status() };
+            }
+
+            case "switchServer": {
+                const known = (await status()).servers.some((one) => one.origin === request.origin);
+                if (!known) return { ok: false, error: await say("errors.unknownServer") };
+                if (!(await holdsOrigin(request.origin))) {
+                    return { ok: false, error: await say("errors.noPermission") };
+                }
+                await inTurn(() => bringServer(request.origin));
+                return { ok: true, status: await status() };
+            }
+
+            case "renameServer": {
+                const name = servers.normalizeServerName(request.name);
+                if (servers.serverNameProblem(name)) {
+                    return {
+                        ok: false,
+                        error: await say("errors.serverNameTooLong", { max: servers.SERVER_NAME_MAX })
+                    };
+                }
+                const listed = (await status()).servers.some((one) => one.origin === request.origin);
+                if (!listed) return { ok: false, error: await say("errors.unknownServer") };
+                // A server shown from an account alone - an install from before
+                // the list - is added to it by being named.
+                const saved = servers.withServer(await savedServers(), request.origin);
+                await saveServers(servers.renameServer(saved, request.origin, name));
+                return { ok: true, status: await status() };
+            }
+
+            case "removeServer": {
+                await inTurn(() => removeServer(request.origin));
+                await badge();
                 return { ok: true, status: await status() };
             }
 
@@ -3023,7 +3277,22 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "updateStatus":
                 // Read, never checked here: the popup asking is not a reason to
                 // make a request, and the alarm is what keeps this current.
-                return { ok: true, update: await UPDATE.getValue() };
+                // What the popup is told is the stored notice brought up to date
+                // with what is known locally: nothing once this version is the
+                // one out (a restart into it leaves the old notice behind), and
+                // how it gets here read again, since the install script may have
+                // started keeping this copy current since the notice was made.
+                return { ok: true, update: await currentNotice(), pending: await diskVersion() };
+
+            case "restartNow": {
+                // Only into a version that is actually waiting: a restart with
+                // nothing new on disk would be a sign-out for nothing.
+                if (!(await diskVersion())) return { ok: true };
+                // After the answer has gone, so the popup is not left waiting on a
+                // worker that no longer exists.
+                setTimeout(() => browser.runtime.reload(), RESTART_DELAY_MS);
+                return { ok: true };
+            }
 
             case "setTimeout": {
                 const chosen = readTimeout(request.timeoutMs);
@@ -3114,9 +3383,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // vault locked: pushing it forward first would mean the act of asking kept the
     // vault open, which is every timeout undone by the thing it was measuring.
     const answerAndTouch = async (): Promise<messages.Reply> => {
-        const reply = await answer();
-        if (USES_VAULT.has(request.kind)) await touch();
-        return reply;
+        answering++;
+        try {
+            const reply = await answer();
+            if (USES_VAULT.has(request.kind)) await touch();
+            return reply;
+        } finally {
+            answering--;
+        }
     };
 
     void answerAndTouch()
@@ -3522,6 +3796,10 @@ export default defineBackground(() => {
             // The connection's own request is collected by a loop in this worker
             // too, and a recycle takes that with it.
             if (await LINK_WAITING.getValue()) startLinking();
+            // And a newer version the updater put in this folder, started once
+            // nothing would be cut short by it. Last, so everything above has
+            // had its say about what is in flight.
+            await restartIfWaiting();
         })();
     });
 
@@ -3536,4 +3814,6 @@ export default defineBackground(() => {
     // And this, which is what a browser that was disconnected while it was closed
     // finds out on the way back up.
     void refreshLink(true);
+    // And a version put on disk while the worker was not running.
+    void restartIfWaiting();
 });

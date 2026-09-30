@@ -67,3 +67,23 @@ export function FoldMark(): React.JSX.Element {
         </svg>
     );
 }
+
+/** Give it another name: a pencil. */
+export function PencilMark(): React.JSX.Element {
+    return (
+        <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+        </svg>
+    );
+}
+
+/** Take it off the list: a bin. */
+export function BinMark(): React.JSX.Element {
+    return (
+        <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M19 6l-1 14H6L5 6" />
+        </svg>
+    );
+}

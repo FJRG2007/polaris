@@ -82,10 +82,21 @@ one origin - no host permission is declared in the manifest, because a
 self-hosted server has no address known at build time and a wildcard would be
 asking to read every page you open.
 
+More than one Polaris is **Servers**, on the home screen and in the account menu:
+add one (the same address and permission as the first), press a row to put it in
+front, rename or remove it. Each server keeps its own accounts, connection and
+vault session - switching sets the one in front aside rather than signing it out
+(`src/lib/servers.ts`, `bringServer` in the worker). Filling and the list inside a
+page use the vault of the server in front, never several at once: every other
+vault's key stays parked in memory exactly as a second account's does, and mixing
+two servers' logins under one box would put a login from a server you are not
+looking at onto a page.
+
 ## Where things are
 
 ```
-src/lib/server.ts        which Polaris this belongs to, and permission for it
+src/lib/server.ts        which Polaris is in front, the saved list, and permission for them
+src/lib/servers.ts       the servers this browser knows, and which account a switch brings back
 src/lib/link.ts          the connection to the account: ask, collect, check, end
 src/lib/protocol.ts      the Bitwarden protocol client: be let in, sync, refresh
 src/lib/accounts.ts      more than one signed-in account, and switching between them
@@ -99,6 +110,7 @@ src/lib/capture.ts       whether a submitted login is worth saving, replacing, o
 src/lib/breach.ts        whether a password being invented is already public
 src/lib/injection.ts     which granted sites the inline script may run on
 src/lib/update.ts        whether a newer build is out, and who is going to install it
+src/lib/self-update.ts   restarting into a version the install script's updater put on disk
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
 test/                    the decisions that can do harm: what matches, and when it locks
@@ -203,10 +215,34 @@ refuses to run one unless the manifest asks: the Chromium build declares
 that opens the vault on the dashboard is refused here, so read the built
 `.output/<target>/manifest.json` rather than `wxt.config.ts` after touching it.
 
+## Keeping it up to date
+
+Chromium installs an extension from its store and nowhere else, so an unpacked
+copy is kept current the nearest real way: `scripts/install.ps1` and
+`scripts/install.sh` put it in one fixed folder and leave a job of the user's own
+behind - a Task Scheduler task on Windows, a launchd agent on macOS, a systemd
+user timer (or a crontab line) on Linux, none of them needing administrator
+rights - that runs every six hours and at sign-in. It asks GitHub for the newest
+`extension-v*` release, downloads the Chromium package beside the live folder,
+checks it against the sha256 GitHub publishes and against its own manifest, and
+swaps it in with two renames. What the job runs is the install script attached to
+that release, checked the same way and replaced with every update. Running the
+line again replaces the job rather than adding one; `uninstall` removes both
+(see the top of each script).
+
+The extension notices by itself. An unpacked extension serves its own files from
+the folder as it is now, so the worker fetching its own `manifest.json` reads the
+new version while `runtime.getManifest()` still reports the running one. It
+restarts into it with `runtime.reload()` once nothing would be cut short - no
+vault open, no login held or half filled, no approval pending, no popup open
+(`src/lib/self-update.ts`). A restart clears session storage, as a browser
+restart does, which is why an open vault waits: it is started on the next lock,
+the next browser start, or the popup's "Start it now".
+
 ## Finding out it is out of date
 
-An extension loaded by hand never updates itself, and nothing in a browser will
-ever mention it. So the worker asks - when the browser starts, and twice a day
+An extension loaded by hand never updates itself unless something replaces its
+files, and nothing in a browser will ever mention it. So the worker asks - when the browser starts, and twice a day
 after that - and the popup carries a line above whichever screen is showing when
 there is something to say.
 
@@ -220,10 +256,11 @@ locked vault should still be able to find out it is months behind.
 What you are told depends on how this copy got here, which `management.getSelf()`
 reports - the one method of that API that needs no `management` permission.
 Installed from a package, the browser updates it once the store has reviewed the
-new version and there is nothing for you to do. Loaded from disk, whether as an
-unpacked folder or Firefox's temporary add-on, it has to be loaded again the same
-way, and the line points at the steps on your own Polaris rather than repeating
-them in a 360-pixel panel. Anything else - put there by other software, or by
+new version and there is nothing for you to do. An unpacked folder the install
+script's job keeps current - it writes `polaris-updater.json` into the folder -
+is told the same. Any other unpacked Chromium copy is shown the one line to run,
+for its system, which sets that job up. Firefox's temporary add-on has nothing on
+disk to keep current, and the line points at the steps on your own Polaris. Anything else - put there by other software, or by
 policy - is told the same as loaded-by-hand, because Polaris cannot promise those
 are being kept current.
 

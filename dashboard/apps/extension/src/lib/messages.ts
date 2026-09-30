@@ -13,6 +13,7 @@
  */
 
 import type { UpdateNotice } from "@/lib/update";
+import type { ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
 
 /** One decrypted login, reduced to what a list needs to draw it. */
@@ -108,6 +109,12 @@ export interface VaultStatus {
      * orphaning the one they were in the middle of approving.
      */
     readonly awaitingApproval: boolean;
+    /**
+     * Every Polaris this browser knows, the one in front marked. Never empty
+     * once an address has been given, and listed even for an install from
+     * before the list existed - see `listServers`.
+     */
+    readonly servers: readonly ServerRef[];
     /** The organizations the connected account can switch to, as the dashboard's
      *  header offers them. Empty for an account in none. */
     readonly organizations: readonly ShelfChoice[];
@@ -357,12 +364,44 @@ export type Request =
      */
     | { readonly kind: "forgetServer" }
     /** Open an organization's shelf, or the account's own with null. */
-    | { readonly kind: "setShelf"; readonly orgId: string | null };
+    | { readonly kind: "setShelf"; readonly orgId: string | null }
+    /**
+     * Add another Polaris and put it in front.
+     *
+     * Sent after the popup has asked the browser for the address, from the
+     * press - the worker only checks the answer. The account in front is set
+     * aside, not signed out, so switching back finds it where it was.
+     */
+    | { readonly kind: "addServer"; readonly typed: string }
+    /**
+     * Put another known server in front: the account on it that was set aside
+     * last, or that server's "connect this browser" when nobody is signed in
+     * there yet. Named by address, which is all the list carries.
+     */
+    | { readonly kind: "switchServer"; readonly origin: string }
+    /** Give a server a name of somebody's own, or take it away with an empty one. */
+    | { readonly kind: "renameServer"; readonly origin: string; readonly name: string }
+    /**
+     * Forget a server, and sign out of every account on it in this browser.
+     *
+     * Each connection is ended on the server too, as Disconnect does. Asked
+     * for from a confirmation in the popup, never from one press.
+     */
+    | { readonly kind: "removeServer"; readonly origin: string }
+    /**
+     * Start the version the updater put on disk now, rather than waiting for
+     * the vault to lock. Only from a press in the popup: it restarts the
+     * extension, which signs out of the vault the way a browser restart does.
+     */
+    | { readonly kind: "restartNow" };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
-    /** A build newer than this one, or null when this one is current. */
-    | { readonly ok: true; readonly update: UpdateNotice | null }
+    /**
+     * A build newer than this one, or null when this one is current - and the
+     * version already on disk waiting for a safe moment to start, or null.
+     */
+    | { readonly ok: true; readonly update: UpdateNotice | null; readonly pending: string | null }
     | { readonly ok: true; readonly items: readonly ItemSummary[] }
     | { readonly ok: true; readonly value: string }
     /** The site in front of somebody, and whether they have shut this out of it. */

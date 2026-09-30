@@ -8,6 +8,8 @@ import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { CheckMark, CopyMark } from "./marks";
+import { ServersFold, ServersPanel } from "./servers";
+import { detectOs, installLine, installShell, repoFromReleaseUrl } from "@polaris/core/extension-install";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
 import type { Words } from "@/lib/words";
@@ -88,40 +90,97 @@ function useStatus(): [VaultStatus | null, () => Promise<void>] {
     return [status, read];
 }
 
-/** What the worker's last check found, if it found anything. */
-function useUpdate(): UpdateNotice | null {
-    const [notice, setNotice] = useState<UpdateNotice | null>(null);
+/** What the worker's last check found, if it found anything - and a newer
+ *  version already on disk, waiting to be started. */
+function useUpdate(): { notice: UpdateNotice | null; pending: string | null } {
+    const [state, setState] = useState<{ notice: UpdateNotice | null; pending: string | null }>({
+        notice: null,
+        pending: null
+    });
     useEffect(() => {
         void (async () => {
             const reply = await askBackground({ kind: "updateStatus" });
-            if (reply.ok && "update" in reply) setNotice(reply.update);
+            if (reply.ok && "update" in reply) setState({ notice: reply.update, pending: reply.pending });
         })();
     }, []);
-    return notice;
+    return state;
 }
 
 /**
  * The one thing this popup says without being asked.
  *
- * What it says depends on how this copy got here, because the two readers have
- * nothing to do with each other. A store install is updated by the store once the
- * new version is reviewed: there is nothing for that person to do, and sending
- * them to re-load a folder by hand would be sending them to undo a working
- * install. A copy loaded from disk updates never, and the only thing that will
- * ever change that is them doing it again - so it points at the steps, on their
- * own Polaris, rather than repeating them in a 360-pixel panel.
+ * What it says depends on how this copy got here, because the readers have
+ * nothing to do with each other:
+ *
+ * - A newer version already on disk, put there by the install script's updater,
+ *   starts by itself at the next safe moment (`lib/self-update.ts`). Said, with
+ *   the way to start it now and what that costs.
+ * - A store install, and a copy the updater keeps current, are updated for
+ *   them: there is nothing to do, and saying so is the whole message.
+ * - A Chromium copy loaded by hand, or by the script before it set up the
+ *   updater, updates never - until the one line is run once. So that line is
+ *   shown, for this system, with a copy button.
+ * - Firefox has no updater at all: its temporary add-on is gone when Firefox
+ *   closes. It keeps pointing at the steps.
  */
 function UpdateBanner({
     notice,
+    pending,
     server
 }: {
     notice: UpdateNotice | null;
+    pending: string | null;
     server: string | null;
 }): React.JSX.Element | null {
     const t = useWords();
+    const [copied, mark] = useCopied();
+    const [starting, setStarting] = useState(false);
+
+    if (pending) {
+        return (
+            <div className="notice small">
+                <p>{t("popup.update.ready", { version: pending })}</p>
+                <button
+                    className="ghost notice-act"
+                    disabled={starting}
+                    onClick={() => {
+                        setStarting(true);
+                        void askBackground({ kind: "restartNow" }).then(() => window.close());
+                    }}
+                >
+                    {t("popup.update.startNow")}
+                </button>
+                <p className="muted">{t("popup.update.startNowHint")}</p>
+            </div>
+        );
+    }
     if (!notice) return null;
     if (notice.kind === "store") {
         return <div className="notice small">{t("popup.update.store", { version: notice.version })}</div>;
+    }
+    if (notice.kind === "auto") {
+        return <div className="notice small">{t("popup.update.auto", { version: notice.version })}</div>;
+    }
+    const repo = repoFromReleaseUrl(notice.url);
+    if (import.meta.env.BROWSER !== "firefox" && repo) {
+        const os = detectOs(navigator.userAgent);
+        const line = installLine(os, repo);
+        return (
+            <div className="notice small">
+                <p>{t("popup.update.runOnce", { version: notice.version, shell: installShell(os) })}</p>
+                <div className="install-line">
+                    <code>{line}</code>
+                    <button
+                        className={copied === "line" ? "icon copied" : "icon"}
+                        aria-label={t("popup.update.copyLine")}
+                        title={copied === "line" ? t("generator.copied") : t("popup.update.copyLine")}
+                        onClick={() => void navigator.clipboard.writeText(line).then(() => mark("line"))}
+                    >
+                        {copied === "line" ? <CheckMark /> : <CopyMark />}
+                    </button>
+                </div>
+            </div>
+        );
     }
     return (
         <div className="notice small">
@@ -146,7 +205,7 @@ function UpdateBanner({
 export function App(): React.JSX.Element {
     const t = useWords();
     const [status, refresh] = useStatus();
-    const update = useUpdate();
+    const { notice: update, pending } = useUpdate();
     const [section, setSection] = useSection();
     /**
      * Asking Polaris to let this browser in, from the locked screen.
@@ -182,13 +241,14 @@ export function App(): React.JSX.Element {
     if (shown === "server" || shown === "link" || !status.server) {
         return (
             <div className="app">
-                <UpdateBanner notice={update} server={status.server} />
+                <UpdateBanner notice={update} pending={pending} server={status.server} />
                 {shown === "link" && status.server ? (
                     <LinkPolaris server={status.server} onDone={refresh} />
                 ) : (
                     <Connect onDone={refresh} />
                 )}
                 <Accounts status={status} onChange={refresh} />
+                <ServersFold status={status} onChange={refresh} />
             </div>
         );
     }
@@ -196,10 +256,17 @@ export function App(): React.JSX.Element {
     // Connected: the frame, and either the home screen or the section open in it.
     return (
         <div className="app">
-            <UpdateBanner notice={update} server={status.server} />
-            <TopBar status={status} onChange={refresh} />
+            <UpdateBanner notice={update} pending={pending} server={status.server} />
+            <TopBar status={status} onChange={refresh} onOpen={setSection} />
             {section === "home" ? (
                 <Home status={status} onOpen={setSection} />
+            ) : section === "servers" ? (
+                <>
+                    <SectionBar title={t("shell.servers")} onBack={() => setSection("home")} />
+                    <main>
+                        <ServersPanel status={status} onChange={refresh} />
+                    </main>
+                </>
             ) : (
                 <>
                     <SectionBar title={t("shell.vault")} onBack={() => setSection("home")} />

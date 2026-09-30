@@ -116,7 +116,12 @@ describe("what a page may ask the worker for", () => {
             "setShelf",
             "link",
             "unlink",
-            "startInline"
+            "startInline",
+            "addServer",
+            "switchServer",
+            "renameServer",
+            "removeServer",
+            "restartNow"
         ] as const) {
             expect(FROM_PAGE.has(kind)).toBe(false);
         }
