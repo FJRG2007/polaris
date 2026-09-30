@@ -13,7 +13,12 @@
 import { formatFrom, type BrevoConfig, type MailjetConfig, type ResendConfig } from "@polaris/core";
 import { sendWithSes } from "./ses";
 import { sendWithSmtp } from "./smtp";
-import type { EmailMessage, MailAccount } from "./types";
+import { calendarContentType, INVITE_FILENAME, type EmailMessage, type MailAccount } from "./types";
+
+/** The invitation's .ics as base64, which is how every API provider here takes a file. */
+function inviteBase64(message: EmailMessage): string | null {
+    return message.calendar ? Buffer.from(message.calendar.ics, "utf8").toString("base64") : null;
+}
 
 /** POST JSON and turn anything but a 2xx into an error carrying the API's text. */
 async function post(
@@ -53,7 +58,18 @@ async function sendWithResend(config: ResendConfig, secret: string, message: Ema
         to: [message.to],
         subject: message.subject,
         text: message.text,
-        ...(message.html ? { html: message.html } : {})
+        ...(message.html ? { html: message.html } : {}),
+        ...(message.calendar
+            ? {
+                  attachments: [
+                      {
+                          filename: INVITE_FILENAME,
+                          content: inviteBase64(message),
+                          content_type: calendarContentType(message.calendar)
+                      }
+                  ]
+              }
+            : {})
     });
 }
 
@@ -63,7 +79,10 @@ async function sendWithBrevo(config: BrevoConfig, secret: string, message: Email
         to: [{ email: message.to }],
         subject: message.subject,
         textContent: message.text,
-        ...(message.html ? { htmlContent: message.html } : {})
+        ...(message.html ? { htmlContent: message.html } : {}),
+        // Brevo takes no content type for an attachment and derives it from the
+        // name, so the METHOD cannot be stated here; the .ics carries its own.
+        ...(message.calendar ? { attachment: [{ name: INVITE_FILENAME, content: inviteBase64(message) }] } : {})
     });
 }
 
@@ -77,7 +96,18 @@ async function sendWithMailjet(config: MailjetConfig, secret: string, message: E
                 To: [{ Email: message.to }],
                 Subject: message.subject,
                 TextPart: message.text,
-                ...(message.html ? { HTMLPart: message.html } : {})
+                ...(message.html ? { HTMLPart: message.html } : {}),
+                ...(message.calendar
+                    ? {
+                          Attachments: [
+                              {
+                                  ContentType: calendarContentType(message.calendar),
+                                  Filename: INVITE_FILENAME,
+                                  Base64Content: inviteBase64(message)
+                              }
+                          ]
+                      }
+                    : {})
             }
         ]
     });
