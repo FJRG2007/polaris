@@ -1084,5 +1084,18 @@
         "access": "Acceso",
         "schedule": "Horario",
         "settings": "Ajustes"
+    },
+    "itemSlots": {
+        "empty": "Hueco vacío",
+        "add": "Añadir objeto",
+        "done": "Hecho",
+        "count": "Cantidad",
+        "stack": "Hasta {count} por hueco, que el jugador recibe como un solo montón.",
+        "earlier": "Mover antes",
+        "later": "Mover después",
+        "remove": "Quitar {item}",
+        "slot": "Hueco {position}: {item}, {count}",
+        "full": "Los {count} huecos están ocupados. Quita uno para añadir otro.",
+        "hint": "Arrastra un objeto a un hueco, o haz clic para añadirlo. Arrastra un hueco fuera de la fila para quitarlo."
     }
 }

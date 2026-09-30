@@ -211,10 +211,6 @@
         "addMilestone": "Add a milestone",
         "points": "Points",
         "levels": "Levels",
-        "item": "Item",
-        "count": "How many",
-        "addItem": "Add an item",
-        "removeItem": "Remove this item",
         "groups": {
             "daily": {
                 "title": "Daily challenges",
@@ -236,7 +232,8 @@
                 "title": "Season milestones",
                 "hint": "Items and levels given on reaching a tier."
             }
-        }
+        },
+        "items": "Items"
     },
     "catalogue": {
         "title": "Challenges on offer",

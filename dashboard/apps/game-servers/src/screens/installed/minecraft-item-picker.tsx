@@ -25,8 +25,9 @@ export function ItemPicker({
     installedAppId,
     ...props
 }: {
-    /** Which server, because what a mod adds is that server's own answer. */
-    installedAppId: string;
+    /** Which server, because what a mod adds is that server's own answer. Null
+     *  searches the vanilla items only. */
+    installedAppId: string | null;
     value: string | null;
     query: string;
     onQueryChange: (query: string) => void;
@@ -40,7 +41,7 @@ export function ItemPicker({
     const source = useMemo<ItemPickerSource<CatalogItem>>(
         () => ({
             load: loadVanillaItems,
-            more: () => loadModItems(installedAppId, t),
+            more: installedAppId === null ? undefined : () => loadModItems(installedAppId, t),
             search: searchItems,
             Icon: ItemIcon,
             labelOf: itemLabel,

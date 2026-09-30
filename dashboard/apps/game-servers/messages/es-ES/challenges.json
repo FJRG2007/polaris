@@ -211,10 +211,6 @@
         "addMilestone": "Añadir un hito",
         "points": "Puntos",
         "levels": "Niveles",
-        "item": "Objeto",
-        "count": "Cantidad",
-        "addItem": "Añadir objeto",
-        "removeItem": "Quitar este objeto",
         "groups": {
             "daily": {
                 "title": "Retos diarios",
@@ -236,7 +232,8 @@
                 "title": "Hitos de temporada",
                 "hint": "Objetos y niveles al llegar a un nivel del pase."
             }
-        }
+        },
+        "items": "Objetos"
     },
     "catalogue": {
         "title": "Retos disponibles",

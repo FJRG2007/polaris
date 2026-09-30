@@ -272,10 +272,11 @@ function Tile({
                         DRAG_EFFECT_ALLOWED as typeof event.dataTransfer.effectAllowed;
                     // Something has to be set or Firefox refuses the drag.
                     event.dataTransfer.setData("text/plain", id);
-                    // Picking it up selects it too, so the count field and the
-                    // caption below agree with what is in the air.
-                    onSelect(id);
+                    // Told first, so a screen that adds on select can tell a pick-up
+                    // from a click. Picking it up selects it too, so the count field
+                    // and the caption below agree with what is in the air.
                     onDragItem(id);
+                    onSelect(id);
                 }}
                 onDragEnd={() => onDragItem?.(null)}
                 className={cn(

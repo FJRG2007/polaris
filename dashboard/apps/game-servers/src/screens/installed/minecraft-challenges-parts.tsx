@@ -10,7 +10,8 @@ import * as ui from "@polaris/ui";
 import * as catalog from "../../lib/minecraft/challenges/catalog";
 import { tierName, type ChallengesT, type PanelLanguage } from "./challenges-text";
 import type * as settingsModule from "../../lib/minecraft/challenges/settings";
-import { ChevronDown, ChevronRight, Info, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, RotateCcw } from "lucide-react";
+import { ItemSlots } from "./item-slots";
 import type { PlayerRow, InstanceView } from "../../lib/minecraft/challenges/challenges-service";
 
 type Settings = settingsModule.ChallengeSettings;
@@ -190,6 +191,7 @@ export function PayoutEditor({
     );
 }
 
+/** A reward's items, picked from the item palette into slots. */
 export function ItemsEditor({
     items,
     onChange,
@@ -201,68 +203,7 @@ export function ItemsEditor({
     t: ChallengesT;
     locked: boolean;
 }) {
-    return (
-        <div className="flex flex-col gap-2">
-            {items.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                    <ui.Input
-                        className="min-w-0 flex-1"
-                        value={item.id}
-                        placeholder="minecraft:diamond"
-                        aria-label={t("rewards.item")}
-                        disabled={locked}
-                        onChange={(event) =>
-                            onChange(
-                                items.map((one, at) =>
-                                    at === index ? { ...one, id: event.target.value } : one
-                                )
-                            )
-                        }
-                    />
-                    <ui.Input
-                        className="w-20"
-                        type="number"
-                        min={1}
-                        max={256}
-                        aria-label={t("rewards.count")}
-                        disabled={locked}
-                        value={Number.isFinite(item.count) ? item.count : ""}
-                        onChange={(event) =>
-                            onChange(
-                                items.map((one, at) =>
-                                    at === index
-                                        ? { ...one, count: numberOf(event.target.value) }
-                                        : one
-                                )
-                            )
-                        }
-                    />
-                    <ui.Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t("rewards.removeItem")}
-                        title={t("rewards.removeItem")}
-                        disabled={locked}
-                        onClick={() => onChange(items.filter((_, at) => at !== index))}
-                    >
-                        <Trash2 className="size-4" />
-                    </ui.Button>
-                </div>
-            ))}
-            {!locked && items.length < 6 && (
-                <div>
-                    <ui.Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => onChange([...items, { id: "minecraft:diamond", count: 1 }])}
-                    >
-                        <Plus className="size-4" />
-                        {t("rewards.addItem")}
-                    </ui.Button>
-                </div>
-            )}
-        </div>
-    );
+    return <ItemSlots label={t("rewards.items")} items={items} onChange={onChange} disabled={locked} />;
 }
 
 /** A progress bar for a challenge in a table. */

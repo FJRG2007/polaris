@@ -72,6 +72,7 @@ import type {
     MinecraftStatus
 } from "../../lib/minecraft/service";
 import { hostUi } from "@polaris/app-host/client";
+import { ItemServerProvider } from "./item-slots";
 import type { AppHostTypes } from "@polaris/app-host";
 
 const { CopyButton } = hostUi.copyButton;
@@ -452,327 +453,331 @@ export function MinecraftPanel({
     }, [router, load]);
 
     return (
-        <div className="flex flex-col gap-4">
-            <ConnectCard
-                status={shownStatus}
-                heard={status !== null}
-                address={status?.address ?? game?.address ?? null}
-                running={isRunning}
-                settings={settings}
-                installedAppId={installedAppId}
-                applicationId={applicationId}
-                reach={shownReach}
-                access={reading.access}
-                canSaveWorld={held.includes("games.moderate")}
-                onOpenPlayers={() => openTab("players")}
-                onOpenConsole={() => openTab("console")}
-            />
-
-            {/* The jar is fetched when the server boots, so a newer one waits for a
-                restart - and nothing else on the page would say so. */}
-            {canManage && isRunning && login.state?.outdated && (
-                <RestartPlanner
-                    installedAppId={installedAppId}
-                    running={isRunning}
-                    changed
-                    reason={t("panel.loginUpdateReason")}
-                    title={t("panel.polarisLoginHasAnUpdate")}
-                    detail={t("panel.loginUpdateDetail")}
-                    onRestarted={() => void login.reload()}
-                />
-            )}
-
-            {error && <p className="text-sm text-danger">{error}</p>}
-
-            <ScrollRow
-                as="nav"
-                className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
-            >
-                {tabs.map((entry) => (
-                    // A real href, so a screen can be middle-clicked, opened in a
-                    // new tab and copied; the plain click is taken over to keep the
-                    // panel's poll alive across the switch.
-                    <a
-                        key={entry.slug}
-                        href={gameTabHref(installedAppId, entry.slug)}
-                        aria-current={tab === entry.slug ? "page" : undefined}
-                        onClick={(event) => {
-                            if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-                            event.preventDefault();
-                            openTab(entry.slug);
-                        }}
-                        className={cn(
-                            "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
-                            tab === entry.slug
-                                ? "border-primary text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        {tabWords(entry.label)}
-                    </a>
-                ))}
-            </ScrollRow>
-
-            {tab === "" && (
-                <OverviewTab
+        // Every reward editor in the panel asks which server, so the item palette
+        // can add what this server's mods carry.
+        <ItemServerProvider value={installedAppId}>
+            <div className="flex flex-col gap-4">
+                <ConnectCard
                     status={shownStatus}
-                    settings={settings}
-                    blueprintId={game?.blueprintId ?? null}
-                    mapId={game?.mapId ?? null}
-                    onOpenPlayers={() => openTab("players")}
                     heard={status !== null}
-                />
-            )}
-            {tab === "console" && (
-                <GameConsole
+                    address={status?.address ?? game?.address ?? null}
+                    running={isRunning}
+                    settings={settings}
                     installedAppId={installedAppId}
                     applicationId={applicationId}
-                    running={isRunning}
-                    game={status?.edition === "bedrock" ? "bedrock" : "java"}
-                    players={[...(status?.players.players ?? [])]}
+                    reach={shownReach}
+                    access={reading.access}
+                    canSaveWorld={held.includes("games.moderate")}
+                    onOpenPlayers={() => openTab("players")}
+                    onOpenConsole={() => openTab("console")}
                 />
-            )}
-            {tab === "announce" && (
-                <div className="flex flex-col gap-4">
-                    <MinecraftAnnounce
+
+                {/* The jar is fetched when the server boots, so a newer one waits for a
+                    restart - and nothing else on the page would say so. */}
+                {canManage && isRunning && login.state?.outdated && (
+                    <RestartPlanner
                         installedAppId={installedAppId}
                         running={isRunning}
-                        edition={status?.edition === "bedrock" ? "bedrock" : "java"}
-                        players={[...(status?.players.players ?? [])]}
+                        changed
+                        reason={t("panel.loginUpdateReason")}
+                        title={t("panel.polarisLoginHasAnUpdate")}
+                        detail={t("panel.loginUpdateDetail")}
+                        onRestarted={() => void login.reload()}
                     />
-                </div>
-            )}
-            {tab === "panel" && (
-                <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
-            )}
-            {tab === "chat" && <MinecraftChatLink installedAppId={installedAppId} />}
-            {tab === "events" && (
-                <CardBoundary name="Events">
-                    <MinecraftEvents
-                        installedAppId={installedAppId}
-                        canManage={held.includes("games.console")}
-                    />
-                </CardBoundary>
-            )}
-            {tab === "challenges" && (
-                <CardBoundary name="Challenges">
-                    <MinecraftChallenges
-                        installedAppId={installedAppId}
-                        canManage={held.includes("games.console")}
-                    />
-                </CardBoundary>
-            )}
-            {tab === "anticheat" &&
-                ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
-                    <Card>
-                        <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            {t("panel.antiCheatReadsWhatThe")}
-                        </CardBody>
-                    </Card>
-                ) : (
-                    <MinecraftXray installedAppId={installedAppId} canManage={canManage} />
-                ))}
-            {tab === "players" && (
-                <MinecraftPlayers
-                    installedAppId={installedAppId}
-                    status={status}
-                    roster={reading.roster}
-                    rosterAsOf={reading.rosterAsOf}
-                    access={reading.access}
-                    sessions={reading.sessions}
-                    seen={reading.seen}
-                    now={reading.now}
-                    timeouts={reading.timeouts}
-                    levels={reading.levels}
-                    idle={reading.idle}
-                    lastLevels={reading.lastLevels}
-                    pending={reading.pending}
-                    passwords={loginOn ? (login.state?.players ?? []) : null}
-                    canResetPasswords={canManage}
-                    onPasswordsChanged={() => void login.reload()}
-                    onChanged={() => void load()}
-                />
-            )}
-            {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
-            {tab === "rules" && (
-                <MinecraftRules
-                    installedAppId={installedAppId}
-                    canManage={held.includes("games.manage")}
-                />
-            )}
-            {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
-            {tab === "usage" &&
-                (applicationId ? (
-                    // The same history Deploy draws for any service, because a game
-                    // server is one: it is already sampled and already stored, and a
-                    // second copy of it under another name would be a second thing
-                    // to keep true.
-                    <div className="space-y-4">
-                        {/* Above the machine's numbers, because it is the one
-                            somebody opens this tab for: what the server cost is
-                            only interesting next to how many people it carried. */}
-                        <MetricsHistory
-                            endpoint={`/api/apps/installed/${installedAppId}/game/players`}
-                            metrics={PLAYER_METRICS}
-                        />
-                        <MetricsHistory
-                            endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
-                            live={`/api/deploy/apps/${applicationId}/metrics/stream`}
-                            metrics={CONSUMPTION_METRICS}
-                        />
-                    </div>
-                ) : (
-                    <Card>
-                        <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            {t("panel.usageIsMeasuredOnceThe")}
-                        </CardBody>
-                    </Card>
-                ))}
+                )}
 
-            {tab === "mods" && (
-                <div className="flex flex-col gap-4">
-                    <MinecraftMods
+                {error && <p className="text-sm text-danger">{error}</p>}
+
+                <ScrollRow
+                    as="nav"
+                    className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
+                >
+                    {tabs.map((entry) => (
+                        // A real href, so a screen can be middle-clicked, opened in a
+                        // new tab and copied; the plain click is taken over to keep the
+                        // panel's poll alive across the switch.
+                        <a
+                            key={entry.slug}
+                            href={gameTabHref(installedAppId, entry.slug)}
+                            aria-current={tab === entry.slug ? "page" : undefined}
+                            onClick={(event) => {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                                event.preventDefault();
+                                openTab(entry.slug);
+                            }}
+                            className={cn(
+                                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
+                                tab === entry.slug
+                                    ? "border-primary text-foreground"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {tabWords(entry.label)}
+                        </a>
+                    ))}
+                </ScrollRow>
+
+                {tab === "" && (
+                    <OverviewTab
+                        status={shownStatus}
+                        settings={settings}
+                        blueprintId={game?.blueprintId ?? null}
+                        mapId={game?.mapId ?? null}
+                        onOpenPlayers={() => openTab("players")}
+                        heard={status !== null}
+                    />
+                )}
+                {tab === "console" && (
+                    <GameConsole
                         installedAppId={installedAppId}
                         applicationId={applicationId}
-                        settings={settings}
-                        playersOnline={status?.players.online ?? 0}
-                        clientMods={game?.clientMods ?? []}
-                        packCommands={game?.packCommands ?? null}
-                        onSaved={reloadSettings}
-                    />
-                    {/* A second catalogue rather than a second source in the one
-                        above: SpigotMC publishes a page and a claim about which
-                        releases were tested, where Modrinth publishes builds, and
-                        only one of the two can be checked before installing. Not
-                        shown on a modded server, where every one of these is a jar
-                        the server cannot read. */}
-                    {/* A pack is the server rather than an addition to it, so it
-                        is offered to any Java server and warns about what it
-                        replaces before it replaces anything. */}
-                    {edition === "java" && (
-                        <ModpacksCard
-                            installedAppId={installedAppId}
-                            modpack={
-                                settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ??
-                                ""
-                            }
-                            onSaved={reloadSettings}
-                        />
-                    )}
-                    {isPluginLoader(loaderForType(software) ?? "") && (
-                        <SpigotPluginsCard
-                            installedAppId={installedAppId}
-                            value={settings.find((entry) => entry.key === SPIGET_KEY)?.value ?? ""}
-                            onSaved={reloadSettings}
-                        />
-                    )}
-                </div>
-            )}
-            {tab === "security" && (
-                <div className="flex flex-col gap-4">
-                    <MinecraftSettings
-                        installedAppId={installedAppId}
-                        settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
-                        playersOnline={status?.players.online ?? 0}
                         running={isRunning}
-                        onSaved={reloadSettings}
+                        game={status?.edition === "bedrock" ? "bedrock" : "java"}
+                        players={[...(status?.players.players ?? [])]}
                     />
-                    {/* Beside the authentication switch rather than on the Mods
-                        screen: it is the answer to what that switch gives up, and
-                        nobody looking for it would think to search a marketplace. */}
-                    <MinecraftJoinPassword
+                )}
+                {tab === "announce" && (
+                    <div className="flex flex-col gap-4">
+                        <MinecraftAnnounce
+                            installedAppId={installedAppId}
+                            running={isRunning}
+                            edition={status?.edition === "bedrock" ? "bedrock" : "java"}
+                            players={[...(status?.players.players ?? [])]}
+                        />
+                    </div>
+                )}
+                {tab === "panel" && (
+                    <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
+                )}
+                {tab === "chat" && <MinecraftChatLink installedAppId={installedAppId} />}
+                {tab === "events" && (
+                    <CardBoundary name="Events">
+                        <MinecraftEvents
+                            installedAppId={installedAppId}
+                            canManage={held.includes("games.console")}
+                        />
+                    </CardBoundary>
+                )}
+                {tab === "challenges" && (
+                    <CardBoundary name="Challenges">
+                        <MinecraftChallenges
+                            installedAppId={installedAppId}
+                            canManage={held.includes("games.console")}
+                        />
+                    </CardBoundary>
+                )}
+                {tab === "anticheat" &&
+                    ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
+                        <Card>
+                            <CardBody className="py-10 text-center text-sm text-muted-foreground">
+                                {t("panel.antiCheatReadsWhatThe")}
+                            </CardBody>
+                        </Card>
+                    ) : (
+                        <MinecraftXray installedAppId={installedAppId} canManage={canManage} />
+                    ))}
+                {tab === "players" && (
+                    <MinecraftPlayers
                         installedAppId={installedAppId}
-                        edition={game?.edition ?? status?.edition ?? "java"}
-                        projects={
-                            settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""
-                        }
-                        software={
-                            settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""
-                        }
-                        playersOnline={status?.players.online ?? 0}
-                        login={login}
-                        onOpenPlayers={() => openTab("players")}
-                        onSaved={reloadSettings}
-                    />
-                    {/* The firewall guards HTTP and a game server is not HTTP, so
-                        its addresses only mean anything here once they are on the
-                        server's own ban list. That is a security question, and it
-                        used to sit at the bottom of the players table. */}
-                    <FirewallSection
-                        installedAppId={installedAppId}
-                        firewall={reading.firewall}
-                        onError={setError}
+                        status={status}
+                        roster={reading.roster}
+                        rosterAsOf={reading.rosterAsOf}
+                        access={reading.access}
+                        sessions={reading.sessions}
+                        seen={reading.seen}
+                        now={reading.now}
+                        timeouts={reading.timeouts}
+                        levels={reading.levels}
+                        idle={reading.idle}
+                        lastLevels={reading.lastLevels}
+                        pending={reading.pending}
+                        passwords={loginOn ? (login.state?.players ?? []) : null}
+                        canResetPasswords={canManage}
+                        onPasswordsChanged={() => void login.reload()}
                         onChanged={() => void load()}
                     />
-                </div>
-            )}
-
-            {tab === "schedule" && (
-                <CardBoundary name="Schedule">
-                    <MinecraftSchedule
-                        runs={game?.routineRuns ?? null}
+                )}
+                {tab === "world" && <MinecraftWorld installedAppId={installedAppId} name={name} />}
+                {tab === "rules" && (
+                    <MinecraftRules
                         installedAppId={installedAppId}
-                        state={game?.scheduleState ?? null}
-                        routed={game?.routed ?? false}
-                        canRoute={game?.canRoute ?? false}
-                        wakeOnJoin={game?.wakeOnJoin ?? true}
-                        schedule={game?.schedule ?? NO_SCHEDULE}
+                        canManage={held.includes("games.manage")}
                     />
-                </CardBoundary>
-            )}
-            {tab === "settings" && (
-                <div className="flex flex-col gap-4">
-                    <CardBoundary name="Appearance">
-                        <MinecraftAppearance
+                )}
+                {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
+                {tab === "usage" &&
+                    (applicationId ? (
+                        // The same history Deploy draws for any service, because a game
+                        // server is one: it is already sampled and already stored, and a
+                        // second copy of it under another name would be a second thing
+                        // to keep true.
+                        <div className="space-y-4">
+                            {/* Above the machine's numbers, because it is the one
+                                somebody opens this tab for: what the server cost is
+                                only interesting next to how many people it carried. */}
+                            <MetricsHistory
+                                endpoint={`/api/apps/installed/${installedAppId}/game/players`}
+                                metrics={PLAYER_METRICS}
+                            />
+                            <MetricsHistory
+                                endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                                live={`/api/deploy/apps/${applicationId}/metrics/stream`}
+                                metrics={CONSUMPTION_METRICS}
+                            />
+                        </div>
+                    ) : (
+                        <Card>
+                            <CardBody className="py-10 text-center text-sm text-muted-foreground">
+                                {t("panel.usageIsMeasuredOnceThe")}
+                            </CardBody>
+                        </Card>
+                    ))}
+
+                {tab === "mods" && (
+                    <div className="flex flex-col gap-4">
+                        <MinecraftMods
                             installedAppId={installedAppId}
-                            name={name}
-                            motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
-                            iconSetAt={game?.iconSetAt ?? null}
+                            applicationId={applicationId}
+                            settings={settings}
                             playersOnline={status?.players.online ?? 0}
+                            clientMods={game?.clientMods ?? []}
+                            packCommands={game?.packCommands ?? null}
                             onSaved={reloadSettings}
                         />
-                    </CardBoundary>
-                    <CardBoundary name="Domain">
-                        <MinecraftDomain
-                            installedAppId={installedAppId}
-                            hostname={game?.hostname ?? null}
-                            suffix={game?.suffix ?? null}
-                            address={status?.address ?? game?.address ?? null}
-                            routed={game?.routed ?? false}
-                            canRoute={game?.canRoute ?? false}
-                        />
-                    </CardBoundary>
-                    <CardBoundary name="Settings">
+                        {/* A second catalogue rather than a second source in the one
+                            above: SpigotMC publishes a page and a claim about which
+                            releases were tested, where Modrinth publishes builds, and
+                            only one of the two can be checked before installing. Not
+                            shown on a modded server, where every one of these is a jar
+                            the server cannot read. */}
+                        {/* A pack is the server rather than an addition to it, so it
+                            is offered to any Java server and warns about what it
+                            replaces before it replaces anything. */}
+                        {edition === "java" && (
+                            <ModpacksCard
+                                installedAppId={installedAppId}
+                                modpack={
+                                    settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ??
+                                    ""
+                                }
+                                onSaved={reloadSettings}
+                            />
+                        )}
+                        {isPluginLoader(loaderForType(software) ?? "") && (
+                            <SpigotPluginsCard
+                                installedAppId={installedAppId}
+                                value={settings.find((entry) => entry.key === SPIGET_KEY)?.value ?? ""}
+                                onSaved={reloadSettings}
+                            />
+                        )}
+                    </div>
+                )}
+                {tab === "security" && (
+                    <div className="flex flex-col gap-4">
                         <MinecraftSettings
                             installedAppId={installedAppId}
-                            settings={settings.filter(
-                                (setting) =>
-                                    setting.group !== MODS_GROUP &&
-                                    setting.group !== SECURITY_GROUP &&
-                                    setting.key !== MOTD_KEY
-                            )}
+                            settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
                             playersOnline={status?.players.online ?? 0}
                             running={isRunning}
-                            withMemory
                             onSaved={reloadSettings}
                         />
-                    </CardBoundary>
-                    <CardBoundary name="Reset">
-                        <MinecraftReset
+                        {/* Beside the authentication switch rather than on the Mods
+                            screen: it is the answer to what that switch gives up, and
+                            nobody looking for it would think to search a marketplace. */}
+                        <MinecraftJoinPassword
                             installedAppId={installedAppId}
-                            edition={game?.edition ?? "java"}
-                            blueprintId={game?.blueprintId ?? null}
-                            mapId={game?.mapId ?? null}
-                            crossplay={hasCrossplay(
-                                settings.find((setting) => setting.key === PROJECTS_KEY)?.value
-                            )}
+                            edition={game?.edition ?? status?.edition ?? "java"}
+                            projects={
+                                settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""
+                            }
+                            software={
+                                settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""
+                            }
                             playersOnline={status?.players.online ?? 0}
-                            onDone={reloadSettings}
+                            login={login}
+                            onOpenPlayers={() => openTab("players")}
+                            onSaved={reloadSettings}
+                        />
+                        {/* The firewall guards HTTP and a game server is not HTTP, so
+                            its addresses only mean anything here once they are on the
+                            server's own ban list. That is a security question, and it
+                            used to sit at the bottom of the players table. */}
+                        <FirewallSection
+                            installedAppId={installedAppId}
+                            firewall={reading.firewall}
+                            onError={setError}
+                            onChanged={() => void load()}
+                        />
+                    </div>
+                )}
+
+                {tab === "schedule" && (
+                    <CardBoundary name="Schedule">
+                        <MinecraftSchedule
+                            runs={game?.routineRuns ?? null}
+                            installedAppId={installedAppId}
+                            state={game?.scheduleState ?? null}
+                            routed={game?.routed ?? false}
+                            canRoute={game?.canRoute ?? false}
+                            wakeOnJoin={game?.wakeOnJoin ?? true}
+                            schedule={game?.schedule ?? NO_SCHEDULE}
                         />
                     </CardBoundary>
-                </div>
-            )}
-        </div>
+                )}
+                {tab === "settings" && (
+                    <div className="flex flex-col gap-4">
+                        <CardBoundary name="Appearance">
+                            <MinecraftAppearance
+                                installedAppId={installedAppId}
+                                name={name}
+                                motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
+                                iconSetAt={game?.iconSetAt ?? null}
+                                playersOnline={status?.players.online ?? 0}
+                                onSaved={reloadSettings}
+                            />
+                        </CardBoundary>
+                        <CardBoundary name="Domain">
+                            <MinecraftDomain
+                                installedAppId={installedAppId}
+                                hostname={game?.hostname ?? null}
+                                suffix={game?.suffix ?? null}
+                                address={status?.address ?? game?.address ?? null}
+                                routed={game?.routed ?? false}
+                                canRoute={game?.canRoute ?? false}
+                            />
+                        </CardBoundary>
+                        <CardBoundary name="Settings">
+                            <MinecraftSettings
+                                installedAppId={installedAppId}
+                                settings={settings.filter(
+                                    (setting) =>
+                                        setting.group !== MODS_GROUP &&
+                                        setting.group !== SECURITY_GROUP &&
+                                        setting.key !== MOTD_KEY
+                                )}
+                                playersOnline={status?.players.online ?? 0}
+                                running={isRunning}
+                                withMemory
+                                onSaved={reloadSettings}
+                            />
+                        </CardBoundary>
+                        <CardBoundary name="Reset">
+                            <MinecraftReset
+                                installedAppId={installedAppId}
+                                edition={game?.edition ?? "java"}
+                                blueprintId={game?.blueprintId ?? null}
+                                mapId={game?.mapId ?? null}
+                                crossplay={hasCrossplay(
+                                    settings.find((setting) => setting.key === PROJECTS_KEY)?.value
+                                )}
+                                playersOnline={status?.players.online ?? 0}
+                                onDone={reloadSettings}
+                            />
+                        </CardBoundary>
+                    </div>
+                )}
+            </div>
+        </ItemServerProvider>
     );
 }
 

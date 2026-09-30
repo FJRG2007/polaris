@@ -13,7 +13,6 @@ import { useMemo, useState } from "react";
 import { useGameText, useSchemaText, type GameText } from "../game-text";
 import type { GameKey } from "../../../messages";
 import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
-import { Plus, Trash2 } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -33,6 +32,7 @@ import { GatheringOptions } from "./event-options-gathering";
 import { RareCatchOptions } from "./event-options-rare-catch";
 import { XpBoostOptions } from "./event-options-xp-boost";
 import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
+import { ItemSlots } from "./item-slots";
 
 const MINING_LABELS: Readonly<
     Record<(typeof catalog.MINING_TARGETS)[number], GameKey<"minecraft">>
@@ -238,80 +238,23 @@ function RewardEditor({
     path: (string | number)[];
 }) {
     const t = useGameText("minecraft");
+    const schemaText = useSchemaText();
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div>
                 <p className="text-sm font-medium">{label}</p>
                 <p className="text-xs text-muted-foreground">{hint}</p>
             </div>
-            {value.items.map((item, index) => (
-                <div key={index} className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                        <Input
-                            value={item.id}
-                            placeholder="minecraft:diamond"
-                            aria-label={t("editor.item")}
-                            onChange={(event) =>
-                                onChange({
-                                    ...value,
-                                    items: value.items.map((one, at) =>
-                                        at === index ? { ...one, id: event.target.value } : one
-                                    )
-                                })
-                            }
-                        />
-                        <Problem text={problemAt(issues, ...path, "items", index, "id")} />
-                    </div>
-                    <Input
-                        className="w-20"
-                        type="number"
-                        min={1}
-                        max={256}
-                        aria-label={t("editor.howMany")}
-                        value={Number.isFinite(item.count) ? item.count : ""}
-                        onChange={(event) =>
-                            onChange({
-                                ...value,
-                                items: value.items.map((one, at) =>
-                                    at === index
-                                        ? { ...one, count: numberOf(event.target.value) }
-                                        : one
-                                )
-                            })
-                        }
-                    />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t("editor.removeThisItem")}
-                        title={t("editor.removeThisItem")}
-                        onClick={() =>
-                            onChange({
-                                ...value,
-                                items: value.items.filter((_, at) => at !== index)
-                            })
-                        }
-                    >
-                        <Trash2 className="size-4" />
-                    </Button>
-                </div>
-            ))}
+            <ItemSlots
+                label={label}
+                items={value.items}
+                onChange={(items) => onChange({ ...value, items })}
+                problemAt={(index) => {
+                    const problem = problemAt(issues, ...path, "items", index);
+                    return problem ? schemaText(problem) : null;
+                }}
+            />
             <div className="flex flex-wrap items-center gap-2">
-                {value.items.length < 6 && (
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                            onChange({
-                                ...value,
-                                items: [...value.items, { id: "minecraft:diamond", count: 1 }]
-                            })
-                        }
-                    >
-                        <Plus className="size-4" />
-                        {t("editor.item")}
-                    </Button>
-                )}
                 <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
                     {t("editor.levels")}
                     <Input

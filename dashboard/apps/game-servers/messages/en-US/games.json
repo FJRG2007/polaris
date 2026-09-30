@@ -1084,5 +1084,18 @@
         "access": "Access",
         "schedule": "Schedule",
         "settings": "Settings"
+    },
+    "itemSlots": {
+        "empty": "Empty slot",
+        "add": "Add an item",
+        "done": "Done",
+        "count": "Count",
+        "stack": "Up to {count} in one slot, which the player gets as one stack.",
+        "earlier": "Move earlier",
+        "later": "Move later",
+        "remove": "Remove {item}",
+        "slot": "Slot {position}: {item}, {count}",
+        "full": "All {count} slots are taken. Remove one to add another.",
+        "hint": "Drag an item into a slot, or click it to add it. Drag a slot out of the row to remove it."
     }
 }
