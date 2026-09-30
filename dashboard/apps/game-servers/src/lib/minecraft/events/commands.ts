@@ -731,6 +731,38 @@ export function readHomes(
 /** How far from anybody's bed an event may put anything. */
 export const HOME_CLEARANCE = 48;
 
+/** How near a bed an event that changes nothing and brings nothing hostile may
+ *  be, once nothing further out would do: an island with its home on it. */
+export const NEAR_CLEARANCE = 8;
+
+/**
+ * How far out, and how far from a home, try number `tries` looks. Everything
+ * starts at its own distance and the full clearance; one that changes nothing
+ * and brings nothing hostile (`nearHome`) comes in after `after` tries -
+ * halving the distance each time, down to just clear of the players - and may
+ * then come as near a home as `NEAR_CLEARANCE`: an island with its home on it.
+ */
+export function searchReach(
+    distance: number,
+    radius: number,
+    tries: number,
+    nearHome: boolean,
+    clearance: number,
+    after = 4
+): { reach: number; clearance: number } {
+    if (!nearHome || tries < after) return { reach: distance, clearance };
+    return {
+        reach: Math.max(radius + 6, Math.round(distance / 2 ** (tries - after + 1))),
+        clearance: NEAR_CLEARANCE + radius
+    };
+}
+
+/** Open water at a column: the sea, a lake - nothing anybody built, and empty
+ *  space for what is built in the air over it. */
+export function waterUnder(point: { x: number; y: number; z: number }): string {
+    return `execute in minecraft:overworld if block ${point.x} ${point.y - 1} ${point.z} minecraft:water`;
+}
+
 /**
  * How far the marker can come down from the column it was dropped on: before
  * 1.19.4 `spreadplayers` puts it on the nearest ground it likes, a block or two

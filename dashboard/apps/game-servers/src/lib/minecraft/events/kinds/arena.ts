@@ -24,6 +24,7 @@
  */
 
 import { text } from "../commands";
+import { fallProof } from "./stage";
 import { PLAYER_NAME } from "../catalog";
 import { stripFormatting } from "../../parse";
 import { GAMEMODES, type Arena, type Box, type Entrant, type Marker } from "../state";
@@ -291,20 +292,27 @@ export function commandable(entrant: Entrant): boolean {
     );
 }
 
-/** Before they are sent back: the kit taken back, their own game mode again. */
+/** Before they are sent back: unable to fall to their death for a while, and
+ *  the kit taken back. Their own game mode only once they are home - switched
+ *  back up in the air, a player who was flying would fall. */
 export function homeward(
     entrant: Entrant,
     marker: Marker | null,
     kit: readonly string[]
 ): string[] {
     return [
+        ...fallProof(entrant.name),
         ...(marker
             ? kit
                   .filter((id) => ITEM_ID.test(id))
                   .map((id) => clearMarked(entrant.name, id, marker))
-            : []),
-        `gamemode ${entrant.gamemode} ${entrant.name}`
+            : [])
     ];
+}
+
+/** Home: their own game mode again. */
+export function homeMode(entrant: Entrant): string {
+    return `gamemode ${entrant.gamemode} ${entrant.name}`;
 }
 
 /** Back to exactly where they stood, facing the way they faced. */

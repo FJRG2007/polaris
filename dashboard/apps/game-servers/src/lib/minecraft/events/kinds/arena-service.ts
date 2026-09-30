@@ -24,6 +24,7 @@
  */
 
 import * as arena from "./arena";
+import * as stage from "./stage";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
@@ -58,7 +59,9 @@ export interface KindContext {
     findPlace(
         place: catalog.EventPlace,
         distance: number,
-        radius: number
+        radius: number,
+        /** `open` for what is built in the air, where open water under it will do. */
+        surface?: "ground" | "open"
     ): Promise<stored.Point | "failed" | null>;
     /** The place given up and another looked for; throws once the tries run out. */
     giveUpPlace(point: stored.Point): Promise<void>;
@@ -245,7 +248,7 @@ async function raise(ctx: KindContext): Promise<void> {
                 ? duel.DUEL_REACH
                 : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
-        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach);
+        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "open");
         if (found === "failed") throw new EventStopped(NO_PLACE);
         return;
     }
@@ -444,21 +447,34 @@ async function bringIn(ctx: KindContext): Promise<void> {
 async function stashAll(ctx: KindContext): Promise<void> {
     if (!(await ctx.atLeast([1, 17]))) return;
     const box = ctx.run.arena!.box;
-    const candidates = stash.spotsUnder({ x1: box.x1, z1: box.z1, x2: box.x2, z2: box.z2, y: box.y1 });
+    const candidates = stash.spotsUnder({
+        x1: box.x1,
+        z1: box.z1,
+        x2: box.x2,
+        z2: box.z2,
+        y: box.y1
+    });
     for (const one of ctx.run.entrants) {
         if (one.stash || !one.away) continue;
         const taken = ctx.run.entrants.flatMap((each) =>
             each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
         );
-        await stashService.stashIn(ctx.server, ctx.stashOwner, one.name, candidates, taken, async (kept) => {
-            ctx.run = {
-                ...ctx.run,
-                entrants: ctx.run.entrants.map((each) =>
-                    each.name === one.name ? { ...each, stash: kept } : each
-                )
-            };
-            await ctx.persist();
-        });
+        await stashService.stashIn(
+            ctx.server,
+            ctx.stashOwner,
+            one.name,
+            candidates,
+            taken,
+            async (kept) => {
+                ctx.run = {
+                    ...ctx.run,
+                    entrants: ctx.run.entrants.map((each) =>
+                        each.name === one.name ? { ...each, stash: kept } : each
+                    )
+                };
+                await ctx.persist();
+            }
+        );
     }
 }
 
@@ -603,7 +619,10 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
             : -1;
     const touring = index >= 0 ? plots[index]! : null;
     // The tour's spot over the roof, found clear once per plot.
-    const view = touring === null ? null : await tourView(ctx, memory, box, touring, options.plotSize, count);
+    const view =
+        touring === null
+            ? null
+            : await tourView(ctx, memory, box, touring, options.plotSize, count);
     const spotOf = (one: stored.Entrant) =>
         view ?? build.plotSpot(box, one.side, options.plotSize, count);
     const here = new Map(
@@ -888,8 +907,11 @@ export async function closeArena(
             // The kit off, then their own things back into their slots, then
             // home - where anything whose slot was taken is dropped at their feet.
             let home = false;
-            const goHome = async (): Promise<boolean> =>
-                (home = arena.wentHome(await server.say([arena.sendHome(one)])));
+            const goHome = async (): Promise<boolean> => {
+                home = arena.wentHome(await server.say([arena.sendHome(one)]));
+                if (home) await server.say([arena.homeMode(one)]);
+                return home;
+            };
             const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
                 if (!one.stash) return true;
                 const how = await stashService.giveBack(
@@ -906,6 +928,7 @@ export async function closeArena(
             // Sent back by an end that was stopped before it wrote so: not moved again.
             const say = (line: string) => server.say([line]);
             if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) {
+                await server.sayAll(stage.fallProof(one.name));
                 if (!(await giveBack())) remaining.push(one);
                 continue;
             }
@@ -934,6 +957,8 @@ export async function closeArena(
                 arena.forceloadArea(left.arena.box, true),
                 ...(left.marker ? [arena.killMarkedDrops(left.arena.box, left.marker)] : [])
             ]);
+            // Whoever is still up there - somebody who walked in, a pet - floats down.
+            await server.sayAll(stage.fallProofOver(left.arena.box));
             let whole = true;
             for (const line of arena.teardown(left.arena)) {
                 if (arena.notLoaded(await server.say([line]))) whole = false;

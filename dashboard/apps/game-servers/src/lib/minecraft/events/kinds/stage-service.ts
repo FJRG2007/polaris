@@ -399,19 +399,32 @@ async function admit(
     // Nor until what they carry is kept too (`stash`): they come in empty-handed.
     if (await tools.canStash()) {
         const volume = layout.volume;
-        const candidates = stash.spotsUnder({ x1: volume.x1, z1: volume.z1, x2: volume.x2, z2: volume.z2, y: volume.y1 });
+        const candidates = stash.spotsUnder({
+            x1: volume.x1,
+            z1: volume.z1,
+            x2: volume.x2,
+            z2: volume.z2,
+            y: volume.y1
+        });
         for (const one of fresh) {
             const taken = state(loop).saved.flatMap((each) =>
                 each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
             );
-            await stashService.stashIn(server, tools.stashOwner, one.name, candidates, taken, async (kept) => {
-                change(loop, {
-                    saved: state(loop).saved.map((each) =>
-                        same(each.name, one.name) ? { ...each, stash: kept } : each
-                    )
-                });
-                await tools.persist();
-            });
+            await stashService.stashIn(
+                server,
+                tools.stashOwner,
+                one.name,
+                candidates,
+                taken,
+                async (kept) => {
+                    change(loop, {
+                        saved: state(loop).saved.map((each) =>
+                            same(each.name, one.name) ? { ...each, stash: kept } : each
+                        )
+                    });
+                    await tools.persist();
+                }
+            );
         }
     }
     const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
@@ -451,7 +464,9 @@ async function sendHome(
     if (!saved) return true;
     const keep = async (kept: stash.Stash | null) => {
         change(loop, {
-            saved: state(loop).saved.map((one) => (same(one.name, name) ? { ...one, stash: kept } : one))
+            saved: state(loop).saved.map((one) =>
+                same(one.name, name) ? { ...one, stash: kept } : one
+            )
         });
         await tools.persist();
     };
@@ -479,6 +494,8 @@ async function returnOne(
         const how = await stashService.giveBack(server, saved.name, saved.stash, keep, then);
         return how === "done" || how === "failed";
     };
+    // Nothing from here on can make them fall to their death.
+    await server.sayAll(stage.fallProof(saved.name));
     // Sent back by an end that was stopped before it wrote so: not moved again.
     const say = (line: string) => server.say([line]);
     if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
@@ -681,8 +698,7 @@ function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
 export function quickLines(loop: StageLoop): string[] {
     const layout = built(loop.run);
     if (!layout || layout.kind !== "parkour" || !state(loop).built) return [];
-    if (!state(loop).racers.some((one) => one.outAt === null && one.finishedAt === null))
-        return [];
+    if (!state(loop).racers.some((one) => one.outAt === null && one.finishedAt === null)) return [];
     const language = loop.language;
     const course = layout.course;
     const total = course.checkpoints.length;
@@ -876,7 +892,8 @@ export async function settle(
         // Whatever is still standing on it - a pet, a mob - floats down
         // rather than falls when it goes.
         const bounds = stage.boundsOf(boxes);
-        if (bounds) await server.sayAll([stage.floatDown(bounds, 60)]);
+        if (bounds)
+            await server.sayAll([stage.floatDown(bounds, 60), ...stage.fallProofOver(bounds)]);
         const standing: stage.Box[] = [];
         for (const box of [...boxes].reverse()) {
             if (stage.fillCount(await server.say([stage.removeLine(box)])) === null)
