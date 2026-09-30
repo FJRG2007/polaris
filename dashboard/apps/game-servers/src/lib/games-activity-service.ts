@@ -154,8 +154,21 @@ export interface RosterRecord {
 }
 
 /** The passes in flight, one per server, so two readers - the minute's sweep and
- *  a screen's live feed - never both open a visit for the same arrival. */
+ *  a screen's live feed - never both open a visit for the same arrival, and no
+ *  visit is opened from open rows a close has just ended. */
 const recording = new Map<string, Promise<unknown>>();
+
+/** `work` once every pass already queued for this server has finished. */
+async function inTurn<T>(installedAppId: string, work: () => Promise<T>): Promise<T> {
+    const previous = recording.get(installedAppId) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(work);
+    recording.set(installedAppId, run);
+    try {
+        return await run;
+    } finally {
+        if (recording.get(installedAppId) === run) recording.delete(installedAppId);
+    }
+}
 
 /**
  * Write down what changed on one server since it was last looked at.
@@ -179,16 +192,7 @@ export async function recordRoster(
         readonly log?: "always" | "changes";
     } = {}
 ): Promise<RosterRecord> {
-    const previous = recording.get(installedAppId) ?? Promise.resolve();
-    const run = previous
-        .catch(() => undefined)
-        .then(() => writeRoster(installedAppId, players, now, options));
-    recording.set(installedAppId, run);
-    try {
-        return await run;
-    } finally {
-        if (recording.get(installedAppId) === run) recording.delete(installedAppId);
-    }
+    return inTurn(installedAppId, () => writeRoster(installedAppId, players, now, options));
 }
 
 async function writeRoster(
@@ -502,6 +506,10 @@ export async function closeGameSessions(
     installedAppId: string,
     at: Date = new Date()
 ): Promise<void> {
+    return inTurn(installedAppId, () => closeOpenSessions(installedAppId, at));
+}
+
+async function closeOpenSessions(installedAppId: string, at: Date): Promise<void> {
     const open = await prisma.gamePlayerSession
         .findMany({ where: { installedAppId, leftAt: null }, select: { id: true, name: true } })
         .catch(() => []);

@@ -54,7 +54,8 @@ const LEAVE = [
 /** What the script prints, as the container would: its three header lines and
  *  the matching lines of the bytes it read. */
 function output(inode: number, size: number, from: number, lines: string[], offset = "+0000"): string {
-    return [`@clock ${offset} 2026-09-30`, `@stat ${inode} ${size} 2026-09-30`, `@from ${from}`, ...lines].join("\n");
+    const written = Date.parse("2026-09-30T23:00:00Z") / 1000;
+    return [`@clock ${offset} 2026-09-30`, `@stat ${inode} ${size} ${written}`, `@from ${from}`, ...lines].join("\n");
 }
 
 function sessions(state: PlayerLogState) {
@@ -115,7 +116,7 @@ describe("the cursor", () => {
             NO_PLAYER_LOG,
             [
                 "@clock +0200 2026-10-01",
-                "@stat 7 300 2026-10-01",
+                `@stat 7 300 ${Date.parse("2026-09-30T22:00:15Z") / 1000}`,
                 "@from 0",
                 "[23:59:50] [Server thread/INFO]: FJRG2007 joined the game",
                 "[00:00:10 INFO]: FJRG2007 lost connection: Disconnected",
@@ -127,6 +128,20 @@ describe("the cursor", () => {
             "join@2026-09-30T21:59:50.000Z",
             "leave@2026-09-30T22:00:10.000Z"
         ]);
+    });
+
+    it("dates a line from before midnight, read after it, on the day it was written", () => {
+        const read = (state: PlayerLogState, written: string, lines: string[]) =>
+            nextPlayerLog(state, ["@clock +0000 2026-10-01", `@stat 7 300 ${Date.parse(written) / 1000}`, "@from 0", ...lines].join("\n"))!;
+        const join = "[23:59:58] [Server thread/INFO]: FJRG2007 joined the game";
+        // RCON chatter wrote to the file at 00:00:02; the newest join is from 23:59:58.
+        const first = read(NO_PLAYER_LOG, "2026-10-01T00:00:02Z", [join]);
+        expect(sessions(first).map((event) => event.at)).toEqual(["2026-09-30T23:59:58.000Z"]);
+        // The overlap reads it again later: the same instant, kept once.
+        expect(read(first, "2026-10-01T00:10:00Z", [join]).lines).toEqual(first.lines);
+        // A restart at 00:10 rescans a log whose last join was at 23:30.
+        const rescan = read(NO_PLAYER_LOG, "2026-10-01T00:10:00Z", ["[23:30:00] [Server thread/INFO]: FJRG2007 joined the game"]);
+        expect(sessions(rescan).map((event) => event.at)).toEqual(["2026-09-30T23:30:00.000Z"]);
     });
 
     it("asks for the new bytes only, and for a bounded scan when it has no cursor", () => {

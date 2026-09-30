@@ -24,30 +24,32 @@ function quoted(argument: string): string {
     return `'${argument.replaceAll("'", "'\\''")}'`;
 }
 
-/** The shell script: each command through the console tool, then its end line. */
+/** The shell script: each command through the console tool, then its end line
+ *  with the tool's exit status. */
 export function sayEachScript(commands: readonly (readonly string[])[]): string {
     return commands
-        .map((argv, index) => `rcon-cli ${argv.map(quoted).join(" ")}; printf '\\n${END} %d\\n' ${index}`)
+        .map((argv, index) => `rcon-cli ${argv.map(quoted).join(" ")}; printf '\\n${END} %d %d\\n' ${index} $?`)
         .join("; ");
 }
 
 /**
  * Each command's answer, in order, from the script's output. Null for one whose
  * end line never arrived - the output ran out of room before it, or the shell
- * stopped - which the caller asks again rather than trusting.
+ * stopped - or whose console tool failed, which the caller asks again rather
+ * than trusting, so a refused command raises the error asking it alone does.
  */
 export function sayEachReplies(output: string, count: number): (string | null)[] {
     const replies: (string | null)[] = Array.from({ length: count }, () => null);
     let held: string[] = [];
     for (const raw of output.split("\n")) {
         const line = raw.replace(/\r$/, "");
-        const end = new RegExp(`^${END} (\\d+)$`).exec(line);
+        const end = new RegExp(`^${END} (\\d+) (\\d+)$`).exec(line);
         if (!end) {
             held.push(line);
             continue;
         }
         const index = Number(end[1]);
-        if (index >= 0 && index < count) replies[index] = held.join("\n").replace(/\n+$/, "");
+        if (index >= 0 && index < count && end[2] === "0") replies[index] = held.join("\n").replace(/\n+$/, "");
         held = [];
     }
     return replies;

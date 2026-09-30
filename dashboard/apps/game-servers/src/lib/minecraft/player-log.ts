@@ -79,8 +79,8 @@ function count(value: number): number {
  * The command, run with `sh -c` in the server's container, for a read that picks
  * up from `cursor`.
  *
- * Prints `@clock <offset> <date>`, `@stat <inode> <size> <date of last write>` and
- * `@from <byte>` - where this read began - then the matching lines of the bytes
+ * Prints `@clock <offset> <date>`, `@stat <inode> <size> <second of last write>`
+ * and `@from <byte>` - where this read began - then the matching lines of the bytes
  * from there to the size it stat'ed. Prints nothing at all for a server with no
  * `latest.log` - Bedrock writes none - which the caller reads as "use the
  * container's log instead".
@@ -92,9 +92,9 @@ export function playerLogScript(cursor: LogCursor | null): string {
         `f=${LATEST}`,
         "[ -f \"$f\" ] || exit 0",
         `echo "@clock $(date +%z) $(date +%F)"`,
-        `set -- $(stat -c '%i %s' "$f")`,
+        `set -- $(stat -c '%i %s %Y' "$f")`,
         `i=$1; s=$2`,
-        `echo "@stat $i $s $(date -r "$f" +%F)"`,
+        `echo "@stat $i $s $3"`,
         // The same file, and at least as long as when it was last read: pick up
         // where that left off. Anything else is a file that was rotated or cut.
         `if [ "$i" = "${inode}" ] && [ "$s" -ge ${offset} ]; then from=$((${offset} - ${OVERLAP_BYTES})); else from=$((s - ${SCAN_BYTES})); fi`,
@@ -112,6 +112,9 @@ const DATED = /^\[(\d{2})([A-Z][a-z]{2})(\d{4}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{
 /** `[10:15:02]` or Paper's `[10:15:02 INFO]`: the time of day alone. */
 const TIMED = /^\[(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?[\] ]/;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** How far past the file's last write, which is whole seconds, a line's own
+ *  stamp may fall. */
+const WRITE_SLACK_MS = 5_000;
 
 /** `+0200` as minutes east of UTC, or null for anything else. */
 function offsetMinutes(text: string | undefined): number | null {
@@ -143,12 +146,12 @@ function instant(
 export function nextPlayerLog(state: PlayerLogState, output: string): PlayerLogState | null {
     const lines = output.split("\n").map((line) => line.replace(/\r$/, ""));
     const clock = /^@clock (\S+) (\d{4}-\d{2}-\d{2})$/.exec(lines[0] ?? "");
-    const stat = /^@stat (\d+) (\d+) (\d{4}-\d{2}-\d{2})$/.exec(lines[1] ?? "");
+    const stat = /^@stat (\d+) (\d+) (\d+)$/.exec(lines[1] ?? "");
     const from = /^@from (\d+)$/.exec(lines[2] ?? "");
     const offset = offsetMinutes(clock?.[1]);
     if (!clock || !stat || !from || offset === null) return null;
 
-    const found = stamped(lines.slice(3), stat[3]!, offset);
+    const found = stamped(lines.slice(3), Number(stat[3]) * 1000, offset);
     const kept = new Set(state.lines);
     const merged = [...state.lines, ...found.filter((line) => !kept.has(line))];
     return {
@@ -160,17 +163,16 @@ export function nextPlayerLog(state: PlayerLogState, output: string): PlayerLogS
 /**
  * One read's lines with an instant each.
  *
- * A time of day alone belongs to the day the file was last written, counting back
- * a day each time the clock goes backwards between two lines read from the end:
- * a file is written in order, so a later line with an earlier time crossed a
- * midnight. A line cut in half - by the size cap, or by the read starting inside
- * it - starts with no stamp and is dropped.
+ * A file is written in order, so no line is later than the file's last write, and
+ * none is later than the line after it. A time of day alone is therefore the
+ * latest instant with that time that is no later than the line after it - the
+ * last write, for the newest - read from the end. A line cut in half - by the
+ * size cap, or by the read starting inside it - starts with no stamp and is
+ * dropped.
  */
-function stamped(lines: readonly string[], lastDate: string, offset: number): string[] {
-    const [year, month, day] = lastDate.split("-").map(Number) as [number, number, number];
+function stamped(lines: readonly string[], lastWrite: number, offset: number): string[] {
     const kept: { at: number; text: string }[] = [];
-    let dayShift = 0;
-    let later: number | null = null;
+    let ceiling = lastWrite + WRITE_SLACK_MS;
     for (let index = lines.length - 1; index >= 0; index--) {
         const text = lines[index]!;
         const dated = DATED.exec(text);
@@ -184,6 +186,7 @@ function stamped(lines: readonly string[], lastDate: string, offset: number): st
                 [Number(dated[4]), Number(dated[5]), Number(dated[6]), Number((dated[7] ?? "0").padEnd(3, "0"))],
                 offset
             );
+            ceiling = at;
             kept.push({ at, text });
             continue;
         }
@@ -192,9 +195,10 @@ function stamped(lines: readonly string[], lastDate: string, offset: number): st
         const ofDay =
             ((Number(timed[1]) * 60 + Number(timed[2])) * 60 + Number(timed[3])) * 1000 +
             Number((timed[4] ?? "0").padEnd(3, "0"));
-        if (later !== null && ofDay > later) dayShift++;
-        later = ofDay;
-        const at = instant(year, month - 1, day, [0, 0, 0, 0], offset) + ofDay - dayShift * DAY_MS;
+        const local = ceiling + offset * 60_000;
+        let at = local - (local % DAY_MS) - offset * 60_000 + ofDay;
+        if (at > ceiling) at -= DAY_MS;
+        ceiling = at;
         kept.push({ at, text });
     }
     return kept.reverse().map((line) => `${new Date(line.at).toISOString()} ${line.text}`);

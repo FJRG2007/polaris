@@ -52,7 +52,7 @@ function server(bags: Record<string, string[]>) {
         trips += 1;
         // What the shell script prints, cut at what one trip hands back.
         expect(sayEachScript(commands)).toContain("rcon-cli");
-        const printed = commands.map((argv, index) => `${answer(argv)}\n@@polaris-end ${index}\n`).join("");
+        const printed = commands.map((argv, index) => `${answer(argv)}\n@@polaris-end ${index} 0\n`).join("");
         return sayEachReplies(printed.slice(0, TRIP_CAP), commands.length);
     };
     return { say, sayEach, trips: () => trips };
@@ -110,13 +110,18 @@ describe("reading bags", () => {
 
 describe("sayEachReplies", () => {
     it("hands back each answer, and nothing for one whose end did not arrive", () => {
-        const output = "first answer\n@@polaris-end 0\nsecond\r\nspans lines\n@@polaris-end 1\nthird, cut off";
+        const output = "first answer\n@@polaris-end 0 0\nsecond\r\nspans lines\n@@polaris-end 1 0\nthird, cut off";
         expect(sayEachReplies(output, 3)).toEqual(["first answer", "second\nspans lines", null]);
+    });
+
+    it("hands back nothing for a command the console tool failed on, so it is asked alone", () => {
+        const output = "Error: connection refused\n@@polaris-end 0 1\nfine\n@@polaris-end 1 0\n";
+        expect(sayEachReplies(output, 2)).toEqual([null, "fine"]);
     });
 
     it("quotes every argument, so a bracket or a quote reaches the game as typed", () => {
         expect(sayEachScript([["data", "get", "entity", "O'Neil", "Inventory[3]"]])).toBe(
-            "rcon-cli 'data' 'get' 'entity' 'O'\\''Neil' 'Inventory[3]'; printf '\\n@@polaris-end %d\\n' 0"
+            "rcon-cli 'data' 'get' 'entity' 'O'\\''Neil' 'Inventory[3]'; printf '\\n@@polaris-end %d %d\\n' 0 $?"
         );
     });
 });
