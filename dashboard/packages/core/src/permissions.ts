@@ -23,6 +23,7 @@ export const PERMISSIONS = [
     "office.use",
     "mail.use",
     "mailserver.manage",
+    "calendar.use",
     "chat.use",
     "chat.spaces",
     "chat.groups",
@@ -99,6 +100,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "notes.use",
         "office.use",
         "mail.use",
+        "calendar.use",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -147,6 +149,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // supplied about an account that is theirs; read-only inside Polaris has
         // no bearing on whether somebody may read their own mail.
         "mail.use",
+        "calendar.use",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -199,6 +202,7 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // badly run can put the machine's address on every blocklist there is. That
     // is a decision about the instance, the way registering a server is.
     "mailserver.manage": { area: "Mail", label: "Run a mail server, and manage its domains and mailboxes" },
+    "calendar.use": { area: "Calendar", label: "Keep calendars, link outside ones and take bookings" },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different

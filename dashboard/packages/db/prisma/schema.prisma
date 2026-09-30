@@ -344,6 +344,14 @@ model User {
     mailUploads         MailUpload[]
     mailTemplates       MailTemplate[]
     chatUploads         ChatUpload[]
+    calendarSources      CalendarSource[]
+    calendars            Calendar[]
+    calendarDisplays     CalendarDisplay[]
+    calendarShares       CalendarShare[]
+    calendarReminders    CalendarReminder[]
+    calendarBookingPages CalendarBookingPage[]
+    calendarProposals    CalendarProposal[]
+    calendarPreference   CalendarPreference?
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -2254,6 +2262,7 @@ model UserConnection {
 
     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
     mailAccounts MailAccount[]
+    calendarSources CalendarSource[]
 
     // One outside account cannot be claimed by two Polaris users.
     @@unique([provider, accountId])
@@ -5791,6 +5800,7 @@ model Team {
     noteSpaceGrants NoteSpaceTeam[]
     folderGrants  TaskFolderTeam[]
     projectGrants ProjectMember[]
+    calendarShares CalendarShare[]
 
     @@unique([orgId, slug])
     @@index([orgId])
@@ -11597,4 +11607,328 @@ model UserBadgeSeen {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@id([userId, key])
+}
+// ---------------------------------------------------------------------------
+// Polaris Calendar (apps/calendar, docs/calendar-plan.md).
+//
+// An object's iCalendar text is the source of truth. The columns beside it
+// (startsAt, endsAt, summary, ...) are derived from it on every write so a range
+// or a search is one indexed query instead of a parse of every row.
+// ---------------------------------------------------------------------------
+
+// An outside account calendars are synced from: a Google or Microsoft link, a
+// CalDAV server, or one ICS address.
+model CalendarSource {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    userId          String    @db.Uuid
+    // google | microsoft | caldav | ics
+    kind            String
+    label           String    @default("")
+    // The linked outside account, for google and microsoft. Set null rather than
+    // cascading: the source stays on screen saying it needs reconnecting.
+    connectionId    String?   @db.Uuid
+    // The CalDAV server or the ICS address.
+    url             String    @default("")
+    username        String    @default("")
+    // The CalDAV app password, envelope-encrypted. Null for the other kinds.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+    refreshMinutes  Int       @default(15)
+    // ok | auth | unreachable | error
+    status          String    @default("ok")
+    lastError       String?
+    lastSyncAt      DateTime?
+    nextSyncAt      DateTime  @default(now())
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    connection UserConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+    calendars  Calendar[]
+
+    @@index([userId])
+    @@index([nextSyncAt])
+}
+
+// One calendar: Polaris's own, one synced from a source, a room or a piece of
+// equipment people book, or the birthdays one.
+model Calendar {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    ownerId       String    @db.Uuid
+    sourceId      String?   @db.Uuid
+    // local | remote | resource | birthdays
+    kind          String    @default("local")
+    name          String
+    description   String    @default("")
+    color         String    @default("#3b82f6")
+    // IANA zone new events default to. Blank is the reader's display zone.
+    timezone      String    @default("")
+    // VEVENT, VTODO or VEVENT,VTODO
+    components    String    @default("VEVENT")
+    // The provider's id for it: a Google calendar id, a Graph id, a CalDAV href.
+    remoteId      String    @default("")
+    // Sync-collection token, Google nextSyncToken or the Graph delta link.
+    syncToken     String    @default("")
+    ctag          String    @default("")
+    readOnly      Boolean   @default(false)
+    // Never counts as busy.
+    transparent   Boolean   @default(false)
+    alarmsMuted   Boolean   @default(false)
+    // JSON { timed: number[], allDay: number[] }: minutes relative to the start.
+    defaultAlarms String    @default("")
+    // JSON for kind=resource: { type, capacity, building, floor, features[] }.
+    resource      String    @default("")
+    publicToken   String?   @unique
+    // "" (not published) | busy | full
+    publicMode    String    @default("")
+    trashedAt     DateTime?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    source   CalendarSource?   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+    objects  CalendarObject[]
+    shares   CalendarShare[]
+    displays CalendarDisplay[]
+
+    @@index([ownerId])
+    @@index([sourceId])
+    @@index([kind])
+}
+
+// How one reader shows a calendar they reach: its place in their list, whether
+// it is drawn, and a colour of their own.
+model CalendarDisplay {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    calendarId String  @db.Uuid
+    userId     String  @db.Uuid
+    position   Int     @default(0)
+    hidden     Boolean @default(false)
+    color      String?
+
+    calendar Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([calendarId, userId])
+    @@index([userId])
+}
+
+// A calendar shared with a person or a team.
+model CalendarShare {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    calendarId  String   @db.Uuid
+    userId      String?  @db.Uuid
+    teamId      String?  @db.Uuid
+    // freebusy | read | write | manage
+    access      String   @default("read")
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+
+    calendar Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+    user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    team     Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+    @@unique([calendarId, userId])
+    @@unique([calendarId, teamId])
+    @@index([userId])
+    @@index([teamId])
+}
+
+// One iCalendar resource: an event series with its overridden occurrences, or a
+// task (VTODO).
+model CalendarObject {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    calendarId  String    @db.Uuid
+    uid         String
+    // VEVENT | VTODO
+    component   String    @default("VEVENT")
+    ics         String
+    // The provider's name for it: a CalDAV resource href, a Google or Graph id.
+    href        String    @default("")
+    etag        String    @default("")
+    summary     String    @default("")
+    location    String    @default("")
+    // Derived: the first start, and the last end - null when it repeats forever.
+    startsAt    DateTime?
+    endsAt      DateTime?
+    allDay      Boolean   @default(false)
+    recurring   Boolean   @default(false)
+    status      String    @default("")
+    // A local change the provider has not taken yet: "" | put | delete
+    pendingPush String    @default("")
+    // The local version the provider refused on a conflict, kept for re-applying.
+    conflictIcs String?
+    deletedAt   DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    calendar    Calendar             @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+    reminders   CalendarReminder[]
+    invitations CalendarInvitation[]
+
+    @@unique([calendarId, uid])
+    @@index([calendarId, startsAt])
+    @@index([calendarId, endsAt])
+    @@index([deletedAt])
+    @@index([pendingPush])
+}
+
+// The next time one alarm of one object fires for one person.
+model CalendarReminder {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    objectId   String   @db.Uuid
+    userId     String   @db.Uuid
+    fireAt     DateTime
+    // The occurrence it is for (its start).
+    occurrence DateTime
+    // Which alarm of the object, so an edit re-plans it.
+    alarmKey   String
+    // DISPLAY | EMAIL
+    action     String   @default("DISPLAY")
+
+    object CalendarObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+    user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([objectId, userId, alarmKey, occurrence])
+    @@index([fireAt])
+}
+
+// Somebody invited to an event, and the token their answer comes back with.
+model CalendarInvitation {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    objectId    String    @db.Uuid
+    email       String
+    userId      String?   @db.Uuid
+    token       String    @unique
+    // NEEDS-ACTION | ACCEPTED | DECLINED | TENTATIVE
+    partstat    String    @default("NEEDS-ACTION")
+    sentAt      DateTime?
+    respondedAt DateTime?
+    createdAt   DateTime  @default(now())
+
+    object CalendarObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+
+    @@unique([objectId, email])
+    @@index([userId])
+}
+
+// A page people outside Polaris book time on.
+model CalendarBookingPage {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    calendarId      String   @db.Uuid
+    slug            String   @unique
+    title           String
+    description     String   @default("")
+    location        String   @default("")
+    // link (only who has the address) | public (listed on the owner's page)
+    visibility      String   @default("link")
+    durationMinutes Int      @default(30)
+    slotMinutes     Int      @default(30)
+    bufferBefore    Int      @default(0)
+    bufferAfter     Int      @default(0)
+    noticeMinutes   Int      @default(240)
+    maxPerDay       Int?
+    horizonDays     Int      @default(60)
+    timezone        String
+    // JSON { weekly: { "0".."6": [{ from, to }] }, overrides: { "YYYY-MM-DD": [{ from, to }] } }
+    availability    String
+    // JSON: calendar ids checked for conflicts.
+    conflictIds     String   @default("[]")
+    // JSON: [{ id, label, kind, required, options? }]
+    questions       String   @default("[]")
+    meetingLink     Boolean  @default(false)
+    enabled         Boolean  @default(true)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    bookings CalendarBooking[]
+
+    @@index([ownerId])
+}
+
+// One booking made on a page.
+model CalendarBooking {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    pageId       String   @db.Uuid
+    objectId     String?  @db.Uuid
+    name         String
+    email        String
+    // JSON answers to the page's questions.
+    answers      String   @default("{}")
+    timezone     String   @default("")
+    start        DateTime
+    end          DateTime
+    // pending (email not confirmed) | confirmed | cancelled
+    status       String   @default("pending")
+    confirmToken String   @unique
+    manageToken  String   @unique
+    createdAt    DateTime @default(now())
+
+    page CalendarBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+    @@index([pageId, start])
+    @@index([status, createdAt])
+}
+
+// A meeting proposal: candidate times people vote on.
+model CalendarProposal {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    calendarId      String?  @db.Uuid
+    title           String
+    description     String   @default("")
+    location        String   @default("")
+    durationMinutes Int      @default(60)
+    timezone        String   @default("")
+    notify          Boolean  @default(true)
+    // open | closed
+    status          String   @default("open")
+    objectId        String?  @db.Uuid
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner        User                          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    dates        CalendarProposalDate[]
+    participants CalendarProposalParticipant[]
+
+    @@index([ownerId])
+}
+
+model CalendarProposalDate {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    proposalId String   @db.Uuid
+    start      DateTime
+
+    proposal CalendarProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+    @@index([proposalId])
+}
+
+model CalendarProposalParticipant {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    proposalId  String    @db.Uuid
+    name        String    @default("")
+    email       String
+    userId      String?   @db.Uuid
+    required    Boolean   @default(true)
+    token       String    @unique
+    // JSON { [dateId]: "yes" | "no" | "maybe" }
+    votes       String    @default("{}")
+    respondedAt DateTime?
+
+    proposal CalendarProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+    @@unique([proposalId, email])
+}
+
+// One person's calendar settings, a JSON document read through a schema.
+model CalendarPreference {
+    userId    String   @id @db.Uuid
+    value     String   @default("{}")
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

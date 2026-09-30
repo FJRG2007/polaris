@@ -235,6 +235,34 @@
             "label": "Aviso de tarea",
             "description": "Un recordatorio que pusiste en una tarea, y el trabajo que vence hoy."
         },
+        "calendarReminder": {
+            "label": "Recordatorio",
+            "description": "Un recordatorio puesto en un evento o una tarea de tus calendarios."
+        },
+        "calendarInvitation": {
+            "label": "Invitación",
+            "description": "Alguien te invitó a un evento, o cambió o canceló uno en el que estás."
+        },
+        "calendarReply": {
+            "label": "Invitación respondida",
+            "description": "Alguien aceptó, rechazó o respondió quizá a un evento que organizaste."
+        },
+        "calendarShared": {
+            "label": "Calendario compartido",
+            "description": "Alguien compartió uno de sus calendarios contigo o con un equipo tuyo."
+        },
+        "calendarBooking": {
+            "label": "Nueva reserva",
+            "description": "Alguien reservó, movió o canceló tiempo en una de tus páginas de reserva."
+        },
+        "calendarProposal": {
+            "label": "Propuesta votada",
+            "description": "Alguien votó las horas de una reunión que propusiste."
+        },
+        "calendarSyncFailed": {
+            "label": "Un calendario dejó de sincronizar",
+            "description": "Un calendario enlazado de Google, Microsoft o un servidor CalDAV rechazó a Polaris o no respondió."
+        },
         "watchAlarm": {
             "label": "Alarma activa",
             "description": "Un servicio, dominio o recurso vigilado ha incumplido su condición."
@@ -388,6 +416,7 @@
         "deploy": "Deploy",
         "watch": "Watch",
         "tasks": "Tareas",
+        "calendar": "Calendario",
         "security": "Seguridad",
         "drive": "Drive",
         "places": "Lugares",

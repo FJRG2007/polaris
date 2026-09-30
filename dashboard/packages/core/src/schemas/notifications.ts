@@ -92,6 +92,7 @@ export const NOTIFICATION_GROUPS = [
     "deploy",
     "watch",
     "tasks",
+    "calendar",
     "security",
     "drive",
     "places",
@@ -107,6 +108,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     deploy: "Deploy",
     watch: "Watch",
     tasks: "Tasks",
+    calendar: "Calendar",
     security: "Security",
     drive: "Drive",
     places: "Places",
@@ -228,6 +230,64 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         group: "tasks",
         label: "Task reminder",
         description: "A reminder you set on a task, and work falling due today.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "calendar.reminder",
+        group: "calendar",
+        label: "Event reminder",
+        description: "A reminder set on an event or a task in your calendars.",
+        level: "info",
+        // Mail stays off here: a reminder can ask for mail itself (an email
+        // alarm), and those are sent whatever this rule says.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "calendar.invitation",
+        group: "calendar",
+        label: "Invitation",
+        description: "Somebody invited you to an event, or changed or cancelled one you are in.",
+        level: "info",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "calendar.reply",
+        group: "calendar",
+        label: "Invitation answered",
+        description: "Somebody accepted, declined or answered maybe to an event you organized.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "calendar.shared",
+        group: "calendar",
+        label: "Calendar shared with you",
+        description: "Somebody shared one of their calendars with you or with a team you are in.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "calendar.booking",
+        group: "calendar",
+        label: "New booking",
+        description: "Somebody booked, moved or cancelled time on one of your booking pages.",
+        level: "info",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "calendar.proposal",
+        group: "calendar",
+        label: "Proposal answered",
+        description: "Somebody voted on the times of a meeting you proposed.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "calendar.syncFailed",
+        group: "calendar",
+        label: "A linked calendar stopped syncing",
+        description: "A calendar you linked from Google, Microsoft or a CalDAV server refused Polaris or could not be reached.",
         level: "warning",
         defaults: { inapp: true, email: false }
     },
