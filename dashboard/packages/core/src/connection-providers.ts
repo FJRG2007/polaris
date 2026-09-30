@@ -276,13 +276,13 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // server, and that is all it should ever unlock.
         signInDefault: false,
         signInWarning:
-            "Steam accounts are traded and phished more than most. This one is linked to be recognised on a game server; letting it sign in makes it a way into Polaris as well."
+            "Steam accounts are traded and phished more than most. This one is linked to be recognized on a game server; letting it sign in makes it a way into Polaris as well."
     },
     {
         slug: "epic",
         name: "Epic Games",
         category: "general",
-        summary: "Be recognised on a game server you own the game on through Epic.",
+        summary: "Be recognized on a game server you own the game on through Epic.",
         description:
             "Games bought on the Epic Store identify a player by an Epic account id rather than a Steam one. Linking yours is what lets whoever runs a server know which of those you are. Polaris reads your account id and display name and nothing else.",
         acceptsToken: false,
@@ -292,7 +292,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // the Steam one beside it.
         signInDefault: false,
         signInWarning:
-            "This account is linked to be recognised on a game server. Letting it sign in makes it a way into Polaris as well."
+            "This account is linked to be recognized on a game server. Letting it sign in makes it a way into Polaris as well."
     },
     {
         slug: "minecraft",
@@ -319,7 +319,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         slug: "discord",
         name: "Discord",
         category: "general",
-        summary: "Be recognised by the servers and screens that know you by your Discord account.",
+        summary: "Be recognized by the servers and screens that know you by your Discord account.",
         description:
             "A FiveM server identifies a player by their Discord account and nothing else. Linking yours records that account id and the name you go by against your Polaris account, so it is held here in a form that cannot be mistyped rather than copied out of Discord and sent over chat. It also hands over your address and the list of servers you are in - their names, and nothing inside them. Polaris never posts as you and never reads your messages.",
         acceptsToken: false,
@@ -332,7 +332,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // read why.
         signInDefault: false,
         signInWarning:
-            "Discord accounts are phished and shared more than most, and a stolen one is often noticed late. This one is linked to be recognised on a game server; letting it sign in makes it a way into Polaris as well.",
+            "Discord accounts are phished and shared more than most, and a stolen one is often noticed late. This one is linked to be recognized on a game server; letting it sign in makes it a way into Polaris as well.",
         // Discord does state whether it confirmed the address, and an unconfirmed
         // one is dropped before it ever gets here. It still arrives held rather
         // than trusted: this is the account the warning above calls easy to take

@@ -145,7 +145,7 @@
         "name": "Name",
         "namePlaceholder": "On hold",
         "kind": "Kind",
-        "colour": "Colour",
+        "colour": "Color",
         "statusColor": "Status color",
         "adding": "Adding...",
         "selected": "{count} tasks selected",

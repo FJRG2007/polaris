@@ -40,7 +40,7 @@ describe("the statuses a new space starts with", () => {
         // The regression in one line: if Cancelled were not a closed status
         // there would have been nothing to hide, and if it were not one of the
         // defaults it would not have happened to everybody.
-        const cancelled = DEFAULT_TASK_STATUSES.find((status) => status.name === "Cancelled");
+        const cancelled = DEFAULT_TASK_STATUSES.find((status) => status.name === "Canceled");
         expect(cancelled?.type).toBe("closed");
         expect(isFinishedStatus(cancelled?.type ?? "open")).toBe(true);
     });

@@ -115,14 +115,7 @@ describe("the Challenges tab", () => {
         expect(screen.getByText("Challenges")).toBeTruthy();
         // The summary opens first; every other part is one press away.
         expect(screen.getByText("Season and bingo")).toBeTruthy();
-        for (const part of [
-            "Summary",
-            "Players",
-            "Community",
-            "Settings",
-            "Rewards",
-            "Catalogue"
-        ]) {
+        for (const part of ["Summary", "Players", "Community", "Settings", "Rewards", "Catalog"]) {
             expect(screen.getByText(part)).toBeTruthy();
         }
         expect(screen.getByText("Today's challenges")).toBeTruthy();
@@ -210,7 +203,7 @@ describe("the Challenges tab", () => {
 
     it("explains every challenge in the catalogue", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
-        fireEvent.click(screen.getByText("Catalogue"));
+        fireEvent.click(screen.getByText("Catalog"));
         answerRead({ view });
         await waitFor(() => expect(screen.getByText("Mining")).toBeTruthy());
         fireEvent.click(screen.getByText("Mining"));

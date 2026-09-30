@@ -95,7 +95,7 @@ export async function sendFile(
             response.on("error", reject);
         });
         request.on("error", reject);
-        request.on("abort", () => reject(new DOMException("The upload was cancelled.", "AbortError")));
+        request.on("abort", () => reject(new DOMException("The upload was canceled.", "AbortError")));
     });
     // Settled whichever way the upload goes, so a refusal mid-upload is not also
     // reported as an unhandled rejection.

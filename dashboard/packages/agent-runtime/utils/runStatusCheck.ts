@@ -145,8 +145,8 @@ const TERMINAL_OUTPUT: Record<RunStatusCheckConclusion, { title: string; summary
     summary: "The Polaris run failed. See the run logs for details.",
   },
   cancelled: {
-    title: "Polaris run cancelled",
-    summary: "The Polaris run was cancelled before it finished.",
+    title: "Polaris run canceled",
+    summary: "The Polaris run was canceled before it finished.",
   },
   timed_out: {
     title: "Polaris run timed out",

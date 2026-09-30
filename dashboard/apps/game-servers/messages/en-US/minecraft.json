@@ -520,7 +520,7 @@
         "whenSomebodyIsConfirmed": "When somebody is confirmed",
         "whatHappensWhenSomebodyIs": "What happens when somebody is confirmed",
         "warningTheySee": "Warning they see",
-        "inTheChatWithA": "In the chat, with a title. Colour codes such as &c work.",
+        "inTheChatWithA": "In the chat, with a title. Color codes such as &c work.",
         "banAfterThisManyHoneypots": "Ban after this many honeypots",
         "banForHours": "Ban for (hours)",
         "upToAWeek": "Up to a week.",
@@ -841,8 +841,8 @@
         }
     },
     "inventoryEditor": {
-        "everythingTheyCarryGoesArmour": "Everything they carry goes, armour and offhand included. This cannot be undone.",
-        "everythingTheyCarryGoesWhen": "Everything they carry goes when they next join, armour and offhand included. This cannot be undone.",
+        "everythingTheyCarryGoesArmour": "Everything they carry goes, armor and offhand included. This cannot be undone.",
+        "everythingTheyCarryGoesWhen": "Everything they carry goes when they next join, armor and offhand included. This cannot be undone.",
         "emptyInventory": "Empty inventory",
         "sendEverything": "Send everything",
         "live": "Live",
@@ -965,7 +965,7 @@
                 "kills": "Most mobs killed",
                 "pvp": "Most players killed",
                 "playtime": "Most time played",
-                "explorer": "Furthest travelled",
+                "explorer": "Furthest traveled",
                 "mined": "Most blocks mined",
                 "diamonds": "Most diamonds mined",
                 "enchanted": "Most items enchanted",
@@ -1198,15 +1198,15 @@
             },
             "rainbow": {
                 "name": "Rainbow",
-                "hint": "Colours running along the line"
+                "hint": "Colors running along the line"
             },
             "wave": {
                 "name": "Wave",
-                "hint": "Two colours flowing across it"
+                "hint": "Two colors flowing across it"
             },
             "shine": {
                 "name": "Shine",
-                "hint": "A glint sweeping over it, its own colours kept"
+                "hint": "A glint sweeping over it, its own colors kept"
             },
             "typewriter": {
                 "name": "Typewriter",
@@ -1619,7 +1619,7 @@
             "explorer": {
                 "label": "Explorer",
                 "summary": "Travel the farthest on foot, swimming, riding or gliding - or race to a set of coordinates announced at the start.",
-                "unit": "metres"
+                "unit": "meters"
             },
             "happy-hour": {
                 "label": "Happy hour",
@@ -1649,8 +1649,8 @@
                 "summary": "Extra experience for every mob killed and every ore mined, for everybody, for a while. No winner - a good filler between competitions."
             },
             "waves": {
-                "label": "Horde defence",
-                "summary": "A defence point is marked away from every home and waves of monsters come for it, each bigger and stronger than the last. Everybody who holds the point is rewarded; the podium goes to the most kills.",
+                "label": "Horde defense",
+                "summary": "A defense point is marked away from every home and waves of monsters come for it, each bigger and stronger than the last. Everybody who holds the point is rewarded; the podium goes to the most kills.",
                 "unit": "kills"
             },
             "meteor-shower": {
@@ -1675,7 +1675,7 @@
             },
             "build-battle": {
                 "label": "Build battle",
-                "summary": "Players who type join each get a plot in the sky, a theme and a kit of coloured glass. When the time is up everybody tours the plots and votes for the best in the chat. Only the kit can be built with; nothing of anybody's is used or taken.",
+                "summary": "Players who type join each get a plot in the sky, a theme and a kit of colored glass. When the time is up everybody tours the plots and votes for the best in the chat. Only the kit can be built with; nothing of anybody's is used or taken.",
                 "unit": "votes"
             }
         },
@@ -1923,7 +1923,7 @@
         "oneALineTheQuestion": "One a line: the question, a bar, then the answers that count, separated by semicolons. Asked before the built-in ones.",
         "whatIsTheNameOf": "What is the name of our spawn town? | Northwatch; north watch",
         "theGoal": "The goal",
-        "farthestTravelled": "Farthest travelled",
+        "farthestTravelled": "Farthest traveled",
         "raceToAPoint": "Race to a point",
         "between200And3000": "Between 200 and 3000.",
         "hasteIi": "Haste II",

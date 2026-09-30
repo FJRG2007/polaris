@@ -20,7 +20,7 @@
         "userAgent": "User agent",
         "localTime": "Their local time",
         "seenAt": "Seen here at",
-        "advice": "Everything above is what the address and the browser said about themselves. Change your password if you did not recognise any of it.",
+        "advice": "Everything above is what the address and the browser said about themselves. Change your password if you did not recognize any of it.",
         "title": "A session of yours was used by somebody else"
     },
     "test": {

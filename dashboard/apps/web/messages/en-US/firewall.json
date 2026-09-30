@@ -580,7 +580,7 @@
         "lifts": "Lifts {when}.",
         "lifted": "Lifted {when}.",
         "decided": "Decided by {source}.",
-        "decidedAfter": "Decided by {source}, after {offences} separate offences."
+        "decidedAfter": "Decided by {source}, after {offences} separate offenses."
     },
     "address": {
         "intro": "Every request from this address in the last {window}, read from the edge's own log.",

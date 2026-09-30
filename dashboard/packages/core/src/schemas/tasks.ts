@@ -63,7 +63,7 @@ export const taskDescription = z
 export const hexColor = z
     .string()
     .trim()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour");
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a color");
 
 const uuid = z.string().uuid();
 
@@ -130,7 +130,7 @@ export const TASK_STATUS_TYPE_HINTS: Record<TaskStatusType, string> = {
     blocked:
         "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
     done: "Finished work. Completing a task moves it to the first status of this kind.",
-    closed: "Filed away without being completed: cancelled, duplicate, or won't do."
+    closed: "Filed away without being completed: canceled, duplicate, or won't do."
 };
 
 /**
@@ -186,7 +186,7 @@ export const DEFAULT_TASK_STATUSES: readonly {
     { name: "On hold", type: "open", color: "#92400e" },
     { name: "In review", type: "active", color: "#eab308" },
     { name: "Done", type: "done", color: "#22c55e" },
-    { name: "Cancelled", type: "closed", color: "#71717a" }
+    { name: "Canceled", type: "closed", color: "#71717a" }
 ];
 
 /**
@@ -388,12 +388,12 @@ export const TASK_GROUP_LABELS: Record<TaskGroupField, string> = {
  * is a column of its own and the only thing that column can ever hold. Hidden
  * there, the column is drawn empty while holding work, and a card dragged into
  * it disappears the moment it is let go: the move saved, the status changed, and
- * nothing on the screen said where the task went. "Cancelled" is that column on
+ * nothing on the screen said where the task went. "Canceled" is that column on
  * every space, since it is one of the statuses a new space starts with.
  *
  * So the filter stands down when closed work has somewhere of its own to be.
  * Grouped by status a task can only land in the group of its own status, so
- * letting it through cannot put a cancelled task anywhere except Cancelled.
+ * letting it through cannot put a cancelled task anywhere except Canceled.
  */
 export function hidesClosedWork(groupBy: TaskGroupField, showClosed: boolean): boolean {
     return !showClosed && groupBy !== "status";

@@ -62,7 +62,7 @@
         "addressSave": "That address could not be saved.",
         "batchImport": "That batch could not be imported.",
         "blockRemove": "That block could not be removed.",
-        "colourSave": "That colour could not be saved.",
+        "colourSave": "That color could not be saved.",
         "changeFailed": "That could not be changed.",
         "forgetFailed": "That could not be forgotten.",
         "snoozeFailed": "That could not be put off.",
@@ -299,7 +299,7 @@
         "lead": "Connect the address you already use. Polaris works out the rest from it, so for most services there is nothing else to fill in.",
         "together": {
             "title": "Every mailbox in one place",
-            "body": "Connect as many as you like. One inbox holds all of them, and each keeps its own colour so you always know which is which."
+            "body": "Connect as many as you like. One inbox holds all of them, and each keeps its own color so you always know which is which."
         },
         "private": {
             "title": "Nothing loads until you say so",
@@ -322,7 +322,7 @@
     "folderRole": {
         "title": "Which folder is your {label}?",
         "thisMailbox": "This mailbox",
-        "body": "{mailbox} does not have a folder Polaris recognises as its {label}. Point at the one you already use and it will remember, on this mailbox and through every later check.",
+        "body": "{mailbox} does not have a folder Polaris recognizes as its {label}. Point at the one you already use and it will remember, on this mailbox and through every later check.",
         "noOthers": "This mailbox has no other folders to choose from.",
         "use": "Use this one",
         "make": "Make one on the mail server",
@@ -402,7 +402,7 @@
         "accountEmpty": "Nothing new has arrived at {address}.",
         "folderEmptyTitle": "{name} is empty",
         "folderEmptyBody": "Nothing in this folder has been synced yet, or there is nothing in it.",
-        "labelEmptyTitle": "Nothing labelled {name}",
+        "labelEmptyTitle": "Nothing labeled {name}",
         "labelEmptyBody": "Put this label on a conversation and it will be collected here."
     },
     "drafts": {
@@ -508,7 +508,7 @@
         "hideFolders": "Hide {address} folders",
         "showFolders": "Show {address} folders",
         "nothingSynced": "Nothing has been synced yet.",
-        "noColour": "No colour",
+        "noColour": "No color",
         "rename": "Rename",
         "delete": "Delete",
         "labels": "Labels",
@@ -568,7 +568,7 @@
         "displayNamePlaceholder": "Left blank, your Polaris name is used",
         "label": "Name in the rail",
         "labelPlaceholder": "Left blank, the address is used",
-        "colour": "Colour",
+        "colour": "Color",
         "automatic": "Automatic",
         "servers": "Server settings",
         "notWorkedOut": "not worked out",
@@ -639,7 +639,7 @@
     "view": {
         "gone": "This conversation is no longer here.",
         "earlier": "{count, plural, one {# earlier message} other {# earlier messages}}",
-        "labelled": "Labelled {name}.",
+        "labelled": "Labeled {name}.",
         "more2": "+{count} more",
         "to": "to",
         "oneAttachment": "1 attachment: {name}",

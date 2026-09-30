@@ -81,6 +81,8 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Type something": "text.typeSomething",
     "That is longer than a code": "text.tooLongForCode",
     "A usage limit stopped this run.": "text.limitStopped",
+    "Canceled from Polaris.": "text.cancelled",
+    // The spelling runs finished before the catalogs moved to US English were stored with.
     "Cancelled from Polaris.": "text.cancelled",
     "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.": "text.stoppedReporting",
     "Could not write the workflow file": "text.workflowWrite",

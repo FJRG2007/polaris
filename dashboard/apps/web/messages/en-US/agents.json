@@ -13,7 +13,7 @@
         "trigger": {
             "mention": "Mentioned",
             "issueOpened": "Issue opened",
-            "issueLabeled": "Issue labelled",
+            "issueLabeled": "Issue labeled",
             "prOpened": "Pull request opened",
             "prReviewRequested": "Review requested",
             "prReviewSubmitted": "Review submitted",
@@ -35,7 +35,7 @@
             "running": "Running",
             "succeeded": "Succeeded",
             "failed": "Failed",
-            "cancelled": "Cancelled"
+            "cancelled": "Canceled"
         },
         "pushPolicy": {
             "disabled": "Read-only",
@@ -126,7 +126,7 @@
         "typeSomething": "Type something",
         "tooLongForCode": "That is longer than a code",
         "limitStopped": "A usage limit stopped this run.",
-        "cancelled": "Cancelled from Polaris.",
+        "cancelled": "Canceled from Polaris.",
         "stoppedReporting": "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.",
         "workflowWrite": "Could not write the workflow file",
         "workflowUnregistered": "GitHub has not registered the workflow file yet. It was just written, so try again in a moment.",

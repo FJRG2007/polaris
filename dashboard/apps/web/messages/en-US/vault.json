@@ -40,8 +40,8 @@
             "copyTotp": "Copy the six digits",
             "openWebsite": "Open the website",
             "edit": "Edit",
-            "unfavourite": "Remove from favourites",
-            "favourite": "Favourite",
+            "unfavourite": "Remove from favorites",
+            "favourite": "Favorite",
             "move": "Move",
             "share": "Share by link",
             "deleteForGood": "Delete for good",
@@ -153,7 +153,7 @@
         "noneSignedIn": "Nothing has signed in yet. An app appears here the first time it does.",
         "lastUsed": "{label} - last used <time></time>",
         "extensionBadge": "Extension",
-        "claimNote": "The name and the kind are what each app said about itself, not something Polaris checked. If you do not recognise one, change your master password: removing a row cannot shut out something that already holds the vault key.",
+        "claimNote": "The name and the kind are what each app said about itself, not something Polaris checked. If you do not recognize one, change your master password: removing a row cannot shut out something that already holds the vault key.",
         "separateTitle": "If an app asks for each address separately",
         "separateHint": "Some versions offer a custom environment with a field per service. These are the values.",
         "webVault": "Web vault",
@@ -191,7 +191,7 @@
             "country": "Country",
             "ssn": "National insurance or social security number",
             "passportNumber": "Passport number",
-            "licenseNumber": "Driving licence number"
+            "licenseNumber": "Driver's license number"
         },
         "hints": {
             "title": "Mr, Ms, Dr",

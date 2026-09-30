@@ -29,7 +29,7 @@
     },
     "badge": {
         "active": "Active",
-        "cancelled": "Cancelled",
+        "cancelled": "Canceled",
         "failed": "Failed",
         "queued": "Queued",
         "deploying": "Deploying",

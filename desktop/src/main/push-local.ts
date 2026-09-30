@@ -158,7 +158,7 @@ class Push {
         if (!folderStat?.isDirectory() || abort.signal.aborted) {
             this.abort = null;
             return abort.signal.aborted
-                ? { ok: false, error: "Cancelled." }
+                ? { ok: false, error: "Canceled." }
                 : { ok: false, error: "That folder is not there any more. Choose it again." };
         }
 
@@ -168,11 +168,11 @@ class Push {
         try {
             this.enter("checking");
             const docker = await dockerReady();
-            if (abort.signal.aborted) return this.finish(false, "Cancelled.", "cancelled");
+            if (abort.signal.aborted) return this.finish(false, "Canceled.", "cancelled");
             if (!docker.ok) return this.finish(false, docker.error);
 
             const key = await apiKeyFor(server, this.window, abort.signal);
-            if (abort.signal.aborted) return this.finish(false, "Cancelled.", "cancelled");
+            if (abort.signal.aborted) return this.finish(false, "Canceled.", "cancelled");
             if (!key) return this.finish(false, "Pushing needs an API key. Nothing was built.", "ready");
             const caller: Caller = { server, key };
             const { repository } = await callJson(
@@ -220,7 +220,7 @@ class Push {
             if (abort.signal.aborted) {
                 return this.phase === "deploying"
                     ? this.finish(true, "Stopped following. The deployment carries on in Polaris.", "cancelled")
-                    : this.finish(false, "Cancelled.", "cancelled");
+                    : this.finish(false, "Canceled.", "cancelled");
             }
             if (caught instanceof ApiFailure) {
                 if (caught.status === 401) dropApiKey();

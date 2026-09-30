@@ -334,7 +334,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         name: "NVIDIA NIM",
         kind: "host",
         envVar: "NVIDIA_API_KEY",
-        summary: "A wide catalogue on NVIDIA's own endpoints.",
+        summary: "A wide catalog on NVIDIA's own endpoints.",
         docsUrl: "https://docs.api.nvidia.com/nim/",
         keyUrl: "https://build.nvidia.com/settings/api-keys",
         defaultModel: { label: "Kimi K3 (NVIDIA)", slug: "nvidia/moonshotai/kimi-k3" }, // i18n-ignore
@@ -368,7 +368,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         name: "SiliconFlow",
         kind: "host",
         envVar: "SILICONFLOW_API_KEY",
-        summary: "A broad Chinese-model catalogue on one key.",
+        summary: "A broad Chinese-model catalog on one key.",
         docsUrl: "https://cloud.siliconflow.com/models",
         keyUrl: "https://cloud.siliconflow.com/account/ak",
         probe: "https://api.siliconflow.com/v1/models",
@@ -559,7 +559,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         name: "NanoGPT",
         kind: "gateway",
         envVar: "NANO_GPT_API_KEY",
-        summary: "The widest catalogue of the routers, paid per request.",
+        summary: "The widest catalog of the routers, paid per request.",
         docsUrl: "https://docs.nano-gpt.com",
         keyUrl: "https://nano-gpt.com/api",
         defaultModel: { label: "GPT 5.6 Sol (NanoGPT)", slug: "nano-gpt/openai/gpt-5.6-sol" } // i18n-ignore
@@ -630,7 +630,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         name: "UnoRouter",
         kind: "gateway",
         envVar: "UNOROUTER_API_KEY",
-        summary: "Serves some of its catalogue at no cost.",
+        summary: "Serves some of its catalog at no cost.",
         docsUrl: "https://unorouter.com/models",
         keyUrl: "https://unorouter.com/dashboard",
         defaultModel: { label: "GPT 5.5 (UnoRouter)", slug: "unorouter/gpt-5.5" }, // i18n-ignore

@@ -4174,7 +4174,7 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
         // i18n-ignore stored with the deployment, written once in the default language
-        error: "Cancelled",
+        error: "Canceled",
         finishedAt: new Date()
     });
     await dropReleaseDomain(deploymentId);
@@ -4420,7 +4420,7 @@ async function settleCancelled(
             // i18n-ignore stored with the deployment, written once in the default language
             ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
             // i18n-ignore stored with the deployment, written once in the default language
-            : "Cancelled",
+            : "Canceled",
         finishedAt: new Date()
     });
     await abandonRelease(deploymentId).catch(() => undefined);

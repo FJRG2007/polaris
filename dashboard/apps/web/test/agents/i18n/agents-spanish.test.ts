@@ -44,7 +44,8 @@ describe("the English core writes", () => {
         const limit =
             "Repositories under acme has used 5 of the 5 runs allowed in 1 day. An administrator sets these under Admin > Agents.";
         expect(agentText(english, limit)).toBe(limit);
-        expect(agentText(english, "Cancelled from Polaris.")).toBe("Cancelled from Polaris.");
+        expect(agentText(english, "Canceled from Polaris.")).toBe("Canceled from Polaris.");
+        expect(agentText(english, "Cancelled from Polaris.")).toBe("Canceled from Polaris.");
     });
 });
 
@@ -60,6 +61,7 @@ describe("in Spanish", () => {
         expect(
             agentText(spanish, "This account has used 3 of the 10 tokens allowed in 30 days. An administrator sets these under Admin > Agents.")
         ).toBe("Esta cuenta ha usado 3 de 10 tokens permitidos en 30 días. Un administrador los define en Admin > Agentes.");
+        expect(agentText(spanish, "Canceled from Polaris.")).toBe("Cancelada desde Polaris.");
         expect(agentText(spanish, "Cancelled from Polaris.")).toBe("Cancelada desde Polaris.");
         expect(agentText(spanish, "GitHub returned 422 starting the workflow")).toBe("GitHub devolvió 422 al iniciar el workflow");
     });

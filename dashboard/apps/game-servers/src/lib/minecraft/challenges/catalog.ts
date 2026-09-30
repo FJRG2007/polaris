@@ -1328,11 +1328,11 @@ export const TEMPLATES: readonly Template[] = [
         category: "crafting",
         group: "toolsmith",
         title: t(
-            "Forge %n iron or diamond tools and armour",
+            "Forge %n iron or diamond tools and armor",
             "Forja %n herramientas o piezas de armadura de hierro o diamante"
         ),
         how: t(
-            "Iron and diamond tools, weapons and armour crafted.",
+            "Iron and diamond tools, weapons and armor crafted.",
             "Herramientas, armas y armaduras de hierro y diamante fabricadas."
         ),
         exploit: t(
@@ -1404,7 +1404,7 @@ export const TEMPLATES: readonly Template[] = [
         id: "Cr7",
         category: "crafting",
         group: "trim",
-        title: t("Trim a piece of armour", "Decora una pieza de armadura"),
+        title: t("Trim a piece of armor", "Decora una pieza de armadura"),
         how: t(
             "Crafting Trims earned since the card was dealt.",
             "El progreso Decoración con estilo conseguido desde que se repartió el cartón."
@@ -1561,7 +1561,7 @@ export const TEMPLATES: readonly Template[] = [
         group: "wool",
         title: t("Shear %n wool", "Esquila %n de lana"),
         how: t(
-            "Wool of any colour picked up, minus dropped, having used shears.",
+            "Wool of any color picked up, minus dropped, having used shears.",
             "Lana de cualquier color recogida, menos la tirada, habiendo usado tijeras."
         ),
         exploit: t(
@@ -1778,7 +1778,7 @@ export const TEMPLATES: readonly Template[] = [
         group: "glass",
         title: t("Place %n glass", "Coloca %n de cristal"),
         how: t(
-            "Glass of any colour placed, minus the same broken.",
+            "Glass of any color placed, minus the same broken.",
             "Cristal de cualquier color colocado, menos el mismo roto."
         ),
         exploit: t("Placing and breaking again nets zero.", "Colocar y volver a romper suma cero."),
@@ -2006,9 +2006,9 @@ export const TEMPLATES: readonly Template[] = [
         id: "K2",
         category: "collection",
         group: "dyes",
-        title: t("Hold %n dye colours at once", "Ten %n colores de tinte a la vez"),
+        title: t("Hold %n dye colors at once", "Ten %n colores de tinte a la vez"),
         how: t(
-            "Dye colours you hold at the same time, each one picked up or crafted since the period began.",
+            "Dye colors you hold at the same time, each one picked up or crafted since the period began.",
             "Colores de tinte que tienes a la vez, cada uno recogido o fabricado desde que empezó el periodo."
         ),
         exploit: t("Dyes from a chest do not count.", "Los tintes sacados de un cofre no cuentan."),

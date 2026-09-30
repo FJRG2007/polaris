@@ -21,7 +21,7 @@ const SCHEMA_KEYS: Readonly<Record<string, NamespaceKey<"tasks">>> = {
     "Choose who to send it to": "schema.chooseRecipients",
     "Add at least one action": "schema.addAction",
     "A form needs at least one question": "schema.formNeedsQuestion",
-    "Pick a colour": "schema.pickColour",
+    "Pick a color": "schema.pickColour",
     "Write something first": "schema.writeSomething",
     "Email is required": "schema.emailRequired",
     "Enter a valid email": "schema.validEmail"

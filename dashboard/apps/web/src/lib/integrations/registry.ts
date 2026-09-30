@@ -435,7 +435,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary: "Let people link their Epic account, so game servers can recognize them.",
         description:
             // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
-            "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organisation authorize.",
+            "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organization authorize.",
         docsUrl: "https://dev.epicgames.com/docs/epic-account-services/getting-started",
         setupLinks: [
             {
@@ -462,7 +462,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Verify your domain",
                 url: "https://dev.epicgames.com/docs/epic-online-services/accounts-and-social/eos-epic-account-services/brand-review/domain-verification",
-                help: "Organization settings -> the domain, then the TXT record Epic gives you at your DNS host. Despite the name, the value is public once it is in DNS - it proves the domain is yours and nothing else. The site it points at has to be reachable without signing in and name your organisation and product; the home page above does.",
+                help: "Organization settings -> the domain, then the TXT record Epic gives you at your DNS host. Despite the name, the value is public once it is in DNS - it proves the domain is yours and nothing else. The site it points at has to be reachable without signing in and name your organization and product; the home page above does.",
                 values: ["domain"]
             },
             {

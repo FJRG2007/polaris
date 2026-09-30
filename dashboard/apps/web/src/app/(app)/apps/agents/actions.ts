@@ -430,7 +430,7 @@ export async function cancelRunAction(input: unknown): Promise<{ error?: string 
     // GitHub, and saying so is better than a button that appears to work.
     if (run.execution === "server") await stopServerRun(run.id);
     // i18n-ignore stored on the run, and said in the reader's words by lib/agents/words
-    await finishAgentRun(run.id, { state: "cancelled", error: "Cancelled from Polaris." });
+    await finishAgentRun(run.id, { state: "cancelled", error: "Canceled from Polaris." });
     revalidatePath(`${AGENTS_PATH}/runs`);
     return {};
 }
