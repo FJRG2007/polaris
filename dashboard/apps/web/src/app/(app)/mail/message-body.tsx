@@ -287,6 +287,44 @@ function frameDocument(
   a{color:${linkColor};}
   ${adapt}
 </style>
+<script>
+  // The one thing the frame is allowed to do: say how tall it is, so the page
+  // can size it. It cannot reach the page - the sandbox withheld same-origin -
+  // and the page treats what arrives as a number and nothing else.
+  //
+  // In the head, before the message: whatever the message's markup does to the
+  // rest of the document, it cannot swallow this or stop it running.
+  (function () {
+    function measure() {
+      var root = document.getElementById("polaris-body");
+      var html = document.documentElement;
+      return Math.max(
+        root ? root.scrollHeight : 0,
+        root ? Math.ceil(root.getBoundingClientRect().height) : 0,
+        document.body ? document.body.scrollHeight : 0,
+        // The page's own box, not its scroll height: the html height is forced
+        // back to auto at the end of the document, so this is the content plus
+        // the padding a page of its own is drawn with - while a scroll height
+        // is never less than the frame and would stop a short message shrinking.
+        html ? Math.ceil(html.getBoundingClientRect().height) : 0
+      );
+    }
+    function tell() { parent.postMessage({ polarisMailHeight: measure() }, "*"); }
+    function watch() {
+      var root = document.getElementById("polaris-body");
+      if (root && typeof ResizeObserver === "function") new ResizeObserver(tell).observe(root);
+      tell();
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch);
+    else watch();
+    window.addEventListener("load", tell);
+    // A picture that arrives after the layout settled changes the height, and a
+    // message is mostly pictures.
+    window.addEventListener("resize", tell);
+    setTimeout(tell, 300);
+    setTimeout(tell, 1500);
+  })();
+</script>
 </head><body><div id="polaris-body">${body}</div>
 <style>
   /* Last in the cascade on purpose, so it beats the message's own sheet.
@@ -296,32 +334,6 @@ function frameDocument(
      pane already scrolling outside it. */
   html,body{height:auto!important;min-height:0!important;overflow:visible!important;}
 </style>
-<script>
-  // The one thing the frame is allowed to do: say how tall it is, so the page
-  // can size it. It cannot reach the page - the sandbox withheld same-origin -
-  // and the page treats what arrives as a number and nothing else.
-  (function () {
-    var root = document.getElementById("polaris-body");
-    // The wrapper rather than the document: a message that sets its own height
-    // to 100% makes the document lie, and the wrapper cannot.
-    function measure() {
-      return Math.max(
-        root ? root.scrollHeight : 0,
-        root ? Math.ceil(root.getBoundingClientRect().height) : 0,
-        document.body ? document.body.scrollHeight : 0
-      );
-    }
-    function tell() { parent.postMessage({ polarisMailHeight: measure() }, "*"); }
-    window.addEventListener("load", tell);
-    if (root) new ResizeObserver(tell).observe(root);
-    // A picture that arrives after the layout settled changes the height, and a
-    // message is mostly pictures.
-    window.addEventListener("resize", tell);
-    setTimeout(tell, 300);
-    setTimeout(tell, 1500);
-    tell();
-  })();
-</script>
 </body></html>`;
 }
 
@@ -329,6 +341,10 @@ function frameDocument(
  *  forty thousand pixels tall is a message trying to push the rest of the
  *  screen away; past this it scrolls inside its own frame. */
 const MAX_FRAME_HEIGHT = 20000;
+
+/** How tall a frame that never reported its height is made: a screen of room
+ *  rather than the opening letterbox. */
+const UNHEARD_HEIGHT = 720;
 
 /**
  * The frame's next height, given what the message says it measures.
@@ -340,6 +356,17 @@ const MAX_FRAME_HEIGHT = 20000;
  * of the page while somebody was trying to use it. A message as tall as its
  * frame is one that fills it, not one asking for more.
  */
+/**
+ * Whether a message is growing with its frame rather than asking for room: after
+ * the frame grew to fit it, it came back exactly as far over as before. A page
+ * drawn with padding around a `100vh` block does that forever - each answer the
+ * frame's height plus the padding - and the frame climbed to the ceiling and
+ * then scrolled inside itself.
+ */
+export function growsWithFrame(gap: number, lastGap: number | null): boolean {
+    return gap > 1 && lastGap !== null && gap === lastGap;
+}
+
 export function nextFrameHeight(current: number, claimed: number): number {
     const measured = Math.ceil(claimed);
     if (measured <= current && measured >= current - 1) return current;
@@ -368,6 +395,13 @@ export function SandboxedHtml({
     }, []);
     const frame = useRef<HTMLIFrameElement | null>(null);
     const [height, setHeight] = useState(240);
+    const drawnHeight = useRef(240);
+    drawnHeight.current = height;
+    const lastGap = useRef<number | null>(null);
+    // Set once a message is found growing with its frame. What it is still over
+    // by is only the padding around a screen-tall block, so the frame stops
+    // offering a scrollbar for it rather than scroll a few pixels of margin.
+    const [settled, setSettled] = useState(false);
     const [clean, setClean] = useState<string | null>(null);
 
     useEffect(() => {
@@ -425,6 +459,17 @@ export function SandboxedHtml({
         );
     }, [clean, origin]);
 
+    // Whether the frame has said how tall it is. A browser or an extension that
+    // stops the frame's one script leaves it at its opening height, scrolling
+    // inside itself; past a moment with no word, it is given the room of a
+    // screen instead of a letterbox.
+    const [heard, setHeard] = useState(false);
+    useEffect(() => {
+        if (heard || clean === null || !origin) return;
+        const timer = setTimeout(() => setHeight((current) => Math.max(current, UNHEARD_HEIGHT)), 2500);
+        return () => clearTimeout(timer);
+    }, [heard, clean, origin]);
+
     useEffect(() => {
         function onMessage(event: MessageEvent) {
             // Only the frame this component owns, and only a number. Anything
@@ -433,6 +478,13 @@ export function SandboxedHtml({
             const claimed = (event.data as { polarisMailHeight?: unknown } | null)
                 ?.polarisMailHeight;
             if (typeof claimed !== "number" || !Number.isFinite(claimed)) return;
+            setHeard(true);
+            const gap = Math.ceil(claimed) - drawnHeight.current;
+            if (growsWithFrame(gap, lastGap.current)) {
+                setSettled(true);
+                return;
+            }
+            lastGap.current = gap;
             setHeight((current) => nextFrameHeight(current, claimed));
         }
         window.addEventListener("message", onMessage);
@@ -464,6 +516,7 @@ export function SandboxedHtml({
                 paper === "own" ? "rounded-md bg-white" : "bg-transparent"
             )}
             style={{ height }}
+            scrolling={settled ? "no" : undefined}
         />
     );
 }
