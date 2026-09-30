@@ -144,15 +144,33 @@ describe("the Challenges tab", () => {
         expect(screen.getByLabelText("Deal Alba new challenges")).toBeTruthy();
     });
 
-    it("saves a change, and only once something changed", async () => {
+    it("saves the on/off switch the moment it is pressed", async () => {
+        // It used to change only the draft: the badge beside it kept reading
+        // Off, and a reload undid it for anybody who never found Save below.
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         answerRead({ view });
         await waitFor(() => expect(screen.getByLabelText("Challenges on")).toBeTruthy());
         expect(screen.queryByText("Save")).toBeNull();
         fireEvent.click(screen.getByLabelText("Challenges on"));
-        fireEvent.click(await screen.findByText("Save"));
         await waitFor(() => expect(saved).toHaveLength(1));
         expect((saved[0] as { enabled: boolean }).enabled).toBe(false);
+        expect(screen.queryByText("Save")).toBeNull();
+    });
+
+    it("puts the switch back and says why when the save is refused", async () => {
+        render(<MinecraftChallenges installedAppId={ID} canManage />);
+        answerRead({ view });
+        const actions = await import("@polaris-app/game-servers/src/screens/installed/challenges-actions");
+        const spy = vi
+            .spyOn(actions, "saveChallengesAction")
+            .mockResolvedValueOnce({ error: "The challenges could not be saved" } as never);
+        const toggle = (await screen.findByLabelText("Challenges on")) as HTMLInputElement;
+        const before = toggle.getAttribute("aria-checked") ?? String(toggle.checked);
+        fireEvent.click(toggle);
+        await waitFor(() => expect(screen.getByText("The challenges could not be saved")).toBeTruthy());
+        const after = screen.getByLabelText("Challenges on");
+        expect(after.getAttribute("aria-checked") ?? String((after as HTMLInputElement).checked)).toBe(before);
+        spy.mockRestore();
     });
 
     it("explains every challenge in the catalogue", async () => {

@@ -314,6 +314,34 @@ export function MinecraftChallenges({
             current ? { ...current, [key]: { ...(current[key] as object), ...patch } } : current
         );
 
+    /**
+     * The on/off switch saves by itself. It used to change only the draft, like
+     * every other field, and the badge beside it reads the saved state - so a
+     * switch turned on read "Off" until Save at the bottom was found, and a
+     * reload undid it. Only `enabled` is written, on top of what is saved, so
+     * edits waiting in the draft are neither saved nor lost.
+     */
+    function switchTo(enabled: boolean): void {
+        if (!view) return;
+        const before = view;
+        const settings = { ...view.settings, enabled };
+        setError(null);
+        setView({ ...view, settings });
+        setDraft((current) => (current ? { ...current, enabled } : current));
+        startTransition(async () => {
+            const answer = await actions.saveChallengesAction({ installedAppId, settings });
+            if (!answer.view) {
+                setView(before);
+                setDraft((current) => (current ? { ...current, enabled: before.settings.enabled } : current));
+                setError(answer.error ?? t("errors.saveFailed"));
+                return;
+            }
+            const saved = answer.view.settings.enabled;
+            accept(answer.view, false);
+            setDraft((current) => (current ? { ...current, enabled: saved } : current));
+        });
+    }
+
     function save(): void {
         if (!draft || problem) return;
         setError(null);
@@ -385,9 +413,9 @@ export function MinecraftChallenges({
                             {settings ? (
                                 <ui.Switch
                                     checked={settings.enabled}
-                                    disabled={locked}
+                                    disabled={locked || pending || !view}
                                     aria-label={t("status.on")}
-                                    onChange={(enabled) => change({ enabled })}
+                                    onChange={switchTo}
                                 />
                             ) : (
                                 <ui.Skeleton className="h-5 w-9" />
