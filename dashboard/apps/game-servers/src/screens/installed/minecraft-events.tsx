@@ -23,7 +23,18 @@ import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, RotateCcw, Square, Trash2 } from "lucide-react";
+import {
+    Copy,
+    FastForward,
+    Info,
+    Loader2,
+    Pencil,
+    Play,
+    Plus,
+    RotateCcw,
+    Square,
+    Trash2
+} from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -577,7 +588,8 @@ export function MinecraftEvents({
             }
             accept(answer.view, false);
             if (answer.outcome === "done") setNote(t("events.givenBack", { name: player }));
-            else if (answer.outcome === "offline") setError(t("events.stashOffline", { name: player }));
+            else if (answer.outcome === "offline")
+                setError(t("events.stashOffline", { name: player }));
             else setError(t("events.stashStillFailed", { name: player }));
         });
     }
@@ -747,7 +759,11 @@ export function MinecraftEvents({
                                             className="flex flex-col items-start gap-0.5"
                                             onSelect={() =>
                                                 setEditing({
-                                                    preset: catalog.newPreset(kind, newId(), kindLabel(t, kind)),
+                                                    preset: catalog.newPreset(
+                                                        kind,
+                                                        newId(),
+                                                        kindLabel(t, kind)
+                                                    ),
                                                     isNew: true
                                                 })
                                             }
@@ -1424,11 +1440,19 @@ export function MinecraftEvents({
                                           z: barrel.z
                                       })
                                     : "";
-                                const detail = [one.event, where, one.note].filter(Boolean).join(" - ");
+                                const detail = [one.event, where, one.note]
+                                    .filter(Boolean)
+                                    .join(" - ");
                                 return (
-                                    <li key={one.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                                    <li
+                                        key={one.id}
+                                        className="flex items-center gap-3 px-3 py-2 text-sm"
+                                    >
                                         <span className="font-medium">{one.player}</span>
-                                        <span className="min-w-0 flex-1 truncate text-muted-foreground" title={detail}>
+                                        <span
+                                            className="min-w-0 flex-1 truncate text-muted-foreground"
+                                            title={detail}
+                                        >
                                             {detail}
                                         </span>
                                         <ui.Button
@@ -1444,7 +1468,9 @@ export function MinecraftEvents({
                                         <ui.Button
                                             variant="ghost"
                                             size="icon-sm"
-                                            aria-label={t("events.dismissStash", { name: one.player })}
+                                            aria-label={t("events.dismissStash", {
+                                                name: one.player
+                                            })}
                                             title={t("events.dismissStash", { name: one.player })}
                                             disabled={!canManage || pending}
                                             onClick={() => void dismissStash(one.id, one.player)}
@@ -1516,11 +1542,18 @@ export function MinecraftEvents({
                                                                     }`
                                                             ),
                                                             ...(one.levels > 0
-                                                                ? [t("events.deliveredLevels", { count: one.levels })]
+                                                                ? [
+                                                                      t("events.deliveredLevels", {
+                                                                          count: one.levels
+                                                                      })
+                                                                  ]
                                                                 : [])
                                                         ].join(", ")
                                                     )
-                                                    .map((what, index) => `${entry.delivered[index]!.name}: ${what}`)
+                                                    .map(
+                                                        (what, index) =>
+                                                            `${entry.delivered[index]!.name}: ${what}`
+                                                    )
                                                     .join("; ")
                                             })}
                                         </p>

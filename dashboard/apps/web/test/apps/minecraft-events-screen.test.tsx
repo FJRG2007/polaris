@@ -92,12 +92,10 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
 
 const retried: string[] = [];
 
-const { MinecraftEvents } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
-);
-const { EventEditor } = await import(
-    "@polaris-app/game-servers/src/screens/installed/event-editor"
-);
+const { MinecraftEvents } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
+const { EventEditor } =
+    await import("@polaris-app/game-servers/src/screens/installed/event-editor");
 
 afterEach(() => {
     cleanup();
@@ -375,9 +373,8 @@ describe("setting up a meteor shower", () => {
 
 describe("the parkour and spleef editors", () => {
     it("sets a course's jumps, difficulty and height, and says a wrong one beside the field", async () => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         const saved: unknown[] = [];
         render(
             <EventEditor
@@ -401,9 +398,8 @@ describe("the parkour and spleef editors", () => {
     });
 
     it("says how big a spleef floor comes out", async () => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         render(
             <EventEditor
                 preset={catalog.newPreset("spleef", "floor")}
@@ -438,9 +434,8 @@ describe("the parkour and spleef editors", () => {
 
 describe("the editor of an event players join", () => {
     const edit = async (preset: catalog.EventPreset, saved: catalog.EventPreset[]) => {
-        const { EventEditor } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { EventEditor } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         render(
             <EventEditor
                 preset={preset}
@@ -545,9 +540,8 @@ describe("the editor in Spanish", () => {
     });
 
     it("names each choice in the reader's language", async () => {
-        const { options, LOOT_LABELS } = await import(
-            "@polaris-app/game-servers/src/screens/installed/event-editor"
-        );
+        const { options, LOOT_LABELS } =
+            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
         const { gameCatalogs } = await import("@polaris-app/game-servers/messages");
         expect(options(gameCatalogs.translator("es-ES", "minecraft"), LOOT_LABELS)[0]).toEqual({
             value: "treasure",
