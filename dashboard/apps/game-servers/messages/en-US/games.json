@@ -822,6 +822,8 @@
         "routerSilent": "The router was started but is not answering on port {port} yet. Give it a moment and turn this on again.",
         "maxAnnounceTemplates": "Only {count} templates can be kept. Remove one first.",
         "senderOffline": "{name} has to be on the server to send their inventory.",
+        "importWrongSyntax": "The inventory imported for {name} was exported from a Minecraft version that writes items differently, so it was not applied.",
+        "importUnread": "{name}'s inventory could not be read, so the import was not applied. It is tried again when they next join.",
         "linkedRefused": "{name} is linked, but the game would not take them: {said}",
         "addressFollowsAccount": "{name} is tied to a Polaris account, so where they connect from follows its sign-ins.",
         "listedRefused": "{name} is on this server's player list, but the game would not take them: {said}",

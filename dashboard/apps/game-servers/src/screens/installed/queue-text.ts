@@ -23,6 +23,10 @@ export function describeQueuedText(t: GameText<"minecraft">, action: QueuedActio
                 item: payload.item,
                 slot: payload.slot
             });
+        case "import-bag":
+            return t(payload.mode === "replace" ? "queue.importReplace" : "queue.importFill", {
+                count: payload.items.length
+            });
         case "ban":
             return payload.reason ? t("queue.banFor", { reason: payload.reason }) : t("queue.ban");
         case "pardon":

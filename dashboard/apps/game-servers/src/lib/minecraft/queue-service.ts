@@ -15,6 +15,7 @@ import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { applyOnContainer } from "./player-access";
 import { giveItem, giveToSlot } from "./item-service";
+import { applyQueuedImport } from "./inventory-transfer-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import { liftSanctions, recordSanction } from "../sanctions-service";
 import {
@@ -139,6 +140,7 @@ function commandFor(username: string, payload: QueuedPayload): string[] | null {
         // A slot write is not one command and goes through the service that knows
         // which spelling this server takes.
         case "set-slot":
+        case "import-bag":
             return null;
     }
 }
@@ -239,6 +241,20 @@ async function apply(
     installedAppId: string,
     action: QueuedAction
 ): Promise<void> {
+    if (action.payload.kind === "import-bag") {
+        const payload = action.payload;
+        try {
+            await applyQueuedImport(server, installedAppId, action.username, payload.items, payload.mode);
+        } catch (caught) {
+            const why = caught instanceof Error ? caught.message : "";
+            throw new Error(
+                gameMessage("games", why === "era" ? "lib.importWrongSyntax" : "lib.importUnread", {
+                    name: action.username
+                })
+            );
+        }
+        return;
+    }
     if (action.payload.kind === "set-slot") {
         await giveToSlot(
             ownerId,

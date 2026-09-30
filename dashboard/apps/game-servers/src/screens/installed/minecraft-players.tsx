@@ -36,6 +36,7 @@ import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
+import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import { describeQueuedText, waitingOnText } from "./queue-text";
@@ -637,6 +638,18 @@ export function MinecraftPlayers({
                                 })}
                             </span>
                         ) : null}
+                        {/* Every bag at once, as a file: Java only, which is where a
+                            bag can be read back and written slot by slot. */}
+                        {!bedrock && (
+                            <>
+                                <InventoryExportMenu
+                                    installedAppId={installedAppId}
+                                    players="all"
+                                    onMessage={(message) => setError(message.error ?? message.note ?? null)}
+                                />
+                                <InventoryImportButton installedAppId={installedAppId} onDone={onChanged} />
+                            </>
+                        )}
                         <Button
                             onClick={() => {
                                 setFormError(null);

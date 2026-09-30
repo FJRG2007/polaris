@@ -822,6 +822,8 @@
         "routerSilent": "El router arrancó pero aún no responde en el puerto {port}. Dale un momento y vuelve a activarlo.",
         "maxAnnounceTemplates": "Solo se pueden guardar {count} plantillas. Quita una primero.",
         "senderOffline": "{name} tiene que estar en el servidor para enviar su inventario.",
+        "importWrongSyntax": "El inventario importado para {name} se exportó de una versión de Minecraft que escribe los objetos distinto, así que no se aplicó.",
+        "importUnread": "No se pudo leer el inventario de {name}, así que la importación no se aplicó. Se reintenta la próxima vez que entre.",
         "linkedRefused": "{name} está vinculado, pero el juego no lo aceptó: {said}",
         "addressFollowsAccount": "{name} está ligado a una cuenta de Polaris, así que desde dónde se conecta sigue sus inicios de sesión.",
         "listedRefused": "{name} está en la lista de jugadores de este servidor, pero el juego no lo aceptó: {said}",

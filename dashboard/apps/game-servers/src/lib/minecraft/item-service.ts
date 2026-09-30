@@ -84,7 +84,7 @@ export async function readSlot(
 /** Whether two stacks are the same one, for a write that is about to overwrite
  *  what it read. Compared on everything, data included: a sword that lost a
  *  point of durability while the dialog was open is not the sword picked up. */
-function sameStack(left: InventoryItem | null, right: InventoryItem | null): boolean {
+export function sameStack(left: InventoryItem | null, right: InventoryItem | null): boolean {
     if (left === null || right === null) return left === right;
     return (
         left.id === right.id &&
@@ -100,7 +100,7 @@ function sameStack(left: InventoryItem | null, right: InventoryItem | null): boo
  * and a server that does not have it says so in a sentence this recognises rather
  * than in an exit code.
  */
-async function writeSlot(
+export async function writeSlot(
     server: ServerContainer,
     installedAppId: string,
     player: string,
