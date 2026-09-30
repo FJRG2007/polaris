@@ -27,7 +27,7 @@
                 "light": "White surfaces, for a bright room.",
                 "system": "Dark or light, whichever this machine is set to.",
                 "midnight": "Nearly black, with the panels further apart. For a dark room.",
-                "graphite": "Grey with no colour cast, for anyone the blue tint bothers."
+                "graphite": "Gray with no color cast, for anyone the blue tint bothers."
             }
         },
         "dateOrder": {
@@ -273,7 +273,7 @@
             "newIntro": "A key acts as you, with a subset of your own permissions and only from where you allow.",
             "what": {
                 "title": "What it is",
-                "hint": "How you will recognise this key in a year."
+                "hint": "How you will recognize this key in a year."
             },
             "namePlaceholder": "Backup script",
             "description": "Description",
@@ -338,7 +338,7 @@
         },
         "outcomes": {
             "linked": "Account connected.",
-            "cancelled": "The authorization was cancelled.",
+            "cancelled": "The authorization was canceled.",
             "stateError": "That request did not come from this page. Start it again.",
             "taken": "That account is already linked to another Polaris account.",
             "limit": "You have already linked as many accounts of that service as you are allowed.",
@@ -745,14 +745,14 @@
         "edit": "Edit {kind, select, banner {banner} other {photo}}",
         "title": "{kind, select, banner {Banner} other {Photo}}",
         "cardTitle": "Photo and banner",
-        "personHint": "How your profile looks to everybody else. Without a photo, Polaris uses the picture your email address has on Gravatar and your initials if it has none; without a banner, a colour taken from your photo.",
-        "orgHint": "How this organization looks wherever it appears - the switcher, its people's rosters, and its own page. Without a photo, Polaris draws its initials; without a banner, a colour taken from the photo."
+        "personHint": "How your profile looks to everybody else. Without a photo, Polaris uses the picture your email address has on Gravatar and your initials if it has none; without a banner, a color taken from your photo.",
+        "orgHint": "How this organization looks wherever it appears - the switcher, its people's rosters, and its own page. Without a photo, Polaris draws its initials; without a banner, a color taken from the photo."
     },
     "appearance": {
         "title": "Appearance",
         "from": "From",
         "to": "To",
-        "colour": "Colour",
+        "colour": "Color",
         "none": "None",
         "saved": "Saved.",
         "clearAll": "Clear it all",
@@ -760,11 +760,11 @@
             "label": "Banner",
             "hint": "The band across the top of your profile, under your banner picture.",
             "fromPhoto": "From your photo",
-            "oneColour": "One colour",
-            "twoColours": "Two colours",
+            "oneColour": "One color",
+            "twoColours": "Two colors",
             "background": "Background",
             "angle": "Angle",
-            "angleLabel": "The angle the two colours run at"
+            "angleLabel": "The angle the two colors run at"
         },
         "decoration": {
             "label": "Avatar decoration",
@@ -777,7 +777,7 @@
         },
         "nameStyle": {
             "label": "Display name style",
-            "hint": "What the paint does, and in which colours. Nothing here changes the size, so a name is never taller than the row it is in."
+            "hint": "What the paint does, and in which colors. Nothing here changes the size, so a name is never taller than the row it is in."
         },
         "font": {
             "label": "Font",

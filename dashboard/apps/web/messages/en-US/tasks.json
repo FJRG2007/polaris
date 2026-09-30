@@ -19,7 +19,7 @@
             "active": "Work in progress. Counts as started but not finished.",
             "blocked": "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
             "done": "Finished work. Completing a task moves it to the first status of this kind.",
-            "closed": "Filed away without being completed: cancelled, duplicate, or won't do."
+            "closed": "Filed away without being completed: canceled, duplicate, or won't do."
         },
         "customField": {
             "text": "Text",
@@ -322,7 +322,7 @@
         "chooseRecipients": "Choose who to send it to",
         "addAction": "Add at least one action",
         "formNeedsQuestion": "A form needs at least one question",
-        "pickColour": "Pick a colour",
+        "pickColour": "Pick a color",
         "writeSomething": "Write something first",
         "emailRequired": "Email is required",
         "validEmail": "Enter a valid email"

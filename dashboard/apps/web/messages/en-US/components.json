@@ -98,7 +98,7 @@
         "hidePassword": "Hide password",
         "noData": "No data",
         "noDataInRange": "No data in this range",
-        "hexColour": "Hex colour",
+        "hexColour": "Hex color",
         "hexOf": "{label}: hex",
         "unit": "Unit",
         "reply": "Reply",
@@ -533,7 +533,7 @@
         },
         "homeCgnat": {
             "label": "Home behind carrier NAT",
-            "summary": "The ISP shares one public IP across customers - common on mobile, fibre resellers and Starlink.",
+            "summary": "The ISP shares one public IP across customers - common on mobile, fiber resellers and Starlink.",
             "routing": "Port forwarding cannot work here. A domain only reaches this server through a tunnel."
         },
         "vps": {
@@ -723,7 +723,7 @@
         "maxOutput": "Max output",
         "gatewayHint": "An endpoint publishes no catalog, so both numbers are needed: without them a run answers in 32,000-token slices and never compacts.",
         "canSignIn": "Polaris can sign you in",
-        "canSignInHint": "It runs {tool}''s own login on a machine of its own. You authorise it in your browser; the credential lands in the field below.",
+        "canSignInHint": "It runs {tool}''s own login on a machine of its own. You authorize it in your browser; the credential lands in the field below.",
         "theTool": "the tool",
         "signInHere": "Sign in here",
         "apiKey": "API key",
@@ -745,7 +745,7 @@
     },
     "signinDialog": {
         "title": "Sign in to {tool}",
-        "intro": "Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorise it in your browser, and paste the code it gives you into the line below the terminal.",
+        "intro": "Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorize it in your browser, and paste the code it gives you into the line below the terminal.",
         "subscription": "This runs on a machine with nothing signed in to it, so it leaves the tool on your own computer alone. It may retire a credential you linked here before, though - some vendors allow one at a time.",
         "openPage": "Open the sign-in page",
         "installing": "Installing the tool on it.",

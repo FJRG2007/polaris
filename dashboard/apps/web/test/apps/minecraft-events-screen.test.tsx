@@ -339,7 +339,7 @@ describe("setting up a horde defence", () => {
                 onSave={() => undefined}
             />
         );
-        expect(screen.getByText("Horde defence")).toBeTruthy();
+        expect(screen.getByText("Horde defense")).toBeTruthy();
         expect(screen.queryByText("Minutes")).toBeNull();
         expect(screen.getByLabelText("Monsters")).toBeTruthy();
         const waves = screen.getByLabelText(/^Waves/) as HTMLInputElement;

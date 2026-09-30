@@ -121,7 +121,7 @@ describe("the Challenges tab", () => {
             "Community",
             "Settings",
             "Rewards",
-            "Catalogue"
+            "Catalog"
         ]) {
             expect(screen.getByText(part)).toBeTruthy();
         }
@@ -210,7 +210,7 @@ describe("the Challenges tab", () => {
 
     it("explains every challenge in the catalogue", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
-        fireEvent.click(screen.getByText("Catalogue"));
+        fireEvent.click(screen.getByText("Catalog"));
         answerRead({ view });
         await waitFor(() => expect(screen.getByText("Mining")).toBeTruthy());
         fireEvent.click(screen.getByText("Mining"));
