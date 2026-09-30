@@ -58,7 +58,7 @@ export interface TuyaDeviceShape {
     readonly product_name?: string;
     readonly model?: string;
     readonly online: boolean;
-    readonly status: readonly { readonly code: string; readonly value: unknown }[];
+    readonly status: readonly { readonly code: string; readonly value?: unknown }[];
 }
 
 /** The data points that are a switch, in the order a device is most likely to
