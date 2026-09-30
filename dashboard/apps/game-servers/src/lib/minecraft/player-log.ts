@@ -1,25 +1,32 @@
 /**
- * The lines about players arriving and leaving, read in a way nothing can drown.
+ * The lines about players arriving and leaving, read in a way nothing can drown
+ * and nothing has to read twice.
  *
  * The container's log is everything the server printed, and a server Polaris talks
  * to prints two lines for every command it is sent - "Thread RCON Client started",
- * "shutting down" - because each command is its own RCON connection. On a server
- * somebody is watching that is every few seconds, and the last 1500 lines of one
- * such server were found to be exactly that and nothing else: no join, no leave,
- * no login address. Anything that read players from that tail read nobody.
+ * "shutting down" - because each command is its own RCON connection. The last 1500
+ * lines of one such server were exactly that: no join, no leave, no login address.
+ * So the lines that matter are picked out of the server's own `logs/latest.log`
+ * inside the container, before anything is cut.
  *
- * So the lines that matter are picked out inside the container, from the server's
- * own `logs/latest.log` and the newest rotated file beside it, before anything is
- * cut to size: the chatter never reaches the cap. The output of one command is cut
- * at 16 KiB with no marker (see `container-files`), so each part is capped at the
- * end that matters - the newest lines - well under it.
+ * That file is large - 125 MB on a modded server by the evening - and is asked
+ * about every few seconds while somebody watches. So it is read the way `tail -f`
+ * reads it: a cursor per server remembers which file (its inode) and how far into
+ * it the last read got, and each read picks out only the bytes written since. A
+ * file that is a different one, or shorter than the cursor, was rotated or cut,
+ * and is scanned again from a bounded distance before its end. No read ever takes
+ * more than `STEP_BYTES` of it. The lines found are kept, a bounded number of
+ * them, so every read still answers with the recent history and not only the
+ * last few seconds of it.
  *
- * The file's stamps are the server's local time, and on vanilla and Paper only the
- * time of day. The container's own date and offset are printed beside them, so each
- * line is turned into the same RFC3339 instant the container's log carries, and
- * every reader that already parses that shape reads this unchanged.
+ * What one command hands back is cut at 16 KiB with no marker (see
+ * `container-files`), so the matching lines are capped at their newest end well
+ * under that. Stamps are the server's local time - Forge's dated ones and vanilla's
+ * time of day - and are turned into the RFC3339 instants the container's log
+ * carries, so every reader that parses that shape reads this unchanged.
  *
- * Pure apart from the script's text: the command runs in `service.ts`.
+ * Pure: the script's text and the reading of its output. `service.ts` runs it and
+ * holds the state between reads.
  */
 
 /** The lines worth keeping: arrivals, departures, and the server starting or
@@ -28,28 +35,75 @@
 const WANTED =
     "logged in with entity id|joined the game|left the game|lost connection: |Starting minecraft server version|Stopping server|Player connected:|Player disconnected:";
 
-/** How much of each file to keep, newest last. Together, and with the headers,
- *  under the 16 KiB one command can return. */
-const LATEST_BYTES = 11_000;
-const ROTATED_BYTES = 4_000;
+const LATEST = "/data/logs/latest.log";
 
-const LOGS = "/data/logs";
+/** How far before its end a file with no usable cursor is scanned. */
+export const SCAN_BYTES = 16 * 1024 * 1024;
+/** The most of the file one read takes. A server that printed more than this
+ *  since the last read has its oldest new bytes skipped rather than the host's
+ *  disk and CPU spent on them. */
+export const STEP_BYTES = 16 * 1024 * 1024;
+/** How far back past the cursor each read starts, so a line that was half written
+ *  when the last read stopped is read whole this time. Lines already kept are not
+ *  kept twice. */
+export const OVERLAP_BYTES = 1024;
+/** How much of the matching lines one read hands back, newest last: under the 16
+ *  KiB one command can return. */
+const MATCH_BYTES = 12_000;
+/** How many matching lines are kept per server between reads. */
+export const KEPT_LINES = 400;
+
+/** Where the last read of a server's log stopped. */
+export interface LogCursor {
+    /** Which file it was, so a rotated one is noticed. */
+    readonly inode: string;
+    /** How many bytes of it have been read. */
+    readonly offset: number;
+}
+
+/** What is kept between reads: the cursor, and the lines found so far. */
+export interface PlayerLogState {
+    readonly cursor: LogCursor | null;
+    /** Container-log lines (`<RFC3339> <line>`), oldest first. */
+    readonly lines: readonly string[];
+}
+
+export const NO_PLAYER_LOG: PlayerLogState = { cursor: null, lines: [] };
+
+/** A whole number the shell may be handed, or nothing. */
+function count(value: number): number {
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
 
 /**
- * The command, run with `sh -c` in the server's container.
+ * The command, run with `sh -c` in the server's container, for a read that picks
+ * up from `cursor`.
  *
- * Prints `@clock <offset> <date>` first, then each file as `@file <name> <date of
- * its last write>` followed by its matching lines. Prints nothing about a file
- * that is not there, so a server with no `latest.log` - Bedrock writes none - reads
- * as having none, and the caller falls back to the container's log.
+ * Prints `@clock <offset> <date>`, `@stat <inode> <size> <date of last write>` and
+ * `@from <byte>` - where this read began - then the matching lines of the bytes
+ * from there to the size it stat'ed. Prints nothing at all for a server with no
+ * `latest.log` - Bedrock writes none - which the caller reads as "use the
+ * container's log instead".
  */
-export const PLAYER_LOG_SCRIPT = [
-    `P='${WANTED}'`,
-    `echo "@clock $(date +%z) $(date +%F)"`,
-    `g=$(ls -1t ${LOGS}/*.log.gz 2>/dev/null | head -n 1)`,
-    `if [ -n "$g" ]; then echo "@file $(basename "$g") $(date -r "$g" +%F)"; gzip -dc "$g" 2>/dev/null | grep -aE "$P" | tail -c ${ROTATED_BYTES}; echo; fi`,
-    `if [ -f ${LOGS}/latest.log ]; then echo "@file latest.log $(date -r ${LOGS}/latest.log +%F)"; grep -aE "$P" ${LOGS}/latest.log | tail -c ${LATEST_BYTES}; fi`
-].join("\n");
+export function playerLogScript(cursor: LogCursor | null): string {
+    const inode = cursor && /^\d+$/.test(cursor.inode) ? cursor.inode : "none";
+    const offset = count(cursor?.offset ?? 0);
+    return [
+        `f=${LATEST}`,
+        "[ -f \"$f\" ] || exit 0",
+        `echo "@clock $(date +%z) $(date +%F)"`,
+        `set -- $(stat -c '%i %s' "$f")`,
+        `i=$1; s=$2`,
+        `echo "@stat $i $s $(date -r "$f" +%F)"`,
+        // The same file, and at least as long as when it was last read: pick up
+        // where that left off. Anything else is a file that was rotated or cut.
+        `if [ "$i" = "${inode}" ] && [ "$s" -ge ${offset} ]; then from=$((${offset} - ${OVERLAP_BYTES})); else from=$((s - ${SCAN_BYTES})); fi`,
+        `[ "$from" -lt 0 ] && from=0`,
+        `[ $((s - from)) -gt ${STEP_BYTES} ] && from=$((s - ${STEP_BYTES}))`,
+        `echo "@from $from"`,
+        `tail -c +$((from + 1)) "$f" | head -c $((s - from)) | grep -aE '${WANTED}' | tail -c ${MATCH_BYTES}`
+    ].join("\n");
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -79,38 +133,38 @@ function instant(
 }
 
 /**
- * The script's output as container-log lines - `<RFC3339> <line>` - oldest first.
+ * The state after one read: the cursor moved to the end of what was read, and
+ * the new matching lines added to the kept ones, oldest first and none twice.
  *
- * Null when it printed nothing usable, which is the caller's cue to read the
- * container's log instead.
+ * Null when the script printed nothing usable - no `latest.log`, or a container
+ * that answered with something else entirely - which is the caller's cue to read
+ * the container's log instead and leave the state as it was.
  */
-export function playerLogLines(output: string): string | null {
+export function nextPlayerLog(state: PlayerLogState, output: string): PlayerLogState | null {
     const lines = output.split("\n").map((line) => line.replace(/\r$/, ""));
     const clock = /^@clock (\S+) (\d{4}-\d{2}-\d{2})$/.exec(lines[0] ?? "");
+    const stat = /^@stat (\d+) (\d+) (\d{4}-\d{2}-\d{2})$/.exec(lines[1] ?? "");
+    const from = /^@from (\d+)$/.exec(lines[2] ?? "");
     const offset = offsetMinutes(clock?.[1]);
-    if (!clock || offset === null) return null;
+    if (!clock || !stat || !from || offset === null) return null;
 
-    const sections: { date: string; lines: string[] }[] = [];
-    for (const line of lines.slice(1)) {
-        const header = /^@file (\S+) (\d{4}-\d{2}-\d{2})$/.exec(line);
-        if (header) {
-            // A rotated file is named for the day it covers; its last write can be
-            // the rotation itself, just after midnight on the next one.
-            const named = /^(\d{4}-\d{2}-\d{2})-\d+\.log\.gz$/.exec(header[1]!)?.[1];
-            sections.push({ date: named ?? header[2]!, lines: [] });
-        } else sections.at(-1)?.lines.push(line);
-    }
-    if (sections.length === 0) return null;
-    return sections.flatMap((section) => stamped(section.lines, section.date, offset)).join("\n");
+    const found = stamped(lines.slice(3), stat[3]!, offset);
+    const kept = new Set(state.lines);
+    const merged = [...state.lines, ...found.filter((line) => !kept.has(line))];
+    return {
+        cursor: { inode: stat[1]!, offset: Number(stat[2]) },
+        lines: merged.slice(-KEPT_LINES)
+    };
 }
 
 /**
- * One file's lines with an instant each.
+ * One read's lines with an instant each.
  *
  * A time of day alone belongs to the day the file was last written, counting back
  * a day each time the clock goes backwards between two lines read from the end:
  * a file is written in order, so a later line with an earlier time crossed a
- * midnight. A line cut in half by the size cap starts with no stamp and is dropped.
+ * midnight. A line cut in half - by the size cap, or by the read starting inside
+ * it - starts with no stamp and is dropped.
  */
 function stamped(lines: readonly string[], lastDate: string, offset: number): string[] {
     const [year, month, day] = lastDate.split("-").map(Number) as [number, number, number];

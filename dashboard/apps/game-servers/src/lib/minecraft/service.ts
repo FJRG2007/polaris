@@ -14,29 +14,29 @@
  * the console text is prose that changes between versions.
  */
 
-import { gameMessage } from "../game-message";
 import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { gameOfServer, withTimeout } from "@polaris/core";
-import { AsyncLocalStorage } from "node:async_hooks";
+import { inRconTurn } from "./rcon-turn";
 import { liveContext } from "./live-values";
+import { gameMessage } from "../game-message";
 import { gameServerAddress } from "./address";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { AppHostTypes } from "@polaris/app-host";
 import { readContainerFile } from "../container-files";
+import { gameOfServer, withTimeout } from "@polaris/core";
 import { readsPlayerList, readsServer } from "./text-vars";
+import { sayEachReplies, sayEachScript } from "./say-each";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
-import { PLAYER_LOG_SCRIPT, playerLogLines } from "./player-log";
-import { sayEachReplies, sayEachScript } from "./say-each";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
-import { inRconTurn } from "./rcon-turn";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
+import { NO_PLAYER_LOG, nextPlayerLog, playerLogScript, type PlayerLogState } from "./player-log";
 
 const { resolveWaf } = host.wafService;
 const { getHostLanIp } = host.hostAddress;
@@ -1179,14 +1179,36 @@ export async function setPlayerExperience(
 export async function readPlayerLog(ownerId: string, installedAppId: string): Promise<string> {
     const install = await resolveInstall(ownerId, installedAppId);
     if (install.edition === "java" && install.running) {
-        const picked = await withPorts(install, ownerId, (ports) =>
-            ports.runIn(install.container, ["sh", "-c", PLAYER_LOG_SCRIPT])
-        )
-            .then((result) => (result.code === 0 ? playerLogLines(result.output) : null))
-            .catch(() => null);
+        const picked = await inPlayerLogTurn(installedAppId, async () => {
+            const state = playerLogs.get(installedAppId) ?? NO_PLAYER_LOG;
+            const next = await withPorts(install, ownerId, (ports) =>
+                ports.runIn(install.container, ["sh", "-c", playerLogScript(state.cursor)])
+            )
+                .then((result) => (result.code === 0 ? nextPlayerLog(state, result.output) : null))
+                .catch(() => null);
+            if (!next) return null;
+            playerLogs.set(installedAppId, next);
+            return next.lines.join("\n");
+        });
         if (picked !== null) return picked;
     }
     return readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL);
+}
+
+/** Where each server's log was last read to, and what it held (see `player-log`). */
+const playerLogs = new Map<string, PlayerLogState>();
+/** One read of a server's log at a time, so two readers never start from the same cursor. */
+const playerLogTurns = new Map<string, Promise<unknown>>();
+
+function inPlayerLogTurn<T>(installedAppId: string, work: () => Promise<T>): Promise<T> {
+    const before = playerLogTurns.get(installedAppId) ?? Promise.resolve();
+    const turn = before.catch(() => undefined).then(work);
+    const settled = turn.catch(() => undefined);
+    playerLogTurns.set(installedAppId, settled);
+    void settled.then(() => {
+        if (playerLogTurns.get(installedAppId) === settled) playerLogTurns.delete(installedAppId);
+    });
+    return turn;
 }
 
 /** Every join and leave the server's log still holds, oldest first. */
