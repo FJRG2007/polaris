@@ -183,7 +183,7 @@ export const RANKINGS = {
         sample: ["1. Steve 120h", "2. Alex 86h"]
     },
     "rank.explorer": {
-        label: "Furthest travelled", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
+        label: "Furthest traveled", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("travelledCm"),
         text: distanceText,
         sample: ["1. Alex 412.5km", "2. Steve 230.1km"]

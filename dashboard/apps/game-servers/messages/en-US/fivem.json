@@ -28,7 +28,7 @@
         "add": "Add",
         "identifier": "Identifier",
         "pasteItWholeAsThe": "Paste it whole, as the game gives it: license:... or discord:...",
-        "whateverTheGameHandsOver": "Whatever the game hands over - a licence, a Discord id, a Steam id. It is shown beside anybody who has connected.",
+        "whateverTheGameHandsOver": "Whatever the game hands over - a license, a Discord id, a Steam id. It is shown beside anybody who has connected.",
         "nameOnTheList": "Name on the list",
         "optional": "Optional",
         "itAppearsInTheGame": "It appears in the game's chat.",
@@ -135,7 +135,7 @@
         },
         "onesync": {
             "label": "OneSync",
-            "hint": "The state synchronisation everything above 32 slots and most roleplay resources need.",
+            "hint": "The state synchronization everything above 32 slots and most roleplay resources need.",
             "choices": {
                 "on": "On",
                 "legacy": "Legacy",

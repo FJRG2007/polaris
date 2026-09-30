@@ -573,7 +573,7 @@
     },
     "variablesHelp": {
         "whatYouCanWrite": "What you can write",
-        "coloursAndStyles": "Colours and styles",
+        "coloursAndStyles": "Colors and styles",
         "groups": {
             "server": "The server",
             "player": "The player reading it",
@@ -682,7 +682,7 @@
             "overhaul": "An overhaul: new creatures, rebalanced stats, its own progression. Several gigabytes, and it changes the game.",
             "colors": "Far more colors on wild creatures, and babies for species that had none.",
             "death": "Find where you died and what you were carrying, instead of losing an evening to it.",
-            "flyers": "Gives flyers their speed levelling back, the way it worked before it was taken out.",
+            "flyers": "Gives flyers their speed leveling back, the way it worked before it was taken out.",
             "stats": "Look at anything and see its level, stats and torpor. The one mod every server ends up with.",
             "tame": "Points at a tame you have left somewhere on the map.",
             "building": "Snap points that work, pick-up without a timer, and pipes and wires that hide. The building mod.",
@@ -749,7 +749,7 @@
         "unknownItem": "That is not an item this server's catalog knows",
         "notItem": "That is not an item",
         "activeWorld": "That is the world the server plays on - switch to another one first",
-        "tooMuchFormatting": "That is too much formatting for one line. Use fewer colours or styles.",
+        "tooMuchFormatting": "That is too much formatting for one line. Use fewer colors or styles.",
         "notMapForGame": "That map is not one this game can be built on",
         "polarisResourceName": "That name belongs to Polaris' own resource",
         "arkPassword": "That password is not one ARK will carry",
@@ -842,7 +842,7 @@
             "container": "Getting the container up."
         },
         "bedrockNoOps": "Bedrock keeps no operators list Polaris can read",
-        "tooMuchFormattingHere": "Too much formatting for one line. Use fewer colours or styles here.",
+        "tooMuchFormattingHere": "Too much formatting for one line. Use fewer colors or styles here.",
         "onlyTitlesStay": "Only the title, subtitle or action bar can stay on screen",
         "chooseWhenDown": "Choose when it comes down",
         "momentPassed": "That moment has already passed",
