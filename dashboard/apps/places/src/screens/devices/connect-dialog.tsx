@@ -37,6 +37,7 @@ import * as registry from "../../lib/device-connections";
 import { Check, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import {
+    Badge,
     Button,
     cn,
     Dialog,
@@ -151,7 +152,7 @@ export function ConnectDialog({
     const brands = useMemo(() => registry.deviceBrands(), []);
     const [brand, setBrand] = useState(brands[0]?.brand ?? "");
     const [chosen, setChosen] = useState(
-        registry.connectionsOfBrand(brands[0]?.brand ?? "")[0]?.id ?? ""
+        registry.recommendedConnection(brands[0]?.brand ?? "")?.id ?? ""
     );
     const [label, setLabel] = useState("");
     const [fields, setFields] = useState<Record<string, string>>({});
@@ -240,10 +241,10 @@ export function ConnectDialog({
 
     /** A make with one way in is not a question, so the second list is only drawn
      *  where there is something to weigh up - and picking a make always settles on
-     *  its best one, which is the first. */
+     *  its recommended one. */
     const pickBrand = (next: string) => {
         setBrand(next);
-        setChosen(registry.connectionsOfBrand(next)[0]?.id ?? "");
+        setChosen(registry.recommendedConnection(next)?.id ?? "");
         setFields({});
         setError("");
         setPairing(null);
@@ -358,7 +359,7 @@ export function ConnectDialog({
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">{t("connect.how")}</span>
                             <div className="flex flex-col gap-2">
-                                {ofBrand.map((entry, index) => (
+                                {ofBrand.map((entry) => (
                                     <button
                                         key={entry.id}
                                         type="button"
@@ -380,13 +381,12 @@ export function ConnectDialog({
                                             )}
                                         />
                                         <span className="flex min-w-0 flex-col gap-0.5">
-                                            <span className="text-sm font-medium">
+                                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
                                                 {registry.connectionWords(t, entry).label}
-                                                {index === 0 && (
-                                                    <span className="text-foreground-subtle">
-                                                        {" "}
+                                                {entry.recommended === true && (
+                                                    <Badge className="border-accent/30 bg-accent/10 text-accent">
                                                         {t("connect.recommended")}
-                                                    </span>
+                                                    </Badge>
                                                 )}
                                             </span>
                                             <span className="text-[0.6875rem] text-muted-foreground">

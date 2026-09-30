@@ -1005,7 +1005,7 @@
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",
-        "recommended": "- recommended",
+        "recommended": "Recommended",
         "title": "Connect devices",
         "reconnectIntro": "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes.",
         "intro": "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place.",

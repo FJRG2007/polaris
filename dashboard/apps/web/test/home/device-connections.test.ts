@@ -114,3 +114,27 @@ describe("a connection made by pairing", () => {
         ]);
     });
 });
+
+describe("the recommended way in", () => {
+    it("is marked on exactly one connection of every brand", () => {
+        for (const { brand } of registry.deviceBrands()) {
+            const marked = registry.connectionsOfBrand(brand).filter((connection) => connection.recommended);
+            expect(marked, brand).toHaveLength(1);
+        }
+    });
+
+    it("is listed first, so the order still reads best first", () => {
+        for (const { brand } of registry.deviceBrands()) {
+            expect(registry.connectionsOfBrand(brand)[0]?.recommended, brand).toBe(true);
+        }
+    });
+
+    it("is the app sign-in for Tuya and the web account for Nuki", () => {
+        expect(registry.recommendedConnection("Tuya")?.id).toBe("tuya-app");
+        expect(registry.recommendedConnection("Nuki")?.id).toBe("nuki-web");
+    });
+
+    it("is nothing for a brand that does not exist", () => {
+        expect(registry.recommendedConnection("Nobody")).toBeNull();
+    });
+});

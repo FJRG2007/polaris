@@ -14,6 +14,11 @@
  * fields from here, the schema validates them from here, and the driver is handed
  * them by name - so a fourth way in is an entry and a driver, and no form.
  *
+ * Each brand marks one as `recommended`: the one that is quickest to set up and
+ * keeps working with the least looking after. It is listed first, the picker
+ * starts on it and labels it, and the rest follow in the order they are worth
+ * trying.
+ *
  * Ordered best first within a brand, and "best" is stated rather than implied:
  * what reaches the device from anywhere, what keeps working when somebody else's
  * server is down, and what does not cost battery are not the same thing, and the
@@ -124,6 +129,9 @@ export interface DeviceConnection {
      *  somebody looking for it in their documentation has to find the same name. */
     readonly label: string;
     readonly reach: ConnectionReach;
+    /** The one of its brand the picker starts on and labels, and lists first:
+     *  quickest to set up and the least to look after. One per brand. */
+    readonly recommended?: boolean;
     /** One sentence in the picker: what it is and what it costs. */
     readonly summary: string;
     /** What its owner has to know before choosing it, where that is more than a
@@ -161,6 +169,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         logo: "nuki",
         label: en("connections.nuki-web.label"),
         reach: "anywhere",
+        // One token pasted from Nuki Web, for every lock on the account, from
+        // anywhere, with the account's record of who opened what. The local way
+        // in answers faster but needs a broker and only the newer locks have it.
+        recommended: true,
         summary: en("connections.nuki-web.summary"),
         note: en("connections.nuki-web.note"),
         steps: [
@@ -241,6 +253,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         logo: "",
         label: en("connections.mqtt-discovery.label"),
         reach: "same-network",
+        recommended: true,
         summary: en("connections.mqtt-discovery.summary"),
         note: en("connections.mqtt-discovery.note"),
         steps: [
@@ -289,6 +302,9 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         logo: "tuya",
         label: en("connections.tuya-app.label"),
         reach: "anywhere",
+        // A user code and a scan with the app the devices are already in,
+        // against a developer project linked to the account by hand.
+        recommended: true,
         summary: en("connections.tuya-app.summary"),
         note: en("connections.tuya-app.note"),
         steps: [
@@ -424,6 +440,13 @@ export function deviceBrands(): readonly DeviceBrand[] {
 
 export function connectionsOfBrand(brand: string): readonly DeviceConnection[] {
     return DEVICE_CONNECTIONS.filter((connection) => connection.brand === brand);
+}
+
+/** The way in a brand's picker starts on: its recommended one, or its first
+ *  where none is marked. */
+export function recommendedConnection(brand: string): DeviceConnection | null {
+    const ofBrand = connectionsOfBrand(brand);
+    return ofBrand.find((connection) => connection.recommended === true) ?? ofBrand[0] ?? null;
 }
 
 /**
