@@ -118,7 +118,7 @@
         "keepHint": "copias, 0 sin límite",
         "for": "Durante",
         "forHint": "días, 0 sin límite",
-        "under": "Por debajo de",
+        "under": "Menos de",
         "underHint": "GB, vacío sin límite",
         "goTo": "Destinos",
         "goToHint": "Cada destino recibe su propia copia, escrita en este orden. La primera es de la que se replican las demás.",

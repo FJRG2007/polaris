@@ -21,7 +21,7 @@
         "notChecked": "Aún sin comprobar.",
         "checking": "Comprobando...",
         "check": "Probar DNS",
-        "addDomain": "Añadir dominio",
+        "addDomain": "Nuevo dominio",
         "noDomains": "Sin dominios",
         "noDomainsBody": "Añade el dominio para el que este servidor recibe correo.",
         "firstDomain": "Principal",
@@ -70,14 +70,14 @@
         "now": "Ahora: {values}",
         "plan": {
             "create": "Crear",
-            "update": "Actualizar",
+            "update": "Cambiar",
             "unchanged": "Ya correcto",
             "conflict": "De otro",
             "skip": "Sin publicar"
         },
         "outcomes": {
             "created": "Creado",
-            "updated": "Actualizado",
+            "updated": "Cambiado",
             "unchanged": "Ya correcto",
             "left": "Sin tocar",
             "failed": "Falló"
@@ -468,7 +468,7 @@
         "intro": "Cada copia es la exportación propia del motor, hecha con el servidor en pausa mientras dura, así que todos los buzones se capturan en el mismo momento. El remitente reintenta el correo enviado mientras tanto. Restaurar vuelve a pausarlo y devuelve el servidor entero.",
         "notRunning": "Aún sin arrancar",
         "notRunningBody": "Se puede proteger cuando termine la instalación.",
-        "whole": "Todo el servidor",
+        "whole": "Servidor entero",
         "lastCopy": "Última copia <when></when>, {count} guardadas",
         "noCopy": "Sin copias aún",
         "lastFailed": "Última copia fallida",

@@ -258,7 +258,7 @@
         "leaveAsWas": "Dejarlo como estaba",
         "cancel": "Cancelar",
         "rowGone": "No se ha cambiado nada: esa fila ya no existe.",
-        "matchKeys": "Filtrar claves",
+        "matchKeys": "Buscar claves",
         "findRows": "Buscar en estas filas",
         "filterRows": "Filtrar filas",
         "refresh": "Actualizar",
