@@ -9,7 +9,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { findFields, isOneTimeCode, isUsername, readForm, type FieldFacts } from "../src/lib/fields";
+import {
+    findFields,
+    isOneTimeCode,
+    isUsername,
+    readForm,
+    type FieldFacts
+} from "../src/lib/fields";
 
 /** An input, with the defaults of an ordinary visible text box. */
 function field(over: Partial<FieldFacts> = {}): FieldFacts {
@@ -140,7 +146,12 @@ describe("what the form is for", () => {
             field({ type: "password", words: "nueva contraseña", form: FORM }),
             field({ type: "password", words: "repite la contraseña", form: FORM })
         ]);
-        expect(form).toMatchObject({ purpose: "change", password: 0, newPassword: 1, confirmPassword: 2 });
+        expect(form).toMatchObject({
+            purpose: "change",
+            password: 0,
+            newPassword: 1,
+            confirmPassword: 2
+        });
     });
 
     it("reads a box followed by its confirmation as a password being set", () => {
@@ -167,7 +178,10 @@ describe("what the form is for", () => {
         ]);
         expect(form).toMatchObject({ givenName: 0, familyName: 1, fullName: null, username: 2 });
 
-        const whole = readForm([field({ autocomplete: "name" }), field({ words: "email", type: "email" })]);
+        const whole = readForm([
+            field({ autocomplete: "name" }),
+            field({ words: "email", type: "email" })
+        ]);
         expect(whole).toMatchObject({ fullName: 0, username: 1 });
     });
 

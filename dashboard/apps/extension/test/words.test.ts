@@ -23,7 +23,9 @@ const spanishWords = wordsIn("es-ES");
 
 describe("the catalogs", () => {
     it("hold the same messages in both languages", () => {
-        expect([...flattenCatalog(spanish).keys()].sort()).toEqual([...flattenCatalog(english).keys()].sort());
+        expect([...flattenCatalog(spanish).keys()].sort()).toEqual(
+            [...flattenCatalog(english).keys()].sort()
+        );
     });
 });
 
@@ -67,9 +69,16 @@ describe("in Spanish", () => {
     it("reads the menu, the lock and a refusal", () => {
         expect(menuEntries(spanishWords)[3]?.title).toBe("Poner mi correo");
         expect(timeoutChoices(spanishWords)[4]?.label).toBe("1 hora");
-        const refused = readIntendedLogin({ name: "", username: "", password: "", uri: "" }, spanishWords);
-        expect(refused.ok ? null : refused.error).toBe("Ponle un nombre para poder encontrarlo después.");
-        expect(spanishWords("shell.greeting", { part: "morning", hasName: "yes", name: "Ana" })).toBe("Buenos días, Ana");
+        const refused = readIntendedLogin(
+            { name: "", username: "", password: "", uri: "" },
+            spanishWords
+        );
+        expect(refused.ok ? null : refused.error).toBe(
+            "Ponle un nombre para poder encontrarlo después."
+        );
+        expect(
+            spanishWords("shell.greeting", { part: "morning", hasName: "yes", name: "Ana" })
+        ).toBe("Buenos días, Ana");
     });
 });
 
@@ -77,14 +86,19 @@ describe("what the browser draws itself", () => {
     type ManifestEnv = { browser: string; manifestVersion: 2 | 3 };
     const build = config.manifest as unknown as (env: ManifestEnv) => Record<string, unknown>;
     const read = (language: string) =>
-        JSON.parse(readFileSync(new URL(`../public/_locales/${language}/messages.json`, import.meta.url), "utf8")) as Record<
-            string,
-            { message: string }
-        >;
+        JSON.parse(
+            readFileSync(
+                new URL(`../public/_locales/${language}/messages.json`, import.meta.url),
+                "utf8"
+            )
+        ) as Record<string, { message: string }>;
 
     it("comes from the locale files, English first, in every language they hold", () => {
         for (const manifestVersion of [2, 3] as const) {
-            const manifest = build({ browser: manifestVersion === 2 ? "firefox" : "chrome", manifestVersion });
+            const manifest = build({
+                browser: manifestVersion === 2 ? "firefox" : "chrome",
+                manifestVersion
+            });
             expect(manifest["default_locale"]).toBe("en");
             expect(manifest["name"]).toBe("__MSG_extName__");
             expect(manifest["description"]).toBe("__MSG_extDescription__");

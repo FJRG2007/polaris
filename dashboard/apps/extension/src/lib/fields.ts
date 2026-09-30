@@ -220,7 +220,9 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
     const username =
         candidates.find((index) => index !== single && isUsername(fields[index])) ?? null;
     const oneTimeCodeBoxes =
-        single !== undefined ? [single] : splitCode(fields, usable, [username, current, newPassword]);
+        single !== undefined
+            ? [single]
+            : splitCode(fields, usable, [username, current, newPassword]);
     const oneTimeCode = oneTimeCodeBoxes[0] ?? null;
 
     const purpose: FormPurpose =
@@ -275,7 +277,8 @@ function nameKind(field: FieldFacts | undefined): NameKind | null {
     if (token === "given-name") return "given";
     if (token === "family-name") return "family";
     if (token !== "" && token !== "off") return null;
-    if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words)) return null;
+    if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words))
+        return null;
     if (FAMILY_WORDS.test(field.words)) return "family";
     if (GIVEN_WORDS.test(field.words)) return "given";
     if (FULL_WORDS.test(field.words)) return "full";

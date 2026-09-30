@@ -47,7 +47,12 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
-import { askBackground, speakRepliesIn, type ItemSummary, type OfferedCapture } from "@/lib/messages";
+import {
+    askBackground,
+    speakRepliesIn,
+    type ItemSummary,
+    type OfferedCapture
+} from "@/lib/messages";
 import { words } from "@/lib/locale-store";
 import { ENGLISH, type Words } from "@/lib/words";
 
@@ -979,7 +984,9 @@ function note(field: HTMLInputElement, count: number): HTMLElement {
     const shadow = host.attachShadow({ mode: "closed" });
     const line = document.createElement("p");
     line.textContent =
-        count === 1 ? t("inline.breachOne") : t("inline.breachMany", { count: count.toLocaleString(t.locale) });
+        count === 1
+            ? t("inline.breachOne")
+            : t("inline.breachMany", { count: count.toLocaleString(t.locale) });
     line.style.cssText = `
         margin: 0;
         border: 1px solid hsl(0 60% 30%);

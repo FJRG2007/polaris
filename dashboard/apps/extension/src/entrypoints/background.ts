@@ -23,7 +23,13 @@ import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matc
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import type { WordKey } from "@/lib/words";
-import { MENU, MENU_ENTRIES, menuEntries, visibleEntries, type MenuTarget } from "@/lib/context-menu";
+import {
+    MENU,
+    MENU_ENTRIES,
+    menuEntries,
+    visibleEntries,
+    type MenuTarget
+} from "@/lib/context-menu";
 import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import {
     decrypt,
@@ -2403,10 +2409,8 @@ async function save(item: {
     });
 
     if (!outcome.ok) {
-        if (outcome.status === null)
-            return { ok: false, error: await say("errors.unreachable") };
-        if (outcome.status === 401)
-            return { ok: false, error: await say("errors.sessionEnded") };
+        if (outcome.status === null) return { ok: false, error: await say("errors.unreachable") };
+        if (outcome.status === 401) return { ok: false, error: await say("errors.sessionEnded") };
         // A 400 here is this client having built the item wrong, which is a defect
         // rather than something the reader can act on - so it is logged with the
         // status and they are told the one useful thing: nothing was saved.
@@ -2460,10 +2464,8 @@ async function changePassword(id: string, password: string): Promise<messages.Re
     const outcome = await protocol.updateLogin(base, access, id, rewritten);
 
     if (!outcome.ok) {
-        if (outcome.status === null)
-            return { ok: false, error: await say("errors.unreachable") };
-        if (outcome.status === 401)
-            return { ok: false, error: await say("errors.sessionEnded") };
+        if (outcome.status === null) return { ok: false, error: await say("errors.unreachable") };
+        if (outcome.status === 401) return { ok: false, error: await say("errors.sessionEnded") };
         if (outcome.status === 409) {
             // Somebody else saved it first. Bring their version down before saying
             // so, because the next thing anybody does is look at the item - and it
@@ -2737,7 +2739,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "unlock": {
                 const opened = await inTurn(() => unlock(request.password));
-                if (!opened.ok) return { ok: false, error: unlockRefusal(opened.reason, await words()) };
+                if (!opened.ok)
+                    return { ok: false, error: unlockRefusal(opened.reason, await words()) };
                 // Deliberately not waited on - an unlock should not sit on the
                 // network - but still in a turn, or the items it brings down could
                 // land after a switch and be read as the incoming account's.
