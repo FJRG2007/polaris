@@ -479,14 +479,13 @@ setup_done() {
     [ "$count" -gt 0 ]
 }
 
-# Give Let's Encrypt the contact address it insists on, taken from the first
-# administrator's account.
+# Give Let's Encrypt a contact address, taken from the first administrator's account.
 #
-# Without one no ACME account can be registered, so no certificate is ever issued:
-# the domain resolves, the edge routes it, and HTTPS fails with the deployment's own
-# certificate - a failure visible only in the edge's log, which is where it sat. The
-# address is already on this deployment and is the right person to email about an
-# expiring certificate, so it is used rather than asked for again.
+# The contact is optional to Let's Encrypt; what it refuses is the reserved address
+# this used to default to, which left no account registered and no certificate
+# issued. The edge now passes a reserved address as none, and one chosen in
+# Admin > Domains replaces this. It is the starting value for an install that has
+# not chosen one there.
 #
 # Never overwrites an address that is already set, and does nothing until an
 # administrator exists (a fresh install writes it on its first update instead).
@@ -650,14 +649,9 @@ main() {
         log "replaced the placeholder example.com address with the LAN default (:80, http://polaris.local)"
     fi
 
-    # The same reservation bites the ACME contact address, which cannot be rewritten
-    # to a working default the way an address can - nobody but the operator knows
-    # their mailbox. Left empty it falls back to admin@example.com, Let's Encrypt
-    # refuses to register the account, and no public certificate is ever issued: the
-    # domain resolves, the edge routes it, and HTTPS still fails. So say so instead.
-    if ! grep -qE '^POLARIS_ACME_EMAIL=.*@.*\.' .env || grep -qE '^POLARIS_ACME_EMAIL=.*example\.com' .env; then
-        err "set POLARIS_ACME_EMAIL in .env to a real address before pointing a public domain here, or Let's Encrypt will issue no certificate"
-    fi
+    # The ACME contact address needs nothing here. It is optional to Let's Encrypt,
+    # the edge passes a reserved one (example.com) as none rather than have the
+    # account refused, and it is chosen in Admin > Domains.
 
     setup_hostnames
     install_cli

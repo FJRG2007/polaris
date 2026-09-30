@@ -7,11 +7,14 @@
  */
 
 import { z } from "zod";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
+import { acmeEmailSchema } from "@/lib/tls/acme-contact";
+import { acmeContactStatus, restartEdge, saveAcmeEmail, type AcmeContactStatus } from "@/lib/tls/acme-edge";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import { getPortBlocks, getPortPolicy, setPortBlock, setPortPolicy } from "@/lib/apps/port-block-store";
@@ -275,4 +278,60 @@ export async function repairCallAddressAction(): Promise<{ ok: boolean; message:
     });
     revalidatePath("/admin/domains");
     return result;
+}
+
+/** How long after answering the edge is restarted: long enough for the answer to
+ *  leave through the edge that is about to stop. */
+const EDGE_RESTART_DELAY_MS = 1_500;
+
+/**
+ * Restart the edge once this request has been answered. Restarting it before would
+ * cut the connection the answer travels back on, and the page would report a save
+ * that worked as a failure.
+ */
+function restartEdgeAfterAnswer(): void {
+    after(async () => {
+        await new Promise((resolve) => setTimeout(resolve, EDGE_RESTART_DELAY_MS));
+        await restartEdge().catch((error) => console.error("polaris: could not restart the edge:", error));
+    });
+}
+
+/**
+ * Keep the certificate contact address, and have the edge pick it up.
+ *
+ * `restarting` says the edge is being restarted after this answer, which is what the
+ * card tells the reader: every page, this one included, stops answering for the
+ * second or two that takes.
+ */
+export async function saveAcmeEmailAction(
+    input: unknown
+): Promise<{ status: AcmeContactStatus; restarting: boolean } | { error: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = acmeEmailSchema.safeParse(input);
+    if (!parsed.success) {
+        const reason = parsed.error.issues[0]?.message === "reserved" ? "reserved" : "invalid";
+        return { error: t(`domains.acme.errors.${reason}`) };
+    }
+    try {
+        await saveAcmeEmail(parsed.data);
+    } catch (error) {
+        console.error("polaris: could not save the certificate contact:", error);
+        return { error: t("domains.acme.errors.saveFailed") };
+    }
+    await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "edge.acmeEmail" });
+    const status = await acmeContactStatus();
+    const restarting = status.canRestart && status.edge === "pending";
+    if (restarting) restartEdgeAfterAnswer();
+    return { status, restarting };
+}
+
+/** Restart the edge so it reads the address it has not yet. */
+export async function restartEdgeAction(): Promise<{ restarting: boolean }> {
+    const user = await requireAdmin();
+    const status = await acmeContactStatus();
+    if (!status.canRestart) return { restarting: false };
+    await recordAudit({ actorId: user.id, action: "domains.restartEdge", targetType: "setting", targetId: "edge.acmeEmail" });
+    restartEdgeAfterAnswer();
+    return { restarting: true };
 }

@@ -459,7 +459,7 @@ services:
   # network). TLS is automatic - Let's Encrypt (HTTP-01) for public domains, a
   # self-signed default cert for the local names and free sslip.io subdomains -
   # and :80 redirects to https. An unknown host 404s instead of falling through
-  # to the dashboard. Set POLARIS_ACME_EMAIL for Let's Encrypt. The same Traefik
+  # to the dashboard. The Let's Encrypt contact is chosen in Admin > Domains. The same Traefik
   # is installed on remote servers by the Deploy onboarding script.
   # v3.6+ auto-negotiates the Docker API version. Newer Docker Engines (28/29)
   # raised the minimum API version and reject Traefik's old 1.24 default, so an
@@ -470,6 +470,9 @@ services:
     restart: unless-stopped
     environment:
       DOCKER_API_VERSION: "1.44"
+      # The installer's certificate contact, used only until one is chosen in
+      # Admin > Domains (see the start-up below).
+      POLARIS_ACME_EMAIL: ${POLARIS_ACME_EMAIL:-}
     depends_on:
       - web
     # Traefik creates the access log itself, as root, mode 0644 - and the
@@ -488,6 +491,15 @@ services:
     # be the whole deployment answering nothing - so it is a best-effort prelude
     # and the exec happens regardless. `--` becomes $0, so the compose command
     # below arrives as "$@".
+    #
+    # The Let's Encrypt contact address is static configuration, read once here.
+    # It comes from `acme-email` in the dynamic directory, which the dashboard
+    # writes when one is chosen in Admin > Domains and restarts this container to
+    # apply - never from a file an operator has to edit. Until then it is the
+    # installer's. The contact is optional to Let's Encrypt, but an address at a
+    # reserved domain makes it refuse the account and issue nothing, so one of
+    # those - the old admin@example.com default among them - is passed as none.
+    # The file is not a route: the file provider reads only .toml/.yaml/.yml.
     entrypoint:
       - /bin/sh
       - -c
@@ -496,7 +508,12 @@ services:
         touch /var/log/traefik/access.log 2>/dev/null;
         chgrp 1000 /var/log/traefik/access.log 2>/dev/null;
         chmod 0664 /var/log/traefik/access.log 2>/dev/null;
-        exec /entrypoint.sh "$$@"
+        email="$${POLARIS_ACME_EMAIL:-}";
+        if [ -f /dynamic/acme-email ]; then email="$$(head -n 1 /dynamic/acme-email 2>/dev/null)"; fi;
+        case "$$email" in *@*.*) ;; *) email="";; esac;
+        case "$$email" in *[!A-Za-z0-9._%+@-]*) email="";; esac;
+        case "$${email#*@}" in example.com|*.example.com|example.net|*.example.net|example.org|*.example.org|*.example|*.invalid|*.localhost|*.test|*.local) email="";; esac;
+        exec /entrypoint.sh "$$@" $${email:+"--certificatesresolvers.letsencrypt.acme.email=$$email"}
       - --
     command:
       - "--providers.docker=true"
@@ -520,7 +537,6 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${POLARIS_ACME_EMAIL:-admin@example.com}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
     ports:
       - "80:80"

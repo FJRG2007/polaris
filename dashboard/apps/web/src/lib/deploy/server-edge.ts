@@ -40,6 +40,7 @@
 import { loadEnv } from "@polaris/config";
 import { onboardingScript } from "@polaris/deploy";
 import { publicAppUrl } from "@/lib/domain-service";
+import { currentAcmeEmail } from "@/lib/tls/acme-edge";
 import { getHostConnection } from "@/lib/host-service";
 import { recordServerEvent } from "@/lib/server-notes-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
@@ -242,10 +243,12 @@ export async function prepareServerEdge(
         // script runs as root on its behalf.
         owner: elevate ? connection.username : undefined,
         proxyNetwork,
-        // Where Let's Encrypt writes about an expiring certificate. Their own
-        // registration requires one; an empty string is refused by the API, so the
-        // operator setting it is what makes a certificate possible at all.
-        acmeEmail: env.POLARIS_ACME_EMAIL || "",
+        // The certificate contact chosen in Domains, the same one this machine's
+        // own edge registers with. Empty is a valid registration - the contact is
+        // optional to Let's Encrypt; an address at a reserved domain is what it
+        // refuses, and `currentAcmeEmail` never returns one. Restricted to
+        // characters that are inert on the command line it is placed on.
+        acmeEmail: (await currentAcmeEmail()).email,
         authSecret: env.POLARIS_AUTH_SECRET || undefined,
         // Where the guard sends somebody to sign in for a require-login rule. Only
         // an address reachable from wherever that visitor is, which is what

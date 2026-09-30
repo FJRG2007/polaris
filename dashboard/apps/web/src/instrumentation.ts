@@ -87,6 +87,13 @@ export async function register(): Promise<void> {
         console.error("polaris: could not prepare the call server key:", error)
     );
 
+    // The certificate contact chosen in Domains, put back where the edge reads it
+    // when it starts, for a volume that was recreated or restored since.
+    const { syncAcmeEmailFile } = await import("./lib/tls/acme-edge");
+    void syncAcmeEmailFile().catch((error) =>
+        console.error("polaris: could not publish the certificate contact:", error)
+    );
+
     // Same for the dashboard's own public hostnames, which the compose labels cannot
     // carry: they are fixed at `up` time, so a domain configured afterwards would only
     // reach the edge again the next time it was saved.

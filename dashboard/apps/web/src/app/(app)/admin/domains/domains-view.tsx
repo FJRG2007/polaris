@@ -28,6 +28,7 @@ import { DomainSetupWizard } from "./setup-wizard";
 import { DnsRecordsCard } from "./dns-records-card";
 import { AddressList } from "@/components/address-list";
 import { OwnerDomainsCard } from "./owner-domains-card";
+import { CertificateContactCard } from "./certificate-contact-card";
 import { PageSection } from "@/components/page-section";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -172,6 +173,10 @@ export function DomainsView() {
             )}
 
             <LocalCertificate />
+
+            {/* Beside the other certificate, and read on its own: it asks the host
+                daemon about the edge, which the overview above does not wait on. */}
+            <CertificateContactCard />
 
             <DnsRecordsCard />
 

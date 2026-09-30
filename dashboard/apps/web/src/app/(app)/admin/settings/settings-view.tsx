@@ -197,7 +197,6 @@ export function SettingsView({
     const [pending, startTransition] = useTransition();
     const [updating, setUpdating] = useState(false);
     const [updateMsg, setUpdateMsg] = useState<string | null>(null);
-    const [showManual, setShowManual] = useState(false);
     // Live update log, streamed from the shared file the updater writes.
     const [logText, setLogText] = useState("");
     const [logResult, setLogResult] = useState<UpdateResult | null>(null);
@@ -488,7 +487,6 @@ export function SettingsView({
     async function onUpdate() {
         setUpdating(true);
         setUpdateMsg(null);
-        setShowManual(false);
         setLogText("");
         setLogResult(null);
         // The host's clock before anything is asked for, so what the previous run
@@ -508,16 +506,11 @@ export function SettingsView({
             return; // stay in the updating state; completion reloads the page
         }
         setUpdating(false);
-        if (result === "unavailable") {
-            setUpdateMsg(t("settings.run.unavailable"));
-            setShowManual(true);
-        } else if (result === "disabled") {
-            setUpdateMsg(t("settings.run.disabled"));
-            setShowManual(true);
-        } else {
-            setUpdateMsg(t("settings.run.unreachable"));
-            setShowManual(true);
-        }
+        // Each says what this machine needs in order to update, in the reader's
+        // terms - never a command to type on it.
+        if (result === "unavailable") setUpdateMsg(t("settings.run.unavailable"));
+        else if (result === "disabled") setUpdateMsg(t("settings.run.disabled"));
+        else setUpdateMsg(t("settings.run.unreachable"));
     }
 
     // Fallback completion watcher, for an update that restarts the dashboard rather
@@ -849,17 +842,6 @@ export function SettingsView({
                                 </div>
                             ) : null}
                             {updateMsg ? <p className="text-foreground">{updateMsg}</p> : null}
-                            {showManual ? (
-                                <p>
-                                    {t.rich("settings.updates.manual", {
-                                        code: (chunks) => (
-                                            <code key="code" className="text-foreground">
-                                                {chunks}
-                                            </code>
-                                        )
-                                    })}
-                                </p>
-                            ) : null}
                             {/* Rendered on the outcome as well as the text: a run cut
                                 off before its first line of output has none, and
                                 hiding the block would take the report button with it. */}

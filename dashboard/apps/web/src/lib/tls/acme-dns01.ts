@@ -11,8 +11,8 @@
  * being checked against.
  */
 
-import { loadEnv } from "@polaris/config";
 import type { Dns01Provider } from "./dns01";
+import { currentAcmeEmail } from "./acme-edge";
 import { getSetting, setSetting } from "@/lib/setting-store";
 
 /** The ACME account key, kept so every order and renewal uses one registration.
@@ -58,7 +58,9 @@ export async function orderDns01Certificate(order: Dns01Order): Promise<{ certif
     const published = new Map<string, string>();
     const certificate = await client.auto({
         csr,
-        email: loadEnv().POLARIS_ACME_EMAIL || undefined,
+        // The address chosen in Domains, the same one the edge registers with; none
+        // is a valid registration.
+        email: (await currentAcmeEmail()).email || undefined,
         termsOfServiceAgreed: true,
         challengePriority: ["dns-01"],
         challengeCreateFn: async (authz, challenge, keyAuthorization) => {

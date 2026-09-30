@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
+import { CERTIFICATE_CONTACT_ID } from "./certificate-contact-card";
 import type { ServerEnvironment } from "@polaris/core";
 import { PageSection } from "@/components/page-section";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -1330,6 +1331,7 @@ function RouterAdviceNote({
     advice: NonNullable<ZoneDnsReport["router"]>;
     gameRules?: readonly RouterForwardRule[];
 }) {
+    const t = useTranslations("admin");
     const danger = advice.level === "danger";
     return (
         <div
@@ -1348,6 +1350,14 @@ function RouterAdviceNote({
                         ))}
                     </ol>
                 )}
+                {advice.key === "cert:untrusted" ? (
+                    <a
+                        href={`#${CERTIFICATE_CONTACT_ID}`}
+                        className="w-fit text-primary underline-offset-2 hover:underline"
+                    >
+                        {t("domainsSetup.certificateContactLink")}
+                    </a>
+                ) : null}
                 {advice.forward && (
                     <RouterSteps
                         server={advice.server}

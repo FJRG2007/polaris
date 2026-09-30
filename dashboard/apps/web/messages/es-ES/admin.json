@@ -531,6 +531,28 @@
             "emptyTitle": "Nada que editar",
             "emptyDescription": "Conecta un token de Cloudflare que pueda editar DNS y sus zonas aparecerán aquí.",
             "openIntegrations": "Abrir Integraciones"
+        },
+        "acme": {
+            "title": "Correo de certificados",
+            "description": "La dirección que se da a Let's Encrypt al emitir los certificados públicos de este servidor. Es opcional: se emiten igual sin ella.",
+            "label": "Correo de contacto",
+            "placeholder": "certs@tu-dominio.com",
+            "hint": "Let's Encrypt ya no avisa de caducidades, así que solo sirve para que pueda contactarte.",
+            "none": "Sin dirección: los certificados se piden sin ella, y Let's Encrypt lo acepta.",
+            "fromInstall": "Tomada de la instalación. Cámbiala aquí para usar otra, o bórrala para no usar ninguna.",
+            "errors": {
+                "invalid": "Eso no es una dirección de correo.",
+                "reserved": "Let's Encrypt rechaza las direcciones de dominios de ejemplo o de pruebas. Usa un buzón real o déjalo vacío.",
+                "saveFailed": "No se ha podido guardar la dirección. Inténtalo de nuevo."
+            },
+            "edge": {
+                "current": "El borde ya está al día con esto.",
+                "pending": "Guardado. El borde mantiene la dirección anterior hasta que se reinicie, lo que corta todos los dominios unos segundos.",
+                "restart": "Reiniciar el borde",
+                "restarting": "Reiniciando el borde. Las páginas pueden no cargar durante unos segundos.",
+                "outdated": "El borde de esta máquina es anterior a este ajuste y sigue usando la dirección de la instalación. <link>Instala la última actualización</link> y usará esta.",
+                "unknown": "El borde lee esto al arrancar y esta máquina no deja que Polaris lo reinicie, así que un cambio se aplica la próxima vez que se reinicie la máquina."
+            }
         }
     },
     "domainsPorts": {
@@ -902,7 +924,8 @@
                 "duckdns": "Apuntaría a la dirección compartida de tu operador, que no llega a este servidor.",
                 "generic": "No disponible en este tipo de servidor."
             }
-        }
+        },
+        "certificateContactLink": "Revisar el correo de certificados"
     },
     "email": {
         "title": "Correo cuenta",
@@ -2898,8 +2921,7 @@
             "lastChecked": "Última prueba",
             "never": "nunca",
             "viewChanges": "<link>Mira los cambios</link> antes de instalar, o actualiza ya: el panel sigue funcionando durante el relevo.",
-            "updateNow": "Actualizar",
-            "manual": "Ejecuta <code>polaris update</code> en el servidor para descargar las últimas imágenes y volver a desplegar."
+            "updateNow": "Actualizar"
         },
         "run": {
             "starting": "La actualización está empezando; esperando a que informe.",
@@ -2909,9 +2931,9 @@
             "lastFailed": "La última actualización falló (código de salida {code}). Mira el registro de abajo.",
             "reportFailed": "No se ha podido preparar el informe. Puedes adjuntar a mano el registro de arriba a una incidencia.",
             "started": "El panel sigue funcionando mientras arranca la nueva compilación; esta página se recarga cuando tome el relevo.",
-            "unavailable": "Este despliegue no instala sus propias actualizaciones; se actualiza desde la máquina en la que se ejecuta.",
-            "disabled": "La actualización automática está desactivada en este servidor.",
-            "unreachable": "No se ha podido contactar con el agente del servidor. Usa el comando manual de abajo.",
+            "unavailable": "Esta instalación no puede actualizarse desde aquí: se instaló sin la parte que instala las actualizaciones. Solo se actualiza instalándola de nuevo, igual que la primera vez. Tus datos y ajustes se conservan, y desde entonces este botón funciona.",
+            "disabled": "Las actualizaciones se desactivaron para esta máquina al instalarla, así que Polaris no las instala, ni desde aquí ni de forma programada.",
+            "unreachable": "La parte de Polaris que instala las actualizaciones no responde. Se reinicia sola, así que vuelve a intentarlo en un minuto. En la edición limitada no existe, y Polaris solo se actualiza instalándolo de nuevo.",
             "updated": "Actualizado. Recargando...",
             "slow": "Está tardando más de lo esperado. El registro de arriba sigue siendo el que está en directo.",
             "noLiveLog": "Actualizando. Este servidor no escribe registro en directo. Se volverá a conectar cuando Polaris vuelva...",

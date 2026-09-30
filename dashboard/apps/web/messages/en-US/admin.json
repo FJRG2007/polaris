@@ -531,6 +531,28 @@
             "emptyTitle": "No zone to edit",
             "emptyDescription": "Connect a Cloudflare token that can edit DNS, and its zones appear here.",
             "openIntegrations": "Open Integrations"
+        },
+        "acme": {
+            "title": "Certificate contact",
+            "description": "The address Let's Encrypt is given when it issues this server's public certificates. Optional: they are issued without one.",
+            "label": "Contact address",
+            "placeholder": "certs@your-domain.com",
+            "hint": "Let's Encrypt no longer sends expiry reminders, so this is only a way for it to reach you.",
+            "none": "No address: certificates are requested without one, which Let's Encrypt accepts.",
+            "fromInstall": "Taken from the installation. Change it here to use another address, or clear it to use none.",
+            "errors": {
+                "invalid": "That is not an email address.",
+                "reserved": "Let's Encrypt refuses addresses at example and test domains. Use a real mailbox, or leave it empty.",
+                "saveFailed": "The address could not be saved. Try again."
+            },
+            "edge": {
+                "current": "The edge is up to date with this.",
+                "pending": "Saved. The edge keeps the previous address until it restarts, which interrupts every domain for a few seconds.",
+                "restart": "Restart the edge",
+                "restarting": "Restarting the edge. Pages may not load for a few seconds.",
+                "outdated": "The edge on this machine predates this setting and still uses the address it was installed with. <link>Install the latest update</link> and it uses this one.",
+                "unknown": "The edge reads this when it starts, and this machine does not let Polaris restart it, so a change applies the next time the machine restarts."
+            }
         }
     },
     "domainsPorts": {
@@ -902,7 +924,8 @@
                 "duckdns": "Would point at your carrier's shared address, which does not reach this server.",
                 "generic": "Not available on this kind of server."
             }
-        }
+        },
+        "certificateContactLink": "Check the certificate contact"
     },
     "email": {
         "title": "Account mail",
@@ -2898,8 +2921,7 @@
             "lastChecked": "Last checked",
             "never": "never",
             "viewChanges": "<link>View changes</link> before installing, or update now - the dashboard stays up while it rolls over.",
-            "updateNow": "Update now",
-            "manual": "Run <code>polaris update</code> on the host to pull the latest images and redeploy."
+            "updateNow": "Update now"
         },
         "run": {
             "starting": "The update is starting; waiting for it to report.",
@@ -2909,9 +2931,9 @@
             "lastFailed": "The last update failed (exit code {code}). See the log below.",
             "reportFailed": "Could not prepare the report. The log above can be attached to an issue by hand.",
             "started": "The dashboard keeps serving while the new build starts; this page reloads when it takes over.",
-            "unavailable": "This deployment does not install its own updates; it is updated from the machine it runs on.",
-            "disabled": "Auto-update is disabled on this host.",
-            "unreachable": "Couldn't reach the host agent. Use the manual command below.",
+            "unavailable": "This installation cannot update itself from here: it was set up without the part that installs updates. It updates only by installing it again, the same way it was installed. Your data and settings are kept, and this button works from then on.",
+            "disabled": "Updates were switched off for this machine when it was set up, so Polaris does not install them, from here or on a schedule.",
+            "unreachable": "The part of Polaris that installs updates is not answering. It restarts on its own, so try again in a minute. In the limited edition it is not there at all, and Polaris updates only by installing it again.",
             "updated": "Updated - reloading...",
             "slow": "This is taking longer than expected. The log above is still the live one.",
             "noLiveLog": "Updating - this host writes no live log. Reconnecting when Polaris is back...",

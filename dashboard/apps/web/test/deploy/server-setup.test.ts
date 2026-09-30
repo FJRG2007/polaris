@@ -22,6 +22,7 @@ let events: { action: string; values?: unknown }[] = [];
 vi.mock("@polaris/config", () => ({
     loadEnv: () => ({ POLARIS_ACME_EMAIL: "ops@example.com", POLARIS_AUTH_SECRET: "s3cret-value" })
 }));
+vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => undefined }));
 vi.mock("@/lib/domain-service", () => ({
     publicAppUrl: async () => "https://polaris.example.com"
 }));
