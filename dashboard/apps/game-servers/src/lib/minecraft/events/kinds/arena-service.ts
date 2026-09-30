@@ -447,21 +447,34 @@ async function bringIn(ctx: KindContext): Promise<void> {
 async function stashAll(ctx: KindContext): Promise<void> {
     if (!(await ctx.atLeast([1, 17]))) return;
     const box = ctx.run.arena!.box;
-    const candidates = stash.spotsUnder({ x1: box.x1, z1: box.z1, x2: box.x2, z2: box.z2, y: box.y1 });
+    const candidates = stash.spotsUnder({
+        x1: box.x1,
+        z1: box.z1,
+        x2: box.x2,
+        z2: box.z2,
+        y: box.y1
+    });
     for (const one of ctx.run.entrants) {
         if (one.stash || !one.away) continue;
         const taken = ctx.run.entrants.flatMap((each) =>
             each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
         );
-        await stashService.stashIn(ctx.server, ctx.stashOwner, one.name, candidates, taken, async (kept) => {
-            ctx.run = {
-                ...ctx.run,
-                entrants: ctx.run.entrants.map((each) =>
-                    each.name === one.name ? { ...each, stash: kept } : each
-                )
-            };
-            await ctx.persist();
-        });
+        await stashService.stashIn(
+            ctx.server,
+            ctx.stashOwner,
+            one.name,
+            candidates,
+            taken,
+            async (kept) => {
+                ctx.run = {
+                    ...ctx.run,
+                    entrants: ctx.run.entrants.map((each) =>
+                        each.name === one.name ? { ...each, stash: kept } : each
+                    )
+                };
+                await ctx.persist();
+            }
+        );
     }
 }
 
@@ -606,7 +619,10 @@ async function buildTick(ctx: KindContext, lines: string[]): Promise<void> {
             : -1;
     const touring = index >= 0 ? plots[index]! : null;
     // The tour's spot over the roof, found clear once per plot.
-    const view = touring === null ? null : await tourView(ctx, memory, box, touring, options.plotSize, count);
+    const view =
+        touring === null
+            ? null
+            : await tourView(ctx, memory, box, touring, options.plotSize, count);
     const spotOf = (one: stored.Entrant) =>
         view ?? build.plotSpot(box, one.side, options.plotSize, count);
     const here = new Map(

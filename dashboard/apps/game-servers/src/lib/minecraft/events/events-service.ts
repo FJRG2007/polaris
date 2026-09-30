@@ -1450,7 +1450,14 @@ async function findPlace(
             // Nothing further out would do - the players live on an island, say:
             // an event that changes nothing and brings nothing hostile comes in
             // closer, halving the distance each try, and nearer a home.
-            const look = commands.searchReach(distance, radius, loop.run.placeTries, how.nearHome === true, clearance, NEAR_AFTER);
+            const look = commands.searchReach(
+                distance,
+                radius,
+                loop.run.placeTries,
+                how.nearHome === true,
+                clearance,
+                NEAR_AFTER
+            );
             point = commands.clearPoint(centre, look.reach, homes, Math.random, look.clearance);
         }
         if (!point) {
@@ -1470,7 +1477,10 @@ async function findPlace(
     if (await dropMark(server, x, z)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
         landed = point;
-        if (point && (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))) {
+        if (
+            point &&
+            (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))
+        ) {
             // The marker can come down a block or two from the column tried - an
             // older server spreads it - and so in the next chunk: that chunk is
             // the one held from now on, and the one tried let go of.
@@ -1673,9 +1683,19 @@ function kindContext(
         },
         persist: () => persist(installedAppId, loop),
         findPlace: (place, distance, radius, surface) =>
-            findPlace(installedAppId, loop, server, place, distance, radius, commands.HOME_CLEARANCE, true, {
-                surface: surface ?? "ground"
-            }),
+            findPlace(
+                installedAppId,
+                loop,
+                server,
+                place,
+                distance,
+                radius,
+                commands.HOME_CLEARANCE,
+                true,
+                {
+                    surface: surface ?? "ground"
+                }
+            ),
         giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),

@@ -4361,7 +4361,13 @@ describe("a meteor shower", () => {
         world.at = { Ana: [0, 64, 0], Ben: [10, 64, 0] };
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(70_000);
         expect(state().history[0]?.outcome).toBe("failed");
         // How each try looks: its own distance first, then in, as near as a home allows.
@@ -4370,7 +4376,9 @@ describe("a meteor shower", () => {
         expect(commands.searchReach(600, 1, 9, true, 48)).toEqual({ reach: 9, clearance: 9 });
         expect(commands.searchReach(600, 1, 9, false, 48)).toEqual({ reach: 600, clearance: 48 });
         const tried = world.sent
-            .map((line) => /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line))
+            .map((line) =>
+                /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line)
+            )
             .filter((match): match is RegExpExecArray => match !== null)
             .map((match) => [Number(match[1]), Number(match[2])] as const)
             // Where the simulated marker always comes down, held as it lands: not a try.
@@ -4577,7 +4585,12 @@ describe("a parkour race", () => {
         // Fall-proof before being moved off the course.
         const proof = world.sent.indexOf("effect give Ben minecraft:slow_falling 10 0 true");
         expect(proof).toBeGreaterThan(0);
-        expect(world.sent.findIndex((line, index) => index > proof && line.startsWith("execute in minecraft:overworld run tp Ben "))).toBeGreaterThan(proof);
+        expect(
+            world.sent.findIndex(
+                (line, index) =>
+                    index > proof && line.startsWith("execute in minecraft:overworld run tp Ben ")
+            )
+        ).toBeGreaterThan(proof);
         expect(world.inside.size).toBe(0);
         expect(after.stageLeftovers).toEqual([]);
         keptTheRules();
@@ -6111,13 +6124,22 @@ describe("a build battle", () => {
         // own game mode only once they are home, and the platform down last.
         const sent = world.sent;
         const proof = sent.indexOf("effect give Ana minecraft:slow_falling 10 0 true");
-        const home = sent.findIndex((line, index) => index > proof && /^execute in minecraft:overworld run tp Ana /.test(line));
+        const home = sent.findIndex(
+            (line, index) =>
+                index > proof && /^execute in minecraft:overworld run tp Ana /.test(line)
+        );
         expect(proof).toBeGreaterThan(0);
         expect(sent[proof + 1]).toBe("effect give Ana minecraft:resistance 10 4 true");
         expect(home).toBeGreaterThan(proof);
         expect(sent.lastIndexOf("gamemode survival Ana")).toBeGreaterThan(home);
-        const teardown = sent.findIndex((line) => line.includes(" minecraft:air replace minecraft:red_stained_glass"));
-        const everyone = sent.findIndex((line) => line.startsWith("execute in minecraft:overworld run effect give @e[") && line.endsWith("minecraft:slow_falling 10 0 true"));
+        const teardown = sent.findIndex((line) =>
+            line.includes(" minecraft:air replace minecraft:red_stained_glass")
+        );
+        const everyone = sent.findIndex(
+            (line) =>
+                line.startsWith("execute in minecraft:overworld run effect give @e[") &&
+                line.endsWith("minecraft:slow_falling 10 0 true")
+        );
         expect(everyone).toBeGreaterThan(home);
         expect(teardown).toBeGreaterThan(everyone);
         expect(after.arenaLeftovers).toEqual([]);
