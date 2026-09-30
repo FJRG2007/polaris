@@ -115,14 +115,7 @@ describe("the Challenges tab", () => {
         expect(screen.getByText("Challenges")).toBeTruthy();
         // The summary opens first; every other part is one press away.
         expect(screen.getByText("Season and bingo")).toBeTruthy();
-        for (const part of [
-            "Summary",
-            "Players",
-            "Community",
-            "Settings",
-            "Rewards",
-            "Catalog"
-        ]) {
+        for (const part of ["Summary", "Players", "Community", "Settings", "Rewards", "Catalog"]) {
             expect(screen.getByText(part)).toBeTruthy();
         }
         expect(screen.getByText("Today's challenges")).toBeTruthy();
