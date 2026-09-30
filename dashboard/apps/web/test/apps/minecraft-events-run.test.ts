@@ -1512,12 +1512,10 @@ describe("a mining rush, from start to podium", () => {
         ]);
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
         expect(world.sent).toContain("xp add Ana 15 levels");
-        // Ben is owed second place and taking part, kept for when he is back.
+        // Ben is owed second place - and no more, being on the podium - kept for
+        // when he is back.
         expect(after.pending.map((one) => one.player)).toEqual(["Ben"]);
-        expect(after.pending[0]?.reward.items.map((item) => item.id)).toEqual([
-            "minecraft:diamond",
-            "minecraft:experience_bottle"
-        ]);
+        expect(after.pending[0]?.reward.items.map((item) => item.id)).toEqual(["minecraft:diamond"]);
         // Everything the event made is taken down, and the side panel given back.
         expect(world.sent).toContain("scoreboard objectives remove pe_score");
         expect(world.sent).toContain("bossbar remove polaris:event");
@@ -2176,12 +2174,9 @@ describe("a prize a full inventory has no room for", () => {
         await play(3 * 60_000 + 4_000);
         const entry = state().history[0]!;
         const ana = entry.delivered.find((one) => one.name === "Ana");
-        // One slot's room: a diamond went in; the rest of the first place and the
-        // whole of the taking-part prize fell at her feet.
-        expect(ana?.items).toEqual([
-            { id: "minecraft:diamond", count: 5, dropped: 4 },
-            { id: "minecraft:experience_bottle", count: 8, dropped: 8 }
-        ]);
+        // One slot's room: a diamond went in; the rest of the first place fell at
+        // her feet (the taking-part prize is for those off the podium).
+        expect(ana?.items).toEqual([{ id: "minecraft:diamond", count: 5, dropped: 4 }]);
         expect(ana?.levels).toBe(15);
         const ben = entry.delivered.find((one) => one.name === "Ben");
         expect(ben?.items.every((one) => one.dropped === 0)).toBe(true);

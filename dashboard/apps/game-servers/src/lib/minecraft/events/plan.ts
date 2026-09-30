@@ -402,9 +402,10 @@ export function podium(
 }
 
 /**
- * What each player is owed: their place's prize, and the prize for taking part
- * on top of it. `took` is everybody who took part, as the event defines it.
- * Empty prizes are left out, so nobody is sent nothing.
+ * What each player is owed: their place's prize on the podium, and the prize
+ * for taking part for everybody else who took part - never both. `took` is
+ * everybody who took part, as the event defines it. Empty prizes are left out,
+ * so nobody is sent nothing.
  */
 export function prizes(
     placed: readonly Placed[],
@@ -427,6 +428,10 @@ export function prizes(
         });
     };
     for (const one of placed) add(one.name, byPlace[one.place] ?? { items: [], levels: 0 });
-    for (const name of took) if (!disqualified.has(name.toLowerCase())) add(name, rewards.everyone);
+    const onPodium = new Set(placed.map((one) => one.name.toLowerCase()));
+    for (const name of took) {
+        const key = name.toLowerCase();
+        if (!disqualified.has(key) && !onPodium.has(key)) add(name, rewards.everyone);
+    }
     return [...owed.entries()].map(([name, reward]) => ({ name, reward }));
 }

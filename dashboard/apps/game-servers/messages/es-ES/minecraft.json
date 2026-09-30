@@ -1670,7 +1670,7 @@
             "first": "1.º",
             "second": "2.º",
             "third": "3.º",
-            "takingPart": "por participar",
+            "takingPart": "el resto",
             "prizes": "Premios - {list}.",
             "noPrizes": "Sin premios.",
             "needsPlayers": "{count, plural, one {Necesita # jugador conectado.} other {Necesita # jugadores conectados.}}",
@@ -1797,7 +1797,7 @@
         },
         "prizes": {
             "entry": "{place} {reward}",
-            "everyone": "Todos: {reward}",
+            "everyone": "El resto: {reward}",
             "none": "Sin premios"
         }
     },
@@ -1873,13 +1873,13 @@
         "tiesShareAPlace": "Los empates comparten puesto.",
         "secondPlace": "Segundo puesto",
         "thirdPlace": "Tercer puesto",
-        "everybodyWhoTookPart": "Todos los que participaron",
-        "everybodyWhoSurvivedTheNight": "Todos los que sobrevivieron a la noche con alguna muerte.",
-        "everybodyWhoHeldThePoint": "Todos los que defendieron el punto durante una oleada y lucharon.",
-        "everybodyWhoJoinedAndCleared": "Todos los que se unieron y superaron al menos un salto.",
-        "everybodyWhoJoined": "Todos los que se unieron.",
+        "everybodyWhoTookPart": "El resto de participantes",
+        "everybodyWhoSurvivedTheNight": "Quien no suba al podio y haya sobrevivido a la noche con alguna muerte.",
+        "everybodyWhoHeldThePoint": "Quien no suba al podio y haya defendido el punto durante una oleada luchando.",
+        "everybodyWhoJoinedAndCleared": "Quien no suba al podio, se haya unido y haya superado al menos un salto.",
+        "everybodyWhoJoined": "Quien no suba al podio y se haya unido.",
         "nobodyButTheWinnerIn": "Nadie más que el ganador, en este.",
-        "everybodyWhoScoredAtAll": "Todos los que puntuaron algo.",
+        "everybodyWhoScoredAtAll": "Quien no suba al podio y haya puntuado algo.",
         "cancel": "Cancelar",
         "done": "Listo",
         "labels": {

@@ -1670,7 +1670,7 @@
             "first": "1st",
             "second": "2nd",
             "third": "3rd",
-            "takingPart": "taking part",
+            "takingPart": "everybody else",
             "prizes": "Prizes - {list}.",
             "noPrizes": "No prizes set.",
             "needsPlayers": "{count, plural, one {Needs # player on the server.} other {Needs # players on the server.}}",
@@ -1797,7 +1797,7 @@
         },
         "prizes": {
             "entry": "{place} {reward}",
-            "everyone": "All: {reward}",
+            "everyone": "Everybody else: {reward}",
             "none": "No prizes"
         }
     },
@@ -1873,13 +1873,13 @@
         "tiesShareAPlace": "Ties share a place.",
         "secondPlace": "Second place",
         "thirdPlace": "Third place",
-        "everybodyWhoTookPart": "Everybody who took part",
-        "everybodyWhoSurvivedTheNight": "Everybody who survived the night with a kill.",
-        "everybodyWhoHeldThePoint": "Everybody who held the point through a wave and fought.",
-        "everybodyWhoJoinedAndCleared": "Everybody who joined and cleared at least one jump.",
-        "everybodyWhoJoined": "Everybody who joined.",
+        "everybodyWhoTookPart": "Everybody else who took part",
+        "everybodyWhoSurvivedTheNight": "Everybody off the podium who survived the night with a kill.",
+        "everybodyWhoHeldThePoint": "Everybody off the podium who held the point through a wave and fought.",
+        "everybodyWhoJoinedAndCleared": "Everybody off the podium who joined and cleared at least one jump.",
+        "everybodyWhoJoined": "Everybody off the podium who joined.",
         "nobodyButTheWinnerIn": "Nobody but the winner, in this one.",
-        "everybodyWhoScoredAtAll": "Everybody who scored at all.",
+        "everybodyWhoScoredAtAll": "Everybody off the podium who scored at all.",
         "cancel": "Cancel",
         "done": "Done",
         "labels": {

@@ -343,7 +343,7 @@ describe("the podium and the prizes", () => {
         expect(placed).toEqual([{ place: 1, name: "Ben", score: 8 }]);
     });
 
-    it("owes a place's prize plus the one for taking part, and nothing empty", () => {
+    it("owes the podium its place's prize, everybody else who took part theirs, and nothing empty", () => {
         const rewards: catalog.Rewards = {
             first: { items: [{ id: "minecraft:diamond", count: 5 }], levels: 10 },
             second: catalog.NO_REWARD,
@@ -355,22 +355,16 @@ describe("the podium and the prizes", () => {
                 { place: 1, name: "Ana", score: 3 },
                 { place: 2, name: "Ben", score: 2 }
             ],
-            ["Ana", "Ben", "Cheat"],
+            ["ana", "Ben", "Cai", "Cheat"],
             rewards,
             new Set(["cheat"])
         );
+        // Ana: first place only, never the taking-part prize on top (in any
+        // casing); Ben's second place is empty, and he is on the podium, so
+        // nothing; Cai took part off the podium; the cheat gets nothing.
         expect(owed).toEqual([
-            {
-                name: "Ana",
-                reward: {
-                    items: [
-                        { id: "minecraft:diamond", count: 5 },
-                        { id: "minecraft:bread", count: 3 }
-                    ],
-                    levels: 10
-                }
-            },
-            { name: "Ben", reward: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 } }
+            { name: "Ana", reward: { items: [{ id: "minecraft:diamond", count: 5 }], levels: 10 } },
+            { name: "Cai", reward: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 } }
         ]);
     });
 });
