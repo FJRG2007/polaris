@@ -13,7 +13,7 @@ import { stripFormatting } from "../../parse";
 import type { ServerContainer } from "../../service";
 import { itemArgument, replaceSlot } from "../../item-argument";
 import { parseStack, type InventoryItem } from "../../inventory";
-import { readLiveContainer, readLiveInventory } from "../../inventory-service";
+import { askerOf, readLiveContainer, readLiveInventory } from "../../inventory-service";
 
 export type { Stash } from "./stash";
 
@@ -30,8 +30,6 @@ export function digest(item: InventoryItem): string | null {
     return createHash("sha256").update(item.data.snbt).digest("hex").slice(0, 16);
 }
 
-const ask = (server: ServerContainer) => (argv: readonly string[]) => server.say(argv);
-
 const passed = (reply: string) => /test passed/i.test(stripFormatting(reply));
 const unloaded = (reply: string) => /not loaded/i.test(stripFormatting(reply));
 
@@ -41,7 +39,7 @@ async function barrelHolds(
     server: ServerContainer,
     spot: stash.Spot
 ): Promise<InventoryItem[] | null> {
-    const reading = await readLiveContainer(ask(server), spot);
+    const reading = await readLiveContainer(askerOf(server), spot);
     if (reading.answered) return reading.unreadable > 0 ? null : reading.items;
     // "Found no elements matching Items": a barrel with nothing in it.
     return /found no elements/i.test(reading.said) ? [] : null;
@@ -80,7 +78,7 @@ export async function stashIn(
     taken: readonly stash.Spot[],
     save: (kept: stash.Stash) => Promise<void>
 ): Promise<stash.Stash | null> {
-    const reading = await readLiveInventory(ask(server), name);
+    const reading = await readLiveInventory(askerOf(server), name);
     if (!reading.answered || reading.unreadable > 0) return null;
     const kept = stash.keepFrom(reading.items, digest);
     if (kept.length === 0) return null;
@@ -111,7 +109,7 @@ export async function stashIn(
     }
     if (!stash.copiedWhole(kept, held, digest)) return undo();
     // Still carrying exactly that: nothing moved while it was copied.
-    const again = await readLiveInventory(ask(server), name);
+    const again = await readLiveInventory(askerOf(server), name);
     const now = stash.keepFrom(again.items, digest);
     if (
         !again.answered ||
@@ -201,7 +199,7 @@ export async function giveBack(
      *  what is dropped lands at their feet at home, never in the arena. */
     goHome?: () => Promise<boolean>
 ): Promise<GiveBack> {
-    const current = await readLiveInventory(ask(server), name);
+    const current = await readLiveInventory(askerOf(server), name);
     if (!current.answered) return "offline";
     // Each barrel still standing is read; one that is gone - broken, or lost
     // with its chunk - is rebuilt from the database copy once the rest is back.
@@ -239,7 +237,7 @@ export async function giveBack(
     const dropped = owed.filter((one) => !neverTaken(one) && !free(one.slot));
     await server.sayAll(into.flatMap((one) => stash.copyBack(name, kept.barrels, one) ?? []));
 
-    const after = await readLiveInventory(ask(server), name);
+    const after = await readLiveInventory(askerOf(server), name);
     const given: stash.Kept[] = [...stayed];
     for (const one of into) {
         // In its slot - or, moved there and then at once, in a slot that did not

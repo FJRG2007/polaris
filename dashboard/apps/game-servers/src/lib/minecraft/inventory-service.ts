@@ -43,6 +43,51 @@ const MOST_ENTRIES = 41;
  *  same whether it is driven by a screen or by the snapshot sweep. */
 type Ask = (argv: readonly string[]) => Promise<string>;
 
+/** Asking several things in one trip, each answer or null for one that did not
+ *  arrive whole (`ServerContainer.sayEach`). */
+type AskEach = (commands: readonly (readonly string[])[]) => Promise<(string | null)[]>;
+
+/**
+ * How the game is asked: one command at a time, and - where the server has it -
+ * several in one trip. A caller without the second reads exactly as before.
+ */
+export interface Asker {
+    readonly ask: Ask;
+    readonly askEach?: AskEach | undefined;
+}
+
+/** The asker for a server's container: its `say`, and its `sayEach` where it has one. */
+export function askerOf(server: ServerContainer): Asker {
+    return {
+        ask: (argv) => server.say(argv),
+        askEach: server.sayEach ? (commands) => server.sayEach!(commands) : undefined
+    };
+}
+
+/**
+ * How many stack-by-stack questions go in one trip. A stack's answer is a few
+ * hundred bytes and at most one RCON packet (4 KiB), and one trip hands back 16
+ * KiB before it is cut; an answer cut off is asked again on its own, so this only
+ * decides how often that happens, never whether the bag is read right.
+ */
+const ENTRIES_PER_TRIP = 10;
+
+/** And how many whole bags: each answer can be a full 4 KiB packet, and three of
+ *  them still come back whole. */
+const BAGS_PER_TRIP = 3;
+
+/** One command's answer from a batch, asking it again alone when it did not arrive. */
+async function eachAnswered(asker: Asker, commands: readonly (readonly string[])[]): Promise<string[]> {
+    const batch = asker.askEach
+        ? await asker.askEach(commands).catch(() => commands.map(() => null))
+        : commands.map(() => null);
+    const answers: string[] = [];
+    for (const [index, argv] of commands.entries()) {
+        answers.push(batch[index] ?? (await asker.ask(argv)));
+    }
+    return answers;
+}
+
 /** A live read, and how it went. */
 export interface LiveReading {
     readonly items: InventoryItem[];
@@ -72,10 +117,35 @@ export interface LiveReading {
  * So the whole bag is still asked for first, because for most players it fits and
  * costs one round trip. When what comes back does not close, the same question is
  * asked one entry at a time: each stack is its own reply, and a single stack fits.
- * That costs a round trip per stack and is only paid by the bags that need it.
+ * Where the server can take several questions in one trip (`Asker.askEach`), the
+ * entries go ten to a trip rather than one, so a full bag is five trips, not
+ * forty-one; only the bags that need it pay even that.
  */
-export async function readLiveInventory(ask: Ask, player: string): Promise<LiveReading> {
-    return readLiveList(ask, ["entity", player], "Inventory", MOST_ENTRIES);
+export async function readLiveInventory(asker: Ask | Asker, player: string): Promise<LiveReading> {
+    const [reading] = await readLiveInventories(asker, [player]);
+    return reading!;
+}
+
+/**
+ * Several players' bags, in as few trips as they fit: every whole bag in one, then
+ * the ones that came back cut off a batch of stacks at a time. An export of the
+ * whole server used to cost a trip per player, and one per stack for every big bag.
+ */
+export async function readLiveInventories(
+    asker: Ask | Asker,
+    players: readonly string[]
+): Promise<LiveReading[]> {
+    const how = typeof asker === "function" ? { ask: asker } : asker;
+    const wholes: string[] = [];
+    for (let start = 0; start < players.length; start += BAGS_PER_TRIP) {
+        const some = players.slice(start, start + BAGS_PER_TRIP);
+        wholes.push(...(await eachAnswered(how, some.map((player) => ["data", "get", "entity", player, "Inventory"]))));
+    }
+    const readings: LiveReading[] = [];
+    for (const [index, player] of players.entries()) {
+        readings.push(await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, wholes[index]!));
+    }
+    return readings;
 }
 
 /** How many stacks a barrel or a chest holds. */
@@ -87,14 +157,24 @@ const CONTAINER_ENTRIES = 27;
  * the Overworld, which is where the command source stands.
  */
 export async function readLiveContainer(
-    ask: Ask,
+    asker: Ask | Asker,
     at: { readonly x: number; readonly y: number; readonly z: number }
 ): Promise<LiveReading> {
-    return readLiveList(ask, ["block", String(at.x), String(at.y), String(at.z)], "Items", CONTAINER_ENTRIES);
+    const how = typeof asker === "function" ? { ask: asker } : asker;
+    const target = ["block", String(at.x), String(at.y), String(at.z)];
+    const whole = await how.ask(["data", "get", ...target, "Items"]);
+    return fromWhole(how, target, "Items", CONTAINER_ENTRIES, whole);
 }
 
-async function readLiveList(ask: Ask, target: readonly string[], path: string, most: number): Promise<LiveReading> {
-    const whole = stripFormatting(await ask(["data", "get", ...target, path]));
+/** A list read from its whole-list answer, and a stack at a time when that answer was cut off. */
+async function fromWhole(
+    asker: Asker,
+    target: readonly string[],
+    path: string,
+    most: number,
+    answer: string
+): Promise<LiveReading> {
+    const whole = stripFormatting(answer);
     if (!isDataReply(whole)) return { items: [], answered: false, chunked: false, unreadable: 0, said: whole };
 
     const items = parseInventory(whole);
@@ -104,15 +184,34 @@ async function readLiveList(ask: Ask, target: readonly string[], path: string, m
         return { items, answered: true, chunked: false, unreadable: 0, said: whole };
     }
 
+    // A batch of entries per trip, stopping at the batch the list ended in. The
+    // list is compact, so past its end every entry is refused; asking a few past
+    // it inside a trip already being made costs nothing worth saving.
     const found: InventoryItem[] = [];
     let unreadable = 0;
-    for (let index = 0; index < most; index += 1) {
-        const reply = stripFormatting(await ask(["data", "get", ...target, `${path}[${index}]`]));
-        // "Found no elements matching Inventory[7]" - the list ended.
-        if (!isDataReply(reply)) break;
-        const stack = parseStack(reply);
-        if (stack) found.push(stack);
-        else unreadable += 1;
+    let ended = false;
+    for (let start = 0; start < most && !ended; start += ENTRIES_PER_TRIP) {
+        const indexes = Array.from(
+            { length: Math.min(ENTRIES_PER_TRIP, most - start) },
+            (_, offset) => start + offset
+        );
+        const commands = asker.askEach
+            ? indexes.map((index) => ["data", "get", ...target, `${path}[${index}]`])
+            : [];
+        const batch = asker.askEach ? await eachAnswered(asker, commands) : null;
+        for (const [position, index] of indexes.entries()) {
+            const reply = stripFormatting(
+                batch ? batch[position]! : await asker.ask(["data", "get", ...target, `${path}[${index}]`])
+            );
+            // "Found no elements matching Inventory[7]" - the list ended.
+            if (!isDataReply(reply)) {
+                ended = true;
+                break;
+            }
+            const stack = parseStack(reply);
+            if (stack) found.push(stack);
+            else unreadable += 1;
+        }
     }
     return {
         items: found.sort((left, right) => left.slot - right.slot),
@@ -166,7 +265,7 @@ export async function writeSnapshot(
 /**
  * Read every player who is on and keep what they are carrying.
  *
- * One round trip per player, through a single container handshake. A player whose
+ * Every bag in one trip where they fit, through a single container handshake. A player whose
  * bag cannot be read is skipped rather than stored empty - the old snapshot, however
  * stale, is a truer answer than a fabricated empty one.
  */
@@ -177,9 +276,10 @@ export async function snapshotOnlinePlayers(
     if (server.edition !== "java" || players.length === 0) return 0;
     const takenAt = new Date();
     let kept = 0;
-    for (const player of players) {
+    const readings = await readLiveInventories(askerOf(server), players).catch(() => null);
+    for (const [index, player] of players.entries()) {
         try {
-            const reading = await readLiveInventory(server.say, player);
+            const reading = readings?.[index] ?? (await readLiveInventory(askerOf(server), player));
             // A refusal is not a bag. Storing what it parsed to would replace a
             // real copy from ten minutes ago with an empty one, which is the copy
             // somebody reads after the player has already logged off.

@@ -30,6 +30,7 @@ import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { PLAYER_LOG_SCRIPT, playerLogLines } from "./player-log";
+import { sayEachReplies, sayEachScript } from "./say-each";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
@@ -578,6 +579,13 @@ export interface ServerContainer {
      */
     sayAll(lines: readonly string[]): Promise<void>;
     /**
+     * Send several commands and hand back each one's answer, in as few trips to
+     * the container as fit (see `say-each`). Null for an answer that did not
+     * arrive whole - ask that one again with `say`. Optional so a stand-in for a
+     * server can leave it out; everything that uses it falls back to `say`.
+     */
+    sayEach?(commands: readonly (readonly string[])[]): Promise<(string | null)[]>;
+    /**
      * Stream a file out of the container, as bytes.
      *
      * `run` collects its output into a string, which is right for a command's
@@ -639,11 +647,43 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
         },
         say: (argv) => sendGameCommand(ports, install, argv),
         sayAll: (lines) => sendGameLines(ports, install, lines),
+        sayEach: (commands) => sendGameCommands(ports, install, commands),
         readFile: (path) => ports.readFile(install.container, path),
         trimWorld: ports.trimWorld
             ? (script, options) => ports.trimWorld!(install.container, script, options)
             : null
     };
+}
+
+/**
+ * Several commands and their answers, one trip into the container per batch.
+ *
+ * Java only: Bedrock's console answers nowhere a command can read back, so it
+ * takes them one at a time. In one RCON turn, so nothing else's answer lands in
+ * between. A batch the container refused is answered as missing, which the
+ * caller asks again one command at a time.
+ */
+async function sendGameCommands(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    commands: readonly (readonly string[])[]
+): Promise<(string | null)[]> {
+    for (const argv of commands) assertSafeCommand(argv);
+    if (commands.length === 0) return [];
+    if (install.edition !== "java") {
+        const answers: (string | null)[] = [];
+        for (const argv of commands)
+            answers.push(await sendGameCommand(ports, install, argv).catch(() => null));
+        return answers;
+    }
+    const result = await inRconTurn(install.installedAppId, () =>
+        withTimeout(
+            ports.runIn(install.container, ["sh", "-c", sayEachScript(commands)]),
+            COMMAND_TIMEOUT_MS * 2,
+            gameMessage("games", "lib.noAnswerInTime")
+        )
+    );
+    return sayEachReplies(result.output, commands.length);
 }
 
 /** Room for one batch in a command's arguments, in base64 characters. */

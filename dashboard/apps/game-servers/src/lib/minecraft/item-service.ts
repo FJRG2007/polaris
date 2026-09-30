@@ -17,7 +17,7 @@ import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { planStackMove } from "./stack-move";
 import { maxStackFor, normalizeItemId, stacksFor } from "./items";
-import { readLiveInventory } from "./inventory-service";
+import { askerOf, readLiveInventory } from "./inventory-service";
 import { parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "../recent-items";
@@ -374,7 +374,7 @@ export async function transferInventory(
 ): Promise<BagTransfer> {
     if (from.toLowerCase() === to.toLowerCase()) refuse("same");
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const reading = await readLiveInventory((argv) => server.say(argv), from);
+        const reading = await readLiveInventory(askerOf(server), from);
         if (!reading.answered)
             throw new Error(gameMessage("games", "lib.senderOffline", { name: from }));
         let moved = 0;
