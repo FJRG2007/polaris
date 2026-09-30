@@ -48,6 +48,23 @@ import * as stashService from "./kinds/stash-service";
 import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
+import { gameMessage, gameMessageIn } from "../../game-message";
+import type { GameKey } from "../../../../messages";
+
+type RefusalKey = GameKey<"minecraft"> extends infer K
+    ? K extends `events.errors.${infer R}`
+        ? R
+        : never
+    : never;
+
+/** Why the screen's request was refused, carried as its catalog key until the
+ *  action that answers it writes it in the reader's language (`messageText`). */
+function refused(key: RefusalKey, params?: Readonly<Record<string, string | number>>): string {
+    return gameMessage("minecraft", `events.errors.${key}`, params);
+}
+
+/** A carried sentence in the history's own words, which are English. */
+const english = (text: string): string => gameMessageIn("en-US", text);
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
@@ -297,7 +314,7 @@ export async function updateEventState(
         });
         if (written.count > 0) return next;
     }
-    throw new Error("The server's settings kept changing while this was saved. Try again.");
+    throw new Error(refused("keptChanging"));
 }
 
 /** Save the events set up on the screen. Checked again here: this is the one
@@ -307,14 +324,14 @@ export async function saveEventsConfig(
     input: unknown
 ): Promise<catalog.EventsConfig> {
     const parsed = catalog.eventsConfigSchema.safeParse(input);
-    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Check the events");
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? refused("check"));
     const value = parsed.data;
     for (let attempt = 0; attempt < WRITE_TRIES; attempt += 1) {
         const row = await prisma.installedApp.findUnique({
             where: { id: installedAppId },
             select: { config: true, status: true }
         });
-        if (!row || row.status === "removed") throw new Error("That server is not here");
+        if (!row || row.status === "removed") throw new Error(refused("noServer"));
         const config = readInstallConfig(row.config);
         const written = await prisma.installedApp.updateMany({
             where: { id: installedAppId, config: row.config },
@@ -332,7 +349,7 @@ export async function saveEventsConfig(
             return value;
         }
     }
-    throw new Error("The server's settings kept changing while this was saved. Try again.");
+    throw new Error(refused("keptChanging"));
 }
 
 // ------------------------------------------------------------------ what the screen shows
@@ -366,8 +383,14 @@ export interface EventsView {
 
 export async function eventsView(installedAppId: string): Promise<EventsView> {
     const row = await readRow(installedAppId);
-    if (!row) throw new Error("That server is not here");
-    const config = settingsOf(row.config);
+    if (!row) throw new Error(refused("noServer"));
+    // A server that never saved its events is shown one of each, named in the
+    // language its players read - which is what saving them keeps.
+    const config = catalog.readEventsConfig(
+        row.config,
+        readSchedule(row.config).timezone,
+        await speechService.homeLanguage(row.ownerId, catalog.chosenLanguage(row.config))
+    );
     const state = stored.readEventState(row.config);
     const run = loops.get(installedAppId)?.run ?? state.run;
     let standings: { name: string; score: number }[] = [];
@@ -474,19 +497,19 @@ export async function startEvent(input: {
     startedBy: string | null;
 }): Promise<stored.EventRun> {
     const row = await readRow(input.installedAppId);
-    if (!row) throw new Error("That server is not here");
+    if (!row) throw new Error(refused("noServer"));
     if (editionOf(row.catalogId) === "bedrock") {
-        throw new Error("Events run on Java servers only");
+        throw new Error(refused("javaOnly"));
     }
     const config = settingsOf(row.config);
     const preset = config.presets.find((one) => one.id === input.presetId);
-    if (!preset) throw new Error("That event no longer exists");
+    if (!preset) throw new Error(gameMessage("minecraft", "events.problems.eventGone"));
     if (!preset.enabled && input.trigger !== "manual")
-        throw new Error("That event is switched off");
+        throw new Error(refused("switchedOff"));
 
     const seen = await sample(row.ownerId, input.installedAppId);
-    if (seen === null) throw new Error("The server is not running");
-    if (seen.size === 0) throw new Error("Nobody is on the server");
+    if (seen === null) throw new Error(refused("notRunning"));
+    if (seen.size === 0) throw new Error(refused("nobodyOn"));
     // The chunks somebody already keeps loaded - a farm, a spawn - before the
     // event loads any: whatever it lets go of at the end, never these.
     const keepForced = await withServerContainer(
@@ -499,14 +522,18 @@ export async function startEvent(input: {
     const active = plan.playersFor(preset, seen, config.settings.afkMinutes, Date.now()).length;
     const needed = catalog.activeNeeded(preset, config.settings);
     if (input.trigger !== "manual" && active < needed) {
-        const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
         throw new Error(
-            `Only ${active} of the ${seen.size} players on are active${where}; this event waits for ${needed}`
+            refused("tooFewActive", {
+                active,
+                count: seen.size,
+                needed,
+                overworld: catalog.needsOverworld(preset) ? "yes" : "no"
+            })
         );
     }
     if (input.trigger !== "manual") {
         const busy = plan.busyReason(seen, config.settings.afkMinutes, Date.now());
-        if (busy) throw new Error(`Not now: ${busy}`);
+        if (busy) throw new Error(refused("notNow", { reason: busy }));
     }
     // Peaceful takes every hostile mob away the moment it appears: a blood moon
     // with no mobs, a boss that is gone before anybody sees it.
@@ -517,9 +544,7 @@ export async function startEvent(input: {
             async (server) => commands.isPeaceful(await server.say([commands.READ_DIFFICULTY]))
         ).catch(() => false);
         if (peaceful) {
-            throw new Error(
-                "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first."
-            );
+            throw new Error(refused("peaceful"));
         }
     }
     // Players who cannot hurt each other have nothing to duel with. Read from
@@ -529,9 +554,7 @@ export async function startEvent(input: {
             readContainerFile(server, SERVER_PROPERTIES)
         ).catch(() => null);
         if (properties !== null && parseProperties(properties).pvp === "false") {
-            throw new Error(
-                "Player versus player is Blocked on this server, and a duel needs it. Allow it under Settings first."
-            );
+            throw new Error(refused("pvpBlocked"));
         }
     }
     // The kit's marker, and what a dropped item remembers of who threw it, are
@@ -542,7 +565,9 @@ export async function startEvent(input: {
         ).catch(() => null);
         if (recent === false) {
             throw new Error(
-                `${catalog.KIND_INFO[preset.kind].label} needs Minecraft 1.16 or later, and this server runs an older one.`
+                refused("needsNewer", {
+                    kind: gameMessage("minecraft", `events.kinds.${preset.kind}.label`)
+                })
             );
         }
     }
@@ -607,10 +632,10 @@ export async function startEvent(input: {
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
-        if (state.run) throw new Error("Another event is on. Let it finish or cancel it first.");
+        if (state.run) throw new Error(refused("anotherOn"));
         return { ...state, run, waiting: null };
     });
-    if (!stored) throw new Error("That server is not here");
+    if (!stored) throw new Error(refused("noServer"));
     startLoop(row.ownerId, input.installedAppId, run, config.settings);
     return run;
 }
@@ -624,7 +649,7 @@ export async function cancelEvent(ownerId: string, installedAppId: string): Prom
     const state = await updateEventState(installedAppId, (current) =>
         current.run ? { ...current, run: { ...current.run, cancelled: true } } : current
     );
-    if (!state?.run) throw new Error("No event is on");
+    if (!state?.run) throw new Error(refused("noneOn"));
     if (!loop) {
         const row = await readRow(installedAppId);
         if (row) startLoop(ownerId, installedAppId, state.run, settingsOf(row.config).settings);
@@ -646,8 +671,8 @@ export async function startNow(ownerId: string, installedAppId: string): Promise
             ? { ...current, run: skipped(current.run) }
             : current
     );
-    if (!state?.run || state.run.cancelled) throw new Error("No event is on");
-    if (state.run.phase !== "countdown") throw new Error("It has already started");
+    if (!state?.run || state.run.cancelled) throw new Error(refused("noneOn"));
+    if (state.run.phase !== "countdown") throw new Error(refused("alreadyStarted"));
     const loop = loops.get(installedAppId);
     if (loop) {
         if (loop.run.phase === "countdown") loop.run = skipped(loop.run);
@@ -672,7 +697,7 @@ export async function forgetPending(installedAppId: string, pendingId: string): 
  */
 export async function retryStash(installedAppId: string, id: string): Promise<stashService.GiveBack> {
     const row = await readRow(installedAppId);
-    if (!row) throw new Error("That server is not here");
+    if (!row) throw new Error(refused("noServer"));
     return withServerContainer(row.ownerId, installedAppId, async (server) => {
         if (!server.running) return "offline" as const;
         return stashService.retryStash(server, installedAppId, id);
@@ -3551,7 +3576,7 @@ async function sweepOne(
         if (busy && stillDue.has(entry.id)) {
             await updateEventState(installedAppId, (current) => ({
                 ...current,
-                waiting: `Waiting: ${busy}`
+                waiting: gameMessage("minecraft", "events.waiting.busyNow", { reason: busy })
             }));
             continue;
         }
@@ -3560,7 +3585,7 @@ async function sweepOne(
             scheduleRuns: { ...current.scheduleRuns, [entry.id]: now }
         }));
         if (busy) {
-            await skip(installedAppId, preset, "scheduled", `Skipped: ${busy}`);
+            await skip(installedAppId, preset, "scheduled", `Skipped: ${english(busy)}`);
             continue;
         }
         const needed = catalog.activeNeeded(preset, settings.settings);
@@ -3589,7 +3614,7 @@ async function sweepOne(
                 installedAppId,
                 preset,
                 "scheduled",
-                `Skipped: ${error instanceof Error ? error.message : "it could not start"}`
+                `Skipped: ${error instanceof Error ? english(error.message) : "it could not start"}`
             );
         }
     }
@@ -3624,7 +3649,10 @@ async function sweepOne(
     } catch (error) {
         await updateEventState(installedAppId, (current) => ({
             ...current,
-            waiting: error instanceof Error ? error.message : "The drawn event could not start"
+            waiting:
+                error instanceof Error
+                    ? error.message
+                    : gameMessage("minecraft", "events.waiting.couldNotStart")
         }));
         return false;
     }

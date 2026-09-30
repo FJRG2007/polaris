@@ -13,6 +13,18 @@
  */
 
 import { z } from "zod";
+import type { GameKey } from "../../../../messages";
+import { gameMessage } from "../../game-message";
+
+/** A schema's complaint, carried as its catalog key until a reader's language is
+ *  known (`lib/game-message`): the screen and the actions write it out. */
+type ProblemKey = GameKey<"minecraft"> extends infer K
+    ? K extends `events.problems.${infer P}`
+        ? P
+        : never
+    : never;
+const problem = (key: ProblemKey, params?: Readonly<Record<string, number>>): string =>
+    gameMessage("minecraft", `events.problems.${key}`, params);
 
 export const EVENT_KINDS = [
     "mining-rush",
@@ -58,13 +70,17 @@ export const rewardItemSchema = z.object({
         .string()
         .trim()
         .toLowerCase()
-        .regex(ITEM_ID, "Write the item as namespace:id, like minecraft:diamond"),
-    count: z.number().int().min(1, "At least one").max(256, "At most 256")
+        .regex(ITEM_ID, problem("itemId")),
+    count: z
+        .number()
+        .int()
+        .min(1, problem("atLeast", { count: 1 }))
+        .max(256, problem("atMost", { count: 256 }))
 });
 
 export const rewardSchema = z.object({
-    items: z.array(rewardItemSchema).max(6, "At most six items per reward"),
-    levels: z.number().int().min(0).max(100, "At most 100 levels")
+    items: z.array(rewardItemSchema).max(6, problem("itemsPerReward", { count: 6 })),
+    levels: z.number().int().min(0).max(100, problem("levelsAtMost", { count: 100 }))
 });
 
 export type Reward = z.infer<typeof rewardSchema>;
@@ -193,14 +209,19 @@ export const optionsSchemas = {
             regeneration: z.boolean().default(false)
         })
         .refine((value) => value.haste || value.luck || value.speed || value.regeneration, {
-            message: "Choose at least one effect"
+            message: problem("chooseEffect")
         }),
     "king-of-the-hill": z.object({
         place: placeSchema.default({ mode: "players" }),
         radius: z.number().int().min(3).max(20).default(6)
     }),
     "treasure-hunt": z.object({
-        chests: z.number().int().min(1, "At least one").max(10, "At most 10").default(5),
+        chests: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(10, problem("atMost", { count: 10 }))
+            .default(5),
         /** How far from the players the chests are hidden, at most. */
         distance: z.number().int().min(50).max(1000).default(300),
         loot: z.enum(LOOT_TABLES).default("dungeon")
@@ -215,41 +236,86 @@ export const optionsSchemas = {
     "xp-boost": z
         .object({
             /** Experience points on top of the game's own, per mob killed. */
-            perKill: z.number().int().min(0).max(100, "At most 100").default(5),
+            perKill: z.number().int().min(0).max(100, problem("atMost", { count: 100 })).default(5),
             /** And per ore block mined. */
-            perOre: z.number().int().min(0).max(100, "At most 100").default(3)
+            perOre: z.number().int().min(0).max(100, problem("atMost", { count: 100 })).default(3)
         })
         .refine((value) => value.perKill > 0 || value.perOre > 0, {
-            message: "Give something for kills, ores or both"
+            message: problem("killsOrOres")
         }),
     waves: z.object({
         place: placeSchema.default({ mode: "players" }),
-        waves: z.number().int().min(3, "At least 3 waves").max(10, "At most 10 waves").default(5),
+        waves: z
+            .number()
+            .int()
+            .min(3, problem("wavesAtLeast", { count: 3 }))
+            .max(10, problem("wavesAtMost", { count: 10 }))
+            .default(5),
         /** Monsters in the first wave for one defender; later waves and more
          *  defenders bring more. */
-        size: z.number().int().min(2, "At least 2").max(12, "At most 12").default(4),
+        size: z
+            .number()
+            .int()
+            .min(2, problem("atLeast", { count: 2 }))
+            .max(12, problem("atMost", { count: 12 }))
+            .default(4),
         mix: z.enum(WAVE_MIXES).default("classic")
     }),
     "meteor-shower": z.object({
         place: placeSchema.default({ mode: "players" }),
-        distance: z.number().int().min(50, "At least 50").max(1000, "At most 1000").default(150),
-        meteors: z.number().int().min(2, "At least 2").max(8, "At most 8").default(4),
+        distance: z
+            .number()
+            .int()
+            .min(50, problem("atLeast", { count: 50 }))
+            .max(1000, problem("atMost", { count: 1000 }))
+            .default(150),
+        meteors: z
+            .number()
+            .int()
+            .min(2, problem("atLeast", { count: 2 }))
+            .max(8, problem("atMost", { count: 8 }))
+            .default(4),
         /** Ore blocks in each meteor. */
-        size: z.number().int().min(3, "At least 3").max(12, "At most 12").default(6),
+        size: z
+            .number()
+            .int()
+            .min(3, problem("atLeast", { count: 3 }))
+            .max(12, problem("atMost", { count: 12 }))
+            .default(6),
         ores: z.enum(METEOR_ORES).default("precious")
     }),
     parkour: z.object({
         place: placeSchema.default({ mode: "players" }),
-        jumps: z.number().int().min(10, "At least 10").max(40, "At most 40").default(20),
+        jumps: z
+            .number()
+            .int()
+            .min(10, problem("atLeast", { count: 10 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(20),
         difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
         /** How far above the ground it is built. */
-        height: z.number().int().min(25, "At least 25").max(40, "At most 40").default(30)
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
     }),
     spleef: z.object({
         place: placeSchema.default({ mode: "players" }),
         /** Blocks from the middle of the floor to its edge. */
-        size: z.number().int().min(5, "At least 5").max(15, "At most 15").default(8),
-        height: z.number().int().min(25, "At least 25").max(40, "At most 40").default(30)
+        size: z
+            .number()
+            .int()
+            .min(5, problem("atLeast", { count: 5 }))
+            .max(15, problem("atMost", { count: 15 }))
+            .default(8),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
     }),
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
@@ -273,15 +339,15 @@ export const optionsSchemas = {
                     z
                         .string()
                         .trim()
-                        .min(2, "At least two characters")
-                        .max(40, "At most 40 characters")
-                        .regex(/^[^{}&]+$/, "No braces or & in a theme")
+                        .min(2, problem("charsAtLeast", { count: 2 }))
+                        .max(40, problem("charsAtMost", { count: 40 }))
+                        .regex(/^[^{}&]+$/, problem("themeChars"))
                 )
-                .max(50, "At most 50 themes")
+                .max(50, problem("themesAtMost", { count: 50 }))
                 .default([])
         })
         .refine((value) => value.themeMode === "random" || value.themes.length > 0, {
-            message: "Write at least one theme",
+            message: problem("writeTheme"),
             path: ["themes"]
         })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
@@ -305,13 +371,17 @@ export const DURATION = { min: 3, max: 60 } as const;
 
 const presetBase = z.object({
     id: z.string().min(1).max(64),
-    name: z.string().trim().min(1, "Give it a name").max(40, "At most 40 characters"),
+    name: z
+        .string()
+        .trim()
+        .min(1, problem("giveName"))
+        .max(40, problem("charsAtMost", { count: 40 })),
     enabled: z.boolean().default(true),
     minutes: z.number().int().min(DURATION.min).max(DURATION.max).default(10),
     /** The least a player must score to be ranked at all, and to get the prize
      *  for taking part. Absent on an event saved before it existed, which then
      *  reads its kind's default (`minScoreOf`). */
-    minScore: z.number().int().min(1, "At least 1").max(1_000_000).optional(),
+    minScore: z.number().int().min(1, problem("atLeast", { count: 1 })).max(1_000_000).optional(),
     rewards: rewardsSchema
 });
 
@@ -370,7 +440,7 @@ export const scheduleEntrySchema = z.object({
     enabled: z.boolean().default(true),
     /** Empty means every day. 0 is Sunday. */
     days: daysSchema.default([]),
-    at: z.string().regex(TIME, "Write the time as HH:MM")
+    at: z.string().regex(TIME, problem("timeFormat"))
 });
 
 export type EventScheduleEntry = z.infer<typeof scheduleEntrySchema>;
@@ -379,8 +449,8 @@ export const randomSchema = z
     .object({
         enabled: z.boolean().default(false),
         days: daysSchema.default([]),
-        from: z.string().regex(TIME, "Write the time as HH:MM").default("18:00"),
-        to: z.string().regex(TIME, "Write the time as HH:MM").default("23:00"),
+        from: z.string().regex(TIME, problem("timeFormat")).default("18:00"),
+        to: z.string().regex(TIME, problem("timeFormat")).default("23:00"),
         minGap: z
             .number()
             .int()
@@ -405,7 +475,7 @@ export const randomSchema = z
             .default([])
     })
     .refine((value) => value.maxGap >= value.minGap, {
-        message: "The longest wait cannot be shorter than the shortest",
+        message: problem("gapOrder"),
         path: ["maxGap"]
     });
 
@@ -430,8 +500,11 @@ export type EventSettings = z.infer<typeof settingsSchema>;
 export const eventsConfigSchema = z
     .object({
         settings: settingsSchema.default({}),
-        presets: z.array(presetSchema).max(40, "At most 40 events"),
-        schedules: z.array(scheduleEntrySchema).max(40, "At most 40 scheduled events").default([])
+        presets: z.array(presetSchema).max(40, problem("eventsAtMost", { count: 40 })),
+        schedules: z
+            .array(scheduleEntrySchema)
+            .max(40, problem("schedulesAtMost", { count: 40 }))
+            .default([])
     })
     .superRefine((value, context) => {
         const ids = new Set(value.presets.map((preset) => preset.id));
@@ -440,7 +513,7 @@ export const eventsConfigSchema = z
                 context.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["schedules", index, "presetId"],
-                    message: "That event no longer exists"
+                    message: problem("eventGone")
                 });
             }
         });
@@ -449,7 +522,7 @@ export const eventsConfigSchema = z
                 context.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ["settings", "random", "pool", index, "presetId"],
-                    message: "That event no longer exists"
+                    message: problem("eventGone")
                 });
             }
         });
@@ -457,10 +530,34 @@ export const eventsConfigSchema = z
 
 export type EventsConfig = z.infer<typeof eventsConfigSchema>;
 
-/** What an event of each kind is, for the screen. */
+/** An event's kind in the players' words: titles, and the name a server's first
+ *  events are given in its language. */
+export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, string>>>> = {
+    "mining-rush": { en: "Mining rush", es: "Fiebre minera" },
+    "mob-hunt": { en: "Mob hunt", es: "Cacería" },
+    "supply-drop": { en: "Supply drop", es: "Suministro aéreo" },
+    "blood-moon": { en: "Blood moon", es: "Luna de sangre" },
+    "world-boss": { en: "World boss", es: "Jefe de mundo" },
+    fishing: { en: "Fishing contest", es: "Concurso de pesca" },
+    trivia: { en: "Trivia", es: "Trivia" },
+    explorer: { en: "Explorer", es: "Explorador" },
+    "happy-hour": { en: "Happy hour", es: "Hora feliz" },
+    "king-of-the-hill": { en: "King of the hill", es: "Rey de la colina" },
+    "treasure-hunt": { en: "Treasure hunt", es: "Búsqueda del tesoro" },
+    gathering: { en: "Gathering", es: "Recolección" },
+    "rare-catch": { en: "Rare catch", es: "Pesca rara" },
+    "xp-boost": { en: "Experience boost", es: "Experiencia extra" },
+    waves: { en: "Horde defence", es: "Oleadas" },
+    "meteor-shower": { en: "Meteor shower", es: "Lluvia de meteoritos" },
+    parkour: { en: "Parkour race", es: "Carrera de parkour" },
+    spleef: { en: "Spleef", es: "El suelo es lava" },
+    "team-duel": { en: "Team duel", es: "Duelo por equipos" },
+    "build-battle": { en: "Build battle", es: "Construcción rápida" }
+};
+
+/** What an event of each kind is. Its name and summary on a screen are the
+ *  catalog's (`events.kinds.<kind>`), in the reader's language. */
 export interface KindInfo {
-    readonly label: string;
-    readonly summary: string;
     /** What decides who wins, in the words the podium uses. */
     readonly unit: string;
     /** Whether it ends with a podium at all. */
@@ -469,141 +566,82 @@ export interface KindInfo {
 
 export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "mining-rush": {
-        label: "Mining rush",
-        summary:
-            "Most ore mined in the time wins. Any ore scores by its rarity, or pick diamonds or ancient debris only. Players caught by Anti X-Ray or the anti-cheat during it are left off the podium.",
         unit: "points",
         competitive: true
     },
     "mob-hunt": {
-        label: "Mob hunt",
-        summary:
-            "Most hostile mobs killed wins, the rare and dangerous ones worth more, or a single kind of mob.",
         unit: "points",
         competitive: true
     },
     "supply-drop": {
-        label: "Supply drop",
-        summary:
-            "A chest of loot lands somewhere in the Overworld. Where is revealed in three steps, a beam of light marks it, and the first player to open it keeps what is inside.",
         unit: "",
         competitive: true
     },
     "blood-moon": {
-        label: "Blood moon",
-        summary:
-            "Night falls with rain and waves of mobs rise around every player on the surface. Survive to dawn without dying; the podium goes to the most kills.",
         unit: "kills",
         competitive: true
     },
     "world-boss": {
-        label: "World boss",
-        summary:
-            "A boss with a health bar everybody sees appears near the players. Damage dealt close to it is counted; if it falls, the podium goes by damage and everybody who hit it is rewarded.",
         unit: "damage",
         competitive: true
     },
     fishing: {
-        label: "Fishing contest",
-        summary: "Most catches with a fishing rod wins.",
         unit: "catches",
         competitive: true
     },
     trivia: {
-        label: "Trivia",
-        summary:
-            "Questions about Minecraft, or a scrambled word, in the chat. The first right answer takes the round. Add questions of your own.",
         unit: "rounds",
         competitive: true
     },
     explorer: {
-        label: "Explorer",
-        summary:
-            "Travel the farthest on foot, swimming, riding or gliding - or race to a set of coordinates announced at the start.",
         unit: "metres",
         competitive: true
     },
     "happy-hour": {
-        label: "Happy hour",
-        summary:
-            "Haste, luck and other effects for everybody for a while. No winner - a good filler between competitions.",
         unit: "",
         competitive: false
     },
     "king-of-the-hill": {
-        label: "King of the hill",
-        summary:
-            "A marked circle appears. The longest time spent inside it wins - so it is worth defending.",
         unit: "seconds",
         competitive: true
     },
     "treasure-hunt": {
-        label: "Treasure hunt",
-        summary:
-            "Loot chests are hidden on open ground around the players, told in clues that get sharper as it goes. Whoever opens the most wins, and keeps what is inside.",
         unit: "chests",
         competitive: true
     },
     gathering: {
-        label: "Gathering",
-        summary:
-            "One material is announced - wheat, logs, cobblestone, iron... Whoever gathers the most of it wins. Nothing is taken from anybody.",
         unit: "items",
         competitive: true
     },
     "rare-catch": {
-        label: "Rare catch",
-        summary:
-            "A fishing race for one treasure - a name tag, a saddle, an enchanted book... The first to fish it up wins, and keeps it.",
         unit: "",
         competitive: true
     },
     "xp-boost": {
-        label: "Experience boost",
-        summary:
-            "Extra experience for every mob killed and every ore mined, for everybody, for a while. No winner - a good filler between competitions.",
         unit: "",
         competitive: false
     },
     waves: {
-        label: "Horde defence",
-        summary:
-            "A defence point is marked away from every home and waves of monsters come for it, each bigger and stronger than the last. Everybody who holds the point is rewarded; the podium goes to the most kills.",
         unit: "kills",
         competitive: true
     },
     "meteor-shower": {
-        label: "Meteor shower",
-        summary:
-            "Meteors of ore fall one after another on open ground away from every home, each marked by a beam of light. Whoever mines the most meteor blocks wins.",
         unit: "blocks",
         competitive: true
     },
     parkour: {
-        label: "Parkour race",
-        summary:
-            "A jump course is built high in the air. Players type join in the chat to take part and are taken to the start; the fastest to the finish wins, and a fall only sends you back to your last checkpoint.",
         unit: "jumps",
         competitive: true
     },
     spleef: {
-        label: "Spleef",
-        summary:
-            "The floor is lava: a snow floor is built high in the air and players who type join get a shovel that only breaks that snow. Dig it out from under the others - whoever falls through is out and sent back - and the last one standing wins.",
         unit: "points",
         competitive: true
     },
     "team-duel": {
-        label: "Team duel",
-        summary:
-            "Players who type join are split into two teams in an arena built in the sky, each given the same sword and shield. The team with more eliminations wins; the podium goes by each player's own. Nobody loses anything: a player low on health is sent back to their side, and inventories are kept whatever happens.",
         unit: "eliminations",
         competitive: true
     },
     "build-battle": {
-        label: "Build battle",
-        summary:
-            "Players who type join each get a plot in the sky, a theme and a kit of coloured glass. When the time is up everybody tours the plots and votes for the best in the chat. Only the kit can be built with; nothing of anybody's is used or taken.",
         unit: "votes",
         competitive: true
     }
@@ -618,12 +656,12 @@ export const DEFAULT_REWARDS: Rewards = {
 };
 
 /** A new event of one kind, as the screen adds it. */
-export function newPreset(kind: EventKind, id: string): EventPreset {
+export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].en): EventPreset {
     const options = optionsSchemas[kind].parse({}) as EventOptions<EventKind>;
     return {
         id,
         kind,
-        name: KIND_INFO[kind].label,
+        name,
         enabled: true,
         minutes:
             kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch"
@@ -640,10 +678,12 @@ export function newPreset(kind: EventKind, id: string): EventPreset {
 }
 
 /** Every kind once, which is what a server that never opened this screen has. */
-export function defaultEventsConfig(): EventsConfig {
+export function defaultEventsConfig(language: Language = "en"): EventsConfig {
     return {
         settings: settingsSchema.parse({}),
-        presets: EVENT_KINDS.map((kind) => newPreset(kind, `default-${kind}`)),
+        presets: EVENT_KINDS.map((kind) =>
+            newPreset(kind, `default-${kind}`, KIND_NAMES[kind][language])
+        ),
         schedules: []
     };
 }
@@ -653,7 +693,8 @@ export function defaultEventsConfig(): EventsConfig {
  *
  * A preset that no longer reads - a kind this version dropped, a field written
  * by hand - is left out rather than failing the whole list, and a server that has
- * none gets one of each kind so the screen opens on something to run.
+ * none gets one of each kind, named in `language`, so the screen opens on something
+ * to run.
  */
 /**
  * The language the operator chose for what players read, or null when none was
@@ -668,10 +709,14 @@ export function chosenLanguage(config: Record<string, unknown>): Language | null
     return LANGUAGES.includes(language as Language) ? (language as Language) : null;
 }
 
-export function readEventsConfig(config: Record<string, unknown>, timezone = "UTC"): EventsConfig {
+export function readEventsConfig(
+    config: Record<string, unknown>,
+    timezone = "UTC",
+    language: Language = "en"
+): EventsConfig {
     const raw = config[EVENTS_KEY];
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-        const fresh = defaultEventsConfig();
+        const fresh = defaultEventsConfig(language);
         return { ...fresh, settings: { ...fresh.settings, timezone } };
     }
     const value = raw as Record<string, unknown>;

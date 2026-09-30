@@ -458,6 +458,23 @@ describe("the editor in Spanish", () => {
         expect(screen.getByText("De 5 a 15: este mide 17 por 17.")).toBeTruthy();
     });
 
+    it("titles the editor and says what is wrong in the reader's language", async () => {
+        locale = "es-ES";
+        render(
+            <EventEditor
+                preset={{ ...catalog.newPreset("treasure-hunt", "hunt"), name: "" }}
+                open
+                onOpenChange={() => undefined}
+                onSave={() => undefined}
+            />
+        );
+        expect(screen.getByText("Caza del tesoro")).toBeTruthy();
+        expect(screen.getAllByText("Ponle un nombre").length).toBeGreaterThan(0);
+        fireEvent.change(screen.getByLabelText(/^Cofres/), { target: { value: "11" } });
+        await waitFor(() => expect(screen.getAllByText("Como máximo 10").length).toBeGreaterThan(0));
+        expect(screen.queryByText(/At most|Give it a name|events\.problems/)).toBeNull();
+    });
+
     it("names each choice in the reader's language", async () => {
         const { options, LOOT_LABELS } = await import(
             "@polaris-app/game-servers/src/screens/installed/event-editor"

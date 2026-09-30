@@ -79,6 +79,10 @@ function rewardText(t: GameText<"minecraft">, reward: catalog.Reward): string {
     return parts.join(", ") || t("events.nothing");
 }
 
+function lowerFirst(text: string): string {
+    return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+}
+
 function newId(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -650,7 +654,7 @@ export function MinecraftEvents({
                             <p className="text-xs text-muted-foreground">
                                 {view.waiting
                                     ? t("events.nextDue", {
-                                          reason: `${view.waiting.charAt(0).toLowerCase()}${view.waiting.slice(1)}`
+                                          reason: lowerFirst(schemaText(view.waiting) ?? "")
                                       })
                                     : view.nextRandomAt
                                       ? t("events.nextFrom", {
@@ -685,7 +689,7 @@ export function MinecraftEvents({
                                             className="flex flex-col items-start gap-0.5"
                                             onSelect={() =>
                                                 setEditing({
-                                                    preset: catalog.newPreset(kind, newId()),
+                                                    preset: catalog.newPreset(kind, newId(), kindLabel(t, kind)),
                                                     isNew: true
                                                 })
                                             }

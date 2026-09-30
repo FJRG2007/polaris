@@ -1240,6 +1240,17 @@ const events = await import("@polaris-app/game-servers/src/lib/minecraft/events/
 const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/speech-service");
 const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
+const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
+
+/** What a refusal says to an English reader: the service carries catalog keys. */
+async function refusal(promise: Promise<unknown>): Promise<string | null> {
+    try {
+        await promise;
+    } catch (error) {
+        return gameMessageIn("en-US", (error as Error).message);
+    }
+    return null;
+}
 
 function setUp(
     presets: catalog.EventPreset[],
@@ -1664,7 +1675,7 @@ describe("starting one now", () => {
             startedBy: null
         });
         await play(4_100);
-        await expect(events.startNow("owner", SERVER)).rejects.toThrow("It has already started");
+        expect(await refusal(events.startNow("owner", SERVER))).toBe("It has already started");
     });
 });
 
@@ -1699,7 +1710,7 @@ describe("calling one off", () => {
             trigger: "manual",
             startedBy: null
         });
-        await expect(
+        const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -1707,13 +1718,14 @@ describe("calling one off", () => {
                 trigger: "manual",
                 startedBy: null
             })
-        ).rejects.toThrow(/another event is on/i);
+        );
+        expect(refused).toMatch(/another event is on/i);
     });
 
     it("refuses one with nobody on the server", async () => {
         world.online = [];
         setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 10 }]);
-        await expect(
+        const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -1721,7 +1733,8 @@ describe("calling one off", () => {
                 trigger: "manual",
                 startedBy: null
             })
-        ).rejects.toThrow(/nobody is on/i);
+        );
+        expect(refused).toMatch(/nobody is on/i);
     });
 });
 
@@ -2589,7 +2602,10 @@ describe("where the players are, and what they are doing", () => {
         world.hurt = { Ana: 55 };
         const held = await events.sweepEvents();
         expect(held.started).toBe(0);
-        expect(state().waiting).toBe("Waiting: Ana is in a fight or in the End");
+        expect(gameMessageIn("en-US", state().waiting ?? "")).toBe("Waiting: Ana is in a fight or in the End");
+        expect(gameMessageIn("es-ES", state().waiting ?? "")).toBe(
+            "Esperando: Ana está en un combate o en el End"
+        );
         // A minute and a half after the last blow, it goes ahead.
         await play(100_000);
         const started = await events.sweepEvents();
@@ -2603,7 +2619,9 @@ describe("where the players are, and what they are doing", () => {
         await play(15 * 60_000);
         await events.sweepEvents();
         expect(state().run).toBeNull();
-        expect(state().waiting).toBe("Waiting for 2 active players in the Overworld (0 now)");
+        expect(gameMessageIn("en-US", state().waiting ?? "")).toBe(
+            "Waiting for 2 active players in the Overworld (0 now)"
+        );
     });
 
     it("does not hold a mining rush back for players in the Nether", async () => {
@@ -2637,7 +2655,7 @@ describe("what the audit found", () => {
     it("refuses an event of hostile mobs on Peaceful, and says how to fix it", async () => {
         world.difficulty = "Peaceful";
         setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 5 }]);
-        await expect(
+        const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -2645,7 +2663,8 @@ describe("what the audit found", () => {
                 trigger: "manual",
                 startedBy: null
             })
-        ).rejects.toThrow(/Peaceful.*Easy or harder under Rules/);
+        );
+        expect(refused).toMatch(/Peaceful.*Easy or harder under Rules/);
     });
 
     it("runs one that needs no hostile mobs on Peaceful", async () => {
@@ -3435,7 +3454,7 @@ describe("a horde defence", () => {
     it("is refused on Peaceful", async () => {
         world.difficulty = "Peaceful";
         setUp([catalog.newPreset("waves", "waves")]);
-        await expect(start()).rejects.toThrow(/Peaceful/);
+        expect(await refusal(start())).toMatch(/Peaceful/);
     });
 
     it("puts the point well away from every bed", async () => {
@@ -4727,7 +4746,7 @@ describe("a team duel", () => {
     it("refuses to start on a server with PvP blocked, and says where to allow it", async () => {
         world.properties = "difficulty=normal\npvp=false\n";
         setUp([duelOf()]);
-        await expect(
+        const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -4735,7 +4754,8 @@ describe("a team duel", () => {
                 trigger: "manual",
                 startedBy: null
             })
-        ).rejects.toThrow(/Player versus player is Blocked.*Allow it under Settings/);
+        );
+        expect(refused).toMatch(/Player versus player is Blocked.*Allow it under Settings/);
         expect(state().run).toBeNull();
     });
 
@@ -4939,7 +4959,7 @@ describe("a server whose version is not in today's log", () => {
         world.version = "1.15.2";
         world.versionIn = "none";
         setUp([duel()]);
-        await expect(
+        const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
                 installedAppId: SERVER,
@@ -4947,7 +4967,8 @@ describe("a server whose version is not in today's log", () => {
                 trigger: "manual",
                 startedBy: null
             })
-        ).rejects.toThrow(/needs Minecraft 1.16/);
+        );
+        expect(refused).toMatch(/needs Minecraft 1.16/);
     });
 });
 

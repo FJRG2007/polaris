@@ -3,7 +3,7 @@
 /** An experience boost's settings: the extra for each kill and each ore. */
 
 import { Input } from "@polaris/ui";
-import { Field, numberOf, problemAt } from "./event-editor";
+import { Field, Problem, numberOf, problemAt } from "./event-editor";
 import { useGameText } from "../game-text";
 import type * as catalog from "../../lib/minecraft/events/catalog";
 
@@ -57,7 +57,7 @@ export function XpBoostOptions({
                     />
                 </Field>
             </div>
-            {nothing && <span className="text-xs text-danger">{nothing}</span>}
+            <Problem text={nothing} />
         </div>
     );
 }

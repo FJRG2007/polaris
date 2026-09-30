@@ -8,35 +8,12 @@
  */
 
 import type { Heading } from "./commands";
-import type { EventKind, GatherMaterial, Language, RareCatch } from "./catalog";
+import { KIND_NAMES, type EventKind, type GatherMaterial, type Language, type RareCatch } from "./catalog";
 
 type Text = Readonly<Record<Language, string>>;
 
 const pick = (text: Text, language: Language): string => text[language];
 
-/** An event's kind in the players' words, for titles. */
-const KIND_NAMES: Readonly<Record<EventKind, Text>> = {
-    "mining-rush": { en: "Mining rush", es: "Fiebre minera" },
-    "mob-hunt": { en: "Mob hunt", es: "Cacería" },
-    "supply-drop": { en: "Supply drop", es: "Suministro aéreo" },
-    "blood-moon": { en: "Blood moon", es: "Luna de sangre" },
-    "world-boss": { en: "World boss", es: "Jefe de mundo" },
-    fishing: { en: "Fishing contest", es: "Concurso de pesca" },
-    trivia: { en: "Trivia", es: "Trivia" },
-    explorer: { en: "Explorer", es: "Explorador" },
-    "happy-hour": { en: "Happy hour", es: "Hora feliz" },
-    "king-of-the-hill": { en: "King of the hill", es: "Rey de la colina" },
-    "treasure-hunt": { en: "Treasure hunt", es: "Búsqueda del tesoro" },
-    gathering: { en: "Gathering", es: "Recolección" },
-    "rare-catch": { en: "Rare catch", es: "Pesca rara" },
-    "xp-boost": { en: "Experience boost", es: "Experiencia extra" },
-    waves: { en: "Horde defence", es: "Oleadas" },
-    "meteor-shower": { en: "Meteor shower", es: "Lluvia de meteoritos" },
-    parkour: { en: "Parkour race", es: "Carrera de parkour" },
-    spleef: { en: "Spleef", es: "El suelo es lava" },
-    "team-duel": { en: "Team duel", es: "Duelo por equipos" },
-    "build-battle": { en: "Build battle", es: "Construcción rápida" }
-};
 
 /** What to do, in one line, said when the countdown starts and again at the start. */
 const RULES: Readonly<Record<EventKind, Text>> = {
@@ -771,12 +748,16 @@ export function joinButtonsText(language: Language): {
     return language === "es"
         ? {
               lead: "&ePulsa para participar (o escribe &funirse&e):",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
               join: { label: "[Unirse]", hover: "Te llevamos al empezar y te devolvemos a donde estabas" },
+              // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Salir]", hover: "Retirarte del evento" }
           }
         : {
               lead: "&eClick to take part (or type &fjoin&e):",
+              // i18n-ignore: in-game button, both languages here (speech picks one)
               join: { label: "[Join]", hover: "You are taken there when it starts and brought back after" },
+              // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Leave]", hover: "Drop out of the event" }
           };
 }

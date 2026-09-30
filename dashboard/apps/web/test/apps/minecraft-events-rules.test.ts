@@ -7,6 +7,10 @@
 import { describe, expect, it } from "vitest";
 import * as plan from "@polaris-app/game-servers/src/lib/minecraft/events/plan";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
+import { gameMessageIn } from "@polaris-app/game-servers/src/lib/game-message";
+
+/** What a carried sentence says to an English reader. */
+const english = (text: string | null | undefined) => gameMessageIn("en-US", text ?? "");
 
 const settings = (patch: Partial<catalog.EventSettings> = {}): catalog.EventSettings => ({
     ...catalog.settingsSchema.parse({}),
@@ -57,6 +61,11 @@ describe("the stored settings", () => {
         expect(catalog.eventsConfigSchema.safeParse(bad).success).toBe(false);
     });
 
+    it("name a server's first events in the language its players read", () => {
+        expect(catalog.readEventsConfig({}).presets[0]?.name).toBe("Mining rush");
+        expect(catalog.readEventsConfig({}, "UTC", "es").presets[0]?.name).toBe("Fiebre minera");
+    });
+
     it("refuse a schedule for an event that is not there", () => {
         const config = catalog.defaultEventsConfig();
         const bad = {
@@ -65,7 +74,10 @@ describe("the stored settings", () => {
         };
         const parsed = catalog.eventsConfigSchema.safeParse(bad);
         expect(parsed.success).toBe(false);
-        expect(parsed.error?.issues[0]?.message).toBe("That event no longer exists");
+        expect(english(parsed.error?.issues[0]?.message)).toBe("That event no longer exists");
+        expect(gameMessageIn("es-ES", parsed.error?.issues[0]?.message ?? "")).toBe(
+            "Ese evento ya no existe"
+        );
     });
 
     it("refuse a happy hour with no effect in it", () => {
@@ -223,7 +235,7 @@ describe("the random draw", () => {
         expect(plan.randomWindowOpen(on, at("03:00"))).toBe(false);
         const decided = plan.decideRandom({ ...base, nextRandomAt: at("03:00"), now: at("03:00") });
         expect(decided.start).toBeNull();
-        expect(decided.waiting).toMatch(/outside/i);
+        expect(english(decided.waiting)).toMatch(/outside/i);
     });
 
     it("waits for enough players who are playing, and says how many", () => {
@@ -234,7 +246,7 @@ describe("the random draw", () => {
             now: at("20:00")
         });
         expect(decided.start).toBeNull();
-        expect(decided.waiting).toBe("Waiting for 2 active players (1 now)");
+        expect(english(decided.waiting)).toBe("Waiting for 2 active players (1 now)");
     });
 
     it("waits while another event is on", () => {
@@ -439,7 +451,7 @@ describe("a competition with prizes, on its own", () => {
             random: always(0)
         });
         expect(decided.start).toBeNull();
-        expect(decided.waiting).toBe("Waiting for 2 active players (1 now)");
+        expect(english(decided.waiting)).toBe("Waiting for 2 active players (1 now)");
     });
 });
 
@@ -489,7 +501,7 @@ describe("fights and worlds", () => {
         const ana = second.get("ana")!;
         expect(plan.busy(ana, 60_000)).toBe(true);
         expect(plan.busy(ana, 60_000 + plan.FIGHT_COOLDOWN_MS + 1)).toBe(false);
-        expect(plan.busyReason(second, 5, 60_000)).toBe("Ana is in a fight or in the End");
+        expect(english(plan.busyReason(second, 5, 60_000))).toBe("Ana is in a fight or in the End");
     });
 
     it("takes the End for a fight with the dragon", () => {

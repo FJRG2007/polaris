@@ -10,9 +10,9 @@
  */
 
 import { useMemo, useState } from "react";
-import { useGameText, type GameText } from "../game-text";
+import { useGameText, useSchemaText, type GameText } from "../game-text";
 import type { GameKey } from "../../../messages";
-import { kindUnit } from "./event-kinds";
+import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
 import { Plus, Trash2 } from "lucide-react";
 import {
     Button,
@@ -128,6 +128,19 @@ export function problemAt(
     return found?.message ?? null;
 }
 
+/** A schema's complaint, in the reader's language: the schemas carry keys. */
+export function Problem({
+    text,
+    className = ""
+}: {
+    text: string | null | undefined;
+    className?: string;
+}) {
+    const schemaText = useSchemaText();
+    if (!text) return null;
+    return <span className={`text-xs text-danger ${className}`.trim()}>{schemaText(text)}</span>;
+}
+
 export function Field({
     label,
     hint,
@@ -144,7 +157,7 @@ export function Field({
             <span className="font-medium">{label}</span>
             {children}
             {problem ? (
-                <span className="text-xs text-danger">{problem}</span>
+                <Problem text={problem} />
             ) : hint ? (
                 <span className="text-xs text-muted-foreground">{hint}</span>
             ) : null}
@@ -247,11 +260,7 @@ function RewardEditor({
                                 })
                             }
                         />
-                        {problemAt(issues, ...path, "items", index, "id") && (
-                            <span className="text-xs text-danger">
-                                {problemAt(issues, ...path, "items", index, "id")}
-                            </span>
-                        )}
+                        <Problem text={problemAt(issues, ...path, "items", index, "id")} />
                     </div>
                     <Input
                         className="w-20"
@@ -317,9 +326,7 @@ function RewardEditor({
                     />
                 </label>
             </div>
-            {problemAt(issues, ...path, "levels") && (
-                <span className="text-xs text-danger">{problemAt(issues, ...path, "levels")}</span>
-            )}
+            <Problem text={problemAt(issues, ...path, "levels")} />
         </div>
     );
 }
@@ -663,9 +670,7 @@ function OptionsFields({
                             />
                         </label>
                     ))}
-                    {problemAt(issues, "options") && (
-                        <span className="text-xs text-danger">{problemAt(issues, "options")}</span>
-                    )}
+                    <Problem text={problemAt(issues, "options")} />
                 </div>
             );
         }
@@ -1017,8 +1022,8 @@ export function EventEditor({
             <DialogContent className="w-[min(40rem,95vw)] max-w-[min(40rem,95vw)]">
                 <div className="flex flex-col gap-4">
                     <DialogHeader className="pr-8">
-                        <DialogTitle>{info.label}</DialogTitle>
-                        <DialogDescription>{info.summary}</DialogDescription>
+                        <DialogTitle>{kindLabel(t, draft.kind)}</DialogTitle>
+                        <DialogDescription>{kindSummary(t, draft.kind)}</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
                         <Field
@@ -1154,7 +1159,7 @@ export function EventEditor({
 
                     <div className="flex items-center justify-end gap-2">
                         {!checked.success && issues[0] && (
-                            <span className="mr-auto text-xs text-danger">{issues[0].message}</span>
+                            <Problem className="mr-auto" text={issues[0].message} />
                         )}
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("editor.cancel")}

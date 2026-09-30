@@ -1247,6 +1247,7 @@ async function payGoalTiers(sweep: Sweep, goal: stored.GoalState): Promise<void>
                             sweep.languageOf(name)
                         )
                     });
+                    // i18n-ignore: an identifier for the payout, never shown to anybody
                     effects.push({ kind: "pay", payout: tierReward, label: `tier ${one}` });
                 }
             }

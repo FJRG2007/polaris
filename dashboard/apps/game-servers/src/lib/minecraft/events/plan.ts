@@ -7,6 +7,7 @@
  * rather than hoped for on a live server.
  */
 
+import { gameMessage } from "../../game-message";
 import { parseTime, zonedMoment } from "../schedule";
 import {
     activeNeeded,
@@ -158,7 +159,8 @@ export function playersFor(
     return active.filter((one) => one.dimension === null || one.dimension === OVERWORLD);
 }
 
-/** Why an automatic event should wait: the active players who are busy. */
+/** Why an automatic event should wait: the active players who are busy, carried
+ *  as a catalog key (`lib/game-message`) for whoever reads it. */
 export function busyReason(
     seen: ReadonlyMap<string, Seen>,
     afkMinutes: number,
@@ -169,7 +171,9 @@ export function busyReason(
         .map((one) => one.name);
     if (names.length === 0) return null;
     const shown = names.slice(0, 3).join(", ");
-    return `${shown}${names.length > 3 ? " and others" : ""} ${names.length === 1 ? "is" : "are"} in a fight or in the End`;
+    return names.length > 3
+        ? gameMessage("minecraft", "events.waiting.busyMore", { names: shown })
+        : gameMessage("minecraft", "events.waiting.busy", { names: shown, count: names.length });
 }
 
 function angleBetween(left: number, right: number): number {
@@ -305,17 +309,25 @@ export function decideRandom(input: {
         return {
             start: null,
             nextRandomAt: input.nextRandomAt,
-            waiting: "Outside the hours events are drawn in"
+            waiting: gameMessage("minecraft", "events.waiting.outsideHours")
         };
     }
     if (input.running) {
-        return { start: null, nextRandomAt: input.nextRandomAt, waiting: "Another event is on" };
+        return {
+            start: null,
+            nextRandomAt: input.nextRandomAt,
+            waiting: gameMessage("minecraft", "events.waiting.anotherOn")
+        };
     }
     // Only what this many players can start: a competition with prizes needs
     // two at least, so one player alone can still get a happy hour but never a
     // podium to themselves.
     if (input.busy) {
-        return { start: null, nextRandomAt: input.nextRandomAt, waiting: `Waiting: ${input.busy}` };
+        return {
+            start: null,
+            nextRandomAt: input.nextRandomAt,
+            waiting: gameMessage("minecraft", "events.waiting.busyNow", { reason: input.busy })
+        };
     }
     const count = input.activeFor ?? (() => input.active);
     const startable = pool.filter(
@@ -328,13 +340,13 @@ export function decideRandom(input: {
             .map((entry) => ({
                 needed: activeNeeded(entry.preset, settings),
                 have: count(entry.preset),
-                where: needsOverworld(entry.preset) ? " in the Overworld" : ""
+                overworld: needsOverworld(entry.preset) ? "yes" : "no"
             }))
             .sort((left, right) => left.needed - left.have - (right.needed - right.have))[0]!;
         return {
             start: null,
             nextRandomAt: input.nextRandomAt,
-            waiting: `Waiting for ${nearest.needed} active ${nearest.needed === 1 ? "player" : "players"}${nearest.where} (${nearest.have} now)`
+            waiting: gameMessage("minecraft", "events.waiting.players", nearest)
         };
     }
     const fresh = startable.filter((entry) => entry.preset.kind !== input.lastKind);
