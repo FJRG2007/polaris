@@ -235,6 +235,14 @@ export interface SaveConnectionInput {
     signIn?: boolean;
     /** Null keeps whatever is stored; a value replaces it. */
     credential?: ConnectionCredential | null;
+    /**
+     * Linked for something that is not bounded by the operator's per-person cap:
+     * the Calendar app, where one person linking several Google or Microsoft
+     * accounts is the point. The cap exists for the services a link grants
+     * Polaris something through (a GitHub account serving a runner pool), not for
+     * somebody reading their own calendars.
+     */
+    beyondLimit?: boolean;
 }
 
 /**
@@ -254,13 +262,18 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
 
     if (!claimed) {
         const limit = await connectionLimit(input.provider);
-        // A typed name is not counted: the proved account is about to replace it,
-        // and refusing that because the claim was there first would keep the
-        // unverified one over the verified.
-        const held = await prisma.userConnection.count({
-            where: { userId, provider: input.provider, method: { not: "manual" } }
-        });
-        if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
+        // Zero is the operator saying nobody links this service at all, which a
+        // calendar link is no exception to.
+        if (limit === 0) throw new ConnectionLimitError(input.provider, limit);
+        if (!input.beyondLimit) {
+            // A typed name is not counted: the proved account is about to replace
+            // it, and refusing that because the claim was there first would keep
+            // the unverified one over the verified.
+            const held = await prisma.userConnection.count({
+                where: { userId, provider: input.provider, method: { not: "manual" } }
+            });
+            if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
+        }
     }
 
     const secret = input.credential ? encryptCredential(input.credential) : undefined;

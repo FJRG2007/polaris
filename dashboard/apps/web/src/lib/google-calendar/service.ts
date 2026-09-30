@@ -62,6 +62,16 @@ export const GOOGLE_DRIVE_SCOPES = ["openid", "email", "https://www.googleapis.c
  */
 export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"];
 
+/**
+ * What linking a calendar to the Calendar app asks for: reading and writing
+ * every calendar the account holds, which is what syncing both ways means.
+ *
+ * Asked for on its own consent screen, like mail: somebody who linked Google to
+ * see their week beside their tasks agreed to a read-only view, and a token that
+ * can change their meetings is a different thing to agree to.
+ */
+export const GOOGLE_CALENDAR_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar"];
+
 export interface GoogleOAuthClient {
     readonly clientId: string;
     readonly clientSecret: string;
@@ -97,7 +107,7 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" | "mail" = "link",
+    flow: "link" | "signin" | "storage" | "mail" | "calendar" = "link",
     /** The account this is being authorized FOR, when something downstream
      *  knows - a mailbox address somebody typed. Google opens on that account
      *  instead of on whichever one the browser happens to be signed into, which
@@ -112,7 +122,9 @@ export function googleAuthorizeUrl(
           ? GOOGLE_DRIVE_SCOPES
           : flow === "mail"
             ? GOOGLE_MAIL_SCOPES
-            : GOOGLE_SCOPES;
+            : flow === "calendar"
+              ? GOOGLE_CALENDAR_SCOPES
+              : GOOGLE_SCOPES;
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);

@@ -62,6 +62,8 @@ const STATE_COOKIE = "polaris_connection_state";
 const CONNECTIONS_SCREEN = "/account/connections";
 /** Where a link started from the Mail app comes back to. */
 const MAIL_SCREEN = "/mail/settings/accounts";
+/** Where a link started from the Calendar app comes back to. */
+const CALENDAR_SCREEN = "/calendar/settings/accounts";
 const LOGIN_SCREEN = "/oauth/login";
 const CHALLENGE_SCREEN = "/oauth/2fa";
 /** Where a finished sign-in lands when the screen asked for nothing else. The
@@ -82,7 +84,15 @@ const SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 /** `storage` is a link that also asks for access to the files Polaris creates,
  *  and `mail` one that asks for the mailbox. Everything downstream treats both
  *  as a link; only the consent screen and where it lands afterwards differ. */
-type ConnectionMode = "link" | "signin" | "storage" | "mail";
+type ConnectionMode = "link" | "signin" | "storage" | "mail" | "calendar";
+
+/** The screen a link trip returns to, when it is not the account's own list.
+ *  `calendar` is a link that asks to read and write the account's calendars. */
+function screenFor(mode: ConnectionMode | undefined): string | undefined {
+    if (mode === "mail") return MAIL_SCREEN;
+    if (mode === "calendar") return CALENDAR_SCREEN;
+    return undefined;
+}
 
 /** What the round trip came back with, as the screen reads it. */
 export type LinkOutcome =
@@ -230,7 +240,7 @@ async function begin(
             origin,
             provider,
             "not_public",
-            mode === "mail" ? MAIL_SCREEN : undefined,
+            screenFor(mode),
             mailReturn({ mode, ...(about?.edit ? { edit: about.edit } : {}) })
         );
     }
@@ -347,6 +357,7 @@ export async function startConnectionLink(request: Request, provider: string): P
         );
     }
     const scope = url.searchParams.get("scope");
+    if (scope === "calendar") return begin(request, provider, "calendar");
     if (scope !== "mail") {
         return begin(request, provider, scope === "storage" ? "storage" : "link");
     }
@@ -418,11 +429,11 @@ export async function finishConnectionCallback(
     // Anything that is not a sign-in is a link, including a callback that
     // arrived with no cookie at all: it lands on the screen it was started from,
     // which for a link is the one that says what went wrong.
-    const screen = held?.mode === "mail" ? MAIL_SCREEN : undefined;
+    const screen = screenFor(held?.mode);
     const back = mailReturn(held);
     if (!code) return endLink(origin, provider, "cancelled", screen, back);
     if (!valid) return endLink(origin, provider, "state_error", screen, back);
-    return finishLink(origin, provider, code, screen, back, held?.wanted);
+    return finishLink(origin, provider, code, screen, back, held?.wanted, held?.mode === "calendar");
 }
 
 /**
@@ -485,7 +496,10 @@ async function finishLink(
     screen?: string,
     extra?: Record<string, string>,
     /** The address this was started for - see `FlowState.wanted`. */
-    wanted?: string
+    wanted?: string,
+    /** A calendar link: somebody linking their work and their personal Google
+     *  calendars is the ordinary case, so the per-person cap does not apply. */
+    beyondLimit = false
 ): Promise<Response> {
     const user = await requireUser();
 
@@ -525,7 +539,8 @@ async function finishLink(
             // Held for its owner, so nobody else can be given an account here
             // under the address the provider just vouched for.
             email: authorized.email,
-            credential: authorized.credential
+            credential: authorized.credential,
+            beyondLimit
         });
         // A mailbox this account authorizes may have been paused for a refused
         // token, and authorizing again is what fixes that. Tried behind the
@@ -681,7 +696,10 @@ function readState(request: Request): FlowState | null {
         return {
             provider: held.provider,
             mode:
-                held.mode === "signin" || held.mode === "storage" || held.mode === "mail"
+                held.mode === "signin" ||
+                held.mode === "storage" ||
+                held.mode === "mail" ||
+                held.mode === "calendar"
                     ? held.mode
                     : "link",
             state: held.state,
