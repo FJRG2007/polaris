@@ -1953,13 +1953,19 @@ async function badge(): Promise<void> {
  * rules for finding its box are `isOneTimeCode` and `splitCode` in `lib/fields`,
  * copied for the reason above.
  *
- * It does not submit the form. Filling is the help somebody asked for; pressing
- * the button for them is a decision nobody made.
+ * `submit` presses the step's own button once what it asks for is in. Picking a
+ * login is asking to be signed in with it, and a sign-in split over a name page,
+ * a password page and a code page is three buttons nobody should have to press
+ * after that pick. It presses the form's submit button, or the button beside the
+ * box where the page has no form, never one that reveals, cancels, goes back or
+ * starts a new account - and only while the box still holds what was typed, so a
+ * page that moved on by itself is not submitted twice.
  */
 function typeIntoPage(
     username: string | null,
     password: string | null,
-    code: string | null
+    code: string | null,
+    submit = false
 ): { user: boolean; pass: boolean; code: boolean } {
     const never = new Set([
         "hidden",
@@ -2001,8 +2007,13 @@ function typeIntoPage(
 
     const usable = (field: HTMLInputElement): boolean => {
         if (never.has(field.type) || field.disabled || field.readOnly) return false;
+        if (field.getAttribute("aria-hidden") === "true") return false;
         const box = field.getBoundingClientRect();
         if (box.width < 2 || box.height < 2) return false;
+        // Parked off the page, which is how a sign-in hides the password box it
+        // asks for on its next step: typed into there, the step that shows it
+        // would find nothing left to fill.
+        if (box.right + window.scrollX <= 0 || box.bottom + window.scrollY <= 0) return false;
         return getComputedStyle(field).visibility !== "hidden";
     };
 
@@ -2087,12 +2098,113 @@ function typeIntoPage(
         field.blur();
     };
 
-    if (username && user) put(user, username);
-    if (password && pass) put(pass, password);
-    const typed = Boolean(code) && codeBoxes.length > 0;
-    if (code && codeBoxes.length === 1) put(codeBoxes[0]!, code);
-    else if (code) for (const [index, box] of codeBoxes.entries()) put(box, code.charAt(index));
-    return { user: Boolean(user), pass: Boolean(pass), code: typed };
+    const typedUser = Boolean(username && user);
+    const typedPass = Boolean(password && pass);
+    // Never over a code somebody has started typing themselves.
+    const typedCode =
+        Boolean(code) && codeBoxes.length > 0 && codeBoxes.every((box) => box.value === "");
+    if (typedUser) put(user!, username!);
+    if (typedPass) put(pass!, password!);
+    if (typedCode && codeBoxes.length === 1) put(codeBoxes[0]!, code!);
+    else if (typedCode)
+        for (const [index, box] of codeBoxes.entries()) put(box, code!.charAt(index));
+
+    // The box this step ends on, which is where its button is looked for.
+    const last = typedCode
+        ? codeBoxes[codeBoxes.length - 1]!
+        : typedPass
+          ? pass!
+          : typedUser
+            ? user!
+            : null;
+    if (submit && last) {
+        const expected = last.value;
+        const notASubmit =
+            /show|hide|reveal|toggle|mostrar|ocultar|cancel|back|atr[aá]s|volver|close|cerrar|forgot|olvid|help|ayuda|sign.?up|regist|create|crear|another|otra|passkey|resend|reenviar|google|apple|microsoft|facebook|github/i;
+        const shown = (element: Element): boolean => {
+            const box = element.getBoundingClientRect();
+            return (
+                box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden"
+            );
+        };
+        const says = (element: Element): string =>
+            [
+                element.textContent ?? "",
+                element.getAttribute("aria-label") ?? "",
+                element.getAttribute("title") ?? "",
+                element.getAttribute("name") ?? "",
+                element.getAttribute("value") ?? "",
+                element.id
+            ].join(" ");
+        const isSubmitType = (element: Element): boolean =>
+            (element instanceof HTMLButtonElement && element.type === "submit") ||
+            (element instanceof HTMLInputElement && ["submit", "image"].includes(element.type));
+        // The buttons that belong with the box: its form's, or those of the
+        // nearest panel around it that has any.
+        const around = (): Element[] => {
+            const selector =
+                "button, input[type=submit], input[type=image], input[type=button], [role=button]";
+            if (last.form) return [...last.form.querySelectorAll(selector)];
+            let panel = last.parentElement;
+            for (let step = 0; step < 6 && panel; step += 1, panel = panel.parentElement) {
+                const found = [...panel.querySelectorAll(selector)];
+                if (found.length > 0) return found;
+            }
+            return [];
+        };
+        const button = (): Element | null => {
+            const fitting = around().filter(
+                (element) =>
+                    shown(element) &&
+                    !element.hasAttribute("aria-pressed") &&
+                    !element.hasAttribute("aria-expanded") &&
+                    !notASubmit.test(says(element))
+            );
+            const after = fitting.filter(
+                (element) =>
+                    last.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING
+            );
+            return after.find(isSubmitType) ?? fitting.find(isSubmitType) ?? after[0] ?? null;
+        };
+        const disabled = (element: Element): boolean =>
+            (element as HTMLButtonElement).disabled === true ||
+            element.getAttribute("aria-disabled") === "true";
+        const started = Date.now();
+        const press = (): void => {
+            // The page moved on by itself - a code row that submits on its last
+            // digit, a step swapped out - so there is nothing left to press.
+            if (!last.isConnected || last.value !== expected) return;
+            const found = button();
+            if (found && disabled(found) && Date.now() - started < 3000) {
+                // Enabled by the page's own check of what was typed, a moment later.
+                window.setTimeout(press, 150);
+                return;
+            }
+            if (found && !disabled(found)) {
+                (found as HTMLElement).click();
+                return;
+            }
+            if (last.form) {
+                last.form.requestSubmit();
+                return;
+            }
+            for (const type of ["keydown", "keypress", "keyup"]) {
+                last.dispatchEvent(
+                    new KeyboardEvent(type, {
+                        key: "Enter",
+                        code: "Enter",
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true
+                    })
+                );
+            }
+        };
+        // After the page has had a moment to take in what was typed: a button a
+        // framework enables once the box is valid is still disabled right now.
+        window.setTimeout(press, 250);
+    }
+    return { user: typedUser, pass: typedPass, code: typedCode };
 }
 
 /**
@@ -2103,10 +2215,14 @@ function typeIntoPage(
  * running inside, and being handed that rather than looking it up is what stops
  * a fill landing in a different tab than the one somebody pressed in.
  */
-async function fill(id: string, page: PageContext | null = null): Promise<messages.Reply> {
+async function fill(
+    id: string,
+    page: PageContext | null = null,
+    only: "code" | null = null
+): Promise<messages.Reply> {
     const target = page ?? (await activeTab());
     if (!target) return { ok: false, error: await say("errors.noPageToFill") };
-    const running = fillTab(id, target);
+    const running = fillTab(id, target, only);
     filling.set(target.tabId, running);
     try {
         return await running;
@@ -2119,7 +2235,17 @@ async function fill(id: string, page: PageContext | null = null): Promise<messag
  *  for the step it is asking about to have been written. */
 const filling = new Map<number, Promise<messages.Reply>>();
 
-async function fillTab(id: string, target: PageContext): Promise<messages.Reply> {
+/**
+ * `only` narrows a fill to the code, for the step that asks for it alone: the
+ * name and password were typed on the steps before, and typing them again into
+ * whatever boxes a code page also carries is typing into something nobody asked
+ * about.
+ */
+async function fillTab(
+    id: string,
+    target: PageContext,
+    only: "code" | null
+): Promise<messages.Reply> {
     const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
     if (!login) return { ok: false, error: await say("errors.itemNotOpen") };
@@ -2148,10 +2274,15 @@ async function fillTab(id: string, target: PageContext): Promise<messages.Reply>
         // boxes a page has is only known inside it, and a code nobody used is
         // thirty seconds from meaning nothing.
         const code = login.totp ? await totpCode(login.totp).catch(() => null) : null;
+        // And each step is submitted once it is typed: a login picked is a
+        // sign-in asked for, however many pages the site spreads it over.
         const [outcome] = await browser.scripting.executeScript({
             target: { tabId: tab.id },
             func: typeIntoPage,
-            args: [login.username, login.password, code]
+            args:
+                only === "code"
+                    ? [null, null, code, true]
+                    : [login.username, login.password, code, true]
         });
         const filled = outcome?.result as
             | { user?: boolean; pass?: boolean; code?: boolean }
@@ -2779,6 +2910,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "secondStepCode": {
                 if (!page) return { ok: false, error: await say("errors.noPage") };
+                // The password's fill may still be typing on a page that swaps in
+                // the code box the moment it is submitted.
+                await filling.get(page.tabId);
                 const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "code");
                 if (!held) return { ok: false, error: await say("errors.noCodeWaiting") };
                 // Once: the box that asked gets it, and a second code box on the
@@ -2788,9 +2922,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!login?.totp || !matchesPage(login.uris, page.url)) {
                     return { ok: false, error: await say("errors.notForSite") };
                 }
-                const code = await totpCode(login.totp);
-                if (!code) return { ok: false, error: await say("errors.badAuthenticator") };
-                return { ok: true, code, remaining: totpRemaining(login.totp) };
+                // Typed and submitted here, like the steps before it, so the
+                // page is never handed the code to do it with.
+                return fill(held.itemId, page, "code");
             }
 
             case "continueSignIn": {
@@ -3010,7 +3144,8 @@ async function fillFromKeyboard(command: string): Promise<void> {
  * that one is empty and in the same form - the confirmation. A code split into
  * one box per digit is spread across the row.
  *
- * Like every fill here, it does not submit anything.
+ * It submits nothing: one value typed into one box somebody pointed at is not
+ * a login picked, and the rest of the form is still theirs to finish.
  */
 function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boolean {
     const active = document.activeElement;
