@@ -36,7 +36,7 @@ import type { ArkProfile } from "../../lib/ark/profile";
 import type { PlayerSeen } from "../../lib/games-activity";
 import type { ServerPresence } from "../../lib/games-service";
 import { useGamePresence } from "../../components/use-game-presence";
-import { presenceLine, seenFor } from "../../lib/games-activity";
+import { presenceLine, seenFor, withLiveSince } from "../../lib/games-activity";
 import { findArkMap, mapRequirementHint } from "@polaris/core";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { ArkAccessView, ArkStatus } from "../../lib/ark/service";
@@ -301,6 +301,15 @@ export function ArkPanel({
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
     const isRunning = status?.running ?? running;
+    // When each player on began the visit they are on, from the stream as soon as
+    // it has it rather than a poll late.
+    const liveSeen = useMemo(
+        () =>
+            streamed && Date.now() - presence.at < PRESENCE_STALE_MS
+                ? withLiveSince(reading.seen, streamed.players)
+                : reading.seen,
+        [reading.seen, streamed, presence.at]
+    );
 
     useEffect(() => {
         const state = statusState(reading.status, isRunning);
@@ -376,7 +385,7 @@ export function ArkPanel({
                     timeouts={reading.timeouts}
                     admins={reading.admins}
                     profiles={reading.profiles}
-                    seen={reading.seen}
+                    seen={liveSeen}
                     canModerate={held.includes("games.moderate")}
                     canManage={held.includes("games.manage")}
                     onChanged={(next) => {

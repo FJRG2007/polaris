@@ -42,6 +42,28 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/schedule-service", () => ({
     }
 }));
 
+/** What each reading wrote into the record of who played, and what it said about
+ *  when their visits began. */
+const recorded: { id: string; names: string[]; log: string | undefined }[] = [];
+const closed: string[] = [];
+let visitSince = new Map<string, Date>();
+
+vi.mock("@polaris-app/game-servers/src/lib/games-activity-service", () => ({
+    recordRoster: async (
+        id: string,
+        players: readonly { name: string }[],
+        _now: Date,
+        options: { log?: string }
+    ) => {
+        recorded.push({ id, names: players.map((player) => player.name), log: options.log });
+        return { arrived: 0, left: 0, since: visitSince };
+    },
+    closeGameSessions: async (id: string) => {
+        closed.push(id);
+    },
+    readSessionLog: async () => null
+}));
+
 const { subscribeGamePresence } = await import("@polaris-app/game-servers/src/lib/games-presence");
 
 function playing(id: string, names: string[]): ServerPresence {
@@ -60,6 +82,9 @@ beforeEach(() => {
     vi.useFakeTimers();
     reads.length = 0;
     sweeps.length = 0;
+    recorded.length = 0;
+    closed.length = 0;
+    visitSince = new Map();
     answer = [playing(ONE, [])];
 });
 
@@ -135,6 +160,44 @@ describe("subscribeGamePresence", () => {
         // Nought here would be a schedule stopping a server for being quiet when
         // it was only still starting.
         expect(sweeps[0]?.known?.get(ONE)).toBeNull();
+        stop();
+    });
+
+    it("writes every reading into the record, so 'since' is as fresh as the feed", async () => {
+        // The minute's sweep only sees who is on once a minute, and not at all on
+        // an instance with no cron configured. While a screen watches, this does.
+        answer = [playing(ONE, ["FJRG2007"])];
+        visitSince = new Map([["@fjrg2007", new Date("2026-09-29T15:04:00.000Z")]]);
+        const frames: (string | null | undefined)[] = [];
+        const stop = subscribeGamePresence(OWNER, [], (reading) =>
+            frames.push(reading.servers[0]?.players[0]?.since)
+        );
+        await vi.advanceTimersByTimeAsync(0);
+        expect(recorded).toEqual([{ id: ONE, names: ["FJRG2007"], log: "changes" }]);
+        expect(frames).toEqual(["2026-09-29T15:04:00.000Z"]);
+
+        // He reconnects: the record opens a new visit and the next frame says so.
+        visitSince = new Map([["@fjrg2007", new Date("2026-09-29T15:30:10.000Z")]]);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(frames).toEqual(["2026-09-29T15:04:00.000Z", "2026-09-29T15:30:10.000Z"]);
+        stop();
+    });
+
+    it("closes what was open on a server whose container is down, and records nothing else", async () => {
+        answer = [{ ...playing(ONE, []), answering: false, containerRunning: false }];
+        const stop = subscribeGamePresence(OWNER, [], () => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(closed).toEqual([ONE]);
+        expect(recorded).toEqual([]);
+        stop();
+    });
+
+    it("leaves a server that is only slow to answer alone", async () => {
+        answer = [{ ...playing(ONE, []), answering: false, containerRunning: true }];
+        const stop = subscribeGamePresence(OWNER, [], () => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(closed).toEqual([]);
+        expect(recorded).toEqual([]);
         stop();
     });
 });

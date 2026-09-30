@@ -45,7 +45,7 @@ import { MinecraftDomain } from "./minecraft-domain";
 import { isConfigCrash } from "../../lib/crash-loop";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
-import type { PlayerSeen } from "../../lib/games-activity";
+import { withLiveSince, type PlayerSeen } from "../../lib/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import type { ServerPresence } from "../../lib/games-service";
@@ -108,6 +108,15 @@ const SECURITY_GROUP = "Security";
  * inside the container.
  */
 const POLL_MS = 12000;
+/**
+ * The same, on the screens that list every player.
+ *
+ * Their rows carry what the stream does not - the level each of them is on, who
+ * has gone AFK, the lists they are in - and somebody watching that table expects
+ * it to move while they watch. Every few seconds, and only while the tab is in
+ * front of somebody: a hidden one reads nothing until it is looked at again.
+ */
+const ROSTER_POLL_MS = 5000;
 /** How old the last reading kept in this tab may be and still paint the screen
  *  while the first poll is out: players online, the badge, the machine. */
 const KEPT_READING_MS = 24 * 3_600_000;
@@ -377,16 +386,31 @@ export function MinecraftPanel({
     useEffect(() => {
         let live = true;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        let inFlight = false;
+        const every = wantsRoster ? ROSTER_POLL_MS : POLL_MS;
         const cycle = async (): Promise<void> => {
-            await load();
-            if (live) timer = setTimeout(() => void cycle(), POLL_MS);
+            if (timer) clearTimeout(timer);
+            timer = undefined;
+            // A tab nobody is looking at asks nothing; coming back to it reads at
+            // once rather than after a whole interval of stale rows.
+            if (!document.hidden && !inFlight) {
+                inFlight = true;
+                await load();
+                inFlight = false;
+            }
+            if (live && !document.hidden) timer = setTimeout(() => void cycle(), every);
+        };
+        const onVisible = (): void => {
+            if (!document.hidden && live && !inFlight) void cycle();
         };
         void cycle();
+        document.addEventListener("visibilitychange", onVisible);
         return () => {
             live = false;
+            document.removeEventListener("visibilitychange", onVisible);
             if (timer) clearTimeout(timer);
         };
-    }, [load]);
+    }, [load, wantsRoster]);
 
     // Who is on it, pushed as it changes rather than waited for. The poll above
     // still reports it, but a poll's worth late; whichever of the two is more
@@ -416,6 +440,15 @@ export function MinecraftPanel({
         [status, kept, reading.now, streamed, presence.at]
     );
     const shownReach = reading.status ? reading.reach : (kept?.reach ?? null);
+    // When each player on began the visit they are on, from the stream as soon as
+    // it has it: a reconnect shows under their row within seconds, not a poll late.
+    const liveSeen = useMemo(
+        () =>
+            streamed && Date.now() - presence.at < PRESENCE_STALE_MS
+                ? withLiveSince(reading.seen, streamed.players)
+                : reading.seen,
+        [reading.seen, streamed, presence.at]
+    );
     // What the poll knows beats what the page was rendered with: the second is a
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
@@ -594,7 +627,7 @@ export function MinecraftPanel({
                         rosterAsOf={reading.rosterAsOf}
                         access={reading.access}
                         sessions={reading.sessions}
-                        seen={reading.seen}
+                        seen={liveSeen}
                         now={reading.now}
                         timeouts={reading.timeouts}
                         levels={reading.levels}

@@ -41,7 +41,15 @@ const readingSchema = z.object({
             containerRunning: z.boolean().nullable(),
             online: z.number(),
             max: z.number(),
-            players: z.array(z.object({ name: z.string(), id: z.string().nullable() })),
+            players: z.array(
+                z.object({
+                    name: z.string(),
+                    id: z.string().nullable(),
+                    // When the visit they are on began. Optional for the same reason
+                    // as the crash loop below: a frame from a build before it.
+                    since: z.string().datetime({ offset: true }).nullable().optional()
+                })
+            ),
             message: z.string().nullable(),
             // Optional rather than required, because a frame is dropped whole when
             // it fails this - and a tab left open across the deploy that added

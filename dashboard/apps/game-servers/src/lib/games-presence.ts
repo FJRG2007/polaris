@@ -18,6 +18,7 @@
  * common case and nobody needs to be told about it.
  */
 
+import { seenKey } from "./games-activity";
 import { sweepWatchedGameSchedules } from "./minecraft/schedule-service";
 import { listGameServerPresence, type ServerPresence } from "./games-service";
 
@@ -102,7 +103,12 @@ async function cycle(
     only: readonly string[] | undefined
 ): Promise<void> {
     if (watch.stopped || watches.get(key) !== watch) return;
-    const servers = await listGameServerPresence(ownerId, alsoIds, only).catch(() => null);
+    const read = await listGameServerPresence(ownerId, alsoIds, only).catch(() => null);
+    if (watch.stopped || watches.get(key) !== watch) return;
+    // Written down as it is read, so that who is on and since when is as fresh
+    // as this feed while somebody watches it - not a minute behind, on the
+    // sweep's clock, and not only on an instance with the sweep configured.
+    const servers = read ? await Promise.all(read.map(recorded)) : null;
     if (watch.stopped || watches.get(key) !== watch) return;
     if (servers) {
         // The schedule is decided from the count this reading already paid for, so
@@ -136,4 +142,42 @@ async function cycle(
     if (watch.stopped || watches.get(key) !== watch) return;
     watch.timer = setTimeout(() => void cycle(key, watch, ownerId, alsoIds, only), READ_EVERY_MS);
     watch.timer.unref?.();
+}
+
+/**
+ * One server's reading, written into the record of who played and handed back
+ * with when each of them arrived.
+ *
+ * The log is read only when somebody arrived or left - that is when its time is
+ * worth more than this feed's own, and reading it every few seconds is not. A
+ * container known to be down closes whatever was open, as the sweep does. Never a
+ * reason to lose the reading: a record that could not be written is the reading
+ * as it was.
+ */
+async function recorded(server: ServerPresence): Promise<ServerPresence> {
+    try {
+        const activity = await import("./games-activity-service");
+        if (!server.answering) {
+            if (server.containerRunning === false) await activity.closeGameSessions(server.id);
+            return server;
+        }
+        const record = await activity.recordRoster(server.id, server.players, new Date(), {
+            log: "changes",
+            readLog: () => activity.readSessionLog(server.id)
+        });
+        return {
+            ...server,
+            players: server.players.map((player) => ({
+                ...player,
+                // By the name too, for a visit opened before the game's id was kept.
+                since:
+                    (
+                        record.since.get(seenKey(player)) ??
+                        record.since.get(seenKey({ name: player.name, id: null }))
+                    )?.toISOString() ?? null
+            }))
+        };
+    } catch {
+        return server;
+    }
 }

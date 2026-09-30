@@ -162,6 +162,9 @@ export interface GameServerFacts {
 export interface PresencePlayer {
     readonly name: string;
     readonly id: string | null;
+    /** When the visit they are on began, ISO 8601, as the live feed recorded it.
+     *  Absent from a reading nobody recorded, which is every one but the feed's. */
+    readonly since?: string | null;
 }
 
 /** Who is on one server, in the one shape every screen that shows it reads. */
