@@ -3,6 +3,7 @@ import {
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
     desktopDownload,
+    extensionDownload,
     pickFile,
     pickRelease,
     type AppFile,
@@ -289,5 +290,68 @@ describe("appDownload", () => {
         } finally {
             vi.unstubAllGlobals();
         }
+    });
+
+    describe("once its answer is two minutes old", () => {
+        // A release published a minute ago was shown as the one before it for ten
+        // minutes, on a screen with no refresh of its own.
+        const listed = (tags: readonly string[], etag: string) => ({
+            ok: true,
+            status: 200,
+            headers: new Headers({ etag }),
+            json: async () => tags.map((tag_name) => release({ tag_name }))
+        });
+
+        it("keeps the answer inside the two minutes without asking again", async () => {
+            vi.useFakeTimers({ now: new Date("2026-09-30T18:00:00Z") });
+            const fetching = vi.fn(async () => listed(["extension-v0.1.10"], '"a"'));
+            vi.stubGlobal("fetch", fetching);
+            try {
+                expect((await extensionDownload("example/within"))?.version).toBe("0.1.10");
+                vi.advanceTimersByTime(119_000);
+                expect((await extensionDownload("example/within"))?.version).toBe("0.1.10");
+                expect(fetching).toHaveBeenCalledTimes(1);
+            } finally {
+                vi.unstubAllGlobals();
+                vi.useRealTimers();
+            }
+        });
+
+        it("asks with the etag it had, and keeps its answer on a 304", async () => {
+            vi.useFakeTimers({ now: new Date("2026-09-30T18:00:00Z") });
+            const fetching = vi
+                .fn()
+                .mockResolvedValueOnce(listed(["extension-v0.1.10"], '"a"'))
+                .mockResolvedValueOnce({ ok: false, status: 304, headers: new Headers(), json: async () => [] });
+            vi.stubGlobal("fetch", fetching);
+            try {
+                await extensionDownload("example/unchanged");
+                vi.advanceTimersByTime(121_000);
+                expect((await extensionDownload("example/unchanged"))?.version).toBe("0.1.10");
+                expect(fetching).toHaveBeenCalledTimes(2);
+                const [, init] = fetching.mock.calls[1] as [string, RequestInit];
+                expect((init.headers as Record<string, string>)["if-none-match"]).toBe('"a"');
+            } finally {
+                vi.unstubAllGlobals();
+                vi.useRealTimers();
+            }
+        });
+
+        it("offers a release published since", async () => {
+            vi.useFakeTimers({ now: new Date("2026-09-30T18:00:00Z") });
+            const fetching = vi
+                .fn()
+                .mockResolvedValueOnce(listed(["extension-v0.1.10"], '"a"'))
+                .mockResolvedValueOnce(listed(["extension-v0.1.12"], '"b"'));
+            vi.stubGlobal("fetch", fetching);
+            try {
+                await extensionDownload("example/published");
+                vi.advanceTimersByTime(121_000);
+                expect((await extensionDownload("example/published"))?.version).toBe("0.1.12");
+            } finally {
+                vi.unstubAllGlobals();
+                vi.useRealTimers();
+            }
+        });
     });
 });
