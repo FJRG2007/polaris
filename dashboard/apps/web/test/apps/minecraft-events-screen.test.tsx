@@ -161,7 +161,11 @@ describe("the Events tab", () => {
         const none = { ...catalog.newPreset("mining-rush", "rush"), rewards: bare };
         const levels = {
             ...catalog.newPreset("fishing", "fish"),
-            rewards: { ...bare, first: { items: [], levels: 1 }, everyone: { items: [], levels: 2 } }
+            rewards: {
+                ...bare,
+                first: { items: [], levels: 1 },
+                everyone: { items: [], levels: 2 }
+            }
         };
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view: { ...view, config: { ...config, presets: [levels, none] } } });
@@ -466,7 +470,9 @@ describe("the editor in Spanish", () => {
             />
         );
         expect(screen.getByText("Fuera a (corazones)")).toBeTruthy();
-        expect(screen.getByText("Se cancela si se apuntan menos durante la cuenta atrás.")).toBeTruthy();
+        expect(
+            screen.getByText("Se cancela si se apuntan menos durante la cuenta atrás.")
+        ).toBeTruthy();
         expect(screen.getByText("El mismo para todos, y se retira al final.")).toBeTruthy();
         expect(screen.getByText(/La arena se construye 30 bloques en alto/)).toBeTruthy();
         expect(screen.queryByText(/around a player who is in the Overworld/)).toBeNull();
@@ -501,7 +507,9 @@ describe("the editor in Spanish", () => {
         expect((screen.getByLabelText(/^Mínimo de jugadores/) as HTMLInputElement).value).toBe("2");
         expect(screen.getAllByText("Ponle un nombre").length).toBeGreaterThan(0);
         fireEvent.change(screen.getByLabelText(/^Cofres/), { target: { value: "11" } });
-        await waitFor(() => expect(screen.getAllByText("Como máximo 10").length).toBeGreaterThan(0));
+        await waitFor(() =>
+            expect(screen.getAllByText("Como máximo 10").length).toBeGreaterThan(0)
+        );
         expect(screen.queryByText(/At most|Give it a name|events\.problems/)).toBeNull();
     });
 

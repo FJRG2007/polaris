@@ -428,7 +428,11 @@ describe("a competition with prizes, on its own", () => {
         const duel = catalog.newPreset("team-duel", "duel");
         expect(catalog.joinersNeeded({ ...duel, minPlayers: 1 })).toBe(2);
         expect(catalog.joinersNeeded({ ...duel, minPlayers: 4 })).toBe(4);
-        const bare = { first: catalog.NO_REWARD, second: catalog.NO_REWARD, third: catalog.NO_REWARD };
+        const bare = {
+            first: catalog.NO_REWARD,
+            second: catalog.NO_REWARD,
+            third: catalog.NO_REWARD
+        };
         const practice = {
             ...catalog.newPreset("parkour", "p"),
             minPlayers: 1,

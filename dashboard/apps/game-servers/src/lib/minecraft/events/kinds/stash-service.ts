@@ -116,7 +116,13 @@ export async function stashIn(
     if (
         !again.answered ||
         now.length !== kept.length ||
-        !kept.every((one) => stash.sameStack(one, again.items.find((item) => item.slot === one.slot), digest))
+        !kept.every((one) =>
+            stash.sameStack(
+                one,
+                again.items.find((item) => item.slot === one.slot),
+                digest
+            )
+        )
     )
         return undo();
 
@@ -139,7 +145,11 @@ export async function stashIn(
             })
         ).id;
     } catch (error) {
-        console.warn("polaris: keeping a copy of a bag failed", owner.installedAppId, String(error));
+        console.warn(
+            "polaris: keeping a copy of a bag failed",
+            owner.installedAppId,
+            String(error)
+        );
         return undo();
     }
     const taking: stash.Stash = {
@@ -211,13 +221,19 @@ export async function giveBack(
     const inBarrel = (one: stash.Kept) =>
         held[one.barrel]?.find((item) => item.slot === one.container);
     // Given back before, by a give-back that stopped before it was written down.
-    const owed = kept.kept.filter((one) => held[one.barrel] !== null && inBarrel(one) !== undefined);
+    const owed = kept.kept.filter(
+        (one) => held[one.barrel] !== null && inBarrel(one) !== undefined
+    );
     const free = (slot: number) => !current.items.some((item) => item.slot === slot);
     // Stopped between writing the stash down and emptying the slots: a stack
     // still in its own slot was never taken, and is only let go of in its barrel.
     const neverTaken = (one: stash.Kept) =>
         kept.state === "taking" &&
-        stash.sameStack(one, current.items.find((item) => item.slot === one.slot), digest);
+        stash.sameStack(
+            one,
+            current.items.find((item) => item.slot === one.slot),
+            digest
+        );
     const stayed = owed.filter(neverTaken);
     const into = owed.filter((one) => !neverTaken(one) && free(one.slot));
     const dropped = owed.filter((one) => !neverTaken(one) && !free(one.slot));
@@ -261,7 +277,12 @@ export async function giveBack(
     given.push(...droppedGiven);
     const left = owed.filter((one) => !given.includes(one));
     if (left.length > 0) {
-        await fail(kept, [...left, ...lost], `${left.length} stack(s) could not be given back and checked`, save);
+        await fail(
+            kept,
+            [...left, ...lost],
+            `${left.length} stack(s) could not be given back and checked`,
+            save
+        );
         return "failed";
     }
     if (lost.length > 0) return rebuild(server, name, { ...kept, kept: lost }, after.items, save);
@@ -279,14 +300,18 @@ async function finish(
         const items = await barrelHolds(server, spot);
         // Something in a barrel nobody is owed: it stays, and is shown.
         if (items !== null && items.length > 0) {
-            await fail(kept, [], "A barrel still held something after everything was given back", save);
+            await fail(
+                kept,
+                [],
+                "A barrel still held something after everything was given back",
+                save
+            );
             return "failed";
         }
     }
     // The database copy goes first: with it gone, a give-back that stops here
     // and is tried again knows everything was already given back.
-    if (kept.record)
-        await prisma.eventInventoryStash.deleteMany({ where: { id: kept.record } });
+    if (kept.record) await prisma.eventInventoryStash.deleteMany({ where: { id: kept.record } });
     await server.sayAll(stash.removeLines(kept));
     await save(null);
     return "done";
@@ -308,7 +333,11 @@ async function fail(
         await prisma.eventInventoryStash
             .update({
                 where: { id: kept.record },
-                data: { status: "failed", note, missing: JSON.stringify(left.map((one) => one.slot)) }
+                data: {
+                    status: "failed",
+                    note,
+                    missing: JSON.stringify(left.map((one) => one.slot))
+                }
             })
             .catch(() => undefined);
     }
@@ -369,7 +398,8 @@ async function rebuild(
     await server.sayAll(lines);
     const left = kept.kept.filter((one) => !built.includes(one));
     if (left.length === 0) {
-        if (kept.record) await prisma.eventInventoryStash.deleteMany({ where: { id: kept.record } });
+        if (kept.record)
+            await prisma.eventInventoryStash.deleteMany({ where: { id: kept.record } });
         await server.sayAll(stash.removeLines(kept)).catch(() => undefined);
         await save(null);
         return "done";
@@ -399,7 +429,15 @@ export async function failedStashes(installedAppId: string): Promise<
         where: { installedAppId, status: "failed", dismissedAt: null },
         orderBy: { createdAt: "desc" },
         take: 50,
-        select: { id: true, player: true, event: true, note: true, barrels: true, missing: true, updatedAt: true }
+        select: {
+            id: true,
+            player: true,
+            event: true,
+            note: true,
+            barrels: true,
+            missing: true,
+            updatedAt: true
+        }
     });
     return rows.map((row) => {
         const parse = <T>(raw: string | null, fallback: T): T => {

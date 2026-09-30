@@ -149,7 +149,10 @@ export function allAir(spots: readonly Spot[]): string {
 }
 
 /** Put down into air only: the barrels, then their casing. */
-export function placeLines(blocks: { barrels: readonly Spot[]; casing: readonly Spot[] }): string[] {
+export function placeLines(blocks: {
+    barrels: readonly Spot[];
+    casing: readonly Spot[];
+}): string[] {
     return [
         ...blocks.barrels.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrel keep`),
         ...blocks.casing.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrier keep`)
