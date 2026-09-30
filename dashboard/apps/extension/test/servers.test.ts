@@ -107,7 +107,9 @@ describe("a server name", () => {
     it("is refused past the length a row has room for, counted after normalizing", () => {
         expect(serverNameProblem("x".repeat(SERVER_NAME_MAX))).toBeNull();
         expect(serverNameProblem("x".repeat(SERVER_NAME_MAX + 1))).toBe("tooLong");
-        expect(serverNameProblem(normalizeServerName(` ${"x".repeat(SERVER_NAME_MAX)} `))).toBeNull();
+        expect(
+            serverNameProblem(normalizeServerName(` ${"x".repeat(SERVER_NAME_MAX)} `))
+        ).toBeNull();
         expect(serverNameProblem(null)).toBeNull();
     });
 });

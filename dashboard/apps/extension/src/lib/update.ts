@@ -46,18 +46,20 @@ export interface VersionAnswer {
 }
 
 function segments(version: string): number[] {
-    return version
-        .trim()
-        .replace(/^v/i, "")
-        // A prerelease suffix is not part of the ordering this needs: the server
-        // never offers one (`pickRelease` drops prereleases), so anything after a
-        // dash is noise rather than a decision.
-        .split("-")[0]!
-        .split(".")
-        .map((part) => {
-            const number = Number.parseInt(part, 10);
-            return Number.isFinite(number) ? number : 0;
-        });
+    return (
+        version
+            .trim()
+            .replace(/^v/i, "")
+            // A prerelease suffix is not part of the ordering this needs: the server
+            // never offers one (`pickRelease` drops prereleases), so anything after a
+            // dash is noise rather than a decision.
+            .split("-")[0]!
+            .split(".")
+            .map((part) => {
+                const number = Number.parseInt(part, 10);
+                return Number.isFinite(number) ? number : 0;
+            })
+    );
 }
 
 /**

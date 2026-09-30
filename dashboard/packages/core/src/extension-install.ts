@@ -28,7 +28,9 @@ export function installShell(os: InstallOs): string {
 /** The whole line, ready to paste with nothing to fill in. */
 export function installLine(os: InstallOs, repo: string): string {
     const scripts = `https://raw.githubusercontent.com/${repo}/main/${SCRIPT_PATH}`;
-    return os === "windows" ? `irm ${scripts}/install.ps1 | iex` : `curl -fsSL ${scripts}/install.sh | sh`;
+    return os === "windows"
+        ? `irm ${scripts}/install.ps1 | iex`
+        : `curl -fsSL ${scripts}/install.sh | sh`;
 }
 
 /**
@@ -51,6 +53,7 @@ export function detectOs(userAgent: string): InstallOs {
  * that is not a GitHub release page.
  */
 export function repoFromReleaseUrl(url: string): string | null {
-    const match = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/releases(?:\/|$)/.exec(url);
+    const match =
+        /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/releases(?:\/|$)/.exec(url);
     return match ? `${match[1]}/${match[2]}` : null;
 }

@@ -54,7 +54,9 @@ export default async function DownloadsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("downloads.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("downloads.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
 
@@ -83,7 +85,9 @@ export default async function DownloadsPage() {
                             {t("downloads.extension.store")}
                             <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
                         </p>
-                        <p className="text-muted-foreground">{t("downloads.extension.storeHint")}</p>
+                        <p className="text-muted-foreground">
+                            {t("downloads.extension.storeHint")}
+                        </p>
                     </div>
 
                     <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
@@ -131,7 +135,9 @@ export default async function DownloadsPage() {
                         <Smartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <div>
                             <p className="font-medium">{t("downloads.later.mobile")}</p>
-                            <p className="text-muted-foreground">{t("downloads.later.mobileHint")}</p>
+                            <p className="text-muted-foreground">
+                                {t("downloads.later.mobileHint")}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-start gap-3">

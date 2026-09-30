@@ -305,7 +305,9 @@ function AccountMenu({
                         role="menuitem"
                         onClick={() => void act({ kind: "switchAccount", id: one.id })}
                     >
-                        <span className="menu-text">{t("shell.switchTo", { name: describeAccount(one) })}</span>
+                        <span className="menu-text">
+                            {t("shell.switchTo", { name: describeAccount(one) })}
+                        </span>
                         <span className="muted small">{accountHost(one.origin)}</span>
                     </button>
                 ))}

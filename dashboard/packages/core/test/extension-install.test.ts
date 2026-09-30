@@ -24,7 +24,9 @@ describe("the install line", () => {
 describe("the repository behind a release page", () => {
     it("is read off a GitHub release address", () => {
         expect(
-            repoFromReleaseUrl("https://github.com/example-org/example-repo/releases/tag/extension-v0.1.13")
+            repoFromReleaseUrl(
+                "https://github.com/example-org/example-repo/releases/tag/extension-v0.1.13"
+            )
         ).toBe("example-org/example-repo");
     });
 

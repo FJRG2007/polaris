@@ -109,27 +109,39 @@ export function ServersPanel({
                                     className="server"
                                     disabled={busy && !server.active}
                                     aria-current={server.active ? "true" : undefined}
-                                    title={server.active ? server.origin : t("shell.switchTo", { name: describeServer(server) })}
+                                    title={
+                                        server.active
+                                            ? server.origin
+                                            : t("shell.switchTo", { name: describeServer(server) })
+                                    }
                                     onClick={() => void switchTo(server)}
                                 >
                                     <span className="server-text">
-                                        <span className="shown strong">{describeServer(server)}</span>
+                                        <span className="shown strong">
+                                            {describeServer(server)}
+                                        </span>
                                         <span className="muted small server-where">
                                             {server.name ? (
                                                 <span className="server-host" title={server.origin}>
                                                     {server.host}
                                                 </span>
                                             ) : null}
-                                            <span>{t("servers.accounts", { count: server.accounts })}</span>
+                                            <span>
+                                                {t("servers.accounts", { count: server.accounts })}
+                                            </span>
                                         </span>
                                     </span>
-                                    {server.active ? <span className="badge">{t("servers.inUse")}</span> : null}
+                                    {server.active ? (
+                                        <span className="badge">{t("servers.inUse")}</span>
+                                    ) : null}
                                 </button>
                                 <div className="acts">
                                     <button
                                         className="icon"
                                         disabled={busy}
-                                        aria-label={t("servers.renameLabel", { name: describeServer(server) })}
+                                        aria-label={t("servers.renameLabel", {
+                                            name: describeServer(server)
+                                        })}
                                         title={t("servers.rename")}
                                         onClick={() => setRenaming(server.origin)}
                                     >
@@ -138,7 +150,9 @@ export function ServersPanel({
                                     <button
                                         className="icon"
                                         disabled={busy}
-                                        aria-label={t("servers.removeLabel", { name: describeServer(server) })}
+                                        aria-label={t("servers.removeLabel", {
+                                            name: describeServer(server)
+                                        })}
                                         title={t("servers.remove")}
                                         onClick={() => setRemoving(server)}
                                     >
@@ -213,7 +227,9 @@ function RenameForm({
                 }}
             />
             {problem ? (
-                <p className="problem inline">{t("errors.serverNameTooLong", { max: SERVER_NAME_MAX })}</p>
+                <p className="problem inline">
+                    {t("errors.serverNameTooLong", { max: SERVER_NAME_MAX })}
+                </p>
             ) : null}
             <div className="rename-acts">
                 <button className="ghost" onClick={onCancel}>
@@ -354,7 +370,10 @@ function ConfirmRemove({
 
     const name = describeServer(server);
     return (
-        <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onCancel()}>
+        <div
+            className="dialog-backdrop"
+            onMouseDown={(event) => event.target === event.currentTarget && onCancel()}
+        >
             <div
                 ref={box}
                 className="dialog"
@@ -403,7 +422,9 @@ export function ServersFold({
     return (
         <div className="fold">
             <div className="row">
-                <span className="muted small">{t("servers.count", { count: status.servers.length })}</span>
+                <span className="muted small">
+                    {t("servers.count", { count: status.servers.length })}
+                </span>
                 <div className="acts">
                     <button className="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>
                         {open ? t("generator.hide") : t("shell.servers")}

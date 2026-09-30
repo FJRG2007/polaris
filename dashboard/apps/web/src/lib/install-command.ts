@@ -23,7 +23,13 @@
  * a script to keep current.
  */
 
-import { INSTALL_OSES, detectOs, installLine, installShell, type InstallOs } from "@polaris/core/extension-install";
+import {
+    INSTALL_OSES,
+    detectOs,
+    installLine,
+    installShell,
+    type InstallOs
+} from "@polaris/core/extension-install";
 
 export { INSTALL_OSES, detectOs, type InstallOs };
 

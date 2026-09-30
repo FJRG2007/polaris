@@ -74,7 +74,10 @@ export async function holdsOrigin(origin: string): Promise<boolean> {
  * they can go back to.
  */
 export async function rememberOrigin(origin: string): Promise<void> {
-    await Promise.all([ORIGIN.setValue(origin), SERVERS.setValue(withServer(await SERVERS.getValue(), origin))]);
+    await Promise.all([
+        ORIGIN.setValue(origin),
+        SERVERS.setValue(withServer(await SERVERS.getValue(), origin))
+    ]);
 }
 
 /** Forget it, on signing out of this server for good. */

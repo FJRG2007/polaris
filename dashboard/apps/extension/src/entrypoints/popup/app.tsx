@@ -9,7 +9,12 @@ import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { CheckMark, CopyMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
-import { detectOs, installLine, installShell, repoFromReleaseUrl } from "@polaris/core/extension-install";
+import {
+    detectOs,
+    installLine,
+    installShell,
+    repoFromReleaseUrl
+} from "@polaris/core/extension-install";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useWords } from "./words";
 import type { Words } from "@/lib/words";
@@ -100,7 +105,8 @@ function useUpdate(): { notice: UpdateNotice | null; pending: string | null } {
     useEffect(() => {
         void (async () => {
             const reply = await askBackground({ kind: "updateStatus" });
-            if (reply.ok && "update" in reply) setState({ notice: reply.update, pending: reply.pending });
+            if (reply.ok && "update" in reply)
+                setState({ notice: reply.update, pending: reply.pending });
         })();
     }, []);
     return state;
@@ -156,10 +162,18 @@ function UpdateBanner({
     }
     if (!notice) return null;
     if (notice.kind === "store") {
-        return <div className="notice small">{t("popup.update.store", { version: notice.version })}</div>;
+        return (
+            <div className="notice small">
+                {t("popup.update.store", { version: notice.version })}
+            </div>
+        );
     }
     if (notice.kind === "auto") {
-        return <div className="notice small">{t("popup.update.auto", { version: notice.version })}</div>;
+        return (
+            <div className="notice small">
+                {t("popup.update.auto", { version: notice.version })}
+            </div>
+        );
     }
     const repo = repoFromReleaseUrl(notice.url);
     if (import.meta.env.BROWSER !== "firefox" && repo) {
@@ -167,14 +181,23 @@ function UpdateBanner({
         const line = installLine(os, repo);
         return (
             <div className="notice small">
-                <p>{t("popup.update.runOnce", { version: notice.version, shell: installShell(os) })}</p>
+                <p>
+                    {t("popup.update.runOnce", {
+                        version: notice.version,
+                        shell: installShell(os)
+                    })}
+                </p>
                 <div className="install-line">
                     <code>{line}</code>
                     <button
                         className={copied === "line" ? "icon copied" : "icon"}
                         aria-label={t("popup.update.copyLine")}
-                        title={copied === "line" ? t("generator.copied") : t("popup.update.copyLine")}
-                        onClick={() => void navigator.clipboard.writeText(line).then(() => mark("line"))}
+                        title={
+                            copied === "line" ? t("generator.copied") : t("popup.update.copyLine")
+                        }
+                        onClick={() =>
+                            void navigator.clipboard.writeText(line).then(() => mark("line"))
+                        }
                     >
                         {copied === "line" ? <CheckMark /> : <CopyMark />}
                     </button>
@@ -624,7 +647,9 @@ function SignIn({
     if (!canVault) {
         return (
             <main className="pad">
-                <p className="muted small">{t("popup.signIn.noVault", { host: new URL(server).host })}</p>
+                <p className="muted small">
+                    {t("popup.signIn.noVault", { host: new URL(server).host })}
+                </p>
             </main>
         );
     }
@@ -798,7 +823,9 @@ function OnEverySite({
                     <button
                         className="ghost"
                         disabled={busy}
-                        title={everywhere ? t("popup.sites.onlySomeHint") : t("popup.sites.everyHint")}
+                        title={
+                            everywhere ? t("popup.sites.onlySomeHint") : t("popup.sites.everyHint")
+                        }
                         onClick={() => void press()}
                     >
                         {everywhere ? t("popup.sites.onlySome") : t("popup.sites.every")}
@@ -902,13 +929,17 @@ function OnThisSite({
         <>
             <div className="row">
                 <span className="muted small">
-                    {granted ? t("popup.sites.shownOn", { host }) : t("popup.sites.notShownOn", { host })}
+                    {granted
+                        ? t("popup.sites.shownOn", { host })
+                        : t("popup.sites.notShownOn", { host })}
                 </span>
                 <div className="acts">
                     <button
                         className="ghost"
                         disabled={busy}
-                        title={granted ? t("popup.sites.notHereHint") : t("popup.sites.showHereHint")}
+                        title={
+                            granted ? t("popup.sites.notHereHint") : t("popup.sites.showHereHint")
+                        }
                         onClick={() => void (granted ? turnOff() : turnOn())}
                     >
                         {granted ? t("popup.sites.notHere") : t("popup.sites.showHere")}
@@ -1082,7 +1113,11 @@ function CountdownRing({ left, of }: { left: number; of: number }): React.JSX.El
     const tone = held <= 5 ? "danger" : held <= Math.max(8, period / 3) ? "warning" : "success";
 
     return (
-        <span className={`ring ${tone}`} role="timer" aria-label={t("popup.items.secondsLeft", { count: held })}>
+        <span
+            className={`ring ${tone}`}
+            role="timer"
+            aria-label={t("popup.items.secondsLeft", { count: held })}
+        >
             <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle
                     cx="12"
@@ -1406,7 +1441,9 @@ function SaveLogin({
                 onKeyDown={(event) => event.key === "Enter" && check.ok && void save()}
             />
             <span className="muted small">
-                {url ? t("popup.saveLogin.savedFor", { where: host ?? url }) : t("popup.saveLogin.noPage")}
+                {url
+                    ? t("popup.saveLogin.savedFor", { where: host ?? url })
+                    : t("popup.saveLogin.noPage")}
             </span>
             <div className="acts">
                 <button className="ghost" disabled={busy || !check.ok} onClick={() => void save()}>
@@ -1523,7 +1560,11 @@ function Accounts({
                 {active
                     ? t.rich("popup.accounts.signedInAs", {
                           who: () => (
-                              <span key="who" className="who-name" title={active.email ?? undefined}>
+                              <span
+                                  key="who"
+                                  className="who-name"
+                                  title={active.email ?? undefined}
+                              >
                                   {describeAccount(active)}
                               </span>
                           )
@@ -1699,7 +1740,10 @@ function Items({
                 <div className="head">
                     <span className="name">{item.name}</span>
                     {item.vault ? (
-                        <span className="vault" title={t("popup.items.sharedFrom", { vault: item.vault })}>
+                        <span
+                            className="vault"
+                            title={t("popup.items.sharedFrom", { vault: item.vault })}
+                        >
                             {item.vault}
                         </span>
                     ) : null}
@@ -1770,7 +1814,9 @@ function Items({
             <section>
                 <h2>{query === "" ? t("popup.items.everything") : t("popup.items.found")}</h2>
                 {found.length === 0 ? (
-                    <p className="muted pad">{query === "" ? t("popup.items.none") : t("popup.items.noMatch")}</p>
+                    <p className="muted pad">
+                        {query === "" ? t("popup.items.none") : t("popup.items.noMatch")}
+                    </p>
                 ) : (
                     <ul>{found.map((item) => row(item, false))}</ul>
                 )}
@@ -1853,7 +1899,9 @@ function Items({
                 </button>
                 <span className="muted small grow">
                     {status.syncedAt
-                        ? t("popup.items.synced", { time: new Date(status.syncedAt).toLocaleTimeString(t.locale) })
+                        ? t("popup.items.synced", {
+                              time: new Date(status.syncedAt).toLocaleTimeString(t.locale)
+                          })
                         : t("popup.items.notSynced")}
                 </span>
             </footer>
