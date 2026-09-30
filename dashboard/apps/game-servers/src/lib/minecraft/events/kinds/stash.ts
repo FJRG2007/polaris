@@ -228,6 +228,31 @@ export function dropLines(name: string, barrels: readonly Spot[], kept: Kept): s
     ];
 }
 
+/** Whether the dropped stack is there at all: before 1.20.5 the summon above
+ *  makes an empty item (its `count` is not read), which is gone at once. */
+export function dropThere(kept: Kept): string {
+    return `execute if entity @e[type=minecraft:item,tag=${dropTag(kept)}]`;
+}
+
+/**
+ * The same drop as the game wrote items before 1.20.5: the placeholder with
+ * `Count`, and the copy taken from the barrel's list of items (an item entity
+ * has no `contents` slot there). What the copy carries of its barrel slot is
+ * taken off again.
+ */
+export function legacyDropLines(name: string, barrels: readonly Spot[], kept: Kept): string[] {
+    const barrel = barrels[kept.barrel];
+    if (!barrel) return [];
+    const tag = dropTag(kept);
+    const it = `@e[type=minecraft:item,tag=${tag},limit=1]`;
+    return [
+        `execute at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",Count:1b},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
+        `execute as ${it} run data modify entity @s Item set from block ${at(barrel)} Items[{Slot:${kept.container}b}]`,
+        `execute as ${it} run data remove entity @s Item.Slot`,
+        `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`
+    ];
+}
+
 /** The dropped stack, read back to check it holds the copy. */
 export function readDrop(kept: Kept): string {
     return `data get entity @e[type=minecraft:item,tag=${dropTag(kept)},limit=1] Item`;

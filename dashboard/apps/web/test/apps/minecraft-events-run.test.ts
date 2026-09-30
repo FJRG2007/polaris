@@ -434,9 +434,24 @@ function itemAnswer(line: string): string | null {
     }
     const summoned = /^execute at (\w+) run summon minecraft:item ~ ~ ~ \{.*Tags:\["(\w+)"\].*\}$/.exec(line);
     if (summoned) {
+        // Before 1.20.5 an item's count is `Count`: without it, an empty item, gone at once.
+        if (!events.atLeast(world.version, [1, 20, 5]) && !line.includes("Count:1b")) return "Summoned new Air";
         world.drops.set(summoned[2]!, { stack: { id: "minecraft:stone", count: 1 }, owner: null });
         return "Summoned new Item";
     }
+    const there = /^execute if entity @e\[type=minecraft:item,tag=(\w+)\]$/.exec(line);
+    if (there) return world.drops.has(there[1]!) ? "Test passed" : "Test failed";
+    const copied =
+        /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] run data modify entity @s Item set from block (-?\d+ -?\d+ -?\d+) Items\[\{Slot:(\d+)b\}\]$/.exec(line);
+    if (copied) {
+        const drop = world.drops.get(copied[1]!);
+        const stack = world.containers.get(copied[2]!)?.get(Number(copied[3]));
+        if (!drop || !stack) return "No entity was found";
+        drop.stack = { ...stack };
+        return "Modified entity data of Item";
+    }
+    if (/^execute as @e\[type=minecraft:item,tag=\w+,limit=1\] run data remove entity @s Item\.Slot$/.test(line))
+        return "Nothing changed. The specified properties already have these values";
     const filled =
         /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] run item replace entity @s contents from block (-?\d+ -?\d+ -?\d+) container\.(\d+)$/.exec(line);
     if (filled) {
@@ -4607,6 +4622,23 @@ describe("players' own things through an arena", () => {
         );
         expect(home).toBeGreaterThan(-1);
         expect(drop).toBeGreaterThan(home);
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("drops it the way an older game writes items, before 1.20.5", async () => {
+        world.version = "1.20.1";
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        // Snowballs picked up in the sword's slot while it ran, as a spleef's snow gives.
+        world.inv.Ana!.set(0, { id: "minecraft:snowball", count: 4 });
+        await play(3 * 60_000 + 10_000);
+        expect(state().run).toBeNull();
+        expect([...world.drops.values()]).toEqual([{ stack: ana.get(0), owner: "Ana" }]);
+        expect(world.sent.some((line) => line.includes('{Item:{id:"minecraft:stone",Count:1b}'))).toBe(true);
+        expect(world.sent.some((line) => line.includes("Items[{Slot:0b}]"))).toBe(true);
         expect(stashRows.size).toBe(0);
     });
 
