@@ -10,6 +10,14 @@ It is built into the dashboard image (`docker/Dockerfile`, stage
 `minecraft-anticheat`) and switched on from a server's Anti-cheat tab
 (`apps/game-servers/src/lib/minecraft/polaris-anticheat.ts`).
 
+## Chat moderation
+
+The bukkit module also holds the server's chat to the rules on its Moderation
+tab in Polaris, cancelling `AsyncPlayerChatEvent` and the chat commands for a
+line that breaks one. The engine is Polaris's own, shared with the NeoForge mod
+and compiled in from `../polaris-common/src/chat` (the image copies it beside
+this directory).
+
 ## Modules
 
 - `api`, `internal`, `internal-shims`, `bukkit-internal` - the public API, storage

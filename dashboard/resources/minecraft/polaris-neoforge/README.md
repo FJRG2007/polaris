@@ -34,6 +34,23 @@ whether or not the login is on; honeypots and reports need the login's address,
 id and token. If this NeoForge build or another mod leaves out any of the code it
 hooks into, the anti-xray stays off and the server starts as usual.
 
+## Chat moderation
+
+Wherever Polaris has written its address, id and token (for the login or for the
+anti-cheat), the mod holds the chat to the rules on the server's Moderation tab:
+it asks Polaris for them every 30 seconds and cancels a `ServerChatEvent` that
+breaks one (another server's address, flooding, the same line again, links,
+shouting, a blocked word), and does the same for the text of `/msg`, `/tell`,
+`/w`, `/me`, `/say` and `/teammsg`. Operators are left alone. Each stopped line
+is reported to Polaris, which keeps it for the tab, answers with the warning
+the player is shown in their own language, and times the player out after
+repeats. The engine is shared with the anti-cheat plugin
+(`../polaris-common/src/chat`).
+
+Messages the server or other mods send to players are not filtered: there is no
+event for them, and a filter on the outgoing packet would have to judge command
+output, death messages and every mod's feedback too.
+
 ## Configuration
 
 Polaris writes these when the server's join-password card switches the mod on.

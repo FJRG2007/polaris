@@ -162,7 +162,10 @@ FROM gradle:9.4.1-jdk21 AS minecraft-anticheat
 
 WORKDIR /ac
 COPY resources/minecraft/polaris-anticheat/ ./
-RUN fingerprint="$(find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+# Chat moderation's engine, shared with the Polaris mod: the bukkit module reads
+# it from ../../polaris-common, which from /ac/bukkit is this folder.
+COPY resources/minecraft/polaris-common/src/chat/ /polaris-common/src/chat/
+RUN fingerprint="$(find . /polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
     && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build -x test \
     && mkdir -p /out \
     && cp bukkit/build/libs/polarisac-bukkit-*.jar /out/polaris-anticheat-bukkit.jar \

@@ -3965,6 +3965,33 @@ model MinecraftAnticheatFlag {
     @@index([installedAppId, player, at])
 }
 
+// A chat line Polaris's mod or plugin stopped on a Minecraft server, and why:
+// what the Moderation tab lists, and what a player's timeout is counted from.
+// Kept two weeks, trimmed as new ones arrive.
+model MinecraftChatBlock {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // The player's name lowercased, which strikes are counted by, and as the
+    // game wrote it, which is what is shown.
+    player         String
+    playerName     String
+    // flood, repeat, caps, link, advertising or word; what in the line did it
+    // (the address, the word); the line itself, as typed.
+    reason         String
+    detail         String
+    text           String
+    // Whether it came through a command (/msg, /me) rather than the chat box.
+    command        Boolean  @default(false)
+    // What followed: warn, or timeout when this one ended in a timeout.
+    action         String
+    at             DateTime
+
+    // The tab's newest-first list.
+    @@index([installedAppId, at])
+    // One player's recent stops, which a timeout is decided on.
+    @@index([installedAppId, player, at])
+}
+
 // One player's challenges on one Minecraft server: what they were dealt today,
 // this week and on the month's card, and how far each has got. The shape is
 // the game-servers app's own (`challenges/state.ts`), kept as JSON because it

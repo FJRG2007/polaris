@@ -1,17 +1,20 @@
 "use server";
 
 /**
- * The Moderation tab: what the server's mods announce to players, and the
- * switch that lets one of them through.
+ * The Moderation tab: the chat rules the server holds players to, what it
+ * stopped, and what the server's mods announce to players.
  *
- * Reading is the moderators', like the tab; letting an announcement through
- * edits a file on the server, so it is the managers'.
+ * Reading, and setting the chat rules, is the moderators', like the tab: the
+ * rules reach the server on their own, with no restart. Letting a mod's
+ * announcement through edits a file on the server, so it is the managers'.
  */
 
 import { z } from "zod";
 import { host } from "@polaris/app-host";
-import { gameWords, messageText } from "../game-words";
+import { gameWords, issueText, messageText } from "../game-words";
 import * as announcements from "../../lib/minecraft/mod-announcements-service";
+import * as chat from "../../lib/minecraft/chat-moderation-service";
+import { chatModerationSchema, type ChatModeration } from "../../lib/minecraft/chat-moderation";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -69,5 +72,53 @@ export async function setAnnouncementAction(input: {
         return { state };
     } catch (caught) {
         return { error: await failure(caught, words("moderation.announcements.saveFailed")) };
+    }
+}
+
+export async function readChatModerationAction(
+    installedAppId: string
+): Promise<{ state?: chat.ChatModerationState; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = serverId.safeParse(installedAppId);
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
+    try {
+        const { access } = await requireGameServer("games.moderate", parsed.data);
+        const applicationId = access.install.applicationId;
+        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        return {
+            state: await chat.chatModerationState(parsed.data, applicationId, access.ownerId)
+        };
+    } catch (caught) {
+        return { error: await failure(caught, words("moderation.chat.readFailed")) };
+    }
+}
+
+const rulesInput = z.object({ installedAppId: serverId, rules: chatModerationSchema });
+
+/** Save the rules. The server takes them within half a minute, with no restart. */
+export async function saveChatModerationAction(input: {
+    installedAppId: string;
+    rules: unknown;
+}): Promise<{ rules?: ChatModeration; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = rulesInput.safeParse(input);
+    if (!parsed.success) {
+        return {
+            error: (await issueText(parsed.error.issues[0]?.message)) ?? words("moderation.chat.saveFailed")
+        };
+    }
+    try {
+        const { user } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const rules = await chat.saveChatModeration(parsed.data.installedAppId, parsed.data.rules);
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.chat-moderation.save",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { enabled: String(rules.enabled) }
+        });
+        return { rules };
+    } catch (caught) {
+        return { error: await failure(caught, words("moderation.chat.saveFailed")) };
     }
 }

@@ -34,6 +34,19 @@ record PolarisConfig(State state, String baseUrl, String serverId, String token,
         return new PolarisConfig(State.ON, url, id, token, "");
     }
 
+    /**
+     * Where Polaris is, whether or not the login is on: the anti-cheat writes the
+     * same three variables when it installs the mod without the login, and what
+     * talks to Polaris for it (the anti-xray's honeypots and reports) needs them
+     * either way. ON when all three are there and valid, OFF otherwise.
+     */
+    static PolarisConfig linkFromEnvironment(Map<String, String> env) {
+        Map<String, String> asIfOn = new java.util.HashMap<>(env);
+        asIfOn.put("POLARIS_LOGIN", "on");
+        PolarisConfig link = fromEnvironment(asIfOn);
+        return link.state() == State.ON ? link : new PolarisConfig(State.OFF, "", "", "", "");
+    }
+
     private static boolean isHttpUrl(String value) {
         try {
             URI uri = URI.create(value);

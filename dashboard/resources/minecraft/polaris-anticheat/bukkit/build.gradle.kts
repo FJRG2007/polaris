@@ -102,6 +102,23 @@ fun liteSharedProviderClassEntries(): Set<String> {
 }
 
 
+// Chat moderation: the same engine as the Polaris mod's, from its shared sources.
+sourceSets {
+    main {
+        java {
+            srcDir("../../polaris-common/src/chat/java")
+        }
+    }
+}
+
+// Formatting is checked on this module's own sources: the shared ones above sit
+// outside it, which the formatter refuses to touch.
+spotless {
+    java {
+        target("src/**/*.java")
+    }
+}
+
 dependencies {
     compileOnly(libs.paper.api)
     compileOnly(libs.placeholderapi)

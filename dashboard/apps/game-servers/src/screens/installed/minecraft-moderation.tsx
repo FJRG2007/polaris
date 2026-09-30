@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * The Moderation tab: what reaches players' chat that nobody on the server
- * wrote. Mods that announce themselves on every join are found and quietened
- * (`mod-announcements.ts`); each can be let through again here.
+ * The Moderation tab: what reaches the players' chat. The rules players' own
+ * lines are held to, and what was stopped (`minecraft-chat-moderation.tsx`);
+ * and the mods that announce themselves on every join, found and quietened
+ * (`mod-announcements.ts`), each of which can be let through again here.
  */
 
 import { useGameText } from "../game-text";
@@ -16,6 +17,7 @@ import type {
     AnnouncerStatus
 } from "../../lib/minecraft/mod-announcements-service";
 import { RestartPlanner } from "./restart-planner";
+import { ChatModerationSection } from "./minecraft-chat-moderation";
 import { readAnnouncementsAction, setAnnouncementAction } from "./moderation-actions";
 
 const { writeSnapshot } = hostUi.snapshotCache;
@@ -51,6 +53,11 @@ export function MinecraftModeration({
 }) {
     return (
         <div className="flex flex-col gap-4">
+            <ChatModerationSection
+                installedAppId={installedAppId}
+                canManage={canManage}
+                running={running}
+            />
             <ModAnnouncementsCard
                 installedAppId={installedAppId}
                 canManage={canManage}
