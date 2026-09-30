@@ -477,6 +477,15 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "places.automation",
+        group: "places",
+        label: "An automation told you something",
+        description: "A step in one of your automations asked to let you know.",
+        level: "info",
+        // On: nobody writes "tell me" into an automation hoping not to be told.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "server.space",
         group: "deploy",
         label: "A server is running out of room",

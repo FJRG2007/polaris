@@ -172,6 +172,10 @@
         "settings": {
             "description": "Dónde guarda la casa lo que graba y qué reconoce las caras.",
             "title": "Ajustes"
+        },
+        "automations": {
+            "title": "Automatizaciones",
+            "description": "Lo que este sitio hace solo: apagar lo que se quedó encendido, cerrar lo que se quedó abierto y avisarte."
         }
     },
     "placeDialog": {
@@ -511,7 +515,10 @@
         "switchbotOdd": "SwitchBot respondió algo inesperado.",
         "switchbotOffline": "El dispositivo no responde a SwitchBot ahora mismo.",
         "switchbotRefused": "SwitchBot rechazó la petición.",
-        "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso"
+        "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso",
+        "automationGone": "Esa automatización no está aquí",
+        "automationNewer": "Esa automatización la guardó un Polaris más nuevo",
+        "automationNames": "Esa automatización nombra algo que ya no está aquí"
     },
     "connections": {
         "nuki-web": {
@@ -1275,5 +1282,294 @@
         "tamper": "Puede que hayan manipulado la cámara {camera}",
         "person": "Hay alguien en {camera}",
         "other": "{kind, select, vehicle {Un vehículo} animal {Un animal} package {Un paquete} other {Algo}} en {camera}"
+    },
+    "automations": {
+        "anyValue": "Cualquiera",
+        "missingDevice": "Un dispositivo que ya no está",
+        "missingAutomation": "Una automatización que ya no está",
+        "toggle": "Cambiar",
+        "attributes": {
+            "state": "Su estado",
+            "door": "Su puerta",
+            "reading": "Su lectura"
+        },
+        "triggers": {
+            "change": "Un aparato cambia",
+            "stays": "Sigue en un estado",
+            "threshold": "Una lectura cruza",
+            "time": "A una hora",
+            "interval": "Cada cierto tiempo",
+            "manual": "Solo a mano"
+        },
+        "conditions": {
+            "device": "Estado de un aparato",
+            "reading": "Una lectura es",
+            "time": "Entre horas",
+            "weekday": "Qué días"
+        },
+        "steps": {
+            "device": "Usar un aparato",
+            "delay": "Esperar un rato",
+            "wait": "Esperar a un aparato",
+            "notify": "Avisarme",
+            "run": "Lanzar automatización"
+        },
+        "compare": {
+            "gt": "Más de",
+            "gte": "Al menos",
+            "lt": "Menos de",
+            "lte": "Como mucho",
+            "eq": "Justo",
+            "ne": "No es"
+        },
+        "days": "{which, select, every {todos los días} weekdays {entre semana} weekends {los fines de semana} other {{list}}}",
+        "units": {
+            "seconds": "{count, plural, one {# segundo} other {# segundos}}",
+            "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+            "hours": "{count, plural, one {# hora} other {# horas}}"
+        },
+        "say": {
+            "time": "A las {time}, {days}",
+            "interval": "Cada {every}",
+            "manual": "Solo cuando se lanza a mano",
+            "threshold": "{device} pasa {direction, select, above {de} other {por debajo de}} {value}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {de {from} a {to}} other {pasa a {to}}}} other {{hasFrom, select, yes {deja de estar {from}} other {cambia}}}}",
+            "stays": "{device}: {value} durante {span}",
+            "is": "{device} {negate, select, yes {no está} other {está}} {value}",
+            "reading": "{device}: {compare} {value}",
+            "between": "Entre las {from} y las {to}",
+            "on": "Días: {days}",
+            "act": "{action}: {device}",
+            "delay": "Esperar {span}",
+            "wait": "Esperar a que {device} esté {value}, hasta {span}",
+            "notify": "Avisar: {message}",
+            "run": "Lanzar {name}"
+        },
+        "cause": {
+            "automation": "La lanzó {name}",
+            "manual": "La lanzó {name} a mano",
+            "time": "A su hora",
+            "interval": "En su intervalo",
+            "stays": "{device} llevaba {value} {span}",
+            "change": "{device} pasó de {from} a {to}"
+        },
+        "status": {
+            "queued": "En cola",
+            "waiting": "Esperando",
+            "running": "En marcha",
+            "succeeded": "Hecha",
+            "failed": "Falló",
+            "skipped": "Omitida",
+            "stopped": "Parada",
+            "refused": "Rechazada",
+            "limited": "Retenida"
+        },
+        "outcomes": {
+            "ok": "Hecho",
+            "failed": "Falló",
+            "refused": "Rechazado",
+            "timedOut": "Sin tiempo",
+            "waiting": "Esperando",
+            "skipped": "Omitido"
+        },
+        "reasons": {
+            "conditions": "Sus condiciones no se cumplían, así que no hizo nada.",
+            "owner": "Quien la guardó ya no tiene los permisos que necesita aquí. Alguien que los tenga tiene que abrirla y guardarla de nuevo.",
+            "loop": "Parada: unas automatizaciones se lanzaban entre sí en bucle.",
+            "limited": "Retenida: saltó demasiadas veces en pocos minutos. Volverá a funcionar cuando se calme.",
+            "disabled": "Parada porque se apagó.",
+            "timedOut": "Parada: el dispositivo no llegó a tiempo.",
+            "step": "Parada en el paso que falló.",
+            "fault": "Algo falló al ejecutarla. No se hizo nada después de ese paso."
+        },
+        "notes": {
+            "deviceGone": "Ese dispositivo ya no está.",
+            "owner": "Quien la guardó ya no puede usar los dispositivos de aquí.",
+            "loop": "No se lanzó: unas automatizaciones se lanzaban entre sí en bucle.",
+            "failed": "El dispositivo no respondió. No se cambió nada.",
+            "notifyFailed": "No se pudo enviar el aviso.",
+            "automationGone": "Esa automatización ya no está.",
+            "automationOff": "Esa automatización está apagada, así que no se lanzó.",
+            "toggleUnknown": "No se sabía su estado, así que no había nada que cambiar."
+        },
+        "errors": {
+            "broken": "Algo en esta tarjeta no está bien. Quítala y vuelve a añadirla.",
+            "time": "Escribe la hora como 07:30.",
+            "days": "Elige al menos un día.",
+            "device": "Elige un dispositivo.",
+            "state": "Elige un valor.",
+            "number": "Escribe un número.",
+            "whole": "Usa un número entero.",
+            "tooSmall": "Es demasiado pequeño.",
+            "tooBig": "Es demasiado grande.",
+            "tooLong": "Es demasiado largo.",
+            "tooMany": "Es el máximo que admite una automatización.",
+            "action": "Elige qué hacer.",
+            "message": "Escribe el mensaje.",
+            "automation": "Elige una automatización.",
+            "timeZone": "Su zona horaria no es una que este servidor conozca.",
+            "noTrigger": "Añade al menos un evento.",
+            "noStep": "Añade al menos un paso.",
+            "emptyGroup": "Un grupo necesita al menos una condición.",
+            "sameState": "Desde y hasta son lo mismo.",
+            "sameTime": "El inicio y el final son la misma hora.",
+            "name": "Ponle un nombre.",
+            "place": "Ese sitio ya no está.",
+            "deviceGone": "Ese dispositivo ya no está en este sitio.",
+            "attribute": "Ese dispositivo no tiene nada así que vigilar.",
+            "notSensor": "Elige un sensor.",
+            "watchOnly": "Ese dispositivo está para verse, no para usarse.",
+            "cannotDo": "Ese dispositivo no puede hacer eso.",
+            "runSelf": "Una automatización no puede lanzarse a sí misma.",
+            "automationGone": "Esa automatización ya no está.",
+            "fix": "Hay tarjetas que corregir antes de poder guardarla.",
+            "noControl": "No puedes usar los dispositivos de aquí, así que una automatización que guardes tampoco podría.",
+            "noAutoOff": "Ese dispositivo no tiene nada que apagar solo."
+        },
+        "notice": {
+            "title": "Automatización: {name}"
+        },
+        "list": {
+            "intro": "Lo que este sitio hace solo. Cada una actúa como quien la guardó por última vez.",
+            "new": "Crear nueva",
+            "blank": "Empezar vacía",
+            "emptyTitle": "Sin automatizaciones",
+            "emptyManage": "Apaga algo al cabo de un rato, ponlo en un horario o haz que un dispositivo siga a otro.",
+            "emptyView": "Nadie ha preparado ninguna para este sitio todavía.",
+            "summary": "{when}{more, plural, =0 {} one { o # más} other { o # más}} - {steps, plural, one {# paso} other {# pasos}}",
+            "neverRan": "Sin ejecutar",
+            "turnOffName": "Apagar {name}",
+            "turnOnName": "Encender {name}",
+            "log": "Qué hizo",
+            "logName": "Qué hizo {name}",
+            "run": "Lanzar ya",
+            "runName": "Lanzar {name} ya",
+            "runOff": "Enciéndela para lanzarla",
+            "started": "En marcha",
+            "remove": "Quitar",
+            "removeName": "Quitar {name}",
+            "removeTitle": "Quitar automatización",
+            "removeQuestion": "¿Quitar {name}?",
+            "removeBody": "Se para en el acto, también lo que estuviera esperando para hacer, y su registro se va con ella."
+        },
+        "editor": {
+            "back": "Automatizaciones",
+            "view": "Vista",
+            "flow": "Flujo",
+            "runs": "Qué hizo",
+            "name": "Nombre",
+            "namePlaceholder": "Luz del porche por la noche",
+            "enabled": "Encendida",
+            "on": "Sí",
+            "off": "No",
+            "saveFirst": "Guarda antes los cambios",
+            "saved": "Guardada.",
+            "readOnly": "Puedes leer esta automatización. Para cambiarla hace falta poder gestionar Lugares.",
+            "when": "Cuando",
+            "whenHint": "Cualquiera de estos la lanza.",
+            "if": "Si",
+            "ifEmpty": "Siempre. Añade una condición para limitar cuándo sigue.",
+            "ifHint": "Solo sigue si se cumplen.",
+            "then": "Luego",
+            "thenHint": "En este orden.",
+            "addTrigger": "Añadir evento",
+            "addCondition": "Añadir condición",
+            "addToGroup": "Añadir al grupo",
+            "addStep": "Añadir paso",
+            "groupsMatch": "Cómo se combinan los grupos",
+            "allGroups": "Todos los grupos",
+            "anyGroup": "Algún grupo",
+            "groupMatch": "Cómo se combinan",
+            "allOf": "Todas estas",
+            "anyOf": "Alguna de estas",
+            "group": "Condición",
+            "removeGroup": "Quitar grupo",
+            "triggerKind": "Tipo de evento",
+            "conditionKind": "Tipo de condición",
+            "stepKind": "Tipo de paso",
+            "remove": "Quitar",
+            "up": "Subir",
+            "down": "Bajar",
+            "zone": "Las horas son de {zone}.",
+            "runsAs": "Actúa como {name}."
+        },
+        "fields": {
+            "at": "A las",
+            "days": "Días",
+            "every": "Cada",
+            "minutesSuffix": "min",
+            "manualHint": "Solo empieza con Lanzar ya o desde otra automatización.",
+            "device": "Aparato",
+            "sensor": "Sensor",
+            "watch": "Vigilar",
+            "from": "Desde",
+            "to": "Hasta",
+            "is": "Está",
+            "for": "Al menos",
+            "direction": "Sentido",
+            "above": "Sube de",
+            "below": "Baja de",
+            "value": "Valor",
+            "test": "Prueba",
+            "isOption": "Está",
+            "isNotOption": "No está",
+            "compare": "Comparar",
+            "do": "Hacer",
+            "wait": "Esperar",
+            "until": "Hasta que esté",
+            "giveUp": "Desistir tras",
+            "onTimeout": "Si nunca llega",
+            "timeoutStop": "Parar aquí",
+            "timeoutContinue": "Seguir igualmente",
+            "message": "Mensaje",
+            "messagePlaceholder": "La luz del porche sigue encendida",
+            "automation": "Automatización",
+            "chooseAutomation": "Elige una automatización",
+            "chooseDevice": "Elige un aparato",
+            "chooseValue": "Elige uno",
+            "typeValue": "Escribe uno",
+            "noDevices": "Aún no hay dispositivos que vigilar aquí.",
+            "noSensors": "No hay sensores en este sitio.",
+            "noOperable": "Aquí no hay ningún dispositivo que se pueda usar.",
+            "noControl": "No puedes usar dispositivos, así que un paso tampoco.",
+            "noOthers": "Este sitio aún no tiene otras automatizaciones.",
+            "unit": "Unidad",
+            "units": {
+                "seconds": "Segundos",
+                "minutes": "Minutos",
+                "hours": "Horas"
+            }
+        },
+        "log": {
+            "title": "Qué hizo",
+            "refresh": "Volver a mirar",
+            "emptyTitle": "Aún no se ha ejecutado",
+            "emptyBody": "Cada vez que salte, aquí queda qué hizo y por qué.",
+            "resumes": "Sigue a las {time}.",
+            "noSteps": "No se ejecutó ningún paso.",
+            "stepGone": "Un paso ya quitado"
+        },
+        "shortcut": {
+            "offTitle": "Apagar solo",
+            "lockTitle": "Volver a cerrar solo",
+            "offAfter": "Cuando lleve encendido",
+            "lockAfter": "Cuando lleve abierta",
+            "minutes": "Duración",
+            "add": "Añadir",
+            "made": "Añadida como {name}. <open>Ábrela</open> para cambiarla."
+        },
+        "templates": {
+            "autoOff": {
+                "title": "Apagar tras un rato",
+                "offName": "Apagar {device} tras {span}",
+                "lockName": "Cerrar {device} tras {span}"
+            },
+            "schedule": {
+                "title": "Encender y apagar con horario"
+            },
+            "follow": {
+                "title": "Si cambia uno, ajustar otro"
+            }
+        }
     }
 }

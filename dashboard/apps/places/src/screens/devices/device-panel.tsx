@@ -53,6 +53,7 @@ import {
     ToggleRight
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
+import { AutoOffShortcut } from "../automations/auto-off-shortcut";
 
 const { ShareDialog } = hostUi.accessShareDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -98,6 +99,12 @@ const TONE_CLASSES: Record<kinds.DeviceTone, string> = {
     danger: "border-danger-edge bg-danger-soft text-danger-ink",
     muted: "border-border bg-muted text-muted-foreground"
 };
+
+/** A tone as a chip's colours, for anything else that reads in the same tones -
+ *  an automation's last run. */
+export function toneClass(tone: kinds.DeviceTone): string {
+    return TONE_CLASSES[tone];
+}
 
 /** A device nobody can reach has no state worth colouring: whatever it was doing
  *  when it last answered is not what it is doing now. */
@@ -410,6 +417,8 @@ export function DevicePanel({
                                     </p>
                                 )}
                             </section>
+
+                            <AutoOffShortcut key={device.id} device={device} canManage={canManage} canControl={canControl} />
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
                                 <h3 className="text-sm font-medium">{t("devicePanel.used")}</h3>

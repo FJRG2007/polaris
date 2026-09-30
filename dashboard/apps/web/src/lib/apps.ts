@@ -890,6 +890,23 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            label: "Automations", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/devices/automations",
+            icon: Workflow,
+            keywords: [
+                "routines",
+                "schedule",
+                "timer",
+                "turn off after",
+                "switch off automatically",
+                "if this then that",
+                "rules",
+                "triggers",
+                "scenes"
+            ]
+        },
+        {
             label: "Settings", // i18n-ignore
             href: "/places/settings",
             icon: SlidersHorizontal,

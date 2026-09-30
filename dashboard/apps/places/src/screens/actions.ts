@@ -64,6 +64,7 @@ import type { MessageParams } from "@polaris/core";
 import { placesT } from "../lib/i18n";
 import type { PlacesKey } from "../../messages";
 import { placesRefusalText } from "../lib/refusal-text";
+import { guard } from "../lib/action-guard";
 import { connectionWords } from "../lib/device-connections";
 
 const { requireUser } = host.session;
@@ -83,29 +84,6 @@ async function say(key: PlacesKey, params?: MessageParams): Promise<string> {
 async function schemaSay(message: string | undefined, fallback: PlacesKey): Promise<string> {
     const t = await placesT();
     return message ? placesRefusalText(t, message) : t(fallback);
-}
-
-/**
- * Turn a refusal into a sentence, and a fault into a line in the log.
- *
- * Only a `HomeError` is shown, because only a `HomeError` was written to be
- * read. Everything else that lands here is a fault, and a fault's own words are
- * about columns, drivers and connection strings - a camera that would not save
- * once told whoever was adding it about a uuid column, which is a sentence that
- * helps nobody and describes the schema to anyone passing.
- *
- * The real one is not swallowed: it goes to the log, whole, where the operator
- * can find it and the person adding a camera does not have to read it.
- */
-async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
-    try {
-        return { value: await run() };
-    } catch (caught) {
-        const t = await placesT();
-        if (caught instanceof HomeError) return { error: placesRefusalText(t, caught.message) };
-        console.error("places: an action failed", caught);
-        return { error: t("refusals.failed") };
-    }
 }
 
 export async function listCamerasAction(): Promise<{
