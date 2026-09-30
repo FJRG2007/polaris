@@ -988,7 +988,10 @@
         "used": "Used",
         "history": "History",
         "emptyTitle": "Nothing recorded yet.",
-        "emptyBody": "Everything this has been told to do lands here, including whatever did not finish."
+        "emptyBody": "Everything this has been told to do lands here, including whatever did not finish.",
+        "switchName": "Turn {name} on or off",
+        "noControl": "You can see this, but not operate it.",
+        "offline": "It is not answering, so it cannot be switched now."
     },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",

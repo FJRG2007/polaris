@@ -167,17 +167,29 @@ export function DevicesView({
         setOpened((current) => (current && current.id === device.id ? device : current));
     };
 
+    /**
+     * Tell a device to do something.
+     *
+     * Where the outcome is known before anything answers - a switch told to go
+     * on is on or it failed - the row moves there at once and moves back if the
+     * answer is a refusal, so a switch flips under the finger rather than a
+     * second later. A lock is left alone until it reports: it is turning, and
+     * where it gets to is the vendor's to say.
+     */
     const act = async (device: DeviceView, action: DeviceAction) => {
         setBusy({ id: device.id, action });
         setError("");
+        const settled = kinds.settledState(action);
+        if (settled) settle({ ...device, state: settled });
         const result = await runAction(
             () => actions.operateDeviceAction(device.id, action),
             setError
         );
         setBusy(null);
-        if (!result) return;
-        if (result.error) {
-            setError(result.error);
+        if (!result || result.error) {
+            if (settled) settle(device);
+            if (!result) return;
+            setError(result.error ?? "");
             throw new Error(result.error);
         }
         if (result.device) settle(result.device);
@@ -393,9 +405,9 @@ export function DevicesView({
                                         <button
                                             type="button"
                                             onClick={() => setOpened(device)}
-                                            className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+                                            className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left"
                                         >
-                                            <span className="flex items-center gap-2">
+                                            <span className="flex min-w-0 max-w-full items-center gap-2">
                                                 <DeviceIcon
                                                     kind={device.kind}
                                                     className="size-4 shrink-0 text-muted-foreground"
@@ -432,7 +444,7 @@ export function DevicesView({
                                                     </Badge>
                                                 )}
                                             </span>
-                                            <span className="truncate text-[0.6875rem] text-foreground-subtle">
+                                            <span className="max-w-full truncate text-[0.6875rem] text-foreground-subtle">
                                                 {[
                                                     device.zone,
                                                     device.model,

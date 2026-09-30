@@ -12,12 +12,15 @@ export function Switch({
     checked,
     onChange,
     disabled,
-    "aria-label": ariaLabel
+    "aria-label": ariaLabel,
+    "aria-describedby": describedBy
 }: {
     checked: boolean;
     onChange: (checked: boolean) => void;
     disabled?: boolean;
     "aria-label"?: string;
+    /** What else a reader should hear about it - why it is off limits, say. */
+    "aria-describedby"?: string;
 }) {
     return (
         <button
@@ -25,6 +28,7 @@ export function Switch({
             role="switch"
             aria-checked={checked}
             aria-label={ariaLabel}
+            aria-describedby={describedBy}
             disabled={disabled}
             onClick={() => onChange(!checked)}
             className={cn(

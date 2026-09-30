@@ -250,6 +250,13 @@ export function actionsFor(kind: string): readonly DeviceAction[] {
     return KIND_ACTIONS[deviceKind(kind)];
 }
 
+/** Whether a kind is worked by one switch rather than a row of buttons: it has
+ *  on and off and nothing else, so the control is where it is now. */
+export function isSwitchable(kind: string): boolean {
+    const actions = actionsFor(kind);
+    return actions.length === 2 && actions.includes("turn-on") && actions.includes("turn-off");
+}
+
 /** The state a device is in once an action has finished, where that is known
  *  before anything answers. A switch told to go on is on or it failed; a lock
  *  told to lock is turning, and what it reaches is the vendor's to report. */

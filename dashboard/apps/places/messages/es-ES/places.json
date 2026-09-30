@@ -988,7 +988,10 @@
         "used": "Uso",
         "history": "Historial",
         "emptyTitle": "Todavía no hay nada registrado.",
-        "emptyBody": "Aquí llega todo lo que se le ha pedido hacer, incluido lo que no terminó."
+        "emptyBody": "Aquí llega todo lo que se le ha pedido hacer, incluido lo que no terminó.",
+        "switchName": "Encender o apagar {name}",
+        "noControl": "Puedes verlo, pero no manejarlo.",
+        "offline": "No responde, así que ahora no se puede cambiar."
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",
