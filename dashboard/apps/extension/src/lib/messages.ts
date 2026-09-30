@@ -222,9 +222,10 @@ export type Request =
     /** The current one-time code for an item, and how long it has left. */
     | { readonly kind: "totpNow"; readonly id: string }
     /**
-     * The code for the login just filled into this tab, asked by the box that
-     * wants it - see `lib/second-step.ts`. Names no item: the worker answers from
-     * what it remembered for the sender's tab and site, once.
+     * Type the code for the login just filled into this tab, asked by the box
+     * that wants it - see `lib/second-step.ts`. Names no item and gets no code
+     * back: the worker types it into the sender's page and submits the step,
+     * from what it remembered for the sender's tab and site, once.
      */
     | { readonly kind: "secondStepCode" }
     /**

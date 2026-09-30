@@ -32,9 +32,10 @@
  * a menu wearing whatever CSS the page happens to have - and a login chooser that
  * a page can restyle is a login chooser a page can disguise.
  *
- * What it deliberately does not do: submit anything. Filling, generating and
- * offering are the help somebody asked for; pressing the button for them is a
- * decision nobody made.
+ * Picking a login is the one thing that submits: it is asking to be signed in,
+ * so the worker presses each step's button as it fills it, and the steps a site
+ * puts after it - the password page, the code page - are filled and submitted
+ * as they appear. Generating a password and offering to save one submit nothing.
  */
 
 import { storage } from "#imports";
@@ -46,7 +47,12 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
-import { askBackground, speakRepliesIn, type ItemSummary, type OfferedCapture } from "@/lib/messages";
+import {
+    askBackground,
+    speakRepliesIn,
+    type ItemSummary,
+    type OfferedCapture
+} from "@/lib/messages";
 import { words } from "@/lib/locale-store";
 import { ENGLISH, type Words } from "@/lib/words";
 
@@ -194,21 +200,25 @@ async function start(): Promise<void> {
         const box = at(seen.fields.password);
         if (!box || passwordAsked.has(box) || box.value !== "") return;
         passwordAsked.add(box);
+        // The fill puts the cursor in the box as it types, and the list must not
+        // drop down there to offer what is being typed.
+        const offered = offeredOn.has(box);
+        offeredOn.add(box);
         void askBackground({ kind: "continueSignIn" }).then((reply) => {
-            if (!reply.ok) return;
-            // Filled, so the list is not to drop down on it later either.
-            offeredOn.add(box);
-            dismiss();
+            if (reply.ok) dismiss();
+            else if (!offered) offeredOn.delete(box);
         });
     };
 
     /**
-     * Type the code for the login just filled, the moment the page asks for it.
+     * Have the code typed for the login just filled, the moment the page asks
+     * for it.
      *
-     * The sign-in's second step: the worker remembered which login went into
-     * this tab, and the first code box that appears on the same site gets that
-     * login's code, worked out now so it has not turned over. Asked once per
-     * box, and never over something already typed. Nothing is submitted.
+     * The sign-in's last step: the worker remembered which login went into this
+     * tab, and the first code box that appears on the same site gets that
+     * login's code, worked out and typed by the worker - so the code never
+     * passes through this script - and submitted, like the steps before it.
+     * Asked once per box, and never over something already typed.
      */
     const claimed = new WeakSet<HTMLInputElement>();
     const claimCode = (): void => {
@@ -218,13 +228,13 @@ async function start(): Promise<void> {
         const [first] = boxes;
         if (!first || claimed.has(first) || boxes.some((box) => box.value !== "")) return;
         claimed.add(first);
+        const fresh = boxes.filter((box) => !offeredOn.has(box));
+        for (const box of fresh) offeredOn.add(box);
         void askBackground({ kind: "secondStepCode" }).then((reply) => {
-            if (!reply.ok || !("code" in reply) || !first.isConnected) return;
-            if (!boxes.every((box) => box.value === "")) return;
-            putCode(boxes, reply.code);
             // A list that dropped down on the box while the code was on its way
             // is offering what has just been typed.
-            dismiss();
+            if (reply.ok) dismiss();
+            else for (const box of fresh) offeredOn.delete(box);
         });
     };
 
@@ -407,17 +417,32 @@ async function start(): Promise<void> {
 
     refresh();
     // The page keeps moving: a field can be replaced, revealed, or scrolled.
-    // One debounced look rather than one per mutation, because a login page
-    // renders hundreds of them in a burst - and scrolling only moves what is
+    // One look per burst rather than one per mutation, because a login page
+    // renders hundreds of them at once - and scrolling only moves what is
     // already there, so it never goes looking again.
+    //
+    // Revealed counts as much as added. A sign-in that has its password box in
+    // the page from the start and shows it on the next step changes a style or
+    // a class and adds nothing, and watching for new nodes alone slept straight
+    // through the step it was waiting for. And the look is taken a fixed time
+    // after the first change rather than after the last: a page with a spinner
+    // or a clock on it never stops changing, and a wait for quiet on one of
+    // those never ends.
     let settling: number | null = null;
     const again = (): void => {
-        if (settling !== null) window.clearTimeout(settling);
-        settling = window.setTimeout(refresh, SETTLE_MS);
+        if (settling !== null) return;
+        settling = window.setTimeout(() => {
+            settling = null;
+            refresh();
+        }, SETTLE_MS);
     };
-    new MutationObserver(again).observe(document.documentElement, {
+    new MutationObserver((records) => {
+        if (!onlyOurs(records)) again();
+    }).observe(document.documentElement, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden", "aria-hidden", "disabled", "type"]
     });
     window.addEventListener("scroll", place, { passive: true, capture: true });
     window.addEventListener("resize", place, { passive: true });
@@ -570,11 +595,16 @@ function describe(field: HTMLInputElement): FieldFacts {
         // The DOM answers -1 for a box with no limit.
         maxLength: field.maxLength > 0 ? field.maxLength : null,
         inputMode: (field.inputMode || "").toLowerCase(),
+        // The same test `typeIntoPage` puts a box to, including a box parked off
+        // the page, which is a step the site has not shown yet.
         usable:
             !field.disabled &&
             !field.readOnly &&
+            field.getAttribute("aria-hidden") !== "true" &&
             box.width >= 2 &&
             box.height >= 2 &&
+            box.right + window.scrollX > 0 &&
+            box.bottom + window.scrollY > 0 &&
             getComputedStyle(field).visibility !== "hidden",
         form: field.form
     };
@@ -612,9 +642,33 @@ function putCode(boxes: readonly HTMLInputElement[], code: string): void {
     for (const [index, box] of boxes.entries()) put(box, code.charAt(index));
 }
 
+/**
+ * Everything this script puts on the page, so watching the page for changes can
+ * leave its own out: a mark is moved by setting its style on every scroll, and a
+ * look taken for each of those would move the marks again, forever.
+ */
+const drawn = new WeakSet<Node>();
+
+/** A host for something of ours on the page, remembered as ours. */
+function ourHost(): HTMLElement {
+    const host = document.createElement("div");
+    drawn.add(host);
+    return host;
+}
+
+/** Whether a change the page made is only one of ours moving or appearing. */
+function onlyOurs(records: readonly MutationRecord[]): boolean {
+    return records.every(
+        (record) =>
+            drawn.has(record.target) ||
+            (record.type === "childList" &&
+                [...record.addedNodes, ...record.removedNodes].every((node) => drawn.has(node)))
+    );
+}
+
 /** The mark that sits in the corner of a box Polaris has something for. */
 function mark(role: Role, onPress: () => void): HTMLElement {
-    const host = document.createElement("div");
+    const host = ourHost();
     host.style.cssText = `position:fixed;z-index:2147483646;width:${MARK}px;height:${MARK}px;`;
     const shadow = host.attachShadow({ mode: "closed" });
     const button = document.createElement("button");
@@ -659,7 +713,7 @@ function floating(field: HTMLInputElement): {
     panel: HTMLElement;
     close: () => void;
 } {
-    const host = document.createElement("div");
+    const host = ourHost();
     const box = field.getBoundingClientRect();
     host.style.cssText = `
         position: fixed;
@@ -919,7 +973,7 @@ function watchForBreaches(field: HTMLInputElement | null): void {
 /** The line under a password box that has turned up in a breach. */
 function note(field: HTMLInputElement, count: number): HTMLElement {
     const box = field.getBoundingClientRect();
-    const host = document.createElement("div");
+    const host = ourHost();
     host.style.cssText = `
         position: fixed;
         z-index: 2147483645;
@@ -930,7 +984,9 @@ function note(field: HTMLInputElement, count: number): HTMLElement {
     const shadow = host.attachShadow({ mode: "closed" });
     const line = document.createElement("p");
     line.textContent =
-        count === 1 ? t("inline.breachOne") : t("inline.breachMany", { count: count.toLocaleString(t.locale) });
+        count === 1
+            ? t("inline.breachOne")
+            : t("inline.breachMany", { count: count.toLocaleString(t.locale) });
     line.style.cssText = `
         margin: 0;
         border: 1px solid hsl(0 60% 30%);
@@ -969,7 +1025,7 @@ function bar(offer: OfferedCapture): void {
     if (offer.kind === "none") return;
     barHost?.remove();
 
-    const host = document.createElement("div");
+    const host = ourHost();
     barHost = host;
     host.style.cssText = `
         position: fixed;

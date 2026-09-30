@@ -6,7 +6,7 @@
         "itemNotOpen": "Ese elemento no está abierto.",
         "offForSite": "Esta extensión está desactivada en este sitio.",
         "notForSite": "Ese elemento no está guardado para este sitio.",
-        "noLoginForm": "No se encontró ningún formulario de inicio de sesión en esta página.",
+        "noLoginForm": "No se encontró ningún formulario de acceso en esta página.",
         "cannotFill": "Esta página no se puede rellenar.",
         "vaultLocked": "La bóveda está bloqueada.",
         "whichPolaris": "Indica primero qué Polaris es.",
@@ -43,10 +43,10 @@
         "silentWorker": "Polaris no respondió. Vuelve a abrir esto."
     },
     "menu": {
-        "fill": "Rellenar el inicio de sesión de este sitio",
+        "fill": "Rellenar el acceso de este sitio",
         "generate": "Generar una contraseña",
-        "code": "Rellenar el código de un solo uso",
-        "email": "Rellenar mi correo"
+        "code": "Rellenar el código temporal",
+        "email": "Poner mi correo"
     },
     "lock": {
         "minutes": "{count, plural, one {# minuto} other {# minutos}}",
@@ -86,11 +86,11 @@
             "digits": "Dígitos",
             "symbols": "Símbolos"
         },
-        "oneStaysOn": "Al menos un tipo tiene que seguir activado",
+        "oneStaysOn": "Al menos un tipo debe seguir activado",
         "avoidLabel": "Evitar caracteres parecidos",
         "avoidHint": "Dejar fuera 0 y O, 1, l e I",
         "avoid": "Sin parecidos",
-        "useHint": "Ponerla directamente en un inicio de sesión nuevo",
+        "useHint": "Ponerla directamente en un acceso nuevo",
         "use": "Usarla",
         "closeLabel": "Cerrar el generador",
         "close": "Cerrar"
@@ -111,7 +111,7 @@
         "open": "Abierta",
         "apps": "Apps",
         "vault": "Vault",
-        "backLabel": "Volver a la pantalla de inicio",
+        "backLabel": "Volver al inicio",
         "back": "Atrás"
     },
     "popup": {
@@ -140,15 +140,15 @@
         "cancel": "Cancelar",
         "signIn": {
             "nothingUntil": "No se entrega nada hasta que alguien con la bóveda abierta diga que sí. Puedes cerrar esto; sigue sin ello.",
-            "noVault": "Esta cuenta no tiene bóveda en {host}, así que aquí no hay inicios de sesión que rellenar.",
+            "noVault": "Esta cuenta no tiene bóveda en {host}, así que aquí no hay accesos que rellenar.",
             "connect": "Conectar tu bóveda",
             "hint": "La aprobación se hace en tu panel, con la bóveda abierta. La clave se entrega sellada, así que solo esta extensión puede abrirla, y queda ligada a esta conexión: desconectar el navegador cierra la bóveda con ella.",
-            "signOut": "Cerrar la sesión de la bóveda",
+            "signOut": "Cerrar sesión de la bóveda",
             "usePassword": "Usar la contraseña maestra"
         },
         "unlock": {
             "title": "Bóveda bloqueada",
-            "placeholder": "Contraseña maestra de la bóveda",
+            "placeholder": "Contraseña maestra",
             "opening": "Abriendo",
             "unlock": "Desbloquear",
             "fromPolaris": "Dejarme entrar desde Polaris"
@@ -157,9 +157,9 @@
             "noEveryPermission": "Sin permiso para todos los sitios, Polaris se queda donde lo activaste.",
             "reloadOpen": "Las páginas ya abiertas lo mantienen hasta que las recargues.",
             "everywhereOn": "Polaris aparece en todos los sitios.",
-            "everywhereOff": "Mostrar Polaris bajo los campos de inicio de sesión en todos los sitios.",
+            "everywhereOff": "Mostrar Polaris bajo los campos de acceso en todos los sitios.",
             "onlySomeHint": "Mostrar Polaris solo en los sitios donde lo actives",
-            "everyHint": "Ofrecer tus inicios de sesión y códigos bajo el campo en todos los sitios, como un gestor de contraseñas",
+            "everyHint": "Ofrecer tus accesos y códigos bajo el campo en todos los sitios, como un gestor de contraseñas",
             "onlySome": "Solo algunos sitios",
             "every": "Todos los sitios",
             "noSitePermission": "Sin permiso para este sitio, no se puede mostrar nada en él.",
@@ -178,31 +178,31 @@
         },
         "items": {
             "secondsLeft": "{count, plural, one {Queda # segundo} other {Quedan # segundos}}",
-            "copyCode": "Copiar el código de un solo uso",
+            "copyCode": "Copiar el código temporal",
             "sharedFrom": "Compartido desde {vault}",
             "copyUsername": "Copiar el usuario",
             "copyPassword": "Copiar la contraseña",
             "noUsername": "Sin usuario",
-            "fillHint": "Rellenar esta página",
+            "fillHint": "Rellenar la página",
             "fill": "Rellenar",
             "replaceHint": "Sustituir la contraseña",
             "replaceFor": "Sustituir la contraseña de {name}",
             "new": "Nueva",
-            "search": "Busca tus inicios de sesión",
+            "search": "Busca tus accesos",
             "forPage": "Para esta página",
             "everything": "Todo",
             "found": "Encontrados",
-            "none": "Aún no hay inicios de sesión guardados.",
+            "none": "Aún no hay accesos guardados.",
             "noMatch": "Nada coincide con eso.",
             "offFor": "Desactivado en {host}.",
-            "offeringFor": "Ofreciendo inicios de sesión para {host}.",
+            "offeringFor": "Ofreciendo accesos para {host}.",
             "useAgain": "Volver a usarlo aquí",
             "never": "Nunca en este sitio",
             "sync": "Sincronizar",
             "lock": "Bloquear",
-            "signOut": "Cerrar sesión",
+            "signOut": "Salir",
             "synced": "Sincronizado a las {time}",
-            "notSynced": "Aún sin sincronizar"
+            "notSynced": "Sin sincronizar"
         },
         "change": {
             "for": "Nueva contraseña para {name}",
@@ -213,13 +213,13 @@
         "saving": "Guardando",
         "save": "Guardar",
         "saveLogin": {
-            "forPage": "Guardar un inicio de sesión para esta página",
-            "open": "Guardar un inicio de sesión",
+            "forPage": "Guardar acceso para esta página",
+            "open": "Guardar acceso",
             "name": "Nombre",
             "username": "Usuario",
             "password": "Contraseña",
             "savedFor": "Guardado para {where}",
-            "noPage": "Sin vincular a ninguna página"
+            "noPage": "Sin página vinculada"
         },
         "lockAfter": "Bloquear tras",
         "accounts": {
@@ -240,14 +240,14 @@
         "nothingSaved": "No hay nada guardado para este sitio.",
         "useEmail": "Usar mi correo",
         "useName": "Usar mi nombre",
-        "makePassword": "Generar una contraseña",
+        "makePassword": "Generar contraseña",
         "makePasswordDetail": "Una segura, para los dos campos de contraseña",
         "again": "Otra",
         "breachOne": "Esta contraseña ha aparecido en una filtración de datos. Elige otra.",
         "breachMany": "Esta contraseña ha aparecido en {count} filtraciones. Elige otra.",
         "updateSaved": "¿Actualizar la contraseña guardada para {name}?",
-        "thisLogin": "este inicio de sesión",
-        "saveThis": "¿Guardar este inicio de sesión en Polaris?",
+        "thisLogin": "este acceso",
+        "saveThis": "¿Guardar este acceso en Polaris?",
         "update": "Actualizar",
         "notNow": "Ahora no",
         "neverHere": "Aquí nunca"

@@ -8,7 +8,7 @@
         "description": "One line under the name in the browser's extension list."
     },
     "commandFillLogin": {
-        "message": "Rellenar el inicio de sesión de esta página",
+        "message": "Rellenar el acceso de esta página",
         "description": "The keyboard shortcut's name in the browser's shortcuts screen."
     }
 }

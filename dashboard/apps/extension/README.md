@@ -117,9 +117,10 @@ The popup is not the only way to use this. With "Show it here" in the popup,
 Polaris also appears inside that site's own pages:
 
 - the mark beside a login box, which offers what the vault has for the page.
-  You pick a login once: a sign-in that asks for the name on one page and the
-  password on the next gets the password on its own, and the authenticator's
-  code after it. Nothing is submitted for you,
+  You pick a login once and it signs you in: each step is filled and its button
+  pressed, and a sign-in that asks for the name on one page and the password on
+  the next gets the password on its own, and the authenticator's code after it -
+  whether the site loads a new page for each step or swaps the boxes in place,
 - the mark beside a **new** password box, which makes one for you and fills the
   confirmation with it,
 - the mark beside a one-time-code box, which types the code for the item you

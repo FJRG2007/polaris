@@ -95,7 +95,7 @@ async function ask(request: Request, from?: { tabId: number; url: string }): Pro
 async function login(
     key: SymmetricKey,
     id: string,
-    fields: { name: string; username: string; password: string; uri: string }
+    fields: { name: string; username: string; password: string; uri: string; totp?: string }
 ): Promise<Record<string, unknown>> {
     return {
         id,
@@ -104,6 +104,7 @@ async function login(
         login: {
             username: await encrypt(fields.username, key),
             password: await encrypt(fields.password, key),
+            ...(fields.totp ? { totp: await encrypt(fields.totp, key) } : {}),
             uris: [{ uri: await encrypt(fields.uri, key), match: null }]
         }
     };
@@ -254,7 +255,7 @@ describe("a sign-in that asks for the password on its next page", () => {
         const next = await ask({ kind: "continueSignIn" }, { tabId: TAB, url: `${SITE}/password` });
 
         expect(next.ok).toBe(true);
-        expect(typed.at(-1)).toEqual(["someone", "hunter2", null]);
+        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true]);
     });
 
     it("fills it once, not on every password box that turns up after", async () => {
@@ -319,7 +320,7 @@ describe("a sign-in that asks for the password on its next page", () => {
         const next = await asking!;
 
         expect(next.ok).toBe(true);
-        expect(typed.at(-1)).toEqual(["someone", "hunter2", null]);
+        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true]);
     });
 
     it("keeps another tab's waiting step through a fill here", async () => {
@@ -351,6 +352,106 @@ describe("a sign-in that asks for the password on its next page", () => {
         const next = await ask({ kind: "continueSignIn" }, { tabId: TAB, url: `${SITE}/login` });
 
         expect(next.ok).toBe(false);
+    });
+});
+
+describe("one pick signs the whole way in", () => {
+    const TAB = 52;
+    let typed: unknown[][] = [];
+    let found: { user: boolean; pass: boolean; code: boolean }[] = [];
+
+    beforeEach(() => {
+        typed = [];
+        found = [];
+        const scripting = fakeBrowser.scripting as unknown as Record<string, unknown>;
+        scripting.executeScript = vi.fn(async (injection: { args?: unknown[] }) => {
+            typed.push(injection.args ?? []);
+            return [{ result: found.shift() ?? { user: false, pass: false, code: false } }];
+        });
+    });
+
+    async function withCode(): Promise<void> {
+        const key = await unlockedVault();
+        ciphers = [
+            await login(key, "item-2", {
+                name: "Bank",
+                username: "someone",
+                password: "hunter2",
+                uri: SITE,
+                totp: "JBSWY3DPEHPK3PXP"
+            })
+        ];
+        revision = 2;
+        await ask({ kind: "sync" });
+    }
+
+    it("submits the step it fills", async () => {
+        await withCode();
+        found.push({ user: true, pass: true, code: false });
+
+        await ask({ kind: "fill", id: "item-2" }, { tabId: TAB, url: `${SITE}/login` });
+
+        expect(typed.at(-1)?.[3]).toBe(true);
+    });
+
+    it("types and submits the code itself when the code box appears, and hands the page no code", async () => {
+        await withCode();
+        found.push({ user: true, pass: true, code: false });
+        await ask({ kind: "fill", id: "item-2" }, { tabId: TAB, url: `${SITE}/login` });
+        found.push({ user: false, pass: false, code: true });
+
+        const reply = await ask({ kind: "secondStepCode" }, { tabId: TAB, url: `${SITE}/verify` });
+
+        expect(reply.ok).toBe(true);
+        expect("code" in reply).toBe(false);
+        const [username, password, code, submit] = typed.at(-1)!;
+        expect([username, password, submit]).toEqual([null, null, true]);
+        expect(code).toMatch(/^\d{6}$/);
+    });
+
+    it("carries a name page through the password page to the code page", async () => {
+        await withCode();
+        found.push({ user: true, pass: false, code: false });
+        await ask({ kind: "fill", id: "item-2" }, { tabId: TAB, url: `${SITE}/login` });
+        found.push({ user: false, pass: true, code: false });
+        const password = await ask(
+            { kind: "continueSignIn" },
+            { tabId: TAB, url: `${SITE}/password` }
+        );
+        found.push({ user: false, pass: false, code: true });
+
+        const code = await ask({ kind: "secondStepCode" }, { tabId: TAB, url: `${SITE}/verify` });
+
+        expect(password.ok).toBe(true);
+        expect(code.ok).toBe(true);
+        expect(typed).toHaveLength(3);
+        const again = await ask({ kind: "secondStepCode" }, { tabId: TAB, url: `${SITE}/verify` });
+        expect(again.ok).toBe(false);
+        expect(typed).toHaveLength(3);
+    });
+
+    it("waits for the password's fill when the code box shows up while it is typing", async () => {
+        await withCode();
+        found.push(
+            { user: true, pass: true, code: false },
+            { user: false, pass: false, code: true }
+        );
+        let asking: Promise<Reply> | null = null;
+        const scripting = fakeBrowser.scripting as unknown as Record<string, unknown>;
+        const typing = scripting.executeScript as (injection: {
+            args?: unknown[];
+        }) => Promise<unknown>;
+        scripting.executeScript = vi.fn(async (injection: { args?: unknown[] }) => {
+            // The page swaps the code box in the moment the password is submitted.
+            asking ??= ask({ kind: "secondStepCode" }, { tabId: TAB, url: `${SITE}/login` });
+            return typing(injection);
+        });
+
+        await ask({ kind: "fill", id: "item-2" }, { tabId: TAB, url: `${SITE}/login` });
+        const next = await asking!;
+
+        expect(next.ok).toBe(true);
+        expect(typed.at(-1)?.[2]).toMatch(/^\d{6}$/);
     });
 });
 
