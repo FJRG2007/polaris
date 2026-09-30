@@ -13,8 +13,8 @@
  */
 
 import { z } from "zod";
-import type { GameKey } from "../../../../messages";
 import { gameMessage } from "../../game-message";
+import type { GameKey } from "../../../../messages";
 
 /** A schema's complaint, carried as its catalog key until a reader's language is
  *  known (`lib/game-message`): the screen and the actions write it out. */
@@ -90,7 +90,8 @@ export const rewardsSchema = z.object({
     first: rewardSchema,
     second: rewardSchema,
     third: rewardSchema,
-    /** For everybody who took part - scored at all, and on a blood moon survived the night. */
+    /** For everybody off the podium who took part - scored at all, and on a blood moon
+     *  survived the night. Never on top of a place's own prize. */
     everyone: rewardSchema
 });
 
