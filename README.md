@@ -47,7 +47,7 @@ on hardware you already own, sharing one account and one interface.
 | CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                                                                                                  |
 | Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules                                                                    |
 | ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking - or connect your existing Linear or Jira and keep its issues mirrored in, with status pushed back |
-| Home Assistant, a camera app       | Places and cameras: live views, detections, clips, and alerts that arrive in chat                                                                                |
+| Home Assistant, a camera app       | Places: cameras with live views, detections, clips and alerts, plus switches, plugs, lights and locks from a dozen brands, with automations                      |
 | Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                                                                                          |
 | Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                                                                                      |
 | Cloudflare's dashboard             | A firewall of your own: rules, country and network blocks, bot defences, bans                                                                                    |
@@ -162,9 +162,11 @@ with one thing does not get the rest.
 - **Analytics** - cookieless web analytics for the sites you host.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
-- **Places** - the places you own and the cameras in them: live views, clips,
-  events, detections and alerts that arrive as messages, plus a notice the
-  moment a camera itself stops answering.
+- **Places** - the places you own, their cameras and their smart devices: live
+  views, clips, events, detections and alerts that arrive as messages; switches,
+  plugs, lights and locks from Tuya, TP-Link, Shelly, Hue, IKEA, Home Assistant
+  and SwitchBot; automations that react to any of them; plus a notice the moment
+  a camera itself stops answering.
 
 **The account itself**
 
