@@ -64,6 +64,15 @@ describe("how this build got here", () => {
         expect(installKind(undefined)).toBe("manual");
         expect(installKind(null)).toBe("manual");
     });
+
+    it("counts an unpacked copy as kept current only when the updater marked its folder", () => {
+        expect(installKind("development", true)).toBe("auto");
+        expect(installKind("development", false)).toBe("manual");
+        // The marker means nothing on a copy no updater can write to, and a
+        // store install stays the store's whatever a folder says.
+        expect(installKind("sideload", true)).toBe("manual");
+        expect(installKind("normal", true)).toBe("store");
+    });
 });
 
 describe("what to show", () => {
@@ -96,5 +105,9 @@ describe("what to show", () => {
 
         const store = noticeFor(RELEASE, "0.1.0", "normal");
         expect(store?.kind).toBe("store");
+    });
+
+    it("tells a copy the updater keeps current that there is nothing to do", () => {
+        expect(noticeFor(RELEASE, "0.1.0", "development", true)?.kind).toBe("auto");
     });
 });
