@@ -179,7 +179,9 @@ function secureSocket(
         socket.once("secureConnect", () => {
             clearTimeout(timer);
             if ("pin" in trust && trust.pin !== null) {
-                const presented = normalizeFingerprint(socket.getPeerCertificate().fingerprint256 ?? "");
+                const presented = normalizeFingerprint(
+                    socket.getPeerCertificate().fingerprint256 ?? ""
+                );
                 if (presented !== normalizeFingerprint(trust.pin)) {
                     socket.destroy();
                     reject(
@@ -288,7 +290,9 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
                     response.on("end", () => {
                         const tls = response.socket as TLSSocket;
                         const peer =
-                            secure && typeof tls.getPeerCertificate === "function" ? tls.getPeerCertificate() : null;
+                            secure && typeof tls.getPeerCertificate === "function"
+                                ? tls.getPeerCertificate()
+                                : null;
                         done({
                             status: response.statusCode ?? 0,
                             headers: response.headers,
@@ -308,7 +312,9 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
             fail(refusal(error as NodeJS.ErrnoException));
             return;
         }
-        request.on("timeout", () => fail(new DriverError("The device did not answer in time.", "unreachable")));
+        request.on("timeout", () =>
+            fail(new DriverError("The device did not answer in time.", "unreachable"))
+        );
         request.on("error", (error: NodeJS.ErrnoException) => fail(refusal(error)));
         if (body) request.write(body);
         request.end();
@@ -324,7 +330,11 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
  * address: somebody who wrote a scheme wrote the whole origin, and
  * `https://ha.example.test` means 443, not the default of a LAN install.
  */
-export function deviceOrigin(typed: string, scheme: "http" | "https", port?: number): string | null {
+export function deviceOrigin(
+    typed: string,
+    scheme: "http" | "https",
+    port?: number
+): string | null {
     const raw = typed.trim();
     if (!raw) return null;
     const hadScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw);
@@ -338,9 +348,11 @@ export function deviceOrigin(typed: string, scheme: "http" | "https", port?: num
     if (url.username || url.password || url.search || url.hash) return null;
     if (url.pathname !== "/" && url.pathname !== "") return null;
     if (!url.hostname) return null;
-    const authority = (hadScheme ? raw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") : raw).split("/")[0] ?? "";
+    const authority =
+        (hadScheme ? raw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") : raw).split("/")[0] ?? "";
     const typedPort = /:\d+$/.test(authority);
-    const chosenPort = url.port || (!hadScheme && !typedPort && port !== undefined ? String(port) : "");
+    const chosenPort =
+        url.port || (!hadScheme && !typedPort && port !== undefined ? String(port) : "");
     return `${url.protocol}//${url.host.replace(/:\d+$/, "")}${chosenPort ? `:${chosenPort}` : ""}`;
 }
 

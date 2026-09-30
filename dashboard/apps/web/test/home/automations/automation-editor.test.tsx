@@ -22,7 +22,11 @@ let toggleAnswer: { error?: string; automation?: AutomationView } = {};
 
 vi.mock("next/navigation", async (original) => ({
     ...(await original<typeof import("next/navigation")>()),
-    useRouter: () => ({ replace: (href: string) => replaced.push(href), push: vi.fn(), refresh: vi.fn() })
+    useRouter: () => ({
+        replace: (href: string) => replaced.push(href),
+        push: vi.fn(),
+        refresh: vi.fn()
+    })
 }));
 
 function device(id: string, kind: string, extra: Partial<DeviceView> = {}): DeviceView {
@@ -47,7 +51,10 @@ function device(id: string, kind: string, extra: Partial<DeviceView> = {}): Devi
     };
 }
 
-const DEVICES = [device("plug", "outlet"), device("door", "lock", { state: "locked", doorState: "closed" })];
+const DEVICES = [
+    device("plug", "outlet"),
+    device("door", "lock", { state: "locked", doorState: "closed" })
+];
 
 const SAVED: AutomationView = {
     id: "auto-1",
@@ -92,7 +99,11 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     getAutomationAction: async (id: string | null) => ({
         automation: id ? SAVED : undefined,
         runs: id ? RUNS : [],
-        context: { placeId: "place-1", devices: DEVICES, siblings: [{ id: "auto-1", name: "Fixture automation" }] }
+        context: {
+            placeId: "place-1",
+            devices: DEVICES,
+            siblings: [{ id: "auto-1", name: "Fixture automation" }]
+        }
     }),
     saveAutomationAction: async (_id: string | null, input: unknown) => {
         saved.push(input);
@@ -101,14 +112,22 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     },
     automationRunsAction: async () => ({ runs: RUNS }),
     runAutomationAction: async () => ({}),
-    listAutomationsAction: async () => ({ automations: [SAVED], devices: DEVICES, placeId: "place-1" }),
+    listAutomationsAction: async () => ({
+        automations: [SAVED],
+        devices: DEVICES,
+        placeId: "place-1"
+    }),
     setAutomationEnabledAction: async () => toggleAnswer,
     deleteAutomationAction: async () => ({}),
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor } = await import("@polaris-app/places/src/screens/automations/automation-editor");
-const { AutomationsView } = await import("@polaris-app/places/src/screens/automations/automations-view");
+const { AutomationEditor } = await import(
+    "@polaris-app/places/src/screens/automations/automation-editor"
+);
+const { AutomationsView } = await import(
+    "@polaris-app/places/src/screens/automations/automations-view"
+);
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -136,13 +155,22 @@ afterEach(() => cleanup());
 describe("a new automation from the switch-off template", () => {
     it("is laid out as when, if and then, ready to save", async () => {
         render(
-            <AutomationEditor automationId={null} template="autoOff" deviceId="plug" canManage canControl initialTab="flow" />
+            <AutomationEditor
+                automationId={null}
+                template="autoOff"
+                deviceId="plug"
+                canManage
+                canControl
+                initialTab="flow"
+            />
         );
         await painted();
         expect(screen.getByRole("heading", { name: "When" })).toBeDefined();
         expect(screen.getByRole("heading", { name: "If" })).toBeDefined();
         expect(screen.getByRole("heading", { name: "Then" })).toBeDefined();
-        expect((screen.getByLabelText(/Name/) as HTMLInputElement).value).toBe("Turn off Fixture plug after 30 minutes");
+        expect((screen.getByLabelText(/Name/) as HTMLInputElement).value).toBe(
+            "Turn off Fixture plug after 30 minutes"
+        );
 
         const save = screen.getByRole("button", { name: "Save" });
         expect(save.getAttribute("aria-disabled")).toBeNull();
@@ -152,26 +180,52 @@ describe("a new automation from the switch-off template", () => {
         expect(saved).toHaveLength(1);
         const input = saved[0] as { definition: { triggers: unknown[]; actions: unknown[] } };
         expect(input.definition.triggers).toEqual([
-            expect.objectContaining({ kind: "stays", deviceId: "plug", attribute: "state", is: "on", minutes: 30 })
+            expect.objectContaining({
+                kind: "stays",
+                deviceId: "plug",
+                attribute: "state",
+                is: "on",
+                minutes: 30
+            })
         ]);
-        expect(input.definition.actions).toEqual([expect.objectContaining({ kind: "device", deviceId: "plug", do: "turn-off" })]);
+        expect(input.definition.actions).toEqual([
+            expect.objectContaining({ kind: "device", deviceId: "plug", do: "turn-off" })
+        ]);
         expect(replaced).toEqual(["/places/devices/automations/auto-2"]);
     });
 
     it("says a wrong number under its field as it is typed", async () => {
         render(
-            <AutomationEditor automationId={null} template="autoOff" deviceId="plug" canManage canControl initialTab="flow" />
+            <AutomationEditor
+                automationId={null}
+                template="autoOff"
+                deviceId="plug"
+                canManage
+                canControl
+                initialTab="flow"
+            />
         );
         await painted();
         fireEvent.change(screen.getByLabelText(/^For/), { target: { value: "0" } });
         expect(screen.getByText("That is too small.")).toBeDefined();
-        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
     });
 });
 
 describe("an empty automation", () => {
     it("marks what is missing, and names it only when Save is pressed", async () => {
-        render(<AutomationEditor automationId={null} template={null} deviceId={null} canManage canControl initialTab="flow" />);
+        render(
+            <AutomationEditor
+                automationId={null}
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
         await painted();
         expect(screen.queryByText("Give it a name.")).toBeNull();
         const save = screen.getByRole("button", { name: "Save" });
@@ -185,7 +239,16 @@ describe("an empty automation", () => {
     });
 
     it("adds steps, moves them and removes them", async () => {
-        render(<AutomationEditor automationId={null} template={null} deviceId={null} canManage canControl initialTab="flow" />);
+        render(
+            <AutomationEditor
+                automationId={null}
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
         await painted();
         openMenu("Add step");
         fireEvent.click(await screen.findByRole("menuitem", { name: "Wait a while" }));
@@ -206,23 +269,43 @@ describe("an empty automation", () => {
 
     it("offers no device to a step when the reader cannot operate them", async () => {
         render(
-            <AutomationEditor automationId={null} template={null} deviceId={null} canManage canControl={false} initialTab="flow" />
+            <AutomationEditor
+                automationId={null}
+                template={null}
+                deviceId={null}
+                canManage
+                canControl={false}
+                initialTab="flow"
+            />
         );
         await painted();
         openMenu("Add step");
         fireEvent.click(await screen.findByRole("menuitem", { name: "Operate a device" }));
-        expect(screen.getByText("You cannot operate devices, so a step cannot use them.")).toBeDefined();
+        expect(
+            screen.getByText("You cannot operate devices, so a step cannot use them.")
+        ).toBeDefined();
     });
 });
 
 describe("the log of a saved automation", () => {
     it("says what happened in words, the device's refusal included", async () => {
-        render(<AutomationEditor automationId="auto-1" template={null} deviceId={null} canManage canControl initialTab="runs" />);
+        render(
+            <AutomationEditor
+                automationId="auto-1"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="runs"
+            />
+        );
         await painted();
         expect(screen.getByText("Run by Fixture owner")).toBeDefined();
         fireEvent.click(screen.getByRole("button", { name: /Run by Fixture owner/ }));
         expect(screen.getByText("Stopped at the step that failed.")).toBeDefined();
-        expect(screen.getByText("Fixture plug was not answering when it was last checked")).toBeDefined();
+        expect(
+            screen.getByText("Fixture plug was not answering when it was last checked")
+        ).toBeDefined();
     });
 });
 
@@ -235,7 +318,11 @@ describe("the list", () => {
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         fireEvent.click(toggle);
         await painted();
-        expect(screen.getByRole("switch", { name: "Switch off Fixture automation" }).getAttribute("aria-checked")).toBe("true");
+        expect(
+            screen
+                .getByRole("switch", { name: "Switch off Fixture automation" })
+                .getAttribute("aria-checked")
+        ).toBe("true");
         expect(screen.getByRole("alert").textContent).toBe("You do not have access to that");
     });
 
@@ -245,6 +332,10 @@ describe("the list", () => {
         await painted();
         fireEvent.click(screen.getByRole("switch", { name: "Switch off Fixture automation" }));
         await painted();
-        expect(screen.getByRole("switch", { name: "Switch on Fixture automation" }).getAttribute("aria-checked")).toBe("false");
+        expect(
+            screen
+                .getByRole("switch", { name: "Switch on Fixture automation" })
+                .getAttribute("aria-checked")
+        ).toBe("false");
     });
 });

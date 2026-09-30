@@ -27,7 +27,8 @@ function homeOf(credentials: Credentials): ha.HomeAssistant {
     if (!url) throw new HomeError("That connection is missing the device's address");
     if (!token) throw new HomeError("That connection is missing its token");
     const home = ha.homeAssistant(url, token);
-    if (!home) throw new HomeError("Write the address as http://homeassistant.local:8123, with no path");
+    if (!home)
+        throw new HomeError("Write the address as http://homeassistant.local:8123, with no path");
     return home;
 }
 
@@ -113,7 +114,13 @@ function serviceFor(domain: string, action: string): string | null {
         return action === "turn-on" ? "turn_on" : action === "turn-off" ? "turn_off" : null;
     }
     if (domain === "lock") {
-        return action === "lock" ? "lock" : action === "unlock" ? "unlock" : action === "unlatch" ? "open" : null;
+        return action === "lock"
+            ? "lock"
+            : action === "unlock"
+              ? "unlock"
+              : action === "unlatch"
+                ? "open"
+                : null;
     }
     return null;
 }

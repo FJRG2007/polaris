@@ -84,7 +84,8 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
     }, [listing]);
 
     const shown = useMemo(
-        () => (listing ? listing.automations.filter((automation) => !hidden.has(automation.id)) : []),
+        () =>
+            listing ? listing.automations.filter((automation) => !hidden.has(automation.id)) : [],
         [listing, hidden]
     );
 
@@ -120,7 +121,10 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         setError("");
         replace({ ...automation, enabled });
         setPending((current) => ({ ...current, [automation.id]: "toggle" }));
-        const result = await runAction(() => actions.setAutomationEnabledAction(automation.id, enabled), setError);
+        const result = await runAction(
+            () => actions.setAutomationEnabledAction(automation.id, enabled),
+            setError
+        );
         settle(automation.id);
         if (!result || result.error || !result.automation) {
             // Back to where it was, with the reason on the line above the list.
@@ -129,7 +133,9 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                     ? {
                           ...current,
                           automations: current.automations.map((entry) =>
-                              entry.id === automation.id ? { ...entry, enabled: automation.enabled } : entry
+                              entry.id === automation.id
+                                  ? { ...entry, enabled: automation.enabled }
+                                  : entry
                           )
                       }
                     : current
@@ -169,7 +175,10 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         }
         setListing((current) =>
             current
-                ? { ...current, automations: current.automations.filter((entry) => entry.id !== target.id) }
+                ? {
+                      ...current,
+                      automations: current.automations.filter((entry) => entry.id !== target.id)
+                  }
                 : current
         );
         hide(target.id, false);
@@ -186,7 +195,9 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                    <Link href="/places/devices/automations/new">{t("automations.list.blank")}</Link>
+                    <Link href="/places/devices/automations/new">
+                        {t("automations.list.blank")}
+                    </Link>
                 </DropdownMenuItem>
                 {auto.TEMPLATES.map((template) => (
                     <DropdownMenuItem key={template} asChild>
@@ -202,12 +213,17 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t("automations.list.intro")}</p>
+                <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    {t("automations.list.intro")}
+                </p>
                 {newMenu}
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -222,7 +238,11 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                 <EmptyState
                     icon={<Workflow className="size-5" />}
                     title={t("automations.list.emptyTitle")}
-                    description={canManage ? t("automations.list.emptyManage") : t("automations.list.emptyView")}
+                    description={
+                        canManage
+                            ? t("automations.list.emptyManage")
+                            : t("automations.list.emptyView")
+                    }
                     action={newMenu ?? undefined}
                 />
             ) : (
@@ -241,8 +261,12 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                     onChange={(next) => void toggle(automation, next)}
                                     aria-label={
                                         automation.enabled
-                                            ? t("automations.list.turnOffName", { name: automation.name })
-                                            : t("automations.list.turnOnName", { name: automation.name })
+                                            ? t("automations.list.turnOffName", {
+                                                  name: automation.name
+                                              })
+                                            : t("automations.list.turnOnName", {
+                                                  name: automation.name
+                                              })
                                     }
                                 />
                                 <Link
@@ -261,7 +285,11 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                     <span className="truncate text-[0.6875rem] text-foreground-subtle">
                                         {firstTrigger
                                             ? t("automations.list.summary", {
-                                                  when: words.describeTrigger(firstTrigger, lookup, t),
+                                                  when: words.describeTrigger(
+                                                      firstTrigger,
+                                                      lookup,
+                                                      t
+                                                  ),
                                                   more: automation.definition.triggers.length - 1,
                                                   steps: automation.definition.actions.length
                                               })
@@ -271,10 +299,16 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                 <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                                     {automation.lastStatus ? (
                                         <>
-                                            <Badge className={toneClass(words.RUN_TONES[automation.lastStatus])}>
+                                            <Badge
+                                                className={toneClass(
+                                                    words.RUN_TONES[automation.lastStatus]
+                                                )}
+                                            >
                                                 {words.runStatusText(automation.lastStatus, t)}
                                             </Badge>
-                                            {automation.lastRunAt && <RelativeTime iso={automation.lastRunAt} />}
+                                            {automation.lastRunAt && (
+                                                <RelativeTime iso={automation.lastRunAt} />
+                                            )}
                                         </>
                                     ) : (
                                         t("automations.list.neverRan")
@@ -282,7 +316,10 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                 </span>
                                 <span className="flex shrink-0 items-center gap-1">
                                     {ran === automation.id && (
-                                        <span className="text-xs text-muted-foreground" role="status">
+                                        <span
+                                            className="text-xs text-muted-foreground"
+                                            role="status"
+                                        >
                                             {t("automations.list.started")}
                                         </span>
                                     )}
@@ -291,10 +328,14 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                         size="sm"
                                         variant="ghost"
                                         className="size-8 p-0"
-                                        aria-label={t("automations.list.logName", { name: automation.name })}
+                                        aria-label={t("automations.list.logName", {
+                                            name: automation.name
+                                        })}
                                         title={t("automations.list.log")}
                                     >
-                                        <Link href={`/places/devices/automations/${automation.id}?tab=runs`}>
+                                        <Link
+                                            href={`/places/devices/automations/${automation.id}?tab=runs`}
+                                        >
                                             <History className="size-4" />
                                         </Link>
                                     </Button>
@@ -305,7 +346,9 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                                 variant="ghost"
                                                 className="size-8 p-0"
                                                 disabled={busy === "run" || !automation.enabled}
-                                                aria-label={t("automations.list.runName", { name: automation.name })}
+                                                aria-label={t("automations.list.runName", {
+                                                    name: automation.name
+                                                })}
                                                 title={
                                                     automation.enabled
                                                         ? t("automations.list.run")
@@ -323,7 +366,9 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                                 size="sm"
                                                 variant="ghost"
                                                 className="size-8 p-0"
-                                                aria-label={t("automations.list.removeName", { name: automation.name })}
+                                                aria-label={t("automations.list.removeName", {
+                                                    name: automation.name
+                                                })}
                                                 title={t("automations.list.remove")}
                                                 onClick={() => setRemoving(automation)}
                                             >

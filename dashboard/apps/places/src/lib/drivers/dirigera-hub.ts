@@ -65,7 +65,13 @@ function base(device: ikea.DirigeraDevice) {
     };
 }
 
-function sensor(device: ikea.DirigeraDevice, externalId: string, name: string, value: string, unit: string): DeviceSnapshot {
+function sensor(
+    device: ikea.DirigeraDevice,
+    externalId: string,
+    name: string,
+    value: string,
+    unit: string
+): DeviceSnapshot {
     return { ...base(device), externalId, kind: "sensor", name, state: "unknown", value, unit };
 }
 
@@ -79,7 +85,8 @@ function rowsOf(device: ikea.DirigeraDevice): DeviceSnapshot[] {
                 ...base(device),
                 externalId: device.id,
                 kind: device.type === "light" ? "light" : "outlet",
-                state: !device.isReachable || typeof on !== "boolean" ? "unknown" : on ? "on" : "off"
+                state:
+                    !device.isReachable || typeof on !== "boolean" ? "unknown" : on ? "on" : "off"
             }
         ];
     }
@@ -90,16 +97,21 @@ function rowsOf(device: ikea.DirigeraDevice): DeviceSnapshot[] {
     }
     if (device.deviceType === "motionSensor" && typeof attributes.isDetected === "boolean") {
         const words = BINARY_WORDS.motion!;
-        return [sensor(device, device.id, own.name, attributes.isDetected ? words.on : words.off, "")];
+        return [
+            sensor(device, device.id, own.name, attributes.isDetected ? words.on : words.off, "")
+        ];
     }
     if (device.deviceType === "environmentSensor") {
         const rows: DeviceSnapshot[] = [];
         const temperature = numberOf(attributes.currentTemperature);
         const humidity = numberOf(attributes.currentRH);
         if (temperature !== null) {
-            rows.push(sensor(device, `${device.id}#temperature`, own.name, String(temperature), "°C"));
+            rows.push(
+                sensor(device, `${device.id}#temperature`, own.name, String(temperature), "°C")
+            );
         }
-        if (humidity !== null) rows.push(sensor(device, `${device.id}#humidity`, own.name, String(humidity), "%"));
+        if (humidity !== null)
+            rows.push(sensor(device, `${device.id}#humidity`, own.name, String(humidity), "%"));
         return rows;
     }
     return [];

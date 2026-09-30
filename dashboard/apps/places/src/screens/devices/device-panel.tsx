@@ -359,7 +359,9 @@ export function DevicePanel({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("devicePanel.editName", { name: device.name })}
+                                        aria-label={t("devicePanel.editName", {
+                                            name: device.name
+                                        })}
                                         title={t("devicePanel.edit")}
                                         onClick={() => onEdit(device)}
                                     >
@@ -395,9 +397,13 @@ export function DevicePanel({
                                         device.firmware &&
                                             t("devicePanel.firmware", { version: device.firmware }),
                                         device.batteryPercent !== null &&
-                                            t("devicePanel.battery", { percent: device.batteryPercent }),
+                                            t("devicePanel.battery", {
+                                                percent: device.batteryPercent
+                                            }),
                                         device.stateAt &&
-                                            t("devicePanel.readAt", { time: format.time(device.stateAt) })
+                                            t("devicePanel.readAt", {
+                                                time: format.time(device.stateAt)
+                                            })
                                     ]
                                         .filter(Boolean)
                                         .join(" - ")}
@@ -418,7 +424,12 @@ export function DevicePanel({
                                 )}
                             </section>
 
-                            <AutoOffShortcut key={device.id} device={device} canManage={canManage} canControl={canControl} />
+                            <AutoOffShortcut
+                                key={device.id}
+                                device={device}
+                                canManage={canManage}
+                                canControl={canControl}
+                            />
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
                                 <h3 className="text-sm font-medium">{t("devicePanel.used")}</h3>

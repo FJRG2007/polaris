@@ -41,8 +41,10 @@ interface Device {
 }
 
 let device: Device | null = null;
-let xorDevice: { answer: (request: Record<string, unknown>) => unknown; requests: Record<string, unknown>[] } | null =
-    null;
+let xorDevice: {
+    answer: (request: Record<string, unknown>) => unknown;
+    requests: Record<string, unknown>[];
+} | null = null;
 
 function sessionKeys(local: Buffer, remote: Buffer, auth: Buffer) {
     const key = sha256(Buffer.from("lsk"), local, remote, auth).subarray(0, 16);
@@ -58,12 +60,18 @@ function ivFor(iv: Buffer, seq: number): Buffer {
 }
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
-    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
+    const actual =
+        await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
     const { DriverError } = await import("@polaris-app/places/src/lib/drivers/contract");
     return {
         deviceHost: actual.deviceHost,
-        lanRequest: async (options: { url: string; body?: Buffer; headers?: Record<string, string> }) => {
-            if (!device) throw new DriverError("Nothing answered on that address and port.", "unreachable");
+        lanRequest: async (options: {
+            url: string;
+            body?: Buffer;
+            headers?: Record<string, string>;
+        }) => {
+            if (!device)
+                throw new DriverError("Nothing answered on that address and port.", "unreachable");
             const url = new URL(options.url);
             const body = options.body ?? Buffer.alloc(0);
             const auth = authHash(device.version, device.user, device.pass);
@@ -86,11 +94,18 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                     device.version === 1
                         ? sha256(device.remote!, auth)
                         : sha256(device.remote!, device.local!, auth);
-                device.authed = body.equals(expected) && options.headers?.cookie === "TP_SESSIONID=abc123";
-                return { status: device.authed ? 200 : 403, headers: {}, body: Buffer.alloc(0), certificate: null };
+                device.authed =
+                    body.equals(expected) && options.headers?.cookie === "TP_SESSIONID=abc123";
+                return {
+                    status: device.authed ? 200 : 403,
+                    headers: {},
+                    body: Buffer.alloc(0),
+                    certificate: null
+                };
             }
             if (url.pathname === "/app/request") {
-                if (!device.authed) return { status: 403, headers: {}, body: Buffer.alloc(0), certificate: null };
+                if (!device.authed)
+                    return { status: 403, headers: {}, body: Buffer.alloc(0), certificate: null };
                 const seq = Number(url.searchParams.get("seq"));
                 const keys = sessionKeys(device.local!, device.remote!, auth);
                 const signature = body.subarray(0, 32);
@@ -104,7 +119,10 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                 ) as Record<string, unknown>;
                 device.requests.push(request);
                 const cipher = createCipheriv("aes-128-cbc", keys.key, ivFor(keys.iv, seq));
-                const reply = Buffer.concat([cipher.update(JSON.stringify(device.answer(request))), cipher.final()]);
+                const reply = Buffer.concat([
+                    cipher.update(JSON.stringify(device.answer(request))),
+                    cipher.final()
+                ]);
                 return {
                     status: 200,
                     headers: {},
@@ -128,7 +146,10 @@ vi.mock("node:net", async (original) => {
         connect(_options: { port: number; host: string }, done: () => void) {
             queueMicrotask(() => {
                 if (!xorDevice) {
-                    this.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" }));
+                    this.emit(
+                        "error",
+                        Object.assign(new Error("refused"), { code: "ECONNREFUSED" })
+                    );
                     return;
                 }
                 done();
@@ -159,7 +180,9 @@ vi.mock("node:net", async (original) => {
 });
 
 const crypto = await import("@polaris-app/places/src/lib/integrations/tplink-crypto");
-const { tapoLocalDriver, kasaLocalDriver } = await import("@polaris-app/places/src/lib/drivers/tplink-local");
+const { tapoLocalDriver, kasaLocalDriver } = await import(
+    "@polaris-app/places/src/lib/drivers/tplink-local"
+);
 
 const TAPO = { host: "192.168.1.40", email: "owner@example.test", password: "correct horse" };
 const b64 = (value: string) => Buffer.from(value).toString("base64");
@@ -170,7 +193,14 @@ beforeEach(() => {
 });
 
 function tapo(answer: Device["answer"], overrides: Partial<Device> = {}): Device {
-    device = { version: 2, user: TAPO.email, pass: TAPO.password, answer, requests: [], ...overrides };
+    device = {
+        version: 2,
+        user: TAPO.email,
+        pass: TAPO.password,
+        answer,
+        requests: [],
+        ...overrides
+    };
     return device;
 }
 
@@ -182,7 +212,9 @@ describe("the ciphers", () => {
     it("encrypts the old protocol exactly as python-kasa's own test expects", () => {
         // tests/protocols/test_iotprotocol.py, test_encrypt_unicode.
         const plain = "{'snowman': '☃'}";
-        const expected = Buffer.from([208, 247, 132, 234, 133, 242, 159, 254, 144, 183, 141, 173, 138, 104, 240, 115, 84, 41]);
+        const expected = Buffer.from([
+            208, 247, 132, 234, 133, 242, 159, 254, 144, 183, 141, 173, 138, 104, 240, 115, 84, 41
+        ]);
         const frame = crypto.xorEncrypt(plain);
         expect(frame.readUInt32BE(0)).toBe(18);
         expect(frame.subarray(4).equals(expected)).toBe(true);
@@ -241,16 +273,30 @@ describe("a Tapo", () => {
             if (methodOf(request) === "get_device_info") {
                 return {
                     error_code: 0,
-                    result: { device_id: "STRIP", type: "SMART.TAPOPLUG", model: "P300", nickname: b64("Desk"), device_on: true }
+                    result: {
+                        device_id: "STRIP",
+                        type: "SMART.TAPOPLUG",
+                        model: "P300",
+                        nickname: b64("Desk"),
+                        device_on: true
+                    }
                 };
             }
-            const start = (request.params as { start_index?: number } | undefined)?.start_index ?? 0;
+            const start =
+                (request.params as { start_index?: number } | undefined)?.start_index ?? 0;
             const all = [
                 { device_id: "C1", nickname: b64("Monitor"), device_on: true },
                 { device_id: "C2", nickname: b64("Printer"), device_on: false },
                 { device_id: "C3", nickname: "", device_on: false }
             ];
-            return { error_code: 0, result: { child_device_list: all.slice(start, start + 2), start_index: start, sum: 3 } };
+            return {
+                error_code: 0,
+                result: {
+                    child_device_list: all.slice(start, start + 2),
+                    start_index: start,
+                    sum: 3
+                }
+            };
         });
         const found = await tapoLocalDriver.list(TAPO);
         expect(found.map((row) => [row.externalId, row.name, row.state])).toEqual([
@@ -275,12 +321,23 @@ describe("a Tapo", () => {
     it("switches a single plug by itself", async () => {
         const at = tapo(() => ({ error_code: 0 }));
         await tapoLocalDriver.act(TAPO, { externalId: "80221AA", kind: "outlet" }, "turn-off");
-        expect(at.requests.at(-1)).toMatchObject({ method: "set_device_info", params: { device_on: false } });
+        expect(at.requests.at(-1)).toMatchObject({
+            method: "set_device_info",
+            params: { device_on: false }
+        });
     });
 
     it("gets in on TP-Link's setup account, as a device that has been bound to one does", async () => {
         tapo(
-            () => ({ error_code: 0, result: { device_id: "X", type: "SMART.TAPOBULB", nickname: b64("Hall"), device_on: false } }),
+            () => ({
+                error_code: 0,
+                result: {
+                    device_id: "X",
+                    type: "SMART.TAPOBULB",
+                    nickname: b64("Hall"),
+                    device_on: false
+                }
+            }),
             { user: "test@tp-link.net", pass: "test" }
         );
         await expect(tapoLocalDriver.list(TAPO)).resolves.toHaveLength(1);
@@ -296,7 +353,10 @@ describe("a Tapo", () => {
     });
 
     it("refuses a hub, which answers but has nothing to switch", async () => {
-        tapo(() => ({ error_code: 0, result: { device_id: "H", type: "SMART.TAPOHUB", nickname: b64("Hub") } }));
+        tapo(() => ({
+            error_code: 0,
+            result: { device_id: "H", type: "SMART.TAPOHUB", nickname: b64("Hub") }
+        }));
         await expect(tapoLocalDriver.verify(TAPO)).rejects.toMatchObject({ kind: "refused" });
     });
 
@@ -330,7 +390,9 @@ describe("a Kasa", () => {
     it("is read on the old port with no account at all", async () => {
         xorDevice = { answer: () => HS300, requests: [] };
         const found = await kasaLocalDriver.list(KASA);
-        expect(found.map((row) => [row.externalId, row.name, row.kind, row.state, row.firmware])).toEqual([
+        expect(
+            found.map((row) => [row.externalId, row.name, row.kind, row.state, row.firmware])
+        ).toEqual([
             ["8006AA#8006AA00", "TV", "outlet", "on", "1.0.10"],
             ["8006AA#8006AA01", "Console", "outlet", "off", "1.0.10"]
         ]);
@@ -339,10 +401,15 @@ describe("a Kasa", () => {
 
     it("switches one outlet of a strip by its id in the context", async () => {
         xorDevice = {
-            answer: (request) => ("context" in request ? { system: { set_relay_state: { err_code: 0 } } } : HS300),
+            answer: (request) =>
+                "context" in request ? { system: { set_relay_state: { err_code: 0 } } } : HS300,
             requests: []
         };
-        await kasaLocalDriver.act(KASA, { externalId: "8006AA#8006AA01", kind: "outlet" }, "turn-on");
+        await kasaLocalDriver.act(
+            KASA,
+            { externalId: "8006AA#8006AA01", kind: "outlet" },
+            "turn-on"
+        );
         expect(xorDevice.requests.at(-1)).toEqual({
             context: { child_ids: ["8006AA01"] },
             system: { set_relay_state: { state: 1 } }
@@ -353,7 +420,11 @@ describe("a Kasa", () => {
         xorDevice = {
             answer: (request) =>
                 "smartlife.iot.smartbulb.lightingservice" in request
-                    ? { "smartlife.iot.smartbulb.lightingservice": { transition_light_state: { err_code: 0 } } }
+                    ? {
+                          "smartlife.iot.smartbulb.lightingservice": {
+                              transition_light_state: { err_code: 0 }
+                          }
+                      }
                     : { system: { get_sysinfo: { err_code: 0 } } },
             requests: []
         };
@@ -382,8 +453,14 @@ describe("a Kasa", () => {
             }),
             requests: []
         };
-        const found = await kasaLocalDriver.list({ ...KASA, email: "owner@example.test", password: "pw" });
-        expect(found).toEqual([expect.objectContaining({ externalId: "KP", name: "Kettle", state: "on" })]);
+        const found = await kasaLocalDriver.list({
+            ...KASA,
+            email: "owner@example.test",
+            password: "pw"
+        });
+        expect(found).toEqual([
+            expect.objectContaining({ externalId: "KP", name: "Kettle", state: "on" })
+        ]);
     });
 
     it("says so when nothing answers on either port", async () => {

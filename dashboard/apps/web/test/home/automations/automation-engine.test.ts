@@ -84,7 +84,8 @@ class MemoryStore implements AutomationStore {
     }
 
     async claimDueRuns(now: Date, lockUntil: Date, limit: number) {
-        const free = (run: RunRecord) => !run.lockedUntil || run.lockedUntil.getTime() < now.getTime();
+        const free = (run: RunRecord) =>
+            !run.lockedUntil || run.lockedUntil.getTime() < now.getTime();
         const due = [...this.runs.values()]
             .filter(
                 (run) =>
@@ -108,7 +109,8 @@ class MemoryStore implements AutomationStore {
 
     async wakeWaiting(deviceId: string, now: Date) {
         for (const run of this.runs.values()) {
-            if (run.waitDeviceId === deviceId && run.status === "waiting") this.runs.set(run.id, { ...run, dueAt: now });
+            if (run.waitDeviceId === deviceId && run.status === "waiting")
+                this.runs.set(run.id, { ...run, dueAt: now });
         }
     }
 
@@ -158,7 +160,14 @@ function boot(): AutomationEngine {
                 acted.push({ deviceId, action });
                 const device = devices.get(deviceId);
                 if (!device) throw new StepRefusal("That device is not here");
-                const state = action === "turn-on" ? "on" : action === "turn-off" ? "off" : action === "lock" ? "locked" : "unlocked";
+                const state =
+                    action === "turn-on"
+                        ? "on"
+                        : action === "turn-off"
+                          ? "off"
+                          : action === "lock"
+                            ? "locked"
+                            : "unlocked";
                 devices.set(deviceId, { ...device, state });
                 // What devices.ts does after every press: tells the automations.
                 await made.observe(INSTALL, devices.get(deviceId)!);
@@ -174,11 +183,29 @@ function boot(): AutomationEngine {
     return made;
 }
 
-function readout(id: string, kind: string, state: string, extra: Partial<DeviceReadout> = {}): DeviceReadout {
-    return { id, kind, name: `Fixture ${id}`, state, door: "none", reading: "", online: true, ...extra };
+function readout(
+    id: string,
+    kind: string,
+    state: string,
+    extra: Partial<DeviceReadout> = {}
+): DeviceReadout {
+    return {
+        id,
+        kind,
+        name: `Fixture ${id}`,
+        state,
+        door: "none",
+        reading: "",
+        online: true,
+        ...extra
+    };
 }
 
-function automation(id: string, definition: Partial<auto.AutomationDefinition>, extra: Partial<AutomationRecord> = {}) {
+function automation(
+    id: string,
+    definition: Partial<auto.AutomationDefinition>,
+    extra: Partial<AutomationRecord> = {}
+) {
     const record: AutomationRecord = {
         id,
         installedAppId: INSTALL,
@@ -273,7 +300,10 @@ describe("a time of day", () => {
 
     it("does not fire for a time that passed before it was switched on", async () => {
         const record = store.automations.get("morning")!;
-        store.automations.set("morning", { ...record, armedAt: new Date("2026-09-30T07:02:00.000Z") });
+        store.automations.set("morning", {
+            ...record,
+            armedAt: new Date("2026-09-30T07:02:00.000Z")
+        });
         at("2026-09-30T07:03:00.000Z");
         await engine.evaluateSchedules(INSTALL);
         expect(store.runsOf("morning")).toHaveLength(0);
@@ -281,7 +311,10 @@ describe("a time of day", () => {
 
     it("reads the time in the automation's own zone", async () => {
         const record = store.automations.get("morning")!;
-        store.automations.set("morning", { ...record, definition: { ...record.definition, timeZone: "Europe/Madrid" } });
+        store.automations.set("morning", {
+            ...record,
+            definition: { ...record.definition, timeZone: "Europe/Madrid" }
+        });
         // 07:00 in Madrid in September is 05:00 UTC.
         at("2026-09-30T05:00:30.000Z");
         await engine.evaluateSchedules(INSTALL);
@@ -293,7 +326,10 @@ describe("an interval", () => {
     it("fires once per period from when it was armed", async () => {
         automation(
             "every15",
-            { triggers: [{ id: "triginterval", kind: "interval", minutes: 15 }], actions: [{ id: "stepnote", kind: "notify", message: "tick" }] },
+            {
+                triggers: [{ id: "triginterval", kind: "interval", minutes: 15 }],
+                actions: [{ id: "stepnote", kind: "notify", message: "tick" }]
+            },
             { armedAt: new Date("2026-09-30T06:00:00.000Z") }
         );
         later(14 * MINUTE);
@@ -313,7 +349,16 @@ describe("an interval", () => {
 describe("a device changing", () => {
     beforeEach(() => {
         automation("follow", {
-            triggers: [{ id: "trigchange", kind: "change", deviceId: "switch", attribute: "state", from: "", to: "on" }],
+            triggers: [
+                {
+                    id: "trigchange",
+                    kind: "change",
+                    deviceId: "switch",
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                }
+            ],
             actions: [{ id: "stepon", kind: "device", deviceId: "lamp", do: "turn-on" }]
         });
         devices.set("lamp", readout("lamp", "light", "off"));
@@ -338,11 +383,29 @@ describe("a device changing", () => {
 
     it("still fires the others when one of them cannot", async () => {
         automation("broken", {
-            triggers: [{ id: "trigchange", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }],
+            triggers: [
+                {
+                    id: "trigchange",
+                    kind: "change",
+                    deviceId: "plug",
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                }
+            ],
             actions: [{ id: "stepnote", kind: "notify", message: "broken" }]
         });
         automation("fine", {
-            triggers: [{ id: "trigchange", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }],
+            triggers: [
+                {
+                    id: "trigchange",
+                    kind: "change",
+                    deviceId: "plug",
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                }
+            ],
             actions: [{ id: "stepnote", kind: "notify", message: "fine" }]
         });
         const count = store.countRunsSince.bind(store);
@@ -367,7 +430,16 @@ describe("a device changing", () => {
 
     it("reads a lock passing through 'moving' as going straight to where it lands", async () => {
         automation("unlocked", {
-            triggers: [{ id: "triglock", kind: "change", deviceId: "door", attribute: "state", from: "locked", to: "unlocked" }],
+            triggers: [
+                {
+                    id: "triglock",
+                    kind: "change",
+                    deviceId: "door",
+                    attribute: "state",
+                    from: "locked",
+                    to: "unlocked"
+                }
+            ],
             actions: [{ id: "stepnote", kind: "notify", message: "unlocked" }]
         });
         await reads(readout("door", "lock", "locked"));
@@ -380,7 +452,16 @@ describe("a device changing", () => {
 
     it("hears a door sensor opening apart from the lock", async () => {
         automation("door", {
-            triggers: [{ id: "trigdoor", kind: "change", deviceId: "door", attribute: "door", from: "", to: "open" }],
+            triggers: [
+                {
+                    id: "trigdoor",
+                    kind: "change",
+                    deviceId: "door",
+                    attribute: "door",
+                    from: "",
+                    to: "open"
+                }
+            ],
             actions: [{ id: "stepnote", kind: "notify", message: "door open" }]
         });
         await reads(readout("door", "lock", "locked", { door: "closed" }));
@@ -443,7 +524,15 @@ describe("a device staying in a state", () => {
 describe("a reading crossing a line", () => {
     it("fires on the way over, not while it stays over", async () => {
         automation("hot", {
-            triggers: [{ id: "trighot", kind: "threshold", deviceId: "temp", direction: "above", value: 25 }],
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25
+                }
+            ],
             actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
         });
         await reads(readout("temp", "sensor", "unknown", { reading: "20.5" }));
@@ -462,14 +551,32 @@ describe("a reading crossing a line", () => {
 
 describe("conditions", () => {
     function guarded(conditions: auto.AutomationDefinition["conditions"]) {
-        automation("guarded", { conditions, actions: [{ id: "stepnote", kind: "notify", message: "went" }] });
+        automation("guarded", {
+            conditions,
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
     }
 
     it("skip a run when a device is not where they say, and say so", async () => {
         devices.set("door", readout("door", "lock", "unlocked"));
         guarded({
             match: "all",
-            groups: [{ id: "group1", match: "all", items: [{ id: "cond01", kind: "device", deviceId: "door", attribute: "state", is: "locked", negate: false }] }]
+            groups: [
+                {
+                    id: "group1",
+                    match: "all",
+                    items: [
+                        {
+                            id: "cond01",
+                            kind: "device",
+                            deviceId: "door",
+                            attribute: "state",
+                            is: "locked",
+                            negate: false
+                        }
+                    ]
+                }
+            ]
         });
         await engine.runNow(store.automations.get("guarded")!, "Fixture person", "press-1");
         await engine.drain();
@@ -482,7 +589,13 @@ describe("conditions", () => {
     it("read a night window across midnight in the automation's zone", async () => {
         guarded({
             match: "all",
-            groups: [{ id: "group1", match: "all", items: [{ id: "cond01", kind: "time", from: "22:00", to: "07:00" }] }]
+            groups: [
+                {
+                    id: "group1",
+                    match: "all",
+                    items: [{ id: "cond01", kind: "time", from: "22:00", to: "07:00" }]
+                }
+            ]
         });
         at("2026-09-30T12:00:00.000Z");
         await engine.runNow(store.automations.get("guarded")!, "Fixture person", "press-1");
@@ -502,7 +615,11 @@ describe("conditions", () => {
         guarded({
             match: "any",
             groups: [
-                { id: "group1", match: "all", items: [{ id: "cond01", kind: "weekday", days: [0, 6] }] },
+                {
+                    id: "group1",
+                    match: "all",
+                    items: [{ id: "cond01", kind: "weekday", days: [0, 6] }]
+                },
                 {
                     id: "group2",
                     match: "any",
@@ -558,14 +675,21 @@ describe("a delay", () => {
         const [claimed] = await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5);
         await store.saveRun(claimed!.id, { status: "running" });
         // Nothing else may take it while it is held.
-        expect(await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5)).toHaveLength(0);
+        expect(await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5)).toHaveLength(
+            0
+        );
         later(3 * MINUTE);
         await boot().drain();
         expect(acted.map((entry) => entry.action)).toEqual(["turn-on"]);
     });
 
     it("comes back early by itself when it is short", async () => {
-        automation("short", { actions: [{ id: "stepwait", kind: "delay", seconds: 20 }, { id: "stepnote", kind: "notify", message: "later" }] });
+        automation("short", {
+            actions: [
+                { id: "stepwait", kind: "delay", seconds: 20 },
+                { id: "stepnote", kind: "notify", message: "later" }
+            ]
+        });
         await engine.runNow(store.automations.get("short")!, "Fixture person", "press-1");
         await engine.drain();
         expect(woken).toContain(20_000);
@@ -605,7 +729,9 @@ describe("an automation that cannot be read", () => {
         await engine.drain();
         expect(store.runsOf("gone")[0]).toMatchObject({ status: "failed", reason: "unreadable" });
         later(5 * MINUTE);
-        expect(await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5)).toHaveLength(0);
+        expect(await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5)).toHaveLength(
+            0
+        );
         expect(notified).toEqual([]);
     });
 });
@@ -614,7 +740,15 @@ describe("waiting for a device", () => {
     function waiter(onTimeout: "stop" | "continue") {
         automation("waiter", {
             actions: [
-                { id: "stepwait", kind: "wait", deviceId: "door", attribute: "door", is: "closed", timeoutMinutes: 10, onTimeout },
+                {
+                    id: "stepwait",
+                    kind: "wait",
+                    deviceId: "door",
+                    attribute: "door",
+                    is: "closed",
+                    timeoutMinutes: 10,
+                    onTimeout
+                },
                 { id: "stepnote", kind: "notify", message: "closed" }
             ]
         });
@@ -664,7 +798,16 @@ describe("loops", () => {
 
     it("stops an automation that flips the device that fires it", async () => {
         automation("flip", {
-            triggers: [{ id: "trigchange", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "" }],
+            triggers: [
+                {
+                    id: "trigchange",
+                    kind: "change",
+                    deviceId: "plug",
+                    attribute: "state",
+                    from: "",
+                    to: ""
+                }
+            ],
             actions: [{ id: "steptoggle", kind: "device", deviceId: "plug", do: "toggle" }]
         });
         await reads(readout("plug", "outlet", "off"));
@@ -683,14 +826,21 @@ describe("loops", () => {
             automationId === "busy" ? RATE_MAX : count(automationId, since);
         await engine.runNow(store.automations.get("starter")!, "Fixture person", "press-1");
         await engine.drain();
-        expect(store.runsOf("starter")[0]?.steps[0]).toMatchObject({ outcome: "skipped", code: "automationHeld" });
+        expect(store.runsOf("starter")[0]?.steps[0]).toMatchObject({
+            outcome: "skipped",
+            code: "automationHeld"
+        });
         expect(notified).toEqual([]);
     });
 
     it("holds back an automation that fires too often, and says so once", async () => {
         automation("chatty", { actions: [{ id: "stepnote", kind: "notify", message: "again" }] });
         for (let press = 0; press < RATE_MAX + 5; press += 1) {
-            await engine.runNow(store.automations.get("chatty")!, "Fixture person", `press-${press}`);
+            await engine.runNow(
+                store.automations.get("chatty")!,
+                "Fixture person",
+                `press-${press}`
+            );
         }
         const runs = store.runsOf("chatty");
         expect(runs.filter((run) => run.status === "queued")).toHaveLength(RATE_MAX);
@@ -704,7 +854,9 @@ describe("the owner's rights", () => {
     });
 
     it("refuse a run whose owner can no longer operate the house", async () => {
-        automation("owned", { actions: [{ id: "stepon", kind: "device", deviceId: "plug", do: "turn-on" }] });
+        automation("owned", {
+            actions: [{ id: "stepon", kind: "device", deviceId: "plug", do: "turn-on" }]
+        });
         mayOperate = false;
         await engine.runNow(store.automations.get("owned")!, "Fixture person", "press-1");
         await engine.drain();
@@ -727,7 +879,11 @@ describe("the owner's rights", () => {
         expect(acted).toEqual([]);
         const run = store.runsOf("owned")[0]!;
         expect(run.status).toBe("refused");
-        expect(run.steps.at(-1)).toMatchObject({ stepId: "stepon", outcome: "refused", code: "owner" });
+        expect(run.steps.at(-1)).toMatchObject({
+            stepId: "stepon",
+            outcome: "refused",
+            code: "owner"
+        });
     });
 });
 
@@ -743,7 +899,10 @@ describe("a device that refuses", () => {
     });
 
     it("is written down in the words the device service used, and stops the run", async () => {
-        refuse.set("plug", new StepRefusal("Fixture plug was not answering when it was last checked"));
+        refuse.set(
+            "plug",
+            new StepRefusal("Fixture plug was not answering when it was last checked")
+        );
         await engine.runNow(store.automations.get("failing")!, "Fixture person", "press-1");
         await engine.drain();
         const run = store.runsOf("failing")[0]!;

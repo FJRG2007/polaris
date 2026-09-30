@@ -135,7 +135,10 @@ export class KlapSession {
         const fullIv = sha256(Buffer.from("iv"), localSeed, remoteSeed, authHash);
         this.iv = fullIv.subarray(0, 12);
         this.seq = fullIv.readInt32BE(28);
-        this.signature = sha256(Buffer.from("ldk"), localSeed, remoteSeed, authHash).subarray(0, 28);
+        this.signature = sha256(Buffer.from("ldk"), localSeed, remoteSeed, authHash).subarray(
+            0,
+            28
+        );
     }
 
     /** The sequence the next request will carry, for a test. */
@@ -162,6 +165,8 @@ export class KlapSession {
      *  signature the reference implementation does not check either. */
     decrypt(body: Buffer, seq: number): string {
         const decipher = createDecipheriv("aes-128-cbc", this.key, this.ivFor(seq));
-        return Buffer.concat([decipher.update(body.subarray(32)), decipher.final()]).toString("utf8");
+        return Buffer.concat([decipher.update(body.subarray(32)), decipher.final()]).toString(
+            "utf8"
+        );
     }
 }

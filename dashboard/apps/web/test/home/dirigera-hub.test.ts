@@ -29,7 +29,8 @@ let devices: unknown[] = [];
 let tokenValid = true;
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
-    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
+    const actual =
+        await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
     return {
         ...actual,
         lanRequest: async (options: {
@@ -62,9 +63,11 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                 }
                 return reply(200, { access_token: "hub-token" });
             }
-            if (request.headers.authorization !== "Bearer hub-token" || !tokenValid) return reply(401, {});
+            if (request.headers.authorization !== "Bearer hub-token" || !tokenValid)
+                return reply(401, {});
             if (path === "/v1/devices" && request.method === "GET") return reply(200, devices);
-            if (path.startsWith("/v1/devices/") && request.method === "PATCH") return reply(202, undefined);
+            if (path.startsWith("/v1/devices/") && request.method === "PATCH")
+                return reply(202, undefined);
             return reply(404, {});
         }
     };
@@ -109,7 +112,9 @@ describe("pairing", () => {
         expect(query.get("code_challenge_method")).toBe("S256");
         expect(authorize.trust).toEqual({ pin: null });
 
-        const tokens = sent.filter((request) => new URL(request.url).pathname === "/v1/oauth/token");
+        const tokens = sent.filter(
+            (request) => new URL(request.url).pathname === "/v1/oauth/token"
+        );
         expect(tokens).toHaveLength(3);
         const form = new URLSearchParams(tokens[0]!.body);
         expect(form.get("grant_type")).toBe("authorization_code");
@@ -123,7 +128,9 @@ describe("pairing", () => {
 
     it("says the button was not pressed when the window closes", async () => {
         pressAfter = 1000;
-        await expect(ikea.pairHub("192.168.1.25", { pollMs: 1, windowMs: 5 })).rejects.toMatchObject({
+        await expect(
+            ikea.pairHub("192.168.1.25", { pollMs: 1, windowMs: 5 })
+        ).rejects.toMatchObject({
             kind: "refused",
             message: expect.stringContaining("action button")
         });
@@ -143,7 +150,14 @@ describe("what a hub has", () => {
                 type: "light",
                 deviceType: "light",
                 isReachable: true,
-                attributes: { customName: "Bed", model: "TRADFRIbulbE27WSglobeopal1055lm", manufacturer: "IKEA of Sweden", firmwareVersion: "1.0.21", isOn: false, lightLevel: 43 }
+                attributes: {
+                    customName: "Bed",
+                    model: "TRADFRIbulbE27WSglobeopal1055lm",
+                    manufacturer: "IKEA of Sweden",
+                    firmwareVersion: "1.0.21",
+                    isOn: false,
+                    lightLevel: 43
+                }
             },
             {
                 id: "outlet-1",
@@ -157,22 +171,47 @@ describe("what a hub has", () => {
                 type: "sensor",
                 deviceType: "openCloseSensor",
                 isReachable: true,
-                attributes: { customName: "Balcony door", model: "PARASOLL", isOpen: true, batteryPercentage: 90 }
+                attributes: {
+                    customName: "Balcony door",
+                    model: "PARASOLL",
+                    isOpen: true,
+                    batteryPercentage: 90
+                }
             },
             {
                 id: "air-1",
                 type: "sensor",
                 deviceType: "environmentSensor",
                 isReachable: true,
-                attributes: { customName: "Bedroom", model: "VINDSTYRKA", currentTemperature: 21, currentRH: 48 }
+                attributes: {
+                    customName: "Bedroom",
+                    model: "VINDSTYRKA",
+                    currentTemperature: 21,
+                    currentRH: 48
+                }
             },
-            { id: "blind-1", type: "blinds", deviceType: "blinds", isReachable: true, attributes: { customName: "Blind" } }
+            {
+                id: "blind-1",
+                type: "blinds",
+                deviceType: "blinds",
+                isReachable: true,
+                attributes: { customName: "Blind" }
+            }
         ];
     });
 
     it("makes lights, outlets and readings, and leaves blinds out", async () => {
         const found = await dirigeraHubDriver.list(PAIRED);
-        expect(found.map((row) => [row.externalId, row.kind, row.name, row.state, row.value ?? null, row.unit ?? null])).toEqual([
+        expect(
+            found.map((row) => [
+                row.externalId,
+                row.kind,
+                row.name,
+                row.state,
+                row.value ?? null,
+                row.unit ?? null
+            ])
+        ).toEqual([
             ["light-1", "light", "Bed", "off", null, null],
             ["outlet-1", "outlet", "Heater", "unknown", null, null],
             ["door-1", "sensor", "Balcony door", "unknown", "Open", ""],
@@ -194,10 +233,14 @@ describe("what a hub has", () => {
 
     it("asks to be paired again when the hub refuses the token", async () => {
         tokenValid = false;
-        await expect(dirigeraHubDriver.list(PAIRED)).rejects.toMatchObject({ kind: "unauthorized" });
+        await expect(dirigeraHubDriver.list(PAIRED)).rejects.toMatchObject({
+            kind: "unauthorized"
+        });
     });
 
     it("asks to be paired again when a connection never was", async () => {
-        await expect(dirigeraHubDriver.list({ host: "192.168.1.25" })).rejects.toMatchObject({ kind: "unauthorized" });
+        await expect(dirigeraHubDriver.list({ host: "192.168.1.25" })).rejects.toMatchObject({
+            kind: "unauthorized"
+        });
     });
 });

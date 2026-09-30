@@ -52,7 +52,12 @@ export function AutoOffShortcut({
         setBusy(true);
         setError("");
         const result = await runAction(
-            () => actions.addAutoOffAction(device.id, Number(minutes), auto.readerZone(format.preferences.timeZone)),
+            () =>
+                actions.addAutoOffAction(
+                    device.id,
+                    Number(minutes),
+                    auto.readerZone(format.preferences.timeZone)
+                ),
             setError
         );
         setBusy(false);
@@ -66,8 +71,14 @@ export function AutoOffShortcut({
     };
 
     return (
-        <section className="flex flex-col gap-2 border-t border-border pt-4" aria-labelledby={`auto-off-${device.id}`}>
-            <h3 id={`auto-off-${device.id}`} className="flex items-center gap-1.5 text-sm font-medium">
+        <section
+            className="flex flex-col gap-2 border-t border-border pt-4"
+            aria-labelledby={`auto-off-${device.id}`}
+        >
+            <h3
+                id={`auto-off-${device.id}`}
+                className="flex items-center gap-1.5 text-sm font-medium"
+            >
                 <Timer className="size-4 shrink-0 text-muted-foreground" />
                 {locks ? t("automations.shortcut.lockTitle") : t("automations.shortcut.offTitle")}
             </h3>
@@ -89,7 +100,9 @@ export function AutoOffShortcut({
             ) : (
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                        {locks ? t("automations.shortcut.lockAfter") : t("automations.shortcut.offAfter")}
+                        {locks
+                            ? t("automations.shortcut.lockAfter")
+                            : t("automations.shortcut.offAfter")}
                     </span>
                     <Select
                         value={minutes}

@@ -76,14 +76,20 @@ const idSchema = z.string().uuid();
 
 async function requireAutomation(installedAppId: string, id: string): Promise<Row> {
     if (!idSchema.safeParse(id).success) throw new HomeError("That automation is not here");
-    const row = await prisma.placeAutomation.findFirst({ where: { id, installedAppId }, select: FIELDS });
+    const row = await prisma.placeAutomation.findFirst({
+        where: { id, installedAppId },
+        select: FIELDS
+    });
     if (!row) throw new HomeError("That automation is not here");
     return row;
 }
 
 /** The automations of one place, oldest first: the order they were written in
  *  is the order somebody remembers them in. */
-export async function listAutomations(installedAppId: string, placeId: string): Promise<auto.AutomationView[]> {
+export async function listAutomations(
+    installedAppId: string,
+    placeId: string
+): Promise<auto.AutomationView[]> {
     const rows = await prisma.placeAutomation.findMany({
         where: { installedAppId, placeId },
         orderBy: { createdAt: "asc" },
@@ -93,7 +99,10 @@ export async function listAutomations(installedAppId: string, placeId: string): 
     return rows.flatMap((row) => toView(row, owners) ?? []);
 }
 
-export async function getAutomation(installedAppId: string, id: string): Promise<auto.AutomationView> {
+export async function getAutomation(
+    installedAppId: string,
+    id: string
+): Promise<auto.AutomationView> {
     const row = await requireAutomation(installedAppId, id);
     const view = toView(row, await ownerNames([row.ownerId]));
     if (!view) throw new HomeError("That automation was saved by a newer Polaris");
@@ -151,7 +160,10 @@ export async function saveAutomation(
     };
     const row = id
         ? await prisma.placeAutomation.update({ where: { id }, data, select: FIELDS })
-        : await prisma.placeAutomation.create({ data: { ...data, installedAppId }, select: FIELDS });
+        : await prisma.placeAutomation.create({
+              data: { ...data, installedAppId },
+              select: FIELDS
+          });
     if (!input.enabled) await stopPending(row.id, ["queued", "waiting", "running"], "disabled");
     else if (id && !sameSteps(before?.definition.actions, input.definition.actions)) {
         await stopPending(row.id, ["waiting", "running"], "edited");
@@ -181,10 +193,7 @@ export async function setAutomationEnabled(
     return view;
 }
 
-function sameSteps(
-    before: readonly auto.Step[] | undefined,
-    after: readonly auto.Step[]
-): boolean {
+function sameSteps(before: readonly auto.Step[] | undefined, after: readonly auto.Step[]): boolean {
     return before !== undefined && JSON.stringify(before) === JSON.stringify(after);
 }
 
@@ -226,11 +235,17 @@ export async function runAutomationNow(
     await engine.runNow(record, byUser, pressId);
     // Not awaited: the first steps may take a few seconds at a slow account, and
     // the screen asks for the log again rather than holding the button down.
-    void engine.drain().catch((error) => console.error("places: an automation could not run:", error));
+    void engine
+        .drain()
+        .catch((error) => console.error("places: an automation could not run:", error));
 }
 
 /** What an automation has done, newest first. */
-export async function listRuns(installedAppId: string, automationId: string, limit = 50): Promise<auto.RunView[]> {
+export async function listRuns(
+    installedAppId: string,
+    automationId: string,
+    limit = 50
+): Promise<auto.RunView[]> {
     await requireAutomation(installedAppId, automationId);
     const rows = await prisma.placeAutomationRun.findMany({
         where: { automationId },

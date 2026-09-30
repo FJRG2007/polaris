@@ -75,7 +75,9 @@ describe("the sealing and the signature, against the SDK", () => {
     });
 
     it("signs the headers, the query and the body as the SDK does", () => {
-        expect(sharing.signTuya(SDK.hashKey, SDK.headers, SDK.queryEnc, SDK.bodyEnc)).toBe(SDK.sign);
+        expect(sharing.signTuya(SDK.hashKey, SDK.headers, SDK.queryEnc, SDK.bodyEnc)).toBe(
+            SDK.sign
+        );
         expect(sharing.signTuya(SDK.hashKey, SDK.headers, "", "")).toBe(SDK.signGet);
     });
 });
@@ -126,9 +128,16 @@ function signed(
     const query = url.searchParams.get("encdata") ?? "";
     const body = raw ? (JSON.parse(raw) as { encdata: string }).encdata : "";
     const expected = sharing.signTuya(hashKey, headers, query, body);
-    if (headers["X-sign"] !== expected) return reply({ success: false, code: 1004, msg: "sign invalid" });
+    if (headers["X-sign"] !== expected)
+        return reply({ success: false, code: 1004, msg: "sign invalid" });
     const params: unknown = query ? JSON.parse(sharing.openTuya(query, secret)) : null;
-    seen.push({ method, url, headers, params, body: body ? JSON.parse(sharing.openTuya(body, secret)) : null });
+    seen.push({
+        method,
+        url,
+        headers,
+        params,
+        body: body ? JSON.parse(sharing.openTuya(body, secret)) : null
+    });
     const result = sharing.sealTuya(JSON.stringify(answer(params)), secret);
     return reply({ success: true, t: 1_800_000_000_000, result });
 }
@@ -153,7 +162,10 @@ beforeEach(() => {
             }
             return reply({ success: true, result: { qrcode: QR_TOKEN } });
         }
-        if (url.origin === LOGIN && url.pathname === `/v1.0/m/life/home-assistant/qrcode/tokens/${QR_TOKEN}`) {
+        if (
+            url.origin === LOGIN &&
+            url.pathname === `/v1.0/m/life/home-assistant/qrcode/tokens/${QR_TOKEN}`
+        ) {
             seen.push({ method, url, headers, params: null, body: null });
             if (!scanned) return reply({ success: false, code: 1010, msg: "not yet" });
             return reply({
@@ -181,7 +193,8 @@ beforeEach(() => {
                 expireTime: 7200
             }));
         }
-        if (url.pathname === "/v1.0/m/life/users/homes") return signed(method, url, headers, raw, () => homes);
+        if (url.pathname === "/v1.0/m/life/users/homes")
+            return signed(method, url, headers, raw, () => homes);
         if (url.pathname === "/v1.0/m/life/ha/home/devices") {
             return signed(method, url, headers, raw, (params) => {
                 const homeId = (params as { homeId?: string } | null)?.homeId ?? "";
@@ -191,7 +204,8 @@ beforeEach(() => {
         if (/^\/v1\.1\/m\/thing\/[^/]+\/commands$/.test(url.pathname)) {
             return signed(method, url, headers, raw, () => true);
         }
-        if (url.pathname === "/v1.0/m/token/terminal/expire") return signed(method, url, headers, raw, () => true);
+        if (url.pathname === "/v1.0/m/token/terminal/expire")
+            return signed(method, url, headers, raw, () => true);
         throw new Error(`unexpected ${url}`);
     });
 });
@@ -230,9 +244,13 @@ describe("signing in by scanning a code", () => {
     });
 
     it("says why a user code was refused, in Tuya's words", async () => {
-        const failure = await pair.start({ userCode: "wrong-code" }).catch((caught: unknown) => caught);
+        const failure = await pair
+            .start({ userCode: "wrong-code" })
+            .catch((caught: unknown) => caught);
         expect(failure).toBeInstanceOf(DriverError);
-        expect((failure as DriverError).message).toBe("Tuya refused the User Code: user code invalid.");
+        expect((failure as DriverError).message).toBe(
+            "Tuya refused the User Code: user code invalid."
+        );
     });
 
     it("waits until the code has been scanned, then hands back the sign-in", async () => {
@@ -262,7 +280,9 @@ describe("signing in by scanning a code", () => {
         vi.stubGlobal("fetch", async () => {
             throw new TypeError("fetch failed");
         });
-        expect(await pair.poll({ userCode: USER_CODE }, { token: QR_TOKEN })).toEqual({ done: false });
+        expect(await pair.poll({ userCode: USER_CODE }, { token: QR_TOKEN })).toEqual({
+            done: false
+        });
     });
 
     it("refuses a state that is not one it started", async () => {
@@ -324,26 +344,32 @@ describe("the token", () => {
             tuyaAppDriver.renew!(lapsing)
         ]);
         expect(first).toEqual(second);
-        expect(seen.filter((request) => request.url.pathname.startsWith("/v1.0/m/token/"))).toHaveLength(1);
+        expect(
+            seen.filter((request) => request.url.pathname.startsWith("/v1.0/m/token/"))
+        ).toHaveLength(1);
     });
 
     it("keeps using a token that still works when the trade does not get through", async () => {
         vi.stubGlobal("fetch", async () => {
             throw new TypeError("fetch failed");
         });
-        expect(await tuyaAppDriver.renew!(session({ refreshToken: "refresh-c", expiresAt: String(Date.now() + 30_000) }))).toBeNull();
-        const failure = await tuyaAppDriver
-            .renew!(session({ refreshToken: "refresh-d", expiresAt: "0" }))
-            .catch((caught: unknown) => caught);
+        expect(
+            await tuyaAppDriver.renew!(
+                session({ refreshToken: "refresh-c", expiresAt: String(Date.now() + 30_000) })
+            )
+        ).toBeNull();
+        const failure = await tuyaAppDriver.renew!(
+            session({ refreshToken: "refresh-d", expiresAt: "0" })
+        ).catch((caught: unknown) => caught);
         expect((failure as DriverError).kind).toBe("unreachable");
     });
 
     it("says the account is signed out when the trade is refused", async () => {
         refreshRefused = true;
         refreshToken = "refresh-revoked";
-        const failure = await tuyaAppDriver
-            .renew!(session({ refreshToken: "refresh-revoked", expiresAt: "0" }))
-            .catch((caught: unknown) => caught);
+        const failure = await tuyaAppDriver.renew!(
+            session({ refreshToken: "refresh-revoked", expiresAt: "0" })
+        ).catch((caught: unknown) => caught);
         expect(failure).toBeInstanceOf(DriverError);
         expect((failure as DriverError).kind).toBe("unauthorized");
         expect((failure as DriverError).message).toBe(
@@ -394,14 +420,21 @@ describe("the devices", () => {
             ]
         };
         const found = await tuyaAppDriver.list(session());
-        expect(found.map((device) => [device.externalId, device.kind, device.name, device.state])).toEqual([
+        expect(
+            found.map((device) => [device.externalId, device.kind, device.name, device.state])
+        ).toEqual([
             ["dev-1#switch_1", "switch", "Hallway 1", "on"],
             ["dev-1#switch_2", "switch", "Hallway 2", "off"],
             ["dev-3#switch_led", "light", "Porch light", "unknown"]
         ]);
         expect(found[0]?.model).toBe("2 Gang Switch");
-        const asked = seen.filter((request) => request.url.pathname === "/v1.0/m/life/ha/home/devices");
-        expect(asked.map((request) => request.params)).toEqual([{ homeId: "42" }, { homeId: "43" }]);
+        const asked = seen.filter(
+            (request) => request.url.pathname === "/v1.0/m/life/ha/home/devices"
+        );
+        expect(asked.map((request) => request.params)).toEqual([
+            { homeId: "42" },
+            { homeId: "43" }
+        ]);
     });
 
     it("reads fields sent as null as empty, and leaves out only a device it cannot read", async () => {
@@ -420,11 +453,17 @@ describe("the devices", () => {
             ]
         };
         const found = await tuyaAppDriver.list(session());
-        expect(found.map((device) => [device.externalId, device.model])).toEqual([["dev-1#switch_1", null]]);
+        expect(found.map((device) => [device.externalId, device.model])).toEqual([
+            ["dev-1#switch_1", null]
+        ]);
     });
 
     it("sends the data point a row stands for, sealed in the body", async () => {
-        await tuyaAppDriver.act(session(), { externalId: "dev-1#switch_2", kind: "switch" }, "turn-on");
+        await tuyaAppDriver.act(
+            session(),
+            { externalId: "dev-1#switch_2", kind: "switch" },
+            "turn-on"
+        );
         const command = seen.find((request) => request.url.pathname.endsWith("/commands"))!;
         expect(command.method).toBe("POST");
         expect(command.url.pathname).toBe("/v1.1/m/thing/dev-1/commands");
@@ -440,7 +479,9 @@ describe("the devices", () => {
 
     it("signs this terminal out when the connection is removed", async () => {
         await tuyaAppDriver.forget!(session());
-        const expire = seen.find((request) => request.url.pathname === "/v1.0/m/token/terminal/expire")!;
+        const expire = seen.find(
+            (request) => request.url.pathname === "/v1.0/m/token/terminal/expire"
+        )!;
         expect(expire.body).toEqual({ accessToken: "access-1", terminalId: "terminal-1" });
     });
 

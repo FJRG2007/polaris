@@ -22,7 +22,8 @@ import * as address from "@polaris-app/places/src/lib/integrations/lan-address";
 // is never allowed to dial. Only that literal is let through here; a name is
 // still resolved and checked by the real resolver.
 vi.mock("@polaris-app/places/src/lib/integrations/lan-address", async (original) => {
-    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-address")>();
+    const actual =
+        await original<typeof import("@polaris-app/places/src/lib/integrations/lan-address")>();
     return {
         ...actual,
         forbiddenAddress: (value: string) => value !== "127.0.0.1" && actual.forbiddenAddress(value)
@@ -82,11 +83,14 @@ afterEach(() => {
 });
 
 async function tlsDevice(): Promise<string> {
-    const server = createHttpsServer({ cert: DEVICE_CERT, key: DEVICE_KEY }, (request, response) => {
-        reached += 1;
-        response.setHeader("content-type", "application/json");
-        response.end(JSON.stringify({ key: request.headers["x-key"] ?? null }));
-    });
+    const server = createHttpsServer(
+        { cert: DEVICE_CERT, key: DEVICE_KEY },
+        (request, response) => {
+            reached += 1;
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({ key: request.headers["x-key"] ?? null }));
+        }
+    );
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
     stop = () => server.close();
@@ -123,7 +127,11 @@ describe("a pinned certificate", () => {
         const origin = await tlsDevice();
         const other = new X509Certificate(OTHER_CERT).fingerprint256;
         await expect(
-            lan.lanRequest({ url: `${origin}/`, headers: { "x-key": "secret" }, trust: { pin: other } })
+            lan.lanRequest({
+                url: `${origin}/`,
+                headers: { "x-key": "secret" },
+                trust: { pin: other }
+            })
         ).rejects.toMatchObject({ kind: "unauthorized" });
         expect(reached).toBe(0);
     });
@@ -142,7 +150,10 @@ describe("a certificate from the maker's authority", () => {
     it("is refused when it names another device", async () => {
         const origin = await tlsDevice();
         await expect(
-            lan.lanRequest({ url: `${origin}/`, trust: { authority: DEVICE_CERT, name: () => false } })
+            lan.lanRequest({
+                url: `${origin}/`,
+                trust: { authority: DEVICE_CERT, name: () => false }
+            })
         ).rejects.toMatchObject({ kind: "unauthorized" });
         expect(reached).toBe(0);
     });
@@ -150,14 +161,19 @@ describe("a certificate from the maker's authority", () => {
     it("is refused when another authority signed it", async () => {
         const origin = await tlsDevice();
         await expect(
-            lan.lanRequest({ url: `${origin}/`, trust: { authority: OTHER_CERT, name: () => true } })
+            lan.lanRequest({
+                url: `${origin}/`,
+                trust: { authority: OTHER_CERT, name: () => true }
+            })
         ).rejects.toMatchObject({ kind: "refused" });
         expect(reached).toBe(0);
     });
 
     it("will not speak https with no rule for trusting it", async () => {
         const origin = await tlsDevice();
-        await expect(lan.lanRequest({ url: `${origin}/` })).rejects.toMatchObject({ kind: "refused" });
+        await expect(lan.lanRequest({ url: `${origin}/` })).rejects.toMatchObject({
+            kind: "refused"
+        });
     });
 });
 
@@ -183,7 +199,9 @@ describe("plain http", () => {
         const origin = await plainDevice((_request, response) => response.end());
         stop?.();
         stop = null;
-        await expect(lan.lanRequest({ url: `${origin}/` })).rejects.toMatchObject({ kind: "unreachable" });
+        await expect(lan.lanRequest({ url: `${origin}/` })).rejects.toMatchObject({
+            kind: "unreachable"
+        });
     });
 });
 
@@ -191,14 +209,22 @@ describe("an address somebody typed", () => {
     it("takes an address, a name, or either with a scheme and a port", () => {
         expect(lan.deviceOrigin("192.168.1.30", "http")).toBe("http://192.168.1.30");
         expect(lan.deviceOrigin("hub.local", "https", 8443)).toBe("https://hub.local:8443");
-        expect(lan.deviceOrigin("https://ha.example.test:8123/", "http")).toBe("https://ha.example.test:8123");
-        expect(lan.deviceOrigin("homeassistant.local", "http", 8123)).toBe("http://homeassistant.local:8123");
-        expect(lan.deviceOrigin("https://ha.example.test", "http", 8123)).toBe("https://ha.example.test");
+        expect(lan.deviceOrigin("https://ha.example.test:8123/", "http")).toBe(
+            "https://ha.example.test:8123"
+        );
+        expect(lan.deviceOrigin("homeassistant.local", "http", 8123)).toBe(
+            "http://homeassistant.local:8123"
+        );
+        expect(lan.deviceOrigin("https://ha.example.test", "http", 8123)).toBe(
+            "https://ha.example.test"
+        );
         expect(lan.deviceHost("https://192.168.1.2:9999")).toBe("192.168.1.2");
     });
 
     it("keeps a port that was typed even when it is the scheme's own", () => {
-        expect(lan.deviceOrigin("homeassistant.local:80", "http", 8123)).toBe("http://homeassistant.local");
+        expect(lan.deviceOrigin("homeassistant.local:80", "http", 8123)).toBe(
+            "http://homeassistant.local"
+        );
         expect(lan.deviceOrigin("[fe80::1]:80", "http", 8123)).toBe("http://[fe80::1]");
         expect(lan.deviceOrigin("[fe80::1]", "http", 8123)).toBe("http://[fe80::1]:8123");
     });
@@ -220,7 +246,9 @@ describe("a device that answers a byte at a time", () => {
             drip = setInterval(() => response.write("x"), 50);
         });
         try {
-            await expect(lan.lanRequest({ url: `${origin}/`, timeoutMs: 400 })).rejects.toMatchObject({
+            await expect(
+                lan.lanRequest({ url: `${origin}/`, timeoutMs: 400 })
+            ).rejects.toMatchObject({
                 message: "The device did not answer in time."
             });
         } finally {
@@ -231,11 +259,15 @@ describe("a device that answers a byte at a time", () => {
 
 describe("an address no device is at", () => {
     it("is refused before anything is dialed", async () => {
-        await expect(lan.lanRequest({ url: "http://169.254.169.254/latest/meta-data/" })).rejects.toMatchObject({
+        await expect(
+            lan.lanRequest({ url: "http://169.254.169.254/latest/meta-data/" })
+        ).rejects.toMatchObject({
             message: FORBIDDEN,
             kind: "refused"
         });
-        await expect(lan.lanRequest({ url: "http://[::1]:8123/" })).rejects.toMatchObject({ message: FORBIDDEN });
+        await expect(lan.lanRequest({ url: "http://[::1]:8123/" })).rejects.toMatchObject({
+            message: FORBIDDEN
+        });
     });
 
     it("is refused when a name resolves to it", async () => {
@@ -247,11 +279,28 @@ describe("an address no device is at", () => {
     });
 
     it("tells this machine and reserved space from a home network", async () => {
-        const actual = await vi.importActual<typeof address>("@polaris-app/places/src/lib/integrations/lan-address");
-        for (const blocked of ["127.0.0.1", "0.0.0.0", "169.254.169.254", "::1", "[fe80::1]", "::ffff:127.0.0.1", "224.0.0.1", "fd00:ec2::254"]) {
+        const actual = await vi.importActual<typeof address>(
+            "@polaris-app/places/src/lib/integrations/lan-address"
+        );
+        for (const blocked of [
+            "127.0.0.1",
+            "0.0.0.0",
+            "169.254.169.254",
+            "::1",
+            "[fe80::1]",
+            "::ffff:127.0.0.1",
+            "224.0.0.1",
+            "fd00:ec2::254"
+        ]) {
             expect(actual.forbiddenAddress(blocked), blocked).toBe(true);
         }
-        for (const allowed of ["192.168.1.30", "10.0.0.5", "172.17.0.1", "fd12:3456::1", "203.0.113.7"]) {
+        for (const allowed of [
+            "192.168.1.30",
+            "10.0.0.5",
+            "172.17.0.1",
+            "fd12:3456::1",
+            "203.0.113.7"
+        ]) {
             expect(actual.forbiddenAddress(allowed), allowed).toBe(false);
         }
     });

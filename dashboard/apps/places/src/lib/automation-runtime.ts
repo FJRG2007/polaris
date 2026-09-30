@@ -22,7 +22,12 @@ import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { readsDevices } from "./automation-kinds";
 import { prismaAutomationStore } from "./automation-store";
-import { createEngine, StepRefusal, type AutomationEngine, type DeviceReadout } from "./automation-engine";
+import {
+    createEngine,
+    StepRefusal,
+    type AutomationEngine,
+    type DeviceReadout
+} from "./automation-engine";
 
 const { notify } = host.notificationsDispatch;
 const { sessionCan } = host.session;
@@ -66,7 +71,15 @@ export function automationEngine(): AutomationEngine {
             async read(installedAppId, deviceId) {
                 const row = await prisma.placeDevice.findFirst({
                     where: { id: deviceId, installedAppId },
-                    select: { id: true, kind: true, name: true, state: true, doorState: true, value: true, online: true }
+                    select: {
+                        id: true,
+                        kind: true,
+                        name: true,
+                        state: true,
+                        doorState: true,
+                        value: true,
+                        online: true
+                    }
                 });
                 return row ? readout(row) : null;
             },
@@ -75,7 +88,12 @@ export function automationEngine(): AutomationEngine {
                 // refusals, the same history entry, the same state afterwards.
                 const devices = await import("./devices");
                 try {
-                    const device = await devices.actOnDevice(installedAppId, deviceId, action, by.automationName);
+                    const device = await devices.actOnDevice(
+                        installedAppId,
+                        deviceId,
+                        action,
+                        by.automationName
+                    );
                     await recordAudit({
                         actorId: by.ownerId,
                         action: `places.device.${action}`,
@@ -144,14 +162,23 @@ async function mayOperate(ownerId: string, right: "run" | "control"): Promise<bo
     });
     if (!user || user.bannedAt || user.disabledAt || user.deletionRequestedAt) return false;
     return sessionCan(
-        { id: user.id, email: user.email, name: user.name ?? "", isAdmin: user.isAdmin, sessionId: "" },
+        {
+            id: user.id,
+            email: user.email,
+            name: user.name ?? "",
+            isAdmin: user.isAdmin,
+            sessionId: ""
+        },
         right === "control" ? "home.control" : "home.manage"
     );
 }
 
 /** What devices were just read as. Never a reason for a sync or a press to fail:
  *  the door moved whether or not an automation hears about it. */
-export async function observeDevices(installedAppId: string, rows: readonly ObservedRow[]): Promise<void> {
+export async function observeDevices(
+    installedAppId: string,
+    rows: readonly ObservedRow[]
+): Promise<void> {
     const running = automationEngine();
     for (const row of rows) {
         try {

@@ -68,7 +68,13 @@ export function durationText(seconds: number, t: PlacesTranslator): string {
 export function daysText(days: readonly number[], t: PlacesTranslator): string {
     const set = [...new Set(days)].sort((a, b) => a - b);
     const which =
-        set.length === 7 ? "every" : set.join() === "1,2,3,4,5" ? "weekdays" : set.join() === "0,6" ? "weekends" : "other";
+        set.length === 7
+            ? "every"
+            : set.join() === "1,2,3,4,5"
+              ? "weekdays"
+              : set.join() === "0,6"
+                ? "weekends"
+                : "other";
     const names = weekdayNames(t.locale, "short");
     // Monday first, which is how a week is read in both languages here.
     const list = [...set]
@@ -91,12 +97,22 @@ export function comparisonText(op: auto.Comparison, t: PlacesTranslator): string
     return t(COMPARISON_KEYS[op]);
 }
 
-function deviceName(lookup: DeviceLookup, id: string, t: PlacesTranslator): { name: string; kind: string } {
+function deviceName(
+    lookup: DeviceLookup,
+    id: string,
+    t: PlacesTranslator
+): { name: string; kind: string } {
     const found = lookup(id);
-    return found ? { name: found.name, kind: found.kind } : { name: t("automations.missingDevice"), kind: "" };
+    return found
+        ? { name: found.name, kind: found.kind }
+        : { name: t("automations.missingDevice"), kind: "" };
 }
 
-export function describeTrigger(trigger: auto.Trigger, lookup: DeviceLookup, t: PlacesTranslator): string {
+export function describeTrigger(
+    trigger: auto.Trigger,
+    lookup: DeviceLookup,
+    t: PlacesTranslator
+): string {
     switch (trigger.kind) {
         case "time":
             return t("automations.say.time", { time: trigger.at, days: daysText(trigger.days, t) });
@@ -134,7 +150,11 @@ export function describeTrigger(trigger: auto.Trigger, lookup: DeviceLookup, t: 
     }
 }
 
-export function describeCondition(condition: auto.Condition, lookup: DeviceLookup, t: PlacesTranslator): string {
+export function describeCondition(
+    condition: auto.Condition,
+    lookup: DeviceLookup,
+    t: PlacesTranslator
+): string {
     switch (condition.kind) {
         case "device": {
             const device = deviceName(lookup, condition.deviceId, t);
@@ -168,7 +188,10 @@ export function describeStep(
     switch (step.kind) {
         case "device": {
             const device = deviceName(lookup, step.deviceId, t);
-            return t("automations.say.act", { action: stepActionText(step.do, t), device: device.name });
+            return t("automations.say.act", {
+                action: stepActionText(step.do, t),
+                device: device.name
+            });
         }
         case "delay":
             return t("automations.say.delay", { span: durationText(step.seconds, t) });
@@ -190,8 +213,13 @@ export function describeStep(
 }
 
 /** Why a run fired, as its log line opens. */
-export function describeCause(cause: auto.RunCause, lookup: DeviceLookup, t: PlacesTranslator): string {
-    if (cause.kind === "automation") return t("automations.cause.automation", { name: cause.byName ?? "" });
+export function describeCause(
+    cause: auto.RunCause,
+    lookup: DeviceLookup,
+    t: PlacesTranslator
+): string {
+    if (cause.kind === "automation")
+        return t("automations.cause.automation", { name: cause.byName ?? "" });
     if (cause.kind === "manual") return t("automations.cause.manual", { name: cause.byUser ?? "" });
     if (cause.kind === "time") return t("automations.cause.time");
     if (cause.kind === "interval") return t("automations.cause.interval");
@@ -244,7 +272,9 @@ const REASONS = [
 /** Why a run stopped where it did, or nothing when it did not stop early. */
 export function reasonText(reason: string | null, t: PlacesTranslator): string {
     if (!reason) return "";
-    return (REASONS as readonly string[]).includes(reason) ? t(`automations.reasons.${reason as (typeof REASONS)[number]}`) : "";
+    return (REASONS as readonly string[]).includes(reason)
+        ? t(`automations.reasons.${reason as (typeof REASONS)[number]}`)
+        : "";
 }
 
 const NOTES = [
@@ -285,7 +315,11 @@ export function issueText(message: string, t: PlacesTranslator): string {
 /** What "turn it off after a while" is called when it is made for one device:
  *  "Turn off Porch light after 30 minutes", or "Lock Front door after ..." for
  *  a lock. */
-export function autoOffName(device: { readonly name: string; readonly kind: string }, minutes: number, t: PlacesTranslator): string {
+export function autoOffName(
+    device: { readonly name: string; readonly kind: string },
+    minutes: number,
+    t: PlacesTranslator
+): string {
     const span = t("automations.units.minutes", { count: minutes });
     const name =
         auto.autoOffPlan(device.kind)?.do === "lock"

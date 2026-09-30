@@ -10083,6 +10083,7 @@ model PlaceAutomationRun {
     @@index([status, dueAt])
     @@index([waitDeviceId])
 }
+
 // A tracker somebody else runs, connected to a space in Tasks.
 //
 // Teams that would use Polaris usually already have work written down in Linear

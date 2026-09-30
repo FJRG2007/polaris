@@ -220,7 +220,10 @@ export function ConnectDialog({
                 setExpired(false);
                 setFields({});
                 setLabel("");
-                latest.current.onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
+                latest.current.onConnected({
+                    devices: result.devices ?? [],
+                    accounts: result.accounts ?? []
+                });
                 return;
             }
             if (stopped) return;
@@ -306,19 +309,21 @@ export function ConnectDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {reconnect ? t("connect.reconnectTitle", { name: reconnect.label }) : t("connect.title")}
+                        {reconnect
+                            ? t("connect.reconnectTitle", { name: reconnect.label })
+                            : t("connect.title")}
                     </DialogTitle>
                     <DialogDescription>
-                        {reconnect
-                            ? t("connect.reconnectIntro")
-                            : t("connect.intro")}
+                        {reconnect ? t("connect.reconnectIntro") : t("connect.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     {!reconnect && !pairing && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("connect.make")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("connect.make")}
+                            </span>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {brands.map((entry) => (
                                     <button
@@ -359,7 +364,9 @@ export function ConnectDialog({
 
                     {!reconnect && !pairing && ofBrand.length > 1 && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("connect.how")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("connect.how")}
+                            </span>
                             <div className="flex flex-col gap-2">
                                 {ofBrand.map((entry) => (
                                     <button
@@ -519,12 +526,17 @@ export function ConnectDialog({
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">
                                 {t("connect.label")}{" "}
-                                <span className="text-foreground-subtle">{t("deviceDialog.optional")}</span>
+                                <span className="text-foreground-subtle">
+                                    {t("deviceDialog.optional")}
+                                </span>
                             </span>
                             <Input
                                 value={label}
                                 maxLength={60}
-                                placeholder={reconnect?.label ?? (connection ? brandWords(connection.brand, t) : "")}
+                                placeholder={
+                                    reconnect?.label ??
+                                    (connection ? brandWords(connection.brand, t) : "")
+                                }
                                 onChange={(event) => setLabel(event.target.value)}
                                 aria-label={t("connect.label")}
                             />

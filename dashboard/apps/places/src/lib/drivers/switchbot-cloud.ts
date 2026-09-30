@@ -30,13 +30,13 @@ const DEVICES_TTL_MS = 15 * 60_000;
 /** Their device types, by what each is here. Exact strings from each device's
  *  page in their documentation. */
 const TYPES: Readonly<Record<string, DeviceKind>> = {
-    "Plug": "outlet",
+    Plug: "outlet",
     "Plug Mini (US)": "outlet",
     "Plug Mini (JP)": "outlet",
     "Plug Mini (EU)": "outlet",
     "Relay Switch 1": "switch",
     "Relay Switch 1PM": "switch",
-    "Bot": "switch",
+    Bot: "switch",
     "Smart Lock": "lock",
     "Smart Lock Pro": "lock",
     "Lock Lite": "lock",
@@ -46,7 +46,7 @@ const TYPES: Readonly<Record<string, DeviceKind>> = {
     "Color Bulb": "light",
     "Strip Light": "light",
     "Ceiling Light": "light",
-    "Meter": "sensor",
+    Meter: "sensor",
     "Contact Sensor": "sensor",
     "Motion Sensor": "sensor"
 };
@@ -61,7 +61,10 @@ function credentialsOf(credentials: Credentials): switchbot.SwitchBotCredentials
 /** Held answers, per account. The key is a hash so no token sits in a map key. */
 const held = new Map<
     string,
-    { devices?: { at: number; list: switchbot.SwitchBotDevice[] }; statuses: Map<string, { at: number; status: Record<string, unknown> }> }
+    {
+        devices?: { at: number; list: switchbot.SwitchBotDevice[] };
+        statuses: Map<string, { at: number; status: Record<string, unknown> }>;
+    }
 >();
 
 function heldFor(keys: switchbot.SwitchBotCredentials) {
@@ -99,7 +102,11 @@ async function statusOf(keys: switchbot.SwitchBotCredentials, deviceId: string) 
         return status;
     } catch (caught) {
         // One plug offline is that plug's problem, not the account's.
-        if (caught instanceof DriverError && caught.kind === "unreachable" && caught.message.startsWith("The device")) {
+        if (
+            caught instanceof DriverError &&
+            caught.kind === "unreachable" &&
+            caught.message.startsWith("The device")
+        ) {
             return null;
         }
         throw caught;
@@ -138,7 +145,11 @@ function doorOf(status: Record<string, unknown>): DeviceSnapshot["doorState"] {
     return door === "open" ? "open" : door === "close" || door === "closed" ? "closed" : "none";
 }
 
-function rowsOf(device: switchbot.SwitchBotDevice, kind: DeviceKind, status: Record<string, unknown> | null): DeviceSnapshot[] {
+function rowsOf(
+    device: switchbot.SwitchBotDevice,
+    kind: DeviceKind,
+    status: Record<string, unknown> | null
+): DeviceSnapshot[] {
     const battery = status ? numberOf(status.battery) : null;
     const base = {
         name: device.deviceName.trim() || device.deviceType,
@@ -174,7 +185,11 @@ function rowsOf(device: switchbot.SwitchBotDevice, kind: DeviceKind, status: Rec
         const temperature = status ? numberOf(status.temperature) : null;
         const humidity = status ? numberOf(status.humidity) : null;
         return [
-            reading(`${device.deviceId}#temperature`, temperature === null ? null : String(temperature), "°C"),
+            reading(
+                `${device.deviceId}#temperature`,
+                temperature === null ? null : String(temperature),
+                "°C"
+            ),
             reading(`${device.deviceId}#humidity`, humidity === null ? null : String(humidity), "%")
         ];
     }
@@ -182,11 +197,23 @@ function rowsOf(device: switchbot.SwitchBotDevice, kind: DeviceKind, status: Rec
         const open = text(status?.openState).toLowerCase();
         const words = BINARY_WORDS.door!;
         // "timeOutNotClose" is a door left open too long - still open.
-        return [reading(device.deviceId, !status || !open ? null : open === "close" ? words.off : words.on, "")];
+        return [
+            reading(
+                device.deviceId,
+                !status || !open ? null : open === "close" ? words.off : words.on,
+                ""
+            )
+        ];
     }
     const moving = status?.moveDetected;
     const words = BINARY_WORDS.motion!;
-    return [reading(device.deviceId, typeof moving === "boolean" ? (moving ? words.on : words.off) : null, "")];
+    return [
+        reading(
+            device.deviceId,
+            typeof moving === "boolean" ? (moving ? words.on : words.off) : null,
+            ""
+        )
+    ];
 }
 
 /** The command an action is, for a kind. A lock has no documented command for

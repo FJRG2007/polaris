@@ -76,7 +76,8 @@ export function isBridge(commonName: string, bridgeId: string): boolean {
 function trustFor(bridgeId: string | null) {
     return {
         authority: HUE_AUTHORITIES,
-        name: (commonName: string) => (bridgeId === null ? commonName.length > 0 : isBridge(commonName, bridgeId))
+        name: (commonName: string) =>
+            bridgeId === null ? commonName.length > 0 : isBridge(commonName, bridgeId)
     };
 }
 
@@ -134,8 +135,12 @@ export async function identifyBridge(host: string): Promise<string> {
 const pairingSchema = z
     .array(
         z.object({
-            success: z.object({ username: z.string(), clientkey: z.string().optional() }).optional(),
-            error: z.object({ type: z.number().int(), description: z.string().optional() }).optional()
+            success: z
+                .object({ username: z.string(), clientkey: z.string().optional() })
+                .optional(),
+            error: z
+                .object({ type: z.number().int(), description: z.string().optional() })
+                .optional()
         })
     )
     .min(1);
@@ -207,7 +212,10 @@ const lightSchema = z
     .object({
         id: z.string(),
         owner: resourceRef,
-        metadata: z.object({ name: z.string().default(""), archetype: z.string().default("") }).partial().default({}),
+        metadata: z
+            .object({ name: z.string().default(""), archetype: z.string().default("") })
+            .partial()
+            .default({}),
         on: z.object({ on: z.boolean() }).optional()
     })
     .passthrough();
@@ -224,7 +232,10 @@ const deviceSchema = z
             })
             .passthrough()
             .default({}),
-        metadata: z.object({ name: z.string().default("") }).partial().default({}),
+        metadata: z
+            .object({ name: z.string().default("") })
+            .partial()
+            .default({}),
         services: z.array(resourceRef).default([])
     })
     .passthrough();

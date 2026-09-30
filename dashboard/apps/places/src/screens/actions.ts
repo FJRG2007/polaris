@@ -162,7 +162,7 @@ export async function savePlaceAction(
         id ? places.updatePlace(install.id, id, shape) : places.createPlace(install.id, shape)
     );
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.placeNotSaved") };
+        return { error: result.error ?? (await say("actions.placeNotSaved")) };
     revalidatePath(PATH);
     return { place: result.value };
 }
@@ -227,7 +227,7 @@ export async function saveAlertAction(
         return alerts.saveAlertRule(install.id, id, user.id, { ...parsed.data, placeId });
     });
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.alertNotSaved") };
+        return { error: result.error ?? (await say("actions.alertNotSaved")) };
     revalidatePath(`${PATH}/alerts`);
     return { rule: result.value };
 }
@@ -391,7 +391,7 @@ export async function probeCameraAction(input: unknown): Promise<{
         })
     );
     if (result.error || !result.value)
-        return { error: result.error ?? await say("dialog.noAnswer") };
+        return { error: result.error ?? (await say("dialog.noAnswer")) };
 
     // Only the path is kept from what the camera answered. Its URL carries the
     // host it thinks it is on, which on a camera behind a repeater is an address
@@ -521,7 +521,7 @@ export async function saveCameraAction(
             : cameras.createCamera(install.id, parsed.data);
     });
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.cameraNotSaved") };
+        return { error: result.error ?? (await say("actions.cameraNotSaved")) };
     revalidatePath(PATH);
     return { camera: result.value };
 }
@@ -597,7 +597,7 @@ export async function listCameraZonesAction(cameraId: string): Promise<{
     const { install } = await requireHome("home.read");
     const result = await guard(() => cameraZones.listCameraZones(install.id, cameraId));
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.areasUnread") };
+        return { error: result.error ?? (await say("actions.areasUnread")) };
     return { zones: result.value };
 }
 
@@ -616,7 +616,7 @@ export async function saveCameraZoneAction(
             : cameraZones.createCameraZone(install.id, cameraId, parsed.data)
     );
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.areaNotSaved") };
+        return { error: result.error ?? (await say("actions.areaNotSaved")) };
     revalidatePath(PATH);
     return { zone: result.value };
 }
@@ -652,7 +652,7 @@ export async function listPlaceZoneNamesAction(): Promise<{ zones?: string[]; er
         return [...names].sort((first, second) => first.localeCompare(second));
     });
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.areasUnread") };
+        return { error: result.error ?? (await say("actions.areasUnread")) };
     return { zones: result.value };
 }
 
@@ -820,7 +820,8 @@ export async function addPersonAction(
 ): Promise<{ person?: people.PersonView; error?: string }> {
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.addPerson(install.id, String(name)));
-    if (result.error || !result.value) return { error: result.error ?? await say("actions.personNotAdded") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await say("actions.personNotAdded")) };
     revalidatePath(`${PATH}/people`);
     return { person: result.value };
 }
@@ -857,7 +858,7 @@ export async function renamePersonAction(
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.renamePerson(install.id, id, String(name)));
     if (result.error || !result.value)
-        return { error: result.error ?? await say("actions.nameNotSaved") };
+        return { error: result.error ?? (await say("actions.nameNotSaved")) };
     revalidatePath(`${PATH}/people`);
     return { person: result.value };
 }
@@ -1313,7 +1314,11 @@ async function connectionRequest<
     if (!connection) return { error: await say("refusals.cannotConnect") };
     const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
     if (!deviceConnections.fieldsComplete(connection, fields)) {
-        return { error: await say("actions.fillIn", { name: connectionWords(await placesT(), connection).label }) };
+        return {
+            error: await say("actions.fillIn", {
+                name: connectionWords(await placesT(), connection).label
+            })
+        };
     }
     return { data: parsed.data as z.infer<S>, connection, fields };
 }
@@ -1469,7 +1474,9 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
     if (!result.value) return { waiting: true };
     await recordAudit({
         actorId: user.id,
-        action: parsed.accountId ? "places.deviceAccount.reconnect" : "places.deviceAccount.connect",
+        action: parsed.accountId
+            ? "places.deviceAccount.reconnect"
+            : "places.deviceAccount.connect",
         targetType: "installedApp",
         targetId: install.id,
         metadata: { connection: connection.id, paired: true }

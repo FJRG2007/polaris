@@ -111,7 +111,8 @@ export async function pairHub(
             return { host, token: parsed.data.access_token, fingerprint };
         }
         // 403 is the hub still waiting for its button.
-        if (token.status !== 403) throw new DriverError("The DIRIGERA hub would not pair with Polaris.", "refused");
+        if (token.status !== 403)
+            throw new DriverError("The DIRIGERA hub would not pair with Polaris.", "refused");
         if (Date.now() >= deadline) {
             throw new DriverError(
                 "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
@@ -122,7 +123,12 @@ export async function pairHub(
     }
 }
 
-async function call(hub: DirigeraHub, method: "GET" | "PATCH", path: string, body?: unknown): Promise<unknown> {
+async function call(
+    hub: DirigeraHub,
+    method: "GET" | "PATCH",
+    path: string,
+    body?: unknown
+): Promise<unknown> {
     const response = await lanRequest({
         url: `https://${hub.host}:${PORT}/v1${path}`,
         method,
@@ -170,5 +176,7 @@ export async function hubDevices(hub: DirigeraHub): Promise<DirigeraDevice[]> {
 /** Switch a light or an outlet. The body is a list of changes, as the hub
  *  expects it. */
 export async function setOn(hub: DirigeraHub, deviceId: string, on: boolean): Promise<void> {
-    await call(hub, "PATCH", `/devices/${encodeURIComponent(deviceId)}`, [{ attributes: { isOn: on } }]);
+    await call(hub, "PATCH", `/devices/${encodeURIComponent(deviceId)}`, [
+        { attributes: { isOn: on } }
+    ]);
 }

@@ -82,7 +82,9 @@ afterEach(() => {
 
 async function drawn(devices: DeviceView[], canControl = true, locale?: "es-ES") {
     listed = devices;
-    render(withMessages(<DevicesView places={[]} canControl={canControl} canManage={false} />, locale));
+    render(
+        withMessages(<DevicesView places={[]} canControl={canControl} canManage={false} />, locale)
+    );
     await screen.findByText(devices[0]!.name);
 }
 
@@ -105,9 +107,11 @@ describe("a switch on a device row", () => {
         expect(screen.getAllByText("On").length).toBeGreaterThan(0);
 
         await act(async () => answer({ device: device({ state: "on" }) }));
-        expect(screen.getByRole("switch", { name: "Turn Desk lamp on or off" }).getAttribute("aria-checked")).toBe(
-            "true"
-        );
+        expect(
+            screen
+                .getByRole("switch", { name: "Turn Desk lamp on or off" })
+                .getAttribute("aria-checked")
+        ).toBe("true");
     });
 
     it("flips back, and says why, when the device refuses", async () => {
@@ -123,7 +127,9 @@ describe("a switch on a device row", () => {
         await act(async () => answer({ error: "Tuya refused the request." }));
         await waitFor(() =>
             expect(
-                screen.getByRole("switch", { name: "Turn Desk lamp on or off" }).getAttribute("aria-checked")
+                screen
+                    .getByRole("switch", { name: "Turn Desk lamp on or off" })
+                    .getAttribute("aria-checked")
             ).toBe("true")
         );
         expect(screen.getByRole("alert").textContent).toContain("Tuya refused the request.");

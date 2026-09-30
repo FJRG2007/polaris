@@ -17,7 +17,10 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { switchBotSign } from "@polaris-app/places/src/lib/integrations/switchbot-api";
-import { forgetSwitchBot, switchBotCloudDriver } from "@polaris-app/places/src/lib/drivers/switchbot-cloud";
+import {
+    forgetSwitchBot,
+    switchBotCloudDriver
+} from "@polaris-app/places/src/lib/drivers/switchbot-cloud";
 
 const KEYS = { token: "open-token-0123456789", secret: "secret-key-0123" };
 
@@ -34,7 +37,9 @@ let statuses: Record<string, unknown> = {};
 let httpStatus = 200;
 
 function envelope(body: unknown, statusCode = 100): Response {
-    return new Response(JSON.stringify({ statusCode, message: "success", body }), { status: httpStatus });
+    return new Response(JSON.stringify({ statusCode, message: "success", body }), {
+        status: httpStatus
+    });
 }
 
 beforeEach(() => {
@@ -42,13 +47,55 @@ beforeEach(() => {
     httpStatus = 200;
     forgetSwitchBot();
     devices = [
-        { deviceId: "PLUG1", deviceName: "Kettle", deviceType: "Plug Mini (EU)", enableCloudService: true, hubDeviceId: "000000000000" },
-        { deviceId: "BOT1", deviceName: "Coffee", deviceType: "Bot", enableCloudService: true, hubDeviceId: "HUB1" },
-        { deviceId: "LOCK1", deviceName: "Front door", deviceType: "Smart Lock Pro", enableCloudService: true, hubDeviceId: "HUB1" },
-        { deviceId: "METER1", deviceName: "Bedroom", deviceType: "Meter", enableCloudService: true, hubDeviceId: "HUB1" },
-        { deviceId: "DOOR1", deviceName: "Back door", deviceType: "Contact Sensor", enableCloudService: true, hubDeviceId: "HUB1" },
-        { deviceId: "CURT1", deviceName: "Curtain", deviceType: "Curtain", enableCloudService: true, hubDeviceId: "HUB1" },
-        { deviceId: "BULB1", deviceName: "Hall", deviceType: "Color Bulb", enableCloudService: false, hubDeviceId: "000000000000" }
+        {
+            deviceId: "PLUG1",
+            deviceName: "Kettle",
+            deviceType: "Plug Mini (EU)",
+            enableCloudService: true,
+            hubDeviceId: "000000000000"
+        },
+        {
+            deviceId: "BOT1",
+            deviceName: "Coffee",
+            deviceType: "Bot",
+            enableCloudService: true,
+            hubDeviceId: "HUB1"
+        },
+        {
+            deviceId: "LOCK1",
+            deviceName: "Front door",
+            deviceType: "Smart Lock Pro",
+            enableCloudService: true,
+            hubDeviceId: "HUB1"
+        },
+        {
+            deviceId: "METER1",
+            deviceName: "Bedroom",
+            deviceType: "Meter",
+            enableCloudService: true,
+            hubDeviceId: "HUB1"
+        },
+        {
+            deviceId: "DOOR1",
+            deviceName: "Back door",
+            deviceType: "Contact Sensor",
+            enableCloudService: true,
+            hubDeviceId: "HUB1"
+        },
+        {
+            deviceId: "CURT1",
+            deviceName: "Curtain",
+            deviceType: "Curtain",
+            enableCloudService: true,
+            hubDeviceId: "HUB1"
+        },
+        {
+            deviceId: "BULB1",
+            deviceName: "Hall",
+            deviceType: "Color Bulb",
+            enableCloudService: false,
+            hubDeviceId: "000000000000"
+        }
     ];
     statuses = {
         PLUG1: { deviceId: "PLUG1", switchStatus: 1, power: 1500.2, version: "V1.2" },
@@ -64,11 +111,14 @@ beforeEach(() => {
             headers: init.headers as Record<string, string>,
             body: typeof init.body === "string" ? init.body : ""
         });
-        if (httpStatus === 401) return new Response(JSON.stringify({ message: "Unauthorized" }), { status: 401 });
+        if (httpStatus === 401)
+            return new Response(JSON.stringify({ message: "Unauthorized" }), { status: 401 });
         const path = new URL(String(url)).pathname;
-        if (path === "/v1.1/devices") return envelope({ deviceList: devices, infraredRemoteList: [] });
+        if (path === "/v1.1/devices")
+            return envelope({ deviceList: devices, infraredRemoteList: [] });
         const status = /^\/v1\.1\/devices\/([^/]+)\/status$/.exec(path);
-        if (status) return statuses[status[1]!] ? envelope(statuses[status[1]!]) : envelope({}, 161);
+        if (status)
+            return statuses[status[1]!] ? envelope(statuses[status[1]!]) : envelope({}, 161);
         if (path.endsWith("/commands")) return envelope({});
         return envelope({}, 190);
     });
@@ -98,7 +148,11 @@ describe("what SwitchBot is sent", () => {
         const command = sent.at(-1)!;
         expect(command.method).toBe("POST");
         expect(new URL(command.url).pathname).toBe("/v1.1/devices/PLUG1/commands");
-        expect(JSON.parse(command.body)).toEqual({ command: "turnOff", parameter: "default", commandType: "command" });
+        expect(JSON.parse(command.body)).toEqual({
+            command: "turnOff",
+            parameter: "default",
+            commandType: "command"
+        });
     });
 
     it("locks and unlocks, and refuses to guess a latch command", async () => {
@@ -113,7 +167,9 @@ describe("what SwitchBot is sent", () => {
 describe("what comes back", () => {
     it("maps what it can draw and leaves the rest out", async () => {
         const found = await switchBotCloudDriver.list(KEYS);
-        expect(found.map((row) => [row.externalId, row.kind, row.state, row.value ?? null, row.online])).toEqual([
+        expect(
+            found.map((row) => [row.externalId, row.kind, row.state, row.value ?? null, row.online])
+        ).toEqual([
             ["PLUG1", "outlet", "on", null, true],
             ["BOT1", "switch", "off", null, true],
             ["LOCK1", "lock", "unlocked", null, true],
@@ -129,12 +185,17 @@ describe("what comes back", () => {
     it("marks one device offline without failing the account", async () => {
         delete statuses.BOT1;
         const found = await switchBotCloudDriver.list(KEYS);
-        expect(found.find((row) => row.externalId === "BOT1")).toMatchObject({ online: false, state: "unknown" });
+        expect(found.find((row) => row.externalId === "BOT1")).toMatchObject({
+            online: false,
+            state: "unknown"
+        });
     });
 
     it("says the keys or the day's allowance are the problem on a 401", async () => {
         httpStatus = 401;
-        await expect(switchBotCloudDriver.verify(KEYS)).rejects.toMatchObject({ kind: "unauthorized" });
+        await expect(switchBotCloudDriver.verify(KEYS)).rejects.toMatchObject({
+            kind: "unauthorized"
+        });
     });
 });
 

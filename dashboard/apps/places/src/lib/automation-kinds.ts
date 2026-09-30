@@ -211,7 +211,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         id: nodeId,
         kind: z.literal("device"),
         deviceId: deviceRef,
-        do: z.enum(STEP_DEVICE_ACTIONS, { errorMap: () => ({ message: "automations.errors.action" }) })
+        do: z.enum(STEP_DEVICE_ACTIONS, {
+            errorMap: () => ({ message: "automations.errors.action" })
+        })
     }),
     z.object({ id: nodeId, kind: z.literal("delay"), seconds: count(1, LIMITS.delaySeconds) }),
     z.object({
@@ -265,7 +267,10 @@ export const definitionSchema = z
     .superRefine((definition, context) => {
         const seen = new Set<string>();
         const nodes: { id: string; path: (string | number)[] }[] = [
-            ...definition.triggers.map((node, index) => ({ id: node.id, path: ["triggers", index] })),
+            ...definition.triggers.map((node, index) => ({
+                id: node.id,
+                path: ["triggers", index]
+            })),
             ...definition.conditions.groups.flatMap((group, index) => [
                 { id: group.id, path: ["conditions", "groups", index] },
                 ...group.items.map((node, item) => ({
@@ -277,7 +282,11 @@ export const definitionSchema = z
         ];
         for (const node of nodes) {
             if (seen.has(node.id)) {
-                context.addIssue({ code: "custom", path: node.path, message: "automations.errors.broken" });
+                context.addIssue({
+                    code: "custom",
+                    path: node.path,
+                    message: "automations.errors.broken"
+                });
             }
             seen.add(node.id);
         }
@@ -307,7 +316,11 @@ export const definitionSchema = z
                     checkWord(context, condition.attribute, condition.is, [...at, "is"], false);
                 }
                 if (condition.kind === "time" && condition.from === condition.to) {
-                    context.addIssue({ code: "custom", path: [...at, "to"], message: "automations.errors.sameTime" });
+                    context.addIssue({
+                        code: "custom",
+                        path: [...at, "to"],
+                        message: "automations.errors.sameTime"
+                    });
                 }
             })
         );
@@ -329,7 +342,8 @@ function checkWord(
     emptyIsAny: boolean
 ): void {
     if (!value) {
-        if (!emptyIsAny) context.addIssue({ code: "custom", path, message: "automations.errors.state" });
+        if (!emptyIsAny)
+            context.addIssue({ code: "custom", path, message: "automations.errors.state" });
         return;
     }
     const known =
@@ -414,8 +428,11 @@ function normalizeNode(node: unknown, clocks: boolean): unknown {
     if (!node || typeof node !== "object" || Array.isArray(node)) return node;
     const value = { ...(node as Record<string, unknown>) };
     for (const field of WORD_FIELDS) if (field in value) value[field] = trimmed(value[field]);
-    if (clocks) for (const field of CLOCK_FIELDS) if (field in value) value[field] = normalizeClock(value[field]);
-    for (const field of NUMBER_FIELDS) if (field in value) value[field] = normalizeNumber(value[field]);
+    if (clocks)
+        for (const field of CLOCK_FIELDS)
+            if (field in value) value[field] = normalizeClock(value[field]);
+    for (const field of NUMBER_FIELDS)
+        if (field in value) value[field] = normalizeNumber(value[field]);
     if ("days" in value) value.days = normalizeDays(value.days);
     return value;
 }
@@ -447,18 +464,24 @@ export function normalizeAutomationInput(input: unknown): unknown {
             next.conditions = {
                 ...conditions,
                 groups: conditions.groups.map((group) =>
-                    group && typeof group === "object" && Array.isArray((group as { items?: unknown }).items)
+                    group &&
+                    typeof group === "object" &&
+                    Array.isArray((group as { items?: unknown }).items)
                         ? {
                               ...(group as Record<string, unknown>),
-                              items: ((group as { items: unknown[] }).items).map((node) =>
-                                  normalizeNode(node, (node as { kind?: unknown } | null)?.kind === "time")
+                              items: (group as { items: unknown[] }).items.map((node) =>
+                                  normalizeNode(
+                                      node,
+                                      (node as { kind?: unknown } | null)?.kind === "time"
+                                  )
                               )
                           }
                         : group
                 )
             };
         }
-        if (Array.isArray(next.actions)) next.actions = next.actions.map((node) => normalizeNode(node, false));
+        if (Array.isArray(next.actions))
+            next.actions = next.actions.map((node) => normalizeNode(node, false));
         value.definition = next;
     }
     return value;
@@ -501,7 +524,8 @@ export function deviceIssues(
     };
     const sensor = (deviceId: string, path: (string | number)[]) => {
         const device = byId.get(deviceId);
-        if (!device) issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
+        if (!device)
+            issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
         else if (kinds.deviceKind(device.kind) !== "sensor") {
             issues.push({ path: [...path, "deviceId"], message: "automations.errors.notSensor" });
         }
@@ -527,7 +551,10 @@ export function deviceIssues(
         if (step.kind === "device") {
             const device = byId.get(step.deviceId);
             if (!device) {
-                issues.push({ path: [...at, "deviceId"], message: "automations.errors.deviceGone" });
+                issues.push({
+                    path: [...at, "deviceId"],
+                    message: "automations.errors.deviceGone"
+                });
             } else if (!device.controllable) {
                 issues.push({ path: [...at, "deviceId"], message: "automations.errors.watchOnly" });
             } else if (!stepActionsFor(device.kind).includes(step.do)) {
@@ -536,9 +563,15 @@ export function deviceIssues(
         }
         if (step.kind === "run") {
             if (step.automationId === context.selfId) {
-                issues.push({ path: [...at, "automationId"], message: "automations.errors.runSelf" });
+                issues.push({
+                    path: [...at, "automationId"],
+                    message: "automations.errors.runSelf"
+                });
             } else if (!context.automationIds.includes(step.automationId)) {
-                issues.push({ path: [...at, "automationId"], message: "automations.errors.automationGone" });
+                issues.push({
+                    path: [...at, "automationId"],
+                    message: "automations.errors.automationGone"
+                });
             }
         }
     });
@@ -558,7 +591,9 @@ export function actsOnDevices(definition: AutomationDefinition): boolean {
 export function readsDevices(definition: AutomationDefinition): boolean {
     return (
         definition.triggers.some((trigger) => "deviceId" in trigger) ||
-        definition.conditions.groups.some((group) => group.items.some((item) => "deviceId" in item)) ||
+        definition.conditions.groups.some((group) =>
+            group.items.some((item) => "deviceId" in item)
+        ) ||
         definition.actions.some((step) => step.kind === "wait")
     );
 }
@@ -659,7 +694,8 @@ export type TemplateId = (typeof TEMPLATES)[number];
  *  light left on is switched off, a door left unlocked is locked. */
 export function autoOffPlan(kind: string): { is: kinds.DeviceState; do: DeviceAction } | null {
     const which = kinds.deviceKind(kind);
-    if (which === "switch" || which === "outlet" || which === "light") return { is: "on", do: "turn-off" };
+    if (which === "switch" || which === "outlet" || which === "light")
+        return { is: "on", do: "turn-off" };
     if (which === "lock") return { is: "unlocked", do: "lock" };
     return null;
 }
@@ -676,7 +712,14 @@ export function autoOffDefinition(
     return {
         timeZone,
         triggers: [
-            { id: nodeIdOf(), kind: "stays", deviceId: device.id, attribute: "state", is: plan.is, minutes }
+            {
+                id: nodeIdOf(),
+                kind: "stays",
+                deviceId: device.id,
+                attribute: "state",
+                is: plan.is,
+                minutes
+            }
         ],
         conditions: { match: "all", groups: [] },
         actions: [{ id: nodeIdOf(), kind: "device", deviceId: device.id, do: plan.do }]
@@ -796,7 +839,9 @@ export interface AutomationView {
 }
 
 export function runStatus(value: string | null | undefined): RunStatus | null {
-    return value && (RUN_STATUSES as readonly string[]).includes(value) ? (value as RunStatus) : null;
+    return value && (RUN_STATUSES as readonly string[]).includes(value)
+        ? (value as RunStatus)
+        : null;
 }
 
 /** Whether a run has finished, one way or another. */

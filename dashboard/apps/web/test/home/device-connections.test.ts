@@ -95,7 +95,10 @@ describe("a connection made by pairing", () => {
         for (const locale of ["en-US", "es-ES"] as const) {
             const t = placesCatalogs.translator(locale, "places");
             for (const connection of paired) {
-                expect(registry.connectionWords(t, connection).pairingPrompt, `${locale} ${connection.id}`).toBeTruthy();
+                expect(
+                    registry.connectionWords(t, connection).pairingPrompt,
+                    `${locale} ${connection.id}`
+                ).toBeTruthy();
             }
         }
     });
@@ -118,7 +121,9 @@ describe("a connection made by pairing", () => {
 describe("the recommended way in", () => {
     it("is marked on exactly one connection of every brand", () => {
         for (const { brand } of registry.deviceBrands()) {
-            const marked = registry.connectionsOfBrand(brand).filter((connection) => connection.recommended);
+            const marked = registry
+                .connectionsOfBrand(brand)
+                .filter((connection) => connection.recommended);
             expect(marked, brand).toHaveLength(1);
         }
     });

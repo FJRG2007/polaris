@@ -270,9 +270,26 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 placeholder: en("connections.mqtt-discovery.fields.host.placeholder"),
                 maxLength: 200
             },
-            { key: "port", label: en("connections.mqtt-discovery.fields.port.label"), defaultValue: "1883", optional: true, maxLength: 5 },
-            { key: "username", label: en("connections.mqtt-discovery.fields.username.label"), optional: true, maxLength: 120 },
-            { key: "password", label: en("connections.mqtt-discovery.fields.password.label"), secret: true, optional: true, maxLength: 200 },
+            {
+                key: "port",
+                label: en("connections.mqtt-discovery.fields.port.label"),
+                defaultValue: "1883",
+                optional: true,
+                maxLength: 5
+            },
+            {
+                key: "username",
+                label: en("connections.mqtt-discovery.fields.username.label"),
+                optional: true,
+                maxLength: 120
+            },
+            {
+                key: "password",
+                label: en("connections.mqtt-discovery.fields.password.label"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            },
             {
                 key: "prefix",
                 label: en("connections.mqtt-discovery.fields.prefix.label"),
@@ -437,7 +454,19 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["outlet", "switch", "light"],
-        search: ["tapo", "kasa", "tplink", "smart plug", "power strip", "bulb", "p100", "p110", "p300", "l530", "local"]
+        search: [
+            "tapo",
+            "kasa",
+            "tplink",
+            "smart plug",
+            "power strip",
+            "bulb",
+            "p100",
+            "p110",
+            "p300",
+            "l530",
+            "local"
+        ]
     },
     {
         id: "kasa-local",
@@ -472,7 +501,18 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["outlet", "switch", "light"],
-        search: ["kasa", "tplink", "hs100", "hs110", "hs300", "kp115", "kl130", "smart plug", "power strip", "local"]
+        search: [
+            "kasa",
+            "tplink",
+            "hs100",
+            "hs110",
+            "hs300",
+            "kp115",
+            "kl130",
+            "smart plug",
+            "power strip",
+            "local"
+        ]
     },
     // Shelly: its own local API is the one way in, and the best one - no account,
     // no cloud, and every generation answers it.
@@ -512,7 +552,18 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["switch", "outlet", "light"],
-        search: ["shelly", "relay", "plug", "dimmer", "bulb", "plus", "pro", "gen3", "gen4", "local"]
+        search: [
+            "shelly",
+            "relay",
+            "plug",
+            "dimmer",
+            "bulb",
+            "plus",
+            "pro",
+            "gen3",
+            "gen4",
+            "local"
+        ]
     },
     // Philips Hue: the bridge's local API is the most convenient and the most
     // stable way in - one button press, every light on the bridge, no cloud.
@@ -550,7 +601,17 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["light", "outlet"],
-        search: ["hue", "philips", "signify", "bridge", "bulb", "light", "smart plug", "zigbee", "local"]
+        search: [
+            "hue",
+            "philips",
+            "signify",
+            "bridge",
+            "bulb",
+            "light",
+            "smart plug",
+            "zigbee",
+            "local"
+        ]
     },
     // IKEA: the DIRIGERA hub's local API is the only way in with no cloud at all,
     // and the most convenient - one button press brings the whole hub. Pairing
@@ -579,7 +640,17 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["light", "outlet", "sensor"],
-        search: ["ikea", "dirigera", "tradfri", "home smart", "hub", "bulb", "outlet", "zigbee", "local"]
+        search: [
+            "ikea",
+            "dirigera",
+            "tradfri",
+            "home smart",
+            "hub",
+            "bulb",
+            "outlet",
+            "zigbee",
+            "local"
+        ]
     },
     // Home Assistant: its REST API with a long-lived token is the one way in,
     // and the fastest to set up - one connection brings the whole house.
@@ -615,7 +686,16 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["switch", "outlet", "light", "lock", "sensor"],
-        search: ["home assistant", "hass", "homeassistant", "zigbee", "z-wave", "zwave", "local", "whole house"]
+        search: [
+            "home assistant",
+            "hass",
+            "homeassistant",
+            "zigbee",
+            "z-wave",
+            "zwave",
+            "local",
+            "whole house"
+        ]
     },
     // SwitchBot: their cloud API is the one documented way in, and the most
     // convenient - a token and a secret from the app, and every device on the
@@ -654,7 +734,16 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["outlet", "switch", "lock", "light", "sensor"],
-        search: ["switchbot", "switch bot", "bot", "smart lock", "plug mini", "meter", "contact sensor", "curtain"]
+        search: [
+            "switchbot",
+            "switch bot",
+            "bot",
+            "smart lock",
+            "plug mini",
+            "meter",
+            "contact sensor",
+            "curtain"
+        ]
     }
 ];
 
@@ -803,25 +892,38 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
     const base = `connections.${connection.id}`;
     const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
     return {
-        brand: connection.brand === en("connections.brandMqtt") ? t("connections.brandMqtt") : connection.brand,
+        brand:
+            connection.brand === en("connections.brandMqtt")
+                ? t("connections.brandMqtt")
+                : connection.brand,
         label: say(`${base}.label`) ?? connection.label,
         summary: say(`${base}.summary`) ?? connection.summary,
         note: say(`${base}.note`) ?? connection.note,
-        steps: (connection.steps ?? []).map((step, index) => say(`${base}.steps.s${index}`) ?? step),
-        link: connection.link ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label } : undefined,
+        steps: (connection.steps ?? []).map(
+            (step, index) => say(`${base}.steps.s${index}`) ?? step
+        ),
+        link: connection.link
+            ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label }
+            : undefined,
         reach: t(`connections.reach.${connection.reach}`),
         pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined
     };
 }
 
 /** One field's words in the reader's language. */
-export function fieldWords(t: PlacesTranslator, connection: DeviceConnection, field: ConnectionField) {
+export function fieldWords(
+    t: PlacesTranslator,
+    connection: DeviceConnection,
+    field: ConnectionField
+) {
     const base = `connections.${connection.id}.fields.${field.key}`;
     const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
     return {
         label: say(`${base}.label`) ?? field.label,
         hint: field.hint ? (say(`${base}.hint`) ?? field.hint) : undefined,
-        placeholder: field.placeholder ? (say(`${base}.placeholder`) ?? field.placeholder) : undefined,
+        placeholder: field.placeholder
+            ? (say(`${base}.placeholder`) ?? field.placeholder)
+            : undefined,
         choices: field.choices?.map((choice) => ({
             value: choice.value,
             label: say(`connections.regions.${choice.value}`) ?? choice.label

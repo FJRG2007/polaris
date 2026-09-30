@@ -31,7 +31,11 @@ const GEN1_PLUGS = new Set(["SHPLG-1", "SHPLG2-1", "SHPLG-S", "SHPLG-U1"]);
 function addressOf(credentials: Credentials): shelly.ShellyAddress {
     const host = credentials.host?.trim();
     if (!host) throw new HomeError("That connection is missing the device's address");
-    const address = shelly.shellyAddress(host, credentials.username?.trim() ?? "", credentials.password ?? "");
+    const address = shelly.shellyAddress(
+        host,
+        credentials.username?.trim() ?? "",
+        credentials.password ?? ""
+    );
     if (!address) throw new HomeError("Write the address as 192.168.1.30, with no path");
     return address;
 }
@@ -41,7 +45,9 @@ function text(value: unknown): string {
 }
 
 function record(value: unknown): Record<string, unknown> {
-    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
 }
 
 function list(value: unknown): Record<string, unknown>[] {
@@ -82,8 +88,14 @@ function channelName(own: string, device: string, index: number, count: number):
     return count > 1 ? `${device} ${index + 1}` : device;
 }
 
-async function readRpc(address: shelly.ShellyAddress, info: shelly.ShellyInfo): Promise<DeviceSnapshot[]> {
-    const [status, config] = await Promise.all([shelly.shellyStatus(address), shelly.shellyConfig(address)]);
+async function readRpc(
+    address: shelly.ShellyAddress,
+    info: shelly.ShellyInfo
+): Promise<DeviceSnapshot[]> {
+    const [status, config] = await Promise.all([
+        shelly.shellyStatus(address),
+        shelly.shellyConfig(address)
+    ]);
     const sys = record(config.sys);
     const device = text(record(sys.device).name) || text(info.id) || "Shelly";
     const model = text(info.model) || text(info.app) || null;
@@ -148,7 +160,10 @@ async function readRpc(address: shelly.ShellyAddress, info: shelly.ShellyInfo): 
  * `light/0`, and on an RGBW2 `white/N` or `color/0` depending on its mode - and
  * the id carries that path, since it is exactly what `act` has to call.
  */
-async function readGen1(address: shelly.ShellyAddress, info: shelly.ShellyInfo): Promise<DeviceSnapshot[]> {
+async function readGen1(
+    address: shelly.ShellyAddress,
+    info: shelly.ShellyInfo
+): Promise<DeviceSnapshot[]> {
     const [settings, status] = await Promise.all([
         shelly.shellyGet(address, "/settings"),
         shelly.shellyGet(address, "/status")
@@ -186,14 +201,20 @@ async function readGen1(address: shelly.ShellyAddress, info: shelly.ShellyInfo):
         });
         // An RGBW2 is four white channels or one colour output; anything else
         // with lights answers on `light/N`.
-        const path = type === "SHRGBW2" ? (text(status.mode) === "color" ? "color" : "white") : "light";
+        const path =
+            type === "SHRGBW2" ? (text(status.mode) === "color" ? "color" : "white") : "light";
         const namedLights = list(settings.lights);
         lights.forEach((light, index) => {
             rows.push(
                 row(
                     `${mac}#${path}/${index}`,
                     "light",
-                    channelName(text(namedLights[index]?.name), device, relays.length + index, total),
+                    channelName(
+                        text(namedLights[index]?.name),
+                        device,
+                        relays.length + index,
+                        total
+                    ),
                     model,
                     firmware,
                     typeof light.ison === "boolean" ? light.ison : null

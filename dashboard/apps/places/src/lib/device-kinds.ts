@@ -167,27 +167,27 @@ export const BINARY_WORDS: Readonly<Record<string, { on: string; off: string }>>
 
 /** The words a driver gives a two-state sensor, by their English. */
 const READING_KEYS: Readonly<Record<string, PlacesKey>> = {
-    "Open": "devices.readings.open",
-    "Closed": "devices.readings.closed",
-    "Unlocked": "devices.readings.unlocked",
-    "Locked": "devices.readings.locked",
-    "Movement": "devices.readings.movement",
-    "Still": "devices.readings.still",
+    Open: "devices.readings.open",
+    Closed: "devices.readings.closed",
+    Unlocked: "devices.readings.unlocked",
+    Locked: "devices.readings.locked",
+    Movement: "devices.readings.movement",
+    Still: "devices.readings.still",
     "Somebody there": "devices.readings.occupied",
-    "Empty": "devices.readings.empty",
-    "Home": "devices.readings.home",
-    "Away": "devices.readings.away",
-    "Wet": "devices.readings.wet",
-    "Dry": "devices.readings.dry",
-    "Smoke": "devices.readings.smoke",
-    "Clear": "devices.readings.clear",
-    "Gas": "devices.readings.gas",
-    "Problem": "devices.readings.problem",
-    "Fine": "devices.readings.fine",
-    "Low": "devices.readings.low",
-    "Connected": "devices.readings.connected",
-    "Disconnected": "devices.readings.disconnected",
-    "Tampered": "devices.readings.tampered"
+    Empty: "devices.readings.empty",
+    Home: "devices.readings.home",
+    Away: "devices.readings.away",
+    Wet: "devices.readings.wet",
+    Dry: "devices.readings.dry",
+    Smoke: "devices.readings.smoke",
+    Clear: "devices.readings.clear",
+    Gas: "devices.readings.gas",
+    Problem: "devices.readings.problem",
+    Fine: "devices.readings.fine",
+    Low: "devices.readings.low",
+    Connected: "devices.readings.connected",
+    Disconnected: "devices.readings.disconnected",
+    Tampered: "devices.readings.tampered"
 };
 
 export type DeviceTone = "success" | "active" | "warning" | "danger" | "muted";

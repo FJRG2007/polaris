@@ -219,7 +219,10 @@ export function AttributePicker({
                     id={id}
                     value={value}
                     disabled={disabled}
-                    options={offered.map((attribute) => ({ value: attribute, label: words.attributeText(attribute, t) }))}
+                    options={offered.map((attribute) => ({
+                        value: attribute,
+                        label: words.attributeText(attribute, t)
+                    }))}
                     onValueChange={(next) => onChange(next as auto.AutomationAttribute)}
                 />
             )}
@@ -266,7 +269,8 @@ export function ValuePicker({
             : attribute === "door"
               ? [...auto.DOOR_WORDS]
               : [...auto.readingWordsFor(reading)];
-    if (value && !offered.includes(value) && attribute === "reading" && offered.length > 0) offered.push(value);
+    if (value && !offered.includes(value) && attribute === "reading" && offered.length > 0)
+        offered.push(value);
 
     if (attribute === "reading" && offered.length === 0) {
         return (
@@ -277,7 +281,11 @@ export function ValuePicker({
                         value={value}
                         disabled={disabled}
                         maxLength={auto.LIMITS.word}
-                        placeholder={allowAny ? t("automations.anyValue") : reading || t("automations.fields.typeValue")}
+                        placeholder={
+                            allowAny
+                                ? t("automations.anyValue")
+                                : reading || t("automations.fields.typeValue")
+                        }
                         aria-invalid={invalid || undefined}
                         onChange={(event) => onChange(event.target.value)}
                     />
@@ -331,7 +339,11 @@ export function DaysPicker({
                 {t("automations.fields.days")}
                 <span aria-hidden="true"> *</span>
             </span>
-            <div className="flex flex-wrap gap-1" role="group" aria-label={t("automations.fields.days")}>
+            <div
+                className="flex flex-wrap gap-1"
+                role="group"
+                aria-label={t("automations.fields.days")}
+            >
                 {order.map((day) => {
                     const on = days.includes(day);
                     return (
@@ -342,7 +354,11 @@ export function DaysPicker({
                             aria-label={long[day]}
                             title={long[day]}
                             disabled={disabled}
-                            onClick={() => onChange(on ? days.filter((entry) => entry !== day) : [...days, day])}
+                            onClick={() =>
+                                onChange(
+                                    on ? days.filter((entry) => entry !== day) : [...days, day]
+                                )
+                            }
                             className={cn(
                                 "h-7 min-w-9 rounded-md border px-2 text-xs transition-colors duration-fast disabled:opacity-50",
                                 on
@@ -397,10 +413,14 @@ export function NumberField({
                         value={Number.isFinite(value) ? String(value) : ""}
                         aria-invalid={invalid || undefined}
                         onChange={(event) =>
-                            onChange(event.target.value === "" ? Number.NaN : Number(event.target.value))
+                            onChange(
+                                event.target.value === "" ? Number.NaN : Number(event.target.value)
+                            )
                         }
                     />
-                    {suffix && <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>}
+                    {suffix && (
+                        <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>
+                    )}
                 </div>
             )}
         </Field>
@@ -502,7 +522,8 @@ export function DurationField({
                         onValueChange={(next) => {
                             const chosen = next as Unit;
                             setUnit(chosen);
-                            if (Number.isFinite(amount)) onChange(Math.round(amount * UNIT_SECONDS[chosen]));
+                            if (Number.isFinite(amount))
+                                onChange(Math.round(amount * UNIT_SECONDS[chosen]));
                         }}
                     />
                 </div>

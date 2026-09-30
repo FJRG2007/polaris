@@ -15,12 +15,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DriverError } from "@polaris-app/places/src/lib/drivers/contract";
 
-let stored: { id: string; installedAppId: string; connection: string; secret: string; status: string; statusNote: string | null };
+let stored: {
+    id: string;
+    installedAppId: string;
+    connection: string;
+    secret: string;
+    status: string;
+    statusNote: string | null;
+};
 const writes: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
 let renew: (credentials: Record<string, string>) => Promise<Record<string, string> | null>;
 
 const seal = (fields: Record<string, string>) =>
-    JSON.stringify({ c: Buffer.from(JSON.stringify(fields)).toString("base64"), n: "", k: "key-1" });
+    JSON.stringify({
+        c: Buffer.from(JSON.stringify(fields)).toString("base64"),
+        n: "",
+        k: "key-1"
+    });
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "test-key" }) }));
 vi.mock("@polaris/storage", () => ({
@@ -51,7 +62,10 @@ vi.mock("@polaris/db", () => ({
                 label: "Home",
                 lastSyncedAt: null
             }),
-            updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            updateMany: async (args: {
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }) => {
                 writes.push(args);
                 if (typeof args.data.secret === "string") stored.secret = args.data.secret;
                 if (typeof args.data.status === "string") stored.status = args.data.status;
@@ -84,19 +98,30 @@ describe("credentials that age", () => {
     });
 
     it("are renewed, stored, and only then handed out", async () => {
-        renew = async (credentials) => ({ ...credentials, accessToken: "new", refreshToken: "r-new" });
+        renew = async (credentials) => ({
+            ...credentials,
+            accessToken: "new",
+            refreshToken: "r-new"
+        });
         const { credentials } = await accountWithCredentials("install-1", "account-1");
         expect(credentials.accessToken).toBe("new");
         const saved = JSON.parse(
             Buffer.from((JSON.parse(stored.secret) as { c: string }).c, "base64").toString("utf8")
         ) as Record<string, string>;
-        expect(saved).toMatchObject({ accessToken: "new", refreshToken: "r-new", userCode: "code" });
+        expect(saved).toMatchObject({
+            accessToken: "new",
+            refreshToken: "r-new",
+            userCode: "code"
+        });
         expect(writes[0]?.where).toEqual({ id: "account-1" });
     });
 
     it("mark the account signed out when the renewal is refused", async () => {
         renew = async () => {
-            throw new DriverError("Tuya no longer accepts this sign-in. Scan a new code from the app.", "unauthorized");
+            throw new DriverError(
+                "Tuya no longer accepts this sign-in. Scan a new code from the app.",
+                "unauthorized"
+            );
         };
         const before = stored.secret;
         await expect(accountWithCredentials("install-1", "account-1")).rejects.toThrow(
@@ -109,7 +134,10 @@ describe("credentials that age", () => {
 
     it("leave the account as it was when the renewal could not get through", async () => {
         renew = async () => {
-            throw new DriverError("Tuya could not be reached. Try again in a moment.", "unreachable");
+            throw new DriverError(
+                "Tuya could not be reached. Try again in a moment.",
+                "unreachable"
+            );
         };
         await expect(accountWithCredentials("install-1", "account-1")).rejects.toThrow();
         expect(stored.status).toBe("unreachable");

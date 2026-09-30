@@ -41,7 +41,11 @@ export default async function AutomationPage({
             <AutomationEditor
                 key={automationId ?? "new"}
                 automationId={automationId}
-                template={template && (TEMPLATES as readonly string[]).includes(template) ? template : null}
+                template={
+                    template && (TEMPLATES as readonly string[]).includes(template)
+                        ? template
+                        : null
+                }
                 deviceId={one(query.device)}
                 canManage={canManage}
                 canControl={canControl}

@@ -322,7 +322,12 @@ describe("appDownload", () => {
             const fetching = vi
                 .fn()
                 .mockResolvedValueOnce(listed(["extension-v0.1.10"], '"a"'))
-                .mockResolvedValueOnce({ ok: false, status: 304, headers: new Headers(), json: async () => [] });
+                .mockResolvedValueOnce({
+                    ok: false,
+                    status: 304,
+                    headers: new Headers(),
+                    json: async () => []
+                });
             vi.stubGlobal("fetch", fetching);
             try {
                 await extensionDownload("example/unchanged");
@@ -343,7 +348,12 @@ describe("appDownload", () => {
             const fetching = vi
                 .fn()
                 .mockResolvedValueOnce(listed(full, '"a"'))
-                .mockResolvedValueOnce({ ok: false, status: 403, headers: new Headers(), json: async () => [] })
+                .mockResolvedValueOnce({
+                    ok: false,
+                    status: 403,
+                    headers: new Headers(),
+                    json: async () => []
+                })
                 .mockResolvedValueOnce(listed(full, '"a"'))
                 .mockResolvedValueOnce(listed(["extension-v0.1.10"], '"a2"'));
             vi.stubGlobal("fetch", fetching);

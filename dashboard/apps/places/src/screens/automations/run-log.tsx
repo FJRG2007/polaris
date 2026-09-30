@@ -102,7 +102,10 @@ export function RunLog({
                 </Button>
             </div>
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -112,7 +115,10 @@ export function RunLog({
                     <Skeleton className="h-12 w-full" />
                 </div>
             ) : runs.length === 0 ? (
-                <EmptyState title={t("automations.log.emptyTitle")} description={t("automations.log.emptyBody")} />
+                <EmptyState
+                    title={t("automations.log.emptyTitle")}
+                    description={t("automations.log.emptyBody")}
+                />
             ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
                     {runs.map((run) => {
@@ -126,7 +132,12 @@ export function RunLog({
                                     onClick={() => setOpen(expanded ? null : run.id)}
                                     className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
                                 >
-                                    <Badge className={cn("shrink-0", toneClass(words.RUN_TONES[run.status]))}>
+                                    <Badge
+                                        className={cn(
+                                            "shrink-0",
+                                            toneClass(words.RUN_TONES[run.status])
+                                        )}
+                                    >
                                         {words.runStatusText(run.status, t)}
                                     </Badge>
                                     <span className="min-w-0 flex-1 truncate text-sm">
@@ -147,10 +158,16 @@ export function RunLog({
                                 </button>
                                 {expanded && (
                                     <div className="flex flex-col gap-2 border-t border-border bg-surface px-3 py-2">
-                                        {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
+                                        {reason && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {reason}
+                                            </p>
+                                        )}
                                         {run.status === "waiting" && run.dueAt && (
                                             <p className="text-xs text-muted-foreground">
-                                                {t("automations.log.resumes", { time: format.dateTime(run.dueAt) })}
+                                                {t("automations.log.resumes", {
+                                                    time: format.dateTime(run.dueAt)
+                                                })}
                                             </p>
                                         )}
                                         {run.steps.length === 0 ? (
@@ -172,14 +189,24 @@ export function RunLog({
                                                             <Badge
                                                                 className={cn(
                                                                     "shrink-0",
-                                                                    toneClass(OUTCOME_TONES[log.outcome])
+                                                                    toneClass(
+                                                                        OUTCOME_TONES[log.outcome]
+                                                                    )
                                                                 )}
                                                             >
-                                                                {words.stepOutcomeText(log.outcome, t)}
+                                                                {words.stepOutcomeText(
+                                                                    log.outcome,
+                                                                    t
+                                                                )}
                                                             </Badge>
                                                             <span className="min-w-0 flex-1 text-sm">
                                                                 {step
-                                                                    ? words.describeStep(step, lookup, automationName, t)
+                                                                    ? words.describeStep(
+                                                                          step,
+                                                                          lookup,
+                                                                          automationName,
+                                                                          t
+                                                                      )
                                                                     : t("automations.log.stepGone")}
                                                                 {note && (
                                                                     <span

@@ -27,7 +27,11 @@ export default async function AutomationsPage() {
                     title={t("pages.automations.title")}
                     description={t("pages.automations.description")}
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <AutomationsView placeId={place.current.id} canManage={canManage} />
         </div>

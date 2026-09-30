@@ -233,7 +233,11 @@ export async function accountWithCredentials(
  * leaves the old credential stored, since it may still be good for a minute and
  * the next use will try again.
  */
-async function renewed(id: string, connection: string, credentials: Credentials): Promise<Credentials> {
+async function renewed(
+    id: string,
+    connection: string,
+    credentials: Credentials
+): Promise<Credentials> {
     const driver = DRIVERS[connection];
     if (!driver?.renew) return credentials;
     let next: Credentials | null;
@@ -241,13 +245,20 @@ async function renewed(id: string, connection: string, credentials: Credentials)
         next = await driver.renew(credentials);
     } catch (caught) {
         if (caught instanceof DriverError) {
-            await markAccount(id, caught.kind === "unauthorized" ? "unauthorized" : "unreachable", caught.message);
+            await markAccount(
+                id,
+                caught.kind === "unauthorized" ? "unauthorized" : "unreachable",
+                caught.message
+            );
             throw new HomeError(caught.message);
         }
         throw caught;
     }
     if (!next) return credentials;
-    await prisma.placeDeviceAccount.updateMany({ where: { id }, data: { secret: sealCredentials(next) } });
+    await prisma.placeDeviceAccount.updateMany({
+        where: { id },
+        data: { secret: sealCredentials(next) }
+    });
     return next;
 }
 
@@ -311,7 +322,8 @@ export async function reconnectAccount(
         where: { id, installedAppId },
         select: { id: true, connection: true, label: true, secret: true }
     });
-    if (!existing || existing.connection !== input.connection) throw new HomeError("That connection is not here");
+    if (!existing || existing.connection !== input.connection)
+        throw new HomeError("That connection is not here");
     const connection = registry.deviceConnection(existing.connection);
     if (!connection) throw new HomeError("Polaris cannot connect that yet");
     const paired = await speaking(() => driverFor(connection.id).verify(input.fields));

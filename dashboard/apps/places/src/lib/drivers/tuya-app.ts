@@ -85,7 +85,8 @@ export const tuyaAppDriver: DeviceDriver = {
                 // A poll that did not get through is a poll to make again in a
                 // few seconds, not a failed sign-in: the code on the screen is
                 // still good, and the person holding the phone is mid-scan.
-                if (caught instanceof TuyaError && caught.kind === "unreachable") return { done: false };
+                if (caught instanceof TuyaError && caught.kind === "unreachable")
+                    return { done: false };
                 return tuyaSpeaking(() => Promise.reject(caught));
             }
             return session ? { done: true, credentials: toCredentials(session) } : { done: false };
@@ -98,7 +99,11 @@ export const tuyaAppDriver: DeviceDriver = {
         try {
             return toCredentials(await tuya.refreshTuyaSession(session));
         } catch (caught) {
-            if (caught instanceof TuyaError && caught.kind === "unreachable" && session.expiresAt > Date.now()) {
+            if (
+                caught instanceof TuyaError &&
+                caught.kind === "unreachable" &&
+                session.expiresAt > Date.now()
+            ) {
                 return null;
             }
             return tuyaSpeaking(() => Promise.reject(caught));

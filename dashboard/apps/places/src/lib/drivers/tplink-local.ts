@@ -44,7 +44,11 @@ function addressOf(credentials: Credentials): tplink.TplinkAddress {
     if (!typed) throw new HomeError("That connection is missing the device's address");
     const host = deviceHost(typed);
     if (!host) throw new HomeError("Write the address as 192.168.1.30, with no path");
-    return { host, username: credentials.email?.trim() ?? "", password: credentials.password ?? "" };
+    return {
+        host,
+        username: credentials.email?.trim() ?? "",
+        password: credentials.password ?? ""
+    };
 }
 
 /** A strip's outlet and the strip, as one id. Split again in `act`. */
@@ -68,7 +72,8 @@ function nickname(value: unknown): string {
     const raw = text(value);
     if (!raw) return "";
     const decoded = Buffer.from(raw, "base64").toString("utf8");
-    return Buffer.from(decoded, "utf8").toString("base64").replace(/=+$/, "") === raw.replace(/=+$/, "")
+    return Buffer.from(decoded, "utf8").toString("base64").replace(/=+$/, "") ===
+        raw.replace(/=+$/, "")
         ? decoded.trim()
         : raw;
 }
@@ -150,7 +155,9 @@ async function readIot(link: tplink.TplinkLink): Promise<DeviceSnapshot[]> {
         return [row(id, "light", name, model, firmware, light?.on_off === 1)];
     }
     if (!type.includes("smartplug")) return [];
-    const children = Array.isArray(info.children) ? (info.children as Record<string, unknown>[]) : [];
+    const children = Array.isArray(info.children)
+        ? (info.children as Record<string, unknown>[])
+        : [];
     if (children.length > 0) {
         return children.flatMap((child, index) => {
             const childId = text(child.id);
@@ -206,17 +213,31 @@ function driver(connection: string, prefer: "klap" | "xor"): DeviceDriver {
             const { childId } = splitAddress(device.externalId);
             const link = await tplink.openTplink(addressOf(credentials), prefer);
             if (link.family === "smart") {
-                if (childId) await tplink.smartChildCall(link, childId, "set_device_info", { device_on: on });
+                if (childId)
+                    await tplink.smartChildCall(link, childId, "set_device_info", {
+                        device_on: on
+                    });
                 else await tplink.smartCall(link, "set_device_info", { device_on: on });
                 return;
             }
             if (device.kind === "light") {
-                await tplink.iotCall(link, "smartlife.iot.smartbulb.lightingservice", "transition_light_state", {
-                    on_off: on ? 1 : 0
-                });
+                await tplink.iotCall(
+                    link,
+                    "smartlife.iot.smartbulb.lightingservice",
+                    "transition_light_state",
+                    {
+                        on_off: on ? 1 : 0
+                    }
+                );
                 return;
             }
-            await tplink.iotCall(link, "system", "set_relay_state", { state: on ? 1 : 0 }, childId ?? undefined);
+            await tplink.iotCall(
+                link,
+                "system",
+                "set_relay_state",
+                { state: on ? 1 : 0 },
+                childId ?? undefined
+            );
         }
     };
 }

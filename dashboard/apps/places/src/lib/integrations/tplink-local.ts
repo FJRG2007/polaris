@@ -119,8 +119,11 @@ export function xorExchange(host: string, request: string, port = XOR_PORT): Pro
                 error instanceof DriverError
                     ? error
                     : error.code === "ENOTFOUND" || error.code === "EAI_AGAIN"
-                    ? new DriverError("That address could not be found on this network.", "unreachable")
-                    : new DriverError("Nothing answered on that address and port.", "unreachable")
+                      ? new DriverError(
+                            "That address could not be found on this network.",
+                            "unreachable"
+                        )
+                      : new DriverError("Nothing answered on that address and port.", "unreachable")
             )
         );
         socket.on("data", (chunk: Buffer) => {
@@ -140,7 +143,9 @@ export function xorExchange(host: string, request: string, port = XOR_PORT): Pro
             fail(forbiddenError());
             return;
         }
-        socket.connect({ port, host: bare, lookup: guardedLookup }, () => socket.write(crypto.xorEncrypt(request)));
+        socket.connect({ port, host: bare, lookup: guardedLookup }, () =>
+            socket.write(crypto.xorEncrypt(request))
+        );
     });
 }
 
@@ -200,7 +205,8 @@ async function klapHandshake(
     for (const version of [2, 1] as const) {
         for (const [username, password] of accounts) {
             const auth = crypto.klapAuthHash(version, username, password);
-            if (!crypto.klapServerHash(version, localSeed, remoteSeed, auth).equals(serverHash)) continue;
+            if (!crypto.klapServerHash(version, localSeed, remoteSeed, auth).equals(serverHash))
+                continue;
             const second = await lanRequest({
                 url: `${base}/handshake2`,
                 method: "POST",
@@ -266,7 +272,10 @@ function xorLink(address: TplinkAddress): TplinkLink {
  * has nothing else; an old Kasa is tried on 9999 first because that is quicker
  * than waiting for port 80 to say no.
  */
-export async function openTplink(address: TplinkAddress, prefer: "klap" | "xor"): Promise<TplinkLink> {
+export async function openTplink(
+    address: TplinkAddress,
+    prefer: "klap" | "xor"
+): Promise<TplinkLink> {
     if (prefer === "xor") {
         try {
             const link = xorLink(address);
@@ -277,7 +286,8 @@ export async function openTplink(address: TplinkAddress, prefer: "klap" | "xor")
             if (caught.message.startsWith("That address could not be found")) throw caught;
         }
         const handshake = await klapHandshake(address);
-        if (!handshake) throw new DriverError("Nothing answered on that address and port.", "unreachable");
+        if (!handshake)
+            throw new DriverError("Nothing answered on that address and port.", "unreachable");
         return klapLink(address, handshake);
     }
     const handshake = await klapHandshake(address);
@@ -327,7 +337,11 @@ export async function smartChildren(link: TplinkLink): Promise<Record<string, un
             page === 0 ? undefined : { start_index: children.length }
         );
         const list = Array.isArray(result.child_device_list) ? result.child_device_list : [];
-        children.push(...list.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object"));
+        children.push(
+            ...list.filter(
+                (entry): entry is Record<string, unknown> => !!entry && typeof entry === "object"
+            )
+        );
         const sum = typeof result.sum === "number" ? result.sum : children.length;
         if (list.length === 0 || children.length >= sum) break;
     }
@@ -367,7 +381,9 @@ export async function iotCall(
     const request: Record<string, unknown> = { [target]: { [command]: argument } };
     if (childId) request.context = { child_ids: [childId] };
     const answer = await link.send(request);
-    const section = (answer as Record<string, unknown> | null)?.[target] as Record<string, unknown> | undefined;
+    const section = (answer as Record<string, unknown> | null)?.[target] as
+        | Record<string, unknown>
+        | undefined;
     const result = section?.[command] as Record<string, unknown> | undefined;
     const code = result?.err_code ?? section?.err_code;
     if (!result || (typeof code === "number" && code !== 0)) {

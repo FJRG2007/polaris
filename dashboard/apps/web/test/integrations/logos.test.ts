@@ -18,7 +18,9 @@ import { DEVICE_CONNECTIONS } from "@polaris-app/places/src/lib/device-connectio
 
 describe("integration logos", () => {
     it("covers every entry in the catalogue", () => {
-        const missing = INTEGRATIONS.filter((entry) => !hasIntegrationLogo(entry.slug)).map((entry) => entry.slug);
+        const missing = INTEGRATIONS.filter((entry) => !hasIntegrationLogo(entry.slug)).map(
+            (entry) => entry.slug
+        );
         expect(missing).toEqual([]);
     });
 
@@ -26,9 +28,9 @@ describe("integration logos", () => {
         // A make's picker tile draws its logo by slug; one missing here is a
         // brand drawn as the generic block. An empty slug is the deliberate
         // "not a brand" of a protocol-level connection.
-        const missing = DEVICE_CONNECTIONS.filter((entry) => entry.logo && !hasIntegrationLogo(entry.logo)).map(
-            (entry) => entry.logo
-        );
+        const missing = DEVICE_CONNECTIONS.filter(
+            (entry) => entry.logo && !hasIntegrationLogo(entry.logo)
+        ).map((entry) => entry.logo);
         expect(missing).toEqual([]);
     });
 

@@ -104,17 +104,33 @@ function randomNonce(): string {
  *  why the two halves can simply be joined and still read as one base64 string
  *  on the way back. */
 export function sealTuya(plain: string, secret: string, nonce: string = randomNonce()): string {
-    const cipher = createCipheriv("aes-128-gcm", Buffer.from(secret, "utf8"), Buffer.from(nonce, "utf8"));
-    const sealed = Buffer.concat([cipher.update(plain, "utf8"), cipher.final(), cipher.getAuthTag()]);
+    const cipher = createCipheriv(
+        "aes-128-gcm",
+        Buffer.from(secret, "utf8"),
+        Buffer.from(nonce, "utf8")
+    );
+    const sealed = Buffer.concat([
+        cipher.update(plain, "utf8"),
+        cipher.final(),
+        cipher.getAuthTag()
+    ]);
     return Buffer.from(nonce, "utf8").toString("base64") + sealed.toString("base64");
 }
 
 export function openTuya(data: string, secret: string): string {
     const raw = Buffer.from(data, "base64");
-    if (raw.length < 12 + 16) throw new TuyaError("Tuya answered with something unexpected.", "refused");
-    const decipher = createDecipheriv("aes-128-gcm", Buffer.from(secret, "utf8"), raw.subarray(0, 12));
+    if (raw.length < 12 + 16)
+        throw new TuyaError("Tuya answered with something unexpected.", "refused");
+    const decipher = createDecipheriv(
+        "aes-128-gcm",
+        Buffer.from(secret, "utf8"),
+        raw.subarray(0, 12)
+    );
     decipher.setAuthTag(raw.subarray(raw.length - 16));
-    return Buffer.concat([decipher.update(raw.subarray(12, raw.length - 16)), decipher.final()]).toString("utf8");
+    return Buffer.concat([
+        decipher.update(raw.subarray(12, raw.length - 16)),
+        decipher.final()
+    ]).toString("utf8");
 }
 
 /** The headers that are signed, in the order they are signed in. */
@@ -178,8 +194,16 @@ export function tuyaEndpoint(raw: string): string {
     } catch {
         throw new TuyaError("Tuya answered with something unexpected.", "refused");
     }
-    const ipLiteral = /^[\d.]+$/.test(url.hostname) || url.hostname.includes(":") || url.hostname.startsWith("[");
-    if (url.protocol !== "https:" || url.username || url.password || ipLiteral || url.search || url.hash) {
+    const ipLiteral =
+        /^[\d.]+$/.test(url.hostname) || url.hostname.includes(":") || url.hostname.startsWith("[");
+    if (
+        url.protocol !== "https:" ||
+        url.username ||
+        url.password ||
+        ipLiteral ||
+        url.search ||
+        url.hash
+    ) {
         throw new TuyaError("Tuya answered with something unexpected.", "refused");
     }
     return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
@@ -192,7 +216,11 @@ export function tuyaNeedsRefresh(session: TuyaSession, now: number = Date.now())
 
 async function send(url: string, init: RequestInit): Promise<Response> {
     try {
-        return await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) });
+        return await fetch(url, {
+            ...init,
+            cache: "no-store",
+            signal: AbortSignal.timeout(TIMEOUT_MS)
+        });
     } catch {
         throw new TuyaError("Tuya could not be reached. Try again in a moment.", "unreachable");
     }
@@ -237,7 +265,8 @@ export async function requestTuyaQr(userCode: string): Promise<string> {
         method: "POST"
     });
     const envelope = envelopeSchema.safeParse(await json(response));
-    if (!envelope.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
+    if (!envelope.success)
+        throw new TuyaError("Tuya answered with something unexpected.", "refused");
     if (envelope.data.success !== true) {
         const detail = envelope.data.msg?.trim();
         throw new TuyaError(
@@ -270,7 +299,10 @@ const loginSchema = z.object({
  * tell a code nobody has scanned from one that has lapsed - so both read as
  * waiting here, and how long to wait is the screen's to decide.
  */
-export async function tuyaLoginResult(qrToken: string, userCode: string): Promise<TuyaSession | null> {
+export async function tuyaLoginResult(
+    qrToken: string,
+    userCode: string
+): Promise<TuyaSession | null> {
     const query = new URLSearchParams({ clientid: TUYA_SHARING_CLIENT_ID, usercode: userCode });
     const response = await send(
         `${LOGIN_HOST}/v1.0/m/life/home-assistant/qrcode/tokens/${encodeURIComponent(qrToken)}?${query}`,
@@ -318,7 +350,9 @@ async function call(
             ? sealTuya(tuyaJson(options.params), secret)
             : "";
     const body =
-        options.body && Object.keys(options.body).length > 0 ? sealTuya(tuyaJson(options.body), secret) : "";
+        options.body && Object.keys(options.body).length > 0
+            ? sealTuya(tuyaJson(options.body), secret)
+            : "";
 
     const headers: Record<string, string> = {
         "X-appKey": TUYA_SHARING_CLIENT_ID,
@@ -335,13 +369,18 @@ async function call(
         headers: body ? { ...headers, "Content-Type": "application/json" } : headers,
         body: body ? JSON.stringify({ encdata: body }) : undefined
     });
-    if (!response.ok) throw new TuyaError("Tuya could not be reached. Try again in a moment.", "unreachable");
+    if (!response.ok)
+        throw new TuyaError("Tuya could not be reached. Try again in a moment.", "unreachable");
 
     const envelope = envelopeSchema.safeParse(await json(response));
-    if (!envelope.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
+    if (!envelope.success)
+        throw new TuyaError("Tuya answered with something unexpected.", "refused");
     if (envelope.data.success !== true) {
         if (options.signedOutIfRefused) {
-            throw new TuyaError("Tuya no longer accepts this sign-in. Scan a new code from the app.", "unauthorized");
+            throw new TuyaError(
+                "Tuya no longer accepts this sign-in. Scan a new code from the app.",
+                "unauthorized"
+            );
         }
         // Their own sentence where there is one, as the cloud client does: a
         // sentence Polaris invented in its place would be a guess.
@@ -399,11 +438,17 @@ export function refreshTuyaSession(session: TuyaSession): Promise<TuyaSession> {
         // A refusal of the refresh token is the account being signed out -
         // revoked in the app, or unused for too long. Anything else (the
         // network, their servers) leaves the sign-in exactly as it was.
-        const answer = await call(session, "GET", `/v1.0/m/token/${encodeURIComponent(session.refreshToken)}`, {
-            signedOutIfRefused: true
-        });
+        const answer = await call(
+            session,
+            "GET",
+            `/v1.0/m/token/${encodeURIComponent(session.refreshToken)}`,
+            {
+                signedOutIfRefused: true
+            }
+        );
         const parsed = refreshSchema.safeParse(answer.result);
-        if (!parsed.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
+        if (!parsed.success)
+            throw new TuyaError("Tuya answered with something unexpected.", "refused");
         return {
             ...session,
             accessToken: parsed.data.accessToken,
@@ -458,8 +503,13 @@ const sharedDeviceSchema = z.object({
 export type TuyaSharedDevice = z.infer<typeof sharedDeviceSchema>;
 
 /** The devices in one home, with the state of each in the same answer. */
-export async function listTuyaHomeDevices(session: TuyaSession, homeId: string): Promise<TuyaSharedDevice[]> {
-    const { result } = await call(session, "GET", "/v1.0/m/life/ha/home/devices", { params: { homeId } });
+export async function listTuyaHomeDevices(
+    session: TuyaSession,
+    homeId: string
+): Promise<TuyaSharedDevice[]> {
+    const { result } = await call(session, "GET", "/v1.0/m/life/ha/home/devices", {
+        params: { homeId }
+    });
     const parsed = z.array(z.unknown()).safeParse(result);
     if (!parsed.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
     return parsed.data.flatMap((entry) => {

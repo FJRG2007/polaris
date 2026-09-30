@@ -137,7 +137,11 @@ export interface AutomationStore {
     markAutomation(id: string, at: Date, status: auto.RunStatus): Promise<void>;
     observation(deviceId: string): Promise<Observation | null>;
     /** Replace what a device was seen doing, only if it is still `previous`. */
-    swapObservation(deviceId: string, previous: Observation | null, next: Observation): Promise<boolean>;
+    swapObservation(
+        deviceId: string,
+        previous: Observation | null,
+        next: Observation
+    ): Promise<boolean>;
     pruneRuns(automationId: string, keep: number): Promise<void>;
 }
 
@@ -161,7 +165,11 @@ export interface EnginePorts {
     /** Whether the owner still holds a right: "run" is keeping automations at
      *  all, "control" is operating the devices a step names. */
     readonly mayOperate: (ownerId: string, right: "run" | "control") => Promise<boolean>;
-    readonly notify: (automation: AutomationRecord, message: string, runId: string) => Promise<void>;
+    readonly notify: (
+        automation: AutomationRecord,
+        message: string,
+        runId: string
+    ) => Promise<void>;
     /** Come back and drain in this many milliseconds. */
     readonly wake?: (ms: number) => void;
     /** Where a fault that is not a refusal is written. */
@@ -271,7 +279,10 @@ export function createEngine(ports: EnginePorts) {
             await store.markAutomation(automation.id, now, "refused");
             return false;
         }
-        const recent = await store.countRunsSince(automation.id, new Date(now.getTime() - RATE_WINDOW_MS));
+        const recent = await store.countRunsSince(
+            automation.id,
+            new Date(now.getTime() - RATE_WINDOW_MS)
+        );
         if (recent >= RATE_MAX) {
             // One row per window, not one per firing: a device flapping twice a
             // second would otherwise fill the log with the same sentence.
@@ -344,12 +355,26 @@ export function createEngine(ports: EnginePorts) {
         };
         const version = next.version;
         if (state !== previous.state) {
-            changed.push({ deviceId: device.id, attribute: "state", from: previous.state, to: state, at: now, version });
+            changed.push({
+                deviceId: device.id,
+                attribute: "state",
+                from: previous.state,
+                to: state,
+                at: now,
+                version
+            });
             next.state = state;
             next.stateSince = now;
         }
         if (device.door !== previous.door) {
-            changed.push({ deviceId: device.id, attribute: "door", from: previous.door, to: device.door, at: now, version });
+            changed.push({
+                deviceId: device.id,
+                attribute: "door",
+                from: previous.door,
+                to: device.door,
+                at: now,
+                version
+            });
             next.door = device.door;
             next.doorSince = now;
         }
@@ -401,13 +426,15 @@ export function createEngine(ports: EnginePorts) {
 
     function matchesChange(trigger: auto.Trigger, change: Transition): boolean {
         if (trigger.kind === "change") {
-            if (trigger.deviceId !== change.deviceId || trigger.attribute !== change.attribute) return false;
+            if (trigger.deviceId !== change.deviceId || trigger.attribute !== change.attribute)
+                return false;
             if (trigger.from && !same(trigger.from, change.from)) return false;
             if (trigger.to && !same(trigger.to, change.to)) return false;
             return true;
         }
         if (trigger.kind === "threshold") {
-            if (trigger.deviceId !== change.deviceId || change.attribute !== "reading") return false;
+            if (trigger.deviceId !== change.deviceId || change.attribute !== "reading")
+                return false;
             const before = numberOf(change.from);
             const after = numberOf(change.to);
             if (before === null || after === null) return false;
@@ -438,7 +465,11 @@ export function createEngine(ports: EnginePorts) {
         }
     }
 
-    async function scheduled(automation: AutomationRecord, trigger: auto.Trigger, now: Date): Promise<void> {
+    async function scheduled(
+        automation: AutomationRecord,
+        trigger: auto.Trigger,
+        now: Date
+    ): Promise<void> {
         const armed = automation.armedAt.getTime();
         if (trigger.kind === "time") {
             const occurrence = lastOccurrence(trigger, automation.definition.timeZone, now);
@@ -501,9 +532,18 @@ export function createEngine(ports: EnginePorts) {
     }
 
     /** Somebody pressed Run now. */
-    async function runNow(automation: AutomationRecord, byUser: string, key: string): Promise<boolean> {
+    async function runNow(
+        automation: AutomationRecord,
+        byUser: string,
+        key: string
+    ): Promise<boolean> {
         const now = ports.now();
-        const queued = await fire(automation, `manual:${key}`, { kind: "manual", byUser, at: iso(now) }, 0);
+        const queued = await fire(
+            automation,
+            `manual:${key}`,
+            { kind: "manual", byUser, at: iso(now) },
+            0
+        );
         if (queued) ports.wake?.(0);
         return queued;
     }
@@ -526,7 +566,11 @@ export function createEngine(ports: EnginePorts) {
                     again = false;
                     for (;;) {
                         const now = ports.now();
-                        const due = await store.claimDueRuns(now, new Date(now.getTime() + LEASE_MS), 20);
+                        const due = await store.claimDueRuns(
+                            now,
+                            new Date(now.getTime() + LEASE_MS),
+                            20
+                        );
                         if (due.length === 0) break;
                         for (const run of due) {
                             try {
@@ -599,7 +643,13 @@ export function createEngine(ports: EnginePorts) {
             const step = definition.actions[index]!;
             const now = ports.now();
             const log = (outcome: auto.StepOutcome, extra: { code?: string; said?: string } = {}) =>
-                steps.push({ stepId: step.id, kind: step.kind, outcome, ...extra, at: iso(ports.now()) });
+                steps.push({
+                    stepId: step.id,
+                    kind: step.kind,
+                    outcome,
+                    ...extra,
+                    at: iso(ports.now())
+                });
 
             if (step.kind === "delay") {
                 const due = new Date(now.getTime() + step.seconds * 1000);
@@ -630,7 +680,8 @@ export function createEngine(ports: EnginePorts) {
                     log("ok");
                     waitUntil = null;
                 } else {
-                    const deadline = waitUntil ?? new Date(now.getTime() + step.timeoutMinutes * 60 * 1000);
+                    const deadline =
+                        waitUntil ?? new Date(now.getTime() + step.timeoutMinutes * 60 * 1000);
                     if (now.getTime() < deadline.getTime()) {
                         await store.saveRun(run.id, {
                             status: "waiting",
@@ -638,7 +689,9 @@ export function createEngine(ports: EnginePorts) {
                             steps,
                             waitUntil: deadline,
                             waitDeviceId: step.deviceId,
-                            dueAt: new Date(Math.min(deadline.getTime(), now.getTime() + RECHECK_MS)),
+                            dueAt: new Date(
+                                Math.min(deadline.getTime(), now.getTime() + RECHECK_MS)
+                            ),
                             lockedUntil: null
                         });
                         return;
@@ -656,7 +709,12 @@ export function createEngine(ports: EnginePorts) {
                 const outcome = await deviceStep(automation, run, step);
                 if (outcome.outcome !== "ok") {
                     log(outcome.outcome, { code: outcome.code, said: outcome.said });
-                    await finish(run, outcome.outcome === "refused" ? "refused" : "failed", steps, "step");
+                    await finish(
+                        run,
+                        outcome.outcome === "refused" ? "refused" : "failed",
+                        steps,
+                        "step"
+                    );
                     return;
                 }
                 log("ok");
@@ -730,12 +788,14 @@ export function createEngine(ports: EnginePorts) {
     ): Promise<{ outcome: auto.StepOutcome; code?: string; said?: string }> {
         // Asked again for every step, not once per run: a run that waited an
         // hour may have outlived its owner's right to open the door.
-        if (!(await ports.mayOperate(automation.ownerId, "control"))) return { outcome: "refused", code: "owner" };
+        if (!(await ports.mayOperate(automation.ownerId, "control")))
+            return { outcome: "refused", code: "owner" };
         let action: DeviceAction;
         if (step.do === auto.TOGGLE) {
             const device = await ports.devices.read(automation.installedAppId, step.deviceId);
             if (!device) return { outcome: "failed", code: "deviceGone" };
-            if (device.state !== "on" && device.state !== "off") return { outcome: "failed", code: "toggleUnknown" };
+            if (device.state !== "on" && device.state !== "off")
+                return { outcome: "failed", code: "toggleUnknown" };
             action = device.state === "on" ? "turn-off" : "turn-on";
         } else {
             action = step.do;

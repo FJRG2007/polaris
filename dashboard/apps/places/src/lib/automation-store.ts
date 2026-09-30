@@ -13,7 +13,12 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 import * as auto from "./automation-kinds";
-import type { AutomationRecord, AutomationStore, Observation, RunRecord } from "./automation-engine";
+import type {
+    AutomationRecord,
+    AutomationStore,
+    Observation,
+    RunRecord
+} from "./automation-engine";
 
 const RUN_FIELDS = {
     id: true,
@@ -121,7 +126,10 @@ export const prismaAutomationStore: AutomationStore = {
     },
 
     async automation(id) {
-        const row = await prisma.placeAutomation.findUnique({ where: { id }, select: AUTOMATION_FIELDS });
+        const row = await prisma.placeAutomation.findUnique({
+            where: { id },
+            select: AUTOMATION_FIELDS
+        });
         return row ? toAutomation(row) : null;
     },
 
@@ -173,7 +181,13 @@ export const prismaAutomationStore: AutomationStore = {
         const claimed: RunRecord[] = [];
         for (const row of candidates) {
             const taken = await prisma.placeAutomationRun.updateMany({
-                where: { id: row.id, status: row.status, step: row.step, dueAt: row.dueAt, ...free },
+                where: {
+                    id: row.id,
+                    status: row.status,
+                    step: row.step,
+                    dueAt: row.dueAt,
+                    ...free
+                },
                 data: { lockedUntil: lockUntil }
             });
             if (taken.count === 1) claimed.push(toRun(row));
@@ -249,6 +263,8 @@ export const prismaAutomationStore: AutomationStore = {
             select: { id: true }
         });
         if (old.length === 0) return;
-        await prisma.placeAutomationRun.deleteMany({ where: { id: { in: old.map((row) => row.id) } } });
+        await prisma.placeAutomationRun.deleteMany({
+            where: { id: { in: old.map((row) => row.id) } }
+        });
     }
 };

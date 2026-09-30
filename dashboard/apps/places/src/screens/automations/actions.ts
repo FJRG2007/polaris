@@ -93,7 +93,11 @@ export async function getAutomationAction(id: string | null): Promise<{
     const result = await guard(async () => {
         if (!id) {
             const { current } = await currentPlace(install.id);
-            return { automation: undefined, runs: [], context: await editorContext(install.id, current.id) };
+            return {
+                automation: undefined,
+                runs: [],
+                context: await editorContext(install.id, current.id)
+            };
         }
         const automation = await automations.getAutomation(install.id, String(id));
         const [runs, context] = await Promise.all([
@@ -103,11 +107,17 @@ export async function getAutomationAction(id: string | null): Promise<{
         return { automation, runs, context };
     });
     if (result.error) return { error: result.error };
-    return { automation: result.value?.automation, runs: result.value?.runs, context: result.value?.context };
+    return {
+        automation: result.value?.automation,
+        runs: result.value?.runs,
+        context: result.value?.context
+    };
 }
 
 /** What an automation has done lately, newest first. */
-export async function automationRunsAction(id: string): Promise<{ runs?: auto.RunView[]; error?: string }> {
+export async function automationRunsAction(
+    id: string
+): Promise<{ runs?: auto.RunView[]; error?: string }> {
     const { install } = await requireHome("home.read");
     const result = await guard(() => automations.listRuns(install.id, String(id)));
     return result.error ? { error: result.error } : { runs: result.value };
@@ -129,7 +139,10 @@ export async function saveAutomationAction(
     const parsed = auto.automationInputSchema.safeParse(auto.normalizeAutomationInput(input));
     if (!parsed.success) {
         return {
-            issues: parsed.error.issues.map((issue) => ({ path: issue.path, message: issueText(issue.message, t) })),
+            issues: parsed.error.issues.map((issue) => ({
+                path: issue.path,
+                message: issueText(issue.message, t)
+            })),
             error: t("automations.errors.fix")
         };
     }
@@ -141,11 +154,16 @@ export async function saveAutomationAction(
     if (checked.error) return { error: checked.error };
     if (checked.value && checked.value.length > 0) {
         return {
-            issues: checked.value.map((issue) => ({ path: issue.path, message: issueText(issue.message, t) })),
+            issues: checked.value.map((issue) => ({
+                path: issue.path,
+                message: issueText(issue.message, t)
+            })),
             error: t("automations.errors.fix")
         };
     }
-    const result = await guard(() => automations.saveAutomation(install.id, user.id, self, parsed.data));
+    const result = await guard(() =>
+        automations.saveAutomation(install.id, user.id, self, parsed.data)
+    );
     if (result.error) return { error: result.error };
     await recordAudit({
         actorId: user.id,
@@ -162,7 +180,9 @@ export async function setAutomationEnabledAction(
     enabled: boolean
 ): Promise<{ automation?: auto.AutomationView; error?: string }> {
     const { user, install } = await requireHome("home.manage");
-    const result = await guard(() => automations.setAutomationEnabled(install.id, String(id), enabled === true));
+    const result = await guard(() =>
+        automations.setAutomationEnabled(install.id, String(id), enabled === true)
+    );
     if (result.error) return { error: result.error };
     await recordAudit({
         actorId: user.id,
@@ -190,7 +210,9 @@ export async function deleteAutomationAction(id: string): Promise<{ error?: stri
  *  rather than waiting on the steps. */
 export async function runAutomationAction(id: string): Promise<{ error?: string }> {
     const { user, install } = await requireHome("home.manage");
-    const result = await guard(() => automations.runAutomationNow(install.id, String(id), user.name, randomUUID()));
+    const result = await guard(() =>
+        automations.runAutomationNow(install.id, String(id), user.name, randomUUID())
+    );
     if (result.error) return { error: result.error };
     await recordAudit({
         actorId: user.id,

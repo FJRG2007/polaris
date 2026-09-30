@@ -71,11 +71,17 @@ async function call(
             body: body === undefined ? undefined : JSON.stringify(body)
         });
     } catch {
-        throw new DriverError("SwitchBot could not be reached. Try again in a moment.", "unreachable");
+        throw new DriverError(
+            "SwitchBot could not be reached. Try again in a moment.",
+            "unreachable"
+        );
     }
     if (response.status === 401 || response.status === 403) throw refusedKeys();
     if (response.status === 429) {
-        throw new DriverError("SwitchBot is answering too many requests at once. Try again in a minute.", "unreachable");
+        throw new DriverError(
+            "SwitchBot is answering too many requests at once. Try again in a minute.",
+            "unreachable"
+        );
     }
 
     let payload: unknown = null;
@@ -85,7 +91,8 @@ async function call(
         payload = null;
     }
     const parsed = envelopeSchema.safeParse(payload);
-    if (!parsed.success) throw new DriverError("SwitchBot answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new DriverError("SwitchBot answered with something unexpected.", "refused");
     const code = parsed.data.statusCode;
     if (code === 100) return parsed.data.body;
     // 161 is the device offline, 171 the hub it talks through.
@@ -109,12 +116,15 @@ export type SwitchBotDevice = z.infer<typeof deviceSchema>;
 
 /** Every physical device on the account. The infrared remotes listed beside
  *  them are not devices anything can read back from, and are left out. */
-export async function switchBotDevices(credentials: SwitchBotCredentials): Promise<SwitchBotDevice[]> {
+export async function switchBotDevices(
+    credentials: SwitchBotCredentials
+): Promise<SwitchBotDevice[]> {
     const body = z
         .object({ deviceList: z.array(z.unknown()).default([]) })
         .passthrough()
         .safeParse(await call(credentials, "GET", "/devices"));
-    if (!body.success) throw new DriverError("SwitchBot answered with something unexpected.", "refused");
+    if (!body.success)
+        throw new DriverError("SwitchBot answered with something unexpected.", "refused");
     return body.data.deviceList.flatMap((item) => {
         const parsed = deviceSchema.safeParse(item);
         return parsed.success ? [parsed.data] : [];

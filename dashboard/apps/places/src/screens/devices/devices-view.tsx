@@ -189,7 +189,9 @@ export function DevicesView({
         if (!result || result.error) {
             if (settled) {
                 const restore = (entry: DeviceView) =>
-                    entry.id === device.id && entry.state === settled ? { ...entry, state: device.state } : entry;
+                    entry.id === device.id && entry.state === settled
+                        ? { ...entry, state: device.state }
+                        : entry;
                 setDevices((current) => (current ?? []).map(restore));
                 setOpened((current) => (current ? restore(current) : current));
             }
@@ -276,9 +278,7 @@ export function DevicesView({
                 <EmptyState
                     title={t("devicesView.emptyTitle")}
                     description={
-                        canManage
-                            ? t("devicesView.emptyManage")
-                            : t("devicesView.emptyView")
+                        canManage ? t("devicesView.emptyManage") : t("devicesView.emptyView")
                     }
                     action={
                         canManage ? (
@@ -323,7 +323,9 @@ export function DevicesView({
                                 size="sm"
                                 variant="ghost"
                                 className="size-6 p-0"
-                                aria-label={t("devicesView.disconnectName", { name: account.label })}
+                                aria-label={t("devicesView.disconnectName", {
+                                    name: account.label
+                                })}
                                 title={t("devicesView.disconnectName", { name: account.label })}
                                 onClick={() => setDisconnecting(account)}
                             >
@@ -362,7 +364,9 @@ export function DevicesView({
                             {account.status === "unauthorized"
                                 ? t("devicesView.refused", { name: account.label })
                                 : t("devicesView.unreachable", { name: account.label })}
-                            {account.statusNote ? ` ${placesRefusalText(t, account.statusNote)}` : ""}
+                            {account.statusNote
+                                ? ` ${placesRefusalText(t, account.statusNote)}`
+                                : ""}
                         </p>
                         {canManage && account.status === "unauthorized" && (
                             <Button size="sm" onClick={() => setReconnecting(account)}>
@@ -382,9 +386,7 @@ export function DevicesView({
             )}
 
             {devices.some((device) => device.placeId === null) && (
-                <p className="text-xs text-muted-foreground">
-                    {t("devicesView.unplacedNote")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("devicesView.unplacedNote")}</p>
             )}
 
             {devices.length === 0 ? (
@@ -458,7 +460,9 @@ export function DevicesView({
                                                         : kinds.doorText(device.doorState, t),
                                                     device.batteryPercent === null
                                                         ? null
-                                                        : t("devicesView.batteryPercent", { percent: device.batteryPercent })
+                                                        : t("devicesView.batteryPercent", {
+                                                              percent: device.batteryPercent
+                                                          })
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" - ")}

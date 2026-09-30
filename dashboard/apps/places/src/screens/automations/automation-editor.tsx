@@ -87,10 +87,17 @@ export function startingDraft(
         const planned = device ? auto.autoOffDefinition(device, 30, timeZone) : null;
         return {
             ...base,
-            name: device ? words.autoOffName(device, 30, t) : t("automations.templates.autoOff.title"),
+            name: device
+                ? words.autoOffName(device, 30, t)
+                : t("automations.templates.autoOff.title"),
             definition: planned ?? {
                 timeZone,
-                triggers: [{ ...(auto.blankTrigger("stays") as Extract<auto.Trigger, { kind: "stays" }>), is: "on" }],
+                triggers: [
+                    {
+                        ...(auto.blankTrigger("stays") as Extract<auto.Trigger, { kind: "stays" }>),
+                        is: "on"
+                    }
+                ],
                 conditions: { match: "all", groups: [] },
                 actions: [auto.blankStep("device")]
             }
@@ -100,11 +107,21 @@ export function startingDraft(
         return {
             ...base,
             name: t("automations.templates.schedule.title"),
-            definition: auto.scheduleDefinition(device?.id ?? "", "07:00", "23:00", [...auto.WEEKDAYS], timeZone)
+            definition: auto.scheduleDefinition(
+                device?.id ?? "",
+                "07:00",
+                "23:00",
+                [...auto.WEEKDAYS],
+                timeZone
+            )
         };
     }
     if (template === "follow") {
-        return { ...base, name: t("automations.templates.follow.title"), definition: auto.followDefinition(timeZone) };
+        return {
+            ...base,
+            name: t("automations.templates.follow.title"),
+            definition: auto.followDefinition(timeZone)
+        };
     }
     return { ...base, name: "", definition: auto.blankDefinition(timeZone) };
 }
@@ -148,7 +165,10 @@ export function AutomationEditor({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await runAction(() => actions.getAutomationAction(automationId), setError);
+            const result = await runAction(
+                () => actions.getAutomationAction(automationId),
+                setError
+            );
             if (cancelled || !result) return;
             if (result.error || !result.context) {
                 setError(result.error ?? t("refusals.failed"));
@@ -195,7 +215,10 @@ export function AutomationEditor({
         [loaded]
     );
 
-    const normalized = useMemo(() => (draft ? auto.normalizeAutomationInput(draft) : null), [draft]);
+    const normalized = useMemo(
+        () => (draft ? auto.normalizeAutomationInput(draft) : null),
+        [draft]
+    );
     const dirty = normalized !== null && JSON.stringify(normalized) !== saved;
 
     /** Every complaint about the draft as it stands: the schema's, then - once
@@ -203,7 +226,11 @@ export function AutomationEditor({
     const issues = useMemo<{ path: readonly (string | number)[]; message: string }[]>(() => {
         if (!normalized) return [];
         const parsed = auto.automationInputSchema.safeParse(normalized);
-        if (!parsed.success) return parsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+        if (!parsed.success)
+            return parsed.error.issues.map((issue) => ({
+                path: issue.path,
+                message: issue.message
+            }));
         return auto.deviceIssues(parsed.data.definition, devices, {
             automationIds: loaded?.context.siblings.map((sibling) => sibling.id) ?? [],
             selfId: automationId
@@ -218,7 +245,8 @@ export function AutomationEditor({
             if (!attempted && UNFINISHED.has(issue.message)) continue;
             found.set(key, words.issueText(issue.message, t));
         }
-        for (const issue of serverIssues) if (!found.has(pathKey(issue.path))) found.set(pathKey(issue.path), issue.message);
+        for (const issue of serverIssues)
+            if (!found.has(pathKey(issue.path))) found.set(pathKey(issue.path), issue.message);
         return (path) => found.get(pathKey(path));
     }, [issues, serverIssues, attempted, t]);
 
@@ -234,8 +262,9 @@ export function AutomationEditor({
         setNotice("");
         setDraft((current) => (current ? change(current) : current));
     };
-    const editDefinition = (change: (current: auto.AutomationDefinition) => auto.AutomationDefinition) =>
-        edit((current) => ({ ...current, definition: change(current.definition) }));
+    const editDefinition = (
+        change: (current: auto.AutomationDefinition) => auto.AutomationDefinition
+    ) => edit((current) => ({ ...current, definition: change(current.definition) }));
 
     const save = async () => {
         if (!draft || !normalized || readOnly) return;
@@ -244,7 +273,10 @@ export function AutomationEditor({
         inFlight.current.save = true;
         setSaving(true);
         setError("");
-        const result = await runAction(() => actions.saveAutomationAction(automationId, normalized), setError);
+        const result = await runAction(
+            () => actions.saveAutomationAction(automationId, normalized),
+            setError
+        );
         inFlight.current.save = false;
         setSaving(false);
         if (!result) return;
@@ -262,7 +294,9 @@ export function AutomationEditor({
         };
         setDraft(stored);
         setSaved(JSON.stringify(auto.normalizeAutomationInput(stored)));
-        setLoaded((current) => (current ? { ...current, automation: result.automation ?? null } : current));
+        setLoaded((current) =>
+            current ? { ...current, automation: result.automation ?? null } : current
+        );
         setAttempted(false);
         setNotice(t("automations.editor.saved"));
         if (!automationId) router.replace(`/places/devices/automations/${result.automation.id}`);
@@ -314,7 +348,10 @@ export function AutomationEditor({
             <div className="flex flex-col gap-4">
                 {header}
                 {error ? (
-                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                    >
                         {error}
                     </p>
                 ) : (
@@ -341,7 +378,12 @@ export function AutomationEditor({
                 {header}
 
                 <div className="flex flex-wrap items-end gap-3">
-                    <fields.Field label={t("automations.editor.name")} path={["name"]} required className="min-w-[12rem] flex-1">
+                    <fields.Field
+                        label={t("automations.editor.name")}
+                        path={["name"]}
+                        required
+                        className="min-w-[12rem] flex-1"
+                    >
                         {(id, invalid) => (
                             <Input
                                 id={id}
@@ -350,7 +392,9 @@ export function AutomationEditor({
                                 disabled={readOnly}
                                 placeholder={t("automations.editor.namePlaceholder")}
                                 aria-invalid={invalid || undefined}
-                                onChange={(event) => edit((current) => ({ ...current, name: event.target.value }))}
+                                onChange={(event) =>
+                                    edit((current) => ({ ...current, name: event.target.value }))
+                                }
                             />
                         )}
                     </fields.Field>
@@ -395,7 +439,10 @@ export function AutomationEditor({
                 </div>
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                    >
                         {error}
                     </p>
                 )}
@@ -404,7 +451,11 @@ export function AutomationEditor({
                         {notice}
                     </p>
                 )}
-                {readOnly && <p className="text-xs text-muted-foreground">{t("automations.editor.readOnly")}</p>}
+                {readOnly && (
+                    <p className="text-xs text-muted-foreground">
+                        {t("automations.editor.readOnly")}
+                    </p>
+                )}
 
                 {tab === "runs" && loaded.automation ? (
                     <RunLog
@@ -434,19 +485,35 @@ export function AutomationEditor({
                                     onChange={(next) =>
                                         editDefinition((current) => ({
                                             ...current,
-                                            triggers: current.triggers.map((entry, at) => (at === index ? next : entry))
+                                            triggers: current.triggers.map((entry, at) =>
+                                                at === index ? next : entry
+                                            )
                                         }))
                                     }
                                     onRemove={() =>
                                         editDefinition((current) => ({
                                             ...current,
-                                            triggers: current.triggers.filter((_, at) => at !== index)
+                                            triggers: current.triggers.filter(
+                                                (_, at) => at !== index
+                                            )
                                         }))
                                     }
-                                    onUp={index > 0 ? () => editDefinition((current) => ({ ...current, triggers: move(current.triggers, index, -1) })) : undefined}
+                                    onUp={
+                                        index > 0
+                                            ? () =>
+                                                  editDefinition((current) => ({
+                                                      ...current,
+                                                      triggers: move(current.triggers, index, -1)
+                                                  }))
+                                            : undefined
+                                    }
                                     onDown={
                                         index < definition.triggers.length - 1
-                                            ? () => editDefinition((current) => ({ ...current, triggers: move(current.triggers, index, 1) }))
+                                            ? () =>
+                                                  editDefinition((current) => ({
+                                                      ...current,
+                                                      triggers: move(current.triggers, index, 1)
+                                                  }))
                                             : undefined
                                     }
                                 />
@@ -454,11 +521,17 @@ export function AutomationEditor({
                             {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
                                 <AddMenu
                                     label={t("automations.editor.addTrigger")}
-                                    options={auto.TRIGGER_KINDS.map((kind) => ({ value: kind, label: words.triggerKindText(kind, t) }))}
+                                    options={auto.TRIGGER_KINDS.map((kind) => ({
+                                        value: kind,
+                                        label: words.triggerKindText(kind, t)
+                                    }))}
                                     onPick={(kind) =>
                                         editDefinition((current) => ({
                                             ...current,
-                                            triggers: [...current.triggers, auto.blankTrigger(kind as auto.TriggerKind)]
+                                            triggers: [
+                                                ...current.triggers,
+                                                auto.blankTrigger(kind as auto.TriggerKind)
+                                            ]
                                         }))
                                     }
                                 />
@@ -468,7 +541,11 @@ export function AutomationEditor({
                         <Stage
                             icon={<Filter className="size-4" />}
                             title={t("automations.editor.if")}
-                            hint={definition.conditions.groups.length === 0 ? t("automations.editor.ifEmpty") : t("automations.editor.ifHint")}
+                            hint={
+                                definition.conditions.groups.length === 0
+                                    ? t("automations.editor.ifEmpty")
+                                    : t("automations.editor.ifHint")
+                            }
                         >
                             {definition.conditions.groups.length > 1 && (
                                 <MatchPicker
@@ -476,7 +553,10 @@ export function AutomationEditor({
                                     disabled={readOnly}
                                     label={t("automations.editor.groupsMatch")}
                                     onChange={(match) =>
-                                        editDefinition((current) => ({ ...current, conditions: { ...current.conditions, match } }))
+                                        editDefinition((current) => ({
+                                            ...current,
+                                            conditions: { ...current.conditions, match }
+                                        }))
                                     }
                                     allLabel={t("automations.editor.allGroups")}
                                     anyLabel={t("automations.editor.anyGroup")}
@@ -497,7 +577,10 @@ export function AutomationEditor({
                                             ...current,
                                             conditions: {
                                                 ...current.conditions,
-                                                groups: current.conditions.groups.map((entry, at) => (at === groupIndex ? next : entry))
+                                                groups: current.conditions.groups.map(
+                                                    (entry, at) =>
+                                                        at === groupIndex ? next : entry
+                                                )
                                             }
                                         }))
                                     }
@@ -506,34 +589,44 @@ export function AutomationEditor({
                                             ...current,
                                             conditions: {
                                                 ...current.conditions,
-                                                groups: current.conditions.groups.filter((_, at) => at !== groupIndex)
+                                                groups: current.conditions.groups.filter(
+                                                    (_, at) => at !== groupIndex
+                                                )
                                             }
                                         }))
                                     }
                                 />
                             ))}
-                            {!readOnly && definition.conditions.groups.length < auto.LIMITS.groups && (
-                                <AddMenu
-                                    label={t("automations.editor.addCondition")}
-                                    options={auto.CONDITION_KINDS.map((kind) => ({ value: kind, label: words.conditionKindText(kind, t) }))}
-                                    onPick={(kind) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            conditions: {
-                                                ...current.conditions,
-                                                groups: [
-                                                    ...current.conditions.groups,
-                                                    {
-                                                        id: auto.nodeIdOf(),
-                                                        match: "all",
-                                                        items: [auto.blankCondition(kind as auto.ConditionKind)]
-                                                    }
-                                                ]
-                                            }
-                                        }))
-                                    }
-                                />
-                            )}
+                            {!readOnly &&
+                                definition.conditions.groups.length < auto.LIMITS.groups && (
+                                    <AddMenu
+                                        label={t("automations.editor.addCondition")}
+                                        options={auto.CONDITION_KINDS.map((kind) => ({
+                                            value: kind,
+                                            label: words.conditionKindText(kind, t)
+                                        }))}
+                                        onPick={(kind) =>
+                                            editDefinition((current) => ({
+                                                ...current,
+                                                conditions: {
+                                                    ...current.conditions,
+                                                    groups: [
+                                                        ...current.conditions.groups,
+                                                        {
+                                                            id: auto.nodeIdOf(),
+                                                            match: "all",
+                                                            items: [
+                                                                auto.blankCondition(
+                                                                    kind as auto.ConditionKind
+                                                                )
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            }))
+                                        }
+                                    />
+                                )}
                         </Stage>
 
                         <Stage
@@ -558,7 +651,9 @@ export function AutomationEditor({
                                     onChange={(next) =>
                                         editDefinition((current) => ({
                                             ...current,
-                                            actions: current.actions.map((entry, at) => (at === index ? next : entry))
+                                            actions: current.actions.map((entry, at) =>
+                                                at === index ? next : entry
+                                            )
                                         }))
                                     }
                                     onRemove={() =>
@@ -567,10 +662,22 @@ export function AutomationEditor({
                                             actions: current.actions.filter((_, at) => at !== index)
                                         }))
                                     }
-                                    onUp={index > 0 ? () => editDefinition((current) => ({ ...current, actions: move(current.actions, index, -1) })) : undefined}
+                                    onUp={
+                                        index > 0
+                                            ? () =>
+                                                  editDefinition((current) => ({
+                                                      ...current,
+                                                      actions: move(current.actions, index, -1)
+                                                  }))
+                                            : undefined
+                                    }
                                     onDown={
                                         index < definition.actions.length - 1
-                                            ? () => editDefinition((current) => ({ ...current, actions: move(current.actions, index, 1) }))
+                                            ? () =>
+                                                  editDefinition((current) => ({
+                                                      ...current,
+                                                      actions: move(current.actions, index, 1)
+                                                  }))
                                             : undefined
                                     }
                                 />
@@ -578,11 +685,17 @@ export function AutomationEditor({
                             {!readOnly && definition.actions.length < auto.LIMITS.steps && (
                                 <AddMenu
                                     label={t("automations.editor.addStep")}
-                                    options={auto.STEP_KINDS.map((kind) => ({ value: kind, label: words.stepKindText(kind, t) }))}
+                                    options={auto.STEP_KINDS.map((kind) => ({
+                                        value: kind,
+                                        label: words.stepKindText(kind, t)
+                                    }))}
                                     onPick={(kind) =>
                                         editDefinition((current) => ({
                                             ...current,
-                                            actions: [...current.actions, auto.blankStep(kind as auto.StepKind)]
+                                            actions: [
+                                                ...current.actions,
+                                                auto.blankStep(kind as auto.StepKind)
+                                            ]
                                         }))
                                     }
                                 />
@@ -620,7 +733,12 @@ function Stage({
 }) {
     return (
         <li className="relative flex gap-3 pb-5">
-            {!last && <span aria-hidden="true" className="absolute bottom-0 left-[0.9375rem] top-8 w-px bg-border" />}
+            {!last && (
+                <span
+                    aria-hidden="true"
+                    className="absolute bottom-0 left-[0.9375rem] top-8 w-px bg-border"
+                />
+            )}
             <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
                 {icon}
             </span>
@@ -749,8 +867,10 @@ function TriggerCard({
     const pickDevice = (next: DeviceView) => {
         if (!("deviceId" in trigger)) return;
         const attribute = auto.attributesFor(next.kind)[0] ?? "state";
-        if (trigger.kind === "change") onChange({ ...trigger, deviceId: next.id, attribute, from: "", to: "" });
-        else if (trigger.kind === "stays") onChange({ ...trigger, deviceId: next.id, attribute, is: "" });
+        if (trigger.kind === "change")
+            onChange({ ...trigger, deviceId: next.id, attribute, from: "", to: "" });
+        else if (trigger.kind === "stays")
+            onChange({ ...trigger, deviceId: next.id, attribute, is: "" });
         else onChange({ ...trigger, deviceId: next.id });
     };
     return (
@@ -783,7 +903,12 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(at) => onChange({ ...trigger, at })}
                     />
-                    <fields.DaysPicker path={path} days={trigger.days} disabled={disabled} onChange={(days) => onChange({ ...trigger, days })} />
+                    <fields.DaysPicker
+                        path={path}
+                        days={trigger.days}
+                        disabled={disabled}
+                        onChange={(days) => onChange({ ...trigger, days })}
+                    />
                 </>
             )}
             {trigger.kind === "interval" && (
@@ -800,7 +925,9 @@ function TriggerCard({
                 />
             )}
             {trigger.kind === "manual" && (
-                <p className="text-xs text-muted-foreground sm:col-span-2">{t("automations.fields.manualHint")}</p>
+                <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {t("automations.fields.manualHint")}
+                </p>
             )}
             {(trigger.kind === "change" || trigger.kind === "stays") && (
                 <>
@@ -892,7 +1019,10 @@ function TriggerCard({
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange({ ...trigger, deviceId: next.id })}
                     />
-                    <fields.Field label={t("automations.fields.direction")} path={[...path, "direction"]}>
+                    <fields.Field
+                        label={t("automations.fields.direction")}
+                        path={[...path, "direction"]}
+                    >
                         {(id) => (
                             <Select
                                 id={id}
@@ -902,7 +1032,12 @@ function TriggerCard({
                                     { value: "above", label: t("automations.fields.above") },
                                     { value: "below", label: t("automations.fields.below") }
                                 ]}
-                                onValueChange={(direction) => onChange({ ...trigger, direction: direction as "above" | "below" })}
+                                onValueChange={(direction) =>
+                                    onChange({
+                                        ...trigger,
+                                        direction: direction as "above" | "below"
+                                    })
+                                }
                             />
                         )}
                     </fields.Field>
@@ -945,7 +1080,10 @@ function ConditionGroupCard({
 }) {
     const t = usePlacesT();
     const setItem = (index: number, item: auto.Condition) =>
-        onChange({ ...group, items: group.items.map((entry, at) => (at === index ? item : entry)) });
+        onChange({
+            ...group,
+            items: group.items.map((entry, at) => (at === index ? item : entry))
+        });
     return (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-2">
             <div className="flex items-center gap-2">
@@ -959,11 +1097,18 @@ function ConditionGroupCard({
                         onChange={(match) => onChange({ ...group, match })}
                     />
                 ) : (
-                    <span className="text-xs text-muted-foreground">{t("automations.editor.group")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("automations.editor.group")}
+                    </span>
                 )}
                 <span className="flex-1" />
                 {!disabled && (
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onRemove}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={onRemove}
+                    >
                         {t("automations.editor.removeGroup")}
                     </Button>
                 )}
@@ -978,17 +1123,37 @@ function ConditionGroupCard({
                     byId={byId}
                     disabled={disabled}
                     onChange={(next) => setItem(index, next)}
-                    onRemove={() => onChange({ ...group, items: group.items.filter((_, at) => at !== index) })}
-                    onUp={index > 0 ? () => onChange({ ...group, items: move(group.items, index, -1) }) : undefined}
-                    onDown={index < group.items.length - 1 ? () => onChange({ ...group, items: move(group.items, index, 1) }) : undefined}
+                    onRemove={() =>
+                        onChange({ ...group, items: group.items.filter((_, at) => at !== index) })
+                    }
+                    onUp={
+                        index > 0
+                            ? () => onChange({ ...group, items: move(group.items, index, -1) })
+                            : undefined
+                    }
+                    onDown={
+                        index < group.items.length - 1
+                            ? () => onChange({ ...group, items: move(group.items, index, 1) })
+                            : undefined
+                    }
                 />
             ))}
-            {group.items.length === 0 && attempted && <p className="text-xs text-danger">{t("automations.errors.emptyGroup")}</p>}
+            {group.items.length === 0 && attempted && (
+                <p className="text-xs text-danger">{t("automations.errors.emptyGroup")}</p>
+            )}
             {!disabled && group.items.length < auto.LIMITS.conditionsPerGroup && (
                 <AddMenu
                     label={t("automations.editor.addToGroup")}
-                    options={auto.CONDITION_KINDS.map((kind) => ({ value: kind, label: words.conditionKindText(kind, t) }))}
-                    onPick={(kind) => onChange({ ...group, items: [...group.items, auto.blankCondition(kind as auto.ConditionKind)] })}
+                    options={auto.CONDITION_KINDS.map((kind) => ({
+                        value: kind,
+                        label: words.conditionKindText(kind, t)
+                    }))}
+                    onPick={(kind) =>
+                        onChange({
+                            ...group,
+                            items: [...group.items, auto.blankCondition(kind as auto.ConditionKind)]
+                        })
+                    }
                 />
             )}
         </div>
@@ -1029,7 +1194,9 @@ function ConditionCard({
                     label={t("automations.editor.conditionKind")}
                     text={(kind) => words.conditionKindText(kind, t)}
                     disabled={disabled}
-                    onChange={(kind) => onChange({ ...auto.blankCondition(kind), id: condition.id })}
+                    onChange={(kind) =>
+                        onChange({ ...auto.blankCondition(kind), id: condition.id })
+                    }
                 />
             }
             disabled={disabled}
@@ -1050,7 +1217,12 @@ function ConditionCard({
                         disabled={disabled}
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) =>
-                            onChange({ ...condition, deviceId: next.id, attribute: auto.attributesFor(next.kind)[0] ?? "state", is: "" })
+                            onChange({
+                                ...condition,
+                                deviceId: next.id,
+                                attribute: auto.attributesFor(next.kind)[0] ?? "state",
+                                is: ""
+                            })
                         }
                     />
                     {device && (
@@ -1072,7 +1244,9 @@ function ConditionCard({
                                     { value: "is", label: t("automations.fields.isOption") },
                                     { value: "not", label: t("automations.fields.isNotOption") }
                                 ]}
-                                onValueChange={(next) => onChange({ ...condition, negate: next === "not" })}
+                                onValueChange={(next) =>
+                                    onChange({ ...condition, negate: next === "not" })
+                                }
                             />
                         )}
                     </fields.Field>
@@ -1105,8 +1279,13 @@ function ConditionCard({
                                 id={id}
                                 value={condition.op}
                                 disabled={disabled}
-                                options={auto.COMPARISONS.map((op) => ({ value: op, label: words.comparisonText(op, t) }))}
-                                onValueChange={(op) => onChange({ ...condition, op: op as auto.Comparison })}
+                                options={auto.COMPARISONS.map((op) => ({
+                                    value: op,
+                                    label: words.comparisonText(op, t)
+                                }))}
+                                onValueChange={(op) =>
+                                    onChange({ ...condition, op: op as auto.Comparison })
+                                }
                             />
                         )}
                     </fields.Field>
@@ -1143,7 +1322,12 @@ function ConditionCard({
                 </>
             )}
             {condition.kind === "weekday" && (
-                <fields.DaysPicker path={path} days={condition.days} disabled={disabled} onChange={(days) => onChange({ ...condition, days })} />
+                <fields.DaysPicker
+                    path={path}
+                    days={condition.days}
+                    disabled={disabled}
+                    onChange={(days) => onChange({ ...condition, days })}
+                />
             )}
         </fields.NodeCard>
     );
@@ -1209,10 +1393,18 @@ function StepCard({
                         value={step.deviceId}
                         path={path}
                         disabled={disabled}
-                        empty={canControl ? t("automations.fields.noOperable") : t("automations.fields.noControl")}
+                        empty={
+                            canControl
+                                ? t("automations.fields.noOperable")
+                                : t("automations.fields.noControl")
+                        }
                         onChange={(next) => {
                             const offered = auto.stepActionsFor(next.kind);
-                            onChange({ ...step, deviceId: next.id, do: offered.includes(step.do) ? step.do : (offered[0] ?? step.do) });
+                            onChange({
+                                ...step,
+                                deviceId: next.id,
+                                do: offered.includes(step.do) ? step.do : (offered[0] ?? step.do)
+                            });
                         }}
                     />
                     <fields.Field label={t("automations.fields.do")} path={[...path, "do"]}>
@@ -1222,11 +1414,16 @@ function StepCard({
                                 value={step.do}
                                 disabled={disabled || !device}
                                 className={invalid ? "border-danger-edge" : undefined}
-                                options={(device ? auto.stepActionsFor(device.kind) : [step.do]).map((action) => ({
+                                options={(device
+                                    ? auto.stepActionsFor(device.kind)
+                                    : [step.do]
+                                ).map((action) => ({
                                     value: action,
                                     label: words.stepActionText(action, t)
                                 }))}
-                                onValueChange={(next) => onChange({ ...step, do: next as auto.StepDeviceAction })}
+                                onValueChange={(next) =>
+                                    onChange({ ...step, do: next as auto.StepDeviceAction })
+                                }
                             />
                         )}
                     </fields.Field>
@@ -1252,7 +1449,12 @@ function StepCard({
                         disabled={disabled}
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) =>
-                            onChange({ ...step, deviceId: next.id, attribute: auto.attributesFor(next.kind)[0] ?? "state", is: "" })
+                            onChange({
+                                ...step,
+                                deviceId: next.id,
+                                attribute: auto.attributesFor(next.kind)[0] ?? "state",
+                                is: ""
+                            })
                         }
                     />
                     {device && (
@@ -1285,7 +1487,11 @@ function StepCard({
                         disabled={disabled}
                         onChange={(timeoutMinutes) => onChange({ ...step, timeoutMinutes })}
                     />
-                    <fields.Field label={t("automations.fields.onTimeout")} path={[...path, "onTimeout"]} className="sm:col-span-2">
+                    <fields.Field
+                        label={t("automations.fields.onTimeout")}
+                        path={[...path, "onTimeout"]}
+                        className="sm:col-span-2"
+                    >
                         {(id) => (
                             <Select
                                 id={id}
@@ -1293,16 +1499,26 @@ function StepCard({
                                 disabled={disabled}
                                 options={[
                                     { value: "stop", label: t("automations.fields.timeoutStop") },
-                                    { value: "continue", label: t("automations.fields.timeoutContinue") }
+                                    {
+                                        value: "continue",
+                                        label: t("automations.fields.timeoutContinue")
+                                    }
                                 ]}
-                                onValueChange={(next) => onChange({ ...step, onTimeout: next as "stop" | "continue" })}
+                                onValueChange={(next) =>
+                                    onChange({ ...step, onTimeout: next as "stop" | "continue" })
+                                }
                             />
                         )}
                     </fields.Field>
                 </>
             )}
             {step.kind === "notify" && (
-                <fields.Field label={t("automations.fields.message")} path={[...path, "message"]} required className="sm:col-span-2">
+                <fields.Field
+                    label={t("automations.fields.message")}
+                    path={[...path, "message"]}
+                    required
+                    className="sm:col-span-2"
+                >
                     {(id, invalid) => (
                         <Textarea
                             id={id}
@@ -1318,7 +1534,12 @@ function StepCard({
                 </fields.Field>
             )}
             {step.kind === "run" && (
-                <fields.Field label={t("automations.fields.automation")} path={[...path, "automationId"]} required className="sm:col-span-2">
+                <fields.Field
+                    label={t("automations.fields.automation")}
+                    path={[...path, "automationId"]}
+                    required
+                    className="sm:col-span-2"
+                >
                     {(id, invalid) =>
                         siblings.length === 0 ? (
                             <p id={id} className="text-xs text-muted-foreground">
@@ -1331,8 +1552,13 @@ function StepCard({
                                 disabled={disabled}
                                 placeholder={t("automations.fields.chooseAutomation")}
                                 className={invalid ? "border-danger-edge" : undefined}
-                                options={siblings.map((sibling) => ({ value: sibling.id, label: sibling.name }))}
-                                onValueChange={(automationId) => onChange({ ...step, automationId })}
+                                options={siblings.map((sibling) => ({
+                                    value: sibling.id,
+                                    label: sibling.name
+                                }))}
+                                onValueChange={(automationId) =>
+                                    onChange({ ...step, automationId })
+                                }
                             />
                         )
                     }

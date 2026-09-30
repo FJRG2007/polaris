@@ -31,7 +31,11 @@ export interface ShellyAddress {
     readonly password: string;
 }
 
-export function shellyAddress(host: string, username: string, password: string): ShellyAddress | null {
+export function shellyAddress(
+    host: string,
+    username: string,
+    password: string
+): ShellyAddress | null {
     const origin = deviceOrigin(host, "http");
     return origin ? { origin, username: username || RPC_USER, password } : null;
 }
@@ -79,7 +83,8 @@ export async function shellyInfo(address: ShellyAddress): Promise<ShellyInfo> {
         throw new DriverError("That address answered, but not as a Shelly.", "refused");
     }
     const result = infoSchema.safeParse(jsonOf(response));
-    if (!result.success) throw new DriverError("That address answered, but not as a Shelly.", "refused");
+    if (!result.success)
+        throw new DriverError("That address answered, but not as a Shelly.", "refused");
     return result.data;
 }
 
@@ -184,9 +189,13 @@ export async function shellyRpc(
         if (response.status === 401) throw passwordRefused();
     }
     if (response.status === 429) {
-        throw new DriverError("The Shelly is refusing requests for a while after too many wrong passwords.", "unreachable");
+        throw new DriverError(
+            "The Shelly is refusing requests for a while after too many wrong passwords.",
+            "unreachable"
+        );
     }
-    if (response.status !== 200) throw new DriverError("The device refused the request.", "refused");
+    if (response.status !== 200)
+        throw new DriverError("The device refused the request.", "refused");
     const result = jsonOf(response);
     if (result === null) throw odd();
     return result;
@@ -219,7 +228,10 @@ function basic(address: ShellyAddress): Record<string, string> {
 }
 
 /** One path on a first-generation device, as JSON. */
-export async function shellyGet(address: ShellyAddress, path: string): Promise<Record<string, unknown>> {
+export async function shellyGet(
+    address: ShellyAddress,
+    path: string
+): Promise<Record<string, unknown>> {
     const response = await lanRequest({ url: `${address.origin}${path}`, headers: basic(address) });
     if (response.status === 401) {
         if (!address.password) {
@@ -230,6 +242,7 @@ export async function shellyGet(address: ShellyAddress, path: string): Promise<R
         }
         throw passwordRefused();
     }
-    if (response.status !== 200) throw new DriverError("The device refused the request.", "refused");
+    if (response.status !== 200)
+        throw new DriverError("The device refused the request.", "refused");
     return parsed(rpcStatusSchema, response);
 }

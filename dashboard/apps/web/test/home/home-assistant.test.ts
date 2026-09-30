@@ -26,10 +26,17 @@ let tokenValid = true;
 let serviceStatus = 200;
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
-    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
+    const actual =
+        await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
     return {
         ...actual,
-        lanRequest: async (options: { url: string; method?: string; body?: string; headers?: Record<string, string>; trust?: unknown }) => {
+        lanRequest: async (options: {
+            url: string;
+            method?: string;
+            body?: string;
+            headers?: Record<string, string>;
+            trust?: unknown;
+        }) => {
             const request: Sent = {
                 url: options.url,
                 method: options.method ?? "GET",
@@ -44,7 +51,10 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                 body: Buffer.from(JSON.stringify(body)),
                 certificate: null
             });
-            if (!tokenValid || request.headers.authorization !== "Bearer long-lived-token-0123456789") {
+            if (
+                !tokenValid ||
+                request.headers.authorization !== "Bearer long-lived-token-0123456789"
+            ) {
                 return reply(401, { message: "401: Unauthorized" });
             }
             const path = new URL(options.url).pathname;
@@ -65,13 +75,37 @@ beforeEach(() => {
     tokenValid = true;
     serviceStatus = 200;
     states = [
-        { entity_id: "switch.kettle", state: "on", attributes: { friendly_name: "Kettle", device_class: "outlet" } },
+        {
+            entity_id: "switch.kettle",
+            state: "on",
+            attributes: { friendly_name: "Kettle", device_class: "outlet" }
+        },
         { entity_id: "switch.porch", state: "off", attributes: { friendly_name: "Porch" } },
-        { entity_id: "light.lounge", state: "unavailable", attributes: { friendly_name: "Lounge", restored: true } },
-        { entity_id: "lock.front_door", state: "locking", attributes: { friendly_name: "Front door", supported_features: 1 } },
-        { entity_id: "binary_sensor.back_door", state: "on", attributes: { friendly_name: "Back door", device_class: "door" } },
-        { entity_id: "sensor.hall_temperature", state: "21.5", attributes: { friendly_name: "Hall", unit_of_measurement: "°C" } },
-        { entity_id: "climate.living_room", state: "heat", attributes: { friendly_name: "Thermostat" } },
+        {
+            entity_id: "light.lounge",
+            state: "unavailable",
+            attributes: { friendly_name: "Lounge", restored: true }
+        },
+        {
+            entity_id: "lock.front_door",
+            state: "locking",
+            attributes: { friendly_name: "Front door", supported_features: 1 }
+        },
+        {
+            entity_id: "binary_sensor.back_door",
+            state: "on",
+            attributes: { friendly_name: "Back door", device_class: "door" }
+        },
+        {
+            entity_id: "sensor.hall_temperature",
+            state: "21.5",
+            attributes: { friendly_name: "Hall", unit_of_measurement: "°C" }
+        },
+        {
+            entity_id: "climate.living_room",
+            state: "heat",
+            attributes: { friendly_name: "Thermostat" }
+        },
         { entity_id: "cover.garage", state: "closed", attributes: { friendly_name: "Garage" } }
     ];
 });
@@ -79,7 +113,9 @@ beforeEach(() => {
 describe("what a house has", () => {
     it("takes switches, lights, locks and sensors, and leaves the rest", async () => {
         const found = await homeAssistantDriver.list(HOME);
-        expect(found.map((row) => [row.externalId, row.kind, row.name, row.state, row.online])).toEqual([
+        expect(
+            found.map((row) => [row.externalId, row.kind, row.name, row.state, row.online])
+        ).toEqual([
             ["switch.kettle", "outlet", "Kettle", "on", true],
             ["switch.porch", "switch", "Porch", "off", true],
             ["light.lounge", "light", "Lounge", "unknown", false],
@@ -91,8 +127,14 @@ describe("what a house has", () => {
 
     it("gives a contact readable words and a temperature its unit", async () => {
         const found = await homeAssistantDriver.list(HOME);
-        expect(found.find((row) => row.externalId === "binary_sensor.back_door")).toMatchObject({ value: "Open", unit: "" });
-        expect(found.find((row) => row.externalId === "sensor.hall_temperature")).toMatchObject({ value: "21.5", unit: "°C" });
+        expect(found.find((row) => row.externalId === "binary_sensor.back_door")).toMatchObject({
+            value: "Open",
+            unit: ""
+        });
+        expect(found.find((row) => row.externalId === "sensor.hall_temperature")).toMatchObject({
+            value: "21.5",
+            unit: "°C"
+        });
     });
 
     it("asks at port 8123 when only an address was given, and trusts only real certificates", async () => {
@@ -104,7 +146,11 @@ describe("what a house has", () => {
 
 describe("what is sent", () => {
     it("turns a switch on through its domain's service", async () => {
-        await homeAssistantDriver.act(HOME, { externalId: "switch.kettle", kind: "outlet" }, "turn-on");
+        await homeAssistantDriver.act(
+            HOME,
+            { externalId: "switch.kettle", kind: "outlet" },
+            "turn-on"
+        );
         const call = sent.at(-1)!;
         expect(call.method).toBe("POST");
         expect(new URL(call.url).pathname).toBe("/api/services/switch/turn_on");
@@ -112,14 +158,22 @@ describe("what is sent", () => {
     });
 
     it("opens a lock's latch with lock.open", async () => {
-        await homeAssistantDriver.act(HOME, { externalId: "lock.front_door", kind: "lock" }, "unlatch");
+        await homeAssistantDriver.act(
+            HOME,
+            { externalId: "lock.front_door", kind: "lock" },
+            "unlatch"
+        );
         expect(new URL(sent.at(-1)!.url).pathname).toBe("/api/services/lock/open");
     });
 
     it("says the device cannot do it when Home Assistant answers 400", async () => {
         serviceStatus = 400;
         await expect(
-            homeAssistantDriver.act(HOME, { externalId: "lock.front_door", kind: "lock" }, "unlatch")
+            homeAssistantDriver.act(
+                HOME,
+                { externalId: "lock.front_door", kind: "lock" },
+                "unlatch"
+            )
         ).rejects.toMatchObject({ kind: "refused" });
     });
 
@@ -138,6 +192,8 @@ describe("the token", () => {
 
     it("that is refused marks the connection, not the house", async () => {
         tokenValid = false;
-        await expect(homeAssistantDriver.verify(HOME)).rejects.toMatchObject({ kind: "unauthorized" });
+        await expect(homeAssistantDriver.verify(HOME)).rejects.toMatchObject({
+            kind: "unauthorized"
+        });
     });
 });

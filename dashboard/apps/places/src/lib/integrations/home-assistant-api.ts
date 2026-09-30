@@ -86,7 +86,11 @@ export type HomeAssistantState = z.infer<typeof stateSchema>;
 /** Every entity and what it is doing. */
 export async function homeAssistantStates(home: HomeAssistant): Promise<HomeAssistantState[]> {
     const response = await call(home, "GET", "/api/states", undefined, MAX_STATES_BYTES);
-    if (response.status === 503) throw new DriverError("Home Assistant is restarting. Try again in a moment.", "unreachable");
+    if (response.status === 503)
+        throw new DriverError(
+            "Home Assistant is restarting. Try again in a moment.",
+            "unreachable"
+        );
     const parsed = z.array(z.unknown()).safeParse(jsonOf(response));
     if (response.status !== 200 || !parsed.success) {
         throw new DriverError("That address answered, but not as Home Assistant.", "refused");
@@ -110,9 +114,14 @@ export async function callService(
     service: string,
     entityId: string
 ): Promise<void> {
-    const response = await call(home, "POST", `/api/services/${domain}/${service}`, { entity_id: entityId });
+    const response = await call(home, "POST", `/api/services/${domain}/${service}`, {
+        entity_id: entityId
+    });
     if (response.status === 400) {
-        throw new DriverError("Home Assistant would not do that. The device may not support it.", "refused");
+        throw new DriverError(
+            "Home Assistant would not do that. The device may not support it.",
+            "refused"
+        );
     }
     if (response.status < 200 || response.status >= 300) {
         throw new DriverError("Home Assistant refused the request.", "refused");

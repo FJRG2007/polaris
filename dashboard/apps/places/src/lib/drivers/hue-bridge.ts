@@ -71,9 +71,12 @@ export const hueBridgeDriver: DeviceDriver = {
         const bridge = bridgeOf(credentials);
         const { lights, devices, connectivity } = await hue.readBridge(bridge);
         const byId = new Map(devices.map((device) => [device.id, device]));
-        const reachable = new Map(connectivity.map((entry) => [entry.owner.rid, entry.status === "connected"]));
+        const reachable = new Map(
+            connectivity.map((entry) => [entry.owner.rid, entry.status === "connected"])
+        );
         const perDevice = new Map<string, number>();
-        for (const light of lights) perDevice.set(light.owner.rid, (perDevice.get(light.owner.rid) ?? 0) + 1);
+        for (const light of lights)
+            perDevice.set(light.owner.rid, (perDevice.get(light.owner.rid) ?? 0) + 1);
 
         return lights.map((light): DeviceSnapshot => {
             const device = byId.get(light.owner.rid);
@@ -90,7 +93,10 @@ export const hueBridgeDriver: DeviceDriver = {
                 externalId: light.id,
                 kind: kindOf(light, device),
                 name: name.trim(),
-                model: device?.product_data.product_name?.trim() || device?.product_data.model_id?.trim() || null,
+                model:
+                    device?.product_data.product_name?.trim() ||
+                    device?.product_data.model_id?.trim() ||
+                    null,
                 firmware: device?.product_data.software_version?.trim() || null,
                 state: !online || !light.on ? "unknown" : light.on.on ? "on" : "off",
                 doorState: "none",

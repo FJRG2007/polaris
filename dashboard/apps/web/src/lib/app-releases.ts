@@ -183,7 +183,9 @@ const cache = new Map<string, Held>();
 
 /** What a walk came back with: the answer, and the first page's `etag`. A `304`
  *  on that page is `unchanged`, meaning the answer already held still stands. */
-type Asked = { readonly unchanged: true } | { readonly found: AppDownload | null; readonly etag: string | null };
+type Asked =
+    | { readonly unchanged: true }
+    | { readonly found: AppDownload | null; readonly etag: string | null };
 
 async function ask(repo: string, prefix: string, etag: string | null): Promise<Asked> {
     const deadline = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
