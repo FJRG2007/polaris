@@ -262,7 +262,27 @@ export async function actOnDevice(
         data: { state: kinds.settledState(action) ?? "moving", stateAt: new Date() },
         select: DEVICE_FIELDS
     });
+    // A socket told to go on is on now, and whatever is watching it hears so
+    // now rather than at the next sync.
+    await tellAutomations(installedAppId, [row]);
     return toView(row);
+}
+
+/**
+ * Tell the automations what devices were just read as.
+ *
+ * Loaded when it is needed, since the automations act through this module and
+ * a cycle between the two at load time would leave one of them half-built.
+ * Never a reason for a sync or a press to fail: the door moved whether or not an
+ * automation heard about it.
+ */
+async function tellAutomations(installedAppId: string, rows: readonly DeviceRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    try {
+        await (await import("./automation-runtime")).observeDevices(installedAppId, rows);
+    } catch (error) {
+        console.error("places: the automations could not be told about a device:", error);
+    }
 }
 
 /**
@@ -314,6 +334,7 @@ async function syncAccount(
 
         const snapshots = await driver.list(credentials);
         const vendor = view.brand.toLowerCase();
+        const read: DeviceRow[] = [];
         for (const snapshot of snapshots) {
             const reading = {
                 kind: snapshot.kind,
@@ -328,7 +349,7 @@ async function syncAccount(
                 unit: snapshot.unit ?? null,
                 stateAt: new Date()
             };
-            await prisma.placeDevice.upsert({
+            const saved = await prisma.placeDevice.upsert({
                 where: { accountId_externalId: { accountId, externalId: snapshot.externalId } },
                 // The name, the place and the zone are not overwritten on the way
                 // in: a door renamed here is renamed for a reason, and a sync that
@@ -342,8 +363,10 @@ async function syncAccount(
                     vendor,
                     externalId: snapshot.externalId,
                     name: snapshot.name
-                }
+                },
+                select: DEVICE_FIELDS
             });
+            read.push(saved);
         }
 
         // Anything on our side the account no longer has. A device somebody sold
@@ -368,6 +391,7 @@ async function syncAccount(
         if (driver.history)
             await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
         await accounts.markSynced(accountId);
+        await tellAutomations(installedAppId, read);
         return snapshots.length;
     } catch (caught) {
         if (caught instanceof DriverError) {

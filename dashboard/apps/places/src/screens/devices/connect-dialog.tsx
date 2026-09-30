@@ -14,6 +14,14 @@
  * hints, what is a secret and what is an address, and the steps for the part that
  * genuinely is not Polaris' to do. Adding a make adds no markup here.
  *
+ * Some ways in are done rather than typed: a code scanned with the maker's app, a
+ * button pressed on a bridge. Those declare `pairing` in the registry, and this
+ * dialog draws the step for them - the code to scan, or the wait - and asks on
+ * its own every few seconds whether it has happened, so nobody has to press
+ * anything once they have scanned. An attempt that runs out stops asking and
+ * offers a new one. Which kind of step, how often and for how long are the
+ * registry's; nothing here names a make.
+ *
  * A credential is written once and never shown again. There is no reveal and no
  * masked copy of it in a field on the next visit: it is a key to somebody's front
  * door, and a screen that can print it back is a screen somebody can be walked
@@ -22,13 +30,14 @@
 
 import Link from "next/link";
 import * as actions from "../actions";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as kinds from "../../lib/device-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
 import * as registry from "../../lib/device-connections";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import {
+    Badge,
     Button,
     cn,
     Dialog,
@@ -47,6 +56,13 @@ import { englishPlaces } from "../../../messages";
 
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
+const { QRCodeSVG } = hostUi.qrCode;
+
+/** One attempt at pairing, as the server started it. */
+interface Pairing {
+    readonly state: Record<string, string>;
+    readonly qr?: string;
+}
 
 /** A make's name as the picker shows it: its own, or the words for the
  *  catch-all that is not a make. */
@@ -136,12 +152,15 @@ export function ConnectDialog({
     const brands = useMemo(() => registry.deviceBrands(), []);
     const [brand, setBrand] = useState(brands[0]?.brand ?? "");
     const [chosen, setChosen] = useState(
-        registry.connectionsOfBrand(brands[0]?.brand ?? "")[0]?.id ?? ""
+        registry.recommendedConnection(brands[0]?.brand ?? "")?.id ?? ""
     );
     const [label, setLabel] = useState("");
     const [fields, setFields] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    /** The attempt being waited on, for a connection made by pairing. */
+    const [pairing, setPairing] = useState<Pairing | null>(null);
+    const [expired, setExpired] = useState(false);
 
     const connectionId = reconnect ? reconnect.connection : chosen;
     const connection = registry.deviceConnection(connectionId);
@@ -149,20 +168,117 @@ export function ConnectDialog({
     const complete = connection ? registry.fieldsComplete(connection, fields) : false;
     const said = connection ? registry.connectionWords(t, connection) : null;
 
+    /** What a poll needs that may change between renders without the attempt
+     *  changing - the screen behind this hands a new callback every render, and
+     *  restarting the wait for that would reset how long a code has left. */
+    const latest = useRef({ label, fields, reconnect, onConnected });
+    latest.current = { label, fields, reconnect, onConnected };
+
+    // An account being reconnected is shown with what it was pointed at, since
+    // that is what it is most likely to be pointed at again. Only what the
+    // registry calls shown ever arrives here; a credential never does.
+    useEffect(() => {
+        setFields(reconnect ? { ...reconnect.settings } : {});
+    }, [reconnect]);
+
+    // A closed dialog is waiting for nothing.
+    useEffect(() => {
+        if (open) return;
+        setPairing(null);
+        setExpired(false);
+    }, [open]);
+
+    // Ask whether the other side has agreed, every few seconds, until it has, it
+    // refuses, or the attempt runs out.
+    useEffect(() => {
+        const steps = connection?.pairing;
+        if (!open || !pairing || expired || !connection || !steps) return;
+        let stopped = false;
+        let asking = false;
+        const ask = async () => {
+            if (stopped || asking) return;
+            asking = true;
+            const now = latest.current;
+            const result = await runAction(
+                () =>
+                    actions.pollDevicePairingAction({
+                        connection: connection.id,
+                        label: now.label,
+                        fields: now.fields,
+                        state: pairing.state,
+                        accountId: now.reconnect?.id
+                    }),
+                setError
+            );
+            asking = false;
+            // A poll that did not get through is asked again on the next tick;
+            // the code on the screen is still good.
+            if (!result) return;
+            if (!result.error && !result.waiting) {
+                stopped = true;
+                setPairing(null);
+                setExpired(false);
+                setFields({});
+                setLabel("");
+                latest.current.onConnected({
+                    devices: result.devices ?? [],
+                    accounts: result.accounts ?? []
+                });
+                return;
+            }
+            if (stopped) return;
+            if (result.error) {
+                stopped = true;
+                setPairing(null);
+                setError(result.error);
+                return;
+            }
+            setError("");
+        };
+        const timer = window.setInterval(() => void ask(), steps.pollMs);
+        const lapse = window.setTimeout(() => setExpired(true), steps.lifetimeMs);
+        return () => {
+            stopped = true;
+            window.clearInterval(timer);
+            window.clearTimeout(lapse);
+        };
+    }, [open, pairing, expired, connection]);
+
     /** A make with one way in is not a question, so the second list is only drawn
      *  where there is something to weigh up - and picking a make always settles on
-     *  its best one, which is the first. */
+     *  its recommended one. */
     const pickBrand = (next: string) => {
         setBrand(next);
-        setChosen(registry.connectionsOfBrand(next)[0]?.id ?? "");
+        setChosen(registry.recommendedConnection(next)?.id ?? "");
         setFields({});
         setError("");
+        setPairing(null);
     };
 
     const pickConnection = (next: string) => {
         setChosen(next);
         setFields({});
         setError("");
+        setPairing(null);
+    };
+
+    /** Begin an attempt at pairing - or a fresh one, when the last ran out. */
+    const startPairing = async () => {
+        if (!connection || !complete || saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(
+            () => actions.startDevicePairingAction({ connection: connection.id, label, fields }),
+            setError
+        );
+        setSaving(false);
+        if (!result) return;
+        if (result.error || !result.state) {
+            setError(result.error ?? "");
+            return;
+        }
+        setExpired(false);
+        setPairing({ state: result.state, qr: result.qr });
     };
 
     const submit = async () => {
@@ -193,19 +309,21 @@ export function ConnectDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {reconnect ? t("connect.reconnectTitle", { name: reconnect.label }) : t("connect.title")}
+                        {reconnect
+                            ? t("connect.reconnectTitle", { name: reconnect.label })
+                            : t("connect.title")}
                     </DialogTitle>
                     <DialogDescription>
-                        {reconnect
-                            ? t("connect.reconnectIntro")
-                            : t("connect.intro")}
+                        {reconnect ? t("connect.reconnectIntro") : t("connect.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    {!reconnect && (
+                    {!reconnect && !pairing && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("connect.make")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("connect.make")}
+                            </span>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {brands.map((entry) => (
                                     <button
@@ -244,11 +362,13 @@ export function ConnectDialog({
                         </div>
                     )}
 
-                    {!reconnect && ofBrand.length > 1 && (
+                    {!reconnect && !pairing && ofBrand.length > 1 && (
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("connect.how")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("connect.how")}
+                            </span>
                             <div className="flex flex-col gap-2">
-                                {ofBrand.map((entry, index) => (
+                                {ofBrand.map((entry) => (
                                     <button
                                         key={entry.id}
                                         type="button"
@@ -270,13 +390,12 @@ export function ConnectDialog({
                                             )}
                                         />
                                         <span className="flex min-w-0 flex-col gap-0.5">
-                                            <span className="text-sm font-medium">
+                                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
                                                 {registry.connectionWords(t, entry).label}
-                                                {index === 0 && (
-                                                    <span className="text-foreground-subtle">
-                                                        {" "}
+                                                {entry.recommended === true && (
+                                                    <Badge className="border-accent/30 bg-accent/10 text-accent">
                                                         {t("connect.recommended")}
-                                                    </span>
+                                                    </Badge>
                                                 )}
                                             </span>
                                             <span className="text-[0.6875rem] text-muted-foreground">
@@ -290,7 +409,7 @@ export function ConnectDialog({
                         </div>
                     )}
 
-                    {connection && (
+                    {connection && !pairing && (
                         <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 px-3 py-2">
                             <span className="flex items-center gap-2 text-xs font-medium">
                                 <IntegrationLogo
@@ -306,7 +425,7 @@ export function ConnectDialog({
                         </div>
                     )}
 
-                    {said && said.steps.length > 0 && (
+                    {!pairing && said && said.steps.length > 0 && (
                         <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
                             {said.steps.map((step, index) => (
                                 <li key={step}>
@@ -332,32 +451,97 @@ export function ConnectDialog({
                         </ol>
                     )}
 
-                    {connection &&
-                        connection.fields.map((field) => (
-                        <Field
-                            key={field.key}
-                            connection={connection}
-                            field={field}
-                            value={fields[field.key] ?? ""}
-                            onChange={(value) =>
-                                setFields((current) => ({ ...current, [field.key]: value }))
-                            }
-                        />
-                    ))}
+                    {pairing && connection?.pairing && (
+                        <div className="flex flex-col items-center gap-3 text-center">
+                            {connection.pairing.kind === "qr" && pairing.qr && (
+                                <div
+                                    role="img"
+                                    aria-label={t("connect.pair.codeLabel")}
+                                    className="relative rounded-lg bg-white p-3"
+                                >
+                                    <QRCodeSVG
+                                        value={pairing.qr}
+                                        size={168}
+                                        level="Q"
+                                        bgColor="#ffffff"
+                                        fgColor="#000000"
+                                    />
+                                    {expired && (
+                                        <div className="absolute inset-0 grid place-items-center rounded-lg bg-background/90 p-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t("connect.pair.expired")}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {said?.pairingPrompt && (
+                                <p className="max-w-sm text-xs text-muted-foreground">
+                                    {said.pairingPrompt}
+                                </p>
+                            )}
+                            {expired ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void startPairing()}
+                                    disabled={saving}
+                                >
+                                    {saving ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="size-4" />
+                                    )}
+                                    {t("connect.pair.newCode")}
+                                </Button>
+                            ) : (
+                                <p
+                                    className="flex items-center gap-2 text-xs text-foreground-subtle"
+                                    aria-live="polite"
+                                >
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    {connection.pairing.kind === "qr"
+                                        ? t("connect.pair.waiting")
+                                        : t("connect.pair.waitingPress")}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                    <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">
-                            {t("connect.label")}{" "}
-                            <span className="text-foreground-subtle">{t("deviceDialog.optional")}</span>
-                        </span>
-                        <Input
-                            value={label}
-                            maxLength={60}
-                            placeholder={reconnect?.label ?? (connection ? brandWords(connection.brand, t) : "")}
-                            onChange={(event) => setLabel(event.target.value)}
-                            aria-label={t("connect.label")}
-                        />
-                    </label>
+                    {!pairing &&
+                        connection &&
+                        connection.fields.map((field) => (
+                            <Field
+                                key={field.key}
+                                connection={connection}
+                                field={field}
+                                value={fields[field.key] ?? ""}
+                                onChange={(value) =>
+                                    setFields((current) => ({ ...current, [field.key]: value }))
+                                }
+                            />
+                        ))}
+
+                    {!pairing && (
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                                {t("connect.label")}{" "}
+                                <span className="text-foreground-subtle">
+                                    {t("deviceDialog.optional")}
+                                </span>
+                            </span>
+                            <Input
+                                value={label}
+                                maxLength={60}
+                                placeholder={
+                                    reconnect?.label ??
+                                    (connection ? brandWords(connection.brand, t) : "")
+                                }
+                                onChange={(event) => setLabel(event.target.value)}
+                                aria-label={t("connect.label")}
+                            />
+                        </label>
+                    )}
 
                     {error && (
                         <p
@@ -373,14 +557,26 @@ export function ConnectDialog({
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
                         {t("common.cancel")}
                     </Button>
-                    <Button
-                        onClick={() => void submit()}
-                        disabled={!complete || saving}
-                        aria-disabled={!complete || saving}
-                    >
-                        {saving && <Loader2 className="size-4 animate-spin" />}
-                        {saving ? t("connect.checking") : t("connect.connect")}
-                    </Button>
+                    {pairing ? (
+                        <Button variant="outline" onClick={() => setPairing(null)}>
+                            {t("connect.pair.back")}
+                        </Button>
+                    ) : (
+                        <Button
+                            onClick={() => void (connection?.pairing ? startPairing() : submit())}
+                            disabled={!complete || saving}
+                            aria-disabled={!complete || saving}
+                        >
+                            {saving && <Loader2 className="size-4 animate-spin" />}
+                            {saving
+                                ? t("connect.checking")
+                                : connection?.pairing
+                                  ? connection.pairing.kind === "qr"
+                                      ? t("connect.pair.showCode")
+                                      : t("connect.pair.start")
+                                  : t("connect.connect")}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

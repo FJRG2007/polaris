@@ -167,17 +167,36 @@ export function DevicesView({
         setOpened((current) => (current && current.id === device.id ? device : current));
     };
 
+    /**
+     * Tell a device to do something.
+     *
+     * Where the outcome is known before anything answers - a switch told to go
+     * on is on or it failed - the row moves there at once and moves back if the
+     * answer is a refusal, so a switch flips under the finger rather than a
+     * second later. A lock is left alone until it reports: it is turning, and
+     * where it gets to is the vendor's to say.
+     */
     const act = async (device: DeviceView, action: DeviceAction) => {
         setBusy({ id: device.id, action });
         setError("");
+        const settled = kinds.settledState(action);
+        if (settled) settle({ ...device, state: settled });
         const result = await runAction(
             () => actions.operateDeviceAction(device.id, action),
             setError
         );
         setBusy(null);
-        if (!result) return;
-        if (result.error) {
-            setError(result.error);
+        if (!result || result.error) {
+            if (settled) {
+                const restore = (entry: DeviceView) =>
+                    entry.id === device.id && entry.state === settled
+                        ? { ...entry, state: device.state }
+                        : entry;
+                setDevices((current) => (current ?? []).map(restore));
+                setOpened((current) => (current ? restore(current) : current));
+            }
+            if (!result) return;
+            setError(result.error ?? "");
             throw new Error(result.error);
         }
         if (result.device) settle(result.device);
@@ -259,9 +278,7 @@ export function DevicesView({
                 <EmptyState
                     title={t("devicesView.emptyTitle")}
                     description={
-                        canManage
-                            ? t("devicesView.emptyManage")
-                            : t("devicesView.emptyView")
+                        canManage ? t("devicesView.emptyManage") : t("devicesView.emptyView")
                     }
                     action={
                         canManage ? (
@@ -306,7 +323,9 @@ export function DevicesView({
                                 size="sm"
                                 variant="ghost"
                                 className="size-6 p-0"
-                                aria-label={t("devicesView.disconnectName", { name: account.label })}
+                                aria-label={t("devicesView.disconnectName", {
+                                    name: account.label
+                                })}
                                 title={t("devicesView.disconnectName", { name: account.label })}
                                 onClick={() => setDisconnecting(account)}
                             >
@@ -345,7 +364,9 @@ export function DevicesView({
                             {account.status === "unauthorized"
                                 ? t("devicesView.refused", { name: account.label })
                                 : t("devicesView.unreachable", { name: account.label })}
-                            {account.statusNote ? ` ${placesRefusalText(t, account.statusNote)}` : ""}
+                            {account.statusNote
+                                ? ` ${placesRefusalText(t, account.statusNote)}`
+                                : ""}
                         </p>
                         {canManage && account.status === "unauthorized" && (
                             <Button size="sm" onClick={() => setReconnecting(account)}>
@@ -365,9 +386,7 @@ export function DevicesView({
             )}
 
             {devices.some((device) => device.placeId === null) && (
-                <p className="text-xs text-muted-foreground">
-                    {t("devicesView.unplacedNote")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("devicesView.unplacedNote")}</p>
             )}
 
             {devices.length === 0 ? (
@@ -393,9 +412,9 @@ export function DevicesView({
                                         <button
                                             type="button"
                                             onClick={() => setOpened(device)}
-                                            className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+                                            className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left"
                                         >
-                                            <span className="flex items-center gap-2">
+                                            <span className="flex min-w-0 max-w-full items-center gap-2">
                                                 <DeviceIcon
                                                     kind={device.kind}
                                                     className="size-4 shrink-0 text-muted-foreground"
@@ -432,7 +451,7 @@ export function DevicesView({
                                                     </Badge>
                                                 )}
                                             </span>
-                                            <span className="truncate text-[0.6875rem] text-foreground-subtle">
+                                            <span className="max-w-full truncate text-[0.6875rem] text-foreground-subtle">
                                                 {[
                                                     device.zone,
                                                     device.model,
@@ -441,7 +460,9 @@ export function DevicesView({
                                                         : kinds.doorText(device.doorState, t),
                                                     device.batteryPercent === null
                                                         ? null
-                                                        : t("devicesView.batteryPercent", { percent: device.batteryPercent })
+                                                        : t("devicesView.batteryPercent", {
+                                                              percent: device.batteryPercent
+                                                          })
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" - ")}

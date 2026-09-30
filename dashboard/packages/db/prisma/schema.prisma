@@ -9442,8 +9442,9 @@ model Place {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    cameras Camera[]
-    devices PlaceDevice[]
+    cameras     Camera[]
+    devices     PlaceDevice[]
+    automations PlaceAutomation[]
 
     @@index([installedAppId])
 }
@@ -9872,9 +9873,10 @@ model PlaceDevice {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    place   Place?              @relation(fields: [placeId], references: [id], onDelete: SetNull)
-    account PlaceDeviceAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    events  PlaceDeviceEvent[]
+    place       Place?                  @relation(fields: [placeId], references: [id], onDelete: SetNull)
+    account     PlaceDeviceAccount?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    events      PlaceDeviceEvent[]
+    observation PlaceDeviceObservation?
 
     // One device per id per account. A sync runs on a schedule and on demand, and
     // the two overlapping must not leave a house with the same door twice. Per
@@ -9978,6 +9980,110 @@ model PlaceDeviceEvent {
     @@unique([deviceId, externalId])
     @@index([deviceId, at])
 }
+
+// What one device was last seen doing, as the automations read it.
+//
+// The device row carries the last reading too, but every sync overwrites it -
+// so "did this just change" cannot be answered from it, and neither can "since
+// when". This row is compared and swapped in one statement per change, which is
+// what makes each transition fire the automations watching it exactly once
+// however many syncs race over the same reading.
+model PlaceDeviceObservation {
+    deviceId     String   @id @db.Uuid
+    /// The device's state word (on, locked...), as `PlaceDevice.state`.
+    state        String
+    stateSince   DateTime
+    /// The paired door sensor (open, closed, unknown, none).
+    door         String
+    doorSince    DateTime
+    /// A sensor's reading as text, or empty for a device that has none.
+    reading      String
+    readingSince DateTime
+    /// One more on every change: what names each change, and what the swap
+    /// compares, so two readers of the same change fire it once.
+    version      Int      @default(0)
+
+    device PlaceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+// An automation: when something happens at a place, and only if, do these.
+//
+// The definition (triggers, conditions, steps) is one JSON document validated by
+// the schema the editor uses, rather than a table per node kind: it is read and
+// written whole, never queried by its parts, and a new kind of step is then a
+// schema change in code rather than a migration.
+model PlaceAutomation {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent.
+    installedAppId String  @db.Uuid
+    placeId        String  @db.Uuid
+    /// Whose rights it acts with: whoever last saved it, since they are the one
+    /// who vouched for every step in it. Checked again on every run.
+    ownerId        String  @db.Uuid
+    name           String
+    enabled        Boolean @default(true)
+    definition     Json
+    /// When it was last switched on or saved. A time of day that passed before
+    /// this is not one it missed.
+    armedAt        DateTime @default(now())
+    lastRunAt      DateTime?
+    /// succeeded | failed | skipped | stopped | refused | limited
+    lastStatus     String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place Place                @relation(fields: [placeId], references: [id], onDelete: Cascade)
+    runs  PlaceAutomationRun[]
+
+    @@index([installedAppId, enabled])
+    @@index([placeId])
+}
+
+// One time an automation fired, and how far it got.
+//
+// Also the queue: a run waiting out a delay, or for a door to close, is a row
+// with a due time that the minute tick resumes - so a two-hour delay survives the
+// dashboard restarting halfway through it.
+model PlaceAutomationRun {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    automationId String    @db.Uuid
+    /// What made this one fire, unique per automation: the same time of day, the
+    /// same change of a device, the same press of Run now is one run, however
+    /// many passes see it.
+    firingKey    String
+    /// The trigger as it fired, for the log ("Front door opened").
+    cause        Json
+    /// How many automations started one another to get here.
+    depth        Int       @default(0)
+    /// queued | waiting | running | succeeded | failed | skipped | stopped |
+    /// refused | limited
+    status       String    @default("queued")
+    /// The next step to run.
+    step         Int       @default(0)
+    /// When a queued or waiting run is next looked at.
+    dueAt        DateTime?
+    /// The end of a wait for a device, after which it gives up.
+    waitUntil    DateTime?
+    /// The device a waiting step is watching, so a change to it wakes the run.
+    waitDeviceId String?   @db.Uuid
+    /// Held while a runner works on it, so two never run the same steps.
+    lockedUntil  DateTime?
+    /// One entry per step reached: what it was, how it went, why.
+    steps        Json      @default("[]")
+    /// Why it stopped, when it did not finish, as a sentence Places wrote.
+    reason       String?
+    startedAt    DateTime  @default(now())
+    finishedAt   DateTime?
+
+    automation PlaceAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@unique([automationId, firingKey])
+    @@index([automationId, startedAt])
+    @@index([status, dueAt])
+    @@index([waitDeviceId])
+}
+
 // A tracker somebody else runs, connected to a space in Tasks.
 //
 // Teams that would use Polaris usually already have work written down in Linear

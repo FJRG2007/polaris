@@ -24,6 +24,8 @@ const SOURCE = resolve(import.meta.dirname, "../../../places/src");
 /** The modules that promise a browser may load them. */
 const CLIENT_SAFE = [
     "lib/device-kinds.ts",
+    "lib/automation-kinds.ts",
+    "lib/automation-words.ts",
     "lib/device-connections.ts",
     "lib/place-kinds.ts",
     "lib/integrations/tuya-regions.ts",

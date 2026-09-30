@@ -14,15 +14,15 @@
  * quiet week.
  *
  * Which controls it gets is `actionsFor`, never this file. A door has three
- * buttons and a socket has two, and the moment a screen decides that for itself
- * is the moment a lock somewhere grows an "On".
+ * buttons and a socket has a switch, and the moment a screen decides that for
+ * itself is the moment a lock somewhere grows an "On".
  */
 
 import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
 import { usePlacesT } from "../use-places-t";
 import { placesRefusalText } from "../../lib/refusal-text";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { DeviceAction, DeviceEventView, DeviceView } from "../../lib/device-kinds";
 import {
     Badge,
@@ -32,6 +32,7 @@ import {
     DialogTitle,
     EmptyState,
     Skeleton,
+    Switch,
     TimeSeriesChart,
     cn
 } from "@polaris/ui";
@@ -52,6 +53,7 @@ import {
     ToggleRight
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
+import { AutoOffShortcut } from "../automations/auto-off-shortcut";
 
 const { ShareDialog } = hostUi.accessShareDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -78,9 +80,9 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     sensor: Gauge
 };
 
-/** The one button of a pair that gets the weight. Locking up and switching a
- *  light on are what people came to press; the other is the correction. */
-const PRIMARY_ACTIONS: readonly DeviceAction[] = ["lock", "turn-on"];
+/** The one button that gets the weight. Locking up is what people came to
+ *  press; the others are the correction. */
+const PRIMARY_ACTIONS: readonly DeviceAction[] = ["lock"];
 
 export function DeviceIcon({ kind, className }: { kind: string; className?: string }) {
     const Icon = KIND_ICONS[kinds.deviceKind(kind)];
@@ -97,6 +99,12 @@ const TONE_CLASSES: Record<kinds.DeviceTone, string> = {
     danger: "border-danger-edge bg-danger-soft text-danger-ink",
     muted: "border-border bg-muted text-muted-foreground"
 };
+
+/** A tone as a chip's colours, for anything else that reads in the same tones -
+ *  an automation's last run. */
+export function toneClass(tone: kinds.DeviceTone): string {
+    return TONE_CLASSES[tone];
+}
 
 /** A device nobody can reach has no state worth colouring: whatever it was doing
  *  when it last answered is not what it is doing now. */
@@ -125,6 +133,58 @@ function StatePill({ device }: { device: DeviceView }) {
     );
 }
 
+/**
+ * On and off, as one switch where the device is now.
+ *
+ * It flips the moment it is pressed: the screen above moves the device to where
+ * it was told before the answer arrives, and back if the answer is a refusal. So
+ * this reads the device and nothing else - there is no second, local idea of the
+ * state to fall out of step with the badge beside it.
+ *
+ * When it cannot be pressed it still shows where the device is, off limits, and
+ * says why - on hover, and to a screen reader - rather than disappearing.
+ */
+function DeviceSwitch({
+    device,
+    canControl,
+    busy,
+    onAct,
+    className
+}: {
+    device: DeviceView;
+    canControl: boolean;
+    busy: boolean;
+    onAct: (action: DeviceAction) => void;
+    className?: string;
+}) {
+    const t = usePlacesT();
+    const reasonId = useId();
+    const reason = !canControl
+        ? t("devicePanel.noControl")
+        : !device.controllable
+          ? t("devicePanel.watchOnly")
+          : !device.online
+            ? t("devicePanel.offline")
+            : "";
+    const on = device.online && device.state === "on";
+    return (
+        <span className={cn("inline-flex items-center", className)} title={reason || undefined}>
+            <Switch
+                checked={on}
+                disabled={reason !== "" || busy}
+                onChange={(next) => onAct(next ? "turn-on" : "turn-off")}
+                aria-label={t("devicePanel.switchName", { name: device.name })}
+                aria-describedby={reason ? reasonId : undefined}
+            />
+            {reason && (
+                <span id={reasonId} className="sr-only">
+                    {reason}
+                </span>
+            )}
+        </span>
+    );
+}
+
 /** The controls, which are the reason most people open this. */
 export function DeviceControls({
     device,
@@ -140,6 +200,17 @@ export function DeviceControls({
     className?: string;
 }) {
     const t = usePlacesT();
+    if (kinds.isSwitchable(device.kind)) {
+        return (
+            <DeviceSwitch
+                device={device}
+                canControl={canControl}
+                busy={busy !== null}
+                onAct={onAct}
+                className={className}
+            />
+        );
+    }
     if (!canControl) return null;
     // Nothing to press on something that only measures. Left silent rather than
     // explained: a row of buttons that is not there needs no note, and a sentence
@@ -288,7 +359,9 @@ export function DevicePanel({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("devicePanel.editName", { name: device.name })}
+                                        aria-label={t("devicePanel.editName", {
+                                            name: device.name
+                                        })}
                                         title={t("devicePanel.edit")}
                                         onClick={() => onEdit(device)}
                                     >
@@ -324,9 +397,13 @@ export function DevicePanel({
                                         device.firmware &&
                                             t("devicePanel.firmware", { version: device.firmware }),
                                         device.batteryPercent !== null &&
-                                            t("devicePanel.battery", { percent: device.batteryPercent }),
+                                            t("devicePanel.battery", {
+                                                percent: device.batteryPercent
+                                            }),
                                         device.stateAt &&
-                                            t("devicePanel.readAt", { time: format.time(device.stateAt) })
+                                            t("devicePanel.readAt", {
+                                                time: format.time(device.stateAt)
+                                            })
                                     ]
                                         .filter(Boolean)
                                         .join(" - ")}
@@ -346,6 +423,13 @@ export function DevicePanel({
                                     </p>
                                 )}
                             </section>
+
+                            <AutoOffShortcut
+                                key={device.id}
+                                device={device}
+                                canManage={canManage}
+                                canControl={canControl}
+                            />
 
                             <section className="flex flex-col gap-2 border-t border-border pt-4">
                                 <h3 className="text-sm font-medium">{t("devicePanel.used")}</h3>

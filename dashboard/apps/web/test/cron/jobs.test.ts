@@ -123,6 +123,9 @@ describe("the work Polaris runs on a schedule", () => {
             // the one thing the optimizer cannot defend against: it is safe
             // against being interrupted, not against a second copy of itself.
             "game-world-trim",
+            // Two passes would each ask every watched account for its devices
+            // and walk the same automation clock twice.
+            "home-automations",
             "home-availability",
             "home-recording",
             "home-retention",

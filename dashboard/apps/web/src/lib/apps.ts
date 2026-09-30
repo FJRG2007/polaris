@@ -890,6 +890,23 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            label: "Automations", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/devices/automations",
+            icon: Workflow,
+            keywords: [
+                "routines",
+                "schedule",
+                "timer",
+                "turn off after",
+                "switch off automatically",
+                "if this then that",
+                "rules",
+                "triggers",
+                "scenes"
+            ]
+        },
+        {
             label: "Settings", // i18n-ignore
             href: "/places/settings",
             icon: SlidersHorizontal,
@@ -2128,7 +2145,14 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         label: "Moderation", // i18n-ignore
         icon: MessageSquareWarning,
         group: TALKING_GROUP,
-        keywords: ["spam", "announcement", "securitycraft", "thanks message", "advertising", "chat filter"]
+        keywords: [
+            "spam",
+            "announcement",
+            "securitycraft",
+            "thanks message",
+            "advertising",
+            "chat filter"
+        ]
     },
     settings: {
         label: "Settings", // i18n-ignore

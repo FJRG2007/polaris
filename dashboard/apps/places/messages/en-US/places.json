@@ -172,6 +172,10 @@
         "settings": {
             "description": "Where the house keeps what it records, and what recognizes faces.",
             "title": "Settings"
+        },
+        "automations": {
+            "title": "Device automations",
+            "description": "What this place does by itself: switch off what was left on, lock what was left open, and tell you when."
         }
     },
     "placeDialog": {
@@ -461,7 +465,61 @@
         "schemaPerson": "Unknown person",
         "schemaSubnet": "Write it as 192.168.1.0/24",
         "schemaConnect": "Pick how to connect it",
-        "relayStatus": "The relay refused it ({status})."
+        "relayStatus": "The relay refused it ({status}).",
+        "noSignIn": "That connection is missing its sign-in",
+        "tuyaSignedOut": "Tuya no longer accepts this sign-in. Scan a new code from the app.",
+        "tuyaUserCode": "Tuya refused the User Code. Check it in the app under Me, Settings, Account and Security.",
+        "tuyaUserCodeBecause": "Tuya refused the User Code: {detail}.",
+        "deviceSlow": "The device did not answer in time.",
+        "deviceCertificate": "The device's certificate is not one Polaris can trust, so nothing was sent to it.",
+        "deviceSwapped": "The device at that address is not the one Polaris was connected to. Connect it again.",
+        "deviceTooMuch": "The device answered with far more than Polaris reads from one.",
+        "deviceUnreachable": "The device could not be reached.",
+        "noDeviceAddress": "That connection is missing the device's address",
+        "deviceOdd": "The device answered with something unexpected.",
+        "deviceRefused": "The device refused the request.",
+        "tplinkAccount": "The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.",
+        "tplinkNothing": "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
+        "tplinkCannot": "A TP-Link device cannot be told to do that",
+        "addressNoPath": "Write the address as 192.168.1.30, with no path",
+        "addressForbidden": "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "shellyNot": "That address answered, but not as a Shelly.",
+        "shellyPassword": "The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.",
+        "shellyNeedsPassword": "This Shelly has a password. Add it to the connection.",
+        "shellyThrottled": "The Shelly is refusing requests for a while after too many wrong passwords.",
+        "shellyNothing": "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
+        "shellyCannot": "A Shelly cannot be told to do that",
+        "shellyChannelGone": "That device is no longer on this Shelly.",
+        "hueKey": "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",
+        "hueNotBridge": "That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.",
+        "huePress": "Press the link button on the Hue bridge, then select Connect within 30 seconds.",
+        "hueNoPair": "The Hue bridge would not pair with Polaris.",
+        "hueBusy": "The Hue bridge is busy. Try again in a moment.",
+        "hueRefused": "The Hue bridge refused the request.",
+        "hueCannot": "A Hue light cannot be told to do that",
+        "dirigeraNot": "That address did not answer as a DIRIGERA hub.",
+        "dirigeraNoPair": "The DIRIGERA hub would not pair with Polaris.",
+        "dirigeraPress": "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
+        "dirigeraToken": "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.",
+        "dirigeraRefused": "The DIRIGERA hub refused the request.",
+        "ikeaCannot": "An IKEA device cannot be told to do that",
+        "haAddress": "Write the address as http://homeassistant.local:8123, with no path",
+        "haToken": "Home Assistant refused the token. Make a new long-lived access token on your Home Assistant profile page.",
+        "haNot": "That address answered, but not as Home Assistant.",
+        "haRestarting": "Home Assistant is restarting. Try again in a moment.",
+        "haUnsupported": "Home Assistant would not do that. The device may not support it.",
+        "haRefused": "Home Assistant refused the request.",
+        "haNothing": "Home Assistant has no switches, lights, locks or sensors for Polaris to show.",
+        "switchbotKeys": "SwitchBot refused the token and secret. They may have been reset in the app, or today's allowance of requests is used up.",
+        "switchbotUnreachable": "SwitchBot could not be reached. Try again in a moment.",
+        "switchbotRate": "SwitchBot is answering too many requests at once. Try again in a minute.",
+        "switchbotOdd": "SwitchBot answered with something unexpected.",
+        "switchbotOffline": "The device is not answering SwitchBot right now.",
+        "switchbotRefused": "SwitchBot refused the request.",
+        "switchbotCannot": "A SwitchBot device cannot be told to do that",
+        "automationGone": "That automation is not here",
+        "automationNewer": "That automation was saved by a newer Polaris",
+        "automationNames": "That automation names something that is not here"
     },
     "connections": {
         "nuki-web": {
@@ -541,6 +599,26 @@
                 }
             }
         },
+        "tuya-app": {
+            "label": "Smart Life / Tuya Smart app",
+            "summary": "Sign in by scanning a code with the app your devices are already in. No developer account.",
+            "note": "It reaches every home on the app account through Tuya's servers. The sign-in renews itself, and removing this connection signs Polaris out at Tuya as well.",
+            "steps": {
+                "s0": "In the Smart Life or Tuya Smart app, open Me, tap the gear, then Account and Security.",
+                "s1": "Copy the User Code shown at the bottom and paste it below.",
+                "s2": "Scan the code Polaris shows with the same app: tap + or Add Device, then Scan."
+            },
+            "fields": {
+                "userCode": {
+                    "label": "User Code from the app",
+                    "hint": "Shown under Account and Security in the app. It is not your password.",
+                    "placeholder": "From the app"
+                }
+            },
+            "pairing": {
+                "prompt": "In the Smart Life or Tuya Smart app, tap + or Add Device, choose Scan and point it at this code."
+            }
+        },
         "tuya-cloud": {
             "label": "Tuya cloud project",
             "summary": "Everything on the Smart Life or Tuya app account, whatever brand is printed on it: switches, sockets and lights.",
@@ -563,6 +641,157 @@
                 "region": {
                     "label": "Data centre",
                     "hint": "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty."
+                }
+            }
+        },
+        "tapo-local": {
+            "label": "Tapo on your own network",
+            "summary": "A plug, strip, switch or bulb answered directly at its address, with the account you use in the Tapo app.",
+            "note": "Nothing goes through TP-Link's servers, so it answers in milliseconds and keeps working when their cloud does not. One connection is one device: a strip brings in each of its outlets. Plugs on very old Tapo firmware use an earlier handshake Polaris does not speak; updating them in the Tapo app fixes that.",
+            "steps": {
+                "s0": "Find the device's IP address in your router's list of connected devices. Giving it a fixed address there keeps this working.",
+                "s1": "Use the email and password you sign into the Tapo app with.",
+                "s2": "Add one connection per device."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.40"
+                },
+                "email": {
+                    "label": "TP-Link email",
+                    "placeholder": "The one you use in the Tapo app"
+                },
+                "password": {
+                    "label": "TP-Link password"
+                }
+            }
+        },
+        "kasa-local": {
+            "label": "Kasa on your own network",
+            "summary": "An older Kasa plug, strip or bulb, answered directly at its address. Most need no account.",
+            "note": "Kasa devices on older firmware answer anyone on the network, so the address is enough. Newer firmware asks for the TP-Link account, the same one as the Kasa app. One connection is one device: a strip brings in each of its outlets.",
+            "steps": {
+                "s0": "Find the device's IP address in your router's list of connected devices, and give it a fixed one there if you can.",
+                "s1": "If Polaris says the device refused, add the email and password you use in the Kasa app."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.41"
+                },
+                "email": {
+                    "label": "TP-Link email",
+                    "hint": "Only for newer firmware. Leave empty otherwise."
+                },
+                "password": {
+                    "label": "TP-Link password"
+                }
+            }
+        },
+        "shelly-local": {
+            "label": "Shelly on your own network",
+            "summary": "A Shelly relay, plug, dimmer or bulb, answered directly at its address. No account needed.",
+            "note": "Every Shelly, old or new, answers on its own network, so nothing goes through a cloud and it keeps working without the internet. One connection is one Shelly: each relay or light channel on it becomes a row. Blinds and meters are left out for now.",
+            "steps": {
+                "s0": "Find the Shelly's IP address in your router's list of connected devices, and give it a fixed one there if you can.",
+                "s1": "If you set a password on it in the Shelly app, add it here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Device address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.30"
+                },
+                "password": {
+                    "label": "Password",
+                    "hint": "Only if you turned on authentication for this Shelly."
+                },
+                "username": {
+                    "label": "Username",
+                    "hint": "Only older Shelly devices use one, and it is admin unless you changed it."
+                }
+            }
+        },
+        "hue-bridge": {
+            "label": "Hue Bridge",
+            "summary": "Every light and smart plug on your Hue Bridge, from one press of its button. Nothing goes through the cloud.",
+            "note": "Polaris talks to the bridge on your network and checks its certificate against Hue's own, so it answers in milliseconds and keeps working without the internet. Lights and plugs arrive; scenes, rooms and colours stay in the Hue app.",
+            "steps": {
+                "s0": "Find the bridge's IP address in your router's list of connected devices.",
+                "s1": "Press the link button on the bridge.",
+                "s2": "Within 30 seconds, select Connect here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Bridge address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.20"
+                },
+                "appKey": {
+                    "label": "Application key",
+                    "hint": "Leave it empty and Polaris makes one when you press the bridge's button."
+                }
+            }
+        },
+        "dirigera-hub": {
+            "label": "DIRIGERA hub",
+            "summary": "The lights, outlets and sensors on your IKEA DIRIGERA hub, from one press of its button. Nothing goes through the cloud.",
+            "note": "Polaris talks to the hub on your network. The hub's certificate is remembered when you pair it, and Polaris refuses to talk to anything else at that address afterwards. Blinds, air purifiers and remotes are left out for now.",
+            "steps": {
+                "s0": "Find the hub's IP address in your router, and give it a fixed one if you can.",
+                "s1": "Select Connect here.",
+                "s2": "Within a minute, press the action button on the hub."
+            },
+            "fields": {
+                "host": {
+                    "label": "Hub address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.25"
+                }
+            }
+        },
+        "home-assistant": {
+            "label": "Home Assistant",
+            "summary": "Every switch, light, lock and sensor your Home Assistant already has, from one connection.",
+            "note": "Whatever Home Assistant talks to arrives through it: Zigbee, Z-Wave and its cloud integrations included. Polaris reads states and sends the same on, off, lock and unlock you would press there. Blinds, thermostats and media players are left out for now.",
+            "steps": {
+                "s0": "In Home Assistant, open your profile page.",
+                "s1": "Under Long-lived access tokens, create one called Polaris and copy it. It is shown once.",
+                "s2": "Paste it here with the address you open Home Assistant at."
+            },
+            "fields": {
+                "url": {
+                    "label": "Home Assistant address",
+                    "hint": "The one you open it at. Port 8123 is assumed if you give only an address.",
+                    "placeholder": "http://homeassistant.local:8123"
+                },
+                "token": {
+                    "label": "Access token",
+                    "placeholder": "Paste the long-lived token"
+                }
+            }
+        },
+        "switchbot-cloud": {
+            "label": "SwitchBot account",
+            "summary": "Plugs, Bots, locks, lights and sensors on your SwitchBot account, reachable from anywhere.",
+            "note": "Everything goes through SwitchBot's servers, so Bluetooth devices need a SwitchBot Hub. The account allows 10,000 requests a day, so the state shown here can be a few minutes old until you refresh. Curtains, humidifiers and infrared remotes are left out for now.",
+            "steps": {
+                "s0": "Open the SwitchBot app, then Profile > Preferences > About.",
+                "s1": "Tap the app version ten times until Developer Options appears.",
+                "s2": "Open Developer Options, tap Get Token, and copy the token and the secret key here."
+            },
+            "link": "SwitchBot's API documentation",
+            "fields": {
+                "token": {
+                    "label": "Token",
+                    "placeholder": "Found in Developer Options"
+                },
+                "secret": {
+                    "label": "Secret key",
+                    "placeholder": "Shown under the token"
                 }
             }
         },
@@ -964,7 +1193,10 @@
         "used": "Used",
         "history": "History",
         "emptyTitle": "Nothing recorded yet.",
-        "emptyBody": "Everything this has been told to do lands here, including whatever did not finish."
+        "emptyBody": "Everything this has been told to do lands here, including whatever did not finish.",
+        "switchName": "Turn {name} on or off",
+        "noControl": "You can see this, but not operate it.",
+        "offline": "It is not answering, so it cannot be switched now."
     },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",
@@ -981,7 +1213,7 @@
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",
-        "recommended": "- recommended",
+        "recommended": "Recommended",
         "title": "Connect devices",
         "reconnectIntro": "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes.",
         "intro": "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place.",
@@ -989,7 +1221,17 @@
         "how": "How to reach it",
         "label": "Name for this connection",
         "checking": "Checking",
-        "connect": "Connect"
+        "connect": "Connect",
+        "pair": {
+            "showCode": "Show code",
+            "start": "Start",
+            "waiting": "Waiting for the scan",
+            "waitingPress": "Waiting for the button",
+            "expired": "This code has expired.",
+            "newCode": "New code",
+            "codeLabel": "Code to scan with the app",
+            "back": "Back"
+        }
     },
     "discover": {
         "intro": "Polaris asks the network first. Give it an address range as well if your cameras sit behind a repeater or an access point that blocks that.",
@@ -1041,5 +1283,297 @@
         "tamper": "The {camera} camera may have been tampered with",
         "person": "Somebody is at the {camera}",
         "other": "A {kind} at the {camera}"
+    },
+    "automations": {
+        "anyValue": "Any value",
+        "missingDevice": "A device no longer here",
+        "missingAutomation": "An automation no longer here",
+        "toggle": "Switch over",
+        "attributes": {
+            "state": "Its state",
+            "door": "Its door",
+            "reading": "Its reading"
+        },
+        "triggers": {
+            "change": "A device changes",
+            "stays": "A device stays",
+            "threshold": "A reading crosses",
+            "time": "At a time",
+            "interval": "Every so often",
+            "manual": "Only by hand"
+        },
+        "conditions": {
+            "device": "A device's state",
+            "reading": "A reading is",
+            "time": "Between times",
+            "weekday": "On days"
+        },
+        "steps": {
+            "device": "Operate a device",
+            "delay": "Wait a while",
+            "wait": "Wait for a device",
+            "notify": "Notify me",
+            "run": "Run an automation"
+        },
+        "compare": {
+            "gt": "Above",
+            "gte": "At least",
+            "lt": "Below",
+            "lte": "At most",
+            "eq": "Exactly",
+            "ne": "Not"
+        },
+        "days": "{which, select, every {every day} weekdays {weekdays} weekends {weekends} other {{list}}}",
+        "units": {
+            "seconds": "{count, plural, one {# second} other {# seconds}}",
+            "minutes": "{count, plural, one {# minute} other {# minutes}}",
+            "hours": "{count, plural, one {# hour} other {# hours}}"
+        },
+        "say": {
+            "time": "At {time}, {days}",
+            "interval": "Every {every}",
+            "manual": "Only when run by hand",
+            "threshold": "{device} goes {direction, select, above {above} other {below}} {value}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
+            "stays": "{device} is {value} for {span}",
+            "is": "{device} {negate, select, yes {is not} other {is}} {value}",
+            "reading": "{device}: {compare} {value}",
+            "between": "Between {from} and {to}",
+            "on": "On {days}",
+            "act": "{action}: {device}",
+            "delay": "Wait {span}",
+            "wait": "Wait until {device} is {value}, up to {span}",
+            "notify": "Notify: {message}",
+            "run": "Run {name}"
+        },
+        "cause": {
+            "automation": "Started by {name}",
+            "manual": "Run by {name}",
+            "time": "At its time",
+            "interval": "On its interval",
+            "stays": "{device} was {value} for {span}",
+            "change": "{device} went from {from} to {to}"
+        },
+        "status": {
+            "queued": "Queued",
+            "waiting": "Waiting",
+            "running": "Running",
+            "succeeded": "Done",
+            "failed": "Failed",
+            "skipped": "Skipped",
+            "stopped": "Stopped",
+            "refused": "Refused",
+            "limited": "Held back"
+        },
+        "outcomes": {
+            "ok": "Done",
+            "failed": "Failed",
+            "refused": "Refused",
+            "timedOut": "Timed out",
+            "waiting": "Waiting",
+            "skipped": "Skipped"
+        },
+        "reasons": {
+            "conditions": "Its conditions did not hold, so nothing ran.",
+            "owner": "Whoever saved it no longer has the rights it needs here. Somebody who does has to open it and save it again.",
+            "loop": "Stopped: automations were starting each other in a loop.",
+            "limited": "Held back: it fired too many times in a few minutes. It runs again once that settles.",
+            "disabled": "Stopped because it was switched off.",
+            "edited": "Stopped because its steps were changed while it ran.",
+            "timedOut": "Stopped: the device did not get there in time.",
+            "step": "Stopped at the step that failed.",
+            "fault": "Something went wrong running it. Nothing after that step ran.",
+            "unreadable": "This automation was saved by a newer Polaris and could not be read, so nothing ran."
+        },
+        "notes": {
+            "deviceGone": "That device is no longer here.",
+            "owner": "Whoever saved it can no longer operate devices here.",
+            "loop": "Not started: automations were starting each other in a loop.",
+            "failed": "The device did not answer. Nothing was changed.",
+            "notifyFailed": "The notification could not be sent.",
+            "automationGone": "That automation is no longer here.",
+            "automationOff": "That automation is switched off, so it was not started.",
+            "automationHeld": "That automation was not started: it ran too many times in the last few minutes, or this step had already started it.",
+            "toggleUnknown": "Its state was not known, so there was nothing to switch over."
+        },
+        "errors": {
+            "broken": "Something in this card is not right. Remove it and add it again.",
+            "time": "Write a time as 07:30.",
+            "days": "Choose at least one day.",
+            "device": "Choose a device.",
+            "state": "Choose a value.",
+            "number": "Enter a number.",
+            "whole": "Use a whole number.",
+            "tooSmall": "That is too small.",
+            "tooBig": "That is too large.",
+            "tooLong": "That is too long.",
+            "tooMany": "That is as many as one automation can hold.",
+            "action": "Choose what to do.",
+            "message": "Write the message.",
+            "automation": "Choose an automation.",
+            "timeZone": "Its time zone is not one this server knows.",
+            "noTrigger": "Add at least one trigger.",
+            "noStep": "Add at least one step.",
+            "emptyGroup": "A group needs at least one condition.",
+            "sameState": "From and to are the same.",
+            "sameTime": "The start and the end are the same time.",
+            "name": "Give it a name.",
+            "place": "That place is no longer here.",
+            "deviceGone": "That device is no longer at this place.",
+            "attribute": "That device has nothing like that to watch.",
+            "notSensor": "Choose a sensor.",
+            "watchOnly": "That device is set to be watched, not operated.",
+            "cannotDo": "That device cannot do that.",
+            "runSelf": "An automation cannot start itself.",
+            "automationGone": "That automation is no longer here.",
+            "fix": "Some cards need fixing before it can be saved.",
+            "noControl": "You cannot operate the devices here, so an automation you save could not either.",
+            "noAutoOff": "That device has nothing to switch off by itself."
+        },
+        "notice": {
+            "title": "Automation: {name}"
+        },
+        "list": {
+            "intro": "What this place does by itself. Each one acts as whoever last saved it.",
+            "new": "New automation",
+            "blank": "Start empty",
+            "emptyTitle": "No automations yet",
+            "emptyManage": "Switch something off after a while, run it on a schedule, or have one device follow another.",
+            "emptyView": "Nobody has set any up for this place yet.",
+            "summary": "{when}{more, plural, =0 {} one { or # more} other { or # more}} - {steps, plural, one {# step} other {# steps}}",
+            "neverRan": "Never ran",
+            "turnOffName": "Switch off {name}",
+            "turnOnName": "Switch on {name}",
+            "log": "What it did",
+            "logName": "What {name} did",
+            "run": "Run now",
+            "runName": "Run {name} now",
+            "runOff": "Switch it on to run it",
+            "started": "Started",
+            "remove": "Remove",
+            "removeName": "Remove {name}",
+            "removeTitle": "Remove automation",
+            "removeQuestion": "Remove {name}?",
+            "removeBody": "It stops at once, including anything it was waiting to do, and its log goes with it."
+        },
+        "editor": {
+            "back": "All automations",
+            "view": "View",
+            "flow": "Flow",
+            "runs": "What it did",
+            "name": "Name",
+            "namePlaceholder": "Porch light off at night",
+            "enabled": "Switched on",
+            "on": "On",
+            "off": "Off",
+            "saveFirst": "Save your changes first",
+            "saved": "Saved.",
+            "readOnly": "You can read this automation. Changing it needs the right to manage Places.",
+            "when": "When",
+            "whenHint": "Any one of these starts it.",
+            "if": "If",
+            "ifEmpty": "Always. Add a condition to limit when it goes on.",
+            "ifHint": "It only goes on if these hold.",
+            "then": "Then",
+            "thenHint": "In this order.",
+            "addTrigger": "Add trigger",
+            "addCondition": "Add condition",
+            "addToGroup": "Add to group",
+            "addStep": "Add step",
+            "groupsMatch": "How the groups combine",
+            "allGroups": "All groups hold",
+            "anyGroup": "Any group holds",
+            "groupMatch": "How these combine",
+            "allOf": "All of these",
+            "anyOf": "Any of these",
+            "group": "Condition",
+            "removeGroup": "Remove group",
+            "triggerKind": "Kind of trigger",
+            "conditionKind": "Kind of condition",
+            "stepKind": "Kind of step",
+            "remove": "Remove",
+            "up": "Move up",
+            "down": "Move down",
+            "zone": "Times are in {zone}.",
+            "runsAs": "Acts as {name}."
+        },
+        "fields": {
+            "at": "At",
+            "days": "Days",
+            "every": "Every",
+            "minutesSuffix": "min",
+            "manualHint": "Starts only from Run now, or from another automation.",
+            "device": "Device",
+            "sensor": "Sensor",
+            "watch": "Watch",
+            "from": "From",
+            "to": "To",
+            "is": "Is",
+            "for": "For at least",
+            "direction": "Direction",
+            "above": "Goes above",
+            "below": "Goes below",
+            "value": "Value",
+            "test": "Test",
+            "isOption": "Is",
+            "isNotOption": "Is not",
+            "compare": "Compare",
+            "do": "Do",
+            "wait": "Wait for",
+            "until": "Until it is",
+            "giveUp": "Give up after",
+            "onTimeout": "If it never gets there",
+            "timeoutStop": "Stop here",
+            "timeoutContinue": "Carry on anyway",
+            "message": "Message",
+            "messagePlaceholder": "The porch light was left on",
+            "automation": "Automation to run",
+            "chooseAutomation": "Choose an automation",
+            "chooseDevice": "Choose a device",
+            "chooseValue": "Choose one",
+            "typeValue": "Type a value",
+            "noDevices": "No devices here to watch yet.",
+            "noSensors": "No sensors at this place.",
+            "noOperable": "No device here can be operated.",
+            "noControl": "You cannot operate devices, so a step cannot use them.",
+            "noOthers": "This place has no other automations yet.",
+            "unit": "Unit",
+            "units": {
+                "seconds": "Seconds",
+                "minutes": "Minutes",
+                "hours": "Hours"
+            }
+        },
+        "log": {
+            "title": "What it did",
+            "refresh": "Check again",
+            "emptyTitle": "It has not run yet",
+            "emptyBody": "Each time it fires, what it did and why is written here.",
+            "resumes": "Carries on at {time}.",
+            "noSteps": "No steps ran.",
+            "stepGone": "A step since removed"
+        },
+        "shortcut": {
+            "offTitle": "Turn off by itself",
+            "lockTitle": "Lock again by itself",
+            "offAfter": "Once it has been on for",
+            "lockAfter": "Once it has been unlocked for",
+            "minutes": "How long",
+            "add": "Add",
+            "made": "Added as {name}. <open>Open it</open> to change it."
+        },
+        "templates": {
+            "autoOff": {
+                "title": "Turn off after a while on",
+                "offName": "Turn off {device} after {span}",
+                "lockName": "Lock {device} after {span}"
+            },
+            "schedule": {
+                "title": "On and off on a schedule"
+            },
+            "follow": {
+                "title": "When one device changes, set another"
+            }
+        }
     }
 }

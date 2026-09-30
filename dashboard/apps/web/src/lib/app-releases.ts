@@ -12,18 +12,26 @@
  * second consumer is where a shared GitHub call with its own cache stops being worth
  * writing twice.
  *
- * The answer is cached for ten minutes per app INCLUDING "there is none" - which is
- * the state every deployment is in for both apps today. Without that, each view of a
- * screen mentioning them spends one of the sixty unauthenticated calls an hour that
- * the update card already spends from the same address.
+ * The answer is cached for two minutes per app INCLUDING "there is none". Without
+ * that, each view of a screen mentioning them spends one of the sixty unauthenticated
+ * calls an hour that the update card already spends from the same address. It used
+ * to be ten, and ten is how long somebody looking for a release that had just been
+ * published was shown the one before it - by a screen that has no refresh of its own.
+ *
+ * Past the two minutes the first page is asked for again with the `etag` it last
+ * came with. An unchanged list answers `304` with no body, and the answer already
+ * held is kept without walking the pages again; GitHub only promises that a `304`
+ * is free of the rate limit for an authorized caller, so the two minutes are what
+ * bounds the spending, and the `etag` is what keeps each look cheap.
  */
 
 /** An "owner/name" GitHub accepts. Anything else - a typo in the environment -
  *  gets no link rather than a link to a page that is not there. */
 const REPO = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/;
 
-/** Releases move at release speed; ten minutes is stale enough to be free. */
-const CACHE_TTL_MS = 10 * 60 * 1000;
+/** Short enough that a release just published is on screen before anybody wonders
+ *  where it is, long enough that a busy screen costs a few calls an hour. */
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 /** GitHub's largest page, and how far back to walk. One list holds every kind of
  *  release this repository cuts, so an app's newest sits behind however many others
@@ -164,39 +172,62 @@ export function pickRelease(
     };
 }
 
-const cache = new Map<string, { found: AppDownload | null; at: number }>();
+interface Held {
+    readonly found: AppDownload | null;
+    readonly at: number;
+    /** The first page's `etag` when this answer was worked out, if it had one. */
+    readonly etag: string | null;
+}
 
-async function ask(repo: string, prefix: string): Promise<AppDownload | null> {
+const cache = new Map<string, Held>();
+
+/** What a walk came back with: the answer, and the first page's `etag`. A `304`
+ *  on that page is `unchanged`, meaning the answer already held still stands. */
+type Asked =
+    | { readonly unchanged: true }
+    | { readonly found: AppDownload | null; readonly etag: string | null };
+
+async function ask(repo: string, prefix: string, etag: string | null): Promise<Asked> {
     const deadline = AbortSignal.timeout(LOOKUP_TIMEOUT_MS);
     const seen: ReleaseListing[] = [];
+    let first: string | null = null;
+    const answer = (found: AppDownload | null): Asked => ({ found, etag: first });
     try {
         for (let page = 1; page <= MAX_PAGES; page++) {
+            const headers: Record<string, string> = {
+                accept: "application/vnd.github+json",
+                "user-agent": "polaris-dashboard"
+            };
+            if (page === 1 && etag) headers["if-none-match"] = etag;
             const response = await fetch(
                 `https://api.github.com/repos/${repo}/releases?per_page=${PAGE_SIZE}&page=${page}`,
-                {
-                    headers: {
-                        accept: "application/vnd.github+json",
-                        "user-agent": "polaris-dashboard"
-                    },
-                    // Never let a slow API call hang a page render.
-                    signal: deadline
-                }
+                // Never let a slow API call hang a page render.
+                { headers, signal: deadline }
             );
-            if (!response.ok) break;
+            if (page === 1 && response.status === 304) return { unchanged: true };
+            if (!response.ok) {
+                first = null;
+                break;
+            }
+            if (page === 1) first = response.headers?.get("etag") ?? null;
             const body = (await response.json()) as unknown;
-            if (!Array.isArray(body) || body.length === 0) break;
+            if (!Array.isArray(body)) {
+                first = null;
+                break;
+            }
+            if (body.length === 0) break;
             seen.push(...(body as ReleaseListing[]));
             const found = pickRelease(seen, prefix);
-            if (found) return found;
+            if (found) return answer(found);
             // A page GitHub did not fill is the last page there is.
             if (body.length < PAGE_SIZE) break;
         }
-        return null;
+        return answer(null);
     } catch {
         // A page must not fail because GitHub is unreachable. No answer reads as
         // "not published", which understates at worst: the screen then points at
         // whatever works without GitHub at all.
-        return null;
+        return { found: null, etag: null };
     }
 }
 
@@ -218,9 +249,14 @@ export async function appDownload(repo: string, prefix: string): Promise<AppDown
     const held = cache.get(key);
     if (held && now - held.at < CACHE_TTL_MS) return held.found;
 
-    const found = await ask(trimmed, prefix);
-    cache.set(key, { found, at: Date.now() });
-    return found;
+    const asked = await ask(trimmed, prefix, held?.etag ?? null);
+    if ("unchanged" in asked && held) {
+        cache.set(key, { ...held, at: Date.now() });
+        return held.found;
+    }
+    const fresh = "unchanged" in asked ? { found: null, etag: null } : asked;
+    cache.set(key, { found: fresh.found, etag: fresh.etag, at: Date.now() });
+    return fresh.found;
 }
 
 /** The desktop app for Windows, macOS and Linux. */

@@ -78,6 +78,12 @@ const LogViewer = dynamic(
     { ssr: false }
 );
 
+/** A QR encoder, for an app that signs something in by a code scanned with a
+ *  phone. Drawn in a connect dialog and nowhere else, so loaded there. */
+const QRCodeSVG = dynamic(() => import("qrcode.react").then((module) => module.QRCodeSVG), {
+    ssr: false
+});
+
 /** Server actions, loaded when first called rather than bundled with every page. */
 type AccessActions = typeof import("@/app/(app)/apps/installed/[id]/access-actions");
 const accessActions = () => import("@/app/(app)/apps/installed/[id]/access-actions");
@@ -114,6 +120,7 @@ export const clientHost = {
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },
+    qrCode: { QRCodeSVG },
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },
     runAction: { runAction },

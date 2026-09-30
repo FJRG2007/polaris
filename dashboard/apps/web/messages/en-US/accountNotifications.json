@@ -331,6 +331,10 @@
             "label": "A camera stopped answering",
             "description": "A camera went quiet, or came back after being quiet."
         },
+        "placesAutomation": {
+            "label": "An automation told you something",
+            "description": "A step in one of your automations asked to let you know."
+        },
         "serverSpace": {
             "label": "A server is running out of room",
             "description": "Polaris freed everything nothing was using and the disk is still nearly full."

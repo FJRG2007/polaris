@@ -14,12 +14,40 @@
  * fields from here, the schema validates them from here, and the driver is handed
  * them by name - so a fourth way in is an entry and a driver, and no form.
  *
+ * Each brand marks one as `recommended`: the one that is quickest to set up and
+ * keeps working with the least looking after. It is listed first, the picker
+ * starts on it and labels it, and the rest follow in the order they are worth
+ * trying.
+ *
  * Ordered best first within a brand, and "best" is stated rather than implied:
  * what reaches the device from anywhere, what keeps working when somebody else's
  * server is down, and what does not cost battery are not the same thing, and the
  * note on each says which of those it is trading away. More than one at once is
  * the normal case rather than the exception - a lock on the web account and on
  * its own bridge is a lock that still answers when either is out.
+ *
+ * Some ways in are not typed but done: a code scanned with the maker's app, a
+ * button pressed on a bridge. Such a connection declares `pairing`, and its
+ * `fields` become what has to be known before the attempt starts (a user code, a
+ * bridge's address) rather than the credential itself. The rest is generic and
+ * no make needs a screen of its own for it:
+ *
+ * - The registry says what the reader is shown (`kind`: a code to scan, or a
+ *   button to press), how often to ask whether it has happened (`pollMs`) and
+ *   how long one attempt is given before a new one is offered (`lifetimeMs`).
+ *   Its words are `connections.<id>.pairing.prompt` in the catalogs: the one
+ *   line under the code or beside the wait.
+ * - The driver implements `pair` (`drivers/contract.ts`): `start` takes the
+ *   fields and answers a state and, for a code, what the code says; `poll`
+ *   takes them back and answers the credentials once the other side agrees.
+ *   The state is shown to the browser, so it never holds a secret.
+ * - `startDevicePairingAction` and `pollDevicePairingAction` run those two for
+ *   the connect dialog, which draws the step, polls on its own and stores the
+ *   account the moment the answer arrives - through the same `verify` as a
+ *   typed credential, so nothing that does not work is ever stored.
+ *
+ * A credential that ages is the driver's `renew`, stored by the account layer on
+ * every use; nothing here has to know about it.
  *
  * Pure and client-safe: the picker and the server read the same list. That is a
  * rule with teeth rather than a note - every import here has to be pure too. This
@@ -67,6 +95,20 @@ export const REACH_LABELS: Readonly<Record<ConnectionReach, string>> = {
     "same-network": en("connections.reach.same-network")
 };
 
+/**
+ * How a connection that is done rather than typed is drawn and waited on. See the
+ * file header for the whole of it.
+ */
+export interface ConnectionPairing {
+    /** What the reader is shown: a code to scan, or a wait for a button. */
+    readonly kind: "qr" | "press";
+    /** How often the dialog asks whether it has happened. */
+    readonly pollMs: number;
+    /** How long one attempt is waited on before the dialog stops asking and
+     *  offers a new one. Polaris' own bound where the maker publishes none. */
+    readonly lifetimeMs: number;
+}
+
 /** One way of reaching one make's devices. */
 export interface DeviceConnection {
     /** Stored on the account row. Never shown. */
@@ -87,6 +129,9 @@ export interface DeviceConnection {
      *  somebody looking for it in their documentation has to find the same name. */
     readonly label: string;
     readonly reach: ConnectionReach;
+    /** The one of its brand the picker starts on and labels, and lists first:
+     *  quickest to set up and the least to look after. One per brand. */
+    readonly recommended?: boolean;
     /** One sentence in the picker: what it is and what it costs. */
     readonly summary: string;
     /** What its owner has to know before choosing it, where that is more than a
@@ -97,6 +142,9 @@ export interface DeviceConnection {
     readonly steps?: readonly string[];
     readonly link?: { readonly label: string; readonly href: string };
     readonly fields: readonly ConnectionField[];
+    /** Present when the connection is made by scanning or pressing something
+     *  once the fields are in, rather than by the fields alone. */
+    readonly pairing?: ConnectionPairing;
     /** What it can bring in, so a screen can say so before anything is typed. */
     readonly kinds: readonly DeviceKind[];
     /** Other words somebody might search for - the product it is part of, the
@@ -106,6 +154,7 @@ export interface DeviceConnection {
 
 const NUKI_TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
 const TUYA_CONSOLE = "https://iot.tuya.com/";
+const SWITCHBOT_API_DOCS = "https://github.com/OpenWonderLabs/SwitchBotAPI";
 
 /**
  * Every way in, best first within each brand.
@@ -121,6 +170,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         logo: "nuki",
         label: en("connections.nuki-web.label"),
         reach: "anywhere",
+        // One token pasted from Nuki Web, for every lock on the account, from
+        // anywhere, with the account's record of who opened what. The local way
+        // in answers faster but needs a broker and only the newer locks have it.
+        recommended: true,
         summary: en("connections.nuki-web.summary"),
         note: en("connections.nuki-web.note"),
         steps: [
@@ -201,6 +254,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         logo: "",
         label: en("connections.mqtt-discovery.label"),
         reach: "same-network",
+        recommended: true,
         summary: en("connections.mqtt-discovery.summary"),
         note: en("connections.mqtt-discovery.note"),
         steps: [
@@ -216,9 +270,26 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 placeholder: en("connections.mqtt-discovery.fields.host.placeholder"),
                 maxLength: 200
             },
-            { key: "port", label: en("connections.mqtt-discovery.fields.port.label"), defaultValue: "1883", optional: true, maxLength: 5 },
-            { key: "username", label: en("connections.mqtt-discovery.fields.username.label"), optional: true, maxLength: 120 },
-            { key: "password", label: en("connections.mqtt-discovery.fields.password.label"), secret: true, optional: true, maxLength: 200 },
+            {
+                key: "port",
+                label: en("connections.mqtt-discovery.fields.port.label"),
+                defaultValue: "1883",
+                optional: true,
+                maxLength: 5
+            },
+            {
+                key: "username",
+                label: en("connections.mqtt-discovery.fields.username.label"),
+                optional: true,
+                maxLength: 120
+            },
+            {
+                key: "password",
+                label: en("connections.mqtt-discovery.fields.password.label"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            },
             {
                 key: "prefix",
                 label: en("connections.mqtt-discovery.fields.prefix.label"),
@@ -241,6 +312,53 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "broker",
             "discovery",
             "local"
+        ]
+    },
+    {
+        id: "tuya-app",
+        brand: "Tuya",
+        logo: "tuya",
+        label: en("connections.tuya-app.label"),
+        reach: "anywhere",
+        // A user code and a scan with the app the devices are already in,
+        // against a developer project linked to the account by hand.
+        recommended: true,
+        summary: en("connections.tuya-app.summary"),
+        note: en("connections.tuya-app.note"),
+        steps: [
+            en("connections.tuya-app.steps.s0"),
+            en("connections.tuya-app.steps.s1"),
+            en("connections.tuya-app.steps.s2")
+        ],
+        fields: [
+            {
+                key: "userCode",
+                label: en("connections.tuya-app.fields.userCode.label"),
+                hint: en("connections.tuya-app.fields.userCode.hint"),
+                placeholder: en("connections.tuya-app.fields.userCode.placeholder"),
+                maxLength: 64
+            }
+        ],
+        // Tuya's SDK says nothing about how long a code lasts, and a scan that
+        // is not confirmed answers the same as one that lapsed. Two minutes is
+        // Polaris' own bound: long enough to find the phone, short enough that
+        // a code left on a screen is not waited on for ever.
+        pairing: { kind: "qr", pollMs: 3_000, lifetimeMs: 120_000 },
+        kinds: ["switch", "outlet", "light"],
+        search: [
+            "smart life",
+            "tuya smart",
+            "qr",
+            "scan",
+            "app",
+            "switch",
+            "socket",
+            "plug",
+            "light",
+            "bulb",
+            "led",
+            "smart plug",
+            "wall switch"
         ]
     },
     {
@@ -296,6 +414,336 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "smart plug",
             "wall switch"
         ]
+    },
+    // TP-Link: Tapo first. Every Tapo and every Kasa on current firmware answers
+    // it, so it is the one that works for the most houses; the Kasa entry is for
+    // the older plugs that need no account at all.
+    {
+        id: "tapo-local",
+        brand: "TP-Link",
+        recommended: true,
+        logo: "tplink",
+        label: en("connections.tapo-local.label"),
+        reach: "same-network",
+        summary: en("connections.tapo-local.summary"),
+        note: en("connections.tapo-local.note"),
+        steps: [
+            en("connections.tapo-local.steps.s0"),
+            en("connections.tapo-local.steps.s1"),
+            en("connections.tapo-local.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.tapo-local.fields.host.label"),
+                hint: en("connections.tapo-local.fields.host.hint"),
+                placeholder: en("connections.tapo-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.tapo-local.fields.email.label"),
+                placeholder: en("connections.tapo-local.fields.email.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.tapo-local.fields.password.label"),
+                secret: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: [
+            "tapo",
+            "kasa",
+            "tplink",
+            "smart plug",
+            "power strip",
+            "bulb",
+            "p100",
+            "p110",
+            "p300",
+            "l530",
+            "local"
+        ]
+    },
+    {
+        id: "kasa-local",
+        brand: "TP-Link",
+        logo: "tplink",
+        label: en("connections.kasa-local.label"),
+        reach: "same-network",
+        summary: en("connections.kasa-local.summary"),
+        note: en("connections.kasa-local.note"),
+        steps: [en("connections.kasa-local.steps.s0"), en("connections.kasa-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.kasa-local.fields.host.label"),
+                hint: en("connections.kasa-local.fields.host.hint"),
+                placeholder: en("connections.kasa-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.kasa-local.fields.email.label"),
+                hint: en("connections.kasa-local.fields.email.hint"),
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.kasa-local.fields.password.label"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: [
+            "kasa",
+            "tplink",
+            "hs100",
+            "hs110",
+            "hs300",
+            "kp115",
+            "kl130",
+            "smart plug",
+            "power strip",
+            "local"
+        ]
+    },
+    // Shelly: its own local API is the one way in, and the best one - no account,
+    // no cloud, and every generation answers it.
+    {
+        id: "shelly-local",
+        brand: "Shelly",
+        recommended: true,
+        logo: "shelly",
+        label: en("connections.shelly-local.label"),
+        reach: "same-network",
+        summary: en("connections.shelly-local.summary"),
+        note: en("connections.shelly-local.note"),
+        steps: [en("connections.shelly-local.steps.s0"), en("connections.shelly-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.shelly-local.fields.host.label"),
+                hint: en("connections.shelly-local.fields.host.hint"),
+                placeholder: en("connections.shelly-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.shelly-local.fields.password.label"),
+                hint: en("connections.shelly-local.fields.password.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "username",
+                label: en("connections.shelly-local.fields.username.label"),
+                hint: en("connections.shelly-local.fields.username.hint"),
+                defaultValue: "admin",
+                optional: true,
+                maxLength: 50
+            }
+        ],
+        kinds: ["switch", "outlet", "light"],
+        search: [
+            "shelly",
+            "relay",
+            "plug",
+            "dimmer",
+            "bulb",
+            "plus",
+            "pro",
+            "gen3",
+            "gen4",
+            "local"
+        ]
+    },
+    // Philips Hue: the bridge's local API is the most convenient and the most
+    // stable way in - one button press, every light on the bridge, no cloud.
+    // Pairing is inside the driver's verify, so it can later move to a pairing
+    // screen without a second implementation.
+    {
+        id: "hue-bridge",
+        brand: "Philips Hue",
+        recommended: true,
+        logo: "philipshue",
+        label: en("connections.hue-bridge.label"),
+        reach: "same-network",
+        summary: en("connections.hue-bridge.summary"),
+        note: en("connections.hue-bridge.note"),
+        steps: [
+            en("connections.hue-bridge.steps.s0"),
+            en("connections.hue-bridge.steps.s1"),
+            en("connections.hue-bridge.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.hue-bridge.fields.host.label"),
+                hint: en("connections.hue-bridge.fields.host.hint"),
+                placeholder: en("connections.hue-bridge.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "appKey",
+                label: en("connections.hue-bridge.fields.appKey.label"),
+                hint: en("connections.hue-bridge.fields.appKey.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 100
+            }
+        ],
+        kinds: ["light", "outlet"],
+        search: [
+            "hue",
+            "philips",
+            "signify",
+            "bridge",
+            "bulb",
+            "light",
+            "smart plug",
+            "zigbee",
+            "local"
+        ]
+    },
+    // IKEA: the DIRIGERA hub's local API is the only way in with no cloud at all,
+    // and the most convenient - one button press brings the whole hub. Pairing
+    // is inside the driver's verify, ready for a shared pairing screen.
+    {
+        id: "dirigera-hub",
+        brand: "IKEA",
+        recommended: true,
+        logo: "ikea",
+        label: en("connections.dirigera-hub.label"),
+        reach: "same-network",
+        summary: en("connections.dirigera-hub.summary"),
+        note: en("connections.dirigera-hub.note"),
+        steps: [
+            en("connections.dirigera-hub.steps.s0"),
+            en("connections.dirigera-hub.steps.s1"),
+            en("connections.dirigera-hub.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.dirigera-hub.fields.host.label"),
+                hint: en("connections.dirigera-hub.fields.host.hint"),
+                placeholder: en("connections.dirigera-hub.fields.host.placeholder"),
+                maxLength: 200
+            }
+        ],
+        kinds: ["light", "outlet", "sensor"],
+        search: [
+            "ikea",
+            "dirigera",
+            "tradfri",
+            "home smart",
+            "hub",
+            "bulb",
+            "outlet",
+            "zigbee",
+            "local"
+        ]
+    },
+    // Home Assistant: its REST API with a long-lived token is the one way in,
+    // and the fastest to set up - one connection brings the whole house.
+    {
+        id: "home-assistant",
+        brand: "Home Assistant",
+        recommended: true,
+        logo: "homeassistant",
+        label: en("connections.home-assistant.label"),
+        reach: "same-network",
+        summary: en("connections.home-assistant.summary"),
+        note: en("connections.home-assistant.note"),
+        steps: [
+            en("connections.home-assistant.steps.s0"),
+            en("connections.home-assistant.steps.s1"),
+            en("connections.home-assistant.steps.s2")
+        ],
+        fields: [
+            {
+                key: "url",
+                label: en("connections.home-assistant.fields.url.label"),
+                hint: en("connections.home-assistant.fields.url.hint"),
+                placeholder: en("connections.home-assistant.fields.url.placeholder"),
+                maxLength: 300
+            },
+            {
+                key: "token",
+                label: en("connections.home-assistant.fields.token.label"),
+                placeholder: en("connections.home-assistant.fields.token.placeholder"),
+                secret: true,
+                minLength: 20,
+                maxLength: 1000
+            }
+        ],
+        kinds: ["switch", "outlet", "light", "lock", "sensor"],
+        search: [
+            "home assistant",
+            "hass",
+            "homeassistant",
+            "zigbee",
+            "z-wave",
+            "zwave",
+            "local",
+            "whole house"
+        ]
+    },
+    // SwitchBot: their cloud API is the one documented way in, and the most
+    // convenient - a token and a secret from the app, and every device on the
+    // account arrives, including the Bluetooth ones behind a hub.
+    {
+        id: "switchbot-cloud",
+        brand: "SwitchBot",
+        recommended: true,
+        logo: "switchbot",
+        label: en("connections.switchbot-cloud.label"),
+        reach: "anywhere",
+        summary: en("connections.switchbot-cloud.summary"),
+        note: en("connections.switchbot-cloud.note"),
+        steps: [
+            en("connections.switchbot-cloud.steps.s0"),
+            en("connections.switchbot-cloud.steps.s1"),
+            en("connections.switchbot-cloud.steps.s2")
+        ],
+        link: { label: en("connections.switchbot-cloud.link"), href: SWITCHBOT_API_DOCS },
+        fields: [
+            {
+                key: "token",
+                label: en("connections.switchbot-cloud.fields.token.label"),
+                placeholder: en("connections.switchbot-cloud.fields.token.placeholder"),
+                secret: true,
+                minLength: 16,
+                maxLength: 500
+            },
+            {
+                key: "secret",
+                label: en("connections.switchbot-cloud.fields.secret.label"),
+                placeholder: en("connections.switchbot-cloud.fields.secret.placeholder"),
+                secret: true,
+                minLength: 8,
+                maxLength: 500
+            }
+        ],
+        kinds: ["outlet", "switch", "lock", "light", "sensor"],
+        search: [
+            "switchbot",
+            "switch bot",
+            "bot",
+            "smart lock",
+            "plug mini",
+            "meter",
+            "contact sensor",
+            "curtain"
+        ]
     }
 ];
 
@@ -340,6 +788,13 @@ export function deviceBrands(): readonly DeviceBrand[] {
 
 export function connectionsOfBrand(brand: string): readonly DeviceConnection[] {
     return DEVICE_CONNECTIONS.filter((connection) => connection.brand === brand);
+}
+
+/** The way in a brand's picker starts on: its recommended one, or its first
+ *  where none is marked. */
+export function recommendedConnection(brand: string): DeviceConnection | null {
+    const ofBrand = connectionsOfBrand(brand);
+    return ofBrand.find((connection) => connection.recommended === true) ?? ofBrand[0] ?? null;
 }
 
 /**
@@ -437,24 +892,38 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
     const base = `connections.${connection.id}`;
     const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
     return {
-        brand: connection.brand === en("connections.brandMqtt") ? t("connections.brandMqtt") : connection.brand,
+        brand:
+            connection.brand === en("connections.brandMqtt")
+                ? t("connections.brandMqtt")
+                : connection.brand,
         label: say(`${base}.label`) ?? connection.label,
         summary: say(`${base}.summary`) ?? connection.summary,
         note: say(`${base}.note`) ?? connection.note,
-        steps: (connection.steps ?? []).map((step, index) => say(`${base}.steps.s${index}`) ?? step),
-        link: connection.link ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label } : undefined,
-        reach: t(`connections.reach.${connection.reach}`)
+        steps: (connection.steps ?? []).map(
+            (step, index) => say(`${base}.steps.s${index}`) ?? step
+        ),
+        link: connection.link
+            ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label }
+            : undefined,
+        reach: t(`connections.reach.${connection.reach}`),
+        pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined
     };
 }
 
 /** One field's words in the reader's language. */
-export function fieldWords(t: PlacesTranslator, connection: DeviceConnection, field: ConnectionField) {
+export function fieldWords(
+    t: PlacesTranslator,
+    connection: DeviceConnection,
+    field: ConnectionField
+) {
     const base = `connections.${connection.id}.fields.${field.key}`;
     const say = (key: string) => (t.has(key) ? t(key as PlacesKey) : undefined);
     return {
         label: say(`${base}.label`) ?? field.label,
         hint: field.hint ? (say(`${base}.hint`) ?? field.hint) : undefined,
-        placeholder: field.placeholder ? (say(`${base}.placeholder`) ?? field.placeholder) : undefined,
+        placeholder: field.placeholder
+            ? (say(`${base}.placeholder`) ?? field.placeholder)
+            : undefined,
         choices: field.choices?.map((choice) => ({
             value: choice.value,
             label: say(`connections.regions.${choice.value}`) ?? choice.label

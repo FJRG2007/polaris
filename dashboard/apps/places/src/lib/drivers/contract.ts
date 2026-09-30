@@ -74,6 +74,40 @@ export interface DeviceHistoryEntry {
 }
 
 /**
+ * One attempt at pairing, as it was started.
+ *
+ * `state` travels to the browser and comes back with every poll, so the server
+ * keeps nothing between the two and a restart in the middle loses nothing. The
+ * price is the rule: it is shown to whoever is pairing, so it never holds a
+ * secret - a token for a code on the screen, an address, never a credential.
+ */
+export interface PairingStart {
+    readonly state: Readonly<Record<string, string>>;
+    /** What the code on the screen says, for a pairing that is scanned. */
+    readonly qr?: string;
+}
+
+/** Whether the other side has said yes yet. Not yet is the normal answer, asked
+ *  again a few seconds later until the attempt runs out. */
+export type PairingPoll =
+    | { readonly done: false }
+    | { readonly done: true; readonly credentials: Credentials };
+
+/**
+ * Connecting by something somebody does rather than something they type: a code
+ * scanned with an app, a button pressed on a bridge.
+ *
+ * `start` is handed the connection's typed fields (a user code, a bridge's
+ * address) and begins the attempt; `poll` asks whether it has been accepted and,
+ * once it has, returns the credentials to store - which are then proved with
+ * `verify` exactly like typed ones, so nothing is stored that does not work.
+ */
+export interface DevicePairing {
+    start(fields: Credentials): Promise<PairingStart>;
+    poll(fields: Credentials, state: Readonly<Record<string, string>>): Promise<PairingPoll>;
+}
+
+/**
  * One way of reaching one make's devices.
  *
  * `verify` is separate from `list` on purpose even where they are the same call:
@@ -89,7 +123,17 @@ export interface DeviceHistoryEntry {
 export interface DeviceDriver {
     /** The connection id from the registry this implements. */
     readonly connection: string;
-    verify(credentials: Credentials): Promise<void>;
+    /**
+     * Prove the credentials, and hand back what to store where proving them
+     * produced something new.
+     *
+     * Most drivers return nothing and what was typed is what is kept. A bridge
+     * paired with a button is the exception: what was typed is an address, and
+     * what the bridge handed back once its button was pressed - a key, the
+     * certificate it answered with - is what every later call needs. Pairing
+     * lives here, inside the driver, so the form stays a list of fields.
+     */
+    verify(credentials: Credentials): Promise<Credentials | void>;
     list(credentials: Credentials): Promise<DeviceSnapshot[]>;
     history?(credentials: Credentials, limit: number): Promise<DeviceHistoryEntry[]>;
     /**
@@ -106,4 +150,16 @@ export interface DeviceDriver {
         device: { readonly externalId: string; readonly kind: string },
         action: DeviceAction
     ): Promise<void>;
+    /** Present on a connection made by pairing rather than by typing. */
+    readonly pair?: DevicePairing;
+    /**
+     * Credentials that age: a sign-in whose token lapses and is traded for a new
+     * one. Handed what is stored before every use; answers the replacement once
+     * the old one is close to its end, and null while it is still good. The
+     * account layer stores what comes back, so a driver never writes anything.
+     */
+    renew?(credentials: Credentials): Promise<Credentials | null>;
+    /** Tell the other side this connection is gone, where it keeps a sign-in of
+     *  its own. Best effort: the account is removed whether or not it answers. */
+    forget?(credentials: Credentials): Promise<void>;
 }

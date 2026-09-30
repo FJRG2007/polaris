@@ -30,7 +30,10 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Camera not found", "refusals.cameraGone"],
     ["An area on this camera is already called that.", "refusals.areaTaken"],
     ["Area not found", "refusals.areaGone"],
-    ["That connection was made by a version of Polaris that is no longer here", "refusals.oldConnection"],
+    [
+        "That connection was made by a version of Polaris that is no longer here",
+        "refusals.oldConnection"
+    ],
     ["That connection is not here", "refusals.connectionGone"],
     ["Polaris cannot connect that yet", "refusals.cannotConnect"],
     ["That device is not here", "refusals.deviceGone"],
@@ -41,12 +44,30 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That connection is missing its keys", "refusals.noKeys"],
     ["A Tuya device cannot be told to do that", "refusals.tuyaCannot"],
     ["The relay did not answer.", "refusals.relayQuiet2"],
-    ["The camera accepted the connection and sent no video. The commonest cause by far is the password: on a Tapo it is the one for your TP-Link account, not one set on the camera. After that, Third-Party Compatibility being off in the Tapo app under Me > Third-Party Services - and on a battery model, the camera going back to sleep.", "refusals.relayNoVideo"],
-    ["The camera refused the password. It is the one for your TP-Link account - the one you sign into the Tapo app with - and not one set on the camera. If that is what you typed, check Third-Party Compatibility is on in the Tapo app, under Me > Third-Party Services.", "refusals.relayPassword"],
-    ["The camera refused the connection outright. Its account may not be allowed to stream, or another app is holding the one connection it gives.", "refusals.relayRefusedOutright"],
-    ["The camera has no stream at that address. If it is a make with a stream path, the path is wrong; if it is one that picks by quality, it may publish only its full-size stream.", "refusals.relayNoStream"],
-    ["The camera stopped answering partway through. On a battery model that is it going back to sleep; otherwise it is the network between here and it.", "refusals.relayStopped"],
-    ["The camera is sending something the relay cannot read. That is usually a codec this relay does not carry yet.", "refusals.relayCodec"],
+    [
+        "The camera accepted the connection and sent no video. The commonest cause by far is the password: on a Tapo it is the one for your TP-Link account, not one set on the camera. After that, Third-Party Compatibility being off in the Tapo app under Me > Third-Party Services - and on a battery model, the camera going back to sleep.",
+        "refusals.relayNoVideo"
+    ],
+    [
+        "The camera refused the password. It is the one for your TP-Link account - the one you sign into the Tapo app with - and not one set on the camera. If that is what you typed, check Third-Party Compatibility is on in the Tapo app, under Me > Third-Party Services.",
+        "refusals.relayPassword"
+    ],
+    [
+        "The camera refused the connection outright. Its account may not be allowed to stream, or another app is holding the one connection it gives.",
+        "refusals.relayRefusedOutright"
+    ],
+    [
+        "The camera has no stream at that address. If it is a make with a stream path, the path is wrong; if it is one that picks by quality, it may publish only its full-size stream.",
+        "refusals.relayNoStream"
+    ],
+    [
+        "The camera stopped answering partway through. On a battery model that is it going back to sleep; otherwise it is the network between here and it.",
+        "refusals.relayStopped"
+    ],
+    [
+        "The camera is sending something the relay cannot read. That is usually a codec this relay does not carry yet.",
+        "refusals.relayCodec"
+    ],
     ["Where is the camera?", "refusals.schemaWhere"],
     ["Just the address: no slashes, spaces or credentials", "refusals.schemaAddress"],
     ["Choose where this camera is reached from", "refusals.schemaReach"],
@@ -66,6 +87,9 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The recognizer would not take that photograph", "refusals.photoRefused"],
     ["The recognizer would not forget them, so nothing was removed", "refusals.forgetRefused"],
     ["Place not found", "refusals.placeGone"],
+    ["That automation is not here", "refusals.automationGone"],
+    ["That automation was saved by a newer Polaris", "refusals.automationNewer"],
+    ["That automation names something that is not here", "refusals.automationNames"],
     ["Move or remove its cameras first", "refusals.moveCameras"],
     ["There has to be somewhere for cameras to be", "refusals.lastPlace"],
     ["This camera does not move", "refusals.noPtz"],
@@ -94,44 +118,205 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Nuki answered with something unexpected.", "refusals.nukiOdd"],
     ["Tuya could not be reached. Try again in a moment.", "refusals.tuyaUnreachable"],
     ["Tuya answered with something unexpected.", "refusals.tuyaOdd"],
-    ["Tuya refused the keys. They may have been revoked, or the project may not cover these devices.", "refusals.tuyaKeys"],
+    [
+        "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
+        "refusals.tuyaKeys"
+    ],
     ["Tuya refused the request.", "refusals.tuyaRefused"],
+    ["That connection is missing its sign-in", "refusals.noSignIn"],
+    [
+        "Tuya no longer accepts this sign-in. Scan a new code from the app.",
+        "refusals.tuyaSignedOut"
+    ],
+    [
+        "Tuya refused the User Code. Check it in the app under Me, Settings, Account and Security.",
+        "refusals.tuyaUserCode"
+    ],
+    ["The device did not answer in time.", "refusals.deviceSlow"],
+    [
+        "The device's certificate is not one Polaris can trust, so nothing was sent to it.",
+        "refusals.deviceCertificate"
+    ],
+    [
+        "The device at that address is not the one Polaris was connected to. Connect it again.",
+        "refusals.deviceSwapped"
+    ],
+    ["The device answered with far more than Polaris reads from one.", "refusals.deviceTooMuch"],
+    ["The device could not be reached.", "refusals.deviceUnreachable"],
+    ["That connection is missing the device's address", "refusals.noDeviceAddress"],
+    ["The device answered with something unexpected.", "refusals.deviceOdd"],
+    ["The device refused the request.", "refusals.deviceRefused"],
+    [
+        "The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.",
+        "refusals.tplinkAccount"
+    ],
+    [
+        "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
+        "refusals.tplinkNothing"
+    ],
+    ["A TP-Link device cannot be told to do that", "refusals.tplinkCannot"],
+    ["Write the address as 192.168.1.30, with no path", "refusals.addressNoPath"],
+    [
+        "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "refusals.addressForbidden"
+    ],
+    ["That address answered, but not as a Shelly.", "refusals.shellyNot"],
+    [
+        "The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.",
+        "refusals.shellyPassword"
+    ],
+    ["This Shelly has a password. Add it to the connection.", "refusals.shellyNeedsPassword"],
+    [
+        "The Shelly is refusing requests for a while after too many wrong passwords.",
+        "refusals.shellyThrottled"
+    ],
+    [
+        "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
+        "refusals.shellyNothing"
+    ],
+    ["A Shelly cannot be told to do that", "refusals.shellyCannot"],
+    ["That device is no longer on this Shelly.", "refusals.shellyChannelGone"],
+    [
+        "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",
+        "refusals.hueKey"
+    ],
+    [
+        "That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.",
+        "refusals.hueNotBridge"
+    ],
+    [
+        "Press the link button on the Hue bridge, then select Connect within 30 seconds.",
+        "refusals.huePress"
+    ],
+    ["The Hue bridge would not pair with Polaris.", "refusals.hueNoPair"],
+    ["The Hue bridge is busy. Try again in a moment.", "refusals.hueBusy"],
+    ["The Hue bridge refused the request.", "refusals.hueRefused"],
+    ["A Hue light cannot be told to do that", "refusals.hueCannot"],
+    ["That address did not answer as a DIRIGERA hub.", "refusals.dirigeraNot"],
+    ["The DIRIGERA hub would not pair with Polaris.", "refusals.dirigeraNoPair"],
+    [
+        "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
+        "refusals.dirigeraPress"
+    ],
+    [
+        "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.",
+        "refusals.dirigeraToken"
+    ],
+    ["The DIRIGERA hub refused the request.", "refusals.dirigeraRefused"],
+    ["An IKEA device cannot be told to do that", "refusals.ikeaCannot"],
+    ["Write the address as http://homeassistant.local:8123, with no path", "refusals.haAddress"],
+    [
+        "Home Assistant refused the token. Make a new long-lived access token on your Home Assistant profile page.",
+        "refusals.haToken"
+    ],
+    ["That address answered, but not as Home Assistant.", "refusals.haNot"],
+    ["Home Assistant is restarting. Try again in a moment.", "refusals.haRestarting"],
+    ["Home Assistant would not do that. The device may not support it.", "refusals.haUnsupported"],
+    ["Home Assistant refused the request.", "refusals.haRefused"],
+    [
+        "Home Assistant has no switches, lights, locks or sensors for Polaris to show.",
+        "refusals.haNothing"
+    ],
+    [
+        "SwitchBot refused the token and secret. They may have been reset in the app, or today's allowance of requests is used up.",
+        "refusals.switchbotKeys"
+    ],
+    ["SwitchBot could not be reached. Try again in a moment.", "refusals.switchbotUnreachable"],
+    [
+        "SwitchBot is answering too many requests at once. Try again in a minute.",
+        "refusals.switchbotRate"
+    ],
+    ["SwitchBot answered with something unexpected.", "refusals.switchbotOdd"],
+    ["The device is not answering SwitchBot right now.", "refusals.switchbotOffline"],
+    ["SwitchBot refused the request.", "refusals.switchbotRefused"],
+    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
-const KIND_BY_WORD = new Map(Object.entries(DEVICE_KIND_LABELS).map(([kind, label]) => [label.toLowerCase(), kind]));
-const ACTION_BY_VERB = new Map(Object.entries(DEVICE_ACTION_VERBS).map(([action, verb]) => [verb, action]));
+const KIND_BY_WORD = new Map(
+    Object.entries(DEVICE_KIND_LABELS).map(([kind, label]) => [label.toLowerCase(), kind])
+);
+const ACTION_BY_VERB = new Map(
+    Object.entries(DEVICE_ACTION_VERBS).map(([action, verb]) => [verb, action])
+);
 
 /** Sentences that carry values, by the shape of their English. */
-const SHAPED: readonly { readonly pattern: RegExp; readonly key: PlacesKey; readonly params: readonly string[] }[] = [
+const SHAPED: readonly {
+    readonly pattern: RegExp;
+    readonly key: PlacesKey;
+    readonly params: readonly string[];
+}[] = [
     { pattern: /^(.+) has to be connected again$/s, key: "refusals.reconnect", params: ["name"] },
-    { pattern: /^(.+) is set to be watched, not operated$/s, key: "refusals.watchOnly", params: ["name"] },
-    { pattern: /^(.+) is not connected to anything$/s, key: "refusals.notConnected", params: ["name"] },
+    {
+        pattern: /^(.+) is set to be watched, not operated$/s,
+        key: "refusals.watchOnly",
+        params: ["name"]
+    },
+    {
+        pattern: /^(.+) is not connected to anything$/s,
+        key: "refusals.notConnected",
+        params: ["name"]
+    },
     {
         pattern: /^(.+) was not answering when it was last checked$/s,
         key: "refusals.notAnswering",
         params: ["name"]
     },
     {
-        pattern: /^Nothing on that broker is announcing itself under "(.*)"\. Check that discovery is switched on in whatever publishes your devices, and that it uses this prefix\.$/s,
+        pattern:
+            /^Nothing on that broker is announcing itself under "(.*)"\. Check that discovery is switched on in whatever publishes your devices, and that it uses this prefix\.$/s,
         key: "refusals.nothingUnderPrefix",
         params: ["prefix"]
     },
     {
-        pattern: /^Nothing on that broker is publishing as a Nuki device under "(.*)"\. Check that MQTT is switched on in the Nuki app and pointed at this broker\.$/s,
+        pattern:
+            /^Nothing on that broker is publishing as a Nuki device under "(.*)"\. Check that MQTT is switched on in the Nuki app and pointed at this broker\.$/s,
         key: "refusals.noNukiUnderPrefix",
         params: ["prefix"]
     },
-    { pattern: /^Nuki refused the request \(HTTP (\d+)\)\.$/, key: "refusals.nukiHttp", params: ["status"] },
-    { pattern: /^Tuya refused the keys: (.+)\.$/s, key: "refusals.tuyaKeysBecause", params: ["detail"] },
-    { pattern: /^Tuya refused the request: (.+)\.$/s, key: "refusals.tuyaRefusedBecause", params: ["detail"] },
-    { pattern: /^(.+) could not be reached$/s, key: "refusals.accountUnreachable", params: ["name"] },
-    { pattern: /^The relay refused it \((\d+)\)\.$/, key: "refusals.relayStatus", params: ["status"] }
+    {
+        pattern: /^Nuki refused the request \(HTTP (\d+)\)\.$/,
+        key: "refusals.nukiHttp",
+        params: ["status"]
+    },
+    {
+        pattern: /^Tuya refused the keys: (.+)\.$/s,
+        key: "refusals.tuyaKeysBecause",
+        params: ["detail"]
+    },
+    {
+        pattern: /^Tuya refused the request: (.+)\.$/s,
+        key: "refusals.tuyaRefusedBecause",
+        params: ["detail"]
+    },
+    {
+        pattern: /^Tuya refused the User Code: (.+)\.$/s,
+        key: "refusals.tuyaUserCodeBecause",
+        params: ["detail"]
+    },
+    {
+        pattern: /^(.+) could not be reached$/s,
+        key: "refusals.accountUnreachable",
+        params: ["name"]
+    },
+    {
+        pattern: /^The relay refused it \((\d+)\)\.$/,
+        key: "refusals.relayStatus",
+        params: ["status"]
+    }
 ];
 
 /** The outage headlines `reachability` writes into an event's label. */
-const OUTAGES: readonly { readonly pattern: RegExp; readonly key: PlacesKey; readonly params: readonly string[] }[] = [
-    { pattern: /^Every camera(?: at (.+))? stopped answering$/s, key: "outage.every", params: ["place"] },
+const OUTAGES: readonly {
+    readonly pattern: RegExp;
+    readonly key: PlacesKey;
+    readonly params: readonly string[];
+}[] = [
+    {
+        pattern: /^Every camera(?: at (.+))? stopped answering$/s,
+        key: "outage.every",
+        params: ["place"]
+    },
     {
         pattern: /^(.+) stopped answering - the only one of (\d+)(?: at (.+))?$/s,
         key: "outage.only",
@@ -152,14 +337,20 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     const kind = cannot ? KIND_BY_WORD.get(cannot[1] ?? "") : undefined;
     const action = cannot ? ACTION_BY_VERB.get(cannot[2] ?? "") : undefined;
     // An ICU selector cannot hold a hyphen, so "turn-on" is asked as "turnOn".
-    if (kind && action) return t("refusals.kindCannot", { kind, action: action.replace("-on", "On") });
+    if (kind && action)
+        return t("refusals.kindCannot", { kind, action: action.replace("-on", "On") });
     for (const { pattern, key: shaped, params } of OUTAGES) {
         const found = pattern.exec(message);
         if (!found) continue;
         const values: Record<string, string | number> = {};
         params.forEach((name, index) => {
             const value = found[index + 1];
-            values[name] = name === "place" ? (value ?? "") : /^\d+$/.test(value ?? "") ? Number(value) : (value ?? "");
+            values[name] =
+                name === "place"
+                    ? (value ?? "")
+                    : /^\d+$/.test(value ?? "")
+                      ? Number(value)
+                      : (value ?? "");
         });
         values.hasPlace = values.place ? "yes" : "no";
         return t(shaped, values);
@@ -167,7 +358,10 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     for (const { pattern, key: shaped, params } of SHAPED) {
         const found = pattern.exec(message);
         if (!found) continue;
-        return t(shaped, Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""])));
+        return t(
+            shaped,
+            Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""]))
+        );
     }
     return message;
 }

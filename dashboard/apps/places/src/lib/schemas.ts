@@ -369,6 +369,17 @@ export const deviceAccountSchema = z.object({
 
 export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;
 
+/**
+ * One step of pairing: the same connection, label and fields, plus what the
+ * attempt was started with and, when this is a reconnect, the account it is for.
+ * The state is whatever the driver's `start` answered and is checked again by the
+ * driver itself - it has been through a browser.
+ */
+export const devicePairingSchema = deviceAccountSchema.extend({
+    state: z.record(z.string().max(64), z.string().max(500)).default({}),
+    accountId: z.string().trim().max(64).optional()
+});
+
 /** What somebody can change about a device here. The rest belongs to the account
  *  it came from and is read back by every sync. */
 export const deviceEditSchema = z.object({
