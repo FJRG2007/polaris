@@ -480,7 +480,14 @@
         "shellyThrottled": "El Shelly rechaza peticiones durante un rato tras demasiadas contraseñas erróneas.",
         "shellyNothing": "Ese Shelly no tiene relé ni luz que controlar. Persianas y medidores aún no se pueden manejar desde Polaris.",
         "shellyCannot": "A un Shelly no se le puede pedir eso",
-        "shellyChannelGone": "Ese dispositivo ya no está en este Shelly."
+        "shellyChannelGone": "Ese dispositivo ya no está en este Shelly.",
+        "hueKey": "El puente Hue ya no acepta a Polaris. Vuelve a conectarlo pulsando antes el botón del puente.",
+        "hueNotBridge": "Esa dirección no respondió con un certificado de puente Hue. Revisa la dirección y, si es un puente antiguo, actualízalo en la app Hue.",
+        "huePress": "Pulsa el botón de enlace del puente Hue y elige Conectar en menos de 30 segundos.",
+        "hueNoPair": "El puente Hue no quiso vincularse con Polaris.",
+        "hueBusy": "El puente Hue está ocupado. Inténtalo en un momento.",
+        "hueRefused": "El puente Hue rechazó la petición.",
+        "hueCannot": "A una luz Hue no se le puede pedir eso"
     },
     "connections": {
         "nuki-web": {
@@ -653,6 +660,27 @@
                 "username": {
                     "label": "Usuario",
                     "hint": "Solo los Shelly antiguos lo usan, y es admin salvo que lo cambiaras."
+                }
+            }
+        },
+        "hue-bridge": {
+            "label": "Hue Bridge",
+            "summary": "Todas las luces y enchufes de tu Hue Bridge, con una pulsación de su botón. Nada pasa por la nube.",
+            "note": "Polaris habla con el puente en tu red y comprueba su certificado contra el de Hue, así que responde en milisegundos y funciona sin internet. Llegan luces y enchufes; escenas, estancias y colores siguen en la app Hue.",
+            "steps": {
+                "s0": "Busca la dirección IP del puente en la lista de dispositivos conectados de tu router.",
+                "s1": "Pulsa el botón de enlace del puente.",
+                "s2": "En menos de 30 segundos, elige Conectar aquí."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.20"
+                },
+                "appKey": {
+                    "label": "Clave de app",
+                    "hint": "Déjala vacía y Polaris crea una cuando pulses el botón del puente."
                 }
             }
         },

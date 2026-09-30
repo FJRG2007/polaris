@@ -87,6 +87,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     nuki: brand.NukiMark,
     tplink: brand.TpLinkMark,
     shelly: brand.ShellyMark,
+    philipshue: brand.PhilipsHueMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
     aws: brand.AwsMark

@@ -410,6 +410,43 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["switch", "outlet", "light"],
         search: ["shelly", "relay", "plug", "dimmer", "bulb", "plus", "pro", "gen3", "gen4", "local"]
+    },
+    // Philips Hue: the bridge's local API is the most convenient and the most
+    // stable way in - one button press, every light on the bridge, no cloud.
+    // Pairing is inside the driver's verify, so it can later move to a pairing
+    // screen without a second implementation.
+    {
+        id: "hue-bridge",
+        brand: "Philips Hue",
+        logo: "philipshue",
+        label: en("connections.hue-bridge.label"),
+        reach: "same-network",
+        summary: en("connections.hue-bridge.summary"),
+        note: en("connections.hue-bridge.note"),
+        steps: [
+            en("connections.hue-bridge.steps.s0"),
+            en("connections.hue-bridge.steps.s1"),
+            en("connections.hue-bridge.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.hue-bridge.fields.host.label"),
+                hint: en("connections.hue-bridge.fields.host.hint"),
+                placeholder: en("connections.hue-bridge.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "appKey",
+                label: en("connections.hue-bridge.fields.appKey.label"),
+                hint: en("connections.hue-bridge.fields.appKey.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 100
+            }
+        ],
+        kinds: ["light", "outlet"],
+        search: ["hue", "philips", "signify", "bridge", "bulb", "light", "smart plug", "zigbee", "local"]
     }
 ];
 

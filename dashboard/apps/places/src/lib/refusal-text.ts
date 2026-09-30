@@ -115,6 +115,13 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.", "refusals.shellyNothing"],
     ["A Shelly cannot be told to do that", "refusals.shellyCannot"],
     ["That device is no longer on this Shelly.", "refusals.shellyChannelGone"],
+    ["The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.", "refusals.hueKey"],
+    ["That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.", "refusals.hueNotBridge"],
+    ["Press the link button on the Hue bridge, then select Connect within 30 seconds.", "refusals.huePress"],
+    ["The Hue bridge would not pair with Polaris.", "refusals.hueNoPair"],
+    ["The Hue bridge is busy. Try again in a moment.", "refusals.hueBusy"],
+    ["The Hue bridge refused the request.", "refusals.hueRefused"],
+    ["A Hue light cannot be told to do that", "refusals.hueCannot"],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

@@ -480,7 +480,14 @@
         "shellyThrottled": "The Shelly is refusing requests for a while after too many wrong passwords.",
         "shellyNothing": "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
         "shellyCannot": "A Shelly cannot be told to do that",
-        "shellyChannelGone": "That device is no longer on this Shelly."
+        "shellyChannelGone": "That device is no longer on this Shelly.",
+        "hueKey": "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",
+        "hueNotBridge": "That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.",
+        "huePress": "Press the link button on the Hue bridge, then select Connect within 30 seconds.",
+        "hueNoPair": "The Hue bridge would not pair with Polaris.",
+        "hueBusy": "The Hue bridge is busy. Try again in a moment.",
+        "hueRefused": "The Hue bridge refused the request.",
+        "hueCannot": "A Hue light cannot be told to do that"
     },
     "connections": {
         "nuki-web": {
@@ -653,6 +660,27 @@
                 "username": {
                     "label": "Username",
                     "hint": "Only older Shelly devices use one, and it is admin unless you changed it."
+                }
+            }
+        },
+        "hue-bridge": {
+            "label": "Hue Bridge",
+            "summary": "Every light and smart plug on your Hue Bridge, from one press of its button. Nothing goes through the cloud.",
+            "note": "Polaris talks to the bridge on your network and checks its certificate against Hue's own, so it answers in milliseconds and keeps working without the internet. Lights and plugs arrive; scenes, rooms and colours stay in the Hue app.",
+            "steps": {
+                "s0": "Find the bridge's IP address in your router's list of connected devices.",
+                "s1": "Press the link button on the bridge.",
+                "s2": "Within 30 seconds, select Connect here."
+            },
+            "fields": {
+                "host": {
+                    "label": "Bridge address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.20"
+                },
+                "appKey": {
+                    "label": "Application key",
+                    "hint": "Leave it empty and Polaris makes one when you press the bridge's button."
                 }
             }
         },
