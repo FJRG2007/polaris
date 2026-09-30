@@ -487,7 +487,13 @@
         "hueNoPair": "El puente Hue no quiso vincularse con Polaris.",
         "hueBusy": "El puente Hue está ocupado. Inténtalo en un momento.",
         "hueRefused": "El puente Hue rechazó la petición.",
-        "hueCannot": "A una luz Hue no se le puede pedir eso"
+        "hueCannot": "A una luz Hue no se le puede pedir eso",
+        "dirigeraNot": "Esa dirección no respondió como un hub DIRIGERA.",
+        "dirigeraNoPair": "El hub DIRIGERA no quiso vincularse con Polaris.",
+        "dirigeraPress": "No se pulsó a tiempo el botón de acción del hub. Elige Conectar y pulsa el botón de acción del hub en menos de un minuto.",
+        "dirigeraToken": "El hub DIRIGERA ya no acepta a Polaris. Vuelve a conectarlo y pulsa el botón del hub.",
+        "dirigeraRefused": "El hub DIRIGERA rechazó la petición.",
+        "ikeaCannot": "A un dispositivo IKEA no se le puede pedir eso"
     },
     "connections": {
         "nuki-web": {
@@ -681,6 +687,23 @@
                 "appKey": {
                     "label": "Clave de app",
                     "hint": "Déjala vacía y Polaris crea una cuando pulses el botón del puente."
+                }
+            }
+        },
+        "dirigera-hub": {
+            "label": "Hub DIRIGERA",
+            "summary": "Las luces, enchufes y sensores de tu hub IKEA DIRIGERA, con una pulsación de su botón. Nada pasa por la nube.",
+            "note": "Polaris habla con el hub en tu red. Su certificado se recuerda al vincularlo, y después Polaris no habla con nada más en esa dirección. Persianas, purificadores y mandos quedan fuera por ahora.",
+            "steps": {
+                "s0": "Busca la dirección IP del hub en tu router y fíjasela si puedes.",
+                "s1": "Elige Conectar aquí.",
+                "s2": "En menos de un minuto, pulsa el botón de acción del hub."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.25"
                 }
             }
         },

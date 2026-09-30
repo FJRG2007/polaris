@@ -24,6 +24,7 @@ import { NUKI_WEB, nukiWebDriver } from "./drivers/nuki-web";
 import { NUKI_LOCAL, nukiLocalDriver } from "./drivers/nuki-local";
 import { TUYA_CLOUD, tuyaCloudDriver } from "./drivers/tuya-cloud";
 import { MQTT_DISCOVERY, mqttDiscoveryDriver } from "./drivers/mqtt-discovery";
+import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
 import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
 import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
 import { KASA_LOCAL, TAPO_LOCAL, kasaLocalDriver, tapoLocalDriver } from "./drivers/tplink-local";
@@ -43,7 +44,8 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [TAPO_LOCAL]: tapoLocalDriver,
     [KASA_LOCAL]: kasaLocalDriver,
     [SHELLY_LOCAL]: shellyLocalDriver,
-    [HUE_BRIDGE]: hueBridgeDriver
+    [HUE_BRIDGE]: hueBridgeDriver,
+    [DIRIGERA_HUB]: dirigeraHubDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {

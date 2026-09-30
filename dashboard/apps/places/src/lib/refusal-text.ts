@@ -122,6 +122,12 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The Hue bridge is busy. Try again in a moment.", "refusals.hueBusy"],
     ["The Hue bridge refused the request.", "refusals.hueRefused"],
     ["A Hue light cannot be told to do that", "refusals.hueCannot"],
+    ["That address did not answer as a DIRIGERA hub.", "refusals.dirigeraNot"],
+    ["The DIRIGERA hub would not pair with Polaris.", "refusals.dirigeraNoPair"],
+    ["The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.", "refusals.dirigeraPress"],
+    ["The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.", "refusals.dirigeraToken"],
+    ["The DIRIGERA hub refused the request.", "refusals.dirigeraRefused"],
+    ["An IKEA device cannot be told to do that", "refusals.ikeaCannot"],
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

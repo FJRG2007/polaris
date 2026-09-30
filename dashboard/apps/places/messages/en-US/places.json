@@ -487,7 +487,13 @@
         "hueNoPair": "The Hue bridge would not pair with Polaris.",
         "hueBusy": "The Hue bridge is busy. Try again in a moment.",
         "hueRefused": "The Hue bridge refused the request.",
-        "hueCannot": "A Hue light cannot be told to do that"
+        "hueCannot": "A Hue light cannot be told to do that",
+        "dirigeraNot": "That address did not answer as a DIRIGERA hub.",
+        "dirigeraNoPair": "The DIRIGERA hub would not pair with Polaris.",
+        "dirigeraPress": "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
+        "dirigeraToken": "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.",
+        "dirigeraRefused": "The DIRIGERA hub refused the request.",
+        "ikeaCannot": "An IKEA device cannot be told to do that"
     },
     "connections": {
         "nuki-web": {
@@ -681,6 +687,23 @@
                 "appKey": {
                     "label": "Application key",
                     "hint": "Leave it empty and Polaris makes one when you press the bridge's button."
+                }
+            }
+        },
+        "dirigera-hub": {
+            "label": "DIRIGERA hub",
+            "summary": "The lights, outlets and sensors on your IKEA DIRIGERA hub, from one press of its button. Nothing goes through the cloud.",
+            "note": "Polaris talks to the hub on your network. The hub's certificate is remembered when you pair it, and Polaris refuses to talk to anything else at that address afterwards. Blinds, air purifiers and remotes are left out for now.",
+            "steps": {
+                "s0": "Find the hub's IP address in your router, and give it a fixed one if you can.",
+                "s1": "Select Connect here.",
+                "s2": "Within a minute, press the action button on the hub."
+            },
+            "fields": {
+                "host": {
+                    "label": "Hub address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.25"
                 }
             }
         },

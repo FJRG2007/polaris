@@ -13,8 +13,8 @@
  * the driver.
  */
 
-import { wallClock, zonedInstant } from "@polaris/core";
 import type { PlacesTranslator } from "./i18n";
+import { wallClock, zonedInstant } from "@polaris/core";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
 
 /** What a device does, which is what decides the buttons it gets. */
@@ -138,7 +138,34 @@ export function readingLine(reading: DeviceReading | null, t: PlacesTranslator =
     return closed ? `${value}${reading.unit}` : `${value} ${reading.unit}`;
 }
 
-/** The words `mqtt-discovery` gives a two-state sensor, by their English. */
+/**
+ * What a thing that is either true or false should say it is.
+ *
+ * Keyed by the device class of the discovery convention, which Home Assistant
+ * uses too, and it is the only reason the answer is readable: "on" is what a
+ * contact publishes and "Open" is what its owner needs to see. Anything unlisted
+ * falls back to on and off, which is honest rather than wrong. Every word here
+ * has an entry in `READING_KEYS` below, so it reads in the viewer's language.
+ */
+export const BINARY_WORDS: Readonly<Record<string, { on: string; off: string }>> = {
+    door: { on: "Open", off: "Closed" },
+    window: { on: "Open", off: "Closed" },
+    garage_door: { on: "Open", off: "Closed" },
+    opening: { on: "Open", off: "Closed" },
+    lock: { on: "Unlocked", off: "Locked" },
+    motion: { on: "Movement", off: "Still" },
+    occupancy: { on: "Somebody there", off: "Empty" },
+    presence: { on: "Home", off: "Away" },
+    moisture: { on: "Wet", off: "Dry" },
+    smoke: { on: "Smoke", off: "Clear" },
+    gas: { on: "Gas", off: "Clear" },
+    problem: { on: "Problem", off: "Fine" },
+    battery: { on: "Low", off: "Fine" },
+    connectivity: { on: "Connected", off: "Disconnected" },
+    tamper: { on: "Tampered", off: "Fine" }
+};
+
+/** The words a driver gives a two-state sensor, by their English. */
 const READING_KEYS: Readonly<Record<string, PlacesKey>> = {
     "Open": "devices.readings.open",
     "Closed": "devices.readings.closed",
@@ -333,7 +360,6 @@ export interface DeviceEventView {
     readonly note: string;
     readonly at: string;
 }
-
 
 /**
  * One line for one entry in the history.

@@ -447,6 +447,34 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["light", "outlet"],
         search: ["hue", "philips", "signify", "bridge", "bulb", "light", "smart plug", "zigbee", "local"]
+    },
+    // IKEA: the DIRIGERA hub's local API is the only way in with no cloud at all,
+    // and the most convenient - one button press brings the whole hub. Pairing
+    // is inside the driver's verify, ready for a shared pairing screen.
+    {
+        id: "dirigera-hub",
+        brand: "IKEA",
+        logo: "ikea",
+        label: en("connections.dirigera-hub.label"),
+        reach: "same-network",
+        summary: en("connections.dirigera-hub.summary"),
+        note: en("connections.dirigera-hub.note"),
+        steps: [
+            en("connections.dirigera-hub.steps.s0"),
+            en("connections.dirigera-hub.steps.s1"),
+            en("connections.dirigera-hub.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.dirigera-hub.fields.host.label"),
+                hint: en("connections.dirigera-hub.fields.host.hint"),
+                placeholder: en("connections.dirigera-hub.fields.host.placeholder"),
+                maxLength: 200
+            }
+        ],
+        kinds: ["light", "outlet", "sensor"],
+        search: ["ikea", "dirigera", "tradfri", "home smart", "hub", "bulb", "outlet", "zigbee", "local"]
     }
 ];
 
