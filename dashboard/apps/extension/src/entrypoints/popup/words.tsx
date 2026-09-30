@@ -39,7 +39,11 @@ export function WordsProvider({
             follow((stored) => {
                 const next = wordsIn(pickLocale(stored));
                 speakRepliesIn(next);
-                setWords(next);
+                // Wrapped, because the words ARE a function: handed to the
+                // setter as they are, React calls them as an updater with the
+                // old words for a key, and the popup went blank the moment an
+                // account in another language connected with it open.
+                setWords(() => next);
             }),
         [follow]
     );
