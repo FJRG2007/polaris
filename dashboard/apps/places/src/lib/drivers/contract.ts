@@ -123,7 +123,17 @@ export interface DevicePairing {
 export interface DeviceDriver {
     /** The connection id from the registry this implements. */
     readonly connection: string;
-    verify(credentials: Credentials): Promise<void>;
+    /**
+     * Prove the credentials, and hand back what to store where proving them
+     * produced something new.
+     *
+     * Most drivers return nothing and what was typed is what is kept. A bridge
+     * paired with a button is the exception: what was typed is an address, and
+     * what the bridge handed back once its button was pressed - a key, the
+     * certificate it answered with - is what every later call needs. Pairing
+     * lives here, inside the driver, so the form stays a list of fields.
+     */
+    verify(credentials: Credentials): Promise<Credentials | void>;
     list(credentials: Credentials): Promise<DeviceSnapshot[]>;
     history?(credentials: Credentials, limit: number): Promise<DeviceHistoryEntry[]>;
     /**

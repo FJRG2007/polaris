@@ -25,6 +25,12 @@ import { NUKI_LOCAL, nukiLocalDriver } from "./drivers/nuki-local";
 import { TUYA_APP, tuyaAppDriver } from "./drivers/tuya-app";
 import { TUYA_CLOUD, tuyaCloudDriver } from "./drivers/tuya-cloud";
 import { MQTT_DISCOVERY, mqttDiscoveryDriver } from "./drivers/mqtt-discovery";
+import { SWITCHBOT_CLOUD, switchBotCloudDriver } from "./drivers/switchbot-cloud";
+import { HOME_ASSISTANT, homeAssistantDriver } from "./drivers/home-assistant";
+import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
+import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
+import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
+import { KASA_LOCAL, TAPO_LOCAL, kasaLocalDriver, tapoLocalDriver } from "./drivers/tplink-local";
 import {
     DriverError,
     type Credentials,
@@ -45,7 +51,14 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [NUKI_LOCAL]: nukiLocalDriver,
     [TUYA_APP]: tuyaAppDriver,
     [TUYA_CLOUD]: tuyaCloudDriver,
-    [MQTT_DISCOVERY]: mqttDiscoveryDriver
+    [MQTT_DISCOVERY]: mqttDiscoveryDriver,
+    [TAPO_LOCAL]: tapoLocalDriver,
+    [KASA_LOCAL]: kasaLocalDriver,
+    [SHELLY_LOCAL]: shellyLocalDriver,
+    [HUE_BRIDGE]: hueBridgeDriver,
+    [DIRIGERA_HUB]: dirigeraHubDriver,
+    [HOME_ASSISTANT]: homeAssistantDriver,
+    [SWITCHBOT_CLOUD]: switchBotCloudDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {
@@ -263,14 +276,14 @@ export async function connectAccount(
     if (!connection || !isConnectable(input.connection)) {
         throw new HomeError("Polaris cannot connect that yet");
     }
-    await speaking(() => driverFor(connection.id).verify(input.fields));
+    const paired = await speaking(() => driverFor(connection.id).verify(input.fields));
     const row = await prisma.placeDeviceAccount.create({
         data: {
             installedAppId,
             brand: connection.brand,
             connection: connection.id,
             label: input.label.trim() || connection.brand,
-            secret: sealCredentials(input.fields),
+            secret: sealCredentials(paired ?? input.fields),
             status: "ok"
         },
         select: ACCOUNT_FIELDS
@@ -297,12 +310,12 @@ export async function reconnectAccount(
     if (!existing) throw new HomeError("That connection is not here");
     const connection = registry.deviceConnection(existing.connection);
     if (!connection) throw new HomeError("Polaris cannot connect that yet");
-    await speaking(() => driverFor(connection.id).verify(input.fields));
+    const paired = await speaking(() => driverFor(connection.id).verify(input.fields));
     const row = await prisma.placeDeviceAccount.update({
         where: { id: existing.id },
         data: {
             label: input.label.trim() || existing.label,
-            secret: sealCredentials(input.fields),
+            secret: sealCredentials(paired ?? input.fields),
             status: "ok",
             statusNote: null
         },

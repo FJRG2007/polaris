@@ -25,7 +25,7 @@
 import { z } from "zod";
 import { HomeError } from "../home-error";
 import * as broker from "../integrations/mqtt-broker";
-import type { DeviceKind } from "../device-kinds";
+import { BINARY_WORDS, type DeviceKind } from "../device-kinds";
 import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
 export const MQTT_DISCOVERY = "mqtt-discovery";
@@ -50,32 +50,6 @@ const COMPONENT_KINDS: Readonly<Record<string, DeviceKind>> = {
     lock: "lock",
     sensor: "sensor",
     binary_sensor: "sensor"
-};
-
-/**
- * What a thing that is either true or false should say it is.
- *
- * The convention has a device class for this and it is the only reason the answer
- * is readable: "on" is what a contact publishes and "Open" is what its owner
- * needs to see. Anything unlisted falls back to on and off, which is honest
- * rather than wrong.
- */
-const BINARY_WORDS: Readonly<Record<string, { on: string; off: string }>> = {
-    door: { on: "Open", off: "Closed" },
-    window: { on: "Open", off: "Closed" },
-    garage_door: { on: "Open", off: "Closed" },
-    opening: { on: "Open", off: "Closed" },
-    lock: { on: "Unlocked", off: "Locked" },
-    motion: { on: "Movement", off: "Still" },
-    occupancy: { on: "Somebody there", off: "Empty" },
-    presence: { on: "Home", off: "Away" },
-    moisture: { on: "Wet", off: "Dry" },
-    smoke: { on: "Smoke", off: "Clear" },
-    gas: { on: "Gas", off: "Clear" },
-    problem: { on: "Problem", off: "Fine" },
-    battery: { on: "Low", off: "Fine" },
-    connectivity: { on: "Connected", off: "Disconnected" },
-    tamper: { on: "Tampered", off: "Fine" }
 };
 
 /**

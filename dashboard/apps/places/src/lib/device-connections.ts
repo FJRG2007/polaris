@@ -154,6 +154,7 @@ export interface DeviceConnection {
 
 const NUKI_TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
 const TUYA_CONSOLE = "https://iot.tuya.com/";
+const SWITCHBOT_API_DOCS = "https://github.com/OpenWonderLabs/SwitchBotAPI";
 
 /**
  * Every way in, best first within each brand.
@@ -396,6 +397,259 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "smart plug",
             "wall switch"
         ]
+    },
+    // TP-Link: Tapo first. Every Tapo and every Kasa on current firmware answers
+    // it, so it is the one that works for the most houses; the Kasa entry is for
+    // the older plugs that need no account at all.
+    {
+        id: "tapo-local",
+        brand: "TP-Link",
+        recommended: true,
+        logo: "tplink",
+        label: en("connections.tapo-local.label"),
+        reach: "same-network",
+        summary: en("connections.tapo-local.summary"),
+        note: en("connections.tapo-local.note"),
+        steps: [
+            en("connections.tapo-local.steps.s0"),
+            en("connections.tapo-local.steps.s1"),
+            en("connections.tapo-local.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.tapo-local.fields.host.label"),
+                hint: en("connections.tapo-local.fields.host.hint"),
+                placeholder: en("connections.tapo-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.tapo-local.fields.email.label"),
+                placeholder: en("connections.tapo-local.fields.email.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.tapo-local.fields.password.label"),
+                secret: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: ["tapo", "kasa", "tplink", "smart plug", "power strip", "bulb", "p100", "p110", "p300", "l530", "local"]
+    },
+    {
+        id: "kasa-local",
+        brand: "TP-Link",
+        logo: "tplink",
+        label: en("connections.kasa-local.label"),
+        reach: "same-network",
+        summary: en("connections.kasa-local.summary"),
+        note: en("connections.kasa-local.note"),
+        steps: [en("connections.kasa-local.steps.s0"), en("connections.kasa-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.kasa-local.fields.host.label"),
+                hint: en("connections.kasa-local.fields.host.hint"),
+                placeholder: en("connections.kasa-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "email",
+                label: en("connections.kasa-local.fields.email.label"),
+                hint: en("connections.kasa-local.fields.email.hint"),
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.kasa-local.fields.password.label"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["outlet", "switch", "light"],
+        search: ["kasa", "tplink", "hs100", "hs110", "hs300", "kp115", "kl130", "smart plug", "power strip", "local"]
+    },
+    // Shelly: its own local API is the one way in, and the best one - no account,
+    // no cloud, and every generation answers it.
+    {
+        id: "shelly-local",
+        brand: "Shelly",
+        logo: "shelly",
+        label: en("connections.shelly-local.label"),
+        reach: "same-network",
+        summary: en("connections.shelly-local.summary"),
+        note: en("connections.shelly-local.note"),
+        steps: [en("connections.shelly-local.steps.s0"), en("connections.shelly-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.shelly-local.fields.host.label"),
+                hint: en("connections.shelly-local.fields.host.hint"),
+                placeholder: en("connections.shelly-local.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "password",
+                label: en("connections.shelly-local.fields.password.label"),
+                hint: en("connections.shelly-local.fields.password.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 200
+            },
+            {
+                key: "username",
+                label: en("connections.shelly-local.fields.username.label"),
+                hint: en("connections.shelly-local.fields.username.hint"),
+                defaultValue: "admin",
+                optional: true,
+                maxLength: 50
+            }
+        ],
+        kinds: ["switch", "outlet", "light"],
+        search: ["shelly", "relay", "plug", "dimmer", "bulb", "plus", "pro", "gen3", "gen4", "local"]
+    },
+    // Philips Hue: the bridge's local API is the most convenient and the most
+    // stable way in - one button press, every light on the bridge, no cloud.
+    // Pairing is inside the driver's verify, so it can later move to a pairing
+    // screen without a second implementation.
+    {
+        id: "hue-bridge",
+        brand: "Philips Hue",
+        logo: "philipshue",
+        label: en("connections.hue-bridge.label"),
+        reach: "same-network",
+        summary: en("connections.hue-bridge.summary"),
+        note: en("connections.hue-bridge.note"),
+        steps: [
+            en("connections.hue-bridge.steps.s0"),
+            en("connections.hue-bridge.steps.s1"),
+            en("connections.hue-bridge.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.hue-bridge.fields.host.label"),
+                hint: en("connections.hue-bridge.fields.host.hint"),
+                placeholder: en("connections.hue-bridge.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "appKey",
+                label: en("connections.hue-bridge.fields.appKey.label"),
+                hint: en("connections.hue-bridge.fields.appKey.hint"),
+                secret: true,
+                optional: true,
+                maxLength: 100
+            }
+        ],
+        kinds: ["light", "outlet"],
+        search: ["hue", "philips", "signify", "bridge", "bulb", "light", "smart plug", "zigbee", "local"]
+    },
+    // IKEA: the DIRIGERA hub's local API is the only way in with no cloud at all,
+    // and the most convenient - one button press brings the whole hub. Pairing
+    // is inside the driver's verify, ready for a shared pairing screen.
+    {
+        id: "dirigera-hub",
+        brand: "IKEA",
+        logo: "ikea",
+        label: en("connections.dirigera-hub.label"),
+        reach: "same-network",
+        summary: en("connections.dirigera-hub.summary"),
+        note: en("connections.dirigera-hub.note"),
+        steps: [
+            en("connections.dirigera-hub.steps.s0"),
+            en("connections.dirigera-hub.steps.s1"),
+            en("connections.dirigera-hub.steps.s2")
+        ],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.dirigera-hub.fields.host.label"),
+                hint: en("connections.dirigera-hub.fields.host.hint"),
+                placeholder: en("connections.dirigera-hub.fields.host.placeholder"),
+                maxLength: 200
+            }
+        ],
+        kinds: ["light", "outlet", "sensor"],
+        search: ["ikea", "dirigera", "tradfri", "home smart", "hub", "bulb", "outlet", "zigbee", "local"]
+    },
+    // Home Assistant: its REST API with a long-lived token is the one way in,
+    // and the fastest to set up - one connection brings the whole house.
+    {
+        id: "home-assistant",
+        brand: "Home Assistant",
+        logo: "homeassistant",
+        label: en("connections.home-assistant.label"),
+        reach: "same-network",
+        summary: en("connections.home-assistant.summary"),
+        note: en("connections.home-assistant.note"),
+        steps: [
+            en("connections.home-assistant.steps.s0"),
+            en("connections.home-assistant.steps.s1"),
+            en("connections.home-assistant.steps.s2")
+        ],
+        fields: [
+            {
+                key: "url",
+                label: en("connections.home-assistant.fields.url.label"),
+                hint: en("connections.home-assistant.fields.url.hint"),
+                placeholder: en("connections.home-assistant.fields.url.placeholder"),
+                maxLength: 300
+            },
+            {
+                key: "token",
+                label: en("connections.home-assistant.fields.token.label"),
+                placeholder: en("connections.home-assistant.fields.token.placeholder"),
+                secret: true,
+                minLength: 20,
+                maxLength: 1000
+            }
+        ],
+        kinds: ["switch", "outlet", "light", "lock", "sensor"],
+        search: ["home assistant", "hass", "homeassistant", "zigbee", "z-wave", "zwave", "local", "whole house"]
+    },
+    // SwitchBot: their cloud API is the one documented way in, and the most
+    // convenient - a token and a secret from the app, and every device on the
+    // account arrives, including the Bluetooth ones behind a hub.
+    {
+        id: "switchbot-cloud",
+        brand: "SwitchBot",
+        logo: "switchbot",
+        label: en("connections.switchbot-cloud.label"),
+        reach: "anywhere",
+        summary: en("connections.switchbot-cloud.summary"),
+        note: en("connections.switchbot-cloud.note"),
+        steps: [
+            en("connections.switchbot-cloud.steps.s0"),
+            en("connections.switchbot-cloud.steps.s1"),
+            en("connections.switchbot-cloud.steps.s2")
+        ],
+        link: { label: en("connections.switchbot-cloud.link"), href: SWITCHBOT_API_DOCS },
+        fields: [
+            {
+                key: "token",
+                label: en("connections.switchbot-cloud.fields.token.label"),
+                placeholder: en("connections.switchbot-cloud.fields.token.placeholder"),
+                secret: true,
+                minLength: 16,
+                maxLength: 500
+            },
+            {
+                key: "secret",
+                label: en("connections.switchbot-cloud.fields.secret.label"),
+                placeholder: en("connections.switchbot-cloud.fields.secret.placeholder"),
+                secret: true,
+                minLength: 8,
+                maxLength: 500
+            }
+        ],
+        kinds: ["outlet", "switch", "lock", "light", "sensor"],
+        search: ["switchbot", "switch bot", "bot", "smart lock", "plug mini", "meter", "contact sensor", "curtain"]
     }
 ];
 

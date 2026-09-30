@@ -465,7 +465,53 @@
         "noSignIn": "A esa conexión le falta su inicio de sesión",
         "tuyaSignedOut": "Tuya ya no acepta esta sesión. Escanea un código nuevo desde la app.",
         "tuyaUserCode": "Tuya no aceptó el código de usuario. Revísalo en la app, en la seguridad de la cuenta.",
-        "tuyaUserCodeBecause": "Tuya no aceptó el código de usuario: {detail}."
+        "tuyaUserCodeBecause": "Tuya no aceptó el código de usuario: {detail}.",
+        "deviceSlow": "El dispositivo no respondió a tiempo.",
+        "deviceCertificate": "El certificado del dispositivo no es de fiar, así que no se le envió nada.",
+        "deviceSwapped": "El dispositivo en esa dirección no es el que se conectó. Vuelve a conectarlo.",
+        "deviceTooMuch": "El dispositivo respondió con mucho más de lo que Polaris lee.",
+        "deviceUnreachable": "No se pudo llegar al dispositivo.",
+        "noDeviceAddress": "A esa conexión le falta la dirección del dispositivo",
+        "deviceOdd": "El dispositivo respondió algo inesperado.",
+        "deviceRefused": "El dispositivo rechazó la petición.",
+        "tplinkAccount": "El dispositivo no aceptó esa cuenta de TP-Link. Usa el correo y la contraseña con los que entras en la app Tapo o Kasa.",
+        "tplinkNothing": "Ese dispositivo TP-Link no es un enchufe, un interruptor ni una bombilla, así que no hay nada que controlar.",
+        "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso",
+        "addressNoPath": "Escribe la dirección como 192.168.1.30, sin ruta",
+        "shellyNot": "Esa dirección respondió, pero no como un Shelly.",
+        "shellyPassword": "El Shelly rechazó la contraseña. Es la que se fija en la app Shelly, en los ajustes de autenticación del dispositivo.",
+        "shellyNeedsPassword": "Este Shelly tiene contraseña. Añádela a la conexión.",
+        "shellyThrottled": "El Shelly rechaza peticiones durante un rato tras demasiadas contraseñas erróneas.",
+        "shellyNothing": "Ese Shelly no tiene relé ni luz que controlar. Persianas y medidores aún no se pueden manejar desde Polaris.",
+        "shellyCannot": "A un Shelly no se le puede pedir eso",
+        "shellyChannelGone": "Ese dispositivo ya no está en este Shelly.",
+        "hueKey": "El puente Hue ya no acepta a Polaris. Vuelve a conectarlo pulsando antes el botón del puente.",
+        "hueNotBridge": "Esa dirección no respondió con un certificado de puente Hue. Revisa la dirección y, si es un puente antiguo, actualízalo en la app Hue.",
+        "huePress": "Pulsa el botón de enlace del puente Hue y elige Conectar en menos de 30 segundos.",
+        "hueNoPair": "El puente Hue no quiso vincularse con Polaris.",
+        "hueBusy": "El puente Hue está ocupado. Inténtalo en un momento.",
+        "hueRefused": "El puente Hue rechazó la petición.",
+        "hueCannot": "A una luz Hue no se le puede pedir eso",
+        "dirigeraNot": "Esa dirección no respondió como un hub DIRIGERA.",
+        "dirigeraNoPair": "El hub DIRIGERA no quiso vincularse con Polaris.",
+        "dirigeraPress": "No se pulsó a tiempo el botón de acción del hub. Elige Conectar y pulsa el botón de acción del hub en menos de un minuto.",
+        "dirigeraToken": "El hub DIRIGERA ya no acepta a Polaris. Vuelve a conectarlo y pulsa el botón del hub.",
+        "dirigeraRefused": "El hub DIRIGERA rechazó la petición.",
+        "ikeaCannot": "A un dispositivo IKEA no se le puede pedir eso",
+        "haAddress": "Escribe la dirección como http://homeassistant.local:8123, sin ruta",
+        "haToken": "Home Assistant rechazó el token. Crea un token de acceso de larga duración nuevo en tu perfil de Home Assistant.",
+        "haNot": "Esa dirección respondió, pero no como Home Assistant.",
+        "haRestarting": "Home Assistant se está reiniciando. Inténtalo en un momento.",
+        "haUnsupported": "Home Assistant no lo hizo. Puede que el dispositivo no lo admita.",
+        "haRefused": "Home Assistant rechazó la petición.",
+        "haNothing": "Home Assistant no tiene interruptores, luces, cerraduras ni sensores que Polaris pueda mostrar.",
+        "switchbotKeys": "SwitchBot rechazó el token y la clave. Puede que se cambiaran en la app o que se haya agotado el cupo de peticiones de hoy.",
+        "switchbotUnreachable": "No se pudo llegar a SwitchBot. Inténtalo en un momento.",
+        "switchbotRate": "SwitchBot está recibiendo demasiadas peticiones. Inténtalo en un minuto.",
+        "switchbotOdd": "SwitchBot respondió algo inesperado.",
+        "switchbotOffline": "El dispositivo no responde a SwitchBot ahora mismo.",
+        "switchbotRefused": "SwitchBot rechazó la petición.",
+        "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso"
     },
     "connections": {
         "nuki-web": {
@@ -587,6 +633,157 @@
                 "region": {
                     "label": "Región",
                     "hint": "En el que se creó el proyecto. Los dispositivos solo existen en ese, así que cualquier otro responde como si la cuenta estuviera vacía."
+                }
+            }
+        },
+        "tapo-local": {
+            "label": "Tapo en tu propia red",
+            "summary": "Un enchufe, regleta, interruptor o bombilla que responde en su dirección, con la cuenta que usas en la app Tapo.",
+            "note": "Nada pasa por los servidores de TP-Link, así que responde en milisegundos y sigue funcionando cuando su nube no. Una conexión es un dispositivo: una regleta trae cada una de sus tomas. Los enchufes con firmware Tapo muy antiguo usan un protocolo anterior que Polaris no habla; actualizarlos en la app Tapo lo arregla.",
+            "steps": {
+                "s0": "Busca la dirección IP del dispositivo en la lista de dispositivos conectados de tu router. Fijársela ahí hace que esto siga funcionando.",
+                "s1": "Usa el correo y la contraseña con los que entras en la app Tapo.",
+                "s2": "Añade una conexión por dispositivo."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.40"
+                },
+                "email": {
+                    "label": "Correo TP-Link",
+                    "placeholder": "El que usas en la app Tapo"
+                },
+                "password": {
+                    "label": "Clave de TP-Link"
+                }
+            }
+        },
+        "kasa-local": {
+            "label": "Kasa en tu propia red",
+            "summary": "Un enchufe, regleta o bombilla Kasa antiguo, que responde en su dirección. Casi todos van sin cuenta.",
+            "note": "Los Kasa con firmware antiguo responden a cualquiera en la red, así que basta con la dirección. El firmware nuevo pide la cuenta de TP-Link, la misma de la app Kasa. Una conexión es un dispositivo: una regleta trae cada una de sus tomas.",
+            "steps": {
+                "s0": "Busca la dirección IP del dispositivo en la lista de conectados de tu router, y fíjasela ahí si puedes.",
+                "s1": "Si Polaris dice que el dispositivo se negó, añade el correo y la contraseña de la app Kasa."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.41"
+                },
+                "email": {
+                    "label": "Correo TP-Link",
+                    "hint": "Solo para firmware nuevo. Si no, déjalo vacío."
+                },
+                "password": {
+                    "label": "Clave de TP-Link"
+                }
+            }
+        },
+        "shelly-local": {
+            "label": "Shelly en tu propia red",
+            "summary": "Un relé, enchufe, regulador o bombilla Shelly, que responde en su dirección. Sin cuenta.",
+            "note": "Todos los Shelly, antiguos o nuevos, responden en su propia red, así que nada pasa por una nube y sigue funcionando sin internet. Una conexión es un Shelly: cada canal de relé o de luz es una fila. Persianas y medidores quedan fuera por ahora.",
+            "steps": {
+                "s0": "Busca la dirección IP del Shelly en la lista de conectados de tu router, y fíjasela ahí si puedes.",
+                "s1": "Si le pusiste contraseña en la app Shelly, añádela aquí."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.30"
+                },
+                "password": {
+                    "label": "Contraseña",
+                    "hint": "Solo si activaste la autenticación en este Shelly."
+                },
+                "username": {
+                    "label": "Usuario",
+                    "hint": "Solo los Shelly antiguos lo usan, y es admin salvo que lo cambiaras."
+                }
+            }
+        },
+        "hue-bridge": {
+            "label": "Hue Bridge",
+            "summary": "Todas las luces y enchufes de tu Hue Bridge, con una pulsación de su botón. Nada pasa por la nube.",
+            "note": "Polaris habla con el puente en tu red y comprueba su certificado contra el de Hue, así que responde en milisegundos y funciona sin internet. Llegan luces y enchufes; escenas, estancias y colores siguen en la app Hue.",
+            "steps": {
+                "s0": "Busca la dirección IP del puente en la lista de dispositivos conectados de tu router.",
+                "s1": "Pulsa el botón de enlace del puente.",
+                "s2": "En menos de 30 segundos, elige Conectar aquí."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.20"
+                },
+                "appKey": {
+                    "label": "Clave de app",
+                    "hint": "Déjala vacía y Polaris crea una cuando pulses el botón del puente."
+                }
+            }
+        },
+        "dirigera-hub": {
+            "label": "Hub DIRIGERA",
+            "summary": "Las luces, enchufes y sensores de tu hub IKEA DIRIGERA, con una pulsación de su botón. Nada pasa por la nube.",
+            "note": "Polaris habla con el hub en tu red. Su certificado se recuerda al vincularlo, y después Polaris no habla con nada más en esa dirección. Persianas, purificadores y mandos quedan fuera por ahora.",
+            "steps": {
+                "s0": "Busca la dirección IP del hub en tu router y fíjasela si puedes.",
+                "s1": "Elige Conectar aquí.",
+                "s2": "En menos de un minuto, pulsa el botón de acción del hub."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.25"
+                }
+            }
+        },
+        "home-assistant": {
+            "label": "Home Assistant",
+            "summary": "Cada interruptor, luz, cerradura y sensor que ya tiene tu Home Assistant, con una conexión.",
+            "note": "Todo lo que Home Assistant maneja llega a través de él: Zigbee, Z-Wave y sus integraciones en la nube incluidas. Polaris lee estados y envía el mismo encender, apagar, cerrar y abrir que pulsarías allí. Persianas, termostatos y reproductores quedan fuera por ahora.",
+            "steps": {
+                "s0": "En Home Assistant, abre la página de tu perfil.",
+                "s1": "En Tokens de acceso de larga duración, crea uno llamado Polaris y cópialo. Se muestra una vez.",
+                "s2": "Pégalo aquí con la dirección a la que abres Home Assistant."
+            },
+            "fields": {
+                "url": {
+                    "label": "Dirección de Home Assistant",
+                    "hint": "La que usas para abrirlo. Si das solo una dirección, se usa el puerto 8123.",
+                    "placeholder": "http://homeassistant.local:8123"
+                },
+                "token": {
+                    "label": "Token de acceso",
+                    "placeholder": "Pega el token de larga duración"
+                }
+            }
+        },
+        "switchbot-cloud": {
+            "label": "Cuenta de SwitchBot",
+            "summary": "Enchufes, Bots, cerraduras, luces y sensores de tu cuenta de SwitchBot, desde cualquier sitio.",
+            "note": "Todo pasa por los servidores de SwitchBot, así que los dispositivos Bluetooth necesitan un SwitchBot Hub. La cuenta permite 10.000 peticiones al día, así que el estado puede tener unos minutos hasta que actualices. Cortinas, humidificadores y mandos infrarrojos quedan fuera por ahora.",
+            "steps": {
+                "s0": "Abre la app SwitchBot y ve a Perfil > Preferencias > Acerca de.",
+                "s1": "Toca la versión de la app diez veces hasta que aparezcan las Opciones de desarrollador.",
+                "s2": "Abre las Opciones de desarrollador, toca Get Token y copia aquí el token y la clave secreta."
+            },
+            "link": "la documentación de SwitchBot",
+            "fields": {
+                "token": {
+                    "label": "Token",
+                    "placeholder": "De Opciones de desarrollador"
+                },
+                "secret": {
+                    "label": "Clave secreta",
+                    "placeholder": "Aparece bajo el token"
                 }
             }
         },
