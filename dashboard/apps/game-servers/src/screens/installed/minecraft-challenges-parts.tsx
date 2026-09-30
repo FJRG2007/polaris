@@ -14,6 +14,12 @@ import { ChevronDown, ChevronRight, Info, RotateCcw } from "lucide-react";
 import { ItemSlots } from "./item-slots";
 import type { PlayerRow, InstanceView } from "../../lib/minecraft/challenges/challenges-service";
 
+/** A title a player holds, in the reader's language whichever one it was won in. */
+function titleText(t: ChallengesT, title: string): string {
+    const season = catalog.championSeason(title);
+    return season === null ? title : t("players.champion", { season });
+}
+
 type Settings = settingsModule.ChallengeSettings;
 type Payout = settingsModule.Payout;
 
@@ -203,7 +209,9 @@ export function ItemsEditor({
     t: ChallengesT;
     locked: boolean;
 }) {
-    return <ItemSlots label={t("rewards.items")} items={items} onChange={onChange} disabled={locked} />;
+    return (
+        <ItemSlots label={t("rewards.items")} items={items} onChange={onChange} disabled={locked} />
+    );
 }
 
 /** A progress bar for a challenge in a table. */
@@ -377,7 +385,7 @@ function PlayerLine({
                     </button>
                     {row.titles.length > 0 && (
                         <p className="text-xs text-muted-foreground">
-                            {row.titles[row.titles.length - 1]}
+                            {titleText(t, row.titles[row.titles.length - 1]!)}
                         </p>
                     )}
                 </td>

@@ -301,7 +301,8 @@ export const serverHost = {
     // who is reading - the request's reader, or any account by id (a linked
     // player, the recipient of a notification). See docs/i18n.md.
     i18nLocaleService: {
-        getUserLocale: later(load.i18nLocaleService, "getUserLocale")
+        getUserLocale: later(load.i18nLocaleService, "getUserLocale"),
+        storedLocale: later(load.i18nLocaleService, "storedLocale")
     },
     i18nRequest: {
         getLocale: later(load.i18nRequest, "getLocale")

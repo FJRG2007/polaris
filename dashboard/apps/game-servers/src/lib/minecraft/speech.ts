@@ -173,6 +173,15 @@ export function languageTag(language: Language): string {
     return `pl_${language}`;
 }
 
+/** Everybody online who reads one language: its tag, or - the server's own -
+ *  anybody without another language's tag, a player not looked at yet included. */
+export function readersOf(language: Language, home: Language): string {
+    if (language !== home) return `@a[tag=${languageTag(language)}]`;
+    return `@a[${LANGUAGES.filter((one) => one !== home)
+        .map((one) => `tag=!${languageTag(one)}`)
+        .join(",")}]`;
+}
+
 /** Who is online and what each reads, by lowercased name, and what everybody
  *  else - a player not looked at yet - reads. */
 export interface Audience {

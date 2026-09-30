@@ -265,7 +265,8 @@ vi.mock("@polaris/app-host", () => ({
                 raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
         },
         i18nLocaleService: {
-            getUserLocale: async (userId: string) => locales.get(userId) ?? "en-US"
+            getUserLocale: async (userId: string) => locales.get(userId) ?? "en-US",
+            storedLocale: async (userId: string) => locales.get(userId) ?? null
         }
     }
 }));
@@ -297,6 +298,7 @@ const START = Date.parse("2026-09-29T12:00:00Z");
 const record = (name: string) =>
     stored.readPlayer(players.get(name.toLowerCase())!.data, name, Date.now());
 const state = () => stored.readServerState(config);
+const settingsOf = () => service.settingsOf(config);
 const PUMPKIN = "minecraft.mined:minecraft.pumpkin";
 const PLACED = "minecraft.used:minecraft.pumpkin";
 const ZOMBIE = "minecraft.killed:minecraft.zombie";
@@ -478,13 +480,79 @@ describe("challenges on a server", () => {
         fake.set("Alba", "pc_menu", 1);
         fake.set("Bruno", "pc_menu", 1);
         await service.runTick("srv", Date.now(), false);
-        const to = (name: string) => fake.heard.filter((line) => line.startsWith(`tellraw ${name} `));
+        const to = (name: string) =>
+            fake.heard.filter((line) => line.startsWith(`tellraw ${name} `));
         expect(to("Alba").some((line) => line.includes("Cosecha 5 de trigo"))).toBe(true);
         expect(to("Alba").some((line) => line.includes("Harvest 5 wheat"))).toBe(false);
         expect(to("Bruno").some((line) => line.includes("Harvest 5 wheat"))).toBe(true);
         expect(to("Bruno").some((line) => line.includes("Cosecha"))).toBe(false);
         // Nothing still carries a message in every language on its way out.
-        expect(fake.heard.some((line) => line.includes('{"polaris":"') || /\ue000/.test(line))).toBe(false);
+        expect(
+            fake.heard.some((line) => line.includes('{"polaris":"') || /\ue000/.test(line))
+        ).toBe(false);
+    });
+
+    it("speaks the owner's language to whoever Polaris has no language for, after the switch saved the settings", async () => {
+        // The operator's server: owner Spanish, events never chose, challenges
+        // switched on from the screen - which saves everything it shows.
+        await service.stopAllLoops();
+        speechService.forget("srv");
+        config = {};
+        locales.set("owner", "es-ES");
+        locales.set("user-en", "en-US");
+        links.set("alba", "user-en");
+        // Linked to an account that has never had a language worked out.
+        links.set("bruno", "user-new");
+        fake.join("Carla", 50, 0);
+        const shown = await service.challengesView("srv");
+        expect(shown.automaticLanguage).toBe("es");
+        await service.saveSettings("srv", {
+            ...shown.settings,
+            enabled: true,
+            eligibility: { ...shown.settings.eligibility, minMinutes: 0 }
+        });
+        expect(settingsOf().serverLanguage).toBeNull();
+        // Its first look, taken at once, drew the day.
+        await vi.waitFor(async () =>
+            expect((await service.challengesView("srv")).version).not.toBeNull()
+        );
+        knownPool();
+        await step(1);
+        await step(16, ["Alba", "Bruno", "Carla"]);
+        expect(fake.heard).toContain("tag Bruno add pl_es");
+        expect(fake.heard).toContain("tag Carla add pl_es");
+        expect(fake.heard).toContain("tag Alba add pl_en");
+        for (const name of ["Alba", "Bruno", "Carla"]) fake.set(name, "pc_menu", 1);
+        await service.runTick("srv", Date.now(), false);
+        const to = (name: string) =>
+            fake.heard.filter((line) => line.startsWith(`tellraw ${name} `));
+        for (const name of ["Bruno", "Carla"]) {
+            expect(to(name).some((line) => line.includes("Cosecha 5 de trigo"))).toBe(true);
+            expect(to(name).some((line) => line.includes("Harvest"))).toBe(false);
+        }
+        expect(to("Alba").some((line) => line.includes("Harvest 5 wheat"))).toBe(true);
+        expect(to("Alba").some((line) => line.includes("Cosecha"))).toBe(false);
+    });
+
+    it("shows the community goal's bar to each language's readers, named in theirs", async () => {
+        links.set("alba", "user-es");
+        locales.set("user-es", "es-ES");
+        await step(1);
+        await step(16, ["Alba", "Bruno"]);
+        expect(state().goals.length).toBeGreaterThan(0);
+        expect(fake.heard).toContain("bossbar set polaris:pc_goal_es players @a[tag=pl_es]");
+        expect(fake.heard).toContain("bossbar set polaris:pc_goal_en players @a[tag=!pl_es]");
+        const named = (id: string) =>
+            fake.heard.find((line) => line.startsWith(`bossbar set ${id} name `)) ?? "";
+        expect(named("polaris:pc_goal_es")).toMatch(/Comunidad|comunidad/);
+        expect(named("polaris:pc_goal_en")).toMatch(/Community|community/);
+        // Nobody reads Spanish any more: its bar is taken down, not left on them.
+        links.clear();
+        speechService.forget("srv");
+        fake.heard.length = 0;
+        await step(16, ["Alba", "Bruno"]);
+        expect(fake.heard).toContain("bossbar remove polaris:pc_goal_es");
+        expect(fake.heard).toContain("bossbar set polaris:pc_goal_en players @a[tag=!pl_es]");
     });
 
     it("answers a player by their own name through a team's prefix and suffix, and a Bedrock player by theirs", async () => {
@@ -669,6 +737,49 @@ describe("challenges on a server", () => {
         await service.sweepChallenges(Date.now());
         expect([...fake.objectives.keys()].filter((name) => name.startsWith("pc_"))).toEqual([]);
         expect(fake.heard).toContain("bossbar remove polaris:pc_alba");
+    });
+
+    it("starts at once when switched on from the screen, and says Running with the version", async () => {
+        await service.stopAllLoops();
+        config = {};
+        fake = new FakeServer();
+        fake.join("Alba");
+        const off = await service.challengesView("srv");
+        expect(off.running).toBe(false);
+        expect(off.version).toBeNull();
+        await service.saveSettings("srv", { ...off.settings, enabled: true });
+        // Running straight away - not on the next minute's sweep.
+        expect((await service.challengesView("srv")).running).toBe(true);
+        await vi.waitFor(async () => {
+            const on = await service.challengesView("srv");
+            expect(on.version).toBe("1.21.4");
+            expect(on.running).toBe(true);
+            expect(on.idle).toBeNull();
+        });
+        expect(fake.objectives.has("pc_menu")).toBe(true);
+    });
+
+    it("says the server is stopped when switched on while it is", async () => {
+        await service.stopAllLoops();
+        config = {};
+        const off = await service.challengesView("srv");
+        server.running = false;
+        try {
+            await service.saveSettings("srv", { ...off.settings, enabled: true });
+            await vi.waitFor(async () => {
+                const view = await service.challengesView("srv");
+                expect(view.idle).toBe("stopped");
+                expect(view.running).toBe(false);
+            });
+        } finally {
+            server.running = true;
+        }
+        // Back up: the next sweep starts it, and it no longer says why it waits.
+        await service.sweepChallenges(Date.now());
+        await service.runTick("srv", Date.now(), true);
+        const view = await service.challengesView("srv");
+        expect(view.running).toBe(true);
+        expect(view.idle).toBeNull();
     });
 
     it("takes its objectives down when switched off", async () => {

@@ -5,6 +5,9 @@
         "on": "Challenges on",
         "running": "Running",
         "idle": "Waiting for the server",
+        "starting": "Starting",
+        "stopped": "The server is stopped. Challenges start once it is running.",
+        "unreachable": "The server's console is not answering. Polaris keeps trying.",
         "off": "Off",
         "version": "Server version: {version}",
         "versionUnknown": "Server version: not read yet",
@@ -111,6 +114,7 @@
         "streak": "Streak",
         "lastSeen": "Last seen",
         "never": "never",
+        "champion": "Season {season} champion",
         "backlog": "+{count} left over",
         "cardDone": "{done}/{total}",
         "progress": "{title}: {progress} / {target}",
@@ -122,7 +126,9 @@
     },
     "settings": {
         "title": "Settings",
-        "language": "What players read",
+        "language": "Default language",
+        "automatic": "Automatic",
+        "automaticIs": "Automatic ({language})",
         "english": "English",
         "spanish": "Spanish",
         "timezone": "Time zone",
@@ -162,7 +168,7 @@
         "groups": {
             "schedule": {
                 "title": "Language and time",
-                "hint": "What players read, and when a new day and a new week start."
+                "hint": "Linked players read their account's language; the rest read this one. And when a new day and week start."
             },
             "layers": {
                 "title": "What runs",

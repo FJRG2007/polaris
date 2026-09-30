@@ -324,6 +324,12 @@ export function championTitle(number: number, language: Language): string {
     return language === "es" ? `Campeón de la temporada ${number}` : `Season ${number} champion`;
 }
 
+/** A title a player holds, in the reader's language whichever one it was won in. */
+export function titleIn(title: string, language: Language): string {
+    const season = catalog.championSeason(title);
+    return season === null ? title : championTitle(season, language);
+}
+
 export function trackedName(title: string, progress: string): string {
     return `&e${title} &7${progress}`;
 }

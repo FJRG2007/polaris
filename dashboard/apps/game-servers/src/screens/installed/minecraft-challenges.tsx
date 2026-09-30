@@ -8,7 +8,8 @@
  * Everything that does not depend on the server's answer is drawn at once;
  * only the values wait. What is running is read again every half minute, so a
  * new day's draw appears without a reload, and an edit in progress is never
- * overwritten by a read.
+ * overwritten by a read. Just switched on, it is read every two seconds until
+ * it runs and the server's version is known, or the server says why not.
  */
 
 import * as ui from "@polaris/ui";
@@ -36,6 +37,9 @@ const { writeSnapshot } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
 
 const SNAPSHOT_MS = 30_000;
+/** How often the tab reads while challenges just switched on get going, and for how long. */
+const HURRY_MS = 2_000;
+const HURRY_FOR_MS = 60_000;
 const snapshotKey = (installedAppId: string) => `minecraft-challenges:${installedAppId}`;
 type Settings = settingsModule.ChallengeSettings;
 
@@ -263,6 +267,10 @@ export function MinecraftChallenges({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const [now, setNow] = useState(() => Date.now());
+    /** Until when the tab reads every two seconds: switched on, until it runs. */
+    const [hurryUntil, setHurryUntil] = useState(0);
+    /** One more for every quick read that came back, so the next is scheduled. */
+    const [beat, setBeat] = useState(0);
 
     const accept = useCallback(
         (next: ChallengesView, replaceDraft: boolean) => {
@@ -297,6 +305,43 @@ export function MinecraftChallenges({
             clearInterval(timer);
         };
     }, [installedAppId]);
+
+    // Just switched on: read again soon, until it runs with the server's version
+    // known, the server says why it cannot, or the minute is up.
+    const settled =
+        !view ||
+        !view.settings.enabled ||
+        (view.idle ?? null) !== null ||
+        (view.running && view.version !== null);
+    useEffect(() => {
+        if (settled || Date.now() >= hurryUntil) return;
+        let alive = true;
+        const timer = setTimeout(() => {
+            void actions
+                .readChallengesAction(installedAppId)
+                .then((answer) => {
+                    if (!alive || !answer.view) return;
+                    accept(answer.view, false);
+                    setNow(Date.now());
+                })
+                .catch(() => {
+                    // Tried again on the next beat.
+                })
+                .finally(() => {
+                    if (alive) setBeat((count) => count + 1);
+                });
+        }, HURRY_MS);
+        return () => {
+            alive = false;
+            clearTimeout(timer);
+        };
+    }, [settled, hurryUntil, beat, installedAppId, accept]);
+    useEffect(() => {
+        const left = hurryUntil - Date.now();
+        if (left <= 0) return;
+        const timer = setTimeout(() => setNow(Date.now()), left);
+        return () => clearTimeout(timer);
+    }, [hurryUntil]);
 
     useEffect(() => {
         if (!note) return;
@@ -353,6 +398,8 @@ export function MinecraftChallenges({
             const saved = answer.view.settings.enabled;
             accept(answer.view, false);
             setDraft((current) => (current ? { ...current, enabled: saved } : current));
+            setNow(Date.now());
+            setHurryUntil(saved ? Date.now() + HURRY_FOR_MS : 0);
         });
     }
 
@@ -396,7 +443,9 @@ export function MinecraftChallenges({
           ? t("status.off")
           : view.running
             ? t("status.running")
-            : t("status.idle");
+            : (view.idle ?? null) === null && now < hurryUntil
+              ? t("status.starting")
+              : t("status.idle");
 
     return (
         <div className="flex flex-col gap-4">
@@ -492,6 +541,9 @@ export function MinecraftChallenges({
                             </span>
                         ) : (
                             <ui.Skeleton className="h-4 w-40" />
+                        )}
+                        {view?.settings.enabled && !view.running && view.idle && (
+                            <span className="text-foreground">{t(`status.${view.idle}`)}</span>
                         )}
                         {!canManage && <span>{t("status.readOnly")}</span>}
                     </div>
@@ -1069,6 +1121,7 @@ export function MinecraftChallenges({
                                     t={t}
                                     locale={locale}
                                     locked={locked}
+                                    automatic={view?.automaticLanguage ?? null}
                                 />
                             )}
                         </ui.CardBody>
@@ -1239,7 +1292,8 @@ function SettingsFields({
     nested,
     t,
     locale,
-    locked
+    locked,
+    automatic
 }: {
     settings: Settings;
     change: (patch: Partial<Settings>) => void;
@@ -1247,7 +1301,11 @@ function SettingsFields({
     t: ChallengesT;
     locale: string;
     locked: boolean;
+    /** What "Automatic" is on this server now; null while unread. */
+    automatic: PanelLanguage | null;
 }) {
+    const languageName = (language: PanelLanguage) =>
+        t(language === "es" ? "settings.spanish" : "settings.english");
     const g = (key: SettingsGroup) => ({
         title: t(`settings.groups.${key}.title`),
         hint: t(`settings.groups.${key}.hint`)
@@ -1259,14 +1317,26 @@ function SettingsFields({
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("settings.language")}</span>
                         <ui.Select
-                            value={settings.language}
+                            value={settings.serverLanguage ?? "auto"}
                             disabled={locked}
                             aria-label={t("settings.language")}
                             options={[
+                                {
+                                    value: "auto",
+                                    label: automatic
+                                        ? t("settings.automaticIs", {
+                                              language: languageName(automatic)
+                                          })
+                                        : t("settings.automatic")
+                                },
                                 { value: "en", label: t("settings.english") },
                                 { value: "es", label: t("settings.spanish") }
                             ]}
-                            onValueChange={(value) => change({ language: value as "en" | "es" })}
+                            onValueChange={(value) =>
+                                change({
+                                    serverLanguage: value === "en" || value === "es" ? value : null
+                                })
+                            }
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">

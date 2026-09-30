@@ -71,8 +71,16 @@ const categorySchema = z.object({
 
 const baseSchema = z.object({
     enabled: z.boolean().default(false),
-    /** What the players read. */
-    language: z.enum(["en", "es"]).default("en"),
+    /**
+     * What a player reads when Polaris does not know their own language (not
+     * linked to an account, or an account that never said); null follows the
+     * server: the events' language, or its owner's.
+     *
+     * Not `language`, which this used to be: the screen wrote whatever it showed
+     * back as a choice - English on any server whose events never chose - so a
+     * stored `language` cannot tell a choice from a default and is not read.
+     */
+    serverLanguage: z.enum(["en", "es"]).nullable().default(null),
     timezone: z.string().trim().min(1).max(64).refine(knownZone, "errors.timezone").default("UTC"),
     /** When a day's challenges change, in the time zone. */
     resetAt: z.string().regex(TIME, "errors.timeFormat").default("00:00"),
@@ -247,8 +255,6 @@ export const settingsSchema = baseSchema.superRefine((value, context) => {
 
 export type ChallengeSettings = z.infer<typeof settingsSchema>;
 
-/** The stored settings, whole: a server without any reads as switched off,
- *  in the time zone and language its events already use. */
 /**
  * The language the operator chose for challenges, or - none chosen - the one
  * chosen for events; null when neither ever was (the server then speaks its
@@ -257,14 +263,18 @@ export type ChallengeSettings = z.infer<typeof settingsSchema>;
 export function chosenLanguage(config: Record<string, unknown>): "en" | "es" | null {
     const raw = config[CHALLENGES_KEY];
     const own =
-        typeof raw === "object" && raw !== null ? (raw as { language?: unknown }).language : undefined;
+        typeof raw === "object" && raw !== null
+            ? (raw as { serverLanguage?: unknown }).serverLanguage
+            : undefined;
     if (own === "en" || own === "es") return own;
     return chosenEventsLanguage(config);
 }
 
+/** The stored settings, whole: a server without any reads as switched off, in
+ *  the time zone its events already use. */
 export function readSettings(
     config: Record<string, unknown>,
-    defaults: { timezone?: string; language?: "en" | "es" } = {}
+    defaults: { timezone?: string } = {}
 ): ChallengeSettings {
     const raw = config[CHALLENGES_KEY];
     // Without the cross-field checks: a goal whose challenge a later version
@@ -272,8 +282,7 @@ export function readSettings(
     const parsed = baseSchema.safeParse(raw ?? {});
     if (parsed.success && raw !== undefined) return parsed.data;
     return settingsSchema.parse({
-        timezone: defaults.timezone && knownZone(defaults.timezone) ? defaults.timezone : "UTC",
-        language: defaults.language ?? "en"
+        timezone: defaults.timezone && knownZone(defaults.timezone) ? defaults.timezone : "UTC"
     });
 }
 

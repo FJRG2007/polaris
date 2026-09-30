@@ -13,6 +13,7 @@
  */
 
 import { asciiJson, text } from "../events/commands";
+import { LANGUAGES, type Language } from "../speech";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
 /** A player's name as a command may carry it: Java's, or Floodgate's `.` in
@@ -216,7 +217,17 @@ export function barRemove(id: string): string {
     return `bossbar remove ${id}`;
 }
 
+/** The community goal's bar before it had one per language: only ever taken down. */
 export const GOAL_BAR = "polaris:pc_goal";
+
+/** The community goal's bar in one language: a bar is one text for everybody
+ *  who sees it, so each language has its own, shown to that language's readers. */
+export function goalBar(language: Language): string {
+    return `${GOAL_BAR}_${language}`;
+}
+
+/** Every bar the community goal may have up, the old one included. */
+export const GOAL_BARS: readonly string[] = [GOAL_BAR, ...LANGUAGES.map(goalBar)];
 
 // ------------------------------------------------------------------ rewards
 
@@ -242,7 +253,7 @@ export function teardown(objectives: readonly string[], bars: readonly string[])
         ...removeObjectives(objectives),
         `scoreboard objectives remove ${MENU}`,
         ...bars.map((id) => barRemove(id)),
-        barRemove(GOAL_BAR),
+        ...GOAL_BARS.map((id) => barRemove(id)),
         barRemove(`${GOAL_BAR}2`)
     ];
 }

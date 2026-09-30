@@ -2,7 +2,8 @@
  * Who on a server reads which language (`speech.ts` does the splitting).
  *
  * A player linked to a Polaris account reads that account's language; anybody
- * else reads the server's own. Each online player carries the tag of theirs
+ * else - and a linked player whose account has never had a language worked
+ * out - reads the server's own. Each online player carries the tag of theirs
  * (`pl_en`, `pl_es`), put on as they are first seen and changed when their
  * account's language does, so a broadcast can be narrowed to its readers.
  *
@@ -41,9 +42,14 @@ export function forget(installedAppId: string): void {
     heard.delete(installedAppId);
 }
 
+/**
+ * The language an account has, or null when it has none yet. Not the
+ * dashboard's default: an account made before Polaris spoke Spanish, whose
+ * owner has not signed in since, would read English on a Spanish server.
+ */
 async function localeOf(userId: string): Promise<string | null> {
     try {
-        return await host.i18nLocaleService.getUserLocale(userId);
+        return await host.i18nLocaleService.storedLocale(userId);
     } catch {
         return null;
     }
@@ -82,7 +88,8 @@ export async function hear(
         const userId = links.get(name.toLowerCase());
         let language = home;
         if (userId) {
-            language = locales.get(userId) ?? speech.gameLanguage(await localeOf(userId));
+            const locale = locales.has(userId) ? null : await localeOf(userId);
+            language = locales.get(userId) ?? (locale ? speech.gameLanguage(locale) : home);
             locales.set(userId, language);
         }
         of.set(name.toLowerCase(), language);
