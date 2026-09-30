@@ -79,17 +79,20 @@ export function InventoryExportMenu({
 
     const run = (use: (file: transfer.TransferFile) => Promise<void> | void) =>
         startTransition(async () => {
-            const result = await actions.exportInventoriesAction({
-                installedAppId,
-                players: all ? "all" : [players]
-            });
+            const result = await actions
+                .exportInventoriesAction({ installedAppId, players: all ? "all" : [players] })
+                .catch(() => ({ file: undefined, missing: undefined, error: undefined }));
             if (!result.file) {
                 onMessage({ error: result.error ?? t("inventoryTransfer.couldNotExport") });
                 return;
             }
+            onMessage({
+                note:
+                    result.missing && result.missing.length > 0
+                        ? t("inventoryTransfer.missing", { names: result.missing.join(", ") })
+                        : undefined
+            });
             await use(result.file);
-            if (result.missing && result.missing.length > 0)
-                onMessage({ note: t("inventoryTransfer.missing", { names: result.missing.join(", ") }) });
         });
 
     return (
@@ -220,7 +223,9 @@ function InventoryImportDialog({
     const preview = () =>
         startTransition(async () => {
             reset();
-            const result = await actions.previewInventoryImportAction({ installedAppId, text, mode, single });
+            const result = await actions
+                .previewInventoryImportAction({ installedAppId, text, mode, single })
+                .catch(() => ({ previews: undefined, error: t("inventoryTransfer.couldNotImport") }));
             if (result.error) setError(result.error);
             else setPreviews(result.previews ?? []);
         });
@@ -237,16 +242,19 @@ function InventoryImportDialog({
         });
         if (!agreed) return;
         startTransition(async () => {
-            const result = await actions.importInventoriesAction({
-                installedAppId,
-                text,
-                mode,
-                single,
-                seen: previews.map((one) => ({
-                    player: one.player,
-                    items: one.plan.flatMap((slot) => (slot.before ? [slot.before] : []))
-                }))
-            });
+            const result = await actions
+                .importInventoriesAction({
+                    installedAppId,
+                    text,
+                    mode,
+                    single,
+                    seen: previews.map((one) => ({
+                        player: one.player,
+                        online: one.online,
+                        items: one.plan.flatMap((slot) => (slot.before ? [slot.before] : []))
+                    }))
+                })
+                .catch(() => ({ outcomes: undefined, error: t("inventoryTransfer.couldNotImport") }));
             if (result.error) {
                 setError(result.error);
                 return;

@@ -157,6 +157,7 @@ export function MinecraftPlayers({
     const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [confirm, confirmElement] = useConfirm();
@@ -415,6 +416,7 @@ export function MinecraftPlayers({
     return (
         <div className="flex flex-col gap-4">
             {error && <p className="text-sm text-danger">{error}</p>}
+            {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
             {/* A server with an empty list is one nobody on earth can join, and
                 nothing anywhere saying why. It is also the state a server lands in
@@ -645,7 +647,10 @@ export function MinecraftPlayers({
                                 <InventoryExportMenu
                                     installedAppId={installedAppId}
                                     players="all"
-                                    onMessage={(message) => setError(message.error ?? message.note ?? null)}
+                                    onMessage={(message) => {
+                                        setNote(message.note ?? null);
+                                        setError(message.error ?? null);
+                                    }}
                                 />
                                 <InventoryImportButton installedAppId={installedAppId} onDone={onChanged} />
                             </>

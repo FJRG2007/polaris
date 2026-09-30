@@ -116,10 +116,14 @@ const stackList = z.array(transfer.transferStackSchema).max(64);
  * they join.
  */
 export async function importInventoriesAction(
-    input: ImportInput & { seen: { player: string; items: z.infer<typeof stackList> }[] }
+    input: ImportInput & { seen: { player: string; online: boolean; items: z.infer<typeof stackList> }[] }
 ): Promise<{ outcomes?: service.ImportOutcome[]; error?: string }> {
     const parsed = importSchema
-        .extend({ seen: z.array(z.object({ player: playerName, items: stackList })).max(transfer.MOST_PLAYERS) })
+        .extend({
+            seen: z
+                .array(z.object({ player: playerName, online: z.boolean(), items: stackList }))
+                .max(transfer.MOST_PLAYERS)
+        })
         .safeParse(input);
     const t = await gameWords("minecraft");
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
@@ -131,7 +135,7 @@ export async function importInventoriesAction(
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
         const online = new Set((await onlinePlayers(access.ownerId, installedAppId)).map((name) => name.toLowerCase()));
-        const seen = new Map(parsed.data.seen.map((one) => [one.player.toLowerCase(), one.items]));
+        const seen = new Map(parsed.data.seen.map((one) => [one.player.toLowerCase(), one]));
         const outcomes: service.ImportOutcome[] = [];
         await withServerContainer(access.ownerId, installedAppId, async (server) => {
             if (read.file.era !== "plain") {
@@ -145,7 +149,8 @@ export async function importInventoriesAction(
                     );
             }
             for (const target of targets) {
-                if (!online.has(target.player.toLowerCase())) {
+                const previewed = seen.get(target.player.toLowerCase());
+                if (!online.has(target.player.toLowerCase()) || !previewed?.online) {
                     await queueAction({
                         installedAppId,
                         username: target.player,
@@ -155,7 +160,7 @@ export async function importInventoriesAction(
                     outcomes.push({ player: target.player, written: 0, skipped: [], queued: true });
                     continue;
                 }
-                const plan = transfer.planImport(seen.get(target.player.toLowerCase()) ?? [], target.items, mode);
+                const plan = transfer.planImport(previewed.items, target.items, mode);
                 const done = await service.applyPlanNow(server, installedAppId, target.player, plan);
                 outcomes.push({ player: target.player, ...done, queued: false });
             }

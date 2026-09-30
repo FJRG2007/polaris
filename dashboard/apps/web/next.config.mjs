@@ -14,6 +14,7 @@ const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
+    experimental: { serverActions: { bodySizeLimit: "32mb" } },
     transpilePackages: [
         "@polaris/ui",
         "@polaris/file-parse",
