@@ -36,6 +36,7 @@ import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
+import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import { describeQueuedText, waitingOnText } from "./queue-text";
@@ -156,6 +157,7 @@ export function MinecraftPlayers({
     const t = useGameText("minecraft");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
     const [confirm, confirmElement] = useConfirm();
@@ -414,6 +416,7 @@ export function MinecraftPlayers({
     return (
         <div className="flex flex-col gap-4">
             {error && <p className="text-sm text-danger">{error}</p>}
+            {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
             {/* A server with an empty list is one nobody on earth can join, and
                 nothing anywhere saying why. It is also the state a server lands in
@@ -637,6 +640,24 @@ export function MinecraftPlayers({
                                 })}
                             </span>
                         ) : null}
+                        {/* Every bag at once, as a file: Java only, which is where a
+                            bag can be read back and written slot by slot. */}
+                        {!bedrock && (
+                            <>
+                                <InventoryExportMenu
+                                    installedAppId={installedAppId}
+                                    players="all"
+                                    onMessage={(message) => {
+                                        setNote(message.note ?? null);
+                                        setError(message.error ?? null);
+                                    }}
+                                />
+                                <InventoryImportButton
+                                    installedAppId={installedAppId}
+                                    onDone={onChanged}
+                                />
+                            </>
+                        )}
                         <Button
                             onClick={() => {
                                 setFormError(null);

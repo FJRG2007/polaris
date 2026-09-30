@@ -26,6 +26,7 @@
 import * as actions from "./minecraft-actions";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
+import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
 import { bySlot } from "../../lib/minecraft/inventory";
 import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
 import { maxStackFor, stacksFor } from "../../lib/minecraft/items";
@@ -341,10 +342,33 @@ export function InventoryEditor({
                             {t("inventoryEditor.readingTheirBag")}
                         </span>
                     )}
+                    <div className="ml-auto flex items-center gap-2">
+                        {reading ? (
+                            <InventoryExportMenu
+                                installedAppId={installedAppId}
+                                players={player}
+                                onMessage={(message) => {
+                                    setNote(message.note ?? null);
+                                    setError(message.error ?? null);
+                                }}
+                            />
+                        ) : null}
+                        {editable ? (
+                            <InventoryImportButton
+                                installedAppId={installedAppId}
+                                into={player}
+                                onDone={() => {
+                                    setLoading(true);
+                                    void reload();
+                                    void readQueue();
+                                    onChanged();
+                                }}
+                            />
+                        ) : null}
+                    </div>
                     <Button
                         size="icon"
                         variant="ghost"
-                        className="ml-auto"
                         disabled={loading || pending}
                         aria-label={t("inventoryEditor.readTheBagAgain")}
                         title={t("inventoryEditor.readTheBagAgain")}

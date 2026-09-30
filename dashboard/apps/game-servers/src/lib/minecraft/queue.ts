@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { IMPORT_MODES, transferStackSchema } from "./inventory-transfer";
 
 /** Every kind of thing that can wait. */
 export const QUEUED_KINDS = [
@@ -19,6 +20,7 @@ export const QUEUED_KINDS = [
     "clear",
     "clear-all",
     "set-slot",
+    "import-bag",
     "ban",
     "pardon",
     "op",
@@ -41,6 +43,7 @@ export const NEEDS_PLAYER: Readonly<Record<QueuedKind, boolean>> = {
     clear: true,
     "clear-all": true,
     "set-slot": true,
+    "import-bag": true,
     ban: false,
     pardon: false,
     op: false,
@@ -68,6 +71,13 @@ export const queuePayloadSchema = z.discriminatedUnion("kind", [
     z
         .object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) })
         .merge(itemPayload),
+    /** A bag imported from a file, written when they join: the stacks exactly
+     *  as the file carries them, data and all. */
+    z.object({
+        kind: z.literal("import-bag"),
+        mode: z.enum(IMPORT_MODES),
+        items: z.array(transferStackSchema).max(64)
+    }),
     z.object({ kind: z.literal("ban"), reason: z.string().trim().max(200).optional() }),
     z.object({ kind: z.literal("pardon") }),
     z.object({ kind: z.literal("op") }),
@@ -114,6 +124,8 @@ export function describeQueued(action: QueuedAction): string {
             return "Empty their inventory";
         case "set-slot":
             return `Put ${payload.count} x ${payload.item} in slot ${payload.slot}`;
+        case "import-bag":
+            return `Import ${payload.items.length} stacks (${payload.mode})`;
         case "ban":
             return payload.reason ? `Ban (${payload.reason})` : "Ban";
         case "pardon":
