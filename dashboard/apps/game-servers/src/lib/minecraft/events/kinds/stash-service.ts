@@ -244,12 +244,12 @@ export async function giveBack(
         return "offline";
     }
     const droppedGiven: stash.Kept[] = [];
-    for (const one of dropped) {
-        await server.sayAll(stash.dropLines(name, kept.barrels, one));
-        // An older game made an empty item of it: dropped the way it writes items.
-        if (!passed(await server.say([stash.dropThere(one)])))
-            await server.sayAll(stash.legacyDropLines(name, kept.barrels, one));
-    }
+    await server.sayAll(
+        dropped.flatMap((one) => [
+            ...stash.dropLines(name, kept.barrels, one),
+            ...stash.legacyDropLines(name, kept.barrels, one)
+        ])
+    );
     for (const one of dropped) {
         const lying = parseStack(stripFormatting(await server.say([stash.readDrop(one)])));
         if (lying && stash.sameStack(one, lying, digest)) {

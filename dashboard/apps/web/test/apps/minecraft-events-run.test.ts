@@ -432,21 +432,24 @@ function itemAnswer(line: string): string | null {
         world.containers.get(emptyBox[1]!)?.delete(Number(emptyBox[2]));
         return "Replaced a slot on 1 block";
     }
-    const summoned = /^execute at (\w+) run summon minecraft:item ~ ~ ~ \{.*Tags:\["(\w+)"\].*\}$/.exec(line);
+    const modern = events.atLeast(world.version, [1, 20, 5]);
+    const summoned =
+        /^execute (unless entity @e\[type=minecraft:item,tag=\w+\] )?at (\w+) run summon minecraft:item ~ ~ ~ \{.*Tags:\["(\w+)"\].*\}$/.exec(line);
     if (summoned) {
+        if (summoned[1] && world.drops.has(summoned[3]!)) return "Test failed";
         // Before 1.20.5 an item's count is `Count`: without it, an empty item, gone at once.
-        if (!events.atLeast(world.version, [1, 20, 5]) && !line.includes("Count:1b")) return "Summoned new Air";
-        world.drops.set(summoned[2]!, { stack: { id: "minecraft:stone", count: 1 }, owner: null });
+        if (!modern && !line.includes("Count:1b")) return "Summoned new Air";
+        world.drops.set(summoned[3]!, { stack: { id: "minecraft:stone", count: 1 }, owner: null });
         return "Summoned new Item";
     }
-    const there = /^execute if entity @e\[type=minecraft:item,tag=(\w+)\]$/.exec(line);
-    if (there) return world.drops.has(there[1]!) ? "Test passed" : "Test failed";
     const copied =
-        /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] run data modify entity @s Item set from block (-?\d+ -?\d+ -?\d+) Items\[\{Slot:(\d+)b\}\]$/.exec(line);
+        /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] unless data entity @s Item\.count run data modify entity @s Item set from block (-?\d+ -?\d+ -?\d+) Items\[\{Slot:(\d+)b\}\]$/.exec(line);
     if (copied) {
         const drop = world.drops.get(copied[1]!);
         const stack = world.containers.get(copied[2]!)?.get(Number(copied[3]));
         if (!drop || !stack) return "No entity was found";
+        // Since 1.20.5 an item is written with `count`, and the copy is not taken twice.
+        if (modern) return "Test failed";
         drop.stack = { ...stack };
         return "Modified entity data of Item";
     }

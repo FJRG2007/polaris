@@ -1873,6 +1873,7 @@
         "tiesShareAPlace": "Ties share a place.",
         "secondPlace": "Second place",
         "thirdPlace": "Third place",
+        "emptyPlaceGetsTheRest": "Left empty, it gets what everybody else does.",
         "everybodyWhoTookPart": "Everybody else who took part",
         "everybodyWhoSurvivedTheNight": "Everybody off the podium who survived the night with a kill.",
         "everybodyWhoHeldThePoint": "Everybody off the podium who held the point through a wave and fought.",

@@ -1873,6 +1873,7 @@
         "tiesShareAPlace": "Los empates comparten puesto.",
         "secondPlace": "Segundo puesto",
         "thirdPlace": "Tercer puesto",
+        "emptyPlaceGetsTheRest": "Vacío, recibe lo mismo que el resto.",
         "everybodyWhoTookPart": "El resto de participantes",
         "everybodyWhoSurvivedTheNight": "Quien no suba al podio y haya sobrevivido a la noche con alguna muerte.",
         "everybodyWhoHeldThePoint": "Quien no suba al podio y haya defendido el punto durante una oleada luchando.",

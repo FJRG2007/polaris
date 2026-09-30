@@ -360,12 +360,32 @@ describe("the podium and the prizes", () => {
             new Set(["cheat"])
         );
         // Ana: first place only, never the taking-part prize on top (in any
-        // casing); Ben's second place is empty, and he is on the podium, so
-        // nothing; Cai took part off the podium; the cheat gets nothing.
+        // casing); Ben's second place is empty, so he is owed what everybody
+        // else is rather than less than them; Cai took part off the podium;
+        // the cheat gets nothing.
         expect(owed).toEqual([
             { name: "Ana", reward: { items: [{ id: "minecraft:diamond", count: 5 }], levels: 10 } },
+            { name: "Ben", reward: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 } },
             { name: "Cai", reward: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 } }
         ]);
+    });
+
+    it("owes a place with no prize nothing when the event counts nobody as taking part", () => {
+        const owed = plan.prizes(
+            [
+                { place: 1, name: "Ana", score: 3 },
+                { place: 2, name: "Ben", score: 2 }
+            ],
+            [],
+            {
+                first: { items: [], levels: 10 },
+                second: catalog.NO_REWARD,
+                third: catalog.NO_REWARD,
+                everyone: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 }
+            },
+            new Set()
+        );
+        expect(owed).toEqual([{ name: "Ana", reward: { items: [], levels: 10 } }]);
     });
 });
 
