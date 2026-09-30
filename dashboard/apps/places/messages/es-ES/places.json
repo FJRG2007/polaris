@@ -482,6 +482,7 @@
         "tplinkNothing": "Ese dispositivo TP-Link no es un enchufe, un interruptor ni una bombilla, así que no hay nada que controlar.",
         "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso",
         "addressNoPath": "Escribe la dirección como 192.168.1.30, sin ruta",
+        "addressForbidden": "Polaris no se conecta a esa dirección. Usa la dirección del dispositivo en tu red, como 192.168.1.30.",
         "shellyNot": "Esa dirección respondió, pero no como un Shelly.",
         "shellyPassword": "El Shelly rechazó la contraseña. Es la que se fija en la app Shelly, en los ajustes de autenticación del dispositivo.",
         "shellyNeedsPassword": "Este Shelly tiene contraseña. Añádela a la conexión.",
@@ -1378,9 +1379,11 @@
             "loop": "Parada: unas automatizaciones se lanzaban entre sí en bucle.",
             "limited": "Retenida: saltó demasiadas veces en pocos minutos. Volverá a funcionar cuando se calme.",
             "disabled": "Parada porque se apagó.",
+            "edited": "Parada porque se cambiaron sus pasos mientras se ejecutaba.",
             "timedOut": "Parada: el dispositivo no llegó a tiempo.",
             "step": "Parada en el paso que falló.",
-            "fault": "Algo falló al ejecutarla. No se hizo nada después de ese paso."
+            "fault": "Algo falló al ejecutarla. No se hizo nada después de ese paso.",
+            "unreadable": "Esta automatización la guardó un Polaris más nuevo y no se pudo leer, así que no se hizo nada."
         },
         "notes": {
             "deviceGone": "Ese dispositivo ya no está.",
@@ -1390,6 +1393,7 @@
             "notifyFailed": "No se pudo enviar el aviso.",
             "automationGone": "Esa automatización ya no está.",
             "automationOff": "Esa automatización está apagada, así que no se lanzó.",
+            "automationHeld": "Esa automatización no se lanzó: se ejecutó demasiadas veces en los últimos minutos, o este paso ya la había lanzado.",
             "toggleUnknown": "No se sabía su estado, así que no había nada que cambiar."
         },
         "errors": {

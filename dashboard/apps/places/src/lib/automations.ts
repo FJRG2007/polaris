@@ -10,6 +10,7 @@
  * Server-only.
  */
 
+import { z } from "zod";
 import { getPlace } from "./places";
 import { prisma } from "@polaris/db";
 import { listDevices } from "./devices";
@@ -71,7 +72,10 @@ function toView(row: Row, owners: ReadonlyMap<string, string>): auto.AutomationV
     };
 }
 
+const idSchema = z.string().uuid();
+
 async function requireAutomation(installedAppId: string, id: string): Promise<Row> {
+    if (!idSchema.safeParse(id).success) throw new HomeError("That automation is not here");
     const row = await prisma.placeAutomation.findFirst({ where: { id, installedAppId }, select: FIELDS });
     if (!row) throw new HomeError("That automation is not here");
     return row;
@@ -134,7 +138,7 @@ export async function saveAutomation(
     id: string | null,
     input: auto.AutomationInput
 ): Promise<auto.AutomationView> {
-    if (id) await requireAutomation(installedAppId, id);
+    const before = id ? toAutomation(await requireAutomation(installedAppId, id)) : null;
     const issues = await checkAutomation(installedAppId, input, id);
     if (issues.length > 0) throw new HomeError("That automation names something that is not here");
     const data = {
@@ -148,7 +152,10 @@ export async function saveAutomation(
     const row = id
         ? await prisma.placeAutomation.update({ where: { id }, data, select: FIELDS })
         : await prisma.placeAutomation.create({ data: { ...data, installedAppId }, select: FIELDS });
-    if (!input.enabled) await stopPending(row.id);
+    if (!input.enabled) await stopPending(row.id, ["queued", "waiting", "running"], "disabled");
+    else if (id && !sameSteps(before?.definition.actions, input.definition.actions)) {
+        await stopPending(row.id, ["waiting", "running"], "edited");
+    }
     const view = toView(row, await ownerNames([row.ownerId]));
     if (!view) throw new HomeError("That automation was saved by a newer Polaris");
     return view;
@@ -168,18 +175,29 @@ export async function setAutomationEnabled(
         data: enabled ? { enabled, armedAt: new Date() } : { enabled },
         select: FIELDS
     });
-    if (!enabled) await stopPending(id);
+    if (!enabled) await stopPending(id, ["queued", "waiting", "running"], "disabled");
     const view = toView(row, await ownerNames([row.ownerId]));
     if (!view) throw new HomeError("That automation was saved by a newer Polaris");
     return view;
 }
 
-async function stopPending(automationId: string): Promise<void> {
+function sameSteps(
+    before: readonly auto.Step[] | undefined,
+    after: readonly auto.Step[]
+): boolean {
+    return before !== undefined && JSON.stringify(before) === JSON.stringify(after);
+}
+
+async function stopPending(
+    automationId: string,
+    statuses: readonly auto.RunStatus[],
+    reason: "disabled" | "edited"
+): Promise<void> {
     await prisma.placeAutomationRun.updateMany({
-        where: { automationId, status: { in: ["queued", "waiting"] } },
+        where: { automationId, status: { in: [...statuses] } },
         data: {
             status: "stopped",
-            reason: "disabled",
+            reason,
             dueAt: null,
             waitUntil: null,
             waitDeviceId: null,

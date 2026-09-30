@@ -108,6 +108,9 @@ function duplicate(error: unknown): boolean {
  *  towards how often an automation has run. */
 const DID_NOT_RUN = ["skipped", "limited"];
 
+/** The statuses a run is still going in. */
+const LIVE = ["queued", "waiting", "running"];
+
 export const prismaAutomationStore: AutomationStore = {
     async enabledAutomations(installedAppId) {
         const rows = await prisma.placeAutomation.findMany({
@@ -170,7 +173,7 @@ export const prismaAutomationStore: AutomationStore = {
         const claimed: RunRecord[] = [];
         for (const row of candidates) {
             const taken = await prisma.placeAutomationRun.updateMany({
-                where: { id: row.id, ...free },
+                where: { id: row.id, status: row.status, step: row.step, dueAt: row.dueAt, ...free },
                 data: { lockedUntil: lockUntil }
             });
             if (taken.count === 1) claimed.push(toRun(row));
@@ -180,14 +183,15 @@ export const prismaAutomationStore: AutomationStore = {
 
     async saveRun(id, patch) {
         const { cause, steps, ...rest } = patch;
-        await prisma.placeAutomationRun.updateMany({
-            where: { id },
+        const saved = await prisma.placeAutomationRun.updateMany({
+            where: { id, status: { in: LIVE } },
             data: {
                 ...rest,
                 ...(cause ? { cause: json(cause) } : {}),
                 ...(steps ? { steps: json(steps) } : {})
             }
         });
+        return saved.count === 1;
     },
 
     async wakeWaiting(deviceId, now) {
@@ -238,7 +242,7 @@ export const prismaAutomationStore: AutomationStore = {
 
     async pruneRuns(automationId, keep) {
         const old = await prisma.placeAutomationRun.findMany({
-            where: { automationId, status: { notIn: ["queued", "waiting", "running"] } },
+            where: { automationId, status: { notIn: LIVE } },
             orderBy: { startedAt: "desc" },
             skip: keep,
             take: 500,

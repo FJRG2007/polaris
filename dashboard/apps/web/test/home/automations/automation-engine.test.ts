@@ -101,7 +101,9 @@ class MemoryStore implements AutomationStore {
 
     async saveRun(id: string, patch: Partial<RunRecord>) {
         const run = this.runs.get(id);
-        if (run) this.runs.set(id, { ...run, ...patch });
+        if (!run || auto.runFinished(run.status)) return false;
+        this.runs.set(id, { ...run, ...patch });
+        return true;
     }
 
     async wakeWaiting(deviceId: string, now: Date) {
@@ -334,6 +336,28 @@ describe("a device changing", () => {
         expect(acted).toEqual([{ deviceId: "lamp", action: "turn-on" }]);
     });
 
+    it("still fires the others when one of them cannot", async () => {
+        automation("broken", {
+            triggers: [{ id: "trigchange", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }],
+            actions: [{ id: "stepnote", kind: "notify", message: "broken" }]
+        });
+        automation("fine", {
+            triggers: [{ id: "trigchange", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }],
+            actions: [{ id: "stepnote", kind: "notify", message: "fine" }]
+        });
+        const count = store.countRunsSince.bind(store);
+        store.countRunsSince = async (automationId, since) => {
+            if (automationId === "broken") throw new Error("fixture database fault");
+            return count(automationId, since);
+        };
+        await reads(readout("plug", "outlet", "off"));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on"));
+        await engine.drain();
+        expect(notified).toEqual(["fine"]);
+        expect(faults.length).toBeGreaterThan(0);
+    });
+
     it("ignores the change it does not name", async () => {
         await reads(readout("switch", "switch", "on"));
         later(MINUTE);
@@ -560,6 +584,30 @@ describe("a delay", () => {
         expect(acted).toHaveLength(1);
         expect(store.runsOf("pulse")[0]).toMatchObject({ status: "stopped", reason: "disabled" });
     });
+
+    it("does nothing more once its run was stopped from outside", async () => {
+        await engine.runNow(store.automations.get("pulse")!, "Fixture person", "press-1");
+        await engine.drain();
+        const run = store.runsOf("pulse")[0]!;
+        store.runs.set(run.id, { ...run, status: "stopped", reason: "edited" });
+        later(2 * 60 * MINUTE);
+        await engine.drain();
+        expect(acted.map((entry) => entry.action)).toEqual(["turn-on"]);
+        expect(store.runsOf("pulse")[0]).toMatchObject({ status: "stopped", reason: "edited" });
+    });
+});
+
+describe("an automation that cannot be read", () => {
+    it("ends its run instead of leaving it to be claimed again", async () => {
+        automation("gone", { actions: [{ id: "stepnote", kind: "notify", message: "never" }] });
+        await engine.runNow(store.automations.get("gone")!, "Fixture person", "press-1");
+        store.automations.delete("gone");
+        await engine.drain();
+        expect(store.runsOf("gone")[0]).toMatchObject({ status: "failed", reason: "unreadable" });
+        later(5 * MINUTE);
+        expect(await store.claimDueRuns(now, new Date(now.getTime() + 2 * MINUTE), 5)).toHaveLength(0);
+        expect(notified).toEqual([]);
+    });
 });
 
 describe("waiting for a device", () => {
@@ -625,6 +673,18 @@ describe("loops", () => {
         await engine.drain();
         expect(acted.length).toBeLessThanOrEqual(MAX_DEPTH + 1);
         expect([...store.runs.values()].some((run) => run.reason === "loop")).toBe(true);
+    });
+
+    it("writes a step that could not start another automation as skipped", async () => {
+        automation("starter", { actions: [{ id: "steprun", kind: "run", automationId: "busy" }] });
+        automation("busy", { actions: [{ id: "stepnote", kind: "notify", message: "busy" }] });
+        const count = store.countRunsSince.bind(store);
+        store.countRunsSince = async (automationId, since) =>
+            automationId === "busy" ? RATE_MAX : count(automationId, since);
+        await engine.runNow(store.automations.get("starter")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(store.runsOf("starter")[0]?.steps[0]).toMatchObject({ outcome: "skipped", code: "automationHeld" });
+        expect(notified).toEqual([]);
     });
 
     it("holds back an automation that fires too often, and says so once", async () => {

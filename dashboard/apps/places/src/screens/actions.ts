@@ -1384,6 +1384,7 @@ export async function reconnectDeviceAccountAction(
 
     const result = await guard(async () => {
         await deviceAccounts.reconnectAccount(install.id, String(accountId), {
+            connection: connection.id,
             label: parsed.label,
             fields
         });
@@ -1446,6 +1447,7 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
         if (!answer.done) return null;
         if (parsed.accountId) {
             await deviceAccounts.reconnectAccount(install.id, parsed.accountId, {
+                connection: connection.id,
                 label: parsed.label,
                 fields: answer.credentials
             });

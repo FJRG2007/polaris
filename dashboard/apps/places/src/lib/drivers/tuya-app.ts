@@ -95,7 +95,14 @@ export const tuyaAppDriver: DeviceDriver = {
     async renew(credentials) {
         const session = sessionOf(credentials);
         if (!tuya.tuyaNeedsRefresh(session)) return null;
-        return toCredentials(await tuyaSpeaking(() => tuya.refreshTuyaSession(session)));
+        try {
+            return toCredentials(await tuya.refreshTuyaSession(session));
+        } catch (caught) {
+            if (caught instanceof TuyaError && caught.kind === "unreachable" && session.expiresAt > Date.now()) {
+                return null;
+            }
+            return tuyaSpeaking(() => Promise.reject(caught));
+        }
     },
 
     /** Whether the sign-in works: the homes on the account are the first thing

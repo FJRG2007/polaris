@@ -213,22 +213,24 @@ export function ConnectDialog({
             asking = false;
             // A poll that did not get through is asked again on the next tick;
             // the code on the screen is still good.
-            if (stopped || !result) return;
+            if (!result) return;
+            if (!result.error && !result.waiting) {
+                stopped = true;
+                setPairing(null);
+                setExpired(false);
+                setFields({});
+                setLabel("");
+                latest.current.onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
+                return;
+            }
+            if (stopped) return;
             if (result.error) {
                 stopped = true;
                 setPairing(null);
                 setError(result.error);
                 return;
             }
-            if (result.waiting) {
-                setError("");
-                return;
-            }
-            stopped = true;
-            setPairing(null);
-            setFields({});
-            setLabel("");
-            now.onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
+            setError("");
         };
         const timer = window.setInterval(() => void ask(), steps.pollMs);
         const lapse = window.setTimeout(() => setExpired(true), steps.lifetimeMs);

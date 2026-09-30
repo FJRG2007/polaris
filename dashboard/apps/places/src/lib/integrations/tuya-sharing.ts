@@ -417,9 +417,12 @@ export function refreshTuyaSession(session: TuyaSession): Promise<TuyaSession> {
     return promise;
 }
 
-const homesSchema = z.array(
-    z.object({ ownerId: z.union([z.string(), z.number()]), name: z.string().default("") })
-);
+const text = z
+    .string()
+    .nullish()
+    .transform((value) => value ?? "");
+
+const homesSchema = z.array(z.object({ ownerId: z.union([z.string(), z.number()]), name: text }));
 
 export async function listTuyaHomes(session: TuyaSession): Promise<{ id: string; name: string }[]> {
     const { result } = await call(session, "GET", "/v1.0/m/life/users/homes");
@@ -431,18 +434,21 @@ export async function listTuyaHomes(session: TuyaSession): Promise<{ id: string;
 const pointSchema = z.object({ code: z.string(), value: z.unknown() });
 
 const sharedDeviceSchema = z.object({
-    id: z.string(),
-    name: z.string().default(""),
-    category: z.string().default(""),
-    product_name: z.string().default(""),
-    online: z.boolean().default(false),
+    id: z.string().min(1),
+    name: text,
+    category: text,
+    product_name: text,
+    online: z
+        .boolean()
+        .nullish()
+        .transform((value) => value ?? false),
     // Kept only where a point has a code and a value, as the SDK does: a point
     // described by number alone is its local form and means nothing here.
     status: z
         .array(z.unknown())
-        .default([])
+        .nullish()
         .transform((points) =>
-            points.flatMap((point) => {
+            (points ?? []).flatMap((point) => {
                 const parsed = pointSchema.safeParse(point);
                 return parsed.success && "value" in (point as object) ? [parsed.data] : [];
             })
@@ -454,9 +460,12 @@ export type TuyaSharedDevice = z.infer<typeof sharedDeviceSchema>;
 /** The devices in one home, with the state of each in the same answer. */
 export async function listTuyaHomeDevices(session: TuyaSession, homeId: string): Promise<TuyaSharedDevice[]> {
     const { result } = await call(session, "GET", "/v1.0/m/life/ha/home/devices", { params: { homeId } });
-    const parsed = z.array(sharedDeviceSchema).safeParse(result);
+    const parsed = z.array(z.unknown()).safeParse(result);
     if (!parsed.success) throw new TuyaError("Tuya answered with something unexpected.", "refused");
-    return parsed.data;
+    return parsed.data.flatMap((entry) => {
+        const device = sharedDeviceSchema.safeParse(entry);
+        return device.success ? [device.data] : [];
+    });
 }
 
 export async function sendTuyaCommands(

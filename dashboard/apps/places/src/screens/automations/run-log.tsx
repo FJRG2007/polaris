@@ -69,7 +69,7 @@ export function RunLog({
     }, [automation.id]);
 
     useEffect(() => {
-        if (refreshKey > 0) void load();
+        void load();
     }, [refreshKey, load]);
 
     const active = (runs ?? []).some((run) => !auto.runFinished(run.status));

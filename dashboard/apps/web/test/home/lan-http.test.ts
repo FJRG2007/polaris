@@ -12,10 +12,25 @@
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { X509Certificate } from "node:crypto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import * as lan from "@polaris-app/places/src/lib/integrations/lan-http";
+import * as address from "@polaris-app/places/src/lib/integrations/lan-address";
+
+// The servers below listen on the loopback address, which a device connection
+// is never allowed to dial. Only that literal is let through here; a name is
+// still resolved and checked by the real resolver.
+vi.mock("@polaris-app/places/src/lib/integrations/lan-address", async (original) => {
+    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-address")>();
+    return {
+        ...actual,
+        forbiddenAddress: (value: string) => value !== "127.0.0.1" && actual.forbiddenAddress(value)
+    };
+});
+
+const FORBIDDEN =
+    "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.";
 
 // Test-only certificates, generated for this file and used nowhere else. The
 // first is its own authority and names itself like a Hue bridge id.
@@ -182,11 +197,62 @@ describe("an address somebody typed", () => {
         expect(lan.deviceHost("https://192.168.1.2:9999")).toBe("192.168.1.2");
     });
 
+    it("keeps a port that was typed even when it is the scheme's own", () => {
+        expect(lan.deviceOrigin("homeassistant.local:80", "http", 8123)).toBe("http://homeassistant.local");
+        expect(lan.deviceOrigin("[fe80::1]:80", "http", 8123)).toBe("http://[fe80::1]");
+        expect(lan.deviceOrigin("[fe80::1]", "http", 8123)).toBe("http://[fe80::1]:8123");
+    });
+
     it("refuses anything carrying a path, a query or credentials", () => {
         expect(lan.deviceOrigin("http://192.168.1.30/api", "http")).toBeNull();
         expect(lan.deviceOrigin("http://admin:pw@192.168.1.30", "http")).toBeNull();
         expect(lan.deviceOrigin("192.168.1.30?x=1", "http")).toBeNull();
         expect(lan.deviceOrigin("ftp://192.168.1.30", "http")).toBeNull();
         expect(lan.deviceOrigin("", "http")).toBeNull();
+    });
+});
+
+describe("a device that answers a byte at a time", () => {
+    it("is given up on when the whole answer takes too long, not only a silence", async () => {
+        let drip: ReturnType<typeof setInterval> | null = null;
+        const origin = await plainDevice((_request, response) => {
+            response.writeHead(200);
+            drip = setInterval(() => response.write("x"), 50);
+        });
+        try {
+            await expect(lan.lanRequest({ url: `${origin}/`, timeoutMs: 400 })).rejects.toMatchObject({
+                message: "The device did not answer in time."
+            });
+        } finally {
+            if (drip) clearInterval(drip);
+        }
+    });
+});
+
+describe("an address no device is at", () => {
+    it("is refused before anything is dialed", async () => {
+        await expect(lan.lanRequest({ url: "http://169.254.169.254/latest/meta-data/" })).rejects.toMatchObject({
+            message: FORBIDDEN,
+            kind: "refused"
+        });
+        await expect(lan.lanRequest({ url: "http://[::1]:8123/" })).rejects.toMatchObject({ message: FORBIDDEN });
+    });
+
+    it("is refused when a name resolves to it", async () => {
+        const origin = await plainDevice((_request, response) => response.end("{}"));
+        const port = new URL(origin).port;
+        await expect(lan.lanRequest({ url: `http://localhost:${port}/` })).rejects.toMatchObject({
+            message: FORBIDDEN
+        });
+    });
+
+    it("tells this machine and reserved space from a home network", async () => {
+        const actual = await vi.importActual<typeof address>("@polaris-app/places/src/lib/integrations/lan-address");
+        for (const blocked of ["127.0.0.1", "0.0.0.0", "169.254.169.254", "::1", "[fe80::1]", "::ffff:127.0.0.1", "224.0.0.1", "fd00:ec2::254"]) {
+            expect(actual.forbiddenAddress(blocked), blocked).toBe(true);
+        }
+        for (const allowed of ["192.168.1.30", "10.0.0.5", "172.17.0.1", "fd12:3456::1", "203.0.113.7"]) {
+            expect(actual.forbiddenAddress(allowed), allowed).toBe(false);
+        }
     });
 });

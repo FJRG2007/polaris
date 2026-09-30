@@ -301,13 +301,17 @@ export async function connectAccount(
 export async function reconnectAccount(
     installedAppId: string,
     id: string,
-    input: { readonly label: string; readonly fields: Readonly<Record<string, string>> }
+    input: {
+        readonly connection: string;
+        readonly label: string;
+        readonly fields: Readonly<Record<string, string>>;
+    }
 ): Promise<DeviceAccountView> {
     const existing = await prisma.placeDeviceAccount.findFirst({
         where: { id, installedAppId },
-        select: { id: true, connection: true, label: true }
+        select: { id: true, connection: true, label: true, secret: true }
     });
-    if (!existing) throw new HomeError("That connection is not here");
+    if (!existing || existing.connection !== input.connection) throw new HomeError("That connection is not here");
     const connection = registry.deviceConnection(existing.connection);
     if (!connection) throw new HomeError("Polaris cannot connect that yet");
     const paired = await speaking(() => driverFor(connection.id).verify(input.fields));
@@ -321,6 +325,11 @@ export async function reconnectAccount(
         },
         select: ACCOUNT_FIELDS
     });
+    const previous = readCredentials(existing.secret);
+    const next = paired ?? input.fields;
+    if (previous && !(previous.terminalId && previous.terminalId === next.terminalId)) {
+        await signOut(existing.connection, existing.secret);
+    }
     return toView(row);
 }
 

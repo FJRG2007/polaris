@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Filter, Loader2, Play, Plus, Zap } from "lucide-react";
 import {
     Button,
@@ -139,6 +139,7 @@ export function AutomationEditor({
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
     const [saving, setSaving] = useState(false);
+    const inFlight = useRef({ save: false, run: false });
     const [running, setRunning] = useState(false);
     const [tab, setTab] = useState<Tab>(automationId ? initialTab : "flow");
     const [refreshKey, setRefreshKey] = useState(0);
@@ -239,10 +240,12 @@ export function AutomationEditor({
     const save = async () => {
         if (!draft || !normalized || readOnly) return;
         setAttempted(true);
-        if (issues.length > 0 || !dirty) return;
+        if (issues.length > 0 || !dirty || inFlight.current.save) return;
+        inFlight.current.save = true;
         setSaving(true);
         setError("");
         const result = await runAction(() => actions.saveAutomationAction(automationId, normalized), setError);
+        inFlight.current.save = false;
         setSaving(false);
         if (!result) return;
         if (result.issues) setServerIssues(result.issues);
@@ -266,10 +269,12 @@ export function AutomationEditor({
     };
 
     const runNow = async () => {
-        if (!automationId) return;
+        if (!automationId || inFlight.current.run) return;
+        inFlight.current.run = true;
         setRunning(true);
         setError("");
         const result = await runAction(() => actions.runAutomationAction(automationId), setError);
+        inFlight.current.run = false;
         setRunning(false);
         if (!result) return;
         if (result.error) {

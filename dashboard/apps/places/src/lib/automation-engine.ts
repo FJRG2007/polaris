@@ -128,7 +128,10 @@ export interface AutomationStore {
     /** Take the queued and waiting runs that are due and free, marking each held
      *  until `lockUntil`. A run another runner holds is not returned. */
     claimDueRuns(now: Date, lockUntil: Date, limit: number): Promise<RunRecord[]>;
-    saveRun(id: string, patch: RunPatch): Promise<void>;
+    /** Write to a run that is still queued, waiting or running. False when it
+     *  has ended meanwhile - stopped from the screen, or removed with its
+     *  automation - and nothing was written. */
+    saveRun(id: string, patch: RunPatch): Promise<boolean>;
     /** Bring forward every run waiting on this device, so it looks now. */
     wakeWaiting(deviceId: string, now: Date): Promise<void>;
     markAutomation(id: string, at: Date, status: auto.RunStatus): Promise<void>;
@@ -381,7 +384,11 @@ export function createEngine(ports: EnginePorts) {
                         at: iso(change.at)
                     };
                     const key = `${trigger.kind}:${trigger.id}:${change.attribute}:${change.version}`;
-                    await fire(automation, key, cause, depth);
+                    try {
+                        await fire(automation, key, cause, depth);
+                    } catch (error) {
+                        fault(`automation ${automation.id} could not fire`, error);
+                    }
                 }
             }
         }
@@ -545,7 +552,7 @@ export function createEngine(ports: EnginePorts) {
         reason: string | null = null
     ): Promise<void> {
         const now = ports.now();
-        await store.saveRun(run.id, {
+        const saved = await store.saveRun(run.id, {
             status,
             steps,
             reason,
@@ -555,13 +562,16 @@ export function createEngine(ports: EnginePorts) {
             lockedUntil: null,
             finishedAt: now
         });
-        await store.markAutomation(run.automationId, now, status);
+        if (saved) await store.markAutomation(run.automationId, now, status);
     }
 
     async function execute(run: RunRecord): Promise<void> {
         const automation = await store.automation(run.automationId);
         const steps: auto.StepLog[] = [...run.steps];
-        if (!automation) return; // Removed with its runs; nothing to finish.
+        if (!automation) {
+            await finish(run, "failed", steps, "unreadable");
+            return;
+        }
         if (!automation.enabled) {
             await finish(run, "stopped", steps, "disabled");
             return;
@@ -580,8 +590,8 @@ export function createEngine(ports: EnginePorts) {
                 await finish(run, "skipped", steps, "conditions");
                 return;
             }
-            await store.saveRun(run.id, { status: "running" });
         }
+        if (!(await store.saveRun(run.id, { status: "running" }))) return;
 
         let index = run.step;
         let waitUntil = run.waitUntil;
@@ -594,13 +604,17 @@ export function createEngine(ports: EnginePorts) {
             if (step.kind === "delay") {
                 const due = new Date(now.getTime() + step.seconds * 1000);
                 log("ok");
-                await store.saveRun(run.id, {
-                    status: "waiting",
-                    step: index + 1,
-                    steps,
-                    dueAt: due,
-                    lockedUntil: null
-                });
+                if (
+                    !(await store.saveRun(run.id, {
+                        status: "waiting",
+                        step: index + 1,
+                        steps,
+                        dueAt: due,
+                        lockedUntil: null
+                    }))
+                ) {
+                    return;
+                }
                 if (step.seconds * 1000 <= TIMER_MS) ports.wake?.(step.seconds * 1000);
                 return;
             }
@@ -674,7 +688,7 @@ export function createEngine(ports: EnginePorts) {
                     await finish(run, "refused", steps, "loop");
                     return;
                 } else {
-                    await fire(
+                    const started = await fire(
                         target,
                         `chain:${run.id}:${step.id}`,
                         {
@@ -685,21 +699,26 @@ export function createEngine(ports: EnginePorts) {
                         },
                         run.depth + 1
                     );
-                    log("ok");
-                    ports.wake?.(0);
+                    if (started) {
+                        log("ok");
+                        ports.wake?.(0);
+                    } else {
+                        log("skipped", { code: "automationHeld" });
+                    }
                 }
             }
 
             index += 1;
             // Saved after every step, so a restart resumes after the last one
             // that finished rather than doing it again.
-            await store.saveRun(run.id, {
+            const kept = await store.saveRun(run.id, {
                 step: index,
                 steps,
                 waitUntil: null,
                 waitDeviceId: null,
                 lockedUntil: new Date(ports.now().getTime() + LEASE_MS)
             });
+            if (!kept) return;
         }
         await finish(run, "succeeded", steps);
     }

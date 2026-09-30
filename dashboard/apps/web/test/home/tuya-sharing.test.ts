@@ -327,6 +327,17 @@ describe("the token", () => {
         expect(seen.filter((request) => request.url.pathname.startsWith("/v1.0/m/token/"))).toHaveLength(1);
     });
 
+    it("keeps using a token that still works when the trade does not get through", async () => {
+        vi.stubGlobal("fetch", async () => {
+            throw new TypeError("fetch failed");
+        });
+        expect(await tuyaAppDriver.renew!(session({ refreshToken: "refresh-c", expiresAt: String(Date.now() + 30_000) }))).toBeNull();
+        const failure = await tuyaAppDriver
+            .renew!(session({ refreshToken: "refresh-d", expiresAt: "0" }))
+            .catch((caught: unknown) => caught);
+        expect((failure as DriverError).kind).toBe("unreachable");
+    });
+
     it("says the account is signed out when the trade is refused", async () => {
         refreshRefused = true;
         refreshToken = "refresh-revoked";
@@ -391,6 +402,25 @@ describe("the devices", () => {
         expect(found[0]?.model).toBe("2 Gang Switch");
         const asked = seen.filter((request) => request.url.pathname === "/v1.0/m/life/ha/home/devices");
         expect(asked.map((request) => request.params)).toEqual([{ homeId: "42" }, { homeId: "43" }]);
+    });
+
+    it("reads fields sent as null as empty, and leaves out only a device it cannot read", async () => {
+        homes = [{ ownerId: 42, name: null }];
+        devicesByHome = {
+            "42": [
+                {
+                    id: "dev-1",
+                    name: "Hallway",
+                    category: "kg",
+                    product_name: null,
+                    online: null,
+                    status: [{ code: "switch_1", value: true }]
+                },
+                { id: null, name: "Broken" }
+            ]
+        };
+        const found = await tuyaAppDriver.list(session());
+        expect(found.map((device) => [device.externalId, device.model])).toEqual([["dev-1#switch_1", null]]);
     });
 
     it("sends the data point a row stands for, sealed in the body", async () => {

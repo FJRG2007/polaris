@@ -8,6 +8,8 @@
  * is `home.manage`, an administrative grant, precisely because it is somewhere a
  * person chooses the address Polaris dials. The rest of the care is here:
  *
+ * - This machine, link-local space and reserved ranges are never dialed, by
+ *   address or by what a name resolves to (`lan-address.ts`).
  * - Redirects are never followed. A device answers for itself; a redirect off it
  *   is not something to chase from inside somebody's network.
  * - What comes back is capped, and only named fields are ever read out of it by
@@ -27,10 +29,12 @@
  * Server-only.
  */
 
+import { isIP } from "node:net";
 import { DriverError } from "../drivers/contract";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { connect as tlsConnect, type PeerCertificate, type TLSSocket } from "node:tls";
+import { forbiddenAddress, forbiddenError, guardedLookup } from "./lan-address";
 
 /** Long enough for a plug on a tired access point, short enough that a screen
  *  waiting on one is not left there. */
@@ -112,7 +116,13 @@ function refusal(error: NodeJS.ErrnoException): DriverError {
     if (code === "ETIMEDOUT" || code === "ABORT_ERR" || error.name === "AbortError") {
         return new DriverError("The device did not answer in time.", "unreachable");
     }
-    if (code.startsWith("ERR_TLS") || code.includes("CERT") || code.includes("SELF_SIGNED")) {
+    if (
+        code.startsWith("ERR_TLS") ||
+        code.startsWith("ERR_SSL") ||
+        code.startsWith("UNABLE_TO_") ||
+        code.includes("CERT") ||
+        code.includes("SELF_SIGNED")
+    ) {
         return new DriverError(
             "The device's certificate is not one Polaris can trust, so nothing was sent to it.",
             "refused"
@@ -139,6 +149,7 @@ function secureSocket(
         const socket = tlsConnect({
             host,
             port,
+            lookup: guardedLookup,
             // An address is not a name a certificate can carry. What identifies
             // the device is checked below, by the rule its maker documents.
             servername: undefined,
@@ -207,6 +218,7 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
     const maxBytes = options.maxBytes ?? MAX_BYTES;
     const host = url.hostname.replace(/^\[|\]$/g, "");
     const port = Number(url.port) || (secure ? 443 : 80);
+    if (isIP(host) && forbiddenAddress(host)) throw forbiddenError();
 
     const trust = options.trust;
     const socket =
@@ -215,6 +227,25 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
             : null;
 
     return new Promise<LanResponse>((resolve, reject) => {
+        let settled = false;
+        const deadline = setTimeout(() => {
+            fail(new DriverError("The device did not answer in time.", "unreachable"));
+        }, timeoutMs);
+        const done = (response: LanResponse) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(deadline);
+            resolve(response);
+        };
+        const fail = (error: DriverError) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(deadline);
+            request?.destroy();
+            socket?.destroy();
+            reject(error);
+        };
+        let request: ReturnType<typeof httpRequest> | undefined;
         const body =
             options.body === undefined
                 ? undefined
@@ -222,61 +253,63 @@ export async function lanRequest(options: LanRequest): Promise<LanResponse> {
                   ? Buffer.from(options.body, "utf8")
                   : options.body;
         const send = secure ? httpsRequest : httpRequest;
-        const request = send(
-            {
-                host,
-                port,
-                path: `${url.pathname}${url.search}`,
-                method: options.method ?? "GET",
-                headers: {
-                    ...(options.headers ?? {}),
-                    ...(body ? { "content-length": String(body.length) } : {})
+        try {
+            request = send(
+                {
+                    host,
+                    port,
+                    path: `${url.pathname}${url.search}`,
+                    method: options.method ?? "GET",
+                    headers: {
+                        ...(options.headers ?? {}),
+                        ...(body ? { "content-length": String(body.length) } : {})
+                    },
+                    // No agent: with one, node opens its own connection and the
+                    // checked socket would never be used.
+                    ...(socket ? { createConnection: () => socket } : { lookup: guardedLookup }),
+                    timeout: timeoutMs
                 },
-                // No agent: with one, node opens its own connection and the checked
-                // socket would never be used.
-                ...(socket ? { createConnection: () => socket } : {}),
-                timeout: timeoutMs
-            },
-            (response) => {
-                const chunks: Buffer[] = [];
-                let size = 0;
-                response.on("data", (chunk: Buffer) => {
-                    size += chunk.length;
-                    if (size > maxBytes) {
-                        request.destroy();
-                        reject(
-                            new DriverError(
-                                "The device answered with far more than Polaris reads from one.",
-                                "refused"
-                            )
-                        );
-                        return;
-                    }
-                    chunks.push(chunk);
-                });
-                response.on("end", () => {
-                    const tls = response.socket as TLSSocket;
-                    const peer = secure && typeof tls.getPeerCertificate === "function" ? tls.getPeerCertificate() : null;
-                    resolve({
-                        status: response.statusCode ?? 0,
-                        headers: response.headers,
-                        body: Buffer.concat(chunks),
-                        certificate: peer
-                            ? {
-                                  fingerprint: normalizeFingerprint(peer.fingerprint256 ?? ""),
-                                  commonName: String(peer.subject?.CN ?? "")
-                              }
-                            : null
+                (response) => {
+                    const chunks: Buffer[] = [];
+                    let size = 0;
+                    response.on("data", (chunk: Buffer) => {
+                        size += chunk.length;
+                        if (size > maxBytes) {
+                            fail(
+                                new DriverError(
+                                    "The device answered with far more than Polaris reads from one.",
+                                    "refused"
+                                )
+                            );
+                            return;
+                        }
+                        chunks.push(chunk);
                     });
-                });
-                response.on("error", (error: NodeJS.ErrnoException) => reject(refusal(error)));
-            }
-        );
-        request.on("timeout", () => {
-            request.destroy();
-            reject(new DriverError("The device did not answer in time.", "unreachable"));
-        });
-        request.on("error", (error: NodeJS.ErrnoException) => reject(refusal(error)));
+                    response.on("end", () => {
+                        const tls = response.socket as TLSSocket;
+                        const peer =
+                            secure && typeof tls.getPeerCertificate === "function" ? tls.getPeerCertificate() : null;
+                        done({
+                            status: response.statusCode ?? 0,
+                            headers: response.headers,
+                            body: Buffer.concat(chunks),
+                            certificate: peer
+                                ? {
+                                      fingerprint: normalizeFingerprint(peer.fingerprint256 ?? ""),
+                                      commonName: String(peer.subject?.CN ?? "")
+                                  }
+                                : null
+                        });
+                    });
+                    response.on("error", (error: NodeJS.ErrnoException) => fail(refusal(error)));
+                }
+            );
+        } catch (error) {
+            fail(refusal(error as NodeJS.ErrnoException));
+            return;
+        }
+        request.on("timeout", () => fail(new DriverError("The device did not answer in time.", "unreachable")));
+        request.on("error", (error: NodeJS.ErrnoException) => fail(refusal(error)));
         if (body) request.write(body);
         request.end();
     });
@@ -305,7 +338,9 @@ export function deviceOrigin(typed: string, scheme: "http" | "https", port?: num
     if (url.username || url.password || url.search || url.hash) return null;
     if (url.pathname !== "/" && url.pathname !== "") return null;
     if (!url.hostname) return null;
-    const chosenPort = url.port || (!hadScheme && port !== undefined ? String(port) : "");
+    const authority = (hadScheme ? raw.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") : raw).split("/")[0] ?? "";
+    const typedPort = /:\d+$/.test(authority);
+    const chosenPort = url.port || (!hadScheme && !typedPort && port !== undefined ? String(port) : "");
     return `${url.protocol}//${url.host.replace(/:\d+$/, "")}${chosenPort ? `:${chosenPort}` : ""}`;
 }
 

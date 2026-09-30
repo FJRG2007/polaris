@@ -187,7 +187,12 @@ export function DevicesView({
         );
         setBusy(null);
         if (!result || result.error) {
-            if (settled) settle(device);
+            if (settled) {
+                const restore = (entry: DeviceView) =>
+                    entry.id === device.id && entry.state === settled ? { ...entry, state: device.state } : entry;
+                setDevices((current) => (current ?? []).map(restore));
+                setOpened((current) => (current ? restore(current) : current));
+            }
             if (!result) return;
             setError(result.error ?? "");
             throw new Error(result.error);

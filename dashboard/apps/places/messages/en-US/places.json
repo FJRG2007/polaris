@@ -482,6 +482,7 @@
         "tplinkNothing": "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
         "tplinkCannot": "A TP-Link device cannot be told to do that",
         "addressNoPath": "Write the address as 192.168.1.30, with no path",
+        "addressForbidden": "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
         "shellyNot": "That address answered, but not as a Shelly.",
         "shellyPassword": "The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.",
         "shellyNeedsPassword": "This Shelly has a password. Add it to the connection.",
@@ -1378,9 +1379,11 @@
             "loop": "Stopped: automations were starting each other in a loop.",
             "limited": "Held back: it fired too many times in a few minutes. It runs again once that settles.",
             "disabled": "Stopped because it was switched off.",
+            "edited": "Stopped because its steps were changed while it ran.",
             "timedOut": "Stopped: the device did not get there in time.",
             "step": "Stopped at the step that failed.",
-            "fault": "Something went wrong running it. Nothing after that step ran."
+            "fault": "Something went wrong running it. Nothing after that step ran.",
+            "unreadable": "This automation was saved by a newer Polaris and could not be read, so nothing ran."
         },
         "notes": {
             "deviceGone": "That device is no longer here.",
@@ -1390,6 +1393,7 @@
             "notifyFailed": "The notification could not be sent.",
             "automationGone": "That automation is no longer here.",
             "automationOff": "That automation is switched off, so it was not started.",
+            "automationHeld": "That automation was not started: it ran too many times in the last few minutes, or this step had already started it.",
             "toggleUnknown": "Its state was not known, so there was nothing to switch over."
         },
         "errors": {

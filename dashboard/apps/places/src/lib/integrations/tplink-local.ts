@@ -23,10 +23,11 @@
  * Server-only.
  */
 
-import { Socket } from "node:net";
 import { lanRequest } from "./lan-http";
+import { Socket, isIP } from "node:net";
 import * as crypto from "./tplink-crypto";
 import { DriverError } from "../drivers/contract";
+import { forbiddenAddress, forbiddenError, guardedLookup } from "./lan-address";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 const KLAP_PORT = 80;
@@ -115,7 +116,9 @@ export function xorExchange(host: string, request: string, port = XOR_PORT): Pro
         socket.setNoDelay(true);
         socket.once("error", (error: NodeJS.ErrnoException) =>
             fail(
-                error.code === "ENOTFOUND" || error.code === "EAI_AGAIN"
+                error instanceof DriverError
+                    ? error
+                    : error.code === "ENOTFOUND" || error.code === "EAI_AGAIN"
                     ? new DriverError("That address could not be found on this network.", "unreachable")
                     : new DriverError("Nothing answered on that address and port.", "unreachable")
             )
@@ -132,7 +135,12 @@ export function xorExchange(host: string, request: string, port = XOR_PORT): Pro
             socket.destroy();
             resolve(crypto.xorDecrypt(buffer.subarray(4, 4 + length)));
         });
-        socket.connect(port, host, () => socket.write(crypto.xorEncrypt(request)));
+        const bare = host.replace(/^\[|\]$/g, "");
+        if (isIP(bare) && forbiddenAddress(bare)) {
+            fail(forbiddenError());
+            return;
+        }
+        socket.connect({ port, host: bare, lookup: guardedLookup }, () => socket.write(crypto.xorEncrypt(request)));
     });
 }
 

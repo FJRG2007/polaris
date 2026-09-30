@@ -117,6 +117,10 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.", "refusals.tplinkNothing"],
     ["A TP-Link device cannot be told to do that", "refusals.tplinkCannot"],
     ["Write the address as 192.168.1.30, with no path", "refusals.addressNoPath"],
+    [
+        "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "refusals.addressForbidden"
+    ],
     ["That address answered, but not as a Shelly.", "refusals.shellyNot"],
     ["The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.", "refusals.shellyPassword"],
     ["This Shelly has a password. Add it to the connection.", "refusals.shellyNeedsPassword"],

@@ -228,7 +228,18 @@ export const RUN_TONES: Readonly<Record<auto.RunStatus, kinds.DeviceTone>> = {
     limited: "warning"
 };
 
-const REASONS = ["conditions", "owner", "loop", "limited", "disabled", "timedOut", "step", "fault"] as const;
+const REASONS = [
+    "conditions",
+    "owner",
+    "loop",
+    "limited",
+    "disabled",
+    "edited",
+    "timedOut",
+    "step",
+    "fault",
+    "unreadable"
+] as const;
 
 /** Why a run stopped where it did, or nothing when it did not stop early. */
 export function reasonText(reason: string | null, t: PlacesTranslator): string {
@@ -244,6 +255,7 @@ const NOTES = [
     "notifyFailed",
     "automationGone",
     "automationOff",
+    "automationHeld",
     "toggleUnknown"
 ] as const;
 

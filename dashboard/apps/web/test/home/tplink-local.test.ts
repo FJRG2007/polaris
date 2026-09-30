@@ -57,9 +57,11 @@ function ivFor(iv: Buffer, seq: number): Buffer {
     return Buffer.concat([iv, tail]);
 }
 
-vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async () => {
+vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
+    const actual = await original<typeof import("@polaris-app/places/src/lib/integrations/lan-http")>();
     const { DriverError } = await import("@polaris-app/places/src/lib/drivers/contract");
     return {
+        deviceHost: actual.deviceHost,
         lanRequest: async (options: { url: string; body?: Buffer; headers?: Record<string, string> }) => {
             if (!device) throw new DriverError("Nothing answered on that address and port.", "unreachable");
             const url = new URL(options.url);
@@ -123,7 +125,7 @@ vi.mock("node:net", async (original) => {
         setTimeout() {}
         setNoDelay() {}
         destroy() {}
-        connect(_port: number, _host: string, done: () => void) {
+        connect(_options: { port: number; host: string }, done: () => void) {
             queueMicrotask(() => {
                 if (!xorDevice) {
                     this.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" }));

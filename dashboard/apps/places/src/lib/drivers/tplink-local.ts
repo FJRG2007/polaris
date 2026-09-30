@@ -23,6 +23,7 @@
 
 import { HomeError } from "../home-error";
 import type { DeviceKind } from "../device-kinds";
+import { deviceHost } from "../integrations/lan-http";
 import * as tplink from "../integrations/tplink-local";
 import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
@@ -39,8 +40,10 @@ const SMART_KINDS: Readonly<Record<string, DeviceKind>> = {
 };
 
 function addressOf(credentials: Credentials): tplink.TplinkAddress {
-    const host = credentials.host?.trim();
-    if (!host) throw new HomeError("That connection is missing the device's address");
+    const typed = credentials.host?.trim();
+    if (!typed) throw new HomeError("That connection is missing the device's address");
+    const host = deviceHost(typed);
+    if (!host) throw new HomeError("Write the address as 192.168.1.30, with no path");
     return { host, username: credentials.email?.trim() ?? "", password: credentials.password ?? "" };
 }
 

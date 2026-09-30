@@ -51,6 +51,7 @@ interface Listing {
 export function AutomationsView({ placeId, canManage }: { placeId: string; canManage: boolean }) {
     const t = usePlacesT();
     const [listing, setListing] = useState<Listing | null>(null);
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
     const [error, setError] = useState("");
     const [pending, setPending] = useState<Record<string, "toggle" | "run">>({});
     const [removing, setRemoving] = useState<auto.AutomationView | null>(null);
@@ -82,6 +83,19 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         return (id) => byId.get(id);
     }, [listing]);
 
+    const shown = useMemo(
+        () => (listing ? listing.automations.filter((automation) => !hidden.has(automation.id)) : []),
+        [listing, hidden]
+    );
+
+    const hide = (id: string, hiding: boolean) =>
+        setHidden((current) => {
+            const next = new Set(current);
+            if (hiding) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+
     const replace = (automation: auto.AutomationView) =>
         setListing((current) =>
             current
@@ -110,7 +124,16 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         settle(automation.id);
         if (!result || result.error || !result.automation) {
             // Back to where it was, with the reason on the line above the list.
-            replace(automation);
+            setListing((current) =>
+                current
+                    ? {
+                          ...current,
+                          automations: current.automations.map((entry) =>
+                              entry.id === automation.id ? { ...entry, enabled: automation.enabled } : entry
+                          )
+                      }
+                    : current
+            );
             if (result?.error) setError(result.error);
             return;
         }
@@ -137,18 +160,19 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         const target = removing;
         if (!target) return;
         setRemoving(null);
-        const before = listing;
+        hide(target.id, true);
+        const result = await runAction(() => actions.deleteAutomationAction(target.id), setError);
+        if (!result || result.error) {
+            hide(target.id, false);
+            if (result?.error) setError(result.error);
+            return;
+        }
         setListing((current) =>
             current
                 ? { ...current, automations: current.automations.filter((entry) => entry.id !== target.id) }
                 : current
         );
-        const result = await runAction(() => actions.deleteAutomationAction(target.id), setError);
-        if (!result || result.error) {
-            setListing(before);
-            if (result?.error) setError(result.error);
-            return;
-        }
+        hide(target.id, false);
         dropAutomationsCache();
     };
 
@@ -194,7 +218,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                     <Skeleton className="h-16 w-full" />
                     <Skeleton className="h-16 w-full" />
                 </div>
-            ) : listing.automations.length === 0 ? (
+            ) : shown.length === 0 ? (
                 <EmptyState
                     icon={<Workflow className="size-5" />}
                     title={t("automations.list.emptyTitle")}
@@ -203,7 +227,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                 />
             ) : (
                 <ul className="flex flex-col gap-2">
-                    {listing.automations.map((automation) => {
+                    {shown.map((automation) => {
                         const busy = pending[automation.id];
                         const firstTrigger = automation.definition.triggers[0];
                         return (

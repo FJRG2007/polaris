@@ -337,6 +337,28 @@ describe("appDownload", () => {
             }
         });
 
+        it("does not hold on to an answer cut short by a later page failing", async () => {
+            vi.useFakeTimers({ now: new Date("2026-09-30T18:00:00Z") });
+            const full = Array.from({ length: 100 }, (_, index) => `dashboard-v0.${index}.0`);
+            const fetching = vi
+                .fn()
+                .mockResolvedValueOnce(listed(full, '"a"'))
+                .mockResolvedValueOnce({ ok: false, status: 403, headers: new Headers(), json: async () => [] })
+                .mockResolvedValueOnce(listed(full, '"a"'))
+                .mockResolvedValueOnce(listed(["extension-v0.1.10"], '"a2"'));
+            vi.stubGlobal("fetch", fetching);
+            try {
+                expect(await extensionDownload("example/cut-short")).toBeNull();
+                vi.advanceTimersByTime(121_000);
+                expect((await extensionDownload("example/cut-short"))?.version).toBe("0.1.10");
+                const [, init] = fetching.mock.calls[2] as [string, RequestInit];
+                expect((init.headers as Record<string, string>)["if-none-match"]).toBeUndefined();
+            } finally {
+                vi.unstubAllGlobals();
+                vi.useRealTimers();
+            }
+        });
+
         it("offers a release published since", async () => {
             vi.useFakeTimers({ now: new Date("2026-09-30T18:00:00Z") });
             const fetching = vi

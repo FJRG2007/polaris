@@ -203,10 +203,17 @@ async function ask(repo: string, prefix: string, etag: string | null): Promise<A
                 { headers, signal: deadline }
             );
             if (page === 1 && response.status === 304) return { unchanged: true };
-            if (!response.ok) break;
+            if (!response.ok) {
+                first = null;
+                break;
+            }
             if (page === 1) first = response.headers?.get("etag") ?? null;
             const body = (await response.json()) as unknown;
-            if (!Array.isArray(body) || body.length === 0) break;
+            if (!Array.isArray(body)) {
+                first = null;
+                break;
+            }
+            if (body.length === 0) break;
             seen.push(...(body as ReleaseListing[]));
             const found = pickRelease(seen, prefix);
             if (found) return answer(found);
