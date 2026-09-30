@@ -94,8 +94,8 @@
         "copy": "Copiar",
         "copyNamed": "Copiar {label}",
         "close": "Cerrar",
-        "showPassword": "Mostrar contraseña",
-        "hidePassword": "Ocultar contraseña",
+        "showPassword": "Mostrar clave",
+        "hidePassword": "Ocultar clave",
         "noData": "Sin datos",
         "noDataInRange": "Sin datos en este intervalo",
         "hexColour": "Color hex",
@@ -644,7 +644,7 @@
         "browser": "Bóveda web",
         "mobile": "App móvil",
         "desktop": "Escritorio",
-        "cli": "Línea de comandos",
+        "cli": "Terminal",
         "other": "App"
     },
     "sessionsTable": {
@@ -1074,7 +1074,7 @@
     },
     "fallback": {
         "inherited": "Heredado.",
-        "setHere": "Definir aquí",
+        "setHere": "Fijar aquí",
         "none": "No hay nada de respaldo. Una ejecución rechazada por su proveedor se detiene ahí.",
         "add": "Añadir modelo",
         "inheritInstead": "Heredar en su lugar",

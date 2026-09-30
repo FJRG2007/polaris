@@ -17,7 +17,7 @@
         "location": "Ubicación",
         "network": "Red",
         "browser": "Navegador y sistema",
-        "userAgent": "Agente de usuario",
+        "userAgent": "User agent",
         "localTime": "Su hora local",
         "seenAt": "Visto aquí",
         "advice": "Todo lo anterior es lo que la dirección y el navegador dijeron de sí mismos. Cambia tu contraseña si no reconoces algo de ello.",

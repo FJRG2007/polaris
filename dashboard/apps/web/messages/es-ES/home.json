@@ -66,7 +66,7 @@
             "description": "Las alarmas que están saltando ahora y lo que saltó hace poco."
         },
         "storage": {
-            "label": "Almacenamiento",
+            "label": "Espacio",
             "description": "Lo lleno que está cada dispositivo conectado."
         },
         "apps": {
