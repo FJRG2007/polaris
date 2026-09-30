@@ -43,6 +43,7 @@ describe("the version on disk", () => {
 describe("when a restart may happen", () => {
     const idle = {
         vaultOpen: false,
+        accountsParked: false,
         holdingLogin: false,
         awaitingApproval: false,
         popupOpen: false,

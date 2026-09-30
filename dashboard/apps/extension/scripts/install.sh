@@ -286,7 +286,10 @@ swap_in() {
 
     # The swap. The live folder is renamed away and the new one renamed in; if
     # the second rename fails the first is undone.
-    if [ -e "$DIR" ]; then mv "$DIR" "$retired"; fi
+    if [ -e "$DIR" ] && ! mv "$DIR" "$retired"; then
+        err "could not move the version in $DIR aside; it was kept"
+        return 1
+    fi
     if ! mv "$stage/unpacked" "$DIR"; then
         [ -e "$retired" ] && mv "$retired" "$DIR"
         err "could not put $tag in place; the version there was kept"
@@ -388,8 +391,10 @@ main() {
 
     # The note in the folder says a job keeps it current. Where none could be
     # set up it says so, and the extension keeps showing the manual steps.
-    if [ "$SCHEDULED" = 0 ] && [ "$UPDATING" = 0 ] && [ -f "$DIR/$MARKER" ]; then
-        sed 's/"updater":"[^"]*"/"updater":"none"/' "$DIR/$MARKER" >"$DIR/$MARKER.tmp" &&
+    if [ "$SCHEDULED" = 0 ] && [ -f "$DIR/$MARKER" ]; then
+        noted=none
+        [ "$UPDATING" = 1 ] && noted=$kind
+        sed "s/\"updater\":\"[^\"]*\"/\"updater\":\"$noted\"/" "$DIR/$MARKER" >"$DIR/$MARKER.tmp" &&
             mv "$DIR/$MARKER.tmp" "$DIR/$MARKER"
     fi
 

@@ -68,6 +68,8 @@ export function waitingVersion(running: string, onDisk: string | null): string |
 export interface InFlight {
     /** A vault key is held - the one in front, or a set-aside account's. */
     readonly vaultOpen: boolean;
+    /** Another server's account is set aside, its connection held in session storage only. */
+    readonly accountsParked: boolean;
     /** A submitted login held to be offered, or a sign-in part way through. */
     readonly holdingLogin: boolean;
     /** An approval somebody went off to give, for the vault or the connection. */
@@ -80,5 +82,12 @@ export interface InFlight {
 
 /** Whether a restart now would interrupt nothing. */
 export function safeToRestart(now: InFlight): boolean {
-    return !now.vaultOpen && !now.holdingLogin && !now.awaitingApproval && !now.popupOpen && !now.answering;
+    return (
+        !now.vaultOpen &&
+        !now.accountsParked &&
+        !now.holdingLogin &&
+        !now.awaitingApproval &&
+        !now.popupOpen &&
+        !now.answering
+    );
 }

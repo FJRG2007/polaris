@@ -271,10 +271,10 @@ function Invoke-PolarisExtensionInstall {
     # The note in the folder says a task keeps it current. Where none could be
     # set up it says so, and the extension keeps showing the manual steps.
     $notePath = Join-Path $dir $marker
-    if (-not $scheduled -and -not $updating -and (Test-Path $notePath)) {
+    if (-not $scheduled -and (Test-Path $notePath)) {
         try {
             $held = Get-Content -Raw -Path $notePath | ConvertFrom-Json
-            $held.updater = "none"
+            $held.updater = if ($updating) { "windows-task" } else { "none" }
             Set-Content -Path $notePath -Value ($held | ConvertTo-Json -Compress) -Encoding UTF8
         } catch { }
     }

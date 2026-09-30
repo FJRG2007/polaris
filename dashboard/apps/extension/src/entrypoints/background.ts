@@ -1897,6 +1897,20 @@ async function status(): Promise<messages.VaultStatus> {
     };
 }
 
+/** Whether an origin is one the Servers screen lists, read without the network. */
+async function listedServer(origin: string): Promise<boolean> {
+    const [saved, parked, active] = await Promise.all([
+        savedServers(),
+        PARKED.getValue(),
+        currentOrigin()
+    ]);
+    return (
+        origin === active ||
+        saved.some((one) => one.origin === origin) ||
+        parked.some((one) => one.origin === origin)
+    );
+}
+
 /** The logins the open shelf shows. What fills a page is not narrowed - a
  *  shelf decides what is listed, not what a site may be signed in with. */
 async function onOpenShelf(found: readonly Login[]): Promise<Login[]> {
@@ -2655,15 +2669,17 @@ async function popupOpen(): Promise<boolean> {
  */
 async function restartIfWaiting(): Promise<void> {
     if (!(await diskVersion())) return;
-    const [capture, second, first, waiting, linking] = await Promise.all([
+    const [capture, second, first, waiting, linking, parked] = await Promise.all([
         CAPTURE.getValue(),
         SECOND_STEP.getValue(),
         FIRST_STEP.getValue(),
         WAITING.getValue(),
-        LINK_WAITING.getValue()
+        LINK_WAITING.getValue(),
+        PARKED.getValue()
     ]);
     const safe = selfUpdate.safeToRestart({
         vaultOpen: (await vault()) !== null || parkedVaults.size > 0,
+        accountsParked: parked.length > 0,
         holdingLogin: capture !== null || second !== null || first !== null,
         awaitingApproval: waiting?.state === "pending" || linking?.state === "pending",
         popupOpen: await popupOpen(),
@@ -3070,8 +3086,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "switchServer": {
-                const known = (await status()).servers.some((one) => one.origin === request.origin);
-                if (!known) return { ok: false, error: await say("errors.unknownServer") };
+                if (!(await listedServer(request.origin))) {
+                    return { ok: false, error: await say("errors.unknownServer") };
+                }
                 if (!(await holdsOrigin(request.origin))) {
                     return { ok: false, error: await say("errors.noPermission") };
                 }
@@ -3087,8 +3104,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                         error: await say("errors.serverNameTooLong", { max: servers.SERVER_NAME_MAX })
                     };
                 }
-                const listed = (await status()).servers.some((one) => one.origin === request.origin);
-                if (!listed) return { ok: false, error: await say("errors.unknownServer") };
+                if (!(await listedServer(request.origin))) {
+                    return { ok: false, error: await say("errors.unknownServer") };
+                }
                 // A server shown from an account alone - an install from before
                 // the list - is added to it by being named.
                 const saved = servers.withServer(await savedServers(), request.origin);
