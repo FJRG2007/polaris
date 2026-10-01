@@ -962,7 +962,10 @@ function answer(sent: string): string {
             : `Gamerule keepInventory is currently set to: ${world.keepInventory}`;
     }
     if (line === "execute in minecraft:overworld run forceload query") return world.forced;
-    if (line === "execute if entity @e[tag=pe_mob]" || line === "execute if entity @e[tag=pe_mob,tag=!pe_wmount]")
+    if (
+        line === "execute if entity @e[tag=pe_mob]" ||
+        line === "execute if entity @e[tag=pe_mob,tag=!pe_wmount]"
+    )
         return world.waveAlive > 0 ? `Test passed, count: ${world.waveAlive}` : "Test failed";
     if (
         line.includes(
@@ -978,9 +981,10 @@ function answer(sent: string): string {
             .map(([name, value]) => `${name} has ${value} [pe_whit]`)
             .join("\n");
     }
-    const wet = /^execute in minecraft:overworld if block (-?\d+) -?\d+ (-?\d+) minecraft:water$/.exec(
-        line
-    );
+    const wet =
+        /^execute in minecraft:overworld if block (-?\d+) -?\d+ (-?\d+) minecraft:water$/.exec(
+            line
+        );
     if (wet) return world.sea && !onIsland(wet[1]!, wet[2]!) ? "Test passed" : "Test failed";
     if (line.startsWith("execute in minecraft:overworld unless block")) {
         const column = /unless block (-?\d+) -?\d+ (-?\d+) /.exec(line);
@@ -1140,7 +1144,8 @@ function answer(sent: string): string {
         world.path = [];
         return "";
     }
-    const pathStep = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_path"/.exec(line);
+    const pathStep =
+        /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_path"/.exec(line);
     if (pathStep) {
         world.path.push([Number(pathStep[1]), Number(pathStep[2])]);
         return "Summoned new Armor Stand";
@@ -1148,7 +1153,10 @@ function answer(sent: string): string {
     if (line.startsWith("execute as @e[tag=pe_path]")) {
         const wet = line.includes("minecraft:water");
         return world.path
-            .filter(([x, z]) => !wet || (world.sea && !onIsland(String(Math.floor(x)), String(Math.floor(z)))))
+            .filter(
+                ([x, z]) =>
+                    !wet || (world.sea && !onIsland(String(Math.floor(x)), String(Math.floor(z))))
+            )
             .map(([x, z]) => `Armor Stand has the following entity data: [${x}d, 70.0d, ${z}d]`)
             .join("\n");
     }
@@ -1157,7 +1165,8 @@ function answer(sent: string): string {
         world.samples = [];
         return "";
     }
-    const sample = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_samp"/.exec(line);
+    const sample =
+        /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_samp"/.exec(line);
     if (sample) {
         if (world.allWater) return "";
         world.samples.push([Number(sample[1]), Number(sample[2])]);
@@ -1171,7 +1180,8 @@ function answer(sent: string): string {
         const wet = world.samples.filter(
             ([x, z]) => world.sea && !onIsland(String(Math.floor(x)), String(Math.floor(z)))
         );
-        if (line === "execute as @e[tag=pe_samp] run data get entity @s Pos") return listed(world.samples);
+        if (line === "execute as @e[tag=pe_samp] run data get entity @s Pos")
+            return listed(world.samples);
         if (line.includes("if block ~ ~-1 ~ minecraft:water")) return listed(wet);
         // A tree, as every other block test answers: whatever the protected-area switch says.
         if (line.includes("if block ~ ~-1 ~ #minecraft:"))
@@ -1237,7 +1247,8 @@ function answer(sent: string): string {
     if (line.includes("spreadplayers") && line.includes("pe_mark"))
         return `Spread 1 entity around ${world.markAt[0]}.5, ${world.markAt[1]}.5 with an average distance of 0 blocks apart`;
     // Over open water everywhere the heightmap finds no ground: nothing was summoned.
-    if (line.startsWith("data get entity @e[tag=pe_mark") && world.allWater) return "No entity was found";
+    if (line.startsWith("data get entity @e[tag=pe_mark") && world.allWater)
+        return "No entity was found";
     if (line.startsWith("data get entity @e[tag=pe_mark"))
         return `Armor Stand has the following entity data: [${world.markAt[0]}.5d, 70.0d, ${world.markAt[1]}.5d]`;
     if (line.includes("if data block") && line.includes("LootTable")) {
@@ -2474,7 +2485,11 @@ describe("a world boss", () => {
         expect(
             world.sent
                 .slice(since)
-                .some((line) => line.startsWith("title Ana actionbar") && visible(line).includes("The Warlord:"))
+                .some(
+                    (line) =>
+                        line.startsWith("title Ana actionbar") &&
+                        visible(line).includes("The Warlord:")
+                )
         ).toBe(false);
     });
 
@@ -3806,7 +3821,8 @@ describe("a treasure hunt", () => {
         // One line saying how many there are - no clues - a column of light over
         // every one from the start, and the way in every action bar.
         const told = world.sent.filter(
-            (line) => line.startsWith("tellraw @a") && visible(line).includes("treasures are hidden")
+            (line) =>
+                line.startsWith("tellraw @a") && visible(line).includes("treasures are hidden")
         );
         expect(told).toHaveLength(1);
         expect(visible(told[0]!)).toContain("3 treasures are hidden");
@@ -4116,7 +4132,11 @@ describe("a gathering", () => {
         expect(first.phase).toBe("running");
         expect(catalog.GATHER_MATERIALS).toContain(first.material);
         expect(first.round).toBe(0);
-        expect(world.sent.some((line) => line.startsWith("title @a title") && visible(line).includes("Round 1/3"))).toBe(true);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && visible(line).includes("Round 1/3")
+            )
+        ).toBe(true);
         // Two minutes on: the round banked, and the next begun with another material.
         const banked = world.sent.length;
         await play(2 * 60_000 + 2_100);
@@ -4131,11 +4151,17 @@ describe("a gathering", () => {
         expect(bank).toBeGreaterThan(-1);
         // Banked before the next round's counts are made afresh.
         expect(bank).toBeLessThan(since.indexOf("scoreboard objectives remove pe_prog"));
-        expect(since.some((line) => line.startsWith("title @a title") && visible(line).includes("Round 2/3"))).toBe(true);
+        expect(
+            since.some(
+                (line) => line.startsWith("title @a title") && visible(line).includes("Round 2/3")
+            )
+        ).toBe(true);
         // The bar is the round's own clock.
         expect(
             since.some(
-                (line) => line.startsWith("bossbar set polaris:event name") && visible(line).includes("Round 2/3")
+                (line) =>
+                    line.startsWith("bossbar set polaris:event name") &&
+                    visible(line).includes("Round 2/3")
             )
         ).toBe(true);
         await play(4 * 60_000 + 5_000);
@@ -4692,7 +4718,9 @@ describe("a meteor shower", () => {
         // Begun at once, the column is chosen on the first tick after.
         await play(2_100);
         const first = world.sent
-            .map((line) => /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line))
+            .map((line) =>
+                /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line)
+            )
             .find((match) => match !== null);
         expect(first).toBeTruthy();
         expect(Math.hypot(Number(first![1]), Number(first![2]))).toBeGreaterThanOrEqual(48);

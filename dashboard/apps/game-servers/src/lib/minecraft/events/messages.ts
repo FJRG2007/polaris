@@ -8,7 +8,13 @@
  */
 
 import type { Heading } from "./commands";
-import { KIND_NAMES, type EventKind, type GatherMaterial, type Language, type RareCatch } from "./catalog";
+import {
+    KIND_NAMES,
+    type EventKind,
+    type GatherMaterial,
+    type Language,
+    type RareCatch
+} from "./catalog";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -40,7 +46,6 @@ export function mark(value: string | number, back: string): string {
 }
 
 const { bad: BAD, reason: REASON, good: GOOD, warn: WARN, info: INFO } = PALETTE;
-
 
 /** What to do, in one line, said when the countdown starts and again at the start. */
 const RULES: Readonly<Record<EventKind, Text>> = {
@@ -274,7 +279,8 @@ export function endedTitle(language: Language): string {
 export function cancelledLine(name: string, language: Language, reason?: string): string {
     const why = reason ? cancelReason(reason, language) : null;
     const event = mark(name, BAD);
-    if (language === "es") return `${BAD}${event} se ha cancelado${why ? `: ${REASON}${why}` : "."}`;
+    if (language === "es")
+        return `${BAD}${event} se ha cancelado${why ? `: ${REASON}${why}` : "."}`;
     return `${BAD}${event} was called off${why ? `: ${REASON}${why}` : "."}`;
 }
 
@@ -652,7 +658,9 @@ export function bossName(boss: string, language: Language): string {
 // ------------------------------------------------------------------ treasure hunt
 
 export function huntHiding(language: Language): string {
-    return language === "es" ? `${INFO}Escondiendo los tesoros...` : `${INFO}Hiding the treasures...`;
+    return language === "es"
+        ? `${INFO}Escondiendo los tesoros...`
+        : `${INFO}Hiding the treasures...`;
 }
 
 /** Once every chest is down: how many, and how to find them - the one line the
@@ -814,7 +822,9 @@ export function catchWon(name: string, language: Language): string {
 }
 
 export function catchMissed(language: Language): string {
-    return language === "es" ? `${INFO}Nadie lo pescó a tiempo.` : `${INFO}Nobody fished it up in time.`;
+    return language === "es"
+        ? `${INFO}Nadie lo pescó a tiempo.`
+        : `${INFO}Nobody fished it up in time.`;
 }
 
 // ------------------------------------------------------------------ experience boost
@@ -853,14 +863,20 @@ export function joinButtonsText(language: Language): {
         ? {
               lead: `${WARN}Pulsa para participar (o escribe ${mark("unirse", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
-              join: { label: "[Unirse]", hover: "Te llevamos al empezar y te devolvemos a donde estabas" },
+              join: {
+                  label: "[Unirse]",
+                  hover: "Te llevamos al empezar y te devolvemos a donde estabas"
+              },
               // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Salir]", hover: "Retirarte del evento" }
           }
         : {
               lead: `${WARN}Click to take part (or type ${mark("join", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
-              join: { label: "[Join]", hover: "You are taken there when it starts and brought back after" },
+              join: {
+                  label: "[Join]",
+                  hover: "You are taken there when it starts and brought back after"
+              },
               // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Leave]", hover: "Drop out of the event" }
           };
@@ -908,7 +924,9 @@ export function notEnoughJoined(joined: number, needed: number, language: Langua
 }
 
 export function backWhereYouWere(language: Language): string {
-    return language === "es" ? `${INFO}Has vuelto a donde estabas.` : `${INFO}You are back where you were.`;
+    return language === "es"
+        ? `${INFO}Has vuelto a donde estabas.`
+        : `${INFO}You are back where you were.`;
 }
 
 export function goTitle(language: Language): string {
@@ -1065,7 +1083,8 @@ export function duelStatus(side: number, eliminations: number, language: Languag
 
 export function duelDown(name: string, by: string | null, language: Language): string {
     const who = mark(name, BAD);
-    if (language === "es") return by ? `${BAD}${who} cae ante ${REASON}${by}` : `${BAD}${who} ha caído`;
+    if (language === "es")
+        return by ? `${BAD}${who} cae ante ${REASON}${by}` : `${BAD}${who} ha caído`;
     return by ? `${BAD}${who} is out - ${REASON}${by}` : `${BAD}${who} is out`;
 }
 
@@ -1083,7 +1102,9 @@ export function themeTitle(language: Language): string {
 }
 
 export function themeLine(theme: string, language: Language): string {
-    return language === "es" ? `${WARN}Tema: ${mark(theme, WARN)}` : `${WARN}Theme: ${mark(theme, WARN)}`;
+    return language === "es"
+        ? `${WARN}Tema: ${mark(theme, WARN)}`
+        : `${WARN}Theme: ${mark(theme, WARN)}`;
 }
 
 export function plotBar(
@@ -1193,5 +1214,7 @@ export function voteNoPlot(plot: number, language: Language): string {
 }
 
 export function themeWas(theme: string, language: Language): string {
-    return language === "es" ? `${INFO}El tema era ${mark(theme, INFO)}` : `${INFO}The theme was ${mark(theme, INFO)}`;
+    return language === "es"
+        ? `${INFO}El tema era ${mark(theme, INFO)}`
+        : `${INFO}The theme was ${mark(theme, INFO)}`;
 }

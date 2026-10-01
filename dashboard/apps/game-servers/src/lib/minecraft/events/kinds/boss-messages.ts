@@ -83,7 +83,9 @@ export function damageRanking(
     entries: readonly { name: string; damage: number }[],
     language: Language
 ): string {
-    const list = entries.map((one, index) => `&f${index + 1}. &b${one.name} &f${one.damage}`).join("&7, ");
+    const list = entries
+        .map((one, index) => `&f${index + 1}. &b${one.name} &f${one.damage}`)
+        .join("&7, ");
     return language === "es" ? `&7Daño hecho: ${list}` : `&7Damage dealt: ${list}`;
 }
 

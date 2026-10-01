@@ -141,7 +141,9 @@ describe("the Events tab", () => {
         fireEvent.click(screen.getByLabelText("What Fishing contest is"));
         expect(screen.getByText(/Most catches with a fishing rod wins/)).toBeTruthy();
         expect(screen.getByText(/Ranked from 3 catches/)).toBeTruthy();
-        expect(screen.getByText(/Prizes - 1st: 1 diamond, 8 experience bottle, 3 levels/)).toBeTruthy();
+        expect(
+            screen.getByText(/Prizes - 1st: 1 diamond, 8 experience bottle, 3 levels/)
+        ).toBeTruthy();
     });
 
     it("lists every prize of an event on its row, whole in the tooltip", async () => {

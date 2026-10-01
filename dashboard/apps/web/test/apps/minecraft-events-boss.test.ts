@@ -563,8 +563,10 @@ describe("the prizes", () => {
             ) + reward.levels;
         const boss = catalog.newPreset("world-boss", "b");
         const epic = worth(
-            bossScaled(boss.rewards, (boss.options as catalog.EventOptions<"world-boss">).difficulty)
-                .first
+            bossScaled(
+                boss.rewards,
+                (boss.options as catalog.EventOptions<"world-boss">).difficulty
+            ).first
         );
         for (const kind of catalog.EVENT_KINDS) {
             if (kind === "world-boss") continue;
@@ -685,7 +687,10 @@ describe("finding the way up", () => {
 });
 
 describe("who wins a boss", () => {
-    const fought = (options: Partial<catalog.EventOptions<"world-boss">>, decidedBy: string | null) =>
+    const fought = (
+        options: Partial<catalog.EventOptions<"world-boss">>,
+        decidedBy: string | null
+    ) =>
         ({
             preset: {
                 ...catalog.newPreset("world-boss", "b"),

@@ -1525,7 +1525,14 @@ async function findPlace(
             // Nothing further out would do - the players live on an island, say:
             // an event that changes nothing and brings nothing hostile comes in
             // closer, halving the distance each try, and nearer a home.
-            const look = commands.searchReach(distance, radius, loop.run.placeTries, how.nearHome === true, clearance, NEAR_AFTER);
+            const look = commands.searchReach(
+                distance,
+                radius,
+                loop.run.placeTries,
+                how.nearHome === true,
+                clearance,
+                NEAR_AFTER
+            );
             point = commands.clearPoint(
                 center,
                 look.reach,
@@ -1654,7 +1661,9 @@ async function siteIsOpen(
     try {
         const samples = commands.siteSamples(center, radius);
         const judged = await judgeAtOnce(loop, server, center, samples, surface);
-        return judged ? judged.refused : await judgeOneByOne(loop, server, center, samples, surface);
+        return judged
+            ? judged.refused
+            : await judgeOneByOne(loop, server, center, samples, surface);
     } finally {
         // The area let go, and the center's own chunk held again as before.
         await server.sayAll([
@@ -1699,7 +1708,8 @@ async function judgeAtOnce(
     if (down.length === 0) return null;
     const key = (one: { x: number; z: number }) => `${one.x},${one.z}`;
     const at = new Map(down.map((one) => [key(one), one]));
-    const read = async (line: string) => new Set(commands.samplesIn(await server.say([line])).map(key));
+    const read = async (line: string) =>
+        new Set(commands.samplesIn(await server.say([line])).map(key));
     const built = await builtAtOnce(loop, server);
     if (built === null) return null;
     const water =
@@ -1707,7 +1717,9 @@ async function judgeAtOnce(
             ? await read(commands.SAMPLES_ON_WATER)
             : new Set<string>();
     const trees = new Set<string>();
-    if (built.size > 0) for (const line of commands.SAMPLES_ON_TREES) for (const one of await read(line)) trees.add(one);
+    if (built.size > 0)
+        for (const line of commands.SAMPLES_ON_TREES)
+            for (const one of await read(line)) trees.add(one);
     const columns = samples.map((sample): Column => {
         const ground = at.get(key(sample));
         // No marker: water or lava, where the heightmap is no ground at all.
@@ -1912,7 +1924,9 @@ async function walkStart(
     place: catalog.EventPlace
 ): Promise<{ x: number; z: number } | undefined> {
     if (place.mode === "fixed") return { x: place.x, z: place.z };
-    return hunt.centerOf(commands.readWhere(await server.say([commands.IN_OVERWORLD]))) ?? undefined;
+    return (
+        hunt.centerOf(commands.readWhere(await server.say([commands.IN_OVERWORLD]))) ?? undefined
+    );
 }
 
 /** Where to look from: the fixed point, or one of the players in the Overworld. */
@@ -2131,7 +2145,9 @@ async function treasureHunt(
     // Said once, when every chest is down: nothing more until one is opened.
     if (loop.run.hidden && loop.run.reveals < 1) {
         lines.push(
-            commands.say(messages.tag(language) + messages.huntStart(loop.run.chests.length, language)),
+            commands.say(
+                messages.tag(language) + messages.huntStart(loop.run.chests.length, language)
+            ),
             commands.sound(commands.SOUNDS.tick)
         );
         loop.run = { ...loop.run, reveals: 1 };
@@ -2237,15 +2253,16 @@ async function hideTreasure(
         let placed = false;
         // Air or a small wild plant first, so a chest that was already there is
         // never counted as one of the hunt's - and never taken away at the end.
-        const gap =
-            loop.run.placeTries >= NEAR_AFTER ? hunt.CHEST_GAP_NEAR : hunt.CHEST_GAP;
+        const gap = loop.run.placeTries >= NEAR_AFTER ? hunt.CHEST_GAP_NEAR : hunt.CHEST_GAP;
         const apart = !hunt.tooClose(found, loop.run.chests, gap);
         let open = false;
         let was: hunt.Plant | null = null;
         if (apart) {
             open = commands.readTest(await server.say([hunt.airAt(found)])) === "passed";
             for (const plant of open ? [] : hunt.PLANTS) {
-                if (commands.readTest(await server.say([hunt.plantAt(found, plant)])) === "passed") {
+                if (
+                    commands.readTest(await server.say([hunt.plantAt(found, plant)])) === "passed"
+                ) {
                     was = plant;
                     open = true;
                     break;
@@ -2824,8 +2841,11 @@ async function meteorShower(
             meteor.blocks.length > 0 &&
             players.some(
                 (one) =>
-                    Math.hypot(one.x - (meteor.x + 0.5), one.y - meteor.y, one.z - (meteor.z + 0.5)) <=
-                    meteors.NEAR
+                    Math.hypot(
+                        one.x - (meteor.x + 0.5),
+                        one.y - meteor.y,
+                        one.z - (meteor.z + 0.5)
+                    ) <= meteors.NEAR
             );
         const whole = meteors.allOurs(meteor);
         if (!near || (whole && commands.readTest(await server.say([whole])) === "passed")) {

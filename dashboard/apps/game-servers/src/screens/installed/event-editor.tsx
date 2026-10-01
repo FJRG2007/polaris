@@ -977,29 +977,29 @@ export function EventEditor({
                         {draft.kind !== "trivia" &&
                             draft.kind !== "waves" &&
                             draft.kind !== "gathering" && (
-                            <Field
-                                label={
-                                    draft.kind === "build-battle"
-                                        ? t("editor.minutesToBuild")
-                                        : t("editor.minutes")
-                                }
-                                problem={problemAt(issues, "minutes")}
-                                hint={t("editor.range", {
-                                    min: catalog.DURATION.min,
-                                    max: catalog.DURATION.max
-                                })}
-                            >
-                                <Input
-                                    type="number"
-                                    min={catalog.DURATION.min}
-                                    max={catalog.DURATION.max}
-                                    value={Number.isFinite(draft.minutes) ? draft.minutes : ""}
-                                    onChange={(event) =>
-                                        change({ minutes: numberOf(event.target.value) })
+                                <Field
+                                    label={
+                                        draft.kind === "build-battle"
+                                            ? t("editor.minutesToBuild")
+                                            : t("editor.minutes")
                                     }
-                                />
-                            </Field>
-                        )}
+                                    problem={problemAt(issues, "minutes")}
+                                    hint={t("editor.range", {
+                                        min: catalog.DURATION.min,
+                                        max: catalog.DURATION.max
+                                    })}
+                                >
+                                    <Input
+                                        type="number"
+                                        min={catalog.DURATION.min}
+                                        max={catalog.DURATION.max}
+                                        value={Number.isFinite(draft.minutes) ? draft.minutes : ""}
+                                        onChange={(event) =>
+                                            change({ minutes: numberOf(event.target.value) })
+                                        }
+                                    />
+                                </Field>
+                            )}
                     </div>
 
                     {catalog.hasMinScore(draft) && (

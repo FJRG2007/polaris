@@ -787,7 +787,10 @@ export function actionbarToFighters(arena: boolean, line: string): string {
  * from the count the side panel shows (`SUM`, in health points): no answer to
  * wait for. `label` is what goes before it, in each language.
  */
-export function damageBarLine(arena: boolean, label: Readonly<Record<catalog.Language, string>>): string {
+export function damageBarLine(
+    arena: boolean,
+    label: Readonly<Record<catalog.Language, string>>
+): string {
     const json = (words: string) =>
         asciiJson(
             JSON.stringify([

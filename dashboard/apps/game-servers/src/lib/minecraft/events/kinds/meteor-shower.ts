@@ -46,7 +46,6 @@ export const PLACE_REACH = 20;
 /** Within this of a meteor a player is close enough to have mined some of it. */
 export const NEAR = 12;
 
-
 /** Each mix, and how often each of its ores comes up. */
 export const ORE_MIX: Readonly<Record<MeteorOres, readonly (readonly [string, number])[]>> = {
     common: [

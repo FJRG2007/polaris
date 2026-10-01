@@ -827,7 +827,14 @@ function takes(lines: readonly string[]): string[] {
 }
 
 describe("a treasure hunt", () => {
-    const chest = (x: number, z: number, opened = false) => ({ x, y: 70, z, opened, by: null, was: null });
+    const chest = (x: number, z: number, opened = false) => ({
+        x,
+        y: 70,
+        z,
+        opened,
+        by: null,
+        was: null
+    });
 
     it("asks whether a spot is air before anything goes there", () => {
         expect(hunt.airAt({ x: 10, y: 70, z: -4 })).toBe(
@@ -935,9 +942,9 @@ describe("a treasure hunt", () => {
             was: "air run kill @a"
         });
         expect(odd.join("\n")).not.toContain("kill");
-        expect(hunt.huntCleanup([{ x: 1, y: 70, z: 2, opened: false, by: null, was: "fern" }], [])[0]).toBe(
-            back[0]
-        );
+        expect(
+            hunt.huntCleanup([{ x: 1, y: 70, z: 2, opened: false, by: null, was: "fern" }], [])[0]
+        ).toBe(back[0]);
     });
 
     it("keeps its chests apart and spreads them out", () => {
@@ -1266,7 +1273,9 @@ describe("a horde defense", () => {
         );
         // The plain bow before the enchanted one, each era's spelling of it after.
         const bows = last.filter((line) =>
-            line.startsWith("item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand")
+            line.startsWith(
+                "item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand"
+            )
         );
         expect(bows[0]).toContain("with minecraft:bow");
         expect(bows).toContain(
@@ -1305,7 +1314,9 @@ describe("a horde defense", () => {
         expect(chicken).toContain('"pe_wmount"');
         expect(chicken).toContain("EggLayTime:1000000");
         expect(chicken).toContain('DeathLootTable:"minecraft:empty"');
-        expect(chicken).toContain('{id:"minecraft:zombie",Tags:["pe_mob","pe_wnew","pe_wride","pe_wrider"]');
+        expect(chicken).toContain(
+            '{id:"minecraft:zombie",Tags:["pe_mob","pe_wnew","pe_wride","pe_wrider"]'
+        );
         expect(chicken).toContain("IsBaby:1b");
         // A spider is one of the wave, and counts; a chicken or a horse is only a mount.
         const spider = jockeys.find((line) => line.includes("summon minecraft:spider"));
@@ -1313,7 +1324,9 @@ describe("a horde defense", () => {
         expect(waves.WAVE_ALIVE).toBe("execute if entity @e[tag=pe_mob,tag=!pe_wmount]");
         expect(waves.MOUNTS_GONE).toBe("kill @e[tag=pe_wmount]");
         // Glowing and the wave's strength go to the fighters, never a mount.
-        expect(lines).toContain("effect give @e[tag=pe_wnew,tag=!pe_wmount] minecraft:glowing 600 0 true");
+        expect(lines).toContain(
+            "effect give @e[tag=pe_wnew,tag=!pe_wmount] minecraft:glowing 600 0 true"
+        );
         expect(lines.at(-1)).toBe("tag @e[tag=pe_wnew] remove pe_wnew");
         // Every mount is the event's, and goes with the rest at the end.
         expect(waves.wavesCleanup("classic")[0]).toBe("kill @e[tag=pe_mob]");
@@ -1549,7 +1562,10 @@ describe("a meteor shower", () => {
         );
         expect(meteors.allOurs({ ...meteor, blocks: [] })).toBeNull();
         expect(
-            meteors.allOurs({ ...meteor, blocks: [{ x: 1, y: 64, z: 1, block: "stone run kill @a" }] })
+            meteors.allOurs({
+                ...meteor,
+                blocks: [{ x: 1, y: 64, z: 1, block: "stone run kill @a" }]
+            })
         ).toBeNull();
     });
 
@@ -2331,7 +2347,12 @@ describe("arming what an event summons", () => {
 
     it("names the weapon of every mob that needs one, and nothing for the rest", () => {
         expect(commands.armLines("tag=x", ["zombie", "spider", "creeper"])).toEqual([]);
-        const archers = commands.armLines("tag=x", ["stray", "bogged", "pillager", "wither_skeleton"]);
+        const archers = commands.armLines("tag=x", [
+            "stray",
+            "bogged",
+            "pillager",
+            "wither_skeleton"
+        ]);
         expect(archers).toContain(
             "item replace entity @e[tag=x,type=minecraft:stray] weapon.mainhand with minecraft:bow"
         );
@@ -2375,7 +2396,9 @@ describe("each kind's defaults", () => {
         ]);
         expect(catalog.newPreset("happy-hour", "h").rewards.first).toEqual(catalog.NO_REWARD);
         for (const kind of catalog.EVENT_KINDS)
-            expect(catalog.presetSchema.safeParse(catalog.newPreset(kind, kind)).success).toBe(true);
+            expect(catalog.presetSchema.safeParse(catalog.newPreset(kind, kind)).success).toBe(
+                true
+            );
     });
 
     it("lasts what fits each kind", () => {
@@ -2429,7 +2452,9 @@ describe("a gathering in rounds", () => {
             used.push(gather.drawMaterial({ material: "random" }, () => 0, used));
         expect(new Set(used).size).toBe(catalog.GATHER_MATERIALS.length);
         // Every one used: any again.
-        expect(catalog.GATHER_MATERIALS).toContain(gather.drawMaterial({ material: "random" }, () => 0, used));
+        expect(catalog.GATHER_MATERIALS).toContain(
+            gather.drawMaterial({ material: "random" }, () => 0, used)
+        );
         expect(gather.drawMaterial({ material: "kelp" }, () => 0, ["kelp"])).toBe("kelp");
     });
 
@@ -2452,7 +2477,8 @@ describe("a gathering in rounds", () => {
             "execute as @a run scoreboard players operation @s pe_gtot += @s pe_gpts"
         );
         // A minute of any material is worth about the same.
-        for (const material of catalog.GATHER_MATERIALS) expect(gather.WORTH[material]).toBeGreaterThan(0);
+        for (const material of catalog.GATHER_MATERIALS)
+            expect(gather.WORTH[material]).toBeGreaterThan(0);
         expect(gather.WORTH.iron_ingot).toBeGreaterThan(gather.WORTH.logs);
         expect(gather.WORTH.logs).toBeGreaterThan(gather.WORTH.cobblestone);
     });
@@ -2500,7 +2526,9 @@ describe("a place that can be walked to", () => {
         const lines = commands.pathLines({ x: 0, z: 0 }, { x: 30, z: 0 });
         expect(lines[0]).toBe("kill @e[tag=pe_path]");
         expect(lines).toHaveLength(1 + 6);
-        expect(lines.at(-1)).toContain("positioned 30.5 0 0.5 positioned over motion_blocking_no_leaves run summon");
+        expect(lines.at(-1)).toContain(
+            "positioned 30.5 0 0.5 positioned over motion_blocking_no_leaves run summon"
+        );
         expect(lines.at(-1)).toContain('"pe_path"');
     });
 });
