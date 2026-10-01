@@ -58,7 +58,7 @@
     },
     "validation": {
         "allDayMismatch": "All-day events take dates; timed events take times.",
-        "colorForm": "Use a colour like #1a73e8.",
+        "colorForm": "Use a color like #1a73e8.",
         "dateForm": "Use the form YYYY-MM-DD.",
         "dateTimeForm": "Use the form YYYY-MM-DDTHH:mm.",
         "endBeforeStart": "The end is before the start.",

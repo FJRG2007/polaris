@@ -30,7 +30,7 @@
     },
     "calendarDialog": {
         "allDayReminders": "All-day events",
-        "color": "Colour",
+        "color": "Color",
         "components": {
             "VEVENT": "Events",
             "VTODO": "Tasks",
@@ -38,7 +38,7 @@
         },
         "create": "Create",
         "created": "{name} created",
-        "customColor": "Other colour",
+        "customColor": "Other color",
         "defaultReminders": "Reminders for new events",
         "description": "Description",
         "edit": "Edit calendar",
@@ -49,11 +49,11 @@
         "neverBusy": "Never show me as busy",
         "new": "Create a calendar",
         "newWithTasks": "New calendar with tasks",
-        "sharedHint": "{owner} shares this calendar with you. Only the colour you see it in changes here.",
+        "sharedHint": "{owner} shares this calendar with you. Only the color you see it in changes here.",
         "timedReminders": "Timed events",
         "timezone": "Time zone",
         "timezoneHint": "Used for events without a zone of their own.",
-        "yourColor": "Your colour"
+        "yourColor": "Your color"
     },
     "categories": {
         "anniversary": "Anniversary",
@@ -87,7 +87,7 @@
         "attachments": "Attachments",
         "attendees": "People",
         "calendar": "Calendar",
-        "calendarColor": "The calendar's colour",
+        "calendarColor": "The calendar's color",
         "categories": "Categories",
         "checkField": "Check this field.",
         "chooseCalendar": "Choose a calendar",
@@ -96,7 +96,7 @@
             "PRIVATE": "Private",
             "PUBLIC": "Public"
         },
-        "color": "Colour",
+        "color": "Color",
         "conference": "Meeting link",
         "conflict": "This event changed on its provider while you were editing. Their version is shown; yours was kept aside.",
         "copyLink": "Copy the link",
@@ -159,7 +159,7 @@
         "starts": "Starts",
         "status": "Status",
         "statusOption": {
-            "CANCELLED": "Cancelled",
+            "CANCELLED": "Canceled",
             "CONFIRMED": "Confirmed",
             "TENTATIVE": "Tentative",
             "none": "Not set"
@@ -183,7 +183,7 @@
     },
     "grid": {
         "allDay": "All day",
-        "cancelled": "cancelled",
+        "cancelled": "canceled",
         "declined": "declined",
         "inCalendar": "in {name}",
         "loadFailed": "The events could not be loaded.",
@@ -225,7 +225,7 @@
     },
     "legend": {
         "busyOnly": "Only the time is shared with you",
-        "cancelled": "Cancelled",
+        "cancelled": "Canceled",
         "confirmed": "Busy, confirmed",
         "declined": "You declined",
         "free": "Shows you as free",
@@ -483,8 +483,8 @@
         "add": "Add a calendar",
         "addElsewhere": "From elsewhere",
         "calendars": "Calendars",
-        "color": "Colour",
-        "colorFailed": "The colour was not changed",
+        "color": "Color",
+        "colorFailed": "The color was not changed",
         "countAsBusy": "Show me as busy",
         "defaultReminders": "Default reminders",
         "delete": "Delete",
@@ -494,7 +494,7 @@
         "deleted": "{name} moved to the trash",
         "dragHint": "Drag one onto the calendar to give it a date.",
         "edit": "Edit",
-        "editColor": "Change colour",
+        "editColor": "Change color",
         "export": "Download .ics",
         "hide": "Hide {name}",
         "holdsTasks": "Holds tasks",
@@ -554,7 +554,7 @@
         "saved": "Task saved",
         "status": "Status",
         "statusOption": {
-            "CANCELLED": "Cancelled",
+            "CANCELLED": "Canceled",
             "COMPLETED": "Done",
             "IN-PROCESS": "In progress",
             "NEEDS-ACTION": "Not started"

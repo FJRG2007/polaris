@@ -48,12 +48,12 @@
         "save": "Save"
     },
     "invitations": {
-        "cancelledSubject": "Cancelled: {title}",
-        "cancelledTitle": "Cancelled: {title}",
+        "cancelledSubject": "Canceled: {title}",
+        "cancelledTitle": "Canceled: {title}",
         "invitedSubject": "Invitation: {title} - {when}",
         "invitedTitle": "Invitation: {title}",
         "mailAnswer": "Answer here:",
-        "mailCancelled": "{organizer} cancelled this event.",
+        "mailCancelled": "{organizer} canceled this event.",
         "mailInvited": "{organizer} invited you to this event.",
         "reply": {
             "accepted": "{who} accepted {title}",
