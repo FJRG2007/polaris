@@ -756,7 +756,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 maxLength: 1000
             }
         ],
-        kinds: ["switch", "outlet", "light", "lock", "sensor", "climate"],
+        kinds: ["switch", "outlet", "light", "lock", "sensor", "climate", "air"],
         search: [
             "home assistant",
             "hass",

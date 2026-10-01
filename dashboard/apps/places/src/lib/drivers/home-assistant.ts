@@ -5,9 +5,11 @@
  * to - Zigbee, Z-Wave, a hundred cloud integrations - arrives through its own
  * API, so a house that has it needs nothing else here. The same domains are
  * taken as from a broker (`mqtt-discovery`): switches, lights, locks and the two
- * kinds of sensor - and air conditioners, from `climate.*`
- * (`home-assistant-climate.ts`). Covers and media players are left out until
- * Polaris has an honest control for them.
+ * kinds of sensor - air conditioners, from `climate.*`
+ * (`home-assistant-climate.ts`), and air purifiers and humidifiers, from `fan.*`
+ * and `humidifier.*` with the sensors on the same device
+ * (`home-assistant-air.ts`). Covers, media players and plain fans are left out
+ * until Polaris has an honest control for them.
  *
  * An entity id is the row's id, because it is what Home Assistant itself keeps
  * stable across renames and restarts.
@@ -17,8 +19,15 @@
 
 import { HomeError } from "../home-error";
 import * as ha from "../integrations/home-assistant-api";
-import { BINARY_WORDS, climateCommandOf, type DeviceKind } from "../device-kinds";
+import {
+    BINARY_WORDS,
+    MEASURE_UNITS,
+    airHeadline,
+    climateCommandOf,
+    type DeviceKind
+} from "../device-kinds";
 import { haClimateService, haClimateSettings } from "./home-assistant-climate";
+import { haAirService, haAirSettings, haAirUnits, type HaAirUnit } from "./home-assistant-air";
 import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
 export const HOME_ASSISTANT = "home-assistant";
@@ -131,6 +140,43 @@ function toSnapshot(entity: ha.HomeAssistantState, unit: "C" | "F" = "C"): Devic
     };
 }
 
+/** The domains a purifier or humidifier is made of. */
+const AIR_DOMAINS = ["fan", "humidifier"];
+
+/** The purifiers and humidifiers in a house. Asks Home Assistant which entities
+ *  share a device only when there is a fan or a humidifier to ask about. */
+async function airUnitsOf(
+    home: ha.HomeAssistant,
+    states: readonly ha.HomeAssistantState[]
+): Promise<HaAirUnit[]> {
+    if (!states.some((entity) => AIR_DOMAINS.includes(domainOf(entity.entity_id)))) return [];
+    const devices = await ha.homeAssistantDevices(home, AIR_DOMAINS).catch(() => new Map());
+    return haAirUnits(states, devices);
+}
+
+/** A purifier, as a row: its power, its settings, and its headline figure. */
+function airSnapshot(unit: HaAirUnit): DeviceSnapshot {
+    const entity = unit.primary;
+    const online = entity.state !== "unavailable";
+    const air = online ? haAirSettings(unit) : null;
+    const headline = air ? airHeadline(air) : null;
+    return {
+        externalId: entity.entity_id,
+        kind: "air",
+        name: text(entity.attributes.friendly_name) || entity.entity_id,
+        model: null,
+        firmware: null,
+        state: !online ? "unknown" : entity.state === "on" ? "on" : entity.state === "off" ? "off" : "unknown",
+        doorState: "none",
+        batteryPercent: null,
+        batteryCritical: false,
+        online,
+        value: headline?.value ?? null,
+        unit: headline ? MEASURE_UNITS[headline.measure] || null : null,
+        air
+    };
+}
+
 /** The service an action is, per domain. */
 function serviceFor(domain: string, action: string): string | null {
     if (domain === "switch" || domain === "light") {
@@ -157,7 +203,11 @@ export const homeAssistantDriver: DeviceDriver = {
         const home = homeOf(credentials);
         await ha.checkHomeAssistant(home);
         const states = await ha.homeAssistantStates(home);
-        if (!states.some((entity) => kindOf(entity) !== null)) {
+        if (
+            !states.some(
+                (entity) => kindOf(entity) !== null || AIR_DOMAINS.includes(domainOf(entity.entity_id))
+            )
+        ) {
             throw new DriverError(
                 "Home Assistant has no switches, lights, locks or sensors for Polaris to show.",
                 "refused"
@@ -172,10 +222,14 @@ export const homeAssistantDriver: DeviceDriver = {
         const unit = states.some((entity) => domainOf(entity.entity_id) === "climate")
             ? await ha.homeAssistantTemperatureUnit(home)
             : "C";
-        return states.flatMap((entity) => {
-            const snapshot = toSnapshot(entity, unit);
-            return snapshot ? [snapshot] : [];
-        });
+        const air = (await airUnitsOf(home, states)).map(airSnapshot);
+        return [
+            ...states.flatMap((entity) => {
+                const snapshot = toSnapshot(entity, unit);
+                return snapshot ? [snapshot] : [];
+            }),
+            ...air
+        ];
     },
 
     async act(credentials, device, action, command) {
@@ -188,6 +242,17 @@ export const homeAssistantDriver: DeviceDriver = {
             if (!entity) throw new HomeError("That device is not here");
             const { service, data } = haClimateService(entity, action, climateCommandOf(command));
             await ha.callService(home, domain, service, device.externalId, data);
+            return;
+        }
+        if (AIR_DOMAINS.includes(domain)) {
+            // Read now, with the entities beside it: a child lock is a switch
+            // of its own, and the humidity is the humidifier's.
+            const home = homeOf(credentials);
+            const units = await airUnitsOf(home, await ha.homeAssistantStates(home));
+            const unit = units.find((entry) => entry.primary.entity_id === device.externalId);
+            if (!unit) throw new HomeError("That device is not here");
+            const call = haAirService(unit, action, command);
+            await ha.callService(home, call.domain, call.service, call.entityId, call.data);
             return;
         }
         const service = serviceFor(domain, action);

@@ -1,11 +1,11 @@
 /**
  * Home Assistant's REST API, as much of it as Places needs.
  *
- * Three calls, from Home Assistant's developer documentation
+ * Four calls, from Home Assistant's developer documentation
  * (developers.home-assistant.io/docs/api/rest): `GET /api/` to prove the token,
- * `GET /api/states` for everything at once, and
- * `POST /api/services/<domain>/<service>` to do something. A long-lived access
- * token in a bearer header opens all three.
+ * `GET /api/states` for everything at once, `POST /api/template` for which
+ * entities share a device, and `POST /api/services/<domain>/<service>` to do
+ * something. A long-lived access token in a bearer header opens all four.
  *
  * An install on the LAN is plain HTTP; one behind a domain has a real
  * certificate, which is checked against the system's authorities like any other
@@ -129,6 +129,45 @@ export async function homeAssistantTemperatureUnit(home: HomeAssistant): Promise
         parsed.data.unit_system.temperature.includes("F")
         ? "F"
         : "C";
+}
+
+/**
+ * Which entities share a device with each of these, rendered by Home Assistant
+ * itself (`POST /api/template`, with its `device_id`, `device_entities` and
+ * `to_json` template functions): the REST states carry no device, and a
+ * purifier's dust and filter sensors are only known to be its own this way.
+ *
+ * Empty when the install will not render it - the entities are then read on
+ * their own, which loses the grouping and nothing else.
+ */
+export async function homeAssistantDevices(
+    home: HomeAssistant,
+    domains: readonly string[]
+): Promise<Map<string, readonly string[]>> {
+    const sources = domains
+        .filter((domain) => /^[a-z_]+$/.test(domain))
+        .map((domain) => `states.${domain} | list`)
+        .join(" + ");
+    if (!sources) return new Map();
+    const template =
+        "{% set ns = namespace(out=[]) %}" +
+        `{% for s in ${sources} %}` +
+        "{% set d = device_id(s.entity_id) %}" +
+        "{% set ns.out = ns.out + [[s.entity_id, (device_entities(d) if d else [])]] %}" +
+        "{% endfor %}{{ ns.out | to_json }}";
+    const response = await call(home, "POST", "/api/template", { template });
+    if (response.status !== 200) return new Map();
+    let rendered: unknown;
+    try {
+        rendered = JSON.parse(response.body.toString("utf8"));
+    } catch {
+        return new Map();
+    }
+    const parsed = z
+        .array(z.tuple([z.string().max(255), z.array(z.string().max(255)).max(200)]))
+        .max(500)
+        .safeParse(rendered);
+    return parsed.success ? new Map(parsed.data) : new Map();
 }
 
 /**
