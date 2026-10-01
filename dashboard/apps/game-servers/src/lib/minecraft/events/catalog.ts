@@ -288,7 +288,11 @@ export const optionsSchemas = {
         }),
     "king-of-the-hill": z.object({
         place: placeSchema.default({ mode: "players" }),
-        radius: z.number().int().min(3).max(20).default(6)
+        radius: z.number().int().min(3).max(20).default(6),
+        /** Played by who joins, brought to it with nothing in their hands - their
+         *  things kept and given back after - where nobody can die, and pushing
+         *  is how the circle is won (`kinds/hill`). */
+        fistsOnly: z.boolean().default(true)
     }),
     "treasure-hunt": z.object({
         chests: z
@@ -755,6 +759,24 @@ export const DEFAULT_REWARDS: Rewards = {
     everyone: { items: [{ id: "minecraft:experience_bottle", count: 8 }], levels: 0 }
 };
 
+/** A king of the hill's length: a few minutes of pushing is plenty. */
+export const HILL_MINUTES = 4;
+
+/**
+ * A king of the hill saved before "fists only" existed, and still on the ten
+ * minutes every event started with then, is read as the shorter length it has
+ * now: ten was nobody's choice, and ten minutes of it was too long. One saved
+ * since carries the option, and keeps whatever length it was given.
+ */
+export function migratePreset(entry: unknown): unknown {
+    if (typeof entry !== "object" || entry === null) return entry;
+    const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
+    if (raw.kind !== "king-of-the-hill" || raw.minutes !== 10) return entry;
+    const options = raw.options;
+    if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
+    return { ...raw, minutes: HILL_MINUTES };
+}
+
 /** A new event of one kind, as the screen adds it. */
 export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].en): EventPreset {
     const options = optionsSchemas[kind].parse({}) as EventOptions<EventKind>;
@@ -768,7 +790,9 @@ export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].e
                 ? 20
                 : kind === "trivia"
                   ? 5
-                  : 10,
+                  : kind === "king-of-the-hill"
+                    ? HILL_MINUTES
+                    : 10,
         minScore: DEFAULT_MIN_SCORE[kind],
         minPlayers: defaultMinPlayers(kind),
         options,
@@ -822,7 +846,7 @@ export function readEventsConfig(
     }
     const value = raw as Record<string, unknown>;
     const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
-        const parsed = presetSchema.safeParse(entry);
+        const parsed = presetSchema.safeParse(migratePreset(entry));
         return parsed.success ? [parsed.data] : [];
     });
     const ids = new Set(presets.map((preset) => preset.id));
@@ -1005,9 +1029,11 @@ export function readyToPlay(run: {
 }): boolean {
     const { preset } = run;
     switch (preset.kind) {
+        case "king-of-the-hill":
+            // With fists only, once everybody is on the hill.
+            return hillFistsOnly(preset) ? run.readyAt !== null : run.place !== null;
         case "supply-drop":
         case "world-boss":
-        case "king-of-the-hill":
         case "waves":
             return run.place !== null;
         case "explorer":
@@ -1081,7 +1107,15 @@ export function playsOnStage(preset: EventPreset): boolean {
 /** Played in an arena built in the sky, by sides - two teams, a plot each - with
  *  a marked kit (`kinds/arena-service.ts`). */
 export function playsInArena(preset: EventPreset): boolean {
-    return preset.kind === "team-duel" || preset.kind === "build-battle";
+    return preset.kind === "team-duel" || preset.kind === "build-battle" || hillFistsOnly(preset);
+}
+
+/** A king of the hill played with fists only: by who joins, in an arena of its own. */
+export function hillFistsOnly(preset: EventPreset): boolean {
+    return (
+        preset.kind === "king-of-the-hill" &&
+        (preset.options as EventOptions<"king-of-the-hill">).fistsOnly
+    );
 }
 
 /**
@@ -1124,5 +1158,6 @@ export function summonsMobs(preset: EventPreset): boolean {
 
 /** The events players fight each other in, which a server with PvP off cannot run. */
 export function needsPvp(preset: EventPreset): boolean {
-    return preset.kind === "team-duel";
+    // Pushing is punching: with PvP off, nobody on the hill could move anybody.
+    return preset.kind === "team-duel" || hillFistsOnly(preset);
 }

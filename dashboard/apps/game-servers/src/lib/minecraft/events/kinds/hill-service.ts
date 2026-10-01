@@ -1,0 +1,271 @@
+/**
+ * Playing a king of the hill: its circle put on the world's own ground, or on a
+ * platform of its own over the sea when there is none (`hill.ts`), then either
+ * walked to by whoever wants it, or - with "fists only" - played by who joined,
+ * brought to it empty-handed and unable to die (`arena-service` brings them in
+ * and sends them back; this plays it).
+ */
+
+import * as hill from "./hill";
+import * as arena from "./arena";
+import * as catalog from "../catalog";
+import * as speech from "../../speech";
+import * as written from "../messages";
+import * as commands from "../commands";
+import * as said from "./hill-messages";
+import type * as stored from "../state";
+import { EventStopped, type KindContext } from "./arena-service";
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
+const hillMessages = speech.spoken(said);
+
+const NO_PLACE = "No dry ground was found for it near the players";
+
+/** Ticks a platform's chunks are waited for before its site is given up. */
+const LOAD_WAITS = 5;
+
+const waits = new Map<string, number>();
+
+function optionsOf(run: stored.EventRun): catalog.EventOptions<"king-of-the-hill"> {
+    return run.preset.options as catalog.EventOptions<"king-of-the-hill">;
+}
+
+/**
+ * The circle's place, over a few ticks: the world's own ground first, clear of
+ * homes and builds; with none, open water, and a platform built over it into
+ * air proven empty. Answers whether it is ready. Throws once nowhere would do.
+ */
+export async function raiseHill(ctx: KindContext): Promise<boolean> {
+    const run = ctx.run;
+    const { radius, place } = optionsOf(run);
+    if (run.place && run.arena) return true;
+    if (!run.overSea) {
+        const found = await ctx.findPlace(place, hill.DISTANCE, radius, "ground", true);
+        if (found === null) return false;
+        if (found !== "failed") {
+            // The world's own ground: nothing built, nothing to take down after.
+            ctx.run = { ...ctx.run, arena: { box: hill.bounds(found, radius), blocks: [] } };
+            await ctx.persist();
+            await announce(ctx, found);
+            return true;
+        }
+        // No untouched ground as wide as the circle - a small island: over the sea.
+        ctx.run = { ...ctx.run, overSea: true, placeTries: 0, target: null, place: null };
+        await ctx.persist();
+        await ctx.server.sayAll([commands.CLEAR_MARK]);
+        return false;
+    }
+    if (!run.place) {
+        const found = await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "open", true);
+        if (found === "failed") throw new EventStopped(NO_PLACE);
+        return false;
+    }
+    return buildPlatform(ctx, run.place, radius);
+}
+
+/**
+ * The platform over the water at `at`, the first air over its surface: the
+ * site held loaded, the air over it counted - anything but air and it is given
+ * up - written down as the event's, then built, only into air. The circle then
+ * stands on it.
+ */
+async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number): Promise<boolean> {
+    const run = ctx.run;
+    const floor = hill.platformBox(at, radius);
+    const proof = hill.proofBox(at, radius);
+    if (proof.y2 > arena.worldTop(await ctx.atLeast([1, 18]))) {
+        await giveUp(ctx, at, "tooHigh");
+        return false;
+    }
+    if (!run.site) {
+        // Written down before it is loaded, so whatever ends the event lets it go.
+        ctx.run = { ...run, site: proof };
+        await ctx.persist();
+        await ctx.server.sayAll([arena.forceloadArea(proof, true)]);
+        return false;
+    }
+    let solid = 0;
+    let loading = false;
+    for (const piece of arena.slices(proof)) {
+        const count = arena.readCount(await ctx.server.say([arena.solidCount(piece)]));
+        if (count === "unloaded") loading = true;
+        else solid += count ?? Number.POSITIVE_INFINITY;
+    }
+    const waited = waits.get(run.id) ?? 0;
+    if (solid === 0 && loading && waited < LOAD_WAITS) {
+        waits.set(run.id, waited + 1);
+        return false;
+    }
+    waits.delete(run.id);
+    if (solid > 0 || loading) {
+        await giveUp(ctx, at, solid > 0 ? "occupied" : "unloaded");
+        return false;
+    }
+    // Ours, written down before a block goes in.
+    const built: stored.Arena = { box: floor, blocks: [hill.PLATFORM_BLOCK] };
+    ctx.run = { ...ctx.run, arena: built };
+    await ctx.persist();
+    await ctx.server.sayAll([arena.fillKeep(floor, hill.PLATFORM_BLOCK)]);
+    const probe = `execute in minecraft:overworld if block ${at.x} ${at.y} ${at.z} ${hill.PLATFORM_BLOCK}`;
+    if (commands.readTest(await ctx.server.say([probe])) !== "passed") {
+        // A protected area refuses blocks without a word.
+        await ctx.server.sayAll(arena.teardown(built));
+        ctx.run = { ...ctx.run, arena: null };
+        await giveUp(ctx, at, "refused");
+        return false;
+    }
+    // The circle stands on it.
+    const top = { ...at, y: at.y + 1 };
+    ctx.run = { ...ctx.run, place: top };
+    await ctx.persist();
+    await announce(ctx, top);
+    return true;
+}
+
+async function giveUp(
+    ctx: KindContext,
+    at: stored.Point,
+    why: Parameters<KindContext["giveUpPlace"]>[1]
+): Promise<void> {
+    if (ctx.run.site) await ctx.server.sayAll([arena.forceloadArea(ctx.run.site, false)]);
+    ctx.run = { ...ctx.run, site: null };
+    await ctx.giveUpPlace(at, why);
+}
+
+async function announce(ctx: KindContext, at: stored.Point): Promise<void> {
+    await ctx.server.sayAll([
+        commands.CLEAR_MARK,
+        commands.say(messages.tag(ctx.language) + messages.circleAt(at.x, at.y, at.z, ctx.language))
+    ]);
+}
+
+/**
+ * The platform taken away, and its site let go: only its block, only inside its
+ * own box. For the king of the hill anybody walks to, from the stored run - so
+ * after a restart too. Played with fists only, the arena's own end does it.
+ */
+export function platformCleanup(run: stored.EventRun): string[] {
+    if (run.preset.kind !== "king-of-the-hill" || catalog.hillFistsOnly(run.preset)) return [];
+    const lines: string[] = [];
+    if (run.arena && run.arena.blocks.length > 0) {
+        lines.push(arena.forceloadArea(run.arena.box, true));
+        lines.push(...arena.teardown(run.arena));
+        lines.push(arena.forceloadArea(run.arena.box, false));
+    }
+    if (run.site) lines.push(arena.forceloadArea(run.site, false));
+    return lines;
+}
+
+/** Everybody told how far the circle is and which way, in their own action bar. */
+async function guide(ctx: KindContext, place: stored.Point, radius: number, lines: string[]): Promise<void> {
+    for (const one of commands.readWhere(await ctx.server.say([commands.IN_OVERWORLD]))) {
+        const away = Math.hypot(one.x - (place.x + 0.5), one.z - (place.z + 0.5));
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                commands.inHill(one, place, radius)
+                    ? messages.hillInside(ctx.language)
+                    : messages.hillGuide(
+                          Math.round(away),
+                          commands.headingTo(one, { x: place.x + 0.5, z: place.z + 0.5 }),
+                          ctx.language
+                      )
+            )
+        );
+    }
+}
+
+/**
+ * One tick of the king of the hill anybody walks to: the circle found, then
+ * drawn, everybody in it given the time, and everybody told the way.
+ */
+export async function walkInTick(ctx: KindContext, seconds: number, lines: string[]): Promise<string | null> {
+    if (!(await raiseHill(ctx))) return null;
+    const place = ctx.run.place!;
+    const { radius } = optionsOf(ctx.run);
+    lines.push(...commands.hillTick(place, radius, seconds));
+    await guide(ctx, place, radius, lines);
+    return null;
+}
+
+/** Where each of them comes in, round the circle. */
+export function entrySpotsFor(run: stored.EventRun): arena.Spot[] {
+    return hill.entrySpots(run.place!, optionsOf(run).radius, run.joined.length);
+}
+
+/** What bringing one of them in says and does, once where they were is kept. */
+export function enterLines(
+    run: stored.EventRun,
+    name: string,
+    index: number,
+    overGround: boolean,
+    language: speech.Speech
+): string[] {
+    const spot = entrySpotsFor(run)[index % Math.max(1, run.joined.length)]!;
+    return [
+        ...hill.enterLines(name, spot, overGround),
+        ...arena.titleTo(name, hillMessages.enterTitle(language), hillMessages.enterSubtitle(language)),
+        arena.tellTo(name, messages.tag(language) + hillMessages.enterLine(language))
+    ];
+}
+
+/**
+ * One tick of the king of the hill played with fists only: nobody can be hurt,
+ * whoever was knocked right off is brought back to the edge, time in the circle
+ * counted for them alone, and the standings kept in the run.
+ */
+export async function fightTick(ctx: KindContext, seconds: number, lines: string[]): Promise<void> {
+    const run = ctx.run;
+    const place = run.place!;
+    const { radius } = optionsOf(run);
+    const spots = entrySpotsFor(run);
+    const room = hill.bounds(place, radius);
+    lines.push(
+        ...hill.protectLines(),
+        ...commands.hillTick(place, radius, seconds, arena.IN_ARENA),
+        ...arena.keepThrown(room),
+        ...commands.hostilesOut(room)
+    );
+    const here = new Map(
+        commands
+            .readWhere(await ctx.server.say([commands.IN_OVERWORLD]))
+            .map((one) => [one.name.toLowerCase(), one])
+    );
+    const overGround = await ctx.atLeast([1, 19, 4]);
+    for (const [index, one] of run.entrants.entries()) {
+        const at = here.get(one.name.toLowerCase());
+        if (!at) continue;
+        if (hill.strayed(at, place, radius)) {
+            const spot = spots[index % spots.length]!;
+            lines.push(
+                ...hill.enterLines(one.name, spot, overGround).filter((line) => line.includes(" tp ")),
+                arena.actionbarTo(one.name, hillMessages.backOnHill(ctx.language))
+            );
+            continue;
+        }
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                commands.inHill(at, place, radius)
+                    ? messages.hillInside(ctx.language)
+                    : messages.hillGuide(
+                          Math.round(Math.hypot(at.x - (place.x + 0.5), at.z - (place.z + 0.5))),
+                          commands.headingTo(at, { x: place.x + 0.5, z: place.z + 0.5 }),
+                          ctx.language
+                      )
+            )
+        );
+    }
+    // The time each has held it, as the side panel counts it, kept in the run for the end.
+    const scores = commands.readScores(await ctx.server.say([commands.READ_SCORES]));
+    const points: Record<string, number> = {};
+    for (const one of run.entrants) {
+        const score = [...scores].find(([name]) => name.toLowerCase() === one.name.toLowerCase())?.[1];
+        if (score !== undefined) points[one.name] = score;
+    }
+    if (JSON.stringify(points) !== JSON.stringify(run.points) && Object.keys(points).length > 0) {
+        ctx.run = { ...ctx.run, points: { ...run.points, ...points } };
+        await ctx.persist();
+    }
+}

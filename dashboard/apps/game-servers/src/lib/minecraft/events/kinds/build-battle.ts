@@ -184,13 +184,15 @@ export function airAt(spot: { x: number; y: number; z: number }, above = 0): str
     return `execute in minecraft:overworld if block ${spot.x} ${spot.y + above} ${spot.z} minecraft:air`;
 }
 
-/** The kit for one builder: the glass, placeable only on the plot and on itself,
- *  and the brush that breaks only it. */
+/** The kit for one builder: the brush that breaks only the kit's glass, then the
+ *  glass, placeable only on the plot and on itself. The brush first, so it lands
+ *  in the first free slot of the hotbar - handed out last, it went to the bag
+ *  behind sixteen stacks of glass, or at the feet of anybody whose bag was full. */
 export function kitCommands(name: string, marker: Marker): string[] {
     const placeOn = [FLOOR, ...KIT_BLOCKS];
     return [
-        ...KIT_BLOCKS.map((id) => giveMarked(name, id, STACK, marker, { placeOn })),
-        giveMarked(name, TOOL, 1, marker, { breaks: KIT_BLOCKS })
+        giveMarked(name, TOOL, 1, marker, { breaks: KIT_BLOCKS }),
+        ...KIT_BLOCKS.map((id) => giveMarked(name, id, STACK, marker, { placeOn }))
     ];
 }
 

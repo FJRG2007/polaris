@@ -3690,7 +3690,10 @@ model EventInventoryStash {
     inventory      String
     // Stringified InventoryItem[] of the slots kept, each stack's data included.
     items          String
-    // Stringified [{x,y,z}]: the two barrels, and the barrier round them.
+    // Stringified {levels, points}: the experience taken, until it is given back.
+    experience     String?
+    // Stringified [{x,y,z}]: a stash kept in barrels before they were in the
+    // database only - the two barrels, and the barrier round them. "[]" since.
     barrels        String
     casing         String    @default("[]")
     // "stashed" | "failed"

@@ -18,6 +18,7 @@ import {
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
+import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];
@@ -80,7 +81,7 @@ export const entrantSchema = z.object({
     /** Carries the arena's tag while in: one who is on without it has been put
      *  back already. False for anybody taken in before the tag was given. */
     tagged: z.boolean().default(false),
-    /** What they carried, kept in barrels until it is given back (`kinds/stash`). */
+    /** What they carried, kept until it is given back (`kinds/stash`). */
     stash: stashSchema.nullable().default(null)
 });
 export type Entrant = z.infer<typeof entrantSchema>;
@@ -109,6 +110,13 @@ export const runSchema = z.object({
     target: z.object({ x: z.number(), z: z.number() }).nullable().default(null),
     /** How many times a place was looked for and not found. */
     placeTries: z.number().int().default(0),
+    /** Where the place was looked for from, and what stopped each try - for the
+     *  history, when nowhere would do (`place-search`). */
+    placeFrom: placeFromSchema.nullable().default(null),
+    placeLog: z.array(placeTrySchema).default([]),
+    /** A king of the hill with no untouched ground for its circle: looking over
+     *  the sea now, for a platform of its own. */
+    overSea: z.boolean().default(false),
     /** How much of a supply drop's position has been told. */
     reveals: z.number().int().default(0),
     /** Trivia: the round being played, from 0. */
@@ -247,7 +255,9 @@ const historySchema = z.object({
     disqualified: z.array(z.string()).default([]),
     /** What each player was handed, and how much of it fell at their feet for
      *  want of room: what `give` answers cannot tell. */
-    delivered: z.array(deliveredSchema).default([])
+    delivered: z.array(deliveredSchema).default([]),
+    /** Where it looked for its place and what stopped it, when nowhere would do. */
+    search: searchSummarySchema.nullable().default(null)
 });
 
 export type EventHistoryEntry = z.infer<typeof historySchema>;
