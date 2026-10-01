@@ -10,6 +10,8 @@
  * runs the search now.
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { withMessages } from "../setup/i18n";
 import type { WhereaboutsView } from "@/lib/storage-whereabouts/follow";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -103,6 +105,31 @@ describe("storage on the network", () => {
             )
         ).toBeTruthy();
         expect(findStorageAgainAction).toHaveBeenCalledWith(ID);
+    });
+
+    it("names the device holding the address when the storage is not found anywhere else", () => {
+        const impostor: WhereaboutsView = {
+            ...unknown,
+            last: {
+                at: "2026-10-01T12:08:00.000Z",
+                outcome: { kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" }
+            }
+        };
+        const { container } = render(withMessages(<NetworkStorageCard storages={[impostor]} />));
+        expect(
+            screen.getByText(
+                "A different device answers at 192.168.1.129 (DESKTOP-7), so its password is not sent there, and it was not found anywhere else on the network."
+            )
+        ).toBeTruthy();
+
+        const evidenceDir = process.env.ENIGMA_GATE_EVIDENCE_DIR;
+        if (evidenceDir) {
+            fs.mkdirSync(evidenceDir, { recursive: true });
+            fs.writeFileSync(
+                path.join(evidenceDir, "network-card-impostor.html"),
+                `<!doctype html><html><head><meta charset="utf-8"><title>impostor outcome - admin uploads card</title></head><body>${container.innerHTML}</body></html>`
+            );
+        }
     });
 
     it("is drawn in Spanish", () => {

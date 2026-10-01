@@ -62,6 +62,10 @@ machine. Change the advertised name with `POLARIS_MDNS_HOSTNAME`. Caddy serves
 these names over plain HTTP (a `.local` name cannot get a public certificate),
 and both are already trusted origins for authentication.
 
+Being on the host network also makes `mdns` the one place Polaris can read the
+host's ARP table, which is how a network storage that changed address is found
+again - see [`../mdns/README.md`](../mdns/README.md#the-hosts-neighbour-table).
+
 ## Configuration
 
 Every setting lives in `.env` (see [`.env.example`](.env.example)). Two values
