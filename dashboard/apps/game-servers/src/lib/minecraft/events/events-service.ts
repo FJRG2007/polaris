@@ -1498,7 +1498,9 @@ async function findPlace(
                 homes,
                 Math.random,
                 look.clearance,
-                how.bearing ?? null
+                // Each its own way while there is room; come in to an island,
+                // whichever way there is ground.
+                loop.run.placeTries < NEAR_AFTER ? (how.bearing ?? null) : null
             );
         }
         if (!point) {
@@ -1515,11 +1517,15 @@ async function findPlace(
     }
     const { x, z } = loop.run.target!;
     const point = await dropMark(server, x, z);
+    // Across the water from where the players are: they live on an island, and
+    // nothing further out will do - the next try comes in at once.
+    const walkable = !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
+    if (!walkable && how.nearHome)
+        loop.run = { ...loop.run, placeTries: Math.max(loop.run.placeTries, NEAR_AFTER - 1) };
     if (
         point &&
         (chosen ||
-            ((!how.walkFrom || (await canWalk(server, how.walkFrom, point))) &&
-                (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground"))))
+            (walkable && (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground"))))
     ) {
         // The marker can come down a block or two from the column tried - an
         // older server spreads it - and so in the next chunk: that chunk is
@@ -1529,7 +1535,7 @@ async function findPlace(
         loop.run = { ...loop.run, place: point, target: { x: point.x, z: point.z } };
         await persist(installedAppId, loop);
         if (moved) await server.sayAll([commands.forceloadRemove(x, z)]);
-        if (how.nearHome && !chosen) loop.placeFloor = Math.min(loop.run.placeTries, NEAR_AFTER + 2);
+        if (how.nearHome && !chosen) loop.placeFloor = Math.min(loop.run.placeTries, PLACE_TRIES - 2);
         return point;
     }
     await server.sayAll([
