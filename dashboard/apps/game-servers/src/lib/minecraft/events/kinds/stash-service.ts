@@ -178,22 +178,28 @@ export type GiveBack =
 export type StashNote = "notGiven" | "experience";
 
 /** The database copy of a stash: each stack whole, the experience, and - once a
- *  give-back has begun - which slots it still owes. */
+ *  give-back has begun - which slots it still owes and which it was writing. */
 async function copyOf(record: string | null): Promise<
     | {
           items: InventoryItem[];
           experience: stash.Experience | null;
           owed: ReadonlySet<number> | null;
+          writing: ReadonlySet<number>;
       }
     | null
     | "unread"
 > {
     if (!record) return null;
-    let row: { items: string; experience: string | null; missing: string | null } | null;
+    let row: {
+        items: string;
+        experience: string | null;
+        missing: string | null;
+        writing: string | null;
+    } | null;
     try {
         row = await prisma.eventInventoryStash.findUnique({
             where: { id: record },
-            select: { items: true, experience: true, missing: true }
+            select: { items: true, experience: true, missing: true, writing: true }
         });
     } catch {
         return "unread";
@@ -202,7 +208,8 @@ async function copyOf(record: string | null): Promise<
     return {
         items: parse<InventoryItem[]>(row.items, []),
         experience: parse<stash.Experience | null>(row.experience, null),
-        owed: row.missing ? new Set(parse<number[]>(row.missing, [])) : null
+        owed: row.missing ? new Set(parse<number[]>(row.missing, [])) : null,
+        writing: new Set(parse<number[]>(row.writing, []))
     };
 }
 
@@ -222,7 +229,8 @@ async function owing(
         where: { id: record },
         data: {
             missing: JSON.stringify(owed.map((one) => one.slot)),
-            experience: experience ? JSON.stringify(experience) : null
+            experience: experience ? JSON.stringify(experience) : null,
+            writing: null
         }
     });
 }
@@ -232,8 +240,10 @@ async function owing(
  * into its own slot when that is empty, through the checked slot write an import
  * uses, and dropped at their feet as theirs when it is not - every one read back
  * and compared before it is let go of. A stack already in its own slot was given
- * back by a give-back that stopped before it wrote so, and is not given again.
- * Then their experience. Saves what is still owed after (null for nothing).
+ * back by a give-back that stopped before it wrote so - when that one had written
+ * down it was writing there - and is not given again. Then their experience,
+ * added to whatever they have earned since. Saves what is still owed after (null
+ * for nothing).
  */
 export async function giveBack(
     server: ServerContainer,
@@ -288,7 +298,9 @@ export async function giveBack(
         const there = at(current.items, one.slot);
         // Never taken - stopped between writing it down and emptying the slot -
         // or given back already by a give-back that stopped before it said so.
-        if (whole(there, item)) given.push(one);
+        // Anywhere else, the same stack there is one of their own since.
+        if (whole(there, item) && (kept.state === "taking" || copy.writing.has(one.slot)))
+            given.push(one);
         else if (there === undefined) toWrite.push({ one, item });
         else toDrop.push({ one, item });
     }
@@ -301,6 +313,11 @@ export async function giveBack(
             toWrite.map((each) => each.item),
             "fill"
         );
+        if (kept.record)
+            await prisma.eventInventoryStash.update({
+                where: { id: kept.record },
+                data: { writing: JSON.stringify(toWrite.map((each) => each.one.slot)) }
+            });
         await applyPlanNow(server, server.installedAppId, name, plan).catch(() => undefined);
         const after = await readLiveInventory(askerOf(server), name);
         if (!after.answered) {
@@ -348,16 +365,14 @@ export async function giveBack(
     }
     const owed = kept.kept.filter((one) => !given.includes(one));
 
-    // Their experience, exactly as it was - set, so a give-back that runs twice
-    // gives it once.
+    // Their experience: set where they still have none, so a give-back that runs
+    // twice gives it once, and added to what they have earned since otherwise -
+    // written down as given the moment it is.
     let experience = kept.experience ?? copy.experience;
-    if (experience) {
-        const now = await experienceOf(server, name);
-        if (now && (now.levels !== experience.levels || now.points !== experience.points))
-            await server.sayAll(stash.setExperience(name, experience));
-        const after = await experienceOf(server, name);
-        if (after && after.levels === experience.levels && after.points === experience.points)
-            experience = null;
+    if (experience && (await experienceBack(server, name, experience, kept.state === "taking"))) {
+        experience = null;
+        await owing(kept.record, owed, null);
+        await save({ ...kept, kept: owed, experience: null });
     }
 
     if (owed.length > 0 || experience) {
@@ -375,6 +390,35 @@ export async function giveBack(
     await removeBarrels(server, kept);
     await save(null);
     return "done";
+}
+
+/** Give back `experience` to `name`: set when they have none - or the stash may
+ *  never have taken it - and added to what they have otherwise. Answers whether
+ *  it is theirs now. */
+async function experienceBack(
+    server: ServerContainer,
+    name: string,
+    experience: stash.Experience,
+    taking: boolean
+): Promise<boolean> {
+    const same = (left: stash.Experience) =>
+        left.levels === experience.levels && left.points === experience.points;
+    const now = await experienceOf(server, name);
+    if (!now) return false;
+    if (same(now)) return true;
+    if (taking || (now.levels === 0 && now.points === 0)) {
+        await server.sayAll(stash.setExperience(name, experience));
+        const after = await experienceOf(server, name);
+        return after !== null && same(after);
+    }
+    await server.sayAll(stash.addExperience(name, experience));
+    const after = await experienceOf(server, name);
+    const levels = now.levels + experience.levels;
+    return (
+        after !== null &&
+        (after.levels > levels ||
+            (after.levels === levels && after.points >= now.points + experience.points))
+    );
 }
 
 /** A stack a command cannot carry, from a stash kept in barrels: copied from its

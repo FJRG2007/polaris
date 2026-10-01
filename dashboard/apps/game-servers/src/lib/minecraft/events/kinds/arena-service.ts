@@ -913,8 +913,11 @@ export async function closeArena(
             // Their own things back only once they are home and down: nothing
             // is given back to a player who could still fall with it.
             const giveBack = async (): Promise<boolean> => {
-                await stashService.settle(server, one.name, (name) => stage.fallProof(name, 5));
+                const down = await stashService.settle(server, one.name, (name) =>
+                    stage.fallProof(name, 5)
+                );
                 if (!one.stash) return true;
+                if (!down) return false;
                 const how = await stashService.giveBack(server, one.name, one.stash, async (kept) => {
                     one = { ...one, stash: kept };
                 });

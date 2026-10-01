@@ -167,6 +167,15 @@ export function setExperience(name: string, experience: Experience): string[] {
     ];
 }
 
+/** Their experience added to: the levels, then the points - which run on into
+ *  the next level as the game counts them. */
+export function addExperience(name: string, experience: Experience): string[] {
+    return [
+        `xp add ${name} ${experience.levels} levels`,
+        `xp add ${name} ${experience.points} points`
+    ];
+}
+
 // ------------------------------------------------------------------ out
 
 /** The tag a stack dropped for somebody carries until it is checked: one per

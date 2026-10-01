@@ -157,6 +157,8 @@ interface World {
     levels: Record<string, number>;
     /** Each player's experience points into their next level. */
     points: Record<string, number>;
+    /** Who is still in the air, with nothing under them. */
+    aloft: string[];
     /** The boss's health, and each player's melee near it since the last look. */
     bossHealth: number;
     raw: Record<string, number>;
@@ -255,6 +257,7 @@ const world: World = {
     room: {},
     levels: {},
     points: {},
+    aloft: [],
     bossHealth: 400,
     raw: {},
     shooters: [],
@@ -1168,6 +1171,12 @@ function answer(sent: string): string {
         world.levels[levels[1]!] = (world.levels[levels[1]!] ?? 0) + Number(levels[2]);
         return `Gave ${levels[2]} experience levels to ${levels[1]}`;
     }
+    const addPoints = /^xp add (\S+) (\d+) points$/.exec(line);
+    if (addPoints) {
+        if (!world.online.includes(addPoints[1]!)) return "No player was found";
+        world.points[addPoints[1]!] = (world.points[addPoints[1]!] ?? 0) + Number(addPoints[2]);
+        return `Gave ${addPoints[2]} experience points to ${addPoints[1]}`;
+    }
     const level = /^xp query (\S+) levels$/.exec(line);
     if (level)
         return world.online.includes(level[1]!)
@@ -1184,9 +1193,9 @@ function answer(sent: string): string {
         (setXp[3] === "levels" ? world.levels : world.points)[setXp[1]!] = Number(setXp[2]);
         return `Set ${setXp[2]} experience ${setXp[3]} on ${setXp[1]}`;
     }
-    // Somebody sent home is on the ground.
-    if (/^execute as \w+ at @s if block ~ ~-0\.2 ~ minecraft:air if block ~ ~-1\.2 ~ minecraft:air$/.test(line))
-        return "Test failed";
+    // Somebody sent home is on the ground, unless still in the air.
+    const airborne = /^execute as (\w+) at @s if block ~ ~-0\.2 ~ minecraft:air if block ~ ~-1\.2 ~ minecraft:air$/.exec(line);
+    if (airborne) return world.aloft.includes(airborne[1]!) ? "Test passed" : "Test failed";
     if (line === "data get entity @e[tag=pe_boss,limit=1] Health")
         return world.bossAlive
             ? `Wither Skeleton has the following entity data: ${world.bossHealth}.0f`
@@ -5435,6 +5444,7 @@ describe("players' own things through an arena", () => {
             [0, { ...ana.get(0)! }],
             [103, { ...ana.get(103)! }]
         ]);
+        stashRows.get(kept.record!)!.writing = JSON.stringify(kept.kept.map((one) => one.slot));
         const stashService = await import(
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
@@ -5444,6 +5454,65 @@ describe("players' own things through an arena", () => {
         expect(world.drops.size).toBe(0);
         const writes = world.sent.slice(from).filter((line) => /^item replace entity Ana (hotbar\.0|armor\.head) with/.test(line));
         expect(writes).toEqual([]);
+    });
+
+    it("does not take a stack of their own since for the one kept, however alike", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        // The same stack again in the same slot, of their own since: nothing was
+        // ever written there by a give-back.
+        world.inv.Ana = new Map([[0, { ...ana.get(0)! }]]);
+        world.pickUp = true;
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
+        expect([...world.inv.Ana!.values()].filter((stack) => stack.id === ana.get(0)!.id)).toHaveLength(2);
+    });
+
+    it("adds their experience to what they earned since, and never sets it over it", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        world.levels = { Ana: 12 };
+        world.points = { Ana: 7 };
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        expect(kept.experience).toEqual({ levels: 12, points: 7 });
+        // A prize delivered before the give-back.
+        world.levels.Ana = 5;
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        const from = world.sent.length;
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
+        expect(world.levels.Ana).toBe(17);
+        expect(world.points.Ana).toBe(7);
+        expect(world.sent.slice(from).some((line) => line.startsWith("xp set Ana"))).toBe(false);
+    });
+
+    it("gives nothing back to somebody still falling, and gives it once they are down", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        world.aloft = ["Ana"];
+        await play(3 * 60_000 + 30_000);
+        expect(state().run).toBeNull();
+        expect(world.inv.Ana!.size).toBe(0);
+        expect(state().arenaLeftovers.flatMap((one) => one.entrants.map((e) => e.name))).toContain("Ana");
+        expect(stashRows.size).toBe(1);
+        // Down: the sweep gives it all back.
+        world.aloft = [];
+        await events.sweepEvents();
+        expect(world.inv.Ana).toEqual(ana);
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(stashRows.size).toBe(0);
     });
 
     it("gives worn armor back into the armor slots, checked", async () => {
@@ -5607,8 +5676,8 @@ describe("a king of the hill", () => {
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(2_100);
         // Nobody can die: Resistance V, and hunger never gets there.
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 3 4 true");
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:saturation 3 0 true");
+        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 4 true");
+        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:saturation 10 0 true");
         // Only those it brought score.
         expect(world.sent.some((line) => line.includes("gamemode=!spectator,tag=pe_arena] run scoreboard players add @s pe_score 2"))).toBe(true);
         // Knocked off, far down: brought back to the edge.

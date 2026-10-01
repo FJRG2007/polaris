@@ -469,8 +469,11 @@ async function returnOne(
     // Their own things back only once they are home and down: nothing is given
     // back to a player who could still fall with it.
     const giveBack = async (): Promise<boolean> => {
-        await stashService.settle(server, saved.name, (name) => stage.fallProof(name, 5));
+        const down = await stashService.settle(server, saved.name, (name) =>
+            stage.fallProof(name, 5)
+        );
         if (!saved.stash) return true;
+        if (!down) return false;
         const how = await stashService.giveBack(server, saved.name, saved.stash, keep);
         return how === "done" || how === "failed";
     };

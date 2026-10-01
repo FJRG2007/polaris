@@ -47,10 +47,10 @@ describe("a king of the hill's platform", () => {
 
     it("keeps everybody it brought from harm, and nobody else", () => {
         const lines = hill.protectLines();
-        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:resistance 3 4 true");
-        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:fire_resistance 3 0 true");
-        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:water_breathing 3 0 true");
-        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:saturation 3 0 true");
+        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 4 true");
+        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:fire_resistance 10 0 true");
+        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:water_breathing 10 0 true");
+        expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:saturation 10 0 true");
         expect(lines.every((line) => line.includes("@a[tag=pe_arena]"))).toBe(true);
     });
 });

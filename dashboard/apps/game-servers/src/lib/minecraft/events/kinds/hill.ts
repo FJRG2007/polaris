@@ -129,9 +129,9 @@ export function strayed(at: { x: number; y: number; z: number }, place: Point, r
 export function protectLines(): string[] {
     const who = `@a[tag=${IN_ARENA}]`;
     return [
-        `effect give ${who} minecraft:resistance 3 4 true`,
-        `effect give ${who} minecraft:fire_resistance 3 0 true`,
-        `effect give ${who} minecraft:water_breathing 3 0 true`,
-        `effect give ${who} minecraft:saturation 3 0 true`
+        `effect give ${who} minecraft:resistance 10 4 true`,
+        `effect give ${who} minecraft:fire_resistance 10 0 true`,
+        `effect give ${who} minecraft:water_breathing 10 0 true`,
+        `effect give ${who} minecraft:saturation 10 0 true`
     ];
 }
